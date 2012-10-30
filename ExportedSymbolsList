@@ -1,0 +1,11 @@
+{
+    global:
+        begin;
+        end;
+        execv;
+        execve;
+        execvp;
+        execvpe;
+    local:
+        *;
+};
