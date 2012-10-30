@@ -7,7 +7,7 @@ project(buildspy)
 set(ourlib_target buildspy)
 set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
 
-add_library(${ourlib_target} SHARED buildspy.c)
+add_library(${ourlib_target} SHARED execs.c writter.c)
 
 set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE C)
