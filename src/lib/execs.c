@@ -1,6 +1,4 @@
-// Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
-
-#define _GNU_SOURCE
+// This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include <sys/types.h>
 #include <sys/stat.h>
