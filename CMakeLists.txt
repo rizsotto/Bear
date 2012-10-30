@@ -12,10 +12,6 @@ add_library(${ourlib_target} SHARED buildspy.c)
 set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE C)
 set_target_properties(${ourlib_target} PROPERTIES
-    SOVERSION 0.1)
-set_target_properties(${ourlib_target} PROPERTIES
-    PREFIX "lib")
-set_target_properties(${ourlib_target} PROPERTIES
     COMPILE_FLAGS -nostdlib)
 set_target_properties(${ourlib_target} PROPERTIES
     LINK_FLAGS "-Wl,--version-script=${ourlib_symbols}")
