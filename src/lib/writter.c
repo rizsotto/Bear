@@ -103,9 +103,13 @@ void report_call(const char *method, char const * const argv[]) {
     // get current working dir
     static char buffer[4096];
     char const * const cwd = getcwd(buffer, sizeof(buffer));
+    // get output file name
+    char * const out = getenv("BEAR_OUTPUT");
     // call the real dumper
-    int fd = open("/tmp/test.out", O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
-    write_call_info(fd, argv, cwd);
-    close(fd);
+    if (out) {
+        int fd = open(out, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
+        write_call_info(fd, argv, cwd);
+        close(fd);
+    }
 }
 

@@ -1,6 +1,6 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
-set(ourlib_target bear)
+set(ourlib_target ear)
 set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
 
 add_library(${ourlib_target} SHARED execs.c writter.c)
