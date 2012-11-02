@@ -9,6 +9,11 @@
 #include <sys/wait.h>
 
 
+// Stringify environment variables
+#define XSTR(s) STR(s)
+#define STR(s) #s
+
+
 static void usage(char const * const name) {
     fprintf(stderr, "Usage: %s [-o output] [-b libear] -- command\n", name);
     exit(EXIT_FAILURE);
@@ -20,8 +25,8 @@ static void runtime_error(char const * const msg) {
 }
 
 int main(int argc, char * const argv[]) {
-    char const * libear_path = 0;
-    char const * output_file = 0; // FIXME: get default value
+    char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
+    char const * output_file = 0;
     char * const * unprocessed_argv = 0;
     pid_t pid;
     int status;
