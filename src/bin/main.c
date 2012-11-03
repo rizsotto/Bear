@@ -14,16 +14,19 @@
 #define STR(s) #s
 
 
+static void usage(char const * const name)  __attribute__ ((noreturn));
 static void usage(char const * const name) {
     fprintf(stderr, "Usage: %s [-o output] [-b libear] -- command\n", name);
     exit(EXIT_FAILURE);
 }
 
+static void runtime_error(char const * const msg) __attribute__ ((noreturn));
 static void runtime_error(char const * const msg) {
     fprintf(stderr, "%s, error %d\n", msg, errno);
     exit(EXIT_FAILURE);
 }
 
+int main(int argc, char * const argv[]);
 int main(int argc, char * const argv[]) {
     char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
     char const * output_file = 0;
