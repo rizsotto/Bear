@@ -1,11 +1,15 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <malloc.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 // basic data structure is a buffer
 struct Buffer {
@@ -107,9 +111,19 @@ void report_call(const char *method, char const * const argv[]) {
     char * const out = getenv("BEAR_OUTPUT");
     // call the real dumper
     if (out) {
-        int fd = open(out, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
-        write_call_info(fd, argv, cwd);
-        close(fd);
+        int s = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (-1 == s) {
+            return;
+        }
+        struct sockaddr_un remote;
+        remote.sun_family = AF_UNIX;
+        strncpy(remote.sun_path, out, sizeof(remote.sun_path) - 1);
+        if (-1 == connect(s, (struct sockaddr *)&remote, sizeof(struct sockaddr_un))) {
+            close(s);
+            return;
+        }
+        write_call_info(s, argv, cwd);
+        close(s);
     }
 }
 
