@@ -11,112 +11,19 @@
 #include <fcntl.h>
 #include <signal.h>
 
-
 // Stringify environment variables
 #define XSTR(s) STR(s)
 #define STR(s) #s
-
-
-static void usage(char const * const name)  __attribute__ ((noreturn));
-static void usage(char const * const name) {
-    fprintf(stderr,
-            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
-            "\n"
-            "   -b libear   libear.so location (default: %s)\n"
-            "   -d socket   multiplexing socket (default: %s)\n",
-            name,
-            XSTR(LIBEAR_INSTALL_DIR),
-            XSTR(DEFAULT_SOCKET_FILE));
-    exit(EXIT_FAILURE);
-}
 
 static pid_t    child_pid;
 static int      child_status = EXIT_FAILURE;
 
 static sigset_t signal_mask;
 
+static void usage(char const * const name)  __attribute__ ((noreturn));
+static void handler(int signum);
+static int collect(char const * socket_file, char const * output_file);
 
-static void handler(int signum) {
-    switch (signum) {
-    case SIGCHLD: {
-        int status;
-        while (0 > waitpid(WAIT_ANY, &status, WNOHANG)) ;
-        child_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-        break;
-        }
-    case SIGINT:
-        kill(child_pid, signum);
-    default:
-        break;
-    }
-}
-
-static void copy(int in, int out) {
-    size_t const buffer_size = 1024;
-    char buffer[buffer_size];
-    for (;;) {
-        int current_read = read(in, &buffer, buffer_size);
-        if (-1 == current_read) {
-            perror("read");
-            exit(EXIT_FAILURE);
-        }
-        int current_write = write(out, &buffer, current_read);
-        if (-1 == current_write) {
-            perror("write");
-            exit(EXIT_FAILURE);
-        }
-        if (buffer_size > current_read) {
-            break;
-        }
-    }
-}
-
-static int collect(char const * socket_file, char const * output_file) {
-    // open the output file
-    int output_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
-    if (-1 == output_fd) {
-        perror("open");
-        exit(EXIT_FAILURE);
-    }
-    // set up socket
-    struct sockaddr_un local;
-    int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (-1 == listen_sock) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
-    memset(&local, 0, sizeof(struct sockaddr_un));
-    local.sun_family = AF_UNIX;
-    strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
-    if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
-    if (-1 == listen(listen_sock, 0)) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-    // enable signals for accept loop
-    if (-1 == sigprocmask(SIG_UNBLOCK, &signal_mask, 0)) {
-        perror("sigprocmask");
-        exit(EXIT_FAILURE);
-    }
-    // do the job
-    int conn_sock;
-    while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
-        copy(conn_sock, output_fd);
-        close(conn_sock);
-    }
-    // skip errors during shutdown
-    close(output_fd);
-    close(listen_sock);
-    unlink(socket_file);
-    return child_status;
-}
 
 int main(int argc, char * const argv[]) {
     char const * socket_file = XSTR(DEFAULT_SOCKET_FILE);
@@ -190,5 +97,101 @@ int main(int argc, char * const argv[]) {
     }
     // never gets here
     return 0;
+}
+
+static void copy(int in, int out);
+
+static int collect(char const * socket_file, char const * output_file) {
+    // open the output file
+    int output_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
+    if (-1 == output_fd) {
+        perror("open");
+        exit(EXIT_FAILURE);
+    }
+    // set up socket
+    struct sockaddr_un local;
+    int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (-1 == listen_sock) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+    memset(&local, 0, sizeof(struct sockaddr_un));
+    local.sun_family = AF_UNIX;
+    strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
+    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
+    if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+    if (-1 == listen(listen_sock, 0)) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    // enable signals for accept loop
+    if (-1 == sigprocmask(SIG_UNBLOCK, &signal_mask, 0)) {
+        perror("sigprocmask");
+        exit(EXIT_FAILURE);
+    }
+    // do the job
+    int conn_sock;
+    while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
+        copy(conn_sock, output_fd);
+        close(conn_sock);
+    }
+    // skip errors during shutdown
+    close(output_fd);
+    close(listen_sock);
+    unlink(socket_file);
+    return child_status;
+}
+
+static void copy(int in, int out) {
+    size_t const buffer_size = 1024;
+    char buffer[buffer_size];
+    for (;;) {
+        int current_read = read(in, &buffer, buffer_size);
+        if (-1 == current_read) {
+            perror("read");
+            exit(EXIT_FAILURE);
+        }
+        int current_write = write(out, &buffer, current_read);
+        if (-1 == current_write) {
+            perror("write");
+            exit(EXIT_FAILURE);
+        }
+        if (buffer_size > current_read) {
+            break;
+        }
+    }
+}
+
+static void handler(int signum) {
+    switch (signum) {
+    case SIGCHLD: {
+        int status;
+        while (0 > waitpid(WAIT_ANY, &status, WNOHANG)) ;
+        child_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+        break;
+        }
+    case SIGINT:
+        kill(child_pid, signum);
+    default:
+        break;
+    }
+}
+
+static void usage(char const * const name) {
+    fprintf(stderr,
+            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
+            "\n"
+            "   -b libear   libear.so location (default: %s)\n"
+            "   -d socket   multiplexing socket (default: %s)\n",
+            name,
+            XSTR(LIBEAR_INSTALL_DIR),
+            XSTR(DEFAULT_SOCKET_FILE));
+    exit(EXIT_FAILURE);
 }
 
