@@ -6,11 +6,8 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <sys/signalfd.h>
-#include <sys/epoll.h>
 #include <fcntl.h>
 #include <signal.h>
 
@@ -19,14 +16,30 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
-
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void usage(char const * const name) {
     fprintf(stderr, "Usage: %s [-o output] [-b libear] [-d socket]-- command\n", name);
     exit(EXIT_FAILURE);
 }
 
-static void copy(int in, int out);
+static pid_t    child_pid;
+static int      child_status;
+
+static void handler(int signum) {
+    switch (signum) {
+    case SIGCHLD: {
+        int status;
+        while (0 > waitpid(WAIT_ANY, &status, WNOHANG)) ;
+        child_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+        break;
+        }
+    case SIGINT:
+        kill(child_pid, signum);
+    default:
+        break;
+    }
+}
+
 static void copy(int in, int out) {
     size_t const buffer_size = 1024;
     char buffer[buffer_size];
@@ -47,125 +60,50 @@ static void copy(int in, int out) {
     }
 }
 
-static int setup_sigchld_fd();
-static int setup_sigchld_fd() {
-    int result;
-    sigset_t mask;
-    sigfillset(&mask);
-    sigdelset(&mask, SIGINT);
-
-    result = signalfd(-1, &mask, 0);
-    if (-1 == result) {
-        perror("signalfd");
+static int collect_and_dump(char const * socket_file, char const * output_file) {
+    // open the output file
+    int output_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
+    if (-1 == output_fd) {
+        perror("open");
         exit(EXIT_FAILURE);
     }
-    fcntl(result, F_SETFL, fcntl(result, F_GETFL, 0) | O_NONBLOCK);
-    return result;
-}
-
-static int setup_socket(char const * socket_file);
-static int setup_socket(char const * socket_file) {
+    // set up socket
     struct sockaddr_un local;
-    int socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (-1 == socket_fd) {
+    int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (-1 == listen_sock) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
     memset(&local, 0, sizeof(struct sockaddr_un));
     local.sun_family = AF_UNIX;
     strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    if (-1 == bind(socket_fd, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
+    unlink(socket_file);
+    if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
-    if (-1 == listen(socket_fd, 0)) {
+    if (-1 == listen(listen_sock, 0)) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    return socket_fd;
-}
-
-static int loop(int listen_sock, int sigchld_fd, int output_fd);
-static int loop(int listen_sock, int sigchld_fd, int output_fd) {
-    #define MAX_EVENTS 10
-    struct epoll_event ev, events[MAX_EVENTS];
-    int conn_sock, nfds, epollfd;
-    int n;
-
-    sigset_t mask;
-    sigfillset(&mask);
-    sigdelset(&mask, SIGINT);
-
-    epollfd = epoll_create(2);
-    if (-1 == epollfd) {
-        perror("epoll_create");
-        exit(EXIT_FAILURE);
+    // do the copying if anyone connected, but can be interapted by signal
+    int conn_sock;
+    while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
+        copy(conn_sock, output_fd);
+        close(conn_sock);
     }
-
-    memset(&ev, 0, sizeof(ev));
-    ev.events = EPOLLIN;
-    ev.data.fd = listen_sock;
-    if (-1 == epoll_ctl(epollfd, EPOLL_CTL_ADD, listen_sock, &ev)) {
-        perror("epoll_ctl: listen_sock");
-        exit(EXIT_FAILURE);
-    }
-
-    memset(&ev, 0, sizeof(ev));
-    ev.events = EPOLLIN;
-    ev.data.fd = sigchld_fd;
-    if (-1 == epoll_ctl(epollfd, EPOLL_CTL_ADD, sigchld_fd, &ev)) {
-        perror("epoll_ctl: sigchld_fd");
-        exit(EXIT_FAILURE);
-    }
-
-    for (;;) {
-        nfds = epoll_pwait(epollfd, events, MAX_EVENTS, -1, &mask);
-        if (-1 == nfds) {
-            perror("epoll_pwait");
-            exit(EXIT_FAILURE);
-        }
-
-        for (n = 0; n < nfds; ++n) {
-            if (events[n].data.fd == listen_sock) {
-                int conn_sock = accept(listen_sock, 0, 0);
-                if (-1 == conn_sock) {
-                    perror("accept");
-                    exit(EXIT_FAILURE);
-                }
-                copy(conn_sock, output_fd);
-                close(conn_sock);
-            } else if (events[n].data.fd == sigchld_fd) {
-                int status;
-                pid_t pid = waitpid(-1, &status, WNOHANG);
-                return WIFEXITED(status) ? WEXITSTATUS(status) : 0;
-            }
-        }
-    }
-}
-
-static int collect_and_dump(char const * socket_file, char const * output_file);
-static int collect_and_dump(char const * socket_file, char const * output_file) {
-    unlink(socket_file);
-    int socket_fd = setup_socket(socket_file);
-    int sigchld_fd = setup_sigchld_fd();
-    int out_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
-    // call dispatch method
-    int result = loop(socket_fd, sigchld_fd, out_fd);
     // shutdown
-    close(out_fd);
-    close(socket_fd);
-    close(sigchld_fd);
+    close(output_fd);
+    close(listen_sock);
     unlink(socket_file);
-    return result;
+    return child_status;
 }
 
-int main(int argc, char * const argv[]);
 int main(int argc, char * const argv[]) {
     char const * socket_file = "/tmp/bear.socket";
     char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
     char const * output_file = 0;
     char * const * unprocessed_argv = 0;
-    pid_t pid;
     // parse command line arguments.
     int flags, opt;
     while ((opt = getopt(argc, argv, "o:b:d:")) != -1) {
@@ -188,12 +126,12 @@ int main(int argc, char * const argv[]) {
     }
     unprocessed_argv = &(argv[optind]);
     // fork
-    pid = fork();
-    if (-1 == pid) {
+    child_pid = fork();
+    if (-1 == child_pid) {
         perror("fork");
         exit(EXIT_FAILURE);
     }
-    if (0 == pid) {
+    if (0 == child_pid) {
         // child process
         if (-1 == setenv("LD_PRELOAD", libear_path, 1)) {
             perror("setenv");
@@ -209,6 +147,19 @@ int main(int argc, char * const argv[]) {
         }
     } else {
         // parent process
+        struct sigaction action, old_action;
+        sigfillset(&action.sa_mask);
+        action.sa_handler = handler;
+        action.sa_flags = 0;
+        if (-1 == sigaction(SIGCHLD,&action,&old_action)) {
+            perror( "sigaction");
+            exit(EXIT_FAILURE);
+        }
+        if (-1 == sigaction(SIGINT,&action,&old_action)) {
+            perror( "sigaction");
+            exit(EXIT_FAILURE);
+        }
+        // dealing with socket
         return collect_and_dump(socket_file, output_file);
     }
     // never gets here
