@@ -16,9 +16,17 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void usage(char const * const name) {
-    fprintf(stderr, "Usage: %s [-o output] [-b libear] [-d socket]-- command\n", name);
+    fprintf(stderr,
+            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
+            "\n"
+            "   -b libear   libear.so location (default: %s)\n"
+            "   -d socket   multiplexing socket (default: %s)\n",
+            name,
+            XSTR(LIBEAR_INSTALL_DIR),
+            XSTR(DEFAULT_SOCKET_FILE));
     exit(EXIT_FAILURE);
 }
 
@@ -111,7 +119,7 @@ static int collect(char const * socket_file, char const * output_file) {
 }
 
 int main(int argc, char * const argv[]) {
-    char const * socket_file = "/tmp/bear.socket";
+    char const * socket_file = XSTR(DEFAULT_SOCKET_FILE);
     char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
     char const * output_file = 0;
     char * const * unprocessed_argv = 0;
