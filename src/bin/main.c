@@ -15,13 +15,14 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+// variables which are used in signal handler
 static pid_t    child_pid;
 static int      child_status = EXIT_FAILURE;
 
-static sigset_t signal_mask;
 
 static void usage(char const * const name)  __attribute__ ((noreturn));
-static void handler(int signum);
+static void mask_all_signals(int command);
+static void install_signal_handler(int signum);
 static int collect(char const * socket_file, char const * output_file);
 
 
@@ -73,25 +74,10 @@ int main(int argc, char * const argv[]) {
         }
     } else {
         // parent process
-        // block all signals until we reach the blocking accept
-        sigfillset(&signal_mask);
-        if (-1 == sigprocmask(SIG_BLOCK, &signal_mask, 0)) {
-            perror("sigprocmask");
-            exit(EXIT_FAILURE);
-        }
+        mask_all_signals(SIG_BLOCK);
         // install signal handlers
-        struct sigaction action, old_action;
-        action.sa_mask = signal_mask;
-        action.sa_handler = handler;
-        action.sa_flags = 0;
-        if (-1 == sigaction(SIGCHLD,&action,&old_action)) {
-            perror( "sigaction");
-            exit(EXIT_FAILURE);
-        }
-        if (-1 == sigaction(SIGINT,&action,&old_action)) {
-            perror( "sigaction");
-            exit(EXIT_FAILURE);
-        }
+        install_signal_handler(SIGCHLD);
+        install_signal_handler(SIGINT);
         // go for the data
         return collect(socket_file, output_file);
     }
@@ -108,6 +94,11 @@ static int collect(char const * socket_file, char const * output_file) {
         perror("open");
         exit(EXIT_FAILURE);
     }
+    // remove old socket file if any
+    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
     // set up socket
     struct sockaddr_un local;
     int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -118,10 +109,6 @@ static int collect(char const * socket_file, char const * output_file) {
     memset(&local, 0, sizeof(struct sockaddr_un));
     local.sun_family = AF_UNIX;
     strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
-        perror("unlink");
-        exit(EXIT_FAILURE);
-    }
     if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
         perror("bind");
         exit(EXIT_FAILURE);
@@ -131,10 +118,7 @@ static int collect(char const * socket_file, char const * output_file) {
         exit(EXIT_FAILURE);
     }
     // enable signals for accept loop
-    if (-1 == sigprocmask(SIG_UNBLOCK, &signal_mask, 0)) {
-        perror("sigprocmask");
-        exit(EXIT_FAILURE);
-    }
+    mask_all_signals(SIG_UNBLOCK);
     // do the job
     int conn_sock;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
@@ -149,6 +133,7 @@ static int collect(char const * socket_file, char const * output_file) {
 }
 
 static void copy(int in, int out) {
+    mask_all_signals(SIG_BLOCK);
     size_t const buffer_size = 1024;
     char buffer[buffer_size];
     for (;;) {
@@ -166,6 +151,7 @@ static void copy(int in, int out) {
             break;
         }
     }
+    mask_all_signals(SIG_UNBLOCK);
 }
 
 static void handler(int signum) {
@@ -180,6 +166,26 @@ static void handler(int signum) {
         kill(child_pid, signum);
     default:
         break;
+    }
+}
+
+static void install_signal_handler(int signum) {
+    struct sigaction action, old_action;
+    sigemptyset(&action.sa_mask);
+    action.sa_handler = handler;
+    action.sa_flags = 0;
+    if (-1 == sigaction(signum, &action, &old_action)) {
+        perror( "sigaction");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void mask_all_signals(int command) {
+    sigset_t signal_mask;
+    sigfillset(&signal_mask);
+    if (-1 == sigprocmask(command, &signal_mask, 0)) {
+        perror("sigprocmask");
+        exit(EXIT_FAILURE);
     }
 }
 
