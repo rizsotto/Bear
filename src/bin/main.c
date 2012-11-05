@@ -23,7 +23,7 @@ static int      child_status = EXIT_FAILURE;
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static int collect(char const * socket_file, char const * output_file);
+static void collect(char const * socket_file, char const * output_file);
 
 
 int main(int argc, char * const argv[]) {
@@ -48,6 +48,7 @@ int main(int argc, char * const argv[]) {
             usage(argv[0]);
         }
     }
+    // validate
     if ((argc == optind) || (0 == output_file)) {
         usage(argv[0]);
     }
@@ -57,8 +58,7 @@ int main(int argc, char * const argv[]) {
     if (-1 == child_pid) {
         perror("fork");
         exit(EXIT_FAILURE);
-    }
-    if (0 == child_pid) {
+    } else if (0 == child_pid) {
         // child process
         if (-1 == setenv("LD_PRELOAD", libear_path, 1)) {
             perror("setenv");
@@ -74,22 +74,20 @@ int main(int argc, char * const argv[]) {
         }
     } else {
         // parent process
-        mask_all_signals(SIG_BLOCK);
-        // install signal handlers
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
         // go for the data
-        return collect(socket_file, output_file);
+        collect(socket_file, output_file);
     }
-    // never gets here
-    return 0;
+    return child_status;
 }
 
 static void copy(int in, int out);
 
-static int collect(char const * socket_file, char const * output_file) {
+static void collect(char const * socket_file, char const * output_file) {
+    mask_all_signals(SIG_BLOCK);
     // open the output file
-    int output_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
+    int output_fd = open(output_file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (-1 == output_fd) {
         perror("open");
         exit(EXIT_FAILURE);
@@ -117,23 +115,22 @@ static int collect(char const * socket_file, char const * output_file) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    // enable signals for accept loop
-    mask_all_signals(SIG_UNBLOCK);
     // do the job
+    mask_all_signals(SIG_UNBLOCK);
     int conn_sock;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
+        mask_all_signals(SIG_BLOCK);
         copy(conn_sock, output_fd);
         close(conn_sock);
+        mask_all_signals(SIG_UNBLOCK);
     }
     // skip errors during shutdown
     close(output_fd);
     close(listen_sock);
     unlink(socket_file);
-    return child_status;
 }
 
 static void copy(int in, int out) {
-    mask_all_signals(SIG_BLOCK);
     size_t const buffer_size = 1024;
     char buffer[buffer_size];
     for (;;) {
@@ -151,7 +148,6 @@ static void copy(int in, int out) {
             break;
         }
     }
-    mask_all_signals(SIG_UNBLOCK);
 }
 
 static void handler(int signum) {
