@@ -23,7 +23,10 @@ static void usage(char const * const name) {
 }
 
 static pid_t    child_pid;
-static int      child_status;
+static int      child_status = EXIT_FAILURE;
+
+static sigset_t signal_mask;
+
 
 static void handler(int signum) {
     switch (signum) {
@@ -60,7 +63,7 @@ static void copy(int in, int out) {
     }
 }
 
-static int collect_and_dump(char const * socket_file, char const * output_file) {
+static int collect(char const * socket_file, char const * output_file) {
     // open the output file
     int output_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
     if (-1 == output_fd) {
@@ -77,7 +80,10 @@ static int collect_and_dump(char const * socket_file, char const * output_file) 
     memset(&local, 0, sizeof(struct sockaddr_un));
     local.sun_family = AF_UNIX;
     strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    unlink(socket_file);
+    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
+        perror("unlink");
+        exit(EXIT_FAILURE);
+    }
     if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
         perror("bind");
         exit(EXIT_FAILURE);
@@ -86,13 +92,18 @@ static int collect_and_dump(char const * socket_file, char const * output_file) 
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    // do the copying if anyone connected, but can be interapted by signal
+    // enable signals for accept loop
+    if (-1 == sigprocmask(SIG_UNBLOCK, &signal_mask, 0)) {
+        perror("sigprocmask");
+        exit(EXIT_FAILURE);
+    }
+    // do the job
     int conn_sock;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         copy(conn_sock, output_fd);
         close(conn_sock);
     }
-    // shutdown
+    // skip errors during shutdown
     close(output_fd);
     close(listen_sock);
     unlink(socket_file);
@@ -147,8 +158,15 @@ int main(int argc, char * const argv[]) {
         }
     } else {
         // parent process
+        // block all signals until we reach the blocking accept
+        sigfillset(&signal_mask);
+        if (-1 == sigprocmask(SIG_BLOCK, &signal_mask, 0)) {
+            perror("sigprocmask");
+            exit(EXIT_FAILURE);
+        }
+        // install signal handlers
         struct sigaction action, old_action;
-        sigfillset(&action.sa_mask);
+        action.sa_mask = signal_mask;
         action.sa_handler = handler;
         action.sa_flags = 0;
         if (-1 == sigaction(SIGCHLD,&action,&old_action)) {
@@ -159,8 +177,8 @@ int main(int argc, char * const argv[]) {
             perror( "sigaction");
             exit(EXIT_FAILURE);
         }
-        // dealing with socket
-        return collect_and_dump(socket_file, output_file);
+        // go for the data
+        return collect(socket_file, output_file);
     }
     // never gets here
     return 0;
