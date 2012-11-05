@@ -74,7 +74,6 @@ static int setup_socket(char const * socket_file) {
     memset(&local, 0, sizeof(struct sockaddr_un));
     local.sun_family = AF_UNIX;
     strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    unlink(local.sun_path);
     if (-1 == bind(socket_fd, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
         perror("bind");
         exit(EXIT_FAILURE);
@@ -146,6 +145,7 @@ static int loop(int listen_sock, int sigchld_fd, int output_fd) {
 
 static int collect_and_dump(char const * socket_file, char const * output_file);
 static int collect_and_dump(char const * socket_file, char const * output_file) {
+    unlink(socket_file);
     int socket_fd = setup_socket(socket_file);
     int sigchld_fd = setup_sigchld_fd();
     int out_fd = open(output_file, O_CREAT|O_APPEND|O_RDWR, S_IRUSR|S_IWUSR);
@@ -155,18 +155,17 @@ static int collect_and_dump(char const * socket_file, char const * output_file) 
     close(out_fd);
     close(socket_fd);
     close(sigchld_fd);
+    unlink(socket_file);
     return result;
 }
 
 int main(int argc, char * const argv[]);
 int main(int argc, char * const argv[]) {
+    char const * socket_file = "/tmp/bear.socket";
     char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
     char const * output_file = 0;
     char * const * unprocessed_argv = 0;
-    char * socket_file = "/tmp/bear_socket_XXXXXX";
     pid_t pid;
-    // make a unique default socket
-//char * socket_file = mktemp(socket_pattern);
     // parse command line arguments.
     int flags, opt;
     while ((opt = getopt(argc, argv, "o:b:d:")) != -1) {
