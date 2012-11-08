@@ -103,10 +103,9 @@ static void write_call_info(int fd, char const * const argv[], char const *cwd) 
     buffer_free(&b);
 }
 
-void report_call(const char *method, char const * const argv[]) {
+void report_call(char const *method, char * const argv[]) {
     // get current working dir
-    static char buffer[4096];
-    char const * const cwd = getcwd(buffer, sizeof(buffer));
+    char const * const cwd = get_current_dir_name();
     // get output file name
     char * const out = getenv("BEAR_OUTPUT");
     // call the real dumper
@@ -122,8 +121,9 @@ void report_call(const char *method, char const * const argv[]) {
             close(s);
             return;
         }
-        write_call_info(s, argv, cwd);
+        write_call_info(s, (char const * const *)argv, cwd);
         close(s);
     }
+    free((void *)cwd);
 }
 

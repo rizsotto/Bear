@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 
 
-void report_call(const char *method, char const * const argv[]);
+void report_call(char const * method, char * const argv[]);
 
 
 int execv(const char *path, char *const argv[]) {
