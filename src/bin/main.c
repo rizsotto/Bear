@@ -4,7 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -23,11 +25,12 @@
 static pid_t    child_pid;
 static int      child_status = EXIT_FAILURE;
 
-
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect(char const * socket_file, char const * output_file);
+
+void copy(int in, int out);
 
 
 int main(int argc, char * const argv[]) {
@@ -86,8 +89,6 @@ int main(int argc, char * const argv[]) {
     return child_status;
 }
 
-static void copy(int in, int out);
-
 static void collect(char const * socket_file, char const * output_file) {
     mask_all_signals(SIG_BLOCK);
     // open the output file
@@ -132,37 +133,6 @@ static void collect(char const * socket_file, char const * output_file) {
     close(output_fd);
     close(listen_sock);
     unlink(socket_file);
-}
-
-static char const * read_string(int in) {
-    size_t length = 0;
-    if (-1 == read(in, (void *)&length, sizeof(size_t))) {
-        perror("read: header");
-        exit(EXIT_FAILURE);
-    }
-    if (length > 0) {
-        char * result = malloc(length + 1);
-        if (-1 == read(in, (void *)result, length)) {
-            free(result);
-            perror("read: message");
-            exit(EXIT_FAILURE);
-        }
-        result[length] = '\0';
-        return result;
-    }
-    return "";
-}
-
-static void copy(int in, int out) {
-    char const * const cwd = read_string(in);
-    char const * const cmd = read_string(in);
-    // FIXME: do filtering and formating
-    write(out, cwd, strlen(cwd));
-    write(out, "\n", 1);
-    write(out, cmd, strlen(cmd));
-    write(out, "\n", 1);
-    free((void *)cwd);
-    free((void *)cmd);
 }
 
 static void handler(int signum) {
