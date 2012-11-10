@@ -1,16 +1,16 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#include "cdb.h"
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <fcntl.h>
 #include <signal.h>
 
 // Stringify environment variables
@@ -29,8 +29,6 @@ static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect(char const * socket_file, char const * output_file);
-
-void copy(int in, int out);
 
 
 int main(int argc, char * const argv[]) {
@@ -92,11 +90,7 @@ int main(int argc, char * const argv[]) {
 static void collect(char const * socket_file, char const * output_file) {
     mask_all_signals(SIG_BLOCK);
     // open the output file
-    int output_fd = open(output_file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
-    if (-1 == output_fd) {
-        perror("open");
-        exit(EXIT_FAILURE);
-    }
+    int output_fd = cdb_open(output_file);
     // remove old socket file if any
     if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
         perror("unlink");
@@ -125,12 +119,12 @@ static void collect(char const * socket_file, char const * output_file) {
     int conn_sock;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         mask_all_signals(SIG_BLOCK);
-        copy(conn_sock, output_fd);
+        cdb_copy(output_fd, conn_sock);
         close(conn_sock);
         mask_all_signals(SIG_UNBLOCK);
     }
     // skip errors during shutdown
-    close(output_fd);
+    cdb_close(output_fd);
     close(listen_sock);
     unlink(socket_file);
 }
