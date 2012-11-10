@@ -15,6 +15,10 @@
 #define XSTR(s) STR(s)
 #define STR(s) #s
 
+#define SOCKET_FILE XSTR(DEFAULT_SOCKET_FILE)
+#define OUTPUT_FILE XSTR(DEFAULT_OUTPUT_FILE)
+#define LIBEAR_FILE XSTR(LIBEAR_INSTALL_DIR)"/libear.so"
+
 // variables which are used in signal handler
 static pid_t    child_pid;
 static int      child_status = EXIT_FAILURE;
@@ -27,9 +31,9 @@ static void collect(char const * socket_file, char const * output_file);
 
 
 int main(int argc, char * const argv[]) {
-    char const * socket_file = XSTR(DEFAULT_SOCKET_FILE);
-    char const * output_file = XSTR(DEFAULT_OUTPUT_FILE);
-    char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
+    char const * socket_file = SOCKET_FILE;
+    char const * output_file = OUTPUT_FILE;
+    char const * libear_path = LIBEAR_FILE;
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
     int flags, opt;
@@ -200,11 +204,13 @@ static void usage(char const * const name) {
     fprintf(stderr,
             "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
             "\n"
+            "   -o output   output file (default: %s)\n"
             "   -b libear   libear.so location (default: %s)\n"
             "   -d socket   multiplexing socket (default: %s)\n",
             name,
-            XSTR(LIBEAR_INSTALL_DIR),
-            XSTR(DEFAULT_SOCKET_FILE));
+            OUTPUT_FILE,
+            LIBEAR_FILE,
+            SOCKET_FILE);
     exit(EXIT_FAILURE);
 }
 
