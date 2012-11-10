@@ -28,8 +28,8 @@ static void collect(char const * socket_file, char const * output_file);
 
 int main(int argc, char * const argv[]) {
     char const * socket_file = XSTR(DEFAULT_SOCKET_FILE);
+    char const * output_file = XSTR(DEFAULT_OUTPUT_FILE);
     char const * libear_path = XSTR(LIBEAR_INSTALL_DIR);
-    char const * output_file = 0;
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
     int flags, opt;
@@ -49,7 +49,7 @@ int main(int argc, char * const argv[]) {
         }
     }
     // validate
-    if ((argc == optind) || (0 == output_file)) {
+    if (argc == optind) {
         usage(argv[0]);
     }
     unprocessed_argv = &(argv[optind]);
