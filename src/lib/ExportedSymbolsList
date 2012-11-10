@@ -6,6 +6,9 @@
         execve;
         execvp;
         execvpe;
+        execl;
+        execlp;
+        execle;
     local:
         *;
 };

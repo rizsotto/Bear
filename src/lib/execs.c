@@ -1,5 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#include "report.h"
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -9,8 +11,7 @@
 #include <dlfcn.h>
 
 
-void report_call(char const * method, char * const argv[]);
-void report_vararg_call(char const * method, const char *arg, ...);
+static void report_vararg_call(char const * method, const char *arg, ...);
 
 
 int execv(const char *path, char *const argv[]) {
@@ -75,7 +76,7 @@ int execle(const char *path, const char *arg, ...) {
 }
 
 
-void report_vararg_call(char const * method, const char *arg, ...) {
+static void report_vararg_call(char const * method, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
 

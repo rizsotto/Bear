@@ -3,7 +3,7 @@
 set(ourlib_target ear)
 set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
 
-add_library(${ourlib_target} SHARED execs.c writter.c)
+add_library(${ourlib_target} SHARED execs.c report.c)
 add_definitions(-D_GNU_SOURCE)
 
 set_target_properties(${ourlib_target} PROPERTIES

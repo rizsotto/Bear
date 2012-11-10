@@ -1,5 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#include "report.h"
+
 #include <unistd.h>
 #include <malloc.h>
 #include <string.h>
