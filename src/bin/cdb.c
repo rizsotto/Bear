@@ -12,15 +12,17 @@
 
 
 int cdb_open(char const * file) {
-    int ofd = open(file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
-    if (-1 == ofd) {
+    int fd = open(file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+    if (-1 == fd) {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    return ofd;
+    dprintf(fd, "[");
+    return fd;
 }
 
 void cdb_close(int fd) {
+    dprintf(fd, "\n]");
     close(fd);
 }
 
@@ -42,19 +44,22 @@ int  cdb_filter(struct CDBEntry * e) {
 }
 
 void cdb_write(int fd, struct CDBEntry * e, size_t count) {
-    write(fd, e->cwd, strlen(e->cwd));
-    write(fd, "\n", 1);
-    write(fd, e->cmd, strlen(e->cmd));
-    write(fd, "\n", 1);
-    write(fd, e->src, strlen(e->src));
-    write(fd, "\n", 1);
+    if (count) {
+        dprintf(fd, ",");
+    }
+    dprintf(fd, "\n{\n"
+                "  \"directory\": \"%s\",\n"
+                "  \"command\": \"%s\",\n"
+                "  \"file\": \"%s\"\n}", e->cwd, e->cmd, e->src);
 }
 
 void cdb_finish(struct CDBEntry * e) {
     free((void *)e->src);
     free((void *)e->cmd);
     free((void *)e->cwd);
-    e->src = e->cmd = e->cwd = 0;
+    e->src = 0;
+    e->cmd = 0;
+    e->cwd = 0;
 }
 
 
