@@ -26,17 +26,21 @@ void cdb_close(int ofd) {
 
 
 static char const * read_string(int in);
-static int is_compiler_call(char const * cmd);
+static char const * get_source_file(char const * cmd);
 
 void cdb_copy(int ofd, int ifd) {
     char const * const cwd = read_string(ifd);
     char const * const cmd = read_string(ifd);
-    if (is_compiler_call(cmd)) {
+    char const * const file = get_source_file(cmd);
+    if (file) {
         write(ofd, cwd, strlen(cwd));
         write(ofd, "\n", 1);
         write(ofd, cmd, strlen(cmd));
         write(ofd, "\n", 1);
+        write(ofd, file, strlen(file));
+        write(ofd, "\n", 1);
     }
+    free((void *)file);
     free((void *)cmd);
     free((void *)cwd);
 }
@@ -59,6 +63,30 @@ static char const * read_string(int in) {
         return result;
     }
     return "";
+}
+
+static char const * const * create_tokens(char const * in);
+static void release_tokens(char const * const * mem);
+
+static int is_known_compiler(char const * cmd);
+static int is_source_file(char const * const arg);
+
+static char const * get_source_file(char const * cmd) {
+    char const * const * args = create_tokens(cmd);
+    char const * result = 0;
+    // looking for compiler name
+    if ((args) && (args[0]) && is_known_compiler(args[0])) {
+        // looking for source file
+        char const * const * it = args;
+        for (; *it; ++it) {
+            if (is_source_file(*it)) {
+                result = strdup(*it);
+                break;
+            }
+        }
+    }
+    release_tokens(args);
+    return result;
 }
 
 static char const * const * create_tokens(char const * in) {
@@ -134,74 +162,41 @@ static int is_known_compiler(char const * cmd) {
     return result;
 }
 
-static int is_linker_flag(char const * const arg) {
-    static char const * const linker_flags[] =
-        { "-Xlinker"
-        , "-l"
-        //, "-nostartfiles"
-        //, "-nodefaultlibs"
-        //, "-nostdlib"
-        //, "-pie"
-        , "-rdynamic"
-        , "-static"
-        , "-static-libgcc"
-        , "-static-libstdc++"
-        , "-shared"
-        , "-shared-libgcc"
-        //, "-symbolic"
+static int is_source_file_extension(char const * arg);
+
+static int is_source_file(char const * const arg) {
+    char const * file_name = strrchr(arg, '/');
+    file_name = (file_name) ? file_name : arg;
+    char const * extension = strrchr(file_name, '.');
+    extension = (extension) ? extension : file_name;
+
+    return is_source_file_extension(extension);
+}
+
+static int is_source_file_extension(char const * arg) {
+    static char const * const extensions[] =
+        { ".c"
+        , ".C"
+        , ".cc"
+        , ".cxx"
+        , ".c++"
+        , ".C++"
+        , ".cpp"
+        , ".cp"
+        , ".i"
+        , ".ii"
+        , ".m"
+        , ".S"
         };
-    static size_t const linker_flags_size =
-        sizeof(linker_flags) / sizeof(char const * const);
+    static size_t const extensions_size =
+        sizeof(extensions) / sizeof(char const * const);
 
     size_t idx = 0;
-    for (; linker_flags_size > idx; ++idx) {
-        if (0 == strcmp(arg, linker_flags[idx])) {
-            return 1;
-        }
-    }
-    static char const lib_flag[] = "-l";
-    static size_t const lib_flag_size = sizeof(lib_flag) - 1;
-    if (0 == strncmp(lib_flag, arg, lib_flag_size)) {
-        return 1;
-    }
-    static char const linker_flag[] = "-Wl,";
-    static size_t const linker_flag_size = sizeof(linker_flag) - 1;
-    if (0 == strncmp(linker_flag, arg, linker_flag_size)) {
-        return 1;
-    }
-    return 0;
-}
-
-static int has_linker_flags(char const * const * args) {
-    int result = 0;
-    char const * const * it = args;
-    for (; *it; ++it) {
-        result += is_linker_flag(*it);
-    }
-    return result;
-}
-
-static int has_compiler_flags(char const * const * args) {
-    char const * const * it = args;
-    for (; *it; ++it) {
-        if (0 == strncmp("-c", *it, 2)) {
+    for (;extensions_size > idx; ++idx) {
+        if (0 == strcmp(arg, extensions[idx])) {
             return 1;
         }
     }
     return 0;
-}
-
-static int is_compiler_call(char const * cmd) {
-    int result = 0;
-    char const * const * args = create_tokens(cmd);
-    // looking for compiler name
-    if ((args) && (args[0]) && is_known_compiler(args[0])) {
-        // catch typical compiler flags
-        result += has_compiler_flags(args) ? 1 : 0;
-        // ignore linking
-        result += has_linker_flags(args) ? 0 : 1;
-    }
-    release_tokens(args);
-    return result;
 }
 
