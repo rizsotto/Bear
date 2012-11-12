@@ -20,29 +20,41 @@ int cdb_open(char const * file) {
     return ofd;
 }
 
-void cdb_close(int ofd) {
-    close(ofd);
+void cdb_close(int fd) {
+    close(fd);
 }
 
 
 static char const * read_string(int in);
+
+void cdb_read(int fd, struct CDBEntry * e) {
+    e->cwd = read_string(fd);
+    e->cmd = read_string(fd);
+    e->src = 0;
+}
+
+
 static char const * get_source_file(char const * cmd);
 
-void cdb_copy(int ofd, int ifd) {
-    char const * const cwd = read_string(ifd);
-    char const * const cmd = read_string(ifd);
-    char const * const file = get_source_file(cmd);
-    if (file) {
-        write(ofd, cwd, strlen(cwd));
-        write(ofd, "\n", 1);
-        write(ofd, cmd, strlen(cmd));
-        write(ofd, "\n", 1);
-        write(ofd, file, strlen(file));
-        write(ofd, "\n", 1);
-    }
-    free((void *)file);
-    free((void *)cmd);
-    free((void *)cwd);
+int  cdb_filter(struct CDBEntry * e) {
+    e->src = get_source_file(e->cmd);
+    return (0 != e->src);
+}
+
+void cdb_write(int fd, struct CDBEntry * e, size_t count) {
+    write(fd, e->cwd, strlen(e->cwd));
+    write(fd, "\n", 1);
+    write(fd, e->cmd, strlen(e->cmd));
+    write(fd, "\n", 1);
+    write(fd, e->src, strlen(e->src));
+    write(fd, "\n", 1);
+}
+
+void cdb_finish(struct CDBEntry * e) {
+    free((void *)e->src);
+    free((void *)e->cmd);
+    free((void *)e->cwd);
+    e->src = e->cmd = e->cwd = 0;
 }
 
 
