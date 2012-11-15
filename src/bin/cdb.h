@@ -16,7 +16,7 @@ struct CDBEntry {
 
 void cdb_read(int fd, struct CDBEntry * e);
 int  cdb_filter(struct CDBEntry * e);
-void cdb_write(int handle, struct CDBEntry * e, size_t count);
+void cdb_write(int handle, struct CDBEntry const * e, size_t count);
 void cdb_finish(struct CDBEntry * e);
 
 #endif

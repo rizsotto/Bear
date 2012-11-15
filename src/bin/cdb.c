@@ -43,7 +43,7 @@ int  cdb_filter(struct CDBEntry * e) {
     return (0 != e->src);
 }
 
-void cdb_write(int fd, struct CDBEntry * e, size_t count) {
+void cdb_write(int fd, struct CDBEntry const * e, size_t count) {
     if (count) {
         dprintf(fd, ",");
     }
