@@ -49,5 +49,15 @@ $ bear -o commands.json -- make
 The `-o` option specify the output file, while the `--` separate the parameters
 from the build command.
 
+Known issues
+------------
+
+Compiler wrappers like [ccache][3] and [distcc][4] could cause duplicates
+or missing items in the compilation database. Make sure you have been disabled
+before you run Bear.
+
+
 [1]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
 [2]: http://www.cmake.org/Wiki/CMake_Useful_Variables
+[3]: http://ccache.samba.org/
+[4]: http://code.google.com/p/distcc/
