@@ -36,10 +36,10 @@ void cdb_read(int fd, struct CDBEntry * e) {
 }
 
 
-static char const * get_source_file(char const * cmd);
+static char const * get_source_file(char const * cmd, char const * cwd);
 
 int  cdb_filter(struct CDBEntry * e) {
-    e->src = get_source_file(e->cmd);
+    e->src = get_source_file(e->cmd, e->cwd);
     return (0 != e->src);
 }
 
@@ -88,7 +88,10 @@ static void release_tokens(char const * const * mem);
 static int is_known_compiler(char const * cmd);
 static int is_source_file(char const * const arg);
 
-static char const * get_source_file(char const * cmd) {
+static char const * fix_path(char const * file, char const * cwd);
+
+
+static char const * get_source_file(char const * cmd, char const * cwd) {
     char const * const * args = create_tokens(cmd);
     char const * result = 0;
     // looking for compiler name
@@ -97,13 +100,24 @@ static char const * get_source_file(char const * cmd) {
         char const * const * it = args;
         for (; *it; ++it) {
             if (is_source_file(*it)) {
-                result = strdup(*it);
+                result = fix_path(*it, cwd);
                 break;
             }
         }
     }
     release_tokens(args);
     return result;
+}
+
+static char const * fix_path(char const * file, char const * cwd) {
+    if ('/' == file[0]) {
+        return strdup(file);
+    } else {
+        size_t const sum_length = strlen(file) + strlen(cwd) + 2;
+        char * result = (char *)malloc(sum_length);
+        snprintf(result, sum_length, "%s/%s", cwd, file);
+        return result;
+    }
 }
 
 static char const * const * create_tokens(char const * in) {
