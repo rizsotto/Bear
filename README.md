@@ -6,10 +6,9 @@ Bear is a tool to generate compilation database for clang tooling.
 The [JSON compilation database][1] is used in clang project to provide
 information how a single compilation unit was processed. When that
 is available then it is easy to re-run the compilation with different
-compiler. Or even more, it can re-run multiple of these compilation in
-one executable. (Look for clang tooling capabilities.)
+programs.
 
-One format of these compilation database, comming from `cmake`. Passing
+One way to get compilation database is to use `cmake` as build tool. Passing
 `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` to cmake generates `compile_commands.json`
 file into the current directory.
 
@@ -18,10 +17,11 @@ no free json file. Bear is a tool to generate such file during the build
 process.
 
 The concept behind Bear is to exec the original build command and
-intercept the `exec` calls. To achive that Bear uses `LD_PRELOAD` mechanism
-provided by GNU C library. So it has two components: one is the library which
-defines the `exec` methods and used in every child processes, second is the
-executable which set the environment up to child processes.
+intercept the `exec` calls of the build tool. To achive that Bear uses
+`LD_PRELOAD` mechanism provided by GNU C library. So it has two components:
+the library and the binary. The library defines the `exec` methods and used
+in every child processes. The executable sets the environment up to child
+processes and writes the output file.
 
 
 How to build
@@ -32,7 +32,6 @@ How to build
 * The configure step made by cmake: `cmake ..`
 You can pass `-DCMAKE_INSTALL_PREFIX=<path>` to override the default
 `/usr/local`. For more cmake control, read about the [related variables][2].
-* To compile and run test suite: `make check`
 * To install: `make install` You can specify `DESTDIR` environment to prefix
 the `CMAKE_INSTALL_PREFIX`.
 
@@ -43,11 +42,12 @@ How to use
 The usage is like this
 
 ```shell
-$ bear -o commands.json -- make
+$ bear -- make
 ```
 
-The `-o` option specify the output file, while the `--` separate the parameters
-from the build command.
+The `--` separate the parameters from the build command. The output file
+called `compile_commands.json` found  in current directory.
+
 
 Known issues
 ------------
