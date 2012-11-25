@@ -1,0 +1,10 @@
+env = Environment()
+
+some_lib = env.SharedLibrary(target="some_lib",
+                             source=["lib/foo.cpp", "lib/bar.cpp"])
+some_app = env.Program(target="some_app",
+                       source=["bin/far.cpp", "bin/boo.cpp"],
+                       CPPPATH=Split('#lib'),
+                       LIBPATH=['.'],
+                       LIBS=['some_lib'])
+
