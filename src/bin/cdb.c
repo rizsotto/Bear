@@ -44,13 +44,20 @@ int  cdb_filter(struct CDBEntry * e) {
 }
 
 void cdb_write(int fd, struct CDBEntry const * e, size_t count) {
-    if (count) {
-        dprintf(fd, ",");
+    if (e->src) {
+        if (count) {
+            dprintf(fd, ",");
+        }
+        dprintf(fd, "\n{\n"
+                    "  \"directory\": \"%s\",\n"
+                    "  \"command\": \"%s\",\n"
+                    "  \"file\": \"%s\"\n}", e->cwd, e->cmd, e->src);
+    } else {
+        dprintf(fd, "\n#{\n"
+                    "#  \"directory\": \"%s\",\n"
+                    "#  \"command\": \"%s\"\n"
+                    "#}\n", e->cwd, e->cmd);
     }
-    dprintf(fd, "\n{\n"
-                "  \"directory\": \"%s\",\n"
-                "  \"command\": \"%s\",\n"
-                "  \"file\": \"%s\"\n}", e->cwd, e->cmd, e->src);
 }
 
 void cdb_finish(struct CDBEntry * e) {

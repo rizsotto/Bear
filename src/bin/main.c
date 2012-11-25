@@ -28,17 +28,18 @@ static int      child_status = EXIT_FAILURE;
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect(char const * socket_file, char const * output_file);
+static void collect(char const * socket_file, char const * output_file, int debug);
 
 
 int main(int argc, char * const argv[]) {
     char const * socket_file = SOCKET_FILE;
     char const * output_file = OUTPUT_FILE;
     char const * libear_path = LIBEAR_FILE;
+    int debug = 0;
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
     int flags, opt;
-    while ((opt = getopt(argc, argv, "o:b:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "o:b:s:d")) != -1) {
         switch (opt) {
         case 'o':
             output_file = optarg;
@@ -46,8 +47,11 @@ int main(int argc, char * const argv[]) {
         case 'b':
             libear_path = optarg;
             break;
-        case 'd':
+        case 's':
             socket_file = optarg;
+            break;
+        case 'd':
+            debug = 1;
             break;
         default: /* '?' */
             usage(argv[0]);
@@ -82,12 +86,12 @@ int main(int argc, char * const argv[]) {
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
         // go for the data
-        collect(socket_file, output_file);
+        collect(socket_file, output_file, debug);
     }
     return child_status;
 }
 
-static void collect(char const * socket_file, char const * output_file) {
+static void collect(char const * socket_file, char const * output_file, int debug) {
     mask_all_signals(SIG_BLOCK);
     // open the output file
     int output_fd = cdb_open(output_file);
@@ -122,7 +126,7 @@ static void collect(char const * socket_file, char const * output_file) {
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         mask_all_signals(SIG_BLOCK);
         cdb_read(conn_sock, &e);
-        if (cdb_filter(&e)) {
+        if ((cdb_filter(&e)) || (debug)) {
             cdb_write(output_fd, &e, nr_of_entries++);
         }
         cdb_finish(&e);
@@ -176,7 +180,8 @@ static void usage(char const * const name) {
             "\n"
             "   -o output   output file (default: %s)\n"
             "   -b libear   libear.so location (default: %s)\n"
-            "   -d socket   multiplexing socket (default: %s)\n",
+            "   -s socket   multiplexing socket (default: %s)\n"
+            "   -d          debug output (default: disabled)",
             name,
             OUTPUT_FILE,
             LIBEAR_FILE,
