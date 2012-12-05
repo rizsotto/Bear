@@ -14,6 +14,7 @@ set_target_properties(${ourlib_target} PROPERTIES
     LINK_FLAGS "-Wl,--version-script=${ourlib_symbols}")
 
 target_link_libraries(${ourlib_target} dl)
+target_link_libraries(${ourlib_target} common)
 
 install(TARGETS ${ourlib_target}
     LIBRARY DESTINATION lib)
