@@ -138,7 +138,7 @@ static char const * fix_path(char const * file, char const * cwd) {
 }
 
 static int is_known_compiler(char const * cmd) {
-    static char const * const compilers[] =
+    static char const * compilers[] =
         { "cc"
         , "gcc"
         , "llvm-gcc"
@@ -147,23 +147,13 @@ static int is_known_compiler(char const * cmd) {
         , "g++"
         , "llvm-g++"
         , "clang++"
+        , 0
         };
-    static size_t const compilers_size =
-        sizeof(compilers) / sizeof(char const * const);
 
-    int result = 0;
     // looking for compiler name
     char * file = basename(cmd);
-    if (file) {
-        size_t idx = 0;
-        for (;compilers_size > idx; ++idx) {
-            if (0 == strcmp(file, compilers[idx])) {
-                ++result;
-                break;
-            }
-        }
-    }
-    return result;
+
+    return sa_find(compilers, file);
 }
 
 static int is_source_file_extension(char const * arg);
@@ -178,7 +168,7 @@ static int is_source_file(char const * const arg) {
 }
 
 static int is_source_file_extension(char const * arg) {
-    static char const * const extensions[] =
+    static char const * extensions[] =
         { ".c"
         , ".C"
         , ".cc"
@@ -191,16 +181,9 @@ static int is_source_file_extension(char const * arg) {
         , ".ii"
         , ".m"
         , ".S"
+        , 0
         };
-    static size_t const extensions_size =
-        sizeof(extensions) / sizeof(char const * const);
 
-    size_t idx = 0;
-    for (;extensions_size > idx; ++idx) {
-        if (0 == strcmp(arg, extensions[idx])) {
-            return 1;
-        }
-    }
-    return 0;
+    return sa_find(extensions, arg);
 }
 
