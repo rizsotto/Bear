@@ -92,8 +92,8 @@ static char const * read_string(int in) {
     if (length > 0) {
         char * result = malloc(length + 1);
         if (-1 == read(in, (void *)result, length)) {
-            free(result);
             perror("read: message");
+            free(result);
             exit(EXIT_FAILURE);
         }
         result[length] = '\0';
