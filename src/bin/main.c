@@ -28,7 +28,7 @@ static int      child_status = EXIT_FAILURE;
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect(char const * socket_file, char const * output_file, int debug);
+static void collect(char const * socket, char const * output, int debug);
 
 
 int main(int argc, char * const argv[]) {
@@ -121,14 +121,11 @@ static void collect(char const * socket_file, char const * output_file, int debu
     // do the job
     mask_all_signals(SIG_UNBLOCK);
     int conn_sock;
-    size_t nr_of_entries = 0;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         mask_all_signals(SIG_BLOCK);
         struct CDBEntry * e = cdb_new();
         cdb_read(conn_sock, e);
-        if ((cdb_filter(e)) || (debug)) {
-            cdb_write(output_fd, e, nr_of_entries++);
-        }
+        cdb_write(output_fd, e, debug);
         cdb_delete(e);
         close(conn_sock);
         mask_all_signals(SIG_UNBLOCK);

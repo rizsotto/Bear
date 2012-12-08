@@ -10,62 +10,35 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stddef.h>
 
 
-struct CDBEntry {
-    char const * cwd;
-    char const * cmd;
-    char const * src;
-};
+static size_t count = 0;
 
+// basic open/close methods with some decorator logic
 int cdb_open(char const * file) {
     int fd = open(file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (-1 == fd) {
         perror("open");
         exit(EXIT_FAILURE);
     }
-    dprintf(fd, "[");
+    dprintf(fd, "[\n");
+    count = 0;
     return fd;
 }
 
 void cdb_close(int fd) {
-    dprintf(fd, "\n]");
+    dprintf(fd, "]\n");
     close(fd);
 }
 
 
-static char const * read_string(int in);
-
-void cdb_read(int fd, struct CDBEntry * e) {
-    e->cwd = read_string(fd);
-    e->cmd = read_string(fd);
-    e->src = 0;
-}
-
-
-static char const * get_source_file(char const * cmd, char const * cwd);
-
-int  cdb_filter(struct CDBEntry * e) {
-    e->src = get_source_file(e->cmd, e->cwd);
-    return (0 != e->src);
-}
-
-void cdb_write(int fd, struct CDBEntry const * e, size_t count) {
-    if (e->src) {
-        if (count) {
-            dprintf(fd, ",");
-        }
-        dprintf(fd, "\n{\n"
-                    "  \"directory\": \"%s\",\n"
-                    "  \"command\": \"%s\",\n"
-                    "  \"file\": \"%s\"\n}", e->cwd, e->cmd, e->src);
-    } else {
-        dprintf(fd, "\n#{\n"
-                    "#  \"directory\": \"%s\",\n"
-                    "#  \"command\": \"%s\"\n"
-                    "#}\n", e->cwd, e->cmd);
-    }
-}
+// data type and alloc/free methods
+struct CDBEntry {
+    char const * cwd;
+    char const * cmd;
+    char const * src;
+};
 
 struct CDBEntry * cdb_new() {
     struct CDBEntry * e = (struct CDBEntry *)malloc(sizeof(struct CDBEntry));
@@ -83,6 +56,36 @@ void cdb_delete(struct CDBEntry * e) {
 }
 
 
+// io related methods
+static char const * read_string(int in);
+static char const * get_source_file(char const * cmd, char const * cwd);
+
+void cdb_read(int fd, struct CDBEntry * e) {
+    e->cwd = read_string(fd);
+    e->cmd = read_string(fd);
+    e->src = get_source_file(e->cmd, e->cwd);
+}
+
+void cdb_write(int fd, struct CDBEntry const * e, int debug) {
+    if (e->src) {
+        if (count++) {
+            dprintf(fd, ",\n");
+        }
+        dprintf(fd, "{\n"
+                    "  \"directory\": \"%s\",\n"
+                    "  \"command\": \"%s\",\n"
+                    "  \"file\": \"%s\"\n"
+                    "}\n", e->cwd, e->cmd, e->src);
+    } else if (debug) {
+        dprintf(fd, "#{\n"
+                    "#  \"directory\": \"%s\",\n"
+                    "#  \"command\": \"%s\"\n"
+                    "#}\n", e->cwd, e->cmd);
+    }
+}
+
+
+// length/value reader method, which hopefuly never blocks
 static char const * read_string(int in) {
     size_t length = 0;
     if (-1 == read(in, (void *)&length, sizeof(size_t))) {
