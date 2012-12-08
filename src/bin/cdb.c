@@ -11,6 +11,12 @@
 #include <fcntl.h>
 
 
+struct CDBEntry {
+    char const * cwd;
+    char const * cmd;
+    char const * src;
+};
+
 int cdb_open(char const * file) {
     int fd = open(file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (-1 == fd) {
@@ -60,13 +66,19 @@ void cdb_write(int fd, struct CDBEntry const * e, size_t count) {
     }
 }
 
-void cdb_finish(struct CDBEntry * e) {
-    free((void *)e->src);
-    free((void *)e->cmd);
-    free((void *)e->cwd);
+struct CDBEntry * cdb_new() {
+    struct CDBEntry * e = (struct CDBEntry *)malloc(sizeof(struct CDBEntry));
     e->src = 0;
     e->cmd = 0;
     e->cwd = 0;
+    return e;
+}
+
+void cdb_delete(struct CDBEntry * e) {
+    free((void *)e->src);
+    free((void *)e->cmd);
+    free((void *)e->cwd);
+    free((void *)e);
 }
 
 

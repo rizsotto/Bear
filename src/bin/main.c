@@ -121,15 +121,15 @@ static void collect(char const * socket_file, char const * output_file, int debu
     // do the job
     mask_all_signals(SIG_UNBLOCK);
     int conn_sock;
-    struct CDBEntry e;
     size_t nr_of_entries = 0;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         mask_all_signals(SIG_BLOCK);
-        cdb_read(conn_sock, &e);
-        if ((cdb_filter(&e)) || (debug)) {
-            cdb_write(output_fd, &e, nr_of_entries++);
+        struct CDBEntry * e = cdb_new();
+        cdb_read(conn_sock, e);
+        if ((cdb_filter(e)) || (debug)) {
+            cdb_write(output_fd, e, nr_of_entries++);
         }
-        cdb_finish(&e);
+        cdb_delete(e);
         close(conn_sock);
         mask_all_signals(SIG_UNBLOCK);
     }
