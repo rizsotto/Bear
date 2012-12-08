@@ -9,3 +9,5 @@ set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE C)
 set_target_properties(${ourlib_target} PROPERTIES
     COMPILE_FLAGS -nostdlib)
+set_target_properties(${ourlib_target} PROPERTIES
+    COMPILE_FLAGS -fPIC)
