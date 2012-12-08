@@ -1,6 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "cdb.h"
+#include "../common/stringarray.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -101,9 +102,6 @@ static char const * read_string(int in) {
     return "";
 }
 
-static char const * const * create_tokens(char const * in);
-static void release_tokens(char const * const * mem);
-
 static int is_known_compiler(char const * cmd);
 static int is_source_file(char const * const arg);
 
@@ -111,7 +109,7 @@ static char const * fix_path(char const * file, char const * cwd);
 
 
 static char const * get_source_file(char const * cmd, char const * cwd) {
-    char const * const * args = create_tokens(cmd);
+    Strings args = sa_unfold(cmd);
     char const * result = 0;
     // looking for compiler name
     if ((args) && (args[0]) && is_known_compiler(args[0])) {
@@ -124,7 +122,7 @@ static char const * get_source_file(char const * cmd, char const * cwd) {
             }
         }
     }
-    release_tokens(args);
+    sa_release(args);
     return result;
 }
 
@@ -136,50 +134,6 @@ static char const * fix_path(char const * file, char const * cwd) {
         char * result = (char *)malloc(sum_length);
         snprintf(result, sum_length, "%s/%s", cwd, file);
         return result;
-    }
-}
-
-static char const * const * create_tokens(char const * in) {
-    char const * * result = 0;
-    size_t result_size = 0;
-    if (in) {
-        char * const copy = strdup(in);
-        if (0 == copy) {
-            perror("strdup");
-            exit(EXIT_FAILURE);
-        }
-        // find separators and insert 0 in place
-        char * it = copy;
-        do {
-            result = (char const * *)realloc(result, (result_size + 1) * sizeof(char const *));
-            if (0 == result) {
-                perror("realloc");
-                exit(EXIT_FAILURE);
-            }
-            result[result_size++] = it;
-            char * sep = strchr(it, ' ');
-            if (sep) {
-                *sep = '\0';
-                ++sep;
-            }
-            it = sep;
-        } while (it);
-        result = (char const * *)realloc(result, (result_size + 1) * sizeof(char const *));
-        if (0 == result) {
-            perror("realloc");
-            exit(EXIT_FAILURE);
-        }
-        result[result_size++] = 0;
-    }
-    return result;
-}
-
-static void release_tokens(char const * const * mem) {
-    if (mem) {
-        if (*mem) {
-            free((void *)(*mem));
-        }
-        free((void *)mem);
     }
 }
 
