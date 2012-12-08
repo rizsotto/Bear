@@ -95,6 +95,9 @@ Strings sa_unfold(String const in) {
 }
 
 Strings sa_append(Strings const in, String e) {
+    if (0 == e) {
+        return in;
+    }
     size_t size = sa_length(in);
     Strings result = (Strings)realloc(in, (size + 2) * sizeof(String));
     if (0 == result) {
