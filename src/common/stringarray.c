@@ -13,7 +13,7 @@ Strings sa_copy(Strings const in) {
 
     Strings result = (Strings)malloc((size + 1) * sizeof(String));
     if (0 == result) {
-        perror("realloc");
+        perror("malloc");
         exit(EXIT_FAILURE);
     }
     result[size] = 0;
@@ -22,6 +22,10 @@ Strings sa_copy(Strings const in) {
     char const * * out_it = result;
     for (;*in_it;++in_it,++out_it) {
         *out_it = strdup(*in_it);
+        if (0 == *out_it) {
+            perror("strdup");
+            exit(EXIT_FAILURE);
+        }
     }
     return result;
 }

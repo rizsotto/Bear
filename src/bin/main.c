@@ -178,7 +178,7 @@ static void usage(char const * const name) {
             "   -o output   output file (default: %s)\n"
             "   -b libear   libear.so location (default: %s)\n"
             "   -s socket   multiplexing socket (default: %s)\n"
-            "   -d          debug output (default: disabled)",
+            "   -d          debug output (default: disabled)\n",
             name,
             OUTPUT_FILE,
             LIBEAR_FILE,

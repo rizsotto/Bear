@@ -42,6 +42,10 @@ struct CDBEntry {
 
 struct CDBEntry * cdb_new() {
     struct CDBEntry * e = (struct CDBEntry *)malloc(sizeof(struct CDBEntry));
+    if (0 == e) {
+        perror("malloc");
+        exit(EXIT_FAILURE);
+    }
     e->src = 0;
     e->cmd = 0;
     e->cwd = 0;
@@ -49,9 +53,11 @@ struct CDBEntry * cdb_new() {
 }
 
 void cdb_delete(struct CDBEntry * e) {
-    free((void *)e->src);
-    free((void *)e->cmd);
-    free((void *)e->cwd);
+    if (e) {
+        free((void *)e->src);
+        free((void *)e->cmd);
+        free((void *)e->cwd);
+    }
     free((void *)e);
 }
 
@@ -130,14 +136,20 @@ static char const * get_source_file(char const * cmd, char const * cwd) {
 }
 
 static char const * fix_path(char const * file, char const * cwd) {
+    char * result = 0;
     if ('/' == file[0]) {
-        return strdup(file);
+        result = strdup(file);
+        if (0 == result) {
+            perror("strdup");
+            exit(EXIT_FAILURE);
+        }
     } else {
-        size_t const sum_length = strlen(file) + strlen(cwd) + 2;
-        char * result = (char *)malloc(sum_length);
-        snprintf(result, sum_length, "%s/%s", cwd, file);
-        return result;
+        if (-1 == asprintf(&result, "%s/%s", cwd, file)) {
+            perror("asprintf");
+            exit(EXIT_FAILURE);
+        }
     }
+    return result;
 }
 
 static int is_known_compiler(char const * cmd) {
