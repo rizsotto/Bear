@@ -2,6 +2,7 @@
 
 #include "report.h"
 #include "../common/stringarray.h"
+#include "../common/protocol.h"
 
 #include <unistd.h>
 #include <malloc.h>
@@ -38,8 +39,6 @@ void report_call(char const *method, char * const argv[]) {
     }
 }
 
-static void write_string(int fd, char const * message);
-
 static void write_cwd(int fd) {
     char const * cwd = get_current_dir_name();
     write_string(fd, cwd);
@@ -50,13 +49,5 @@ static void write_call(int fd, char const * argv[]) {
     char const * cmd = sa_fold(argv);
     write_string(fd, cmd);
     free((void *)cmd);
-}
-
-static void write_string(int fd, char const * message) {
-    size_t const length = strlen(message);
-    write(fd, (void const *)&length, sizeof(length));
-    if (length > 0) {
-        write(fd, (void const *)message, length);
-    }
 }
 

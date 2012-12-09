@@ -3,6 +3,7 @@
 add_executable(unit_test main.c)
 add_definitions(-D_GNU_SOURCE)
 target_link_libraries(unit_test common)
+target_link_libraries(unit_test rt)
 include_directories(../../src/common)
 
 add_custom_target(unit_level

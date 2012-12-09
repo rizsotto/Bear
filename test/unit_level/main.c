@@ -4,8 +4,14 @@
 
 #include <malloc.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include <stringarray.h>
+#include <protocol.h>
 
 void test_sa_length() {
     char const * input[] =
@@ -110,6 +116,38 @@ void test_sa_copy() {
     assert(0 == result[4]);
 }
 
+void test_io(int fd) {
+    char const * const in_msg_1 = "this is\x02my\x1fmessage!";
+    char const * const in_msg_2 = "";
+
+    write_string(fd, in_msg_1);
+    write_string(fd, in_msg_2);
+    write_string(fd, 0);
+
+    assert(0 == lseek(fd, 0, SEEK_SET));
+
+    char const * const out_msg_1 = read_string(fd);
+    char const * const out_msg_2 = read_string(fd);
+    char const * const out_msg_3 = read_string(fd);
+
+    assert(0 == strcmp(in_msg_1, out_msg_1));
+    assert(0 == strcmp(in_msg_2, out_msg_2));
+    assert(0 == strcmp(in_msg_2, out_msg_3));
+
+    free((void *)out_msg_1);
+    free((void *)out_msg_2);
+    free((void *)out_msg_3);
+}
+
+void test_protocol() {
+    char const * const file_name = "protocol_test";
+    int fd = shm_open(file_name, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+    assert(-1 != fd);
+    test_io(fd);
+    close(fd);
+    shm_unlink(file_name);
+}
+
 int main() {
     test_sa_length();
     test_sa_fold();
@@ -118,5 +156,6 @@ int main() {
     test_sa_append();
     test_sa_find();
     test_sa_copy();
+    test_protocol();
     return 0;
 }

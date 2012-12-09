@@ -2,7 +2,9 @@
 
 set(ourlib_target common)
 
-add_library(${ourlib_target} STATIC stringarray.c)
+add_library(${ourlib_target} STATIC
+    stringarray.c
+    protocol.c)
 add_definitions(-D_GNU_SOURCE)
 
 set_target_properties(${ourlib_target} PROPERTIES

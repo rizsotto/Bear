@@ -2,6 +2,7 @@
 
 #include "cdb.h"
 #include "../common/stringarray.h"
+#include "../common/protocol.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -63,7 +64,6 @@ void cdb_delete(struct CDBEntry * e) {
 
 
 // io related methods
-static char const * read_string(int in);
 static char const * get_source_file(char const * cmd, char const * cwd);
 
 void cdb_read(int fd, struct CDBEntry * e) {
@@ -90,26 +90,6 @@ void cdb_write(int fd, struct CDBEntry const * e, int debug) {
     }
 }
 
-
-// length/value reader method, which hopefuly never blocks
-static char const * read_string(int in) {
-    size_t length = 0;
-    if (-1 == read(in, (void *)&length, sizeof(size_t))) {
-        perror("read: header");
-        exit(EXIT_FAILURE);
-    }
-    if (length > 0) {
-        char * result = malloc(length + 1);
-        if (-1 == read(in, (void *)result, length)) {
-            perror("read: message");
-            free(result);
-            exit(EXIT_FAILURE);
-        }
-        result[length] = '\0';
-        return result;
-    }
-    return "";
-}
 
 static int is_known_compiler(char const * cmd);
 static int is_source_file(char const * const arg);
