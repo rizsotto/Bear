@@ -3,6 +3,7 @@
 set(ourlib_target common)
 
 add_library(${ourlib_target} STATIC
+    json.c
     stringarray.c
     protocol.c)
 add_definitions(-D_GNU_SOURCE)

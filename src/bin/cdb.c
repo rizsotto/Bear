@@ -3,6 +3,7 @@
 #include "cdb.h"
 #include "../common/stringarray.h"
 #include "../common/protocol.h"
+#include "../common/json.h"
 
 #include <unistd.h>
 #include <string.h>
@@ -37,7 +38,7 @@ void cdb_close(int fd) {
 // data type and alloc/free methods
 struct CDBEntry {
     char const * cwd;
-    char const * cmd;
+    char const * * cmd;
     char const * src;
 };
 
@@ -56,7 +57,7 @@ struct CDBEntry * cdb_new() {
 void cdb_delete(struct CDBEntry * e) {
     if (e) {
         free((void *)e->src);
-        free((void *)e->cmd);
+        sa_release(e->cmd);
         free((void *)e->cwd);
     }
     free((void *)e);
@@ -64,15 +65,16 @@ void cdb_delete(struct CDBEntry * e) {
 
 
 // io related methods
-static char const * get_source_file(char const * cmd, char const * cwd);
+static char const * get_source_file(char const * * cmd, char const * cwd);
 
 void cdb_read(int fd, struct CDBEntry * e) {
     e->cwd = read_string(fd);
-    e->cmd = read_string(fd);
+    e->cmd = read_string_array(fd);
     e->src = get_source_file(e->cmd, e->cwd);
 }
 
 void cdb_write(int fd, struct CDBEntry const * e, int debug) {
+    char const * const cmd = json_escape(e->cmd);
     if (e->src) {
         if (count++) {
             dprintf(fd, ",\n");
@@ -81,13 +83,14 @@ void cdb_write(int fd, struct CDBEntry const * e, int debug) {
                     "  \"directory\": \"%s\",\n"
                     "  \"command\": \"%s\",\n"
                     "  \"file\": \"%s\"\n"
-                    "}\n", e->cwd, e->cmd, e->src);
+                    "}\n", e->cwd, cmd, e->src);
     } else if (debug) {
         dprintf(fd, "#{\n"
                     "#  \"directory\": \"%s\",\n"
                     "#  \"command\": \"%s\"\n"
-                    "#}\n", e->cwd, e->cmd);
+                    "#}\n", e->cwd, cmd);
     }
+    free((void *)cmd);
 }
 
 
@@ -97,8 +100,7 @@ static int is_source_file(char const * const arg);
 static char const * fix_path(char const * file, char const * cwd);
 
 
-static char const * get_source_file(char const * cmd, char const * cwd) {
-    Strings args = sa_unfold(cmd);
+static char const * get_source_file(char const * * args, char const * cwd) {
     char const * result = 0;
     // looking for compiler name
     if ((args) && (args[0]) && is_known_compiler(args[0])) {
@@ -111,7 +113,6 @@ static char const * get_source_file(char const * cmd, char const * cwd) {
             }
         }
     }
-    sa_release(args);
     return result;
 }
 

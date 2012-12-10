@@ -1,4 +1,5 @@
 env = Environment()
+env.Append(CPPDEFINES={'RELEASE_BUILD' : 'First release \"quoted\"'})
 
 some_lib = env.SharedLibrary(target="some_lib",
                              source=["lib/foo.cpp", "lib/bar.cpp"])

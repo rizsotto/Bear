@@ -46,8 +46,6 @@ static void write_cwd(int fd) {
 }
 
 static void write_call(int fd, char const * argv[]) {
-    char const * cmd = sa_fold(argv);
-    write_string(fd, cmd);
-    free((void *)cmd);
+    write_string_array(fd, argv);
 }
 
