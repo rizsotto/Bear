@@ -62,6 +62,23 @@ void test_sa_append() {
     sa_release(result);
 }
 
+void test_sa_remove() {
+    Strings result = 0;
+
+    result = sa_append(result, strdup("this"));
+    result = sa_append(result, strdup("and"));
+    result = sa_append(result, strdup("that"));
+
+    result = sa_remove(result, result[1]);
+
+    assert(2 == sa_length(result));
+    assert(0 == strcmp("this", result[0]));
+    assert(0 == strcmp("that", result[1]));
+    assert(0 == result[2]);
+
+    sa_release(result);
+}
+
 void test_sa_find() {
     char const * input[] =
         { "this"
@@ -168,6 +185,7 @@ int main() {
     test_sa_length();
     test_sa_fold();
     test_sa_append();
+    test_sa_remove();
     test_sa_find();
     test_sa_copy();
     test_string_io();

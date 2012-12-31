@@ -30,6 +30,15 @@ Strings sa_copy(Strings const in) {
     return result;
 }
 
+void sa_release(Strings in) {
+    char const * const * it = in;
+    for (; (in) && (*it); ++it) {
+        free((void *)*it);
+    }
+    free((void *)in);
+    in = 0;
+}
+
 Strings sa_append(Strings const in, String e) {
     if (0 == e) {
         return in;
@@ -45,13 +54,29 @@ Strings sa_append(Strings const in, String e) {
     return result;
 }
 
-void sa_release(Strings in) {
-    char const * const * it = in;
-    for (; (in) && (*it); ++it) {
-        free((void *)*it);
+Strings sa_remove(Strings const in, String e) {
+    if (0 == e) {
+        return in;
     }
-    free((void *)in);
-    in = 0;
+    char const * * it = in;
+    int action = 0;
+    for (; (in) && (*it); ++it) {
+        if ((*it) == e) {
+            ++action;
+        }
+        if (action) {
+            char const * * next = it + 1;
+            *it = *next;
+        }
+    }
+    // now resize the array
+    size_t size = sa_length(in);
+    Strings result = (Strings)realloc(in, (size + 1) * sizeof(String));
+    if (0 == result) {
+        perror("realloc");
+        exit(EXIT_FAILURE);
+    }
+    return result;
 }
 
 size_t sa_length(Strings const in) {
