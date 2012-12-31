@@ -1,6 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "cdb.h"
+#include "../common/envarray.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -69,11 +70,11 @@ int main(int argc, char * const argv[]) {
         exit(EXIT_FAILURE);
     } else if (0 == child_pid) {
         // child process
-        if (-1 == setenv("LD_PRELOAD", libear_path, 1)) {
+        if (-1 == setenv(ENV_PRELOAD, libear_path, 1)) {
             perror("setenv");
             exit(EXIT_FAILURE);
         }
-        if (-1 == setenv("BEAR_OUTPUT", socket_file, 1)) {
+        if (-1 == setenv(ENV_OUTPUT, socket_file, 1)) {
             perror("setenv");
             exit(EXIT_FAILURE);
         }

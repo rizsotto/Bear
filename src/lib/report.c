@@ -2,6 +2,7 @@
 
 #include "report.h"
 #include "../common/stringarray.h"
+#include "../common/envarray.h"
 #include "../common/protocol.h"
 
 #include <unistd.h>
@@ -19,7 +20,7 @@ static void write_call(int fd, char const * argv[]);
 
 void report_call(char const *method, char * const argv[]) {
     // get output file name
-    char * const out = getenv("BEAR_OUTPUT");
+    char * const out = getenv(ENV_OUTPUT);
     // connect to server
     if (out) {
         int s = socket(AF_UNIX, SOCK_STREAM, 0);

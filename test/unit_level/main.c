@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include <stringarray.h>
+#include <envarray.h>
 #include <protocol.h>
 #include <json.h>
 
@@ -114,6 +115,26 @@ void test_sa_copy() {
     sa_release(result);
 }
 
+void test_env_insert() {
+    char const * input[] =
+        { "HOME=/home/user"
+        , "BEAR_OUTPUT=/tmp/socket"
+        , "LD_PRELOAD_NOW=what_is_this"
+        , "LD_PRELOAD=/tmp/lib"
+        , 0
+        };
+    Strings result = sa_copy(input);
+
+    result = env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
+    result = env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
+
+    assert(sa_find(result, "BEAR_OUTPUT=/tmp/other_socket"));
+    assert(sa_find(result, "LD_PRELOAD=/tmp/other_lib"));
+    assert(sa_find(result, "LD_PRELOAD_NOW=what_is_this"));
+
+    sa_release(result);
+}
+
 void test_string_io() {
     int fds[2];
     pipe(fds);
@@ -188,6 +209,7 @@ int main() {
     test_sa_remove();
     test_sa_find();
     test_sa_copy();
+    test_env_insert();
     test_string_io();
     test_string_array_io();
     test_json();

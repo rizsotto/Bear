@@ -2,6 +2,7 @@
 
 #include "report.h"
 #include "../common/stringarray.h"
+#include "../common/envarray.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -15,7 +16,6 @@
 
 
 static void report_vararg_call(char const * method, const char *arg, ...);
-static Strings extend_env_array(Strings);
 
 
 int execv(const char *path, char *const argv[]) {
@@ -38,7 +38,9 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
         exit(EXIT_FAILURE);
     }
 
-    Strings menvp = extend_env_array((Strings)envp);
+    Strings menvp = sa_copy((Strings)envp);
+    menvp = env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
+    menvp = env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
     int const result = (*fp)(path, argv, (char *const *)menvp);
     sa_release(menvp);
     return result;
@@ -64,7 +66,9 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
         exit(EXIT_FAILURE);
     }
 
-    Strings menvp = extend_env_array((Strings)envp);
+    Strings menvp = sa_copy((Strings)envp);
+    menvp = env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
+    menvp = env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
     int const result = (*fp)(file, argv, (char *const *)menvp);
     sa_release(menvp);
     return result;
@@ -138,21 +142,3 @@ static void report_vararg_call(char const * method, const char *arg, ...) {
     va_end(args);
 }
 
-static String create_env(char const * key) {
-    char * result = 0;
-    char * const value = getenv(key);
-    if (value) {
-        if (-1 == asprintf(&result, "%s=%s", key, value)) {
-            perror("asprintf");
-            exit(EXIT_FAILURE);
-        }
-    }
-    return result;
-}
-
-static Strings extend_env_array(Strings in) {
-    Strings result = sa_copy(in);
-    result = sa_append(result, create_env("LD_PRELOAD"));
-    result = sa_append(result, create_env("BEAR_OUTPUT"));
-    return result;
-}
