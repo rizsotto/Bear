@@ -60,8 +60,6 @@ void write_string(int fd, char const * message) {
     }
 }
 
-static size_t count(char const * *);
-
 void write_string_array(int fd, char const * * message) {
     size_t const length = sa_length(message);
     write(fd, (void const *)&length, sizeof(size_t));
