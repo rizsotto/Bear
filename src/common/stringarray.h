@@ -4,11 +4,14 @@
 #define COMMON_STRINGARRAY_H
 
 #include <stddef.h>
+#include <stdarg.h>
 
 typedef char const *    String;
 typedef String *        Strings;
 
 Strings sa_copy(Strings const in);
+Strings sa_build(String arg, va_list ap);
+
 void    sa_release(Strings);
 
 Strings sa_append(Strings const in, String e);

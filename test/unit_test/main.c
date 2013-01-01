@@ -115,6 +115,29 @@ void test_sa_copy() {
     sa_release(result);
 }
 
+Strings sa_build_stdarg_driver(char const * arg, ...) {
+    va_list args;
+    va_start(args, arg);
+
+    Strings result = sa_build(arg, args);
+
+    va_end(args);
+    return result;
+}
+
+void test_sa_build() {
+    Strings result = sa_build_stdarg_driver("this", "is", "my", "message", 0);
+
+    assert(4 == sa_length(result));
+    assert(0 == strcmp("this",      result[0]));
+    assert(0 == strcmp("is",        result[1]));
+    assert(0 == strcmp("my",        result[2]));
+    assert(0 == strcmp("message",   result[3]));
+    assert(0 == result[4]);
+
+    sa_release(result);
+}
+
 void test_env_insert() {
     char const * input[] =
         { "HOME=/home/user"
@@ -209,6 +232,7 @@ int main() {
     test_sa_remove();
     test_sa_find();
     test_sa_copy();
+    test_sa_build();
     test_env_insert();
     test_string_io();
     test_string_array_io();

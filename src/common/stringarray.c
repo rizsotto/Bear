@@ -30,6 +30,25 @@ Strings sa_copy(Strings const in) {
     return result;
 }
 
+Strings sa_build(String arg, va_list args) {
+    Strings result = 0;
+    String it = arg;
+    size_t size = 0;
+    for (; it; it = va_arg(args, String)) {
+        result = (Strings)realloc(result, (size + 1) * sizeof(String));
+        String copy = strdup(it);
+        if (0 == copy) {
+            perror("strdup");
+            exit(EXIT_FAILURE);
+        }
+        result[size++] = copy;
+    }
+    result = (Strings)realloc(result, (size + 1) * sizeof(String));
+    result[size++] = 0;
+
+    return result;
+}
+
 void sa_release(Strings in) {
     char const * const * it = in;
     for (; (in) && (*it); ++it) {
