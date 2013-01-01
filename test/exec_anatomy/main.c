@@ -25,7 +25,7 @@ void fork_fun(exec_fun f) {
 
 
 void call_execv() {
-    char * const compiler = "cc";
+    char * const compiler = "/usr/bin/cc";
     char * const argv[] =
         { "cc"
         , "-c"
@@ -37,9 +37,9 @@ void call_execv() {
 }
 
 void call_execve() {
-    char * const compiler = "cc";
+    char * const compiler = "/usr/bin/cc";
     char * const argv[] =
-        { "cc"
+        { compiler
         , "-c"
         , "execve.c"
         , 0
@@ -67,7 +67,7 @@ void call_execvp() {
 void call_execvpe() {
     char * const compiler = "cc";
     char * const argv[] =
-        { "cc"
+        { "/usr/bin/cc"
         , "-c"
         , "execvpe.c"
         , 0
@@ -81,19 +81,19 @@ void call_execvpe() {
 }
 
 void call_execl() {
-    char * const compiler = "cc";
+    char * const compiler = "/usr/bin/cc";
 
-    execl(compiler, compiler, "-c", "execl.c", (char *)0);
+    execl(compiler, "cc", "-c", "execl.c", (char *)0);
 }
 
 void call_execlp() {
     char * const compiler = "cc";
 
-    execlp(compiler, compiler, "-c", "execlp.c", (char *)0);
+    execlp(compiler, "cc", "-c", "execlp.c", (char *)0);
 }
 
 void call_execle() {
-    char * const compiler = "cc";
+    char * const compiler = "/usr/bin/cc";
     char * const envp[] =
         { "THIS=THAT"
         , 0
@@ -109,7 +109,7 @@ void call_execle_and_printenv() {
         };
 
     char * const pe = "/usr/bin/printenv";
-    execle(pe, pe, (char *)0, envp);
+    execle(pe, "printenv", (char *)0, envp);
 }
 
 int main() {
