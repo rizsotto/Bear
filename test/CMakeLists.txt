@@ -6,5 +6,3 @@ add_subdirectory(exec_anatomy)
 
 add_custom_target(check)
 add_dependencies(check run_unit_test)
-add_dependencies(check run_exec_anatomy)
-add_dependencies(check end-to-end)
