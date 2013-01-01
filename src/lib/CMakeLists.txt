@@ -9,8 +9,6 @@ add_definitions(-D_GNU_SOURCE)
 set_target_properties(${ourlib_target} PROPERTIES
     LINKER_LANGUAGE C)
 set_target_properties(${ourlib_target} PROPERTIES
-    COMPILE_FLAGS -nostdlib)
-set_target_properties(${ourlib_target} PROPERTIES
     LINK_FLAGS "-Wl,--version-script=${ourlib_symbols}")
 
 target_link_libraries(${ourlib_target} dl)
