@@ -102,6 +102,16 @@ void call_execle() {
     execle(compiler, compiler, "-c", "execle.c", (char *)0, envp);
 }
 
+void call_execle_and_printenv() {
+    char * const envp[] =
+        { "THIS=THAT"
+        , 0
+        };
+
+    char * const pe = "/usr/bin/printenv";
+    execle(pe, pe, (char *)0, envp);
+}
+
 int main() {
     fork_fun(call_execv);
     fork_fun(call_execve);
@@ -110,5 +120,6 @@ int main() {
     fork_fun(call_execl);
     fork_fun(call_execlp);
     fork_fun(call_execle);
+    fork_fun(call_execle_and_printenv);
     return 0;
 }
