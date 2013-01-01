@@ -6,10 +6,10 @@ target_link_libraries(unit_test common)
 target_link_libraries(unit_test rt)
 include_directories(../../src/common)
 
-add_custom_target(unit_level
+add_custom_target(run_unit_test
   COMMAND ./unit_test
   COMMENT "Running unit tests")
 
-add_dependencies(unit_level unit_test)
-add_dependencies(unit_level ear)
-add_dependencies(unit_level bear)
+add_dependencies(run_unit_test unit_test)
+add_dependencies(run_unit_test ear)
+add_dependencies(run_unit_test bear)
