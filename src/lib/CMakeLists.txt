@@ -1,5 +1,7 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
+include(GNUInstallDirs)
+
 set(ourlib_target ear)
 set(ourlib_symbols ${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList)
 
@@ -15,4 +17,4 @@ target_link_libraries(${ourlib_target} dl)
 target_link_libraries(${ourlib_target} common)
 
 install(TARGETS ${ourlib_target}
-    LIBRARY DESTINATION lib)
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
