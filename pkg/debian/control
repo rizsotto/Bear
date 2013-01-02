@@ -1,0 +1,12 @@
+Source: bear
+Maintainer: Laszlo Nagy <rizsotto@gmail.com>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.3
+Build-Depends: debhelper, cmake
+
+Package: bear
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: BuildEAR
+ Bear is a tool to generate compilation database for clang tooling.
