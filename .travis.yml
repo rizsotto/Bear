@@ -10,6 +10,7 @@ before_script:
 
 script:
   - cmake ..
+  - make
   - make check
 
 after_script:
