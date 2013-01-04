@@ -1,7 +1,7 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
-set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bin/bear)
-set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/lib/libear.so)
+set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
+set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear.so)
 
 add_custom_target(run_end-to-end
   COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o scons.json -- scons -C ${CMAKE_CURRENT_SOURCE_DIR} -s

@@ -1,9 +1,9 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "cdb.h"
-#include "../common/stringarray.h"
-#include "../common/protocol.h"
-#include "../common/json.h"
+#include "stringarray.h"
+#include "protocol.h"
+#include "json.h"
 
 #include <unistd.h>
 #include <string.h>

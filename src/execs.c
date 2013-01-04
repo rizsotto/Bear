@@ -1,8 +1,8 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "report.h"
-#include "../common/stringarray.h"
-#include "../common/envarray.h"
+#include "stringarray.h"
+#include "envarray.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>

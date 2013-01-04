@@ -1,9 +1,9 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "report.h"
-#include "../common/stringarray.h"
-#include "../common/envarray.h"
-#include "../common/protocol.h"
+#include "stringarray.h"
+#include "envarray.h"
+#include "protocol.h"
 
 #include <unistd.h>
 #include <malloc.h>

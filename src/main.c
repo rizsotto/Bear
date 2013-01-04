@@ -1,7 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "cdb.h"
-#include "../common/envarray.h"
+#include "envarray.h"
 
 #include <unistd.h>
 #include <stdio.h>

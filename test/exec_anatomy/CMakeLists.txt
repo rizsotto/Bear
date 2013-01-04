@@ -3,8 +3,8 @@
 add_executable(exec_anatomy main.c)
 add_definitions(-D_GNU_SOURCE)
 
-set(BEAR_EXE ../../src/bin/bear)
-set(BEAR_LIB ../../src/lib/libear.so)
+set(BEAR_EXE ../../src/bear)
+set(BEAR_LIB ../../src/libear.so)
 
 add_custom_target(run_exec_anatomy
   COMMAND touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c
