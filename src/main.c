@@ -20,7 +20,7 @@
 
 #define SOCKET_FILE XSTR(DEFAULT_SOCKET_FILE)
 #define OUTPUT_FILE XSTR(DEFAULT_OUTPUT_FILE)
-#define LIBEAR_FILE XSTR(LIBEAR_INSTALL_DIR)"/libear.so"
+#define LIBEAR_FILE XSTR(DEFAULT_PRELOAD_FILE)
 
 // variables which are used in signal handler
 static pid_t    child_pid;
