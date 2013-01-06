@@ -15,10 +15,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-static void write_cwd(int fd);
-static void write_call(int fd, char const * argv[]);
+static void write_message(int fd, char const * function, char * const argv[]);
 
-void report_call(char const *method, char * const argv[]) {
+void report_call(char const *function, char * const argv[]) {
     // get output file name
     char * const out = getenv(ENV_OUTPUT);
     // connect to server
@@ -34,19 +33,19 @@ void report_call(char const *method, char * const argv[]) {
             close(s);
             return;
         }
-        write_cwd(s);
-        write_call(s, (char const **)argv);
+        write_message(s, function, argv);
         close(s);
     }
 }
 
-static void write_cwd(int fd) {
-    char const * cwd = get_current_dir_name();
-    write_string(fd, cwd);
-    free((void*)cwd);
+static void write_message(int fd, char const * function, char * const argv[]) {
+    struct bear_message msg;
+    {
+        msg.pid = getpid();
+        msg.fun = function;
+        msg.cwd = get_current_dir_name();
+        msg.cmd = argv;
+    }
+    bear_write_message(fd, &msg);
+    free((void*)msg.cwd);
 }
-
-static void write_call(int fd, char const * argv[]) {
-    write_string_array(fd, argv);
-}
-

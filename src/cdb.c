@@ -68,8 +68,11 @@ void cdb_delete(struct CDBEntry * e) {
 static char const * get_source_file(char const * * cmd, char const * cwd);
 
 void cdb_read(int fd, struct CDBEntry * e) {
-    e->cwd = read_string(fd);
-    e->cmd = read_string_array(fd);
+    struct bear_message msg;
+    bear_read_message(fd, &msg);
+
+    e->cwd = msg.cwd;
+    e->cmd = msg.cmd;
     e->src = get_source_file(e->cmd, e->cwd);
 }
 

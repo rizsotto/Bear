@@ -11,7 +11,16 @@
 
 
 #ifdef SERVER
-char const * read_string(int fd) {
+static pid_t read_pid(int fd) {
+    pid_t result= 0;
+    if (-1 == read(fd, (void *)&result, sizeof(pid_t))) {
+        perror("read: pid");
+        exit(EXIT_FAILURE);
+    }
+    return result;
+}
+
+static char const * read_string(int fd) {
     size_t length = 0;
     if (-1 == read(fd, (void *)&length, sizeof(size_t))) {
         perror("read: string length");
@@ -32,7 +41,7 @@ char const * read_string(int fd) {
     return result;
 }
 
-char const * * read_string_array(int fd) {
+static char const * * read_string_array(int fd) {
     size_t length = 0;
     if (-1 == read(fd, (void *)&length, sizeof(size_t))) {
         perror("read: string array length");
@@ -51,10 +60,21 @@ char const * * read_string_array(int fd) {
     result[length] = 0;
     return result;
 }
+
+void bear_read_message(int fd, struct bear_message * e) {
+    e->pid = read_pid(fd);
+    e->fun = read_string(fd);
+    e->cwd = read_string(fd);
+    e->cmd = read_string_array(fd);
+}
 #endif
 
 #ifdef CLIENT
-void write_string(int fd, char const * message) {
+static void write_pid(int fd, pid_t pid) {
+    write(fd, (void const *)&pid, sizeof(pid_t));
+}
+
+static void write_string(int fd, char const * message) {
     size_t const length = (message) ? strlen(message) : 0;
     write(fd, (void const *)&length, sizeof(size_t));
     if (length > 0) {
@@ -62,12 +82,19 @@ void write_string(int fd, char const * message) {
     }
 }
 
-void write_string_array(int fd, char const * * message) {
+static void write_string_array(int fd, char const * * message) {
     size_t const length = sa_length(message);
     write(fd, (void const *)&length, sizeof(size_t));
     size_t it = 0;
     for (; it < length; ++it) {
         write_string(fd, message[it]);
     }
+}
+
+void bear_write_message(int fd, struct bear_message const * e) {
+    write_pid(fd, e->pid);
+    write_string(fd, e->fun);
+    write_string(fd, e->cwd);
+    write_string_array(fd, e->cmd);
 }
 #endif

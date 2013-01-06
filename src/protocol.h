@@ -1,16 +1,23 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef COMMON_PROTOCOL_H
-#define COMMON_PROTOCOL_H
+#ifndef BEAR_PROTOCOL_H
+#define BEAR_PROTOCOL_H
+
+#include <unistd.h>
+
+struct bear_message {
+    pid_t pid;
+    char const * fun;
+    char const * cwd;
+    char const * * cmd;
+};
 
 #ifdef SERVER
-char const *    read_string(int fd);
-char const * *  read_string_array(int fd);
+void bear_read_message(int fd, struct bear_message * e);
 #endif
 
 #ifdef CLIENT
-void write_string(int fd, char const *);
-void write_string_array(int fd, char const * *);
+void bear_write_message(int fd, struct bear_message const * e);
 #endif
 
 #endif

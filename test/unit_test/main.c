@@ -158,56 +158,6 @@ void test_env_insert() {
     sa_release(result);
 }
 
-void test_string_io() {
-    int fds[2];
-    pipe(fds);
-
-    char const * const in_msg_1 = "this is my fmessage!";
-    char const * const in_msg_2 = "";
-
-    write_string(fds[1], in_msg_1);
-    write_string(fds[1], in_msg_2);
-    write_string(fds[1], 0);
-
-    char const * const out_msg_1 = read_string(fds[0]);
-    char const * const out_msg_2 = read_string(fds[0]);
-    char const * const out_msg_3 = read_string(fds[0]);
-
-    assert(0 == strcmp(in_msg_1, out_msg_1));
-    assert(0 == strcmp(in_msg_2, out_msg_2));
-    assert(0 == strcmp(in_msg_2, out_msg_3));
-
-    free((void *)out_msg_1);
-    free((void *)out_msg_2);
-    free((void *)out_msg_3);
-}
-
-void test_string_array_io() {
-    int fds[2];
-    pipe(fds);
-
-    char const * input[] =
-        { "this"
-        , "is"
-        , "my"
-        , "message"
-        , 0
-        };
-
-    write_string_array(fds[1], input);
-
-    char const * * const result = read_string_array(fds[0]);
-
-    assert(4 == sa_length(result));
-    assert(0 == strcmp("this",      result[0]));
-    assert(0 == strcmp("is",        result[1]));
-    assert(0 == strcmp("my",        result[2]));
-    assert(0 == strcmp("message",   result[3]));
-    assert(0 == result[4]);
-
-    sa_release(result);
-}
-
 void test_json() {
     char const * input_const[] =
         { "this"
@@ -225,6 +175,47 @@ void test_json() {
     free((void *)result);
 }
 
+void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
+    assert(sa_length(lhs) == sa_length(rhs));
+    size_t const length = sa_length(lhs);
+    int i = 0;
+    for (; i < length; ++i) {
+        assert(0 == strcmp(lhs[i], rhs[i]));
+    }
+}
+
+void assert_messages_equals(struct bear_message const * lhs,
+                            struct bear_message const * rhs) {
+    assert(lhs->pid == rhs->pid);
+    assert(0 == strcmp(lhs->fun, rhs->fun));
+    assert(0 == strcmp(lhs->cwd, rhs->cwd));
+    assert_stringarray_equals(lhs->cmd, rhs->cmd);
+}
+
+void test_protocol() {
+    struct bear_message msg[2];
+    {
+        msg[1].pid = 9;
+        msg[1].fun = "exec";
+        msg[1].cwd = "/tmp";
+        char const * cmds[] =
+                { "this"
+                , "that"
+                , 0
+                };
+        msg[1].cmd = cmds;
+    }
+    {
+        int fds[2];
+        pipe(fds);
+
+        bear_write_message(fds[1], &msg[1]);
+        bear_read_message(fds[0], &msg[0]);
+    }
+    assert_messages_equals(&msg[1], &msg[0]);
+}
+
+
 int main() {
     test_sa_length();
     test_sa_fold();
@@ -234,8 +225,7 @@ int main() {
     test_sa_copy();
     test_sa_build();
     test_env_insert();
-    test_string_io();
-    test_string_array_io();
     test_json();
+    test_protocol();
     return 0;
 }
