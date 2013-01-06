@@ -11,9 +11,9 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
-typedef void (*send_message)(struct bear_message const *);
+typedef void (*send_message)(char const *, struct bear_message const *);
 
-static void report(send_message fp, char const * fun, char * const argv[]) {
+static void report(send_message fp, char const * out_file, char const * fun, char * const argv[]) {
     struct bear_message msg;
     {
         msg.pid = getpid();
@@ -21,17 +21,11 @@ static void report(send_message fp, char const * fun, char * const argv[]) {
         msg.cwd = get_current_dir_name();
         msg.cmd = (char const **)argv;
     }
-    (*fp)(&msg);
+    (*fp)(out_file, &msg);
     free((void*)msg.cwd);
 }
 
-static void send_on_unix_socket(struct bear_message const * msg) {
-    char * const out = getenv(ENV_OUTPUT);
-    if (0 == out) {
-        perror("getenv");
-        exit(EXIT_FAILURE);
-    }
-
+static void send_on_unix_socket(char const * out, struct bear_message const * msg) {
     int s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (-1 == s) {
         perror("socket");
@@ -49,5 +43,11 @@ static void send_on_unix_socket(struct bear_message const * msg) {
 }
 
 void report_call(char const *fun, char * const argv[]) {
-    return report(send_on_unix_socket, fun, argv);
+    char * const out = getenv(ENV_OUTPUT);
+    if (0 == out) {
+        perror("getenv");
+        exit(EXIT_FAILURE);
+    }
+
+    return report(send_on_unix_socket, out, fun, argv);
 }
