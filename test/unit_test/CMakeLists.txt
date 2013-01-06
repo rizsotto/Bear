@@ -5,7 +5,7 @@ add_executable(unit_test
     ../../src/stringarray.c
     ../../src/protocol.c
     ../../src/json.c
-    ../../src/envarray.c
+    ../../src/environ.c
     )
 add_definitions(-D_GNU_SOURCE)
 include_directories(../../src)

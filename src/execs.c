@@ -1,7 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
 #include "stringarray.h"
-#include "envarray.h"
+#include "environ.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,8 +27,8 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
     }
 
     Strings menvp = sa_copy((Strings)envp);
-    menvp = env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
-    menvp = env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+    menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
+    menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
     int const result = (*fp)(path, argv, (char *const *)menvp);
     sa_release(menvp);
     return result;
@@ -48,8 +48,8 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
     }
 
     Strings menvp = sa_copy((Strings)envp);
-    menvp = env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
-    menvp = env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+    menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
+    menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
     int const result = (*fp)(file, argv, (char *const *)menvp);
     sa_release(menvp);
     return result;

@@ -11,9 +11,18 @@
 #include <fcntl.h>
 
 #include <stringarray.h>
-#include <envarray.h>
+#include <environ.h>
 #include <protocol.h>
 #include <json.h>
+
+void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
+    assert(sa_length(lhs) == sa_length(rhs));
+    size_t const length = sa_length(lhs);
+    int i = 0;
+    for (; i < length; ++i) {
+        assert(0 == strcmp(lhs[i], rhs[i]));
+    }
+}
 
 void test_sa_length() {
     char const * input[] =
@@ -148,23 +157,19 @@ void test_env_insert() {
         };
     Strings result = sa_copy(input);
 
-    result = env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
-    result = env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
+    result = bear_env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
+    result = bear_env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
 
-    assert(sa_find(result, "BEAR_OUTPUT=/tmp/other_socket"));
-    assert(sa_find(result, "LD_PRELOAD=/tmp/other_lib"));
-    assert(sa_find(result, "LD_PRELOAD_NOW=what_is_this"));
+    char const * expected[] = 
+        { "HOME=/home/user"
+        , "LD_PRELOAD_NOW=what_is_this"
+        , "BEAR_OUTPUT=/tmp/other_socket"
+        , "LD_PRELOAD=/tmp/other_lib"
+        , 0
+        };
+    assert_stringarray_equals(expected, result);
 
     sa_release(result);
-}
-
-void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
-    assert(sa_length(lhs) == sa_length(rhs));
-    size_t const length = sa_length(lhs);
-    int i = 0;
-    for (; i < length; ++i) {
-        assert(0 == strcmp(lhs[i], rhs[i]));
-    }
 }
 
 void test_json() {

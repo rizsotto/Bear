@@ -1,13 +1,14 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include "envarray.h"
+#include "environ.h"
+#include "stringarray.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 
-Strings env_insert(Strings envs, char const * key, char const * value) {
+char const * * bear_env_insert(char const * envs[], char const * key, char const * value) {
     if (0 == value) {
         perror("getenv");
         exit(EXIT_FAILURE);

@@ -1,6 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include "envarray.h"
+#include "environ.h"
 #include "protocol.h"
 
 #include <unistd.h>

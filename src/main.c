@@ -2,7 +2,7 @@
 
 #include "protocol.h"
 #include "output.h"
-#include "envarray.h"
+#include "environ.h"
 
 #include <unistd.h>
 #include <stdio.h>

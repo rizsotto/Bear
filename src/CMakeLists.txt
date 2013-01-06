@@ -11,7 +11,7 @@ add_definitions(-DDEFAULT_OUTPUT_FILE=compile_commands.json)
 add_library(ear SHARED
     stringarray.c
     protocol.c
-    envarray.c
+    environ.c
     execs.c
     report.c)
 target_link_libraries(ear dl)
