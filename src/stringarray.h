@@ -9,8 +9,10 @@
 typedef char const *    String;
 typedef String *        Strings;
 
+#ifdef CLIENT
 Strings sa_copy(Strings const in);
 Strings sa_build(String arg, va_list ap);
+#endif
 
 void    sa_release(Strings);
 
@@ -20,6 +22,8 @@ Strings sa_remove(Strings const in, String e);
 size_t  sa_length(Strings const in);
 int     sa_find(Strings const in, String e);
 
+#ifdef SERVER
 String  sa_fold(Strings const in, char const sep);
+#endif
 
 #endif

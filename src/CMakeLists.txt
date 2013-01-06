@@ -16,7 +16,8 @@ add_library(ear SHARED
     report.c)
 target_link_libraries(ear dl)
 set_target_properties(ear PROPERTIES
-    LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList")
+    LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList"
+    COMPILE_DEFINITIONS "CLIENT")
 
 
 add_executable(bear
@@ -25,6 +26,8 @@ add_executable(bear
     main.c
     cdb.c
     json.c)
+set_target_properties(bear PROPERTIES
+    COMPILE_DEFINITIONS "SERVER")
 
 
 install(TARGETS bear

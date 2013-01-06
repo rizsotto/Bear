@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef CLIENT
 Strings sa_copy(Strings const in) {
     size_t const size = sa_length(in);
 
@@ -48,6 +49,7 @@ Strings sa_build(String arg, va_list args) {
 
     return result;
 }
+#endif
 
 void sa_release(Strings in) {
     char const * const * it = in;
@@ -119,6 +121,7 @@ int sa_find(Strings const in, String e) {
     return 0;
 }
 
+#ifdef SERVER
 String sa_fold(Strings const in, char const separator) {
     char * acc = 0;
     size_t acc_size = 0;
@@ -146,3 +149,4 @@ String sa_fold(Strings const in, char const separator) {
     acc[acc_size++] = '\0';
     return acc;
 }
+#endif

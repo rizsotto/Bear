@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 
+#ifdef SERVER
 char const * read_string(int fd) {
     size_t length = 0;
     if (-1 == read(fd, (void *)&length, sizeof(size_t))) {
@@ -50,8 +51,9 @@ char const * * read_string_array(int fd) {
     result[length] = 0;
     return result;
 }
+#endif
 
-
+#ifdef CLIENT
 void write_string(int fd, char const * message) {
     size_t const length = (message) ? strlen(message) : 0;
     write(fd, (void const *)&length, sizeof(size_t));
@@ -68,4 +70,4 @@ void write_string_array(int fd, char const * * message) {
         write_string(fd, message[it]);
     }
 }
-
+#endif
