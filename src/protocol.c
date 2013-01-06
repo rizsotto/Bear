@@ -74,7 +74,7 @@ void bear_free_message(struct bear_message * e) {
     e->fun = 0;
     free((void*)e->cwd);
     e->cwd = 0;
-    sa_release(e->cmd);
+    bear_strings_release(e->cmd);
     e->cmd = 0;
 }
 #endif
@@ -93,7 +93,7 @@ static void write_string(int fd, char const * message) {
 }
 
 static void write_string_array(int fd, char const * * message) {
-    size_t const length = sa_length(message);
+    size_t const length = bear_strings_length(message);
     write(fd, (void const *)&length, sizeof(size_t));
     size_t it = 0;
     for (; it < length; ++it) {

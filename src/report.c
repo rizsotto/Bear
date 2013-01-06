@@ -19,7 +19,7 @@ static void report(send_message fp, char const * fun, char * const argv[]) {
         msg.pid = getpid();
         msg.fun = fun;
         msg.cwd = get_current_dir_name();
-        msg.cmd = argv;
+        msg.cmd = (char const **)argv;
     }
     (*fp)(&msg);
     free((void*)msg.cwd);

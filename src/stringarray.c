@@ -9,8 +9,8 @@
 #include <stdlib.h>
 
 #ifdef CLIENT
-char const ** sa_copy(char const ** const in) {
-    size_t const size = sa_length(in);
+char const ** bear_strings_copy(char const ** const in) {
+    size_t const size = bear_strings_length(in);
 
     char const ** result =
         (char const **)malloc((size + 1) * sizeof(char const *));
@@ -32,7 +32,7 @@ char const ** sa_copy(char const ** const in) {
     return result;
 }
 
-char const ** sa_build(char const * const arg, va_list args) {
+char const ** bear_strings_build(char const * const arg, va_list args) {
     char const ** result = 0;
     char const * it = arg;
     size_t size = 0;
@@ -52,7 +52,7 @@ char const ** sa_build(char const * const arg, va_list args) {
 }
 #endif
 
-void sa_release(char const ** in) {
+void bear_strings_release(char const ** in) {
     char const * const * it = in;
     for (; (in) && (*it); ++it) {
         free((void *)*it);
@@ -61,11 +61,11 @@ void sa_release(char const ** in) {
     in = 0;
 }
 
-char const ** sa_append(char const ** const in, char const * const e) {
+char const ** bear_strings_append(char const ** const in, char const * const e) {
     if (0 == e) {
         return in;
     }
-    size_t size = sa_length(in);
+    size_t size = bear_strings_length(in);
     char const ** result = (char const **)realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result) {
         perror("realloc");
@@ -76,7 +76,7 @@ char const ** sa_append(char const ** const in, char const * const e) {
     return result;
 }
 
-char const ** sa_remove(char const ** const in, char const * const e) {
+char const ** bear_strings_remove(char const ** const in, char const * const e) {
     if (0 == e) {
         return in;
     }
@@ -92,7 +92,7 @@ char const ** sa_remove(char const ** const in, char const * const e) {
         }
     }
     // now resize the array
-    size_t size = sa_length(in);
+    size_t size = bear_strings_length(in);
     char const ** result = (char const **)realloc(in, (size + 1) * sizeof(char const *));
     if (0 == result) {
         perror("realloc");
@@ -101,7 +101,7 @@ char const ** sa_remove(char const ** const in, char const * const e) {
     return result;
 }
 
-size_t sa_length(char const * const * in) {
+size_t bear_strings_length(char const * const * in) {
     size_t result = 0;
     char const * const * it = in;
     for (; (in) && (*it); ++it, ++result)
@@ -109,7 +109,7 @@ size_t sa_length(char const * const * in) {
     return result;
 }
 
-int sa_find(char const * const * in, char const * const e) {
+int bear_strings_find(char const * const * in, char const * const e) {
     if (0 == e)
         return 0;
 
@@ -123,7 +123,7 @@ int sa_find(char const * const * in, char const * const e) {
 }
 
 #ifdef SERVER
-char const * sa_fold(char const * const * in, char const separator) {
+char const * bear_strings_fold(char const * const * in, char const separator) {
     char * acc = 0;
     size_t acc_size = 0;
 

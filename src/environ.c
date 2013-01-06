@@ -24,10 +24,10 @@ char const * * bear_env_insert(char const * envs[], char const * key, char const
     char const * * it = envs;
     for (; (envs) && (*it); ++it) {
         if (0 == strncmp(env, *it, key_length)) {
-            envs = sa_remove(envs, *it);
+            envs = bear_strings_remove(envs, *it);
             it = envs;
         }
     }
-    return sa_append(envs, env);
+    return bear_strings_append(envs, env);
 }
 

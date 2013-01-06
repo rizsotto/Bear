@@ -16,15 +16,15 @@
 #include <json.h>
 
 void assert_stringarray_equals(char const ** const lhs, char const ** const rhs) {
-    assert(sa_length(lhs) == sa_length(rhs));
-    size_t const length = sa_length(lhs);
+    assert(bear_strings_length(lhs) == bear_strings_length(rhs));
+    size_t const length = bear_strings_length(lhs);
     int i = 0;
     for (; i < length; ++i) {
         assert(0 == strcmp(lhs[i], rhs[i]));
     }
 }
 
-void test_sa_length() {
+void test_strings_length() {
     char const * input[] =
         { "this"
         , "is"
@@ -32,12 +32,12 @@ void test_sa_length() {
         , "message"
         , 0
         };
-    assert(4 == sa_length(input));
-    assert(2 == sa_length(input + 2));
-    assert(0 == sa_length(0));
+    assert(4 == bear_strings_length(input));
+    assert(2 == bear_strings_length(input + 2));
+    assert(0 == bear_strings_length(0));
 }
 
-void test_sa_fold() {
+void test_strings_fold() {
     char const * input[] =
         { "this"
         , "is"
@@ -46,50 +46,50 @@ void test_sa_fold() {
         , 0
         };
     char const * const expected = "this\x1fis\x1fmy\x1fmessage";
-    char const * const result = sa_fold(input, '\x1f');
+    char const * const result = bear_strings_fold(input, '\x1f');
 
-    assert((0 == strcmp(expected, result)) && "sa_fold failed");
+    assert((0 == strcmp(expected, result)) && "bear_strings_fold failed");
 
     free((void *)result);
 }
 
-void test_sa_append() {
+void test_strings_append() {
     char const ** result = 0;
 
-    result = sa_append(result, strdup("this"));
+    result = bear_strings_append(result, strdup("this"));
 
-    assert(1 == sa_length(result));
+    assert(1 == bear_strings_length(result));
     assert(0 == strcmp("this", result[0]));
     assert(0 == result[1]);
 
-    result = sa_append(result, strdup("that"));
+    result = bear_strings_append(result, strdup("that"));
 
-    assert(2 == sa_length(result));
+    assert(2 == bear_strings_length(result));
     assert(0 == strcmp("this", result[0]));
     assert(0 == strcmp("that", result[1]));
     assert(0 == result[2]);
 
-    sa_release(result);
+    bear_strings_release(result);
 }
 
-void test_sa_remove() {
+void test_strings_remove() {
     char const ** result = 0;
 
-    result = sa_append(result, strdup("this"));
-    result = sa_append(result, strdup("and"));
-    result = sa_append(result, strdup("that"));
+    result = bear_strings_append(result, strdup("this"));
+    result = bear_strings_append(result, strdup("and"));
+    result = bear_strings_append(result, strdup("that"));
 
-    result = sa_remove(result, result[1]);
+    result = bear_strings_remove(result, result[1]);
 
-    assert(2 == sa_length(result));
+    assert(2 == bear_strings_length(result));
     assert(0 == strcmp("this", result[0]));
     assert(0 == strcmp("that", result[1]));
     assert(0 == result[2]);
 
-    sa_release(result);
+    bear_strings_release(result);
 }
 
-void test_sa_find() {
+void test_strings_find() {
     char const * input[] =
         { "this"
         , "is"
@@ -97,14 +97,14 @@ void test_sa_find() {
         , "message"
         , 0
         };
-    assert(sa_find(input, "this"));
-    assert(sa_find(input, "my"));
+    assert(bear_strings_find(input, "this"));
+    assert(bear_strings_find(input, "my"));
 
-    assert(0 == sa_find(input, "th"));
-    assert(0 == sa_find(input, "messa"));
+    assert(0 == bear_strings_find(input, "th"));
+    assert(0 == bear_strings_find(input, "messa"));
 }
 
-void test_sa_copy() {
+void test_strings_copy() {
     char const * input[] =
         { "this"
         , "is"
@@ -112,39 +112,37 @@ void test_sa_copy() {
         , "message"
         , 0
         };
-    char const ** result = sa_copy(input);
+    char const ** result = bear_strings_copy(input);
 
-    assert(4 == sa_length(result));
-    assert(0 == strcmp("this",      result[0]));
-    assert(0 == strcmp("is",        result[1]));
-    assert(0 == strcmp("my",        result[2]));
-    assert(0 == strcmp("message",   result[3]));
-    assert(0 == result[4]);
+    assert_stringarray_equals(input, result);
+    assert(input != result);
 
-    sa_release(result);
+    bear_strings_release(result);
 }
 
-char const ** sa_build_stdarg_driver(char const * arg, ...) {
+char const ** bear_strings_build_stdarg_driver(char const * arg, ...) {
     va_list args;
     va_start(args, arg);
 
-    char const ** result = sa_build(arg, args);
+    char const ** result = bear_strings_build(arg, args);
 
     va_end(args);
     return result;
 }
 
-void test_sa_build() {
-    char const ** result = sa_build_stdarg_driver("this", "is", "my", "message", 0);
+void test_strings_build() {
+    char const ** result = bear_strings_build_stdarg_driver("this", "is", "my", "message", 0);
 
-    assert(4 == sa_length(result));
-    assert(0 == strcmp("this",      result[0]));
-    assert(0 == strcmp("is",        result[1]));
-    assert(0 == strcmp("my",        result[2]));
-    assert(0 == strcmp("message",   result[3]));
-    assert(0 == result[4]);
+    char const * expected[] = 
+        { "this"
+        , "is"
+        , "my"
+        , "message"
+        , 0
+        };
+    assert_stringarray_equals(expected, result);
 
-    sa_release(result);
+    bear_strings_release(result);
 }
 
 void test_env_insert() {
@@ -155,7 +153,7 @@ void test_env_insert() {
         , "LD_PRELOAD=/tmp/lib"
         , 0
         };
-    char const ** result = sa_copy(input);
+    char const ** result = bear_strings_copy(input);
 
     result = bear_env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
     result = bear_env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
@@ -169,7 +167,7 @@ void test_env_insert() {
         };
     assert_stringarray_equals(expected, result);
 
-    sa_release(result);
+    bear_strings_release(result);
 }
 
 void test_json() {
@@ -179,7 +177,7 @@ void test_json() {
         , "message=\"shit\\gold\""
         , 0
         };
-    char const ** input = sa_copy(input_const);
+    char const ** input = bear_strings_copy(input_const);
     char const ** result = bear_json_escape_strings(input);
 
     char const * expected[] = 
@@ -190,7 +188,7 @@ void test_json() {
         };
     assert_stringarray_equals(expected, result);
 
-    sa_release(input);
+    bear_strings_release(input);
 }
 
 void assert_messages_equals(struct bear_message const * lhs,
@@ -226,13 +224,13 @@ void test_protocol() {
 
 
 int main() {
-    test_sa_length();
-    test_sa_fold();
-    test_sa_append();
-    test_sa_remove();
-    test_sa_find();
-    test_sa_copy();
-    test_sa_build();
+    test_strings_length();
+    test_strings_fold();
+    test_strings_append();
+    test_strings_remove();
+    test_strings_find();
+    test_strings_copy();
+    test_strings_build();
     test_env_insert();
     test_json();
     test_protocol();
