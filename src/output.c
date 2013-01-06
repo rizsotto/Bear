@@ -37,7 +37,7 @@ static char const * get_source_file(char const * * cmd, char const * cwd);
 
 void bear_append_json_output(int fd, struct bear_message const * e, int debug) {
     char const * src = get_source_file(e->cmd, e->cwd);
-    char const * const cmd = json_escape(e->cmd);
+    char const * const cmd = sa_fold(bear_json_escape_strings(e->cmd), ' ');
     if (src) {
         if (count++) {
             dprintf(fd, ",\n");

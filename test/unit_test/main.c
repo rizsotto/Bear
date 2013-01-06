@@ -158,6 +158,15 @@ void test_env_insert() {
     sa_release(result);
 }
 
+void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
+    assert(sa_length(lhs) == sa_length(rhs));
+    size_t const length = sa_length(lhs);
+    int i = 0;
+    for (; i < length; ++i) {
+        assert(0 == strcmp(lhs[i], rhs[i]));
+    }
+}
+
 void test_json() {
     char const * input_const[] =
         { "this"
@@ -166,22 +175,17 @@ void test_json() {
         , 0
         };
     Strings input = sa_copy(input_const);
-    String result = json_escape(input);
+    Strings result = bear_json_escape_strings(input);
 
-    assert(0 == strcmp("this \\\"is my\\\" message=\\\"shit\\\\gold\\\"",
-                       result));
+    char const * expected[] = 
+        { "this"
+        , "\\\"is my\\\""
+        , "message=\\\"shit\\\\gold\\\""
+        , 0
+        };
+    assert_stringarray_equals(expected, result);
 
     sa_release(input);
-    free((void *)result);
-}
-
-void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
-    assert(sa_length(lhs) == sa_length(rhs));
-    size_t const length = sa_length(lhs);
-    int i = 0;
-    for (; i < length; ++i) {
-        assert(0 == strcmp(lhs[i], rhs[i]));
-    }
 }
 
 void assert_messages_equals(struct bear_message const * lhs,

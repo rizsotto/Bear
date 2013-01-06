@@ -1,8 +1,9 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef COMMON_JSON_H
-#define COMMON_JSON_H
+#ifndef BEAR_JSON_H
+#define BEAR_JSON_H
 
-char const * json_escape(char const * *);
+char const *   bear_json_escape_string(char const *);
+char const * * bear_json_escape_strings(char const * *);
 
 #endif

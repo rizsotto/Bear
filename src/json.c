@@ -8,19 +8,18 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-static char const * fix_single_argument(char const *);
 
-char const * json_escape(char const * * raw) {
+char const * * bear_json_escape_strings(char const * * raw) {
     char const * * it = raw;
     for (; (raw) && (*it); ++it) {
-        char const * const new = fix_single_argument(*it);
+        char const * const new = bear_json_escape_string(*it);
         if (new) {
             char const * const tmp = *it;
             *it = new;
             free((void *)tmp);
         }
     }
-    return sa_fold(raw, ' ');
+    return raw;
 }
 
 static size_t count(char const * const begin,
@@ -29,7 +28,7 @@ static size_t count(char const * const begin,
 
 static int needs_escape(int);
 
-static char const * fix_single_argument(char const * raw) {
+char const * bear_json_escape_string(char const * raw) {
     size_t const length = (raw) ? strlen(raw) : 0;
     size_t const spaces = count(raw, raw + length, isspace);
     size_t const json = count(raw, raw + length, needs_escape);
