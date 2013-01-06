@@ -6,24 +6,21 @@
 #include <stddef.h>
 #include <stdarg.h>
 
-typedef char const *    String;
-typedef String *        Strings;
-
 #ifdef CLIENT
-Strings sa_copy(Strings const in);
-Strings sa_build(String arg, va_list ap);
+char const ** sa_copy(char const ** const in);
+char const ** sa_build(char const * arg, va_list ap);
 #endif
 
-void    sa_release(Strings);
+char const ** sa_append(char const ** in, char const * e);
+char const ** sa_remove(char const ** in, char const * e);
 
-Strings sa_append(Strings const in, String e);
-Strings sa_remove(Strings const in, String e);
+size_t  sa_length(char const * const * in);
+int     sa_find(char const * const * in, char const * e);
 
-size_t  sa_length(Strings const in);
-int     sa_find(Strings const in, String e);
+void    sa_release(char const **);
 
 #ifdef SERVER
-String  sa_fold(Strings const in, char const sep);
+char const * sa_fold(char const * const * in, char const sep);
 #endif
 
 #endif

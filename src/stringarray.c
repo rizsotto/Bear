@@ -9,10 +9,11 @@
 #include <stdlib.h>
 
 #ifdef CLIENT
-Strings sa_copy(Strings const in) {
+char const ** sa_copy(char const ** const in) {
     size_t const size = sa_length(in);
 
-    Strings result = (Strings)malloc((size + 1) * sizeof(String));
+    char const ** result =
+        (char const **)malloc((size + 1) * sizeof(char const *));
     if (0 == result) {
         perror("malloc");
         exit(EXIT_FAILURE);
@@ -31,27 +32,27 @@ Strings sa_copy(Strings const in) {
     return result;
 }
 
-Strings sa_build(String arg, va_list args) {
-    Strings result = 0;
-    String it = arg;
+char const ** sa_build(char const * const arg, va_list args) {
+    char const ** result = 0;
+    char const * it = arg;
     size_t size = 0;
-    for (; it; it = va_arg(args, String)) {
-        result = (Strings)realloc(result, (size + 1) * sizeof(String));
-        String copy = strdup(it);
+    for (; it; it = va_arg(args, char const *)) {
+        result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+        char const * copy = strdup(it);
         if (0 == copy) {
             perror("strdup");
             exit(EXIT_FAILURE);
         }
         result[size++] = copy;
     }
-    result = (Strings)realloc(result, (size + 1) * sizeof(String));
+    result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
     result[size++] = 0;
 
     return result;
 }
 #endif
 
-void sa_release(Strings in) {
+void sa_release(char const ** in) {
     char const * const * it = in;
     for (; (in) && (*it); ++it) {
         free((void *)*it);
@@ -60,12 +61,12 @@ void sa_release(Strings in) {
     in = 0;
 }
 
-Strings sa_append(Strings const in, String e) {
+char const ** sa_append(char const ** const in, char const * const e) {
     if (0 == e) {
         return in;
     }
     size_t size = sa_length(in);
-    Strings result = (Strings)realloc(in, (size + 2) * sizeof(String));
+    char const ** result = (char const **)realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result) {
         perror("realloc");
         exit(EXIT_FAILURE);
@@ -75,7 +76,7 @@ Strings sa_append(Strings const in, String e) {
     return result;
 }
 
-Strings sa_remove(Strings const in, String e) {
+char const ** sa_remove(char const ** const in, char const * const e) {
     if (0 == e) {
         return in;
     }
@@ -92,7 +93,7 @@ Strings sa_remove(Strings const in, String e) {
     }
     // now resize the array
     size_t size = sa_length(in);
-    Strings result = (Strings)realloc(in, (size + 1) * sizeof(String));
+    char const ** result = (char const **)realloc(in, (size + 1) * sizeof(char const *));
     if (0 == result) {
         perror("realloc");
         exit(EXIT_FAILURE);
@@ -100,7 +101,7 @@ Strings sa_remove(Strings const in, String e) {
     return result;
 }
 
-size_t sa_length(Strings const in) {
+size_t sa_length(char const * const * in) {
     size_t result = 0;
     char const * const * it = in;
     for (; (in) && (*it); ++it, ++result)
@@ -108,7 +109,7 @@ size_t sa_length(Strings const in) {
     return result;
 }
 
-int sa_find(Strings const in, String e) {
+int sa_find(char const * const * in, char const * const e) {
     if (0 == e)
         return 0;
 
@@ -122,7 +123,7 @@ int sa_find(Strings const in, String e) {
 }
 
 #ifdef SERVER
-String sa_fold(Strings const in, char const separator) {
+char const * sa_fold(char const * const * in, char const separator) {
     char * acc = 0;
     size_t acc_size = 0;
 

@@ -15,7 +15,7 @@
 #include <protocol.h>
 #include <json.h>
 
-void assert_stringarray_equals(Strings const lhs, Strings const rhs) {
+void assert_stringarray_equals(char const ** const lhs, char const ** const rhs) {
     assert(sa_length(lhs) == sa_length(rhs));
     size_t const length = sa_length(lhs);
     int i = 0;
@@ -54,7 +54,7 @@ void test_sa_fold() {
 }
 
 void test_sa_append() {
-    Strings result = 0;
+    char const ** result = 0;
 
     result = sa_append(result, strdup("this"));
 
@@ -73,7 +73,7 @@ void test_sa_append() {
 }
 
 void test_sa_remove() {
-    Strings result = 0;
+    char const ** result = 0;
 
     result = sa_append(result, strdup("this"));
     result = sa_append(result, strdup("and"));
@@ -112,7 +112,7 @@ void test_sa_copy() {
         , "message"
         , 0
         };
-    Strings result = sa_copy(input);
+    char const ** result = sa_copy(input);
 
     assert(4 == sa_length(result));
     assert(0 == strcmp("this",      result[0]));
@@ -124,18 +124,18 @@ void test_sa_copy() {
     sa_release(result);
 }
 
-Strings sa_build_stdarg_driver(char const * arg, ...) {
+char const ** sa_build_stdarg_driver(char const * arg, ...) {
     va_list args;
     va_start(args, arg);
 
-    Strings result = sa_build(arg, args);
+    char const ** result = sa_build(arg, args);
 
     va_end(args);
     return result;
 }
 
 void test_sa_build() {
-    Strings result = sa_build_stdarg_driver("this", "is", "my", "message", 0);
+    char const ** result = sa_build_stdarg_driver("this", "is", "my", "message", 0);
 
     assert(4 == sa_length(result));
     assert(0 == strcmp("this",      result[0]));
@@ -155,7 +155,7 @@ void test_env_insert() {
         , "LD_PRELOAD=/tmp/lib"
         , 0
         };
-    Strings result = sa_copy(input);
+    char const ** result = sa_copy(input);
 
     result = bear_env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
     result = bear_env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
@@ -179,8 +179,8 @@ void test_json() {
         , "message=\"shit\\gold\""
         , 0
         };
-    Strings input = sa_copy(input_const);
-    Strings result = bear_json_escape_strings(input);
+    char const ** input = sa_copy(input_const);
+    char const ** result = bear_json_escape_strings(input);
 
     char const * expected[] = 
         { "this"
