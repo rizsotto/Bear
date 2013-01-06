@@ -30,7 +30,7 @@ static int      child_status = EXIT_FAILURE;
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect(char const * socket, char const * output, int debug);
+static void collect_messages(char const * socket, char const * output, int debug);
 
 
 int main(int argc, char * const argv[]) {
@@ -87,14 +87,15 @@ int main(int argc, char * const argv[]) {
         // parent process
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
-        // go for the data
-        collect(socket_file, output_file, debug);
+        mask_all_signals(SIG_BLOCK);
+        collect_messages(socket_file, output_file, debug);
     }
     return child_status;
 }
 
-static void collect(char const * socket_file, char const * output_file, int debug) {
-    mask_all_signals(SIG_BLOCK);
+static void receive_on_unix_socket(char const * socket_file, int output_fd, int debug);
+
+static void collect_messages(char const * socket_file, char const * output_file, int debug) {
     // open the output file
     int output_fd = bear_open_json_output(output_file);
     // remove old socket file if any
@@ -102,40 +103,59 @@ static void collect(char const * socket_file, char const * output_file, int debu
         perror("unlink");
         exit(EXIT_FAILURE);
     }
-    // set up socket
-    struct sockaddr_un local;
-    int listen_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (-1 == listen_sock) {
+    // receive messages
+    receive_on_unix_socket(socket_file, output_fd, debug);
+    // skip errors during shutdown
+    bear_close_json_output(output_fd);
+    unlink(socket_file);
+}
+
+static int create_unix_socket(char const * file);
+static int accept_message(int fd, struct bear_message * msg);
+
+static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
+    int s = create_unix_socket(file);
+    mask_all_signals(SIG_UNBLOCK);
+    struct bear_message msg = { 0, 0, 0, 0 };
+    while (accept_message(s, &msg)) {
+        mask_all_signals(SIG_BLOCK);
+        bear_append_json_output(out_fd, &msg, debug);
+        bear_free_message(&msg);
+        mask_all_signals(SIG_UNBLOCK);
+    }
+    mask_all_signals(SIG_BLOCK);
+    close(s);
+}
+
+static int create_unix_socket(char const * file) {
+    struct sockaddr_un addr;
+    int s = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (-1 == s) {
         perror("socket");
         exit(EXIT_FAILURE);
     }
-    memset(&local, 0, sizeof(struct sockaddr_un));
-    local.sun_family = AF_UNIX;
-    strncpy(local.sun_path, socket_file, sizeof(local.sun_path) - 1);
-    if (-1 == bind(listen_sock, (struct sockaddr *)&local, sizeof(struct sockaddr_un))) {
+    memset(&addr, 0, sizeof(struct sockaddr_un));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, file, sizeof(addr.sun_path) - 1);
+    if (-1 == bind(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) {
         perror("bind");
         exit(EXIT_FAILURE);
     }
-    if (-1 == listen(listen_sock, 0)) {
+    if (-1 == listen(s, 0)) {
         perror("listen");
         exit(EXIT_FAILURE);
     }
-    // do the job
-    mask_all_signals(SIG_UNBLOCK);
-    int conn_sock;
-    while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
-        mask_all_signals(SIG_BLOCK);
-        struct bear_message msg;
-        bear_read_message(conn_sock, &msg);
-        bear_append_json_output(output_fd, &msg, debug);
-        bear_free_message(&msg);
-        close(conn_sock);
-        mask_all_signals(SIG_UNBLOCK);
+    return s;
+}
+
+static int accept_message(int s, struct bear_message * msg) {
+    int connection = accept(s, 0, 0);
+    if (-1 != connection) {
+        bear_read_message(connection, msg);
+        close(connection);
+        return 1;
     }
-    // skip errors during shutdown
-    bear_close_json_output(output_fd);
-    close(listen_sock);
-    unlink(socket_file);
+    return 0;
 }
 
 static void handler(int signum) {
