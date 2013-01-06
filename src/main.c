@@ -1,6 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include "cdb.h"
+#include "protocol.h"
+#include "output.h"
 #include "envarray.h"
 
 #include <unistd.h>
@@ -95,7 +96,7 @@ int main(int argc, char * const argv[]) {
 static void collect(char const * socket_file, char const * output_file, int debug) {
     mask_all_signals(SIG_BLOCK);
     // open the output file
-    int output_fd = cdb_open(output_file);
+    int output_fd = bear_open_json_output(output_file);
     // remove old socket file if any
     if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
         perror("unlink");
@@ -124,15 +125,15 @@ static void collect(char const * socket_file, char const * output_file, int debu
     int conn_sock;
     while ((conn_sock = accept(listen_sock, 0, 0)) != -1) {
         mask_all_signals(SIG_BLOCK);
-        struct CDBEntry * e = cdb_new();
-        cdb_read(conn_sock, e);
-        cdb_write(output_fd, e, debug);
-        cdb_delete(e);
+        struct bear_message msg;
+        bear_read_message(conn_sock, &msg);
+        bear_append_json_output(output_fd, &msg, debug);
+        bear_free_message(&msg);
         close(conn_sock);
         mask_all_signals(SIG_UNBLOCK);
     }
     // skip errors during shutdown
-    cdb_close(output_fd);
+    bear_close_json_output(output_fd);
     close(listen_sock);
     unlink(socket_file);
 }

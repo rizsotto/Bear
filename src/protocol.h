@@ -14,6 +14,7 @@ struct bear_message {
 
 #ifdef SERVER
 void bear_read_message(int fd, struct bear_message * e);
+void bear_free_message(struct bear_message * e);
 #endif
 
 #ifdef CLIENT

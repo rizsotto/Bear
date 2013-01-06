@@ -1,6 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include "cdb.h"
+#include "output.h"
 #include "stringarray.h"
 #include "protocol.h"
 #include "json.h"
@@ -17,8 +17,7 @@
 
 static size_t count = 0;
 
-// basic open/close methods with some decorator logic
-int cdb_open(char const * file) {
+int bear_open_json_output(char const * file) {
     int fd = open(file, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
     if (-1 == fd) {
         perror("open");
@@ -29,56 +28,17 @@ int cdb_open(char const * file) {
     return fd;
 }
 
-void cdb_close(int fd) {
+void bear_close_json_output(int fd) {
     dprintf(fd, "]\n");
     close(fd);
 }
 
-
-// data type and alloc/free methods
-struct CDBEntry {
-    char const * cwd;
-    char const * * cmd;
-    char const * src;
-};
-
-struct CDBEntry * cdb_new() {
-    struct CDBEntry * e = (struct CDBEntry *)malloc(sizeof(struct CDBEntry));
-    if (0 == e) {
-        perror("malloc");
-        exit(EXIT_FAILURE);
-    }
-    e->src = 0;
-    e->cmd = 0;
-    e->cwd = 0;
-    return e;
-}
-
-void cdb_delete(struct CDBEntry * e) {
-    if (e) {
-        free((void *)e->src);
-        sa_release(e->cmd);
-        free((void *)e->cwd);
-    }
-    free((void *)e);
-}
-
-
-// io related methods
 static char const * get_source_file(char const * * cmd, char const * cwd);
 
-void cdb_read(int fd, struct CDBEntry * e) {
-    struct bear_message msg;
-    bear_read_message(fd, &msg);
-
-    e->cwd = msg.cwd;
-    e->cmd = msg.cmd;
-    e->src = get_source_file(e->cmd, e->cwd);
-}
-
-void cdb_write(int fd, struct CDBEntry const * e, int debug) {
+void bear_append_json_output(int fd, struct bear_message const * e, int debug) {
+    char const * src = get_source_file(e->cmd, e->cwd);
     char const * const cmd = json_escape(e->cmd);
-    if (e->src) {
+    if (src) {
         if (count++) {
             dprintf(fd, ",\n");
         }
@@ -86,14 +46,15 @@ void cdb_write(int fd, struct CDBEntry const * e, int debug) {
                     "  \"directory\": \"%s\",\n"
                     "  \"command\": \"%s\",\n"
                     "  \"file\": \"%s\"\n"
-                    "}\n", e->cwd, cmd, e->src);
+                    "}\n", e->cwd, cmd, src);
     } else if (debug) {
-        dprintf(fd, "#{\n"
-                    "#  \"directory\": \"%s\",\n"
-                    "#  \"command\": \"%s\"\n"
-                    "#}\n", e->cwd, cmd);
+        dprintf(fd, "{\n"
+                    "  \"directory\": \"%s\",\n"
+                    "  \"command\": \"%s\"\n"
+                    "}\n", e->cwd, cmd);
     }
     free((void *)cmd);
+    free((void *)src);
 }
 
 

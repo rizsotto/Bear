@@ -67,6 +67,16 @@ void bear_read_message(int fd, struct bear_message * e) {
     e->cwd = read_string(fd);
     e->cmd = read_string_array(fd);
 }
+
+void bear_free_message(struct bear_message * e) {
+    e->pid = 0;
+    free((void*)e->fun);
+    e->fun = 0;
+    free((void*)e->cwd);
+    e->cwd = 0;
+    sa_release(e->cmd);
+    e->cmd = 0;
+}
 #endif
 
 #ifdef CLIENT

@@ -24,7 +24,7 @@ add_executable(bear
     stringarray.c
     protocol.c
     main.c
-    cdb.c
+    output.c
     json.c)
 set_target_properties(bear PROPERTIES
     COMPILE_DEFINITIONS "SERVER")
