@@ -1,6 +1,5 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#include "report.h"
 #include "stringarray.h"
 #include "envarray.h"
 
@@ -15,6 +14,8 @@
 
 #include <dlfcn.h>
 
+
+void report_call(char const *fun, char * const argv[]);
 
 int execve(const char *path, char *const argv[], char *const envp[]) {
     report_call("execve", argv);
