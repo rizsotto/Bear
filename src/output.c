@@ -42,7 +42,22 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
 {
     char const * src = get_source_file(e->cmd, e->cwd);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
-    if (src)
+    if (debug)
+    {
+        if (count++)
+        {
+            dprintf(fd, ",\n");
+        }
+        dprintf(fd,
+                "{\n"
+                "  \"pid\": \"%d\",\n"
+                "  \"function\": \"%s\",\n"
+                "  \"directory\": \"%s\",\n"
+                "  \"command\": \"%s\"\n"
+                "}\n",
+                e->pid, e->fun, e->cwd, cmd);
+    }
+    else if (src)
     {
         if (count++)
         {
@@ -55,15 +70,6 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
                 "  \"file\": \"%s\"\n"
                 "}\n",
                 e->cwd, cmd, src);
-    }
-    else if (debug)
-    {
-        dprintf(fd,
-                "{\n"
-                "  \"directory\": \"%s\",\n"
-                "  \"command\": \"%s\"\n"
-                "}\n",
-                e->cwd, cmd);
     }
     free((void *)cmd);
     free((void *)src);
