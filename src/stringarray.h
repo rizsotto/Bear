@@ -20,7 +20,7 @@ int           bear_strings_find(char const * const * in, char const * e);
 void          bear_strings_release(char const **);
 
 #ifdef SERVER
-char const *  bear_strings_fold(char const * const * in, char const sep);
+char const  * bear_strings_fold(char const * const * in, char const sep);
 #endif
 
 #endif

@@ -5,7 +5,8 @@
 
 #include <unistd.h>
 
-struct bear_message {
+struct bear_message
+{
     pid_t pid;
     char const * fun;
     char const * cwd;

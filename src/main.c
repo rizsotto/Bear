@@ -30,7 +30,8 @@ static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, int debug);
 
 
-int main(int argc, char * const argv[]) {
+int main(int argc, char * const argv[])
+{
     char const * socket_file = SOCKET_FILE;
     char const * output_file = OUTPUT_FILE;
     char const * libear_path = LIBEAR_FILE;
@@ -38,8 +39,10 @@ int main(int argc, char * const argv[]) {
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "o:b:s:d")) != -1) {
-        switch (opt) {
+    while ((opt = getopt(argc, argv, "o:b:s:d")) != -1)
+    {
+        switch (opt)
+        {
         case 'o':
             output_file = optarg;
             break;
@@ -57,30 +60,39 @@ int main(int argc, char * const argv[]) {
         }
     }
     // validate
-    if (argc == optind) {
+    if (argc == optind)
+    {
         usage(argv[0]);
     }
     unprocessed_argv = &(argv[optind]);
     // fork
     child_pid = fork();
-    if (-1 == child_pid) {
+    if (-1 == child_pid)
+    {
         perror("fork");
         exit(EXIT_FAILURE);
-    } else if (0 == child_pid) {
+    }
+    else if (0 == child_pid)
+    {
         // child process
-        if (-1 == setenv(ENV_PRELOAD, libear_path, 1)) {
+        if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
+        {
             perror("setenv");
             exit(EXIT_FAILURE);
         }
-        if (-1 == setenv(ENV_OUTPUT, socket_file, 1)) {
+        if (-1 == setenv(ENV_OUTPUT, socket_file, 1))
+        {
             perror("setenv");
             exit(EXIT_FAILURE);
         }
-        if (-1 == execvp(*unprocessed_argv, unprocessed_argv)) {
+        if (-1 == execvp(*unprocessed_argv, unprocessed_argv))
+        {
             perror("execvp");
             exit(EXIT_FAILURE);
         }
-    } else {
+    }
+    else
+    {
         // parent process
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
@@ -92,11 +104,13 @@ int main(int argc, char * const argv[]) {
 
 static void receive_on_unix_socket(char const * socket_file, int output_fd, int debug);
 
-static void collect_messages(char const * socket_file, char const * output_file, int debug) {
+static void collect_messages(char const * socket_file, char const * output_file, int debug)
+{
     // open the output file
     int output_fd = bear_open_json_output(output_file);
     // remove old socket file if any
-    if ((-1 == unlink(socket_file)) && (ENOENT != errno)) {
+    if ((-1 == unlink(socket_file)) && (ENOENT != errno))
+    {
         perror("unlink");
         exit(EXIT_FAILURE);
     }
@@ -107,11 +121,13 @@ static void collect_messages(char const * socket_file, char const * output_file,
     unlink(socket_file);
 }
 
-static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
+static void receive_on_unix_socket(char const * file, int out_fd, int debug)
+{
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
     struct bear_message msg;
-    while (bear_accept_message(s, &msg)) {
+    while (bear_accept_message(s, &msg))
+    {
         mask_all_signals(SIG_BLOCK);
         bear_append_json_output(out_fd, &msg, debug);
         bear_free_message(&msg);
@@ -121,14 +137,17 @@ static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
     close(s);
 }
 
-static void handler(int signum) {
-    switch (signum) {
-    case SIGCHLD: {
+static void handler(int signum)
+{
+    switch (signum)
+    {
+    case SIGCHLD:
+    {
         int status;
         while (0 > waitpid(WAIT_ANY, &status, WNOHANG)) ;
         child_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
         break;
-        }
+    }
     case SIGINT:
         kill(child_pid, signum);
     default:
@@ -136,27 +155,32 @@ static void handler(int signum) {
     }
 }
 
-static void install_signal_handler(int signum) {
+static void install_signal_handler(int signum)
+{
     struct sigaction action, old_action;
     sigemptyset(&action.sa_mask);
     action.sa_handler = handler;
     action.sa_flags = 0;
-    if (-1 == sigaction(signum, &action, &old_action)) {
+    if (-1 == sigaction(signum, &action, &old_action))
+    {
         perror( "sigaction");
         exit(EXIT_FAILURE);
     }
 }
 
-static void mask_all_signals(int command) {
+static void mask_all_signals(int command)
+{
     sigset_t signal_mask;
     sigfillset(&signal_mask);
-    if (-1 == sigprocmask(command, &signal_mask, 0)) {
+    if (-1 == sigprocmask(command, &signal_mask, 0))
+    {
         perror("sigprocmask");
         exit(EXIT_FAILURE);
     }
 }
 
-static void usage(char const * const name) {
+static void usage(char const * const name)
+{
     fprintf(stderr,
             "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
             "\n"

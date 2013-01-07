@@ -1,7 +1,8 @@
 #ifndef foo_h
 #define foo_h
 
-namespace acme {
+namespace acme
+{
 
 void t1();
 

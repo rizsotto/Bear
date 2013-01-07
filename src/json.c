@@ -9,11 +9,14 @@
 #include <stdlib.h>
 
 
-char const * * bear_json_escape_strings(char const * * raw) {
+char const * * bear_json_escape_strings(char const * * raw)
+{
     char const * * it = raw;
-    for (; (raw) && (*it); ++it) {
+    for (; (raw) && (*it); ++it)
+    {
         char const * const new = bear_json_escape_string(*it);
-        if (new) {
+        if (new)
+        {
             char const * const tmp = *it;
             *it = new;
             free((void *)tmp);
@@ -28,32 +31,39 @@ static size_t count(char const * const begin,
 
 static int needs_escape(int);
 
-char const * bear_json_escape_string(char const * raw) {
+char const * bear_json_escape_string(char const * raw)
+{
     size_t const length = (raw) ? strlen(raw) : 0;
     size_t const spaces = count(raw, raw + length, isspace);
     size_t const json = count(raw, raw + length, needs_escape);
 
-    if ((0 == spaces) && (0 == json)) {
+    if ((0 == spaces) && (0 == json))
+    {
         return 0;
     }
 
     char * const result = malloc(length + ((0 != spaces) * 4) + json + 1);
-    if (0 == result) {
+    if (0 == result)
+    {
         perror("malloc");
         exit(EXIT_FAILURE);
     }
     char * it = result;
-    if (spaces) {
+    if (spaces)
+    {
         *it++ = '\\';
         *it++ = '\"';
     }
-    for (; (raw) && (*raw); ++raw) {
-        if (needs_escape(*raw)) {
+    for (; (raw) && (*raw); ++raw)
+    {
+        if (needs_escape(*raw))
+        {
             *it++ = '\\';
         }
         *it++ = *raw;
     }
-    if (spaces) {
+    if (spaces)
+    {
         *it++ = '\\';
         *it++ = '\"';
     }
@@ -63,19 +73,24 @@ char const * bear_json_escape_string(char const * raw) {
 
 static size_t count(char const * const begin,
                     char const * const end,
-                    int (*fp)(int)) {
+                    int (*fp)(int))
+{
     size_t result = 0;
     char const * it = begin;
-    for (; it != end; ++it) {
-        if (fp(*it)) {
+    for (; it != end; ++it)
+    {
+        if (fp(*it))
+        {
             ++result;
         }
     }
     return result;
 }
 
-static int needs_escape(int c) {
-    switch (c) {
+static int needs_escape(int c)
+{
+    switch (c)
+    {
     case '\\':
     case '\"':
         return 1;
