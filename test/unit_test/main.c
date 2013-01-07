@@ -79,7 +79,8 @@ void test_strings_remove() {
     result = bear_strings_append(result, strdup("and"));
     result = bear_strings_append(result, strdup("that"));
 
-    result = bear_strings_remove(result, result[1]);
+    char const * removed = result[1];
+    result = bear_strings_remove(result, removed);
 
     assert(2 == bear_strings_length(result));
     assert(0 == strcmp("this", result[0]));
@@ -87,6 +88,7 @@ void test_strings_remove() {
     assert(0 == result[2]);
 
     bear_strings_release(result);
+    free((void*)removed);
 }
 
 void test_strings_find() {
@@ -154,6 +156,8 @@ void test_env_insert() {
         , 0
         };
     char const ** result = bear_strings_copy(input);
+    char const * leak_guard_1 = result[1];
+    char const * leak_guard_2 = result[3];
 
     result = bear_env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
     result = bear_env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
@@ -168,6 +172,8 @@ void test_env_insert() {
     assert_stringarray_equals(expected, result);
 
     bear_strings_release(result);
+    free((void*)leak_guard_1);
+    free((void*)leak_guard_2);
 }
 
 void test_json() {
@@ -200,26 +206,28 @@ void assert_messages_equals(struct bear_message const * lhs,
 }
 
 void test_protocol() {
-    struct bear_message msg[2];
+    struct bear_message input;
     {
-        msg[1].pid = 9;
-        msg[1].fun = "exec";
-        msg[1].cwd = "/tmp";
+        input.pid = 9;
+        input.fun = "exec";
+        input.cwd = "/tmp";
         char const * cmds[] =
                 { "this"
                 , "that"
                 , 0
                 };
-        msg[1].cmd = cmds;
+        input.cmd = cmds;
     }
+    struct bear_message result;
     {
         int fds[2];
         pipe(fds);
 
-        bear_write_message(fds[1], &msg[1]);
-        bear_read_message(fds[0], &msg[0]);
+        bear_write_message(fds[1], &input);
+        bear_read_message(fds[0], &result);
     }
-    assert_messages_equals(&msg[1], &msg[0]);
+    assert_messages_equals(&input, &result);
+    bear_free_message(&result);
 }
 
 
