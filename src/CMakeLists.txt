@@ -12,8 +12,7 @@ add_library(ear SHARED
     stringarray.c
     protocol.c
     environ.c
-    execs.c
-    report.c)
+    execs.c)
 target_link_libraries(ear dl)
 set_target_properties(ear PROPERTIES
     LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList"

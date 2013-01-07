@@ -9,10 +9,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <signal.h>
 
 // Stringify environment variables
@@ -110,14 +107,11 @@ static void collect_messages(char const * socket_file, char const * output_file,
     unlink(socket_file);
 }
 
-static int create_unix_socket(char const * file);
-static int accept_message(int fd, struct bear_message * msg);
-
 static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
-    int s = create_unix_socket(file);
+    int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
     struct bear_message msg = { 0, 0, 0, 0 };
-    while (accept_message(s, &msg)) {
+    while (bear_accept_message(s, &msg)) {
         mask_all_signals(SIG_BLOCK);
         bear_append_json_output(out_fd, &msg, debug);
         bear_free_message(&msg);
@@ -125,37 +119,6 @@ static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
     }
     mask_all_signals(SIG_BLOCK);
     close(s);
-}
-
-static int create_unix_socket(char const * file) {
-    struct sockaddr_un addr;
-    int s = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (-1 == s) {
-        perror("socket");
-        exit(EXIT_FAILURE);
-    }
-    memset(&addr, 0, sizeof(struct sockaddr_un));
-    addr.sun_family = AF_UNIX;
-    strncpy(addr.sun_path, file, sizeof(addr.sun_path) - 1);
-    if (-1 == bind(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) {
-        perror("bind");
-        exit(EXIT_FAILURE);
-    }
-    if (-1 == listen(s, 0)) {
-        perror("listen");
-        exit(EXIT_FAILURE);
-    }
-    return s;
-}
-
-static int accept_message(int s, struct bear_message * msg) {
-    int connection = accept(s, 0, 0);
-    if (-1 != connection) {
-        bear_read_message(connection, msg);
-        close(connection);
-        return 1;
-    }
-    return 0;
 }
 
 static void handler(int signum) {

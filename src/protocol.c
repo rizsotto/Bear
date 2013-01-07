@@ -8,7 +8,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
+
+static size_t init_socket(char const * file, struct sockaddr_un * addr);
 
 #ifdef SERVER
 static pid_t read_pid(int fd) {
@@ -77,6 +82,30 @@ void bear_free_message(struct bear_message * e) {
     bear_strings_release(e->cmd);
     e->cmd = 0;
 }
+
+int bear_create_unix_socket(char const * file) {
+    struct sockaddr_un addr;
+    int s = init_socket(file, &addr);
+    if (-1 == bind(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) {
+        perror("bind");
+        exit(EXIT_FAILURE);
+    }
+    if (-1 == listen(s, 0)) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+    return s;
+}
+
+int bear_accept_message(int s, struct bear_message * msg) {
+    int connection = accept(s, 0, 0);
+    if (-1 != connection) {
+        bear_read_message(connection, msg);
+        close(connection);
+        return 1;
+    }
+    return 0;
+}
 #endif
 
 #ifdef CLIENT
@@ -107,4 +136,27 @@ void bear_write_message(int fd, struct bear_message const * e) {
     write_string(fd, e->cwd);
     write_string_array(fd, e->cmd);
 }
+
+void bear_send_message(char const * file, struct bear_message const * msg) {
+    struct sockaddr_un addr;
+    int s = init_socket(file, &addr);
+    if (-1 == connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un))) {
+        perror("connect");
+        exit(EXIT_FAILURE);
+    }
+    bear_write_message(s, msg);
+    close(s);
+}
 #endif
+
+static size_t init_socket(char const * file, struct sockaddr_un * addr) {
+    int s = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (-1 == s) {
+        perror("socket");
+        exit(EXIT_FAILURE);
+    }
+    memset((void*)addr, 0, sizeof(struct sockaddr_un));
+    addr->sun_family = AF_UNIX;
+    strncpy(addr->sun_path, file, sizeof(addr->sun_path) - 1);
+    return s;
+}

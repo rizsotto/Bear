@@ -2,6 +2,7 @@
 
 #include "stringarray.h"
 #include "environ.h"
+#include "protocol.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -15,7 +16,7 @@
 #include <dlfcn.h>
 
 
-void report_call(char const *fun, char * const argv[]);
+static void report_call(char const *fun, char * const argv[]);
 
 int execve(const char *path, char *const argv[], char *const envp[]) {
     report_call("execve", argv);
@@ -94,3 +95,27 @@ int execle(const char *path, const char *arg, ...) {
     return result;
 }
 
+
+typedef void (*send_message)(char const * socket, struct bear_message const *);
+
+static void report(send_message fp, char const * socket, char const * fun, char * const argv[]) {
+    struct bear_message msg;
+    {
+        msg.pid = getpid();
+        msg.fun = fun;
+        msg.cwd = get_current_dir_name();
+        msg.cmd = (char const **)argv;
+    }
+    (*fp)(socket, &msg);
+    free((void*)msg.cwd);
+}
+
+static void report_call(char const *fun, char * const argv[]) {
+    char * const socket = getenv(ENV_OUTPUT);
+    if (0 == socket) {
+        perror("getenv");
+        exit(EXIT_FAILURE);
+    }
+
+    return report(bear_send_message, socket, fun, argv);
+}

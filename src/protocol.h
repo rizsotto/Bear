@@ -15,10 +15,15 @@ struct bear_message {
 #ifdef SERVER
 void bear_read_message(int fd, struct bear_message * e);
 void bear_free_message(struct bear_message * e);
+
+int bear_create_unix_socket(char const * socket);
+int bear_accept_message(int fd, struct bear_message * e);
 #endif
 
 #ifdef CLIENT
 void bear_write_message(int fd, struct bear_message const * e);
+
+void bear_send_message(char const * socket, struct bear_message const * e);
 #endif
 
 #endif
