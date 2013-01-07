@@ -206,18 +206,12 @@ void assert_messages_equals(struct bear_message const * lhs,
 }
 
 void test_protocol() {
-    struct bear_message input;
-    {
-        input.pid = 9;
-        input.fun = "exec";
-        input.cwd = "/tmp";
-        char const * cmds[] =
-                { "this"
-                , "that"
-                , 0
-                };
-        input.cmd = cmds;
-    }
+    char const * cmds[] =
+            { "this"
+            , "that"
+            , 0
+            };
+    struct bear_message input = { 9, "exec", "/tmp", cmds };
     struct bear_message result;
     {
         int fds[2];
