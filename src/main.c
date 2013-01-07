@@ -126,7 +126,7 @@ static void receive_on_unix_socket(char const * file, int out_fd, int debug)
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
     struct bear_message msg;
-    while (bear_accept_message(s, &msg))
+    while ((child_pid) && bear_accept_message(s, &msg))
     {
         mask_all_signals(SIG_BLOCK);
         bear_append_json_output(out_fd, &msg, debug);
@@ -146,6 +146,7 @@ static void handler(int signum)
         int status;
         while (0 > waitpid(WAIT_ANY, &status, WNOHANG)) ;
         child_status = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+        child_pid = 0;
         break;
     }
     case SIGINT:
