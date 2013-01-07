@@ -121,7 +121,7 @@ static void write_string(int fd, char const * message) {
     }
 }
 
-static void write_string_array(int fd, char const * * message) {
+static void write_string_array(int fd, char const * const * message) {
     size_t const length = bear_strings_length(message);
     write(fd, (void const *)&length, sizeof(size_t));
     size_t it = 0;

@@ -37,7 +37,7 @@ int main(int argc, char * const argv[]) {
     int debug = 0;
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
-    int flags, opt;
+    int opt;
     while ((opt = getopt(argc, argv, "o:b:s:d")) != -1) {
         switch (opt) {
         case 'o':
@@ -110,7 +110,7 @@ static void collect_messages(char const * socket_file, char const * output_file,
 static void receive_on_unix_socket(char const * file, int out_fd, int debug) {
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
-    struct bear_message msg = { 0, 0, 0, 0 };
+    struct bear_message msg;
     while (bear_accept_message(s, &msg)) {
         mask_all_signals(SIG_BLOCK);
         bear_append_json_output(out_fd, &msg, debug);

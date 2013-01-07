@@ -101,7 +101,7 @@ char const ** bear_strings_remove(char const ** const in, char const * const e) 
     return result;
 }
 
-size_t bear_strings_length(char const * const * in) {
+size_t bear_strings_length(char const * const * const in) {
     size_t result = 0;
     char const * const * it = in;
     for (; (in) && (*it); ++it, ++result)
