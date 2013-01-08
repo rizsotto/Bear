@@ -3,14 +3,19 @@
 add_executable(exec_anatomy main.c)
 add_definitions(-D_GNU_SOURCE)
 
-set(BEAR_EXE ../../src/bear)
-set(BEAR_LIB ../../src/libear.so)
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/expected.json.in
+  ${CMAKE_CURRENT_BINARY_DIR}/expected.json
+  @ONLY)
 
-add_custom_target(run_exec_anatomy
-  COMMAND touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c
-  COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -s ./socket -- ./exec_anatomy
-  COMMENT "Running exec anatomy")
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/run.sh.in
+  ${CMAKE_CURRENT_BINARY_DIR}/run.sh
+  @ONLY)
 
-add_dependencies(run_exec_anatomy exec_anatomy)
-add_dependencies(run_exec_anatomy ear)
-add_dependencies(run_exec_anatomy bear)
+add_test(NAME run_exec_anatomy
+  COMMAND ./run.sh)
+
+add_dependencies(check exec_anatomy)
+add_dependencies(exec_anatomy ear)
+add_dependencies(exec_anatomy bear)

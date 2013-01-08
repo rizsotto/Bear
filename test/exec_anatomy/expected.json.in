@@ -1,0 +1,43 @@
+[
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "cc -c execv.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execv.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "/usr/bin/cc -c execve.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execve.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "cc -c execvp.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execvp.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "/usr/bin/cc -c execvpe.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execvpe.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "cc -c execl.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execl.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "cc -c execlp.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execlp.c"
+}
+,
+{
+  "directory": "@CMAKE_CURRENT_BINARY_DIR@",
+  "command": "/usr/bin/cc -c execle.c",
+  "file": "@CMAKE_CURRENT_BINARY_DIR@/execle.c"
+}
+]

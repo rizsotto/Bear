@@ -1,0 +1,12 @@
+#!/bin/bash
+# Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
+
+set -o nounset
+set -o errexit
+
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/libear.so"
+
+touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c
+${BEAR_EXE} -b ${BEAR_LIB} -s ./socket -- ./exec_anatomy
+diff expected.json compile_commands.json
