@@ -4,9 +4,6 @@ cmake_minimum_required(VERSION 2.8)
 
 project(bear C)
 
-add_subdirectory(src)
-add_subdirectory(test)
-
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "Laszlo Nagy <rizsotto at gmail dot com>")
 set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
@@ -22,3 +19,10 @@ set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
 set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
 include(CPack)
+
+include(GNUInstallDirs)
+install(FILES COPYING README.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+add_subdirectory(src)
+add_subdirectory(test)
