@@ -1,0 +1,19 @@
+#!/bin/bash
+# Copyright 2012 by Laszlo Nagy [see file MIT-LICENSE]
+
+set -o nounset
+set -o errexit
+
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/libear.so"
+
+set +o errexit
+${BEAR_EXE} -b ${BEAR_LIB} -s ./socket -- false
+rc=$?
+set -o errexit
+
+if [ 0 == $rc ]; then
+  echo "exit code was not captured" && false
+fi
+
+${BEAR_EXE} -b ${BEAR_LIB} -s ./socket -- true
