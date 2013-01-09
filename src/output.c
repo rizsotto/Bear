@@ -51,11 +51,12 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
         dprintf(fd,
                 "{\n"
                 "  \"pid\": \"%d\",\n"
+                "  \"ppid\": \"%d\",\n"
                 "  \"function\": \"%s\",\n"
                 "  \"directory\": \"%s\",\n"
                 "  \"command\": \"%s\"\n"
                 "}\n",
-                e->pid, e->fun, e->cwd, cmd);
+                e->pid, e->ppid, e->fun, e->cwd, cmd);
     }
     else if (src)
     {

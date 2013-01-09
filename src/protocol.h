@@ -8,6 +8,7 @@
 struct bear_message
 {
     pid_t pid;
+    pid_t ppid;
     char const * fun;
     char const * cwd;
     char const * * cmd;

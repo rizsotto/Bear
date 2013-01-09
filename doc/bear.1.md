@@ -80,6 +80,7 @@ of the debug output looks like this:
 
     [
       { "pid": "1234",
+        "ppid": "100",
         "function": "execve",
         "directory": "/home/user/llvm/build",
         "command": "clang++ -Irelative -c -o file.o file.cc" },

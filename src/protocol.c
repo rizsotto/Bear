@@ -80,6 +80,7 @@ static char const * * read_string_array(int fd)
 void bear_read_message(int fd, struct bear_message * e)
 {
     e->pid = read_pid(fd);
+    e->ppid = read_pid(fd);
     e->fun = read_string(fd);
     e->cwd = read_string(fd);
     e->cmd = read_string_array(fd);
@@ -88,6 +89,7 @@ void bear_read_message(int fd, struct bear_message * e)
 void bear_free_message(struct bear_message * e)
 {
     e->pid = 0;
+    e->ppid = 0;
     free((void *)e->fun);
     e->fun = 0;
     free((void *)e->cwd);
@@ -156,6 +158,7 @@ static void write_string_array(int fd, char const * const * message)
 void bear_write_message(int fd, struct bear_message const * e)
 {
     write_pid(fd, e->pid);
+    write_pid(fd, e->ppid);
     write_string(fd, e->fun);
     write_string(fd, e->cwd);
     write_string_array(fd, e->cmd);

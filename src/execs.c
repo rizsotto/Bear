@@ -126,13 +126,14 @@ typedef void (*send_message)(char const * socket, struct bear_message const *);
 
 static void report(send_message fp, char const * socket, char const * fun, char const * const argv[])
 {
-    struct bear_message msg;
+    struct bear_message const msg =
     {
-        msg.pid = getpid();
-        msg.fun = fun;
-        msg.cwd = get_current_dir_name();
-        msg.cmd = (char const **)argv;
-    }
+        getpid(),
+        getppid(),
+        fun,
+        get_current_dir_name(),
+        (char const **)argv
+    };
     (*fp)(socket, &msg);
     free((void *)msg.cwd);
 }

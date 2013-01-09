@@ -222,6 +222,7 @@ void assert_messages_equals(struct bear_message const * lhs,
                             struct bear_message const * rhs)
 {
     assert(lhs->pid == rhs->pid);
+    assert(lhs->ppid == rhs->ppid);
     assert(0 == strcmp(lhs->fun, rhs->fun));
     assert(0 == strcmp(lhs->cwd, rhs->cwd));
     assert_stringarray_equals(lhs->cmd, rhs->cmd);
@@ -235,7 +236,7 @@ void test_protocol()
         "that",
         0
     };
-    struct bear_message input = { 9, "exec", "/tmp", cmds };
+    struct bear_message input = { 9, 1, "exec", "/tmp", cmds };
     struct bear_message result;
     {
         int fds[2];
