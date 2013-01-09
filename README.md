@@ -27,6 +27,10 @@ processes and writes the output file.
 How to build
 ------------
 
+You need a C compiler and cmake installed. To create man page, you need
+*pandoc* installed on your system. To create packages there are targets
+in the cmake file.
+
 * It is better to build it in a separate build directory.
 `mkdir build && cd build`
 * The configure step made by cmake: `cmake ..`
