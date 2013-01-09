@@ -44,6 +44,14 @@ environment up to child processes and writes the output file.
     It contains all available informations of the `exec` calls.
     (This option for those who want to extend functionality of bear.)
 
+-c
+:   Print out known compilers, which are used at the post-processing
+    step.
+
+-e
+:   Print out known source file extensions, which are used at the
+    post-processing step.
+
 # OUTPUT
 
 There are two version of output formats. One is defined by the clang
@@ -63,9 +71,10 @@ name. Bear has a built in list of known compiler names. Second task is
 to find the source file name from the list of arguments. This is dones
 by looking for the arguemnts and check whether it has extension, and
 the extension is for a source file. Again, bear has a built in list of
-known source file extensions.
+known source file extensions. Both built-in lists can be viewed but not
+modified.
 
-Since the post process might be buggy there is a way to see all exec
+Since the post process might be buggy, there is a way to see all exec
 calls. This gives opportunity to write custom post processing. The format
 of the debug output looks like this:
 

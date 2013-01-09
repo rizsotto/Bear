@@ -39,7 +39,7 @@ int main(int argc, char * const argv[])
     char * const * unprocessed_argv = 0;
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "o:b:s:d")) != -1)
+    while ((opt = getopt(argc, argv, "o:b:s:dceh?")) != -1)
     {
         switch (opt)
         {
@@ -55,6 +55,13 @@ int main(int argc, char * const argv[])
         case 'd':
             debug = 1;
             break;
+        case 'c':
+            bear_print_known_compilers();
+            return 0;
+        case 'e':
+            bear_print_known_extensions();
+            return 0;
+        case 'h':
         default: /* '?' */
             usage(argv[0]);
         }
@@ -188,7 +195,10 @@ static void usage(char const * const name)
             "   -o output   output file (default: %s)\n"
             "   -b libear   libear.so location (default: %s)\n"
             "   -s socket   multiplexing socket (default: %s)\n"
-            "   -d          debug output (default: disabled)\n",
+            "   -d          debug output (default: disabled)\n"
+            "   -c          print out known compilers\n"
+            "   -e          print out known source file extensions\n"
+            "   -h          this message\n",
             name,
             OUTPUT_FILE,
             LIBEAR_FILE,

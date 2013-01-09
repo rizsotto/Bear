@@ -125,21 +125,21 @@ static char const * fix_path(char const * file, char const * cwd)
     return result;
 }
 
+static char const * const compilers[] =
+{
+    "cc",
+    "gcc",
+    "llvm-gcc",
+    "clang",
+    "c++",
+    "g++",
+    "llvm-g++",
+    "clang++",
+    0
+};
+
 static int is_known_compiler(char const * cmd)
 {
-    static char const * compilers[] =
-    {
-        "cc",
-        "gcc",
-        "llvm-gcc",
-        "clang",
-        "c++",
-        "g++",
-        "llvm-g++",
-        "clang++",
-        0
-    };
-
     // looking for compiler name
     char * file = basename(cmd);
 
@@ -158,25 +158,43 @@ static int is_source_file(char const * const arg)
     return is_source_file_extension(extension);
 }
 
+static char const * const extensions[] =
+{
+    ".c",
+    ".C",
+    ".cc",
+    ".cxx",
+    ".c++",
+    ".C++",
+    ".cpp",
+    ".cp",
+    ".i",
+    ".ii",
+    ".m",
+    ".S",
+    0
+};
+
 static int is_source_file_extension(char const * arg)
 {
-    static char const * extensions[] =
-    {
-        ".c",
-        ".C",
-        ".cc",
-        ".cxx",
-        ".c++",
-        ".C++",
-        ".cpp",
-        ".cp",
-        ".i",
-        ".ii",
-        ".m",
-        ".S",
-        0
-    };
-
     return bear_strings_find(extensions, arg);
 }
 
+void print_array(char const * const * const in)
+{
+    char const * const * it = in;
+    for (; *it; ++it)
+    {
+        printf("  %s\n",*it);
+    }
+}
+
+void bear_print_known_compilers()
+{
+    print_array(compilers);
+}
+
+void bear_print_known_extensions()
+{
+    print_array(extensions);
+}
