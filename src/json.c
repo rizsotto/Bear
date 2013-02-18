@@ -60,7 +60,7 @@ char const * bear_json_escape_string(char const * raw)
         {
             *it++ = '\\';
         }
-        *it++ = *raw;
+        *it++ = isspace(*raw) ? ' ' : *raw;
     }
     if (spaces)
     {
@@ -97,4 +97,3 @@ static int needs_escape(int c)
     }
     return 0;
 }
-

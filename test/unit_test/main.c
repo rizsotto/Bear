@@ -201,6 +201,7 @@ void test_json()
         "this",
         "is my",
         "message=\"shit\\gold\"",
+        "with\tall the\rbad\nwhitespaces",
         0
     };
     char const ** input = bear_strings_copy(input_const);
@@ -211,6 +212,7 @@ void test_json()
         "this",
         "\\\"is my\\\"",
         "message=\\\"shit\\\\gold\\\"",
+        "\\\"with all the bad whitespaces\\\"",
         0
     };
     assert_stringarray_equals(expected, result);
