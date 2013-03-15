@@ -3,10 +3,10 @@
 #include "json.h"
 #include "stringarray.h"
 
-#include <malloc.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 
 char const * * bear_json_escape_strings(char const * * raw)
