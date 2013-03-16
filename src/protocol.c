@@ -13,12 +13,13 @@
 
 
 static size_t init_socket(char const * file, struct sockaddr_un * addr);
+static ssize_t socket_read(int fd, void * buf, size_t nbyte);
 
 #ifdef SERVER
 static pid_t read_pid(int fd)
 {
     pid_t result = 0;
-    if (-1 == read(fd, (void *)&result, sizeof(pid_t)))
+    if (-1 == socket_read(fd, (void *)&result, sizeof(pid_t)))
     {
         perror("read: pid");
         exit(EXIT_FAILURE);
@@ -29,7 +30,7 @@ static pid_t read_pid(int fd)
 static char const * read_string(int fd)
 {
     size_t length = 0;
-    if (-1 == read(fd, (void *)&length, sizeof(size_t)))
+    if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
     {
         perror("read: string length");
         exit(EXIT_FAILURE);
@@ -42,7 +43,7 @@ static char const * read_string(int fd)
     }
     if (length > 0)
     {
-        if (-1 == read(fd, (void *)result, length))
+        if (-1 == socket_read(fd, (void *)result, length))
         {
             perror("read: string value");
             exit(EXIT_FAILURE);
@@ -55,7 +56,7 @@ static char const * read_string(int fd)
 static char const * * read_string_array(int fd)
 {
     size_t length = 0;
-    if (-1 == read(fd, (void *)&length, sizeof(size_t)))
+    if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
     {
         perror("read: string array length");
         exit(EXIT_FAILURE);
@@ -124,6 +125,21 @@ int bear_accept_message(int s, struct bear_message * msg)
         return 1;
     }
     return 0;
+}
+
+static ssize_t socket_read(int fd, void * buf, size_t nbyte)
+{
+    ssize_t sum = 0;
+    while (sum != nbyte)
+    {
+        ssize_t const cur = read(fd, buf + sum, nbyte - sum);
+        if (-1 == cur)
+        {
+            return cur;
+        }
+        sum += cur;
+    }
+    return sum;
 }
 #endif
 
