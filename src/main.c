@@ -193,7 +193,7 @@ static void usage(char const * const name)
             "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
             "\n"
             "   -o output   output file (default: %s)\n"
-            "   -b libear   libear.so location (default: %s)\n"
+            "   -b libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: %s)\n"
             "   -d          debug output (default: disabled)\n"
             "   -c          print out known compilers\n"

@@ -3,7 +3,7 @@
 include(GNUInstallDirs)
 
 add_definitions(-D_GNU_SOURCE)
-add_definitions(-DDEFAULT_PRELOAD_FILE=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libear.so)
+add_definitions(-DDEFAULT_PRELOAD_FILE=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
 add_definitions(-DDEFAULT_SOCKET_FILE=/tmp/bear.socket)
 add_definitions(-DDEFAULT_OUTPUT_FILE=compile_commands.json)
 
@@ -13,7 +13,7 @@ add_library(ear SHARED
     protocol.c
     environ.c
     execs.c)
-target_link_libraries(ear dl)
+target_link_libraries(ear ${CMAKE_DL_LIBS})
 set_target_properties(ear PROPERTIES
     LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList"
     COMPILE_DEFINITIONS "CLIENT")
