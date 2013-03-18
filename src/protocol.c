@@ -13,9 +13,23 @@
 
 
 static size_t init_socket(char const * file, struct sockaddr_un * addr);
-static ssize_t socket_read(int fd, void * buf, size_t nbyte);
 
 #ifdef SERVER
+static ssize_t socket_read(int fd, void * buf, size_t nbyte)
+{
+    ssize_t sum = 0;
+    while (sum != nbyte)
+    {
+        ssize_t const cur = read(fd, buf + sum, nbyte - sum);
+        if (-1 == cur)
+        {
+            return cur;
+        }
+        sum += cur;
+    }
+    return sum;
+}
+
 static pid_t read_pid(int fd)
 {
     pid_t result = 0;
@@ -126,13 +140,15 @@ int bear_accept_message(int s, struct bear_message * msg)
     }
     return 0;
 }
+#endif
 
-static ssize_t socket_read(int fd, void * buf, size_t nbyte)
+#ifdef CLIENT
+static ssize_t socket_write(int fd, const void *buf, size_t nbyte)
 {
     ssize_t sum = 0;
     while (sum != nbyte)
     {
-        ssize_t const cur = read(fd, buf + sum, nbyte - sum);
+        ssize_t const cur = write(fd, buf + sum, nbyte - sum);
         if (-1 == cur)
         {
             return cur;
@@ -141,28 +157,26 @@ static ssize_t socket_read(int fd, void * buf, size_t nbyte)
     }
     return sum;
 }
-#endif
 
-#ifdef CLIENT
 static void write_pid(int fd, pid_t pid)
 {
-    write(fd, (void const *)&pid, sizeof(pid_t));
+    socket_write(fd, (void const *)&pid, sizeof(pid_t));
 }
 
 static void write_string(int fd, char const * message)
 {
     size_t const length = (message) ? strlen(message) : 0;
-    write(fd, (void const *)&length, sizeof(size_t));
+    socket_write(fd, (void const *)&length, sizeof(size_t));
     if (length > 0)
     {
-        write(fd, (void const *)message, length);
+        socket_write(fd, (void const *)message, length);
     }
 }
 
 static void write_string_array(int fd, char const * const * message)
 {
     size_t const length = bear_strings_length(message);
-    write(fd, (void const *)&length, sizeof(size_t));
+    socket_write(fd, (void const *)&length, sizeof(size_t));
     size_t it = 0;
     for (; it < length; ++it)
     {
