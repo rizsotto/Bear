@@ -21,8 +21,8 @@
 #define LIBEAR_FILE XSTR(DEFAULT_PRELOAD_FILE)
 
 // variables which are used in signal handler
-static pid_t    child_pid;
-static int      child_status = EXIT_FAILURE;
+static volatile pid_t    child_pid;
+static volatile int      child_status = EXIT_FAILURE;
 
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
@@ -165,11 +165,20 @@ static void handler(int signum)
 
 static void install_signal_handler(int signum)
 {
-    struct sigaction action, old_action;
-    sigemptyset(&action.sa_mask);
+    struct sigaction action;
     action.sa_handler = handler;
     action.sa_flags = 0;
-    if (-1 == sigaction(signum, &action, &old_action))
+    if (0 != sigemptyset(&action.sa_mask))
+    {
+        perror( "sigemptyset");
+        exit(EXIT_FAILURE);
+    }
+    if (0 != sigaddset(&action.sa_mask, signum))
+    {
+        perror( "sigaddset");
+        exit(EXIT_FAILURE);
+    }
+    if (0 != sigaction(signum, &action, NULL))
     {
         perror( "sigaction");
         exit(EXIT_FAILURE);
@@ -179,8 +188,12 @@ static void install_signal_handler(int signum)
 static void mask_all_signals(int command)
 {
     sigset_t signal_mask;
-    sigfillset(&signal_mask);
-    if (-1 == sigprocmask(command, &signal_mask, 0))
+    if (0 != sigfillset(&signal_mask))
+    {
+        perror("sigfillset");
+        exit(EXIT_FAILURE);
+    }
+    if (0 != sigprocmask(command, &signal_mask, 0))
     {
         perror("sigprocmask");
         exit(EXIT_FAILURE);
