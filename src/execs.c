@@ -1,5 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#include "config.h"
+
 #include "stringarray.h"
 #include "environ.h"
 #include "protocol.h"
@@ -19,30 +21,39 @@ static void report_call(char const * fun, char const * const argv[]);
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
 
+#ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {
     report_call("execve", (char const * const *)argv);
     return call_execve(path, argv, envp);
 }
+#endif
 
+#ifdef HAVE_EXECV
 int execv(const char * path, char * const argv[])
 {
     report_call("execv", (char const * const *)argv);
     return call_execve(path, argv, environ);
 }
+#endif
 
+#ifdef HAVE_EXECVPE
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
     report_call("execvpe", (char const * const *)argv);
     return call_execvpe(file, argv, envp);
 }
+#endif
 
+#ifdef HAVE_EXECVP
 int execvp(const char * file, char * const argv[])
 {
     report_call("execvp", (char const * const *)argv);
     return call_execvpe(file, argv, environ);
 }
+#endif
 
+#ifdef HAVE_EXECL
 int execl(const char * path, const char * arg, ...)
 {
     va_list args;
@@ -55,7 +66,9 @@ int execl(const char * path, const char * arg, ...)
     bear_strings_release(argv);
     return result;
 }
+#endif
 
+#ifdef HAVE_EXECLP
 int execlp(const char * file, const char * arg, ...)
 {
     va_list args;
@@ -68,7 +81,9 @@ int execlp(const char * file, const char * arg, ...)
     bear_strings_release(argv);
     return result;
 }
+#endif
 
+#ifdef HAVE_EXECLE
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 int execle(const char * path, const char * arg, ...)
 {
@@ -83,6 +98,7 @@ int execle(const char * path, const char * arg, ...)
     bear_strings_release(argv);
     return result;
 }
+#endif
 
 
 static int call_execve(const char * path, char * const argv[], char * const envp[])

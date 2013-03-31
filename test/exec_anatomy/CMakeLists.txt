@@ -2,6 +2,7 @@
 
 add_executable(exec_anatomy main.c)
 add_definitions(-D_GNU_SOURCE)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../src)
 
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/expected.json.in
