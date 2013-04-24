@@ -145,7 +145,7 @@ static void report(send_message fp, char const * socket, char const * fun, char 
         getpid(),
         getppid(),
         fun,
-        get_current_dir_name(),
+        getcwd(NULL, 0),
         (char const **)argv
     };
     (*fp)(socket, &msg);
