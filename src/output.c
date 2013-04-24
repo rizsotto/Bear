@@ -162,7 +162,7 @@ static int is_known_compiler(char const * cmd)
     // looking for compiler name
     // have to cpy cmd since POSIX basename modifies input
     char * local_cmd = strdup(cmd);
-    char * file = basename(cmd);
+    char * file = basename(local_cmd);
     free(local_cmd);
 
     return bear_strings_find(compilers, file);
