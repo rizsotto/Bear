@@ -113,6 +113,9 @@ static int call_execve(const char * path, char * const argv[], char * const envp
     char const ** menvp = bear_strings_copy((char const * *)envp);
     menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
     menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+#ifdef ENV_FLAT
+    menvp = bear_env_insert(menvp, ENV_FLAT, getenv(ENV_FLAT));
+#endif
     int const result = (*fp)(path, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;
@@ -130,6 +133,9 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     char const ** menvp = bear_strings_copy((char const * *)envp);
     menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
     menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+#ifdef ENV_FLAT
+    menvp = bear_env_insert(menvp, ENV_FLAT, getenv(ENV_FLAT));
+#endif
     int const result = (*fp)(file, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;

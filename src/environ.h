@@ -3,8 +3,13 @@
 #ifndef BEAR_ENVIRON_H
 #define BEAR_ENVIRON_H
 
-static char const * const ENV_PRELOAD = "LD_PRELOAD";
-static char const * const ENV_OUTPUT  = "BEAR_OUTPUT";
+#ifdef __APPLE__
+#define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
+#define ENV_FLAT "DYLD_FORCE_FLAT_NAMESPACE"
+#else
+#define ENV_PRELOAD "LD_PRELOAD"
+#endif
+#define ENV_OUTPUT  "BEAR_OUTPUT"
 
 char const * * bear_env_insert(char const * * in, char const * key, char const * value);
 char * * bear_get_environ(void);
