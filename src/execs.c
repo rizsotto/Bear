@@ -29,7 +29,7 @@ int execve(const char * path, char * const argv[], char * const envp[])
 }
 #endif
 
-#ifdef HAVE_EXECV
+#if defined(HAVE_EXECV) && !defined(__APPLE__)
 int execv(const char * path, char * const argv[])
 {
     report_call("execv", (char const * const *)argv);
@@ -37,7 +37,7 @@ int execv(const char * path, char * const argv[])
 }
 #endif
 
-#ifdef HAVE_EXECVPE
+#if defined(HAVE_EXECVPE) && !defined(__APPLE__)
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
     report_call("execvpe", (char const * const *)argv);
@@ -45,7 +45,7 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 }
 #endif
 
-#ifdef HAVE_EXECVP
+#if defined(HAVE_EXECVP) && !defined(__APPLE__)
 int execvp(const char * file, char * const argv[])
 {
     report_call("execvp", (char const * const *)argv);
@@ -53,7 +53,7 @@ int execvp(const char * file, char * const argv[])
 }
 #endif
 
-#ifdef HAVE_EXECL
+#if defined(HAVE_EXECL) && !defined(__APPLE__)
 int execl(const char * path, const char * arg, ...)
 {
     va_list args;
@@ -68,7 +68,7 @@ int execl(const char * path, const char * arg, ...)
 }
 #endif
 
-#ifdef HAVE_EXECLP
+#if defined(HAVE_EXECLP) && !defined(__APPLE__)
 int execlp(const char * file, const char * arg, ...)
 {
     va_list args;
@@ -83,7 +83,7 @@ int execlp(const char * file, const char * arg, ...)
 }
 #endif
 
-#ifdef HAVE_EXECLE
+#if defined(HAVE_EXECLE) && !defined(__APPLE__)
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 int execle(const char * path, const char * arg, ...)
 {
