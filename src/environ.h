@@ -7,5 +7,6 @@
 #define ENV_OUTPUT  "BEAR_OUTPUT"
 
 char const * * bear_env_insert(char const * * in, char const * key, char const * value);
+char * * bear_get_environ(void);
 
 #endif

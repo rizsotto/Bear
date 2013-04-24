@@ -7,6 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifdef __APPLE__
+#include <crt_externs.h>
+#endif
+
 
 char const * * bear_env_insert(char const * envs[], char const * key, char const * value)
 {
@@ -36,3 +40,12 @@ char const * * bear_env_insert(char const * envs[], char const * key, char const
     return bear_strings_append(envs, env);
 }
 
+char * * bear_get_environ(void)
+{
+#ifdef __APPLE__
+    // environ is not available for shared libraries have to use _NSGetEnviron()
+    return *_NSGetEnviron();
+#else
+    return environ;
+#endif
+}
