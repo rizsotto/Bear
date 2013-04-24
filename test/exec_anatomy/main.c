@@ -153,31 +153,61 @@ void call_execle_and_printenv()
 }
 #endif
 
+void print_expected_output(FILE *fd, const char *cmd, const char *file, const char *cwd)
+{
+    static int need_comma = 0;
+    if (need_comma)
+        fprintf(fd, ",\n");
+    fprintf(fd, "{\n");
+    fprintf(fd, "  \"directory\": \"%s\",\n", cwd);
+    fprintf(fd, "  \"command\": \"%s -c %s\",\n", cmd, file);
+    fprintf(fd, "  \"file\": \"%s/%s\"\n", cwd, file);
+    fprintf(fd, "}\n");
+    need_comma = 1;
+}
+
 int main()
 {
+    char * const cwd = getcwd(NULL, 0);
+    FILE *expected_out = fopen("expected.json", "w");
+    if (!expected_out)
+    {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+    fprintf(expected_out, "[\n");
 #ifdef HAVE_EXECV
+    print_expected_output(expected_out, "cc", "execv.c", cwd);
     fork_fun(call_execv);
 #endif
 #ifdef HAVE_EXECVE
+    print_expected_output(expected_out, "/usr/bin/cc", "execve.c", cwd);
     fork_fun(call_execve);
 #endif
 #ifdef HAVE_EXECVP
+    print_expected_output(expected_out, "cc", "execvp.c", cwd);
     fork_fun(call_execvp);
 #endif
 #ifdef HAVE_EXECVPE
+    print_expected_output(expected_out, "/usr/bin/cc", "execvpe.c", cwd);
     fork_fun(call_execvpe);
 #endif
 #ifdef HAVE_EXECL
+    print_expected_output(expected_out, "cc", "execl.c", cwd);
     fork_fun(call_execl);
 #endif
 #ifdef HAVE_EXECLP
+    print_expected_output(expected_out, "cc", "execlp.c", cwd);
     fork_fun(call_execlp);
 #endif
 #ifdef HAVE_EXECLE
+    print_expected_output(expected_out, "/usr/bin/cc", "execle.c", cwd);
     fork_fun(call_execle);
 #endif
 #ifdef HAVE_EXECLE
     fork_fun(call_execle_and_printenv);
 #endif
+    fprintf(expected_out, "]\n");
+    fclose(expected_out);
     return 0;
 }

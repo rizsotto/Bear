@@ -5,11 +5,6 @@ add_definitions(-D_GNU_SOURCE)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../src)
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/expected.json.in
-  ${CMAKE_CURRENT_BINARY_DIR}/expected.json
-  @ONLY)
-
-configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/run.sh.in
   ${CMAKE_CURRENT_BINARY_DIR}/run.sh
   @ONLY)
