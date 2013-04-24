@@ -33,7 +33,7 @@ int execve(const char * path, char * const argv[], char * const envp[])
 int execv(const char * path, char * const argv[])
 {
     report_call("execv", (char const * const *)argv);
-    return call_execve(path, argv, environ);
+    return call_execve(path, argv, bear_get_environ());
 }
 #endif
 
@@ -49,7 +49,7 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 int execvp(const char * file, char * const argv[])
 {
     report_call("execvp", (char const * const *)argv);
-    return call_execvpe(file, argv, environ);
+    return call_execvpe(file, argv, bear_get_environ());
 }
 #endif
 
@@ -62,7 +62,7 @@ int execl(const char * path, const char * arg, ...)
     va_end(args);
 
     report_call("execl", (char const * const *)argv);
-    int const result = call_execve(path, (char * const *)argv, environ);
+    int const result = call_execve(path, (char * const *)argv, bear_get_environ());
     bear_strings_release(argv);
     return result;
 }
@@ -77,7 +77,7 @@ int execlp(const char * file, const char * arg, ...)
     va_end(args);
 
     report_call("execlp", (char const * const *)argv);
-    int const result = call_execvpe(file, (char * const *)argv, environ);
+    int const result = call_execvpe(file, (char * const *)argv, bear_get_environ());
     bear_strings_release(argv);
     return result;
 }
