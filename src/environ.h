@@ -5,6 +5,7 @@
 
 #ifdef __APPLE__
 #define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
+#define ENV_FLAT "DYLD_FORCE_FLAT_NAMESPACE"
 #else
 #define ENV_PRELOAD "LD_PRELOAD"
 #endif

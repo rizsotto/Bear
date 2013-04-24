@@ -92,6 +92,13 @@ int main(int argc, char * const argv[])
             perror("setenv");
             exit(EXIT_FAILURE);
         }
+#ifdef ENV_FLAT
+        if (-1 == setenv(ENV_FLAT, "1", 1))
+        {
+            perror("setenv");
+            exit(EXIT_FAILURE);
+        }
+#endif ENV_FLAT
         if (-1 == execvp(*unprocessed_argv, unprocessed_argv))
         {
             perror("execvp");
