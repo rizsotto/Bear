@@ -6,6 +6,7 @@
 #include "json.h"
 
 #include <unistd.h>
+#include <libgen.h> // must be before string.h so we get POSIX basename
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -159,9 +160,12 @@ static char const * const compilers[] =
 static int is_known_compiler(char const * cmd)
 {
     // looking for compiler name
-    char * file = basename(cmd);
-
-    return bear_strings_find(compilers, file);
+    // have to copy cmd since POSIX basename modifies input
+    char * local_cmd = strdup(cmd);
+    char * file = basename(local_cmd);
+    int result = bear_strings_find(compilers, file);
+    free(local_cmd);
+    return result;
 }
 
 static int is_source_file_extension(char const * arg);
