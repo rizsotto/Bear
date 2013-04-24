@@ -163,9 +163,9 @@ static int is_known_compiler(char const * cmd)
     // have to copy cmd since POSIX basename modifies input
     char * local_cmd = strdup(cmd);
     char * file = basename(local_cmd);
+    int result = bear_strings_find(compilers, file);
     free(local_cmd);
-
-    return bear_strings_find(compilers, file);
+    return result;
 }
 
 static int is_source_file_extension(char const * arg);
