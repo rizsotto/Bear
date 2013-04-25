@@ -20,40 +20,59 @@ static void report_call(char const * fun, char const * const argv[]);
 
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
+static int call_execvp(const char * file, char * const argv[]);
+
+static int in_exec = 0;
 
 #ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {
-    report_call("execve", (char const * const *)argv);
-    return call_execve(path, argv, envp);
+    if (!in_exec)
+        report_call("execve", (char const * const *)argv);
+    in_exec = 1;
+    int const result = call_execve(path, argv, envp);
+    in_exec = 0;
+    return result;
 }
 #endif
 
-#if defined(HAVE_EXECV) && !defined(__APPLE__)
+#ifdef HAVE_EXECV
 int execv(const char * path, char * const argv[])
 {
-    report_call("execv", (char const * const *)argv);
-    return call_execve(path, argv, bear_get_environ());
+    if (!in_exec)
+        report_call("execv", (char const * const *)argv);
+    in_exec = 1;
+    int const result = call_execve(path, argv, bear_get_environ());
+    in_exec = 0;
+    return result;
 }
 #endif
 
-#if defined(HAVE_EXECVPE) && !defined(__APPLE__)
+#ifdef HAVE_EXECVPE
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
-    report_call("execvpe", (char const * const *)argv);
-    return call_execvpe(file, argv, envp);
+    if (!in_exec)
+        report_call("execvpe", (char const * const *)argv);
+    in_exec = 1;
+    int const result = call_execvpe(file, argv, envp);
+    in_exec = 0;
+    return result;
 }
 #endif
 
-#if defined(HAVE_EXECVP) && !defined(__APPLE__)
+#ifdef HAVE_EXECVP
 int execvp(const char * file, char * const argv[])
 {
-    report_call("execvp", (char const * const *)argv);
-    return call_execvpe(file, argv, bear_get_environ());
+    if (!in_exec)
+        report_call("execvp", (char const * const *)argv);
+    in_exec = 1;
+    int const result = call_execvp(file, argv);
+    in_exec = 0;
+    return result;
 }
 #endif
 
-#if defined(HAVE_EXECL) && !defined(__APPLE__)
+#ifdef HAVE_EXECL
 int execl(const char * path, const char * arg, ...)
 {
     va_list args;
@@ -61,14 +80,17 @@ int execl(const char * path, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    report_call("execl", (char const * const *)argv);
+    if (!in_exec)
+        report_call("execl", (char const * const *)argv);
+    in_exec = 1;
     int const result = call_execve(path, (char * const *)argv, bear_get_environ());
     bear_strings_release(argv);
+    in_exec = 0;
     return result;
 }
 #endif
 
-#if defined(HAVE_EXECLP) && !defined(__APPLE__)
+#ifdef HAVE_EXECLP
 int execlp(const char * file, const char * arg, ...)
 {
     va_list args;
@@ -76,14 +98,17 @@ int execlp(const char * file, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    report_call("execlp", (char const * const *)argv);
-    int const result = call_execvpe(file, (char * const *)argv, bear_get_environ());
+    if (!in_exec)
+        report_call("execlp", (char const * const *)argv);
+    in_exec = 1;
+    int const result = call_execvp(file, (char * const *)argv);
     bear_strings_release(argv);
+    in_exec = 0;
     return result;
 }
 #endif
 
-#if defined(HAVE_EXECLE) && !defined(__APPLE__)
+#ifdef HAVE_EXECLE
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 int execle(const char * path, const char * arg, ...)
 {
@@ -93,9 +118,12 @@ int execle(const char * path, const char * arg, ...)
     char const ** envp = va_arg(args, char const **);
     va_end(args);
 
-    report_call("execle", (char const * const *)argv);
+    if (!in_exec)
+        report_call("execle", (char const * const *)argv);
+    in_exec = 1;
     int const result = call_execve(path, (char * const *)argv, (char * const *)envp);
     bear_strings_release(argv);
+    in_exec = 0;
     return result;
 }
 #endif
@@ -141,6 +169,18 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     return result;
 }
 
+static int call_execvp(const char * file, char * const argv[]) 
+{
+    int (*fp)(const char * file, char * const argv[]) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "execlp")))
+    {
+        perror("dlsym");
+        exit(EXIT_FAILURE);
+    }
+    
+    return (*fp)(file, argv);
+} 
+  
 
 typedef void (*send_message)(char const * socket, struct bear_message const *);
 
