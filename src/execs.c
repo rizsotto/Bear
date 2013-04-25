@@ -20,36 +20,71 @@ static void report_call(char const * fun, char const * const argv[]);
 
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
+static int call_execvp(const char * file, char * const argv[]);
+
+static int in_exec = 0;
 
 #ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {
-    report_call("execve", (char const * const *)argv);
-    return call_execve(path, argv, envp);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execve", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execve(path, argv, envp);
+    if (clear_in_exec)
+        in_exec = 0;
+    return result;
 }
 #endif
 
 #ifdef HAVE_EXECV
 int execv(const char * path, char * const argv[])
 {
-    report_call("execv", (char const * const *)argv);
-    return call_execve(path, argv, environ);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execv", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execve(path, argv, bear_get_environ());
+    if (clear_in_exec)
+        in_exec = 0;
+    return result;
 }
 #endif
 
 #ifdef HAVE_EXECVPE
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
-    report_call("execvpe", (char const * const *)argv);
-    return call_execvpe(file, argv, envp);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execvpe", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execvpe(file, argv, envp);
+    if (clear_in_exec)
+        in_exec = 0;
+    return result;
 }
 #endif
 
 #ifdef HAVE_EXECVP
 int execvp(const char * file, char * const argv[])
 {
-    report_call("execvp", (char const * const *)argv);
-    return call_execvpe(file, argv, environ);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execvp", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execvp(file, argv);
+    if (clear_in_exec)
+        in_exec = 0;
+    return result;
 }
 #endif
 
@@ -61,9 +96,16 @@ int execl(const char * path, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    report_call("execl", (char const * const *)argv);
-    int const result = call_execve(path, (char * const *)argv, environ);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execl", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execve(path, (char * const *)argv, bear_get_environ());
     bear_strings_release(argv);
+    if (clear_in_exec)
+        in_exec = 0;
     return result;
 }
 #endif
@@ -76,9 +118,16 @@ int execlp(const char * file, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    report_call("execlp", (char const * const *)argv);
-    int const result = call_execvpe(file, (char * const *)argv, environ);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execlp", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
+    int const result = call_execvp(file, (char * const *)argv);
     bear_strings_release(argv);
+    if (clear_in_exec)
+        in_exec = 0;
     return result;
 }
 #endif
@@ -93,9 +142,16 @@ int execle(const char * path, const char * arg, ...)
     char const ** envp = va_arg(args, char const **);
     va_end(args);
 
-    report_call("execle", (char const * const *)argv);
+    int clear_in_exec = 0;
+    if (!in_exec)
+    {
+        report_call("execle", (char const * const *)argv);
+        clear_in_exec = in_exec = 1;
+    }
     int const result = call_execve(path, (char * const *)argv, (char * const *)envp);
     bear_strings_release(argv);
+    if (clear_in_exec)
+        in_exec = 0;
     return result;
 }
 #endif
@@ -113,6 +169,9 @@ static int call_execve(const char * path, char * const argv[], char * const envp
     char const ** menvp = bear_strings_copy((char const * *)envp);
     menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
     menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+#ifdef ENV_FLAT
+    menvp = bear_env_insert(menvp, ENV_FLAT, getenv(ENV_FLAT));
+#endif
     int const result = (*fp)(path, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;
@@ -130,11 +189,26 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     char const ** menvp = bear_strings_copy((char const * *)envp);
     menvp = bear_env_insert(menvp, ENV_PRELOAD, getenv(ENV_PRELOAD));
     menvp = bear_env_insert(menvp, ENV_OUTPUT, getenv(ENV_OUTPUT));
+#ifdef ENV_FLAT
+    menvp = bear_env_insert(menvp, ENV_FLAT, getenv(ENV_FLAT));
+#endif
     int const result = (*fp)(file, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;
 }
 
+static int call_execvp(const char * file, char * const argv[]) 
+{
+    int (*fp)(const char * file, char * const argv[]) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "execvp")))
+    {
+        perror("dlsym");
+        exit(EXIT_FAILURE);
+    }
+    
+    return (*fp)(file, argv);
+} 
+  
 
 typedef void (*send_message)(char const * socket, struct bear_message const *);
 

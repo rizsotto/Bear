@@ -1,12 +1,12 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
-add_executable(exec_anatomy main.c)
+add_executable(exec_anatomy ${CMAKE_CURRENT_BINARY_DIR}/main.c)
 add_definitions(-D_GNU_SOURCE)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../src)
 
 configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/expected.json.in
-  ${CMAKE_CURRENT_BINARY_DIR}/expected.json
+  ${CMAKE_CURRENT_SOURCE_DIR}/main.c.in
+  ${CMAKE_CURRENT_BINARY_DIR}/main.c
   @ONLY)
 
 configure_file(
