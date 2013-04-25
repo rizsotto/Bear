@@ -175,7 +175,6 @@ int main()
         exit(EXIT_FAILURE);
     }
     fprintf(expected_out, "[\n");
-    printf("main pass\n");
 #ifdef HAVE_EXECV
     print_expected_output(expected_out, "cc", "execv.c");
     fork_fun(call_execv);
