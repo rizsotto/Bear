@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <paths.h>
 
 typedef void (*exec_fun)();
 
@@ -83,6 +84,22 @@ void call_execvp()
     };
 
     execvp(compiler, argv);
+}
+#endif
+
+#ifdef HAVE_EXECVP2
+void call_execvP()
+{
+    char * const compiler = "cc";
+    char * const argv[] =
+    {
+        "cc",
+        "-c",
+        "execvP.c",
+        0
+    };
+
+    execvP(compiler, _PATH_DEFPATH, argv);
 }
 #endif
 
@@ -187,6 +204,10 @@ int main()
 #ifdef HAVE_EXECVP
     print_expected_output(expected_out, "cc", "execvp.c", cwd);
     fork_fun(call_execvp);
+#endif
+#ifdef HAVE_EXECVP2
+    print_expected_output(expected_out, "cc", "execvP.c", cwd);
+    fork_fun(call_execvP);
 #endif
 #ifdef HAVE_EXECVPE
     print_expected_output(expected_out, "/usr/bin/cc", "execvpe.c", cwd);
