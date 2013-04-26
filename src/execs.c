@@ -16,25 +16,26 @@
 #include <dlfcn.h>
 
 
+static int already_reported = 0;
+
 static void report_call(char const * fun, char const * const argv[]);
+static void report_failed_call(char const * fun, int result, int report_state);
 
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
-static int call_execvp(const char * file, char * const argv[]);
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[]);
 #endif
 
-static int already_reported = 0;
-
 #ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {
-    int clear_reported = (!already_reported);
+    int const report_state = already_reported;
+
     report_call("execve", (char const * const *)argv);
     int const result = call_execve(path, argv, envp);
-    if (clear_reported)
-        already_reported = 0;
+    report_failed_call("execve", result, report_state);
+
     return result;
 }
 #endif
@@ -42,11 +43,11 @@ int execve(const char * path, char * const argv[], char * const envp[])
 #ifdef HAVE_EXECV
 int execv(const char * path, char * const argv[])
 {
-    int clear_reported = (!already_reported);
+    int const report_state = already_reported;
+
     report_call("execv", (char const * const *)argv);
     int const result = call_execve(path, argv, bear_get_environ());
-    if (clear_reported)
-        already_reported = 0;
+    report_failed_call("execv", result, report_state);
     return result;
 }
 #endif
@@ -54,11 +55,12 @@ int execv(const char * path, char * const argv[])
 #ifdef HAVE_EXECVPE
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
-    int clear_reported = (!already_reported);
+    int const report_state = already_reported;
+
     report_call("execvpe", (char const * const *)argv);
     int const result = call_execvpe(file, argv, envp);
-    if (clear_reported)
-        already_reported = 0;
+    report_failed_call("execvpe", result, report_state);
+
     return result;
 }
 #endif
@@ -66,11 +68,11 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 #ifdef HAVE_EXECVP
 int execvp(const char * file, char * const argv[])
 {
-    int clear_reported = (!already_reported);
+    int const report_state = already_reported;
+
     report_call("execvp", (char const * const *)argv);
-    int const result = call_execvp(file, argv);
-    if (clear_reported)
-        already_reported = 0;
+    int const result = call_execvpe(file, argv, bear_get_environ());
+    report_failed_call("execvp", result, report_state);
     return result;
 }
 #endif
@@ -78,11 +80,11 @@ int execvp(const char * file, char * const argv[])
 #ifdef HAVE_EXECVP2
 int execvP(const char * file, const char * search_path, char * const argv[])
 {
-    int clear_reported = (!already_reported);
+    int const report_state = already_reported;
+
     report_call("execvP", (char const * const *)argv);
     int const result = call_execvP(file, search_path, argv);
-    if (clear_reported)
-        already_reported = 0;
+    report_failed_call("execvP", result, report_state);
     return result;
 }
 #endif
@@ -95,12 +97,10 @@ int execl(const char * path, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    int clear_reported = (!already_reported);
     report_call("execl", (char const * const *)argv);
     int const result = call_execve(path, (char * const *)argv, bear_get_environ());
+    report_failed_call("execl", result, 0);
     bear_strings_release(argv);
-    if (clear_reported)
-        already_reported = 0;
     return result;
 }
 #endif
@@ -113,12 +113,10 @@ int execlp(const char * file, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, args);
     va_end(args);
 
-    int clear_reported = (!already_reported);
     report_call("execlp", (char const * const *)argv);
-    int const result = call_execvp(file, (char * const *)argv);
+    int const result = call_execvpe(file, (char * const *)argv, bear_get_environ());
+    report_failed_call("execlp", result, 0);
     bear_strings_release(argv);
-    if (clear_reported)
-        already_reported = 0;
     return result;
 }
 #endif
@@ -133,12 +131,10 @@ int execle(const char * path, const char * arg, ...)
     char const ** envp = va_arg(args, char const **);
     va_end(args);
 
-    int clear_reported = (!already_reported);
     report_call("execle", (char const * const *)argv);
     int const result = call_execve(path, (char * const *)argv, (char * const *)envp);
+    report_failed_call("execle", result, 0);
     bear_strings_release(argv);
-    if (clear_reported)
-        already_reported = 0;
     return result;
 }
 #endif
@@ -184,18 +180,6 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     return result;
 }
 
-static int call_execvp(const char * file, char * const argv[]) 
-{
-    int (*fp)(const char * file, char * const argv[]) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "execvp")))
-    {
-        perror("dlsym");
-        exit(EXIT_FAILURE);
-    }
-    
-    return (*fp)(file, argv);
-} 
-
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[])
 {
@@ -224,13 +208,14 @@ static void report(send_message fp, char const * socket, char const * fun, char 
     };
     (*fp)(socket, &msg);
     free((void *)msg.cwd);
-    already_reported = 1;
 }
 
 static void report_call(char const * fun, char const * const argv[])
 {
     if (already_reported)
         return;
+    already_reported = 1;
+
     char * const socket = getenv(ENV_OUTPUT);
     if (0 == socket)
     {
@@ -239,4 +224,10 @@ static void report_call(char const * fun, char const * const argv[])
     }
 
     return report(bear_send_message, socket, fun, argv);
+}
+
+static void report_failed_call(char const * fun, int result_code, int report_state)
+{
+    if (!report_state)
+        already_reported = 0;
 }
