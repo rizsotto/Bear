@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef __APPLE__
+#ifdef NEED_NSGETENVIRON 
 #include <crt_externs.h>
 #else
 #include <unistd.h>
@@ -44,7 +44,7 @@ char const * * bear_env_insert(char const * envs[], char const * key, char const
 
 char * * bear_get_environ(void)
 {
-#ifdef __APPLE__
+#ifdef NEED_NSGETENVIRON 
     // environ is not available for shared libraries have to use _NSGetEnviron()
     return *_NSGetEnviron();
 #else

@@ -8,3 +8,4 @@
 #cmakedefine HAVE_EXECLP
 #cmakedefine HAVE_EXECLE
 #cmakedefine APPLE
+#cmakedefine NEED_NSGETENVIRON
