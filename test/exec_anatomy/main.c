@@ -21,6 +21,8 @@ void fork_fun(exec_fun f)
     else if (0 == child)
     {
         (*f)();
+        fprintf(stderr, "children process failed to exec\n");
+        exit(EXIT_FAILURE);
     }
     else
     {
@@ -28,6 +30,12 @@ void fork_fun(exec_fun f)
         if (-1 == waitpid(child, &status, 0))
         {
             perror("wait");
+            exit(EXIT_FAILURE);
+        }
+        int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+        if (exit_code)
+        {
+            fprintf(stderr, "children process has non zero exit code\n");
             exit(EXIT_FAILURE);
         }
     }
