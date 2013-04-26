@@ -21,8 +21,12 @@ static int already_reported = 0;
 static void report_call(char const * fun, char const * const argv[]);
 static void report_failed_call(char const * fun, int result, int report_state);
 
+#ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
+#endif
+#ifdef HAVE_EXECVPE
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
+#endif
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[]);
 #endif
@@ -41,6 +45,9 @@ int execve(const char * path, char * const argv[], char * const envp[])
 #endif
 
 #ifdef HAVE_EXECV
+# ifndef HAVE_EXECVE
+#  error can not implement execv without execve
+# endif
 int execv(const char * path, char * const argv[])
 {
     int const report_state = already_reported;
@@ -66,6 +73,9 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 #endif
 
 #ifdef HAVE_EXECVP
+# ifndef HAVE_EXECVPE
+#  error can not implement execvp without execvpe
+# endif
 int execvp(const char * file, char * const argv[])
 {
     int const report_state = already_reported;
@@ -90,6 +100,9 @@ int execvP(const char * file, const char * search_path, char * const argv[])
 #endif
 
 #ifdef HAVE_EXECL
+# ifndef HAVE_EXECVE
+#  error can not implement execl without execve
+# endif
 int execl(const char * path, const char * arg, ...)
 {
     va_list args;
@@ -106,6 +119,9 @@ int execl(const char * path, const char * arg, ...)
 #endif
 
 #ifdef HAVE_EXECLP
+# ifndef HAVE_EXECVPE
+#  error can not implement execlp without execvpe
+# endif
 int execlp(const char * file, const char * arg, ...)
 {
     va_list args;
@@ -122,6 +138,9 @@ int execlp(const char * file, const char * arg, ...)
 #endif
 
 #ifdef HAVE_EXECLE
+# ifndef HAVE_EXECVE
+#  error can not implement execle without execve
+# endif
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 int execle(const char * path, const char * arg, ...)
 {
@@ -140,6 +159,7 @@ int execle(const char * path, const char * arg, ...)
 #endif
 
 
+#ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[])
 {
     int (*fp)(const char *, char * const *, char * const *) = 0;
@@ -159,7 +179,9 @@ static int call_execve(const char * path, char * const argv[], char * const envp
     bear_strings_release(menvp);
     return result;
 }
+#endif
 
+#ifdef HAVE_EXECVPE
 static int call_execvpe(const char * file, char * const argv[], char * const envp[])
 {
     int (*fp)(const char *, char * const *, char * const *) = 0;
@@ -179,6 +201,7 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     bear_strings_release(menvp);
     return result;
 }
+#endif
 
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[])
