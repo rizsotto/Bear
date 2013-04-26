@@ -24,6 +24,9 @@ static void report_failed_call(char const * fun, int result, int report_state);
 #ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 #endif
+#ifdef HAVE_EXECVP
+static int call_execvp(const char * file, char * const argv[]);
+#endif
 #ifdef HAVE_EXECVPE
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
 #endif
@@ -73,15 +76,12 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 #endif
 
 #ifdef HAVE_EXECVP
-# ifndef HAVE_EXECVPE
-#  error can not implement execvp without execvpe
-# endif
 int execvp(const char * file, char * const argv[])
 {
     int const report_state = already_reported;
 
     report_call("execvp", (char const * const *)argv);
-    int const result = call_execvpe(file, argv, bear_get_environ());
+    int const result = call_execvp(file, argv);
     report_failed_call("execvp", result, report_state);
     return result;
 }
@@ -119,8 +119,8 @@ int execl(const char * path, const char * arg, ...)
 #endif
 
 #ifdef HAVE_EXECLP
-# ifndef HAVE_EXECVPE
-#  error can not implement execlp without execvpe
+# ifndef HAVE_EXECVP
+#  error can not implement execlp without execvp
 # endif
 int execlp(const char * file, const char * arg, ...)
 {
@@ -130,7 +130,7 @@ int execlp(const char * file, const char * arg, ...)
     va_end(args);
 
     report_call("execlp", (char const * const *)argv);
-    int const result = call_execvpe(file, (char * const *)argv, bear_get_environ());
+    int const result = call_execvp(file, (char * const *)argv);
     report_failed_call("execlp", result, 0);
     bear_strings_release(argv);
     return result;
@@ -201,6 +201,20 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     bear_strings_release(menvp);
     return result;
 }
+#endif
+
+#ifdef HAVE_EXECVP
+static int call_execvp(const char * file, char * const argv[])
+{
+    int (*fp)(const char * file, char * const argv[]) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "execvp")))
+    {
+        perror("dlsym");
+        exit(EXIT_FAILURE);
+    }
+    
+    return (*fp)(file, argv);
+} 
 #endif
 
 #ifdef HAVE_EXECVP2
