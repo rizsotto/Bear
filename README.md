@@ -17,11 +17,11 @@ no free json file. Bear is a tool to generate such file during the build
 process.
 
 The concept behind Bear is to exec the original build command and
-intercept the `exec` calls of the build tool. To achive that Bear uses
-`LD_PRELOAD` mechanism provided by GNU C library. So it has two components:
-the library and the binary. The library defines the `exec` methods and used
-in every child processes. The executable sets the environment up to child
-processes and writes the output file.
+intercept the `exec` calls of the build tool. To achive that Bear uses the
+`LD_PRELOAD` or `DYLD_INSERT_LIBRARIES` mechanisms provided by the dynamic
+linker. So it has two components: the library and the binary. The library
+defines the `exec` methods and used in every child processes. The executable
+sets the environment up to child processes and writes the output file.
 
 
 How to build

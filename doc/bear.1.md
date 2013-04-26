@@ -20,10 +20,11 @@ is available then it is easy to re-run the compilation with different
 programs.
 
 Bear execs the original build command and intercept the `exec` calls.
-To achive that Bear uses `LD_PRELOAD` mechanism provided by GNU C library.
-There is a library which defines the `exec` methods and used in every
-child processes of the build command. The executable itself sets the
-environment up to child processes and writes the output file.
+To achive that Bear uses the `LD_PRELOAD` or `DYLD_INSERT_LIBRARIES`
+mechanisms provided by the dynamic linker. There is a library which
+defines the `exec` methods and used in every child processes of the
+build command. The executable itself sets the environment up to child
+processes and writes the output file.
 
 # OPTIONS
 
