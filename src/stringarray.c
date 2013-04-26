@@ -23,7 +23,7 @@ char const ** bear_strings_copy(char const ** const in)
 
     char const * const * in_it = in;
     char const * * out_it = result;
-    for (; *in_it; ++in_it, ++out_it)
+    for (; (in_it) && (*in_it); ++in_it, ++out_it)
     {
         *out_it = strdup(*in_it);
         if (0 == *out_it)
@@ -61,7 +61,7 @@ char const ** bear_strings_build(char const * const arg, va_list args)
 void bear_strings_release(char const ** in)
 {
     char const * const * it = in;
-    for (; (in) && (*it); ++it)
+    for (; (it) && (*it); ++it)
     {
         free((void *)*it);
     }
@@ -72,9 +72,8 @@ void bear_strings_release(char const ** in)
 char const ** bear_strings_append(char const ** const in, char const * const e)
 {
     if (0 == e)
-    {
         return in;
-    }
+
     size_t size = bear_strings_length(in);
     char const ** result = (char const **)realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result)
@@ -90,39 +89,38 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
 char const ** bear_strings_remove(char const ** const in, char const * const e)
 {
     if (0 == e)
-    {
         return in;
-    }
-    char const * * it = in;
+
     int action = 0;
-    for (; (in) && (*it); ++it)
+    char const * * it = in;
+    for (; (it) && (*it); ++it)
     {
         if ((*it) == e)
-        {
             ++action;
-        }
+
         if (action)
-        {
-            char const * * next = it + 1;
-            *it = *next;
-        }
+            *it = *(it + action);
     }
-    // now resize the array
-    size_t size = bear_strings_length(in);
-    char const ** result = (char const **)realloc(in, (size + 1) * sizeof(char const *));
-    if (0 == result)
+    // resize the array when needed
+    if (action)
     {
-        perror("realloc");
-        exit(EXIT_FAILURE);
+        size_t size = bear_strings_length(in);
+        char const ** result = (char const **)realloc(in, (size + 1) * sizeof(char const *));
+        if (0 == result)
+        {
+            perror("realloc");
+            exit(EXIT_FAILURE);
+        }
+        return result;
     }
-    return result;
+    return in;
 }
 
 size_t bear_strings_length(char const * const * const in)
 {
     size_t result = 0;
     char const * const * it = in;
-    for (; (in) && (*it); ++it, ++result)
+    for (; (it) && (*it); ++it, ++result)
         ;
     return result;
 }
@@ -130,17 +128,13 @@ size_t bear_strings_length(char const * const * const in)
 int bear_strings_find(char const * const * in, char const * const e)
 {
     if (0 == e)
-    {
         return 0;
-    }
 
     char const * const * it = in;
-    for (; (in) && (*it); ++it)
+    for (; (it) && (*it); ++it)
     {
         if (0 == strcmp(e, *it))
-        {
             return 1;
-        }
     }
     return 0;
 }
@@ -152,7 +146,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
     size_t acc_size = 0;
 
     char const * const * it = in;
-    for (; *it; ++it)
+    for (; (it) && (*it); ++it)
     {
         size_t const sep = (in == it) ? 0 : 1;
         size_t const it_size = strlen(*it);
