@@ -21,6 +21,9 @@ static void report_call(char const * fun, char const * const argv[]);
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 static int call_execvpe(const char * file, char * const argv[], char * const envp[]);
 static int call_execvp(const char * file, char * const argv[]);
+#ifdef HAVE_EXECVP2
+static int call_execvP(const char * file, const char * search_path, char * const argv[]);
+#endif
 
 static int already_reported = 0;
 
@@ -66,6 +69,18 @@ int execvp(const char * file, char * const argv[])
     int clear_reported = (!already_reported);
     report_call("execvp", (char const * const *)argv);
     int const result = call_execvp(file, argv);
+    if (clear_reported)
+        already_reported = 0;
+    return result;
+}
+#endif
+
+#ifdef HAVE_EXECVP2
+int execvP(const char * file, const char * search_path, char * const argv[])
+{
+    int clear_reported = (!already_reported);
+    report_call("execvP", (char const * const *)argv);
+    int const result = call_execvP(file, search_path, argv);
     if (clear_reported)
         already_reported = 0;
     return result;
@@ -180,7 +195,20 @@ static int call_execvp(const char * file, char * const argv[])
     
     return (*fp)(file, argv);
 } 
-  
+
+#ifdef HAVE_EXECVP2
+static int call_execvP(const char * file, const char * search_path, char * const argv[])
+{
+    int (*fp)(const char *, const char *, char * const *) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "execvP")))
+    {
+        perror("dlsym");
+        exit(EXIT_FAILURE);
+    }
+
+    return (*fp)(file, search_path, argv);
+}
+#endif
 
 typedef void (*send_message)(char const * socket, struct bear_message const *);
 

@@ -4,6 +4,7 @@
 #cmakedefine HAVE_EXECV
 #cmakedefine HAVE_EXECVPE
 #cmakedefine HAVE_EXECVP
+#cmakedefine HAVE_EXECVP2
 #cmakedefine HAVE_EXECL
 #cmakedefine HAVE_EXECLP
 #cmakedefine HAVE_EXECLE
