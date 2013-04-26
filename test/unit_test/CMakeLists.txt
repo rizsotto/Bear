@@ -8,7 +8,7 @@ add_executable(unit_test
     ../../src/environ.c
     )
 add_definitions(-D_GNU_SOURCE)
-include_directories(../../src)
+include_directories(../../src ${CMAKE_CURRENT_BINARY_DIR}/../../src)
 set_target_properties(unit_test PROPERTIES
     COMPILE_DEFINITIONS "CLIENT;SERVER")
 

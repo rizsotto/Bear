@@ -7,4 +7,4 @@
 #cmakedefine HAVE_EXECL
 #cmakedefine HAVE_EXECLP
 #cmakedefine HAVE_EXECLE
-
+#cmakedefine APPLE
