@@ -3,7 +3,9 @@
 #ifndef BEAR_ENVIRON_H
 #define BEAR_ENVIRON_H
 
-#ifdef __APPLE__
+#include "config.h"
+
+#ifdef APPLE
 #define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
 #define ENV_FLAT "DYLD_FORCE_FLAT_NAMESPACE"
 #else
