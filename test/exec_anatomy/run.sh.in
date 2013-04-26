@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
 set -o nounset
