@@ -16,10 +16,14 @@ add_library(ear SHARED
 target_link_libraries(ear ${CMAKE_DL_LIBS})
 set_target_properties(ear PROPERTIES
     COMPILE_DEFINITIONS "CLIENT")
-if (CMAKE_COMPILER_IS_GNUCC)
+if(APPLE)
+    # Macs have an entirely different linker.
+    set_target_properties(ear PROPERTIES
+        LINK_FLAGS "-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/AppleExportedSymbolsList")
+else()
     set_target_properties(ear PROPERTIES
         LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/ExportedSymbolsList")
-endif (CMAKE_COMPILER_IS_GNUCC)
+endif()
 
 
 add_executable(bear

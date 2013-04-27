@@ -10,7 +10,8 @@
 #ifdef NEED_NSGETENVIRON 
 #include <crt_externs.h>
 #else
-#include <unistd.h>
+// Some platforms don't provide environ in any header.
+extern char **environ;
 #endif
 
 

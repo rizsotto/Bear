@@ -19,7 +19,7 @@ static size_t count = 0;
 
 int bear_open_json_output(char const * file)
 {
-    int fd = open(file, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    int fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
     if (-1 == fd)
     {
         perror("open");
