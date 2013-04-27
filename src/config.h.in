@@ -10,4 +10,3 @@
 #cmakedefine HAVE_EXECLE
 #cmakedefine APPLE
 #cmakedefine NEED_NSGETENVIRON
-#cmakedefine HAVE_ENVIRON_IN_UNISTD_H

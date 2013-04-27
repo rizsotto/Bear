@@ -42,7 +42,6 @@ check_function_exists(execlp HAVE_EXECLP)
 check_function_exists(execle HAVE_EXECLE)
 include(CheckSymbolExists)
 check_symbol_exists(_NSGetEnviron crt_externs.h NEED_NSGETENVIRON)
-check_symbol_exists(environ unistd.h HAVE_ENVIRON_IN_UNISTD_H)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 

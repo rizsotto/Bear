@@ -9,8 +9,6 @@
 
 #ifdef NEED_NSGETENVIRON 
 #include <crt_externs.h>
-#elif defined(HAVE_ENVIRON_IN_UNISTD_H)
-#include <unistd.h>
 #else
 // Some platforms don't provide environ in any header.
 extern char **environ;
