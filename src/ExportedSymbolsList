@@ -5,6 +5,7 @@
         execv;
         execve;
         execvp;
+        execvP;
         execvpe;
         execl;
         execlp;
