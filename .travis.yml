@@ -4,14 +4,9 @@ compiler:
   - gcc
   - clang
 
-before_script:
-  - mkdir build
-  - cd build
-
 script:
-  - cmake ..
+  - cmake .
+  - make all
   - make check
-
-after_script:
-  - cd ..
-  - rm -rf build
+  - mkdir target_dir
+  - DESTDIR=target_dir make install
