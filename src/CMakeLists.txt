@@ -3,9 +3,10 @@
 include(GNUInstallDirs)
 
 add_definitions(-D_GNU_SOURCE)
-add_definitions(-DDEFAULT_PRELOAD_FILE=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
-add_definitions(-DDEFAULT_SOCKET_FILE=/tmp/bear.socket)
-add_definitions(-DDEFAULT_OUTPUT_FILE=compile_commands.json)
+
+set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(DEFAULT_SOCKET_FILE /tmp/bear.socket)
+set(DEFAULT_OUTPUT_FILE compile_commands.json)
 
 
 add_library(ear SHARED
