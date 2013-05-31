@@ -12,13 +12,9 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-// Stringify environment variables
-#define XSTR(s) STR(s)
-#define STR(s) #s
-
-#define SOCKET_FILE XSTR(DEFAULT_SOCKET_FILE)
-#define OUTPUT_FILE XSTR(DEFAULT_OUTPUT_FILE)
-#define LIBEAR_FILE XSTR(DEFAULT_PRELOAD_FILE)
+#define SOCKET_FILE DEFAULT_SOCKET_FILE
+#define OUTPUT_FILE DEFAULT_OUTPUT_FILE
+#define LIBEAR_FILE DEFAULT_PRELOAD_FILE
 
 // variables which are used in signal handler
 static volatile pid_t    child_pid;
