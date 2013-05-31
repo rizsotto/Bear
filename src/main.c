@@ -12,7 +12,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define SOCKET_FILE DEFAULT_SOCKET_FILE
 #define OUTPUT_FILE DEFAULT_OUTPUT_FILE
 #define LIBEAR_FILE DEFAULT_PRELOAD_FILE
 
@@ -25,14 +24,18 @@ static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, int debug);
 
+#define SOCKET_DIRECTORY DEFAULT_TEMP_DIRECTORY "/bear.XXXXXX";
 
 int main(int argc, char * const argv[])
 {
-    char const * socket_file = SOCKET_FILE;
+    char const * socket_file = NULL;
     char const * output_file = OUTPUT_FILE;
     char const * libear_path = LIBEAR_FILE;
+    char socket_directory[] = SOCKET_DIRECTORY;
+    char temp_socket[] = SOCKET_DIRECTORY "/socket";
     int debug = 0;
     char * const * unprocessed_argv = 0;
+    int use_temp_socket = 0;
     // parse command line arguments.
     int opt;
     while ((opt = getopt(argc, argv, "o:b:s:dceh?")) != -1)
@@ -68,6 +71,20 @@ int main(int argc, char * const argv[])
         usage(argv[0]);
     }
     unprocessed_argv = &(argv[optind]);
+    // create temporary directory for socket
+    if (NULL == socket_file)
+    {
+        if (NULL == mkdtemp(socket_directory))
+        {
+            perror("mkdtemp");
+            exit(EXIT_FAILURE);
+        }
+
+        // replace XXXXXX in temp_socket with the new content from socket_directory
+        strncpy(temp_socket, socket_directory, sizeof(socket_directory) - 1);
+        socket_file = temp_socket;
+        use_temp_socket = 1;
+    }
     // fork
     child_pid = fork();
     if (-1 == child_pid)
@@ -108,6 +125,11 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
         collect_messages(socket_file, output_file, debug);
+        if (1 == use_temp_socket)
+        {
+            // remove temporary directory
+            rmdir(socket_directory);
+        }
     }
     return child_status;
 }
@@ -210,15 +232,14 @@ static void usage(char const * const name)
             "\n"
             "   -o output   output file (default: %s)\n"
             "   -b libear   library location (default: %s)\n"
-            "   -s socket   multiplexing socket (default: %s)\n"
+            "   -s socket   multiplexing socket (default: randomly generated)\n"
             "   -d          debug output (default: disabled)\n"
             "   -c          print out known compilers\n"
             "   -e          print out known source file extensions\n"
             "   -h          this message\n",
             name,
             OUTPUT_FILE,
-            LIBEAR_FILE,
-            SOCKET_FILE);
+            LIBEAR_FILE);
     exit(EXIT_FAILURE);
 }
 
