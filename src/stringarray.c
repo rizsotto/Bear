@@ -42,7 +42,14 @@ char const ** bear_strings_build(char const * const arg, va_list args)
     size_t size = 0;
     for (; it; it = va_arg(args, char const *))
     {
-        result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+        char const ** temp = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+        if (NULL == temp)
+        {
+            free(result);
+            perror("realloc");
+            exit(EXIT_FAILURE);
+        }
+        result = temp;
         char const * copy = strdup(it);
         if (0 == copy)
         {
@@ -51,7 +58,14 @@ char const ** bear_strings_build(char const * const arg, va_list args)
         }
         result[size++] = copy;
     }
-    result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+    char const ** temp = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+    if (NULL == temp)
+    {
+        free(result);
+        perror("realloc");
+        exit(EXIT_FAILURE);
+    }
+    result = temp;
     result[size++] = 0;
 
     return result;
