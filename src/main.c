@@ -12,9 +12,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define OUTPUT_FILE DEFAULT_OUTPUT_FILE
-#define LIBEAR_FILE DEFAULT_PRELOAD_FILE
-
 // variables which are used in signal handler
 static volatile pid_t    child_pid;
 static volatile int      child_status = EXIT_FAILURE;
@@ -26,8 +23,8 @@ static void collect_messages(char const * socket, char const * output, int debug
 
 int main(int argc, char * const argv[])
 {
-    char const * output_file = OUTPUT_FILE;
-    char const * libear_path = LIBEAR_FILE;
+    char const * output_file = DEFAULT_OUTPUT_FILE;
+    char const * libear_path = DEFAULT_PRELOAD_FILE;
     char * socket_file = 0;
     char const * socket_dir = 0;
     int debug = 0;
@@ -235,8 +232,8 @@ static void usage(char const * const name)
             "   -e          print out known source file extensions\n"
             "   -h          this message\n",
             name,
-            OUTPUT_FILE,
-            LIBEAR_FILE);
+            DEFAULT_OUTPUT_FILE,
+            DEFAULT_PRELOAD_FILE);
     exit(EXIT_FAILURE);
 }
 
