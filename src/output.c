@@ -205,7 +205,7 @@ static int is_source_file_extension(char const * arg)
     return bear_strings_find(extensions, arg);
 }
 
-void print_array(char const * const * const in)
+static void print_array(char const * const * const in)
 {
     char const * const * it = in;
     for (; *it; ++it)
