@@ -1,5 +1,7 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#pragma once
+
 #cmakedefine HAVE_EXECVE
 #cmakedefine HAVE_EXECV
 #cmakedefine HAVE_EXECVPE

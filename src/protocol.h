@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef BEAR_PROTOCOL_H
-#define BEAR_PROTOCOL_H
+#pragma once
 
 #include <unistd.h>
 
@@ -26,6 +25,4 @@ int bear_accept_message(int fd, struct bear_message * e);
 void bear_write_message(int fd, struct bear_message const * e);
 
 void bear_send_message(char const * socket, struct bear_message const * e);
-#endif
-
 #endif

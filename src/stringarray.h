@@ -1,7 +1,6 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
-#ifndef BEAR_STRINGS_H
-#define BEAR_STRINGS_H
+#pragma once
 
 #include <stddef.h>
 
@@ -21,6 +20,4 @@ void          bear_strings_release(char const **);
 
 #ifdef SERVER
 char const  * bear_strings_fold(char const * const * in, char const sep);
-#endif
-
 #endif
