@@ -1,8 +1,8 @@
 // This file is distributed under MIT-LICENSE. See COPYING for details.
 
+#include "config.h"
 #include "protocol.h"
 #include "output.h"
-#include "environ.h"
 
 #include <unistd.h>
 #include <stdio.h>
