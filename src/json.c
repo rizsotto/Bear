@@ -45,7 +45,7 @@ char const * bear_json_escape_string(char const * raw)
     char * const result = malloc(length + ((0 != spaces) * 4) + json + 1);
     if (0 == result)
     {
-        perror("malloc");
+        perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
     char * it = result;

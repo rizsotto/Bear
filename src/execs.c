@@ -165,7 +165,7 @@ static int call_execve(const char * path, char * const argv[], char * const envp
     int (*fp)(const char *, char * const *, char * const *) = 0;
     if (0 == (fp = dlsym(RTLD_NEXT, "execve")))
     {
-        perror("dlsym");
+        perror("bear: dlsym");
         exit(EXIT_FAILURE);
     }
 
@@ -187,7 +187,7 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
     int (*fp)(const char *, char * const *, char * const *) = 0;
     if (0 == (fp = dlsym(RTLD_NEXT, "execvpe")))
     {
-        perror("dlsym");
+        perror("bear: dlsym");
         exit(EXIT_FAILURE);
     }
 
@@ -209,7 +209,7 @@ static int call_execvp(const char * file, char * const argv[])
     int (*fp)(const char * file, char * const argv[]) = 0;
     if (0 == (fp = dlsym(RTLD_NEXT, "execvp")))
     {
-        perror("dlsym");
+        perror("bear: dlsym");
         exit(EXIT_FAILURE);
     }
     
@@ -223,7 +223,7 @@ static int call_execvP(const char * file, const char * search_path, char * const
     int (*fp)(const char *, const char *, char * const *) = 0;
     if (0 == (fp = dlsym(RTLD_NEXT, "execvP")))
     {
-        perror("dlsym");
+        perror("bear: dlsym");
         exit(EXIT_FAILURE);
     }
 
@@ -256,7 +256,7 @@ static void report_call(char const * fun, char const * const argv[])
     char * const socket = getenv(ENV_OUTPUT);
     if (0 == socket)
     {
-        perror("getenv");
+        perror("bear: getenv");
         exit(EXIT_FAILURE);
     }
 

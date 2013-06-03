@@ -35,7 +35,7 @@ static pid_t read_pid(int fd)
     pid_t result = 0;
     if (-1 == socket_read(fd, (void *)&result, sizeof(pid_t)))
     {
-        perror("read: pid");
+        perror("bear: read pid");
         exit(EXIT_FAILURE);
     }
     return result;
@@ -46,20 +46,20 @@ static char const * read_string(int fd)
     size_t length = 0;
     if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
     {
-        perror("read: string length");
+        perror("bear: read string length");
         exit(EXIT_FAILURE);
     }
     char * result = malloc((length + 1) * sizeof(char));
     if (0 == result)
     {
-        perror("malloc");
+        perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
     if (length > 0)
     {
         if (-1 == socket_read(fd, (void *)result, length))
         {
-            perror("read: string value");
+            perror("bear: read string value");
             exit(EXIT_FAILURE);
         }
     }
@@ -72,14 +72,14 @@ static char const * * read_string_array(int fd)
     size_t length = 0;
     if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
     {
-        perror("read: string array length");
+        perror("bear: read string array length");
         exit(EXIT_FAILURE);
     }
     char const * * result =
         (char const * *)malloc((length + 1) * sizeof(char const *));
     if (0 == result)
     {
-        perror("malloc");
+        perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
     size_t it = 0;
@@ -118,12 +118,12 @@ int bear_create_unix_socket(char const * file)
     int s = init_socket(file, &addr);
     if (-1 == bind(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)))
     {
-        perror("bind");
+        perror("bear: bind");
         exit(EXIT_FAILURE);
     }
     if (-1 == listen(s, 0))
     {
-        perror("listen");
+        perror("bear: listen");
         exit(EXIT_FAILURE);
     }
     return s;
@@ -199,7 +199,7 @@ void bear_send_message(char const * file, struct bear_message const * msg)
     int s = init_socket(file, &addr);
     if (-1 == connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)))
     {
-        perror("connect");
+        perror("bear: connect");
         exit(EXIT_FAILURE);
     }
     bear_write_message(s, msg);
@@ -212,7 +212,7 @@ static size_t init_socket(char const * file, struct sockaddr_un * addr)
     int s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (-1 == s)
     {
-        perror("socket");
+        perror("bear: socket");
         exit(EXIT_FAILURE);
     }
     memset((void *)addr, 0, sizeof(struct sockaddr_un));

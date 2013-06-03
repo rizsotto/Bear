@@ -19,14 +19,14 @@ char const * * bear_env_insert(char const * envs[], char const * key, char const
 {
     if (0 == value)
     {
-        perror("getenv");
+        perror("bear: getenv");
         exit(EXIT_FAILURE);
     }
     // create new env value
     char * env = 0;
     if (-1 == asprintf(&env, "%s=%s", key, value))
     {
-        perror("asprintf");
+        perror("bear: asprintf");
         exit(EXIT_FAILURE);
     }
     // remove environments which has the same key

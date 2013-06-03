@@ -22,7 +22,7 @@ int bear_open_json_output(char const * file)
     int fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
     if (-1 == fd)
     {
-        perror("open");
+        perror("bear: open");
         exit(EXIT_FAILURE);
     }
     dprintf(fd, "[\n");
@@ -111,7 +111,7 @@ static char const * fix_path(char const * file, char const * cwd)
         result = strdup(file);
         if (0 == result)
         {
-            perror("strdup");
+            perror("bear: strdup");
             exit(EXIT_FAILURE);
         }
     }
@@ -119,7 +119,7 @@ static char const * fix_path(char const * file, char const * cwd)
     {
         if (-1 == asprintf(&result, "%s/%s", cwd, file))
         {
-            perror("asprintf");
+            perror("bear: asprintf");
             exit(EXIT_FAILURE);
         }
     }

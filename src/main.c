@@ -89,7 +89,7 @@ int main(int argc, char * const argv[])
     child_pid = fork();
     if (-1 == child_pid)
     {
-        perror("fork");
+        perror("bear: fork");
         exit(EXIT_FAILURE);
     }
     else if (0 == child_pid)
@@ -97,24 +97,24 @@ int main(int argc, char * const argv[])
         // child process
         if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
         {
-            perror("setenv");
+            perror("bear: setenv");
             exit(EXIT_FAILURE);
         }
         if (-1 == setenv(ENV_OUTPUT, socket_file, 1))
         {
-            perror("setenv");
+            perror("bear: setenv");
             exit(EXIT_FAILURE);
         }
 #ifdef ENV_FLAT
         if (-1 == setenv(ENV_FLAT, "1", 1))
         {
-            perror("setenv");
+            perror("bear: setenv");
             exit(EXIT_FAILURE);
         }
 #endif
         if (-1 == execvp(*unprocessed_argv, unprocessed_argv))
         {
-            perror("execvp");
+            perror("bear: execvp");
             exit(EXIT_FAILURE);
         }
     }
@@ -143,7 +143,7 @@ static void collect_messages(char const * socket_file, char const * output_file,
     // remove old socket file if any
     if ((-1 == unlink(socket_file)) && (ENOENT != errno))
     {
-        perror("unlink");
+        perror("bear: unlink");
         exit(EXIT_FAILURE);
     }
     // receive messages
@@ -195,17 +195,17 @@ static void install_signal_handler(int signum)
     action.sa_flags = 0;
     if (0 != sigemptyset(&action.sa_mask))
     {
-        perror( "sigemptyset");
+        perror("bear: sigemptyset");
         exit(EXIT_FAILURE);
     }
     if (0 != sigaddset(&action.sa_mask, signum))
     {
-        perror( "sigaddset");
+        perror("bear: sigaddset");
         exit(EXIT_FAILURE);
     }
     if (0 != sigaction(signum, &action, NULL))
     {
-        perror( "sigaction");
+        perror("bear: sigaction");
         exit(EXIT_FAILURE);
     }
 }
@@ -215,12 +215,12 @@ static void mask_all_signals(int command)
     sigset_t signal_mask;
     if (0 != sigfillset(&signal_mask))
     {
-        perror("sigfillset");
+        perror("bear: sigfillset");
         exit(EXIT_FAILURE);
     }
     if (0 != sigprocmask(command, &signal_mask, 0))
     {
-        perror("sigprocmask");
+        perror("bear: sigprocmask");
         exit(EXIT_FAILURE);
     }
 }
