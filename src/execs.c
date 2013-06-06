@@ -34,6 +34,13 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
 static int call_execvP(const char * file, const char * search_path, char * const argv[]);
 #endif
 
+#ifdef HAVE_VFORK
+pid_t vfork(void)
+{
+    return fork();
+}
+#endif
+
 #ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {

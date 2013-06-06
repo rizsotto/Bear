@@ -2,6 +2,7 @@
     global:
         begin;
         end;
+        vfork;
         execv;
         execve;
         execvp;

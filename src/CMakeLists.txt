@@ -36,6 +36,7 @@ set_target_properties(bear PROPERTIES
     COMPILE_DEFINITIONS "SERVER")
 
 include(CheckFunctionExists)
+check_function_exists(vfork HAVE_VFORK)
 check_function_exists(execve HAVE_EXECVE)
 check_function_exists(execv HAVE_EXECV)
 check_function_exists(execvpe HAVE_EXECVPE)
