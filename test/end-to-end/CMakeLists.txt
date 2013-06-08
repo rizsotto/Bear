@@ -1,15 +1,50 @@
 # This file is distributed under MIT-LICENSE. See COPYING for details.
 
+message(STATUS "Looking for scons")
+find_program(SCONS_EXECUTABLE
+  NAMES scons
+  PATHS ENV SCONS_PATH)
+if (SCONS_EXECUTABLE)
+  set(SCONS_FOUND 1)
+  message(STATUS "Looking for scons -- found")
+endif()
+
+message(STATUS "Looking for qmake")
+find_program(QMAKE_EXECUTABLE
+  NAMES qmake qmake-qt4
+  PATHS ENV QMAKE_PATH)
+if (QMAKE_EXECUTABLE)
+  set(QMAKE_FOUND 1)
+  message(STATUS "Looking for qmake -- found")
+endif()
+
+
 set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
 set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear.so)
 
-add_custom_target(run_end-to-end
-  COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o scons.json -- scons -C ${CMAKE_CURRENT_SOURCE_DIR} -s
-  COMMAND scons -C ${CMAKE_CURRENT_SOURCE_DIR} -c -s
-  COMMAND qmake-qt4 ${CMAKE_CURRENT_SOURCE_DIR}/test.pro
-  COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o qmake.json -- make
-  COMMAND make distclean
-  COMMENT "Running module tests")
+if(SCONS_FOUND)
+  add_custom_target(run_scons_test
+    COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o scons.json -- ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND test `cat scons.json | grep command | wc -l` -eq 2
+    COMMENT "Running module tests with scons")
 
-add_dependencies(run_end-to-end ear)
-add_dependencies(run_end-to-end bear)
+  add_dependencies(run_scons_test ear)
+  add_dependencies(run_scons_test bear)
+
+  add_test(NAME run_scons_test
+    COMMAND make run_scons_test)
+endif()
+
+if(QMAKE_FOUND)
+  add_custom_target(run_qmake_test
+    COMMAND ${QMAKE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qmake.pro
+    COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o qmake.json -- make
+    COMMAND test `cat qmake.json | grep command | wc -l` -eq 4
+    COMMENT "Running module tests with qmake")
+
+  add_dependencies(run_qmake_test ear)
+  add_dependencies(run_qmake_test bear)
+
+  add_test(NAME run_qmake_test
+    COMMAND make run_qmake_test)
+endif()
