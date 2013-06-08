@@ -123,6 +123,7 @@ int main(int argc, char * const argv[])
         if (socket_dir)
         {
             rmdir(socket_dir);
+            free((void *)socket_file);
         }
     }
     return child_status;
