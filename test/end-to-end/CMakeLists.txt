@@ -25,7 +25,8 @@ set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear.so)
 if(SCONS_FOUND)
   add_custom_target(run_scons_test
     COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o scons.json -- ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND test `cat scons.json | grep command | wc -l` -eq 2
+    COMMAND ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR} -c
+    COMMAND test `cat scons.json | grep command | wc -l` -eq 4
     COMMENT "Running module tests with scons")
 
   add_dependencies(run_scons_test ear)
@@ -39,6 +40,7 @@ if(QMAKE_FOUND)
   add_custom_target(run_qmake_test
     COMMAND ${QMAKE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qmake.pro
     COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o qmake.json -- make
+    COMMAND make clean
     COMMAND test `cat qmake.json | grep command | wc -l` -eq 4
     COMMENT "Running module tests with qmake")
 

@@ -1,4 +1,10 @@
-#VariantDir('build','lib',duplicate= False)
-#SConscript('SConscript')
-AddOption('--build', default='build')
-SConscript("SConscript", variant_dir=GetOption('build'), duplicate=0)
+env = Environment()
+env.Append(CPPDEFINES={'RELEASE_BUILD' : 'First release \"quoted\"'})
+
+some_lib = env.SharedLibrary(target="some_lib",
+                             source=["lib/foo.cpp", "lib/bar.cpp"])
+some_app = env.Program(target="some_app",
+                       source=["bin/far.cpp", "bin/boo.cpp"],
+                       CPPPATH=Split('#lib'),
+                       LIBPATH=['.'],
+                       LIBS=['some_lib'])
