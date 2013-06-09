@@ -25,7 +25,7 @@ set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear.so)
 if(true)
   add_custom_target(run_shell_test
     COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o shell.json -- ${CMAKE_CURRENT_SOURCE_DIR}/compile.sh ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMAND test `${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < shell.json` -eq 4
+    COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < shell.json` -eq 4
     COMMENT "Running module tests with shell")
 
   add_dependencies(run_shell_test ear)
@@ -39,7 +39,7 @@ if(SCONS_FOUND)
   add_custom_target(run_scons_test
     COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o scons.json -- ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR} -c
-    COMMAND test `${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < scons.json` -eq 4
+    COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < scons.json` -eq 4
     COMMENT "Running module tests with scons")
 
   add_dependencies(run_scons_test ear)
@@ -54,7 +54,7 @@ if(QMAKE_FOUND)
     COMMAND ${QMAKE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qmake.pro
     COMMAND ${BEAR_EXE} -b ${BEAR_LIB} -o qmake.json -- make
     COMMAND make distclean
-    COMMAND test `${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < qmake.json` -eq 4
+    COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < qmake.json` -eq 4
     COMMENT "Running module tests with qmake")
 
   add_dependencies(run_qmake_test ear)

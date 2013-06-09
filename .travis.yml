@@ -6,7 +6,7 @@ compiler:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq pandoc
+  - sudo apt-get install -qq pandoc python
 
 script:
   - cmake .
