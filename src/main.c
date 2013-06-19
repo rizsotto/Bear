@@ -19,7 +19,9 @@ static volatile int      child_status = EXIT_FAILURE;
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, int debug);
+static void collect_messages(char const * socket, char const * output, int debug, int sync_fd);
+static void notify_child(int fd);
+static void wait_for_parent(int fd);
 
 int main(int argc, char * const argv[])
 {
@@ -29,6 +31,7 @@ int main(int argc, char * const argv[])
     char const * socket_dir = 0;
     int debug = 0;
     char * const * unprocessed_argv = 0;
+    int sync_fd[2];
     // parse command line arguments.
     int opt;
     while ((opt = getopt(argc, argv, "o:b:s:dceh?")) != -1)
@@ -80,6 +83,12 @@ int main(int argc, char * const argv[])
             exit(EXIT_FAILURE);
         }
     }
+    // set up sync pipe
+    if (-1 == pipe(sync_fd))
+    {
+        perror("bear: pipe");
+        exit(EXIT_FAILURE);
+    }
     // fork
     child_pid = fork();
     if (-1 == child_pid)
@@ -90,6 +99,7 @@ int main(int argc, char * const argv[])
     else if (0 == child_pid)
     {
         // child process
+        wait_for_parent(sync_fd[0]);
         if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
         {
             perror("bear: setenv");
@@ -119,7 +129,7 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
-        collect_messages(socket_file, output_file, debug);
+        collect_messages(socket_file, output_file, debug, sync_fd[1]);
         if (socket_dir)
         {
             rmdir(socket_dir);
@@ -129,9 +139,9 @@ int main(int argc, char * const argv[])
     return child_status;
 }
 
-static void receive_on_unix_socket(char const * socket_file, int output_fd, int debug);
+static void receive_on_unix_socket(char const * socket_file, int output_fd, int debug, int sync_fd);
 
-static void collect_messages(char const * socket_file, char const * output_file, int debug)
+static void collect_messages(char const * socket_file, char const * output_file, int debug, int sync_fd)
 {
     // open the output file
     int output_fd = bear_open_json_output(output_file);
@@ -142,16 +152,17 @@ static void collect_messages(char const * socket_file, char const * output_file,
         exit(EXIT_FAILURE);
     }
     // receive messages
-    receive_on_unix_socket(socket_file, output_fd, debug);
+    receive_on_unix_socket(socket_file, output_fd, debug, sync_fd);
     // skip errors during shutdown
     bear_close_json_output(output_fd);
     unlink(socket_file);
 }
 
-static void receive_on_unix_socket(char const * file, int out_fd, int debug)
+static void receive_on_unix_socket(char const * file, int out_fd, int debug, int sync_fd)
 {
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
+    notify_child(sync_fd);
     struct bear_message msg;
     while ((child_pid) && bear_accept_message(s, &msg))
     {
@@ -238,3 +249,23 @@ static void usage(char const * const name)
     exit(EXIT_FAILURE);
 }
 
+static void notify_child(int fd)
+{
+    if (-1 == write(fd, "ready", 5))
+    {
+        perror("bear: write");
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+}
+
+static void wait_for_parent(int fd)
+{
+    char buffer[8];
+    if (-1 == read(fd, buffer, sizeof(buffer)))
+    {
+        perror("bear: read");
+        exit(EXIT_FAILURE);
+    }
+    close(fd);
+}
