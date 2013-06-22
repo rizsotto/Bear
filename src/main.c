@@ -99,6 +99,7 @@ int main(int argc, char * const argv[])
     else if (0 == child_pid)
     {
         // child process
+        close(sync_fd[1]);
         wait_for_parent(sync_fd[0]);
         if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
         {
@@ -129,6 +130,7 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
+        close(sync_fd[0]);
         collect_messages(socket_file, output_file, debug, sync_fd[1]);
         if (socket_dir)
         {
@@ -261,7 +263,7 @@ static void notify_child(int fd)
 
 static void wait_for_parent(int fd)
 {
-    char buffer[8];
+    char buffer[5];
     if (-1 == read(fd, buffer, sizeof(buffer)))
     {
         perror("bear: read");
