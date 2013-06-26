@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 message(STATUS "Looking for scons")
 find_program(SCONS_EXECUTABLE
   NAMES scons

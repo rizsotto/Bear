@@ -1,5 +1,5 @@
 % BEAR(1) Bear User Manuals
-% Laszlo Nagy
+% László Nagy
 % January 8, 2013
 
 # NAME
@@ -100,7 +100,7 @@ before you run Bear.
 
 # COPYRIGHT
 
-Bear is Copyright (C) 2012-2013 Laszlo Nagy <https://github.com/rizsotto/Bear>
+Copyright (C) 2012, 2013 by László Nagy <https://github.com/rizsotto/Bear>
 
 [1]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
 [2]: http://ccache.samba.org/

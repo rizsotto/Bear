@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 include(GNUInstallDirs)
 
 add_definitions(-D_GNU_SOURCE)

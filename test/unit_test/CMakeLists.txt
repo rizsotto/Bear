@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 add_executable(unit_test
     main.c
     ../../src/stringarray.c

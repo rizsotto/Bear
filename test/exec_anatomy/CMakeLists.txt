@@ -1,5 +1,3 @@
-# This file is distributed under MIT-LICENSE. See COPYING for details.
-
 add_executable(exec_anatomy main.c)
 add_definitions(-D_GNU_SOURCE)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../src)
