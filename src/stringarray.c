@@ -56,28 +56,43 @@ char const ** bear_strings_build(char const * const arg, va_list args)
     char const ** result = 0;
     char const * it = arg;
     size_t size = 0;
+    size_t i = 0;
     for (; it; it = va_arg(args, char const *))
     {
-        result = realloc(result, (size + 1) * sizeof(char const *));
-        if (0 == result)
+        char const** tmp = realloc(result, (size + 1) * sizeof(char const *));
+        if (0 == tmp)
         {
+            for (i = 0; i < size; i++) {
+              free((char**) result[i]);
+            }
+            free(result);
             perror("bear: realloc");
             exit(EXIT_FAILURE);
         }
+        result = tmp;
         char const * copy = strdup(it);
         if (0 == copy)
         {
+            for (i = 0; i < size; i++) {
+              free((char**) result[i]);
+            }
+            free(result);
             perror("bear: strdup");
             exit(EXIT_FAILURE);
         }
         result[size++] = copy;
     }
-    result = realloc(result, (size + 1) * sizeof(char const *));
-    if (0 == result)
+    char const** tmp = realloc(result, (size + 1) * sizeof(char const *));
+    if (0 == tmp)
     {
+        for (i = 0; i < size; i++) {
+          free((char**) result[i]);
+        }
+        free(result);
         perror("bear: realloc");
         exit(EXIT_FAILURE);
     }
+    result = tmp;
     result[size++] = 0;
 
     return result;
@@ -104,6 +119,7 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
     char const ** result = realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result)
     {
+        free(in);
         perror("bear: realloc");
         exit(EXIT_FAILURE);
     }
@@ -134,6 +150,7 @@ char const ** bear_strings_remove(char const ** const in, char const * const e)
         char const ** result = realloc(in, (size + 1) * sizeof(char const *));
         if (0 == result)
         {
+            free(in);
             perror("bear: realloc");
             exit(EXIT_FAILURE);
         }
@@ -176,12 +193,14 @@ char const * bear_strings_fold(char const * const * in, char const separator)
     {
         size_t const sep = (in == it) ? 0 : 1;
         size_t const it_size = strlen(*it);
-        acc = realloc(acc, acc_size + sep + it_size);
-        if (0 == acc)
+        char* tmp = realloc(acc, acc_size + sep + it_size);
+        if (0 == tmp)
         {
+            free(acc);
             perror("bear: realloc");
             exit(EXIT_FAILURE);
         }
+        acc = tmp;
         if (sep)
         {
             acc[acc_size++] = separator;
@@ -189,12 +208,14 @@ char const * bear_strings_fold(char const * const * in, char const separator)
         strncpy((acc + acc_size), *it, it_size);
         acc_size += it_size;
     }
-    acc = realloc(acc, acc_size + 1);
-    if (0 == acc)
+    char* tmp = realloc(acc, acc_size + 1);
+    if (0 == tmp)
     {
+        free(acc);
         perror("bear: realloc");
         exit(EXIT_FAILURE);
     }
+    acc = tmp;
     acc[acc_size++] = '\0';
     return acc;
 }
