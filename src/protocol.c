@@ -92,8 +92,7 @@ static char const * * read_string_array(int fd)
         perror("bear: read string array length");
         exit(EXIT_FAILURE);
     }
-    char const * * result =
-        (char const * *)malloc((length + 1) * sizeof(char const *));
+    char const * * result = malloc((length + 1) * sizeof(char const *));
     if (0 == result)
     {
         perror("bear: malloc");

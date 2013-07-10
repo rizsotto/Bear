@@ -29,8 +29,7 @@ char const ** bear_strings_copy(char const ** const in)
 {
     size_t const size = bear_strings_length(in);
 
-    char const ** result =
-        (char const **)malloc((size + 1) * sizeof(char const *));
+    char const ** result = malloc((size + 1) * sizeof(char const *));
     if (0 == result)
     {
         perror("bear: malloc");
@@ -59,7 +58,7 @@ char const ** bear_strings_build(char const * const arg, va_list args)
     size_t size = 0;
     for (; it; it = va_arg(args, char const *))
     {
-        result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+        result = realloc(result, (size + 1) * sizeof(char const *));
         if (0 == result)
         {
             perror("bear: realloc");
@@ -73,7 +72,7 @@ char const ** bear_strings_build(char const * const arg, va_list args)
         }
         result[size++] = copy;
     }
-    result = (char const **)realloc(result, (size + 1) * sizeof(char const *));
+    result = realloc(result, (size + 1) * sizeof(char const *));
     if (0 == result)
     {
         perror("bear: realloc");
@@ -102,7 +101,7 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
         return in;
 
     size_t size = bear_strings_length(in);
-    char const ** result = (char const **)realloc(in, (size + 2) * sizeof(char const *));
+    char const ** result = realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result)
     {
         perror("bear: realloc");
@@ -132,7 +131,7 @@ char const ** bear_strings_remove(char const ** const in, char const * const e)
     if (action)
     {
         size_t size = bear_strings_length(in);
-        char const ** result = (char const **)realloc(in, (size + 1) * sizeof(char const *));
+        char const ** result = realloc(in, (size + 1) * sizeof(char const *));
         if (0 == result)
         {
             perror("bear: realloc");
@@ -177,7 +176,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
     {
         size_t const sep = (in == it) ? 0 : 1;
         size_t const it_size = strlen(*it);
-        acc = (char *)realloc(acc, acc_size + sep + it_size);
+        acc = realloc(acc, acc_size + sep + it_size);
         if (0 == acc)
         {
             perror("bear: realloc");
@@ -190,7 +189,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
         strncpy((acc + acc_size), *it, it_size);
         acc_size += it_size;
     }
-    acc = (char *)realloc(acc, acc_size + 1);
+    acc = realloc(acc, acc_size + 1);
     if (0 == acc)
     {
         perror("bear: realloc");
