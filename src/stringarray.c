@@ -92,7 +92,6 @@ void bear_strings_release(char const ** in)
         free((void *)*it);
     }
     free((void *)in);
-    in = 0;
 }
 
 char const ** bear_strings_append(char const ** const in, char const * const e)
