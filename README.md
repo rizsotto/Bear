@@ -86,3 +86,7 @@ have a suggestion how to fix it, include that as well. Patches are also
 welcome.
 
   [ISSUES]: https://github.com/rizsotto/Bear/issues
+
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/rizsotto/Bear/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
