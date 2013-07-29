@@ -82,17 +82,6 @@ char const ** bear_strings_build(char const * const arg, va_list args)
 
     return result;
 }
-#endif
-
-void bear_strings_release(char const ** in)
-{
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
-    {
-        free((void *)*it);
-    }
-    free((void *)in);
-}
 
 char const ** bear_strings_append(char const ** const in, char const * const e)
 {
@@ -140,6 +129,7 @@ char const ** bear_strings_remove(char const ** const in, char const * const e)
     }
     return in;
 }
+#endif
 
 size_t bear_strings_length(char const * const * const in)
 {
@@ -162,6 +152,16 @@ int bear_strings_find(char const * const * in, char const * const e)
             return 1;
     }
     return 0;
+}
+
+void bear_strings_release(char const ** in)
+{
+    char const * const * it = in;
+    for (; (it) && (*it); ++it)
+    {
+        free((void *)*it);
+    }
+    free((void *)in);
 }
 
 #ifdef SERVER
