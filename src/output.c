@@ -96,6 +96,7 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
 
 static int is_known_compiler(char const * cmd);
 static int is_source_file(char const * const arg);
+static int is_dependency_generation_flag(char const * const arg);
 
 static char const * fix_path(char const * file, char const * cwd);
 
@@ -113,6 +114,10 @@ static char const * get_source_file(char const * * args, char const * cwd)
             if (is_source_file(*it))
             {
                 result = fix_path(*it, cwd);
+            }
+            else if (is_dependency_generation_flag(*it))
+            {
+                result = 0;
                 break;
             }
         }
@@ -220,6 +225,11 @@ static char const * const extensions[] =
 static int is_source_file_extension(char const * arg)
 {
     return bear_strings_find(extensions, arg);
+}
+
+static int is_dependency_generation_flag(char const * const arg)
+{
+    return (2 <= strlen(arg)) && ('-' == arg[0]) && ('M' == arg[1]);
 }
 
 static void print_array(char const * const * const in)
