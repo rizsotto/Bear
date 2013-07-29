@@ -167,34 +167,32 @@ int bear_strings_find(char const * const * in, char const * const e)
 #ifdef SERVER
 char const * bear_strings_fold(char const * const * in, char const separator)
 {
-    char * acc = 0;
-    size_t acc_size = 0;
-
+    // calculate the needed size
+    size_t size = 0;
     char const * const * it = in;
     for (; (it) && (*it); ++it)
+        size += strlen(*it) + 1;
+    // allocate memory once
+    char * result = malloc(size * sizeof(char));
+    if (0 == result)
     {
-        size_t const sep = (in == it) ? 0 : 1;
-        size_t const it_size = strlen(*it);
-        acc = realloc(acc, acc_size + sep + it_size);
-        if (0 == acc)
-        {
-            perror("bear: realloc");
-            exit(EXIT_FAILURE);
-        }
-        if (sep)
-        {
-            acc[acc_size++] = separator;
-        }
-        strncpy((acc + acc_size), *it, it_size);
-        acc_size += it_size;
-    }
-    acc = realloc(acc, acc_size + 1);
-    if (0 == acc)
-    {
-        perror("bear: realloc");
+        perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
-    acc[acc_size++] = '\0';
-    return acc;
+    // copy each row to the result
+    char * result_ptr = result;
+    for (it = in; (it) && (*it); ++it)
+    {
+        size_t const it_size = strlen(*it);
+
+        strncpy(result_ptr, *it, it_size);
+        result_ptr += it_size;
+
+        *result_ptr++ = separator;
+    }
+    // replace the last separator to terminating zero
+    *--result_ptr = '\0';
+
+    return result;
 }
 #endif
