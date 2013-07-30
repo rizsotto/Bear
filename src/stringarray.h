@@ -19,21 +19,21 @@
 
 #pragma once
 
-#include <stddef.h>
 
 #ifdef CLIENT
+#include <stddef.h>
 #include <stdarg.h>
-char const ** bear_strings_copy(char const ** const in);
 char const ** bear_strings_build(char const * arg, va_list ap);
 
+char const ** bear_strings_copy(char const ** const in);
 char const ** bear_strings_append(char const ** in, char const * e);
-#endif
 
 size_t        bear_strings_length(char const * const * in);
+#endif
+
 void          bear_strings_release(char const **);
 
-char const *  bear_strings_find(char const * const * in, char const * e);
-
 #ifdef SERVER
-char const  * bear_strings_fold(char const * const * in, char const sep);
+char const *  bear_strings_find(char const * const * in, char const * e);
+char const *  bear_strings_fold(char const * const * in, char const sep);
 #endif

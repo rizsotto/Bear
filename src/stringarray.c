@@ -25,32 +25,6 @@
 #include <stdlib.h>
 
 #ifdef CLIENT
-char const ** bear_strings_copy(char const ** const in)
-{
-    size_t const size = bear_strings_length(in);
-
-    char const ** result = malloc((size + 1) * sizeof(char const *));
-    if (0 == result)
-    {
-        perror("bear: malloc");
-        exit(EXIT_FAILURE);
-    }
-    result[size] = 0;
-
-    char const * const * in_it = in;
-    char const * * out_it = result;
-    for (; (in_it) && (*in_it); ++in_it, ++out_it)
-    {
-        *out_it = strdup(*in_it);
-        if (0 == *out_it)
-        {
-            perror("bear: strdup");
-            exit(EXIT_FAILURE);
-        }
-    }
-    return result;
-}
-
 char const ** bear_strings_build(char const * const arg, va_list args)
 {
     char const ** result = 0;
@@ -83,6 +57,32 @@ char const ** bear_strings_build(char const * const arg, va_list args)
     return result;
 }
 
+char const ** bear_strings_copy(char const ** const in)
+{
+    size_t const size = bear_strings_length(in);
+
+    char const ** result = malloc((size + 1) * sizeof(char const *));
+    if (0 == result)
+    {
+        perror("bear: malloc");
+        exit(EXIT_FAILURE);
+    }
+    result[size] = 0;
+
+    char const * const * in_it = in;
+    char const * * out_it = result;
+    for (; (in_it) && (*in_it); ++in_it, ++out_it)
+    {
+        *out_it = strdup(*in_it);
+        if (0 == *out_it)
+        {
+            perror("bear: strdup");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return result;
+}
+
 char const ** bear_strings_append(char const ** const in, char const * const e)
 {
     if (0 == e)
@@ -99,7 +99,6 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
     result[size++] = 0;
     return result;
 }
-#endif
 
 size_t bear_strings_length(char const * const * const in)
 {
@@ -109,6 +108,7 @@ size_t bear_strings_length(char const * const * const in)
         ;
     return result;
 }
+#endif
 
 void bear_strings_release(char const ** in)
 {
@@ -120,6 +120,7 @@ void bear_strings_release(char const ** in)
     free((void *)in);
 }
 
+#ifdef SERVER
 char const * bear_strings_find(char const * const * in, char const * const e)
 {
     if (0 == e)
@@ -134,7 +135,6 @@ char const * bear_strings_find(char const * const * in, char const * const e)
     return 0;
 }
 
-#ifdef SERVER
 char const * bear_strings_fold(char const * const * in, char const separator)
 {
     // calculate the needed size
