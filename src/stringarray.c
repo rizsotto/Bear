@@ -99,36 +99,6 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
     result[size++] = 0;
     return result;
 }
-
-char const ** bear_strings_remove(char const ** const in, char const * const e)
-{
-    if (0 == e)
-        return in;
-
-    int action = 0;
-    char const * * it = in;
-    for (; (it) && (*it); ++it)
-    {
-        if ((*it) == e)
-            ++action;
-
-        if (action)
-            *it = *(it + action);
-    }
-    // resize the array when needed
-    if (action)
-    {
-        size_t size = bear_strings_length(in);
-        char const ** result = realloc(in, (size + 1) * sizeof(char const *));
-        if (0 == result)
-        {
-            perror("bear: realloc");
-            exit(EXIT_FAILURE);
-        }
-        return result;
-    }
-    return in;
-}
 #endif
 
 size_t bear_strings_length(char const * const * const in)
@@ -140,20 +110,6 @@ size_t bear_strings_length(char const * const * const in)
     return result;
 }
 
-int bear_strings_find(char const * const * in, char const * const e)
-{
-    if (0 == e)
-        return 0;
-
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
-    {
-        if (0 == strcmp(e, *it))
-            return 1;
-    }
-    return 0;
-}
-
 void bear_strings_release(char const ** in)
 {
     char const * const * it = in;
@@ -162,6 +118,20 @@ void bear_strings_release(char const ** in)
         free((void *)*it);
     }
     free((void *)in);
+}
+
+char const * bear_strings_find(char const * const * in, char const * const e)
+{
+    if (0 == e)
+        return 0;
+
+    char const * const * it = in;
+    for (; (it) && (*it); ++it)
+    {
+        if (0 == strcmp(e, *it))
+            return *it;
+    }
+    return 0;
 }
 
 #ifdef SERVER

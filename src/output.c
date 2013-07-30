@@ -188,7 +188,7 @@ static int is_known_compiler(char const * cmd)
     // have to copy cmd since POSIX basename modifies input
     char * local_cmd = strdup(cmd);
     char * file = basename(local_cmd);
-    int result = bear_strings_find(compilers, file);
+    int result = (bear_strings_find(compilers, file)) ? 1 : 0;
     free(local_cmd);
     return result;
 }
@@ -224,7 +224,7 @@ static char const * const extensions[] =
 
 static int is_source_file_extension(char const * arg)
 {
-    return bear_strings_find(extensions, arg);
+    return (bear_strings_find(extensions, arg)) ? 1 : 0;
 }
 
 static int is_dependency_generation_flag(char const * const arg)

@@ -32,32 +32,43 @@ extern char **environ;
 #endif
 
 
-char const * * bear_env_insert(char const * envs[], char const * key, char const * value)
+char const * * bear_update_environ(char const * envs[], char const * key)
 {
+    char const * const value = getenv(key);
     if (0 == value)
     {
         perror("bear: getenv");
         exit(EXIT_FAILURE);
     }
-    // create new env value
-    char * env = 0;
-    if (-1 == asprintf(&env, "%s=%s", key, value))
-    {
-        perror("bear: asprintf");
-        exit(EXIT_FAILURE);
-    }
-    // remove environments which has the same key
-    size_t const key_length = strlen(key) + 1;
+    // find the key if it's there
+    size_t const key_length = strlen(key);
     char const * * it = envs;
-    for (; (envs) && (*it); ++it)
+    for (; (it) && (*it); ++it)
     {
-        if (0 == strncmp(env, *it, key_length))
-        {
-            envs = bear_strings_remove(envs, *it);
-            it = envs;
-        }
+        if ((0 == strncmp(*it, key, key_length)) &&
+            (strlen(*it) > key_length) &&
+            ('=' == (*it)[key_length]))
+            break;
     }
-    return bear_strings_append(envs, env);
+    // check the value might already correct
+    char const * * result = envs;
+    if ((0 == *it) || (strcmp(*it + key_length + 1, value)))
+    {
+        char * env = 0;
+        if (-1 == asprintf(&env, "%s=%s", key, value))
+        {
+            perror("bear: asprintf");
+            exit(EXIT_FAILURE);
+        }
+        if (*it)
+        {
+            free((void *)*it);
+            *it = env;
+        }
+        else
+            result = bear_strings_append(envs, env);
+    }
+    return result;
 }
 
 char * * bear_get_environ(void)

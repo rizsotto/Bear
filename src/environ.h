@@ -19,5 +19,5 @@
 
 #pragma once
 
-char const * * bear_env_insert(char const * * in, char const * key, char const * value);
+char const * * bear_update_environ(char const * * in, char const * key);
 char * * bear_get_environ(void);

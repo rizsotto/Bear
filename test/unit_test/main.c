@@ -96,26 +96,6 @@ void test_strings_append()
     bear_strings_release(result);
 }
 
-void test_strings_remove()
-{
-    char const ** result = 0;
-
-    result = bear_strings_append(result, strdup("this"));
-    result = bear_strings_append(result, strdup("and"));
-    result = bear_strings_append(result, strdup("that"));
-
-    char const * removed = result[1];
-    result = bear_strings_remove(result, removed);
-
-    assert(2 == bear_strings_length(result));
-    assert(0 == strcmp("this", result[0]));
-    assert(0 == strcmp("that", result[1]));
-    assert(0 == result[2]);
-
-    bear_strings_release(result);
-    free((void *)removed);
-}
-
 void test_strings_find()
 {
     char const * input[] =
@@ -126,8 +106,8 @@ void test_strings_find()
         "message",
         0
     };
-    assert(bear_strings_find(input, "this"));
-    assert(bear_strings_find(input, "my"));
+    assert(input[0] == bear_strings_find(input, "this"));
+    assert(input[2] == bear_strings_find(input, "my"));
 
     assert(0 == bear_strings_find(input, "th"));
     assert(0 == bear_strings_find(input, "messa"));
@@ -186,29 +166,28 @@ void test_env_insert()
         "HOME=/home/user",
         "BEAR_OUTPUT=/tmp/socket",
         "LD_PRELOAD_NOW=what_is_this",
-        "LD_PRELOAD=/tmp/lib",
         0
     };
     char const ** result = bear_strings_copy(input);
-    char const * leak_guard_1 = result[1];
-    char const * leak_guard_2 = result[3];
 
-    result = bear_env_insert(result, "BEAR_OUTPUT", "/tmp/other_socket");
-    result = bear_env_insert(result, "LD_PRELOAD", "/tmp/other_lib");
+    setenv("BEAR_OUTPUT", "/tmp/other_socket", 1);
+    setenv("LD_PRELOAD", "/tmp/other_lib", 1);
+    setenv("HOME", "/home/user", 1);
+    result = bear_update_environ(result, "HOME");
+    result = bear_update_environ(result, "BEAR_OUTPUT");
+    result = bear_update_environ(result, "LD_PRELOAD");
 
     char const * expected[] =
     {
         "HOME=/home/user",
-        "LD_PRELOAD_NOW=what_is_this",
         "BEAR_OUTPUT=/tmp/other_socket",
+        "LD_PRELOAD_NOW=what_is_this",
         "LD_PRELOAD=/tmp/other_lib",
         0
     };
     assert_stringarray_equals(expected, result);
 
     bear_strings_release(result);
-    free((void *)leak_guard_1);
-    free((void *)leak_guard_2);
 }
 
 void test_json()
@@ -274,7 +253,6 @@ int main()
     test_strings_length();
     test_strings_fold();
     test_strings_append();
-    test_strings_remove();
     test_strings_find();
     test_strings_copy();
     test_strings_build();
