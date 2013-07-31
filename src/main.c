@@ -33,6 +33,7 @@
 static volatile pid_t    child_pid;
 static volatile int      child_status = EXIT_FAILURE;
 
+static void report_version();
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
@@ -51,7 +52,7 @@ int main(int argc, char * const argv[])
     int sync_fd[2];
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "o:b:s:dceh?")) != -1)
+    while ((opt = getopt(argc, argv, "o:b:s:dcevh?")) != -1)
     {
         switch (opt)
         {
@@ -72,6 +73,9 @@ int main(int argc, char * const argv[])
             return 0;
         case 'e':
             bear_print_known_extensions();
+            return 0;
+        case 'v':
+            report_version();
             return 0;
         case 'h':
         default: /* '?' */
@@ -248,6 +252,16 @@ static void mask_all_signals(int command)
         perror("bear: sigprocmask");
         exit(EXIT_FAILURE);
     }
+}
+
+static void report_version()
+{
+    fprintf(stdout,
+            "Bear %s\n"
+            "Copyright (C) 2012, 2013 by László Nagy\n"
+            "This is free software; see the source for copying conditions.  There is NO\n"
+            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+            BEAR_VERSION);
 }
 
 static void usage(char const * const name)

@@ -19,6 +19,8 @@
 
 #pragma once
 
+#cmakedefine BEAR_VERSION "@BEAR_VERSION@"
+
 #cmakedefine HAVE_VFORK
 #cmakedefine HAVE_EXECVE
 #cmakedefine HAVE_EXECV
