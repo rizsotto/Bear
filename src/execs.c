@@ -35,6 +35,8 @@
 
 static int already_reported = 0;
 
+static char const * * update_environment(char * const envp[]);
+
 static void report_call(char const * fun, char const * const argv[]);
 static void report_failed_call(char const * fun, int result, int report_state);
 
@@ -193,12 +195,7 @@ static int call_execve(const char * path, char * const argv[], char * const envp
         exit(EXIT_FAILURE);
     }
 
-    char const ** menvp = bear_strings_copy((char const * *)envp);
-    menvp = bear_update_environ(menvp, ENV_PRELOAD);
-    menvp = bear_update_environ(menvp, ENV_OUTPUT);
-#ifdef ENV_FLAT
-    menvp = bear_update_environ(menvp, ENV_FLAT);
-#endif
+    char const ** const menvp = update_environment(envp);
     int const result = (*fp)(path, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;
@@ -215,12 +212,7 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
         exit(EXIT_FAILURE);
     }
 
-    char const ** menvp = bear_strings_copy((char const * *)envp);
-    menvp = bear_update_environ(menvp, ENV_PRELOAD);
-    menvp = bear_update_environ(menvp, ENV_OUTPUT);
-#ifdef ENV_FLAT
-    menvp = bear_update_environ(menvp, ENV_FLAT);
-#endif
+    char const ** const menvp = update_environment(envp);
     int const result = (*fp)(file, argv, (char * const *)menvp);
     bear_strings_release(menvp);
     return result;
@@ -254,6 +246,17 @@ static int call_execvP(const char * file, const char * search_path, char * const
     return (*fp)(file, search_path, argv);
 }
 #endif
+
+static char const * * update_environment(char * const envp[])
+{
+    char const ** result = bear_strings_copy((char const * *)envp);
+    result = bear_update_environ(result, ENV_PRELOAD);
+    result = bear_update_environ(result, ENV_OUTPUT);
+#ifdef ENV_FLAT
+    result = bear_update_environ(result, ENV_FLAT);
+#endif
+    return result;
+}
 
 typedef void (*send_message)(char const * socket, struct bear_message const *);
 
