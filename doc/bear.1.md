@@ -46,12 +46,15 @@ processes and writes the output file.
     (This option for those who want to extend functionality of bear.)
 
 -c
-:   Print out known compilers, which are used at the post-processing
-    step.
+:   Prints known compilers, which are used at the post-processing step
+    and exit.
 
 -e
-:   Print out known source file extensions, which are used at the
-    post-processing step.
+:   Prints known source file extensions, which are used at the
+    post-processing step and exit.
+
+-v
+:   Print out Bear version and exit.
 
 # OUTPUT
 

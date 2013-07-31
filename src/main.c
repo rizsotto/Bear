@@ -273,8 +273,9 @@ static void usage(char const * const name)
             "   -b libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
             "   -d          debug output (default: disabled)\n"
-            "   -c          print out known compilers\n"
-            "   -e          print out known source file extensions\n"
+            "   -c          prints known compilers and exit\n"
+            "   -e          prints known source file extensions and exit\n"
+            "   -v          prints Bear version and exit\n"
             "   -h          this message\n",
             name,
             DEFAULT_OUTPUT_FILE,
