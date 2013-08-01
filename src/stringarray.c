@@ -143,7 +143,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
     for (; (it) && (*it); ++it)
         size += strlen(*it) + 1;
     // allocate memory once
-    char * result = malloc(size * sizeof(char));
+    char * result = (0 != size) ? malloc(size * sizeof(char)) : 0;
     if (0 == result)
     {
         perror("bear: malloc");

@@ -52,7 +52,7 @@ char const * * bear_update_environ(char const * envs[], char const * key)
     }
     // check the value might already correct
     char const * * result = envs;
-    if ((0 == *it) || (strcmp(*it + key_length + 1, value)))
+    if ((0 != it) && ((0 == *it) || (strcmp(*it + key_length + 1, value))))
     {
         char * env = 0;
         if (-1 == asprintf(&env, "%s=%s", key, value))

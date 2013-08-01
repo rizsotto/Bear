@@ -59,6 +59,8 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
 {
     char const * src = get_source_file(e->cmd, e->cwd);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
+    if (0 == cmd)
+        goto cleanup;
     if (debug)
     {
         if (count++)
@@ -89,6 +91,7 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
                 "}\n",
                 e->cwd, cmd, src);
     }
+cleanup:
     free((void *)cmd);
     free((void *)src);
 }
@@ -117,7 +120,11 @@ static char const * get_source_file(char const * * args, char const * cwd)
             }
             else if (is_dependency_generation_flag(*it))
             {
-                result = 0;
+                if (result)
+                {
+                    free((void *)result);
+                    result = 0;
+                }
                 break;
             }
         }
