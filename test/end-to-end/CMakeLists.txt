@@ -18,7 +18,7 @@ endif()
 
 
 set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
-set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear.so)
+set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear${CMAKE_SHARED_LIBRARY_SUFFIX})
 
 if(true)
   add_custom_target(run_shell_test
