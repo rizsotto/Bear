@@ -80,20 +80,22 @@ void test_strings_append()
 {
     char const ** result = 0;
 
-    result = bear_strings_append(result, strdup("this"));
+    char const * const this = "this";
+    char const * const that = "that";
+    result = bear_strings_append(result, this);
 
     assert(1 == bear_strings_length(result));
-    assert(0 == strcmp("this", result[0]));
+    assert(this == result[0]);
     assert(0 == result[1]);
 
-    result = bear_strings_append(result, strdup("that"));
+    result = bear_strings_append(result, that);
 
     assert(2 == bear_strings_length(result));
-    assert(0 == strcmp("this", result[0]));
-    assert(0 == strcmp("that", result[1]));
+    assert(this == result[0]);
+    assert(that == result[1]);
     assert(0 == result[2]);
 
-    bear_strings_release(result);
+    free((void *)result);
 }
 
 void test_strings_find()
