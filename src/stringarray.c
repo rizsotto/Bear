@@ -61,16 +61,15 @@ char const ** bear_strings_copy(char const ** const in)
 {
     size_t const size = bear_strings_length(in);
 
-    char const ** result = malloc((size + 1) * sizeof(char const *));
+    char const ** const result = malloc((size + 1) * sizeof(char const *));
     if (0 == result)
     {
         perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
-    result[size] = 0;
 
     char const * const * in_it = in;
-    char const * * out_it = result;
+    char const ** out_it = result;
     for (; (in_it) && (*in_it); ++in_it, ++out_it)
     {
         *out_it = strdup(*in_it);
@@ -80,6 +79,7 @@ char const ** bear_strings_copy(char const ** const in)
             exit(EXIT_FAILURE);
         }
     }
+    *out_it = 0;
     return result;
 }
 
@@ -104,8 +104,8 @@ size_t bear_strings_length(char const * const * const in)
 {
     size_t result = 0;
     char const * const * it = in;
-    for (; (it) && (*it); ++it, ++result)
-        ;
+    for (; (it) && (*it); ++it)
+        ++result;
     return result;
 }
 #endif
