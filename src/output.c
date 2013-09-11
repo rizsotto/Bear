@@ -59,8 +59,6 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
 {
     char const * src = get_source_file(e->cmd, e->cwd);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
-    if (0 == cmd)
-        goto cleanup;
     if (debug)
     {
         if (count++)
@@ -91,7 +89,6 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
                 "}\n",
                 e->cwd, cmd, src);
     }
-cleanup:
     free((void *)cmd);
     free((void *)src);
 }
@@ -114,7 +111,7 @@ static char const * get_source_file(char const * * args, char const * cwd)
         char const * const * it = args;
         for (; *it; ++it)
         {
-            if (is_source_file(*it))
+            if ((0 == result) && (is_source_file(*it)))
             {
                 result = fix_path(*it, cwd);
             }

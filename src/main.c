@@ -122,10 +122,12 @@ int main(int argc, char * const argv[])
         // child process
         close(sync_fd[1]);
         wait_for_parent(sync_fd[0]);
-        if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
-        {
-            perror("bear: setenv");
-            exit(EXIT_FAILURE);
+        if (libear_path) {
+            if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
+            {
+                perror("bear: setenv");
+                exit(EXIT_FAILURE);
+            }
         }
         if (-1 == setenv(ENV_OUTPUT, socket_file, 1))
         {
