@@ -21,25 +21,25 @@
 
 #include <unistd.h>
 
-struct bear_message
+typedef struct bear_message_t
 {
     pid_t pid;
     pid_t ppid;
     char const * fun;
     char const * cwd;
     char const * * cmd;
-};
+} bear_message_t;
 
 #ifdef SERVER
-void bear_read_message(int fd, struct bear_message * e);
-void bear_free_message(struct bear_message * e);
+void bear_read_message(int fd, bear_message_t * e);
+void bear_free_message(bear_message_t * e);
 
 int bear_create_unix_socket(char const * socket);
-int bear_accept_message(int fd, struct bear_message * e);
+int bear_accept_message(int fd, bear_message_t * e);
 #endif
 
 #ifdef CLIENT
-void bear_write_message(int fd, struct bear_message const * e);
+void bear_write_message(int fd, bear_message_t const * e);
 
-void bear_send_message(char const * socket, struct bear_message const * e);
+void bear_send_message(char const * socket, bear_message_t const * e);
 #endif

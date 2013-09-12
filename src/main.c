@@ -88,15 +88,15 @@ static void report_version();
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, struct bear_configuration const * cfg, int sync_fd);
+static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
-static void print_known_compilers(struct bear_configuration const * config);
-static void print_known_extensions(struct bear_configuration const * config);
+static void print_known_compilers(bear_output_config_t const * config);
+static void print_known_extensions(bear_output_config_t const * config);
 
 int main(int argc, char * const argv[])
 {
-    struct bear_configuration config;
+    bear_output_config_t config;
     config.debug = 0;
     config.dependency_generation_filtered = 1;
     config.compilers = compilers;
@@ -222,12 +222,12 @@ int main(int argc, char * const argv[])
     return child_status;
 }
 
-static void receive_on_unix_socket(char const * socket_file, struct bear_output * handle, int sync_fd);
+static void receive_on_unix_socket(char const * socket_file, bear_output_t * handle, int sync_fd);
 
-static void collect_messages(char const * socket_file, char const * output_file, struct bear_configuration const * cfg, int sync_fd)
+static void collect_messages(char const * socket_file, char const * output_file, bear_output_config_t const * cfg, int sync_fd)
 {
     // open the output file
-    struct bear_output * handle = bear_open_json_output(output_file, cfg);
+    bear_output_t * handle = bear_open_json_output(output_file, cfg);
     // remove old socket file if any
     if ((-1 == unlink(socket_file)) && (ENOENT != errno))
     {
@@ -241,12 +241,12 @@ static void collect_messages(char const * socket_file, char const * output_file,
     unlink(socket_file);
 }
 
-static void receive_on_unix_socket(char const * file, struct bear_output * handle, int sync_fd)
+static void receive_on_unix_socket(char const * file, bear_output_t * handle, int sync_fd)
 {
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
     notify_child(sync_fd);
-    struct bear_message msg;
+    bear_message_t msg;
     while ((child_pid) && bear_accept_message(s, &msg))
     {
         mask_all_signals(SIG_BLOCK);
@@ -373,12 +373,12 @@ static void print_array(char const * const * const in)
     }
 }
 
-static void print_known_compilers(struct bear_configuration const * config)
+static void print_known_compilers(bear_output_config_t const * config)
 {
     print_array(config->compilers);
 }
 
-static void print_known_extensions(struct bear_configuration const * config)
+static void print_known_extensions(bear_output_config_t const * config)
 {
     print_array(config->extensions);
 }

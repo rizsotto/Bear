@@ -107,7 +107,7 @@ static char const * * read_string_array(int fd)
     return result;
 }
 
-void bear_read_message(int fd, struct bear_message * e)
+void bear_read_message(int fd, bear_message_t * e)
 {
     e->pid = read_pid(fd);
     e->ppid = read_pid(fd);
@@ -116,7 +116,7 @@ void bear_read_message(int fd, struct bear_message * e)
     e->cmd = read_string_array(fd);
 }
 
-void bear_free_message(struct bear_message * e)
+void bear_free_message(bear_message_t * e)
 {
     e->pid = 0;
     e->ppid = 0;
@@ -145,7 +145,7 @@ int bear_create_unix_socket(char const * file)
     return s;
 }
 
-int bear_accept_message(int s, struct bear_message * msg)
+int bear_accept_message(int s, bear_message_t * msg)
 {
     int connection = accept(s, 0, 0);
     if (-1 != connection)
@@ -200,7 +200,7 @@ static void write_string_array(int fd, char const * const * message)
     }
 }
 
-void bear_write_message(int fd, struct bear_message const * e)
+void bear_write_message(int fd, bear_message_t const * e)
 {
     write_pid(fd, e->pid);
     write_pid(fd, e->ppid);
@@ -209,7 +209,7 @@ void bear_write_message(int fd, struct bear_message const * e)
     write_string_array(fd, e->cmd);
 }
 
-void bear_send_message(char const * file, struct bear_message const * msg)
+void bear_send_message(char const * file, bear_message_t const * msg)
 {
     struct sockaddr_un addr;
     int s = init_socket(file, &addr);

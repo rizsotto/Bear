@@ -32,17 +32,17 @@
 #include <stddef.h>
 
 
-struct bear_output
+typedef struct bear_output_t
 {
     int fd;
     size_t count;
-    struct bear_configuration const * config;
-};
+    bear_output_config_t const * config;
+} bear_output_t;
 
 
-struct bear_output * bear_open_json_output(char const * file, struct bear_configuration const * config)
+bear_output_t * bear_open_json_output(char const * file, bear_output_config_t const * config)
 {
-    struct bear_output * handle = malloc(sizeof(struct bear_output));
+    bear_output_t * handle = malloc(sizeof(bear_output_t));
     if (0 == handle)
     {
         perror("bear: malloc");
@@ -63,16 +63,16 @@ struct bear_output * bear_open_json_output(char const * file, struct bear_config
     return handle;
 }
 
-void bear_close_json_output(struct bear_output * handle)
+void bear_close_json_output(bear_output_t * handle)
 {
     dprintf(handle->fd, "]\n");
     close(handle->fd);
     free((void *)handle);
 }
 
-static char const * get_source_file(char const * * cmd, char const * cwd, struct bear_configuration const * config);
+static char const * get_source_file(char const * * cmd, char const * cwd, bear_output_config_t const * config);
 
-void bear_append_json_output(struct bear_output * handle, struct bear_message const * e)
+void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
     char const * const src = get_source_file(e->cmd, e->cwd, handle->config);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
@@ -118,7 +118,7 @@ static int is_dependency_generation_flag(char const * const arg);
 static char const * fix_path(char const * file, char const * cwd);
 
 
-static char const * get_source_file(char const * * args, char const * cwd, struct bear_configuration const * config)
+static char const * get_source_file(char const * * args, char const * cwd, bear_output_config_t const * config)
 {
     char const * result = 0;
     // looking for compiler name

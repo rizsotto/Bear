@@ -258,11 +258,11 @@ static char const * * update_environment(char * const envp[])
     return result;
 }
 
-typedef void (*send_message)(char const * socket, struct bear_message const *);
+typedef void (*send_message)(char const * socket, bear_message_t const *);
 
 static void report(send_message fp, char const * socket, char const * fun, char const * const argv[])
 {
-    struct bear_message const msg =
+    bear_message_t const msg =
     {
         getpid(),
         getppid(),

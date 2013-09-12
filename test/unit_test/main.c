@@ -218,8 +218,8 @@ void test_json()
     bear_strings_release(input);
 }
 
-void assert_messages_equals(struct bear_message const * lhs,
-                            struct bear_message const * rhs)
+void assert_messages_equals(bear_message_t const * lhs,
+                            bear_message_t const * rhs)
 {
     assert(lhs->pid == rhs->pid);
     assert(lhs->ppid == rhs->ppid);
@@ -236,8 +236,8 @@ void test_protocol()
         "that",
         0
     };
-    struct bear_message input = { 9, 1, "exec", "/tmp", cmds };
-    struct bear_message result;
+    bear_message_t input = { 9, 1, "exec", "/tmp", cmds };
+    bear_message_t result;
     {
         int fds[2];
         pipe(fds);
