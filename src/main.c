@@ -90,6 +90,7 @@ static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
 static void prepare_socket_file(char ** socket_file, char const ** socket_dir);
+static void teardown_socket_file(char * socket_file, char const * socket_dir);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
 static void print_known_compilers(bear_output_config_t const * config);
@@ -199,11 +200,7 @@ int main(int argc, char * const argv[])
         mask_all_signals(SIG_BLOCK);
         close(sync_fd[0]);
         collect_messages(socket_file, output_file, &config, sync_fd[1]);
-        if (socket_dir)
-        {
-            rmdir(socket_dir);
-            free((void *)socket_file);
-        }
+        teardown_socket_file(socket_file, socket_dir);
     }
     return child_status;
 }
@@ -227,7 +224,6 @@ static void collect_messages(char const * socket_file, char const * output_file,
     // release resources
     bear_close_json_output(handle);
     close(s);
-    unlink(socket_file);
 }
 
 static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
@@ -236,15 +232,21 @@ static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
     if (0 == *socket_file)
     {
         char template[] = "/tmp/bear-XXXXXX";
-        *socket_dir = mkdtemp(template);
-        if (0 == *socket_dir)
+        char const * temp_dir = mkdtemp(template);
+        if (0 == temp_dir)
         {
             perror("bear: mkdtemp");
             exit(EXIT_FAILURE);
         }
-        if (-1 == asprintf(socket_file, "%s/socket", *socket_dir))
+        if (-1 == asprintf(socket_file, "%s/socket", temp_dir))
         {
             perror("bear: asprintf");
+            exit(EXIT_FAILURE);
+        }
+        *socket_dir = strdup(temp_dir);
+        if (0 == *socket_dir)
+        {
+            perror("bear: strdup");
             exit(EXIT_FAILURE);
         }
     }
@@ -253,6 +255,17 @@ static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
     {
         perror("bear: unlink");
         exit(EXIT_FAILURE);
+    }
+}
+
+static void teardown_socket_file(char * socket_file, char const * socket_dir)
+{
+    unlink(socket_file);
+    if (socket_dir)
+    {
+        rmdir(socket_dir);
+        free((void *)socket_dir);
+        free((void *)socket_file);
     }
 }
 
