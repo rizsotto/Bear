@@ -29,6 +29,57 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+static char const * compilers[] =
+{
+    "cc",
+    "gcc",
+    "gcc-4.1",
+    "gcc-4.2",
+    "gcc-4.3",
+    "gcc-4.4",
+    "gcc-4.5",
+    "gcc-4.6",
+    "gcc-4.7",
+    "gcc-4.8",
+    "llvm-gcc",
+    "clang",
+    "clang-3.0",
+    "clang-3.1",
+    "clang-3.2",
+    "clang-3.3",
+    "clang-3.4",
+    "c++",
+    "g++",
+    "g++-4.1",
+    "g++-4.2",
+    "g++-4.3",
+    "g++-4.4",
+    "g++-4.5",
+    "g++-4.6",
+    "g++-4.7",
+    "g++-4.8",
+    "llvm-g++",
+    "clang++",
+    0
+};
+
+static char const * extensions[] =
+{
+    ".c",
+    ".C",
+    ".cc",
+    ".cxx",
+    ".c++",
+    ".C++",
+    ".cpp",
+    ".cp",
+    ".i",
+    ".ii",
+    ".m",
+    ".S",
+    0
+};
+
 // variables which are used in signal handler
 static volatile pid_t    child_pid;
 static volatile int      child_status = EXIT_FAILURE;
@@ -37,17 +88,24 @@ static void report_version();
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, int debug, int sync_fd);
+static void collect_messages(char const * socket, char const * output, struct bear_configuration const * cfg, int sync_fd);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
+static void print_known_compilers(struct bear_configuration const * config);
+static void print_known_extensions(struct bear_configuration const * config);
 
 int main(int argc, char * const argv[])
 {
+    struct bear_configuration config;
+    config.debug = 0;
+    config.dependency_generation_filtered = 1;
+    config.compilers = compilers;
+    config.extensions = extensions;
+
     char const * output_file = DEFAULT_OUTPUT_FILE;
     char const * libear_path = DEFAULT_PRELOAD_FILE;
     char * socket_file = 0;
     char const * socket_dir = 0;
-    int debug = 0;
     char * const * unprocessed_argv = 0;
     int sync_fd[2];
     // parse command line arguments.
@@ -66,13 +124,13 @@ int main(int argc, char * const argv[])
             socket_file = optarg;
             break;
         case 'd':
-            debug = 1;
+            config.debug = 1;
             break;
         case 'c':
-            bear_print_known_compilers();
+            print_known_compilers(&config);
             return 0;
         case 'e':
-            bear_print_known_extensions();
+            print_known_extensions(&config);
             return 0;
         case 'v':
             report_version();
@@ -154,7 +212,7 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
         close(sync_fd[0]);
-        collect_messages(socket_file, output_file, debug, sync_fd[1]);
+        collect_messages(socket_file, output_file, &config, sync_fd[1]);
         if (socket_dir)
         {
             rmdir(socket_dir);
@@ -164,12 +222,12 @@ int main(int argc, char * const argv[])
     return child_status;
 }
 
-static void receive_on_unix_socket(char const * socket_file, int output_fd, int debug, int sync_fd);
+static void receive_on_unix_socket(char const * socket_file, struct bear_output * handle, int sync_fd);
 
-static void collect_messages(char const * socket_file, char const * output_file, int debug, int sync_fd)
+static void collect_messages(char const * socket_file, char const * output_file, struct bear_configuration const * cfg, int sync_fd)
 {
     // open the output file
-    int output_fd = bear_open_json_output(output_file);
+    struct bear_output * handle = bear_open_json_output(output_file, cfg);
     // remove old socket file if any
     if ((-1 == unlink(socket_file)) && (ENOENT != errno))
     {
@@ -177,13 +235,13 @@ static void collect_messages(char const * socket_file, char const * output_file,
         exit(EXIT_FAILURE);
     }
     // receive messages
-    receive_on_unix_socket(socket_file, output_fd, debug, sync_fd);
+    receive_on_unix_socket(socket_file, handle, sync_fd);
     // skip errors during shutdown
-    bear_close_json_output(output_fd);
+    bear_close_json_output(handle);
     unlink(socket_file);
 }
 
-static void receive_on_unix_socket(char const * file, int out_fd, int debug, int sync_fd)
+static void receive_on_unix_socket(char const * file, struct bear_output * handle, int sync_fd)
 {
     int s = bear_create_unix_socket(file);
     mask_all_signals(SIG_UNBLOCK);
@@ -192,7 +250,7 @@ static void receive_on_unix_socket(char const * file, int out_fd, int debug, int
     while ((child_pid) && bear_accept_message(s, &msg))
     {
         mask_all_signals(SIG_BLOCK);
-        bear_append_json_output(out_fd, &msg, debug);
+        bear_append_json_output(handle, &msg);
         bear_free_message(&msg);
         mask_all_signals(SIG_UNBLOCK);
     }
@@ -304,4 +362,23 @@ static void wait_for_parent(int fd)
         exit(EXIT_FAILURE);
     }
     close(fd);
+}
+
+static void print_array(char const * const * const in)
+{
+    char const * const * it = in;
+    for (; *it; ++it)
+    {
+        printf("  %s\n",*it);
+    }
+}
+
+static void print_known_compilers(struct bear_configuration const * config)
+{
+    print_array(config->compilers);
+}
+
+static void print_known_extensions(struct bear_configuration const * config)
+{
+    print_array(config->extensions);
 }

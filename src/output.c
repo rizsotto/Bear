@@ -32,40 +32,57 @@
 #include <stddef.h>
 
 
-static size_t count = 0;
-
-int bear_open_json_output(char const * file)
+struct bear_output
 {
-    int fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
-    if (-1 == fd)
+    int fd;
+    size_t count;
+    struct bear_configuration const * config;
+};
+
+
+struct bear_output * bear_open_json_output(char const * file, struct bear_configuration const * config)
+{
+    struct bear_output * handle = malloc(sizeof(struct bear_output));
+    if (0 == handle)
+    {
+        perror("bear: malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    handle->count = 0;
+    handle->config = config;
+    handle->fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+    if (-1 == handle->fd)
     {
         perror("bear: open");
         exit(EXIT_FAILURE);
     }
-    dprintf(fd, "[\n");
-    count = 0;
-    return fd;
+
+    dprintf(handle->fd, "[\n");
+
+    return handle;
 }
 
-void bear_close_json_output(int fd)
+void bear_close_json_output(struct bear_output * handle)
 {
-    dprintf(fd, "]\n");
-    close(fd);
+    dprintf(handle->fd, "]\n");
+    close(handle->fd);
+    free((void *)handle);
 }
 
-static char const * get_source_file(char const * * cmd, char const * cwd);
+static char const * get_source_file(char const * * cmd, char const * cwd, struct bear_configuration const * config);
 
-void bear_append_json_output(int fd, struct bear_message const * e, int debug)
+void bear_append_json_output(struct bear_output * handle, struct bear_message const * e)
 {
-    char const * src = get_source_file(e->cmd, e->cwd);
+    char const * const src = get_source_file(e->cmd, e->cwd, handle->config);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
-    if (debug)
+    if (handle->config->debug)
     {
-        if (count++)
+        if (handle->count++)
         {
-            dprintf(fd, ",\n");
+            dprintf(handle->fd, ",\n");
         }
-        dprintf(fd,
+        dprintf(handle->fd,
                 "{\n"
                 "  \"pid\": \"%d\",\n"
                 "  \"ppid\": \"%d\",\n"
@@ -77,11 +94,11 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
     }
     else if (src)
     {
-        if (count++)
+        if (handle->count++)
         {
-            dprintf(fd, ",\n");
+            dprintf(handle->fd, ",\n");
         }
-        dprintf(fd,
+        dprintf(handle->fd,
                 "{\n"
                 "  \"directory\": \"%s\",\n"
                 "  \"command\": \"%s\",\n"
@@ -94,24 +111,24 @@ void bear_append_json_output(int fd, struct bear_message const * e, int debug)
 }
 
 
-static int is_known_compiler(char const * cmd);
-static int is_source_file(char const * const arg);
+static int is_known_compiler(char const * cmd, char const ** compilers);
+static int is_source_file(char const * const arg, char const ** extensions);
 static int is_dependency_generation_flag(char const * const arg);
 
 static char const * fix_path(char const * file, char const * cwd);
 
 
-static char const * get_source_file(char const * * args, char const * cwd)
+static char const * get_source_file(char const * * args, char const * cwd, struct bear_configuration const * config)
 {
     char const * result = 0;
     // looking for compiler name
-    if ((args) && (args[0]) && is_known_compiler(args[0]))
+    if ((args) && (args[0]) && is_known_compiler(args[0], config->compilers))
     {
         // looking for source file
         char const * const * it = args;
         for (; *it; ++it)
         {
-            if ((0 == result) && (is_source_file(*it)))
+            if ((0 == result) && (is_source_file(*it, config->extensions)))
             {
                 result = fix_path(*it, cwd);
             }
@@ -152,41 +169,7 @@ static char const * fix_path(char const * file, char const * cwd)
     return result;
 }
 
-static char const * const compilers[] =
-{
-    "cc",
-    "gcc",
-    "gcc-4.1",
-    "gcc-4.2",
-    "gcc-4.3",
-    "gcc-4.4",
-    "gcc-4.5",
-    "gcc-4.6",
-    "gcc-4.7",
-    "gcc-4.8",
-    "llvm-gcc",
-    "clang",
-    "clang-3.0",
-    "clang-3.1",
-    "clang-3.2",
-    "clang-3.3",
-    "clang-3.4",
-    "c++",
-    "g++",
-    "g++-4.1",
-    "g++-4.2",
-    "g++-4.3",
-    "g++-4.4",
-    "g++-4.5",
-    "g++-4.6",
-    "g++-4.7",
-    "g++-4.8",
-    "llvm-g++",
-    "clang++",
-    0
-};
-
-static int is_known_compiler(char const * cmd)
+static int is_known_compiler(char const * cmd, char const ** compilers)
 {
     // looking for compiler name
     // have to copy cmd since POSIX basename modifies input
@@ -197,36 +180,19 @@ static int is_known_compiler(char const * cmd)
     return result;
 }
 
-static int is_source_file_extension(char const * arg);
+static int is_source_file_extension(char const * arg, char const ** extensions);
 
-static int is_source_file(char const * const arg)
+static int is_source_file(char const * const arg, char const ** extensions)
 {
     char const * file_name = strrchr(arg, '/');
     file_name = (file_name) ? file_name : arg;
     char const * extension = strrchr(file_name, '.');
     extension = (extension) ? extension : file_name;
 
-    return is_source_file_extension(extension);
+    return is_source_file_extension(extension, extensions);
 }
 
-static char const * const extensions[] =
-{
-    ".c",
-    ".C",
-    ".cc",
-    ".cxx",
-    ".c++",
-    ".C++",
-    ".cpp",
-    ".cp",
-    ".i",
-    ".ii",
-    ".m",
-    ".S",
-    0
-};
-
-static int is_source_file_extension(char const * arg)
+static int is_source_file_extension(char const * arg, char const ** extensions)
 {
     return (bear_strings_find(extensions, arg)) ? 1 : 0;
 }
@@ -234,23 +200,4 @@ static int is_source_file_extension(char const * arg)
 static int is_dependency_generation_flag(char const * const arg)
 {
     return (2 <= strlen(arg)) && ('-' == arg[0]) && ('M' == arg[1]);
-}
-
-static void print_array(char const * const * const in)
-{
-    char const * const * it = in;
-    for (; *it; ++it)
-    {
-        printf("  %s\n",*it);
-    }
-}
-
-void bear_print_known_compilers()
-{
-    print_array(compilers);
-}
-
-void bear_print_known_extensions()
-{
-    print_array(extensions);
 }

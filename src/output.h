@@ -19,12 +19,19 @@
 
 #pragma once
 
+struct bear_configuration
+{
+    int debug;
+    int dependency_generation_filtered;
+    char const ** compilers;
+    char const ** extensions;
+};
+
 struct bear_message;
+struct bear_output;
 
-int  bear_open_json_output(char const * file);
-void bear_close_json_output(int fd);
 
-void bear_append_json_output(int fd, struct bear_message const * e, int debug);
+struct bear_output * bear_open_json_output(char const * file, struct bear_configuration const * config);
+void bear_close_json_output(struct bear_output * handle);
 
-void bear_print_known_extensions();
-void bear_print_known_compilers();
+void bear_append_json_output(struct bear_output * handle, struct bear_message const * e);
