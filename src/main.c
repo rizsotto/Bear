@@ -208,25 +208,14 @@ int main(int argc, char * const argv[])
     return child_status;
 }
 
-static void receive_on_unix_socket(char const * socket_file, bear_output_t * handle, int sync_fd);
-
 static void collect_messages(char const * socket_file, char const * output_file, bear_output_config_t const * cfg, int sync_fd)
 {
-    // open the output file
     bear_output_t * handle = bear_open_json_output(output_file, cfg);
-    // receive messages
-    receive_on_unix_socket(socket_file, handle, sync_fd);
-    // skip errors during shutdown
-    bear_close_json_output(handle);
-    unlink(socket_file);
-}
-
-static void receive_on_unix_socket(char const * file, bear_output_t * handle, int sync_fd)
-{
-    int s = bear_create_unix_socket(file);
-    mask_all_signals(SIG_UNBLOCK);
+    int s = bear_create_unix_socket(socket_file);
     notify_child(sync_fd);
+    // receive messages
     bear_message_t msg;
+    mask_all_signals(SIG_UNBLOCK);
     while ((child_pid) && bear_accept_message(s, &msg))
     {
         mask_all_signals(SIG_BLOCK);
@@ -235,7 +224,10 @@ static void receive_on_unix_socket(char const * file, bear_output_t * handle, in
         mask_all_signals(SIG_UNBLOCK);
     }
     mask_all_signals(SIG_BLOCK);
+    // release resources
+    bear_close_json_output(handle);
     close(s);
+    unlink(socket_file);
 }
 
 static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
