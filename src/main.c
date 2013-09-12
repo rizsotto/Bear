@@ -89,6 +89,7 @@ static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
+static void prepare_socket_file(char ** socket_file, char const ** socket_dir);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
 static void print_known_compilers(bear_output_config_t const * config);
@@ -146,22 +147,7 @@ int main(int argc, char * const argv[])
         usage(argv[0]);
     }
     unprocessed_argv = &(argv[optind]);
-    // create temporary directory for socket
-    if (0 == socket_file)
-    {
-        char template[] = "/tmp/bear-XXXXXX";
-        socket_dir = mkdtemp(template);
-        if (0 == socket_dir)
-        {
-            perror("bear: mkdtemp");
-            exit(EXIT_FAILURE);
-        }
-        if (-1 == asprintf(&socket_file, "%s/socket", socket_dir))
-        {
-            perror("bear: asprintf");
-            exit(EXIT_FAILURE);
-        }
-    }
+    prepare_socket_file(&socket_file, &socket_dir);
     // set up sync pipe
     if (-1 == pipe(sync_fd))
     {
@@ -228,12 +214,6 @@ static void collect_messages(char const * socket_file, char const * output_file,
 {
     // open the output file
     bear_output_t * handle = bear_open_json_output(output_file, cfg);
-    // remove old socket file if any
-    if ((-1 == unlink(socket_file)) && (ENOENT != errno))
-    {
-        perror("bear: unlink");
-        exit(EXIT_FAILURE);
-    }
     // receive messages
     receive_on_unix_socket(socket_file, handle, sync_fd);
     // skip errors during shutdown
@@ -256,6 +236,32 @@ static void receive_on_unix_socket(char const * file, bear_output_t * handle, in
     }
     mask_all_signals(SIG_BLOCK);
     close(s);
+}
+
+static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
+{
+    // create temporary directory for socket
+    if (0 == *socket_file)
+    {
+        char template[] = "/tmp/bear-XXXXXX";
+        *socket_dir = mkdtemp(template);
+        if (0 == *socket_dir)
+        {
+            perror("bear: mkdtemp");
+            exit(EXIT_FAILURE);
+        }
+        if (-1 == asprintf(socket_file, "%s/socket", *socket_dir))
+        {
+            perror("bear: asprintf");
+            exit(EXIT_FAILURE);
+        }
+    }
+    // remove old socket file if any
+    if ((-1 == unlink(*socket_file)) && (ENOENT != errno))
+    {
+        perror("bear: unlink");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void handler(int signum)
