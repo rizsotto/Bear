@@ -80,77 +80,73 @@ static char const * extensions[] =
     0
 };
 
+typedef struct bear_command_config_t
+{
+    char const * output_file;
+    char const * libear_file;
+    char const * socket_dir;
+    char const * socket_file;
+    char * const * unprocessed_argv;
+    int debug : 1;
+    int print_compilers : 1;
+    int print_extensions : 1;
+} bear_command_config_t;
+
 // variables which are used in signal handler
 static volatile pid_t    child_pid;
 static volatile int      child_status = EXIT_FAILURE;
 
 // forward declare the used methods
-static void report_version();
-static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
 static void update_environment(char const * key, char const * value);
-static void prepare_socket_file(char ** socket_file, char const ** socket_dir);
-static void teardown_socket_file(char * socket_file, char const * socket_dir);
+static void prepare_socket_file(bear_command_config_t *);
+static void teardown_socket_file(bear_command_config_t *);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
+static void parse(int argc, char * const argv[], bear_command_config_t * config);
+static void update_output_config(bear_command_config_t const * commands, bear_output_config_t * config);
+
+static void print_version();
+static void print_usage(char const * const name);
 static void print_known_compilers(bear_output_config_t const * config);
 static void print_known_extensions(bear_output_config_t const * config);
 
+
 int main(int argc, char * const argv[])
 {
-    bear_output_config_t config;
-    config.debug = 0;
-    config.dependency_generation_filtered = 1;
-    config.compilers = compilers;
-    config.extensions = extensions;
-
-    char const * output_file = DEFAULT_OUTPUT_FILE;
-    char const * libear_path = DEFAULT_PRELOAD_FILE;
-    char * socket_file = 0;
-    char const * socket_dir = 0;
-    char * const * unprocessed_argv = 0;
+    bear_output_config_t config = {
+        .debug = 0,
+        .dependency_generation_filtered = 1,
+        .compilers = compilers,
+        .extensions = extensions
+    };
+    bear_command_config_t commands = {
+        .output_file = DEFAULT_OUTPUT_FILE,
+        .libear_file = DEFAULT_PRELOAD_FILE,
+        .socket_dir = 0,
+        .socket_file = 0,
+        .unprocessed_argv = 0,
+        .debug = 0,
+        .print_compilers = 0,
+        .print_extensions = 0
+    };
     int sync_fd[2];
-    // parse command line arguments.
-    int opt;
-    while ((opt = getopt(argc, argv, "o:b:s:dcevh?")) != -1)
+
+    parse(argc, argv, &commands);
+    update_output_config(&commands, &config);
+    if (commands.print_compilers)
     {
-        switch (opt)
-        {
-        case 'o':
-            output_file = optarg;
-            break;
-        case 'b':
-            libear_path = optarg;
-            break;
-        case 's':
-            socket_file = optarg;
-            break;
-        case 'd':
-            config.debug = 1;
-            break;
-        case 'c':
-            print_known_compilers(&config);
-            return 0;
-        case 'e':
-            print_known_extensions(&config);
-            return 0;
-        case 'v':
-            report_version();
-            return 0;
-        case 'h':
-        default: /* '?' */
-            usage(argv[0]);
-        }
+        print_known_compilers(&config);
+        exit(EXIT_SUCCESS);
     }
-    // validate
-    if (argc == optind)
+    if (commands.print_extensions)
     {
-        usage(argv[0]);
+        print_known_extensions(&config);
+        exit(EXIT_SUCCESS);
     }
-    unprocessed_argv = &(argv[optind]);
-    prepare_socket_file(&socket_file, &socket_dir);
+    prepare_socket_file(&commands);
     // set up sync pipe
     if (-1 == pipe(sync_fd))
     {
@@ -169,15 +165,17 @@ int main(int argc, char * const argv[])
         // child process
         close(sync_fd[1]);
         wait_for_parent(sync_fd[0]);
-        free((void *)socket_dir);
-        if (libear_path) {
-            update_environment(ENV_PRELOAD, libear_path);
-            update_environment(ENV_OUTPUT, socket_file);
+        update_environment(ENV_PRELOAD, commands.libear_file);
+        update_environment(ENV_OUTPUT, commands.socket_file);
 #ifdef ENV_FLAT
-            update_environment(ENV_FLAT, "1");
+        update_environment(ENV_FLAT, "1");
 #endif
+        if (commands.socket_dir)
+        {
+            free((void *)commands.socket_dir);
+            free((void *)commands.socket_file);
         }
-        if (-1 == execvp(*unprocessed_argv, unprocessed_argv))
+        if (-1 == execvp(*commands.unprocessed_argv, commands.unprocessed_argv))
         {
             perror("bear: execvp");
             exit(EXIT_FAILURE);
@@ -190,8 +188,8 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
         close(sync_fd[0]);
-        collect_messages(socket_file, output_file, &config, sync_fd[1]);
-        teardown_socket_file(socket_file, socket_dir);
+        collect_messages(commands.socket_file, commands.output_file, &config, sync_fd[1]);
+        teardown_socket_file(&commands);
     }
     return child_status;
 }
@@ -226,10 +224,10 @@ static void update_environment(char const * key, char const * value)
     }
 }
 
-static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
+static void prepare_socket_file(bear_command_config_t * config)
 {
     // create temporary directory for socket
-    if (0 == *socket_file)
+    if (0 == config->socket_file)
     {
         char template[] = "/tmp/bear-XXXXXX";
         char const * temp_dir = mkdtemp(template);
@@ -238,35 +236,86 @@ static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
             perror("bear: mkdtemp");
             exit(EXIT_FAILURE);
         }
-        if (-1 == asprintf(socket_file, "%s/socket", temp_dir))
+        if (-1 == asprintf((char **)&(config->socket_file), "%s/socket", temp_dir))
         {
             perror("bear: asprintf");
             exit(EXIT_FAILURE);
         }
-        *socket_dir = strdup(temp_dir);
-        if (0 == *socket_dir)
+        config->socket_dir = strdup(temp_dir);
+        if (0 == config->socket_dir)
         {
             perror("bear: strdup");
             exit(EXIT_FAILURE);
         }
     }
     // remove old socket file if any
-    if ((-1 == unlink(*socket_file)) && (ENOENT != errno))
+    if ((-1 == unlink(config->socket_file)) && (ENOENT != errno))
     {
         perror("bear: unlink");
         exit(EXIT_FAILURE);
     }
 }
 
-static void teardown_socket_file(char * socket_file, char const * socket_dir)
+static void teardown_socket_file(bear_command_config_t * config)
 {
-    unlink(socket_file);
-    if (socket_dir)
+    unlink(config->socket_file);
+    if (config->socket_dir)
     {
-        rmdir(socket_dir);
-        free((void *)socket_dir);
-        free((void *)socket_file);
+        rmdir(config->socket_dir);
+        free((void *)config->socket_dir);
+        free((void *)config->socket_file);
     }
+}
+
+static void parse(int argc, char * const argv[], bear_command_config_t * commands)
+{
+    // parse command line arguments.
+    int opt;
+    while ((opt = getopt(argc, argv, "o:b:s:dcevh?")) != -1)
+    {
+        switch (opt)
+        {
+        case 'o':
+            commands->output_file = optarg;
+            break;
+        case 'b':
+            commands->libear_file = optarg;
+            break;
+        case 's':
+            commands->socket_file = optarg;
+            break;
+        case 'd':
+            commands->debug = 1;
+            break;
+        case 'c':
+            commands->print_compilers = 1;
+            break;
+        case 'e':
+            commands->print_extensions = 1;
+            break;
+        case 'v':
+            print_version();
+            exit(EXIT_SUCCESS);
+        case 'h':
+            print_usage(argv[0]);
+            exit(EXIT_SUCCESS);
+        default: /* '?' */
+            print_usage(argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+    // validate
+    if (argc == optind)
+    {
+        print_usage(argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    commands->unprocessed_argv = &(argv[optind]);
+}
+
+static void update_output_config(bear_command_config_t const * commands, bear_output_config_t * config)
+{
+    config->debug = commands->debug;
 }
 
 static void handler(int signum)
@@ -325,35 +374,6 @@ static void mask_all_signals(int command)
     }
 }
 
-static void report_version()
-{
-    fprintf(stdout,
-            "Bear %s\n"
-            "Copyright (C) 2012, 2013 by László Nagy\n"
-            "This is free software; see the source for copying conditions.  There is NO\n"
-            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
-            BEAR_VERSION);
-}
-
-static void usage(char const * const name)
-{
-    fprintf(stderr,
-            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
-            "\n"
-            "   -o output   output file (default: %s)\n"
-            "   -b libear   library location (default: %s)\n"
-            "   -s socket   multiplexing socket (default: randomly generated)\n"
-            "   -d          debug output (default: disabled)\n"
-            "   -c          prints known compilers and exit\n"
-            "   -e          prints known source file extensions and exit\n"
-            "   -v          prints Bear version and exit\n"
-            "   -h          this message\n",
-            name,
-            DEFAULT_OUTPUT_FILE,
-            DEFAULT_PRELOAD_FILE);
-    exit(EXIT_FAILURE);
-}
-
 static void notify_child(int fd)
 {
     if (-1 == write(fd, "ready", 5))
@@ -373,6 +393,34 @@ static void wait_for_parent(int fd)
         exit(EXIT_FAILURE);
     }
     close(fd);
+}
+
+static void print_version()
+{
+    fprintf(stdout,
+            "Bear %s\n"
+            "Copyright (C) 2012, 2013 by László Nagy\n"
+            "This is free software; see the source for copying conditions.  There is NO\n"
+            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+            BEAR_VERSION);
+}
+
+static void print_usage(char const * const name)
+{
+    fprintf(stderr,
+            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
+            "\n"
+            "   -o output   output file (default: %s)\n"
+            "   -b libear   library location (default: %s)\n"
+            "   -s socket   multiplexing socket (default: randomly generated)\n"
+            "   -d          debug output (default: disabled)\n"
+            "   -c          prints known compilers and exit\n"
+            "   -e          prints known source file extensions and exit\n"
+            "   -v          prints Bear version and exit\n"
+            "   -h          this message\n",
+            name,
+            DEFAULT_OUTPUT_FILE,
+            DEFAULT_PRELOAD_FILE);
 }
 
 static void print_array(char const * const * const in)
