@@ -84,11 +84,13 @@ static char const * extensions[] =
 static volatile pid_t    child_pid;
 static volatile int      child_status = EXIT_FAILURE;
 
+// forward declare the used methods
 static void report_version();
 static void usage(char const * const name)  __attribute__ ((noreturn));
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
 static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
+static void update_environment(char const * key, char const * value);
 static void prepare_socket_file(char ** socket_file, char const ** socket_dir);
 static void teardown_socket_file(char * socket_file, char const * socket_dir);
 static void notify_child(int fd);
@@ -169,24 +171,12 @@ int main(int argc, char * const argv[])
         wait_for_parent(sync_fd[0]);
         free((void *)socket_dir);
         if (libear_path) {
-            if (-1 == setenv(ENV_PRELOAD, libear_path, 1))
-            {
-                perror("bear: setenv");
-                exit(EXIT_FAILURE);
-            }
-        }
-        if (-1 == setenv(ENV_OUTPUT, socket_file, 1))
-        {
-            perror("bear: setenv");
-            exit(EXIT_FAILURE);
-        }
+            update_environment(ENV_PRELOAD, libear_path);
+            update_environment(ENV_OUTPUT, socket_file);
 #ifdef ENV_FLAT
-        if (-1 == setenv(ENV_FLAT, "1", 1))
-        {
-            perror("bear: setenv");
-            exit(EXIT_FAILURE);
-        }
+            update_environment(ENV_FLAT, "1");
 #endif
+        }
         if (-1 == execvp(*unprocessed_argv, unprocessed_argv))
         {
             perror("bear: execvp");
@@ -225,6 +215,15 @@ static void collect_messages(char const * socket_file, char const * output_file,
     // release resources
     bear_close_json_output(handle);
     close(s);
+}
+
+static void update_environment(char const * key, char const * value)
+{
+    if (-1 == setenv(key, value, 1))
+    {
+        perror("bear: setenv");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void prepare_socket_file(char ** socket_file, char const ** socket_dir)
