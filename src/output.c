@@ -32,12 +32,12 @@
 #include <stddef.h>
 
 
-typedef struct bear_output_t
+struct bear_output_t
 {
     int fd;
     size_t count;
     bear_output_config_t const * config;
-} bear_output_t;
+};
 
 
 bear_output_t * bear_open_json_output(char const * file, bear_output_config_t const * config)

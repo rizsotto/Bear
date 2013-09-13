@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "protocol.h"
+
 typedef struct bear_output_config_t
 {
     int debug;
@@ -27,7 +29,6 @@ typedef struct bear_output_config_t
     char const ** extensions;
 } bear_output_config_t;
 
-typedef struct bear_message_t bear_message_t;
 typedef struct bear_output_t bear_output_t;
 
 
