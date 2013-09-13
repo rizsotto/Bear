@@ -20,7 +20,7 @@ set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation databa
 include(CPack)
 
 include(GNUInstallDirs)
-install(FILES COPYING README.md
+install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 add_subdirectory(src)
