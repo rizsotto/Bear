@@ -36,11 +36,11 @@ struct bear_output_t
 {
     int fd;
     size_t count;
-    bear_output_config_t const * config;
+    bear_output_filter_t const * filter;
 };
 
 
-bear_output_t * bear_open_json_output(char const * file, bear_output_config_t const * config)
+bear_output_t * bear_open_json_output(char const * file, bear_output_filter_t const * filter)
 {
     bear_output_t * handle = malloc(sizeof(bear_output_t));
     if (0 == handle)
@@ -50,7 +50,7 @@ bear_output_t * bear_open_json_output(char const * file, bear_output_config_t co
     }
 
     handle->count = 0;
-    handle->config = config;
+    handle->filter = filter;
     handle->fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
     if (-1 == handle->fd)
     {
@@ -70,14 +70,14 @@ void bear_close_json_output(bear_output_t * handle)
     free((void *)handle);
 }
 
-static char const * get_source_file(char const * * cmd, char const * cwd, bear_output_config_t const * config);
+static char const * get_source_file(char const * * cmd, char const * cwd, bear_output_filter_t const * filter);
 
 void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
-    if (handle->config)
+    if (handle->filter)
     {
-        char const * const src = get_source_file(e->cmd, e->cwd, handle->config);
+        char const * const src = get_source_file(e->cmd, e->cwd, handle->filter);
         if (src)
         {
             if (handle->count++)
@@ -121,17 +121,17 @@ static int is_dependency_generation_flag(char const * const arg);
 static char const * fix_path(char const * file, char const * cwd);
 
 
-static char const * get_source_file(char const * * args, char const * cwd, bear_output_config_t const * config)
+static char const * get_source_file(char const * * args, char const * cwd, bear_output_filter_t const * filter)
 {
     char const * result = 0;
     // looking for compiler name
-    if ((args) && (args[0]) && is_known_compiler(args[0], config->compilers))
+    if ((args) && (args[0]) && is_known_compiler(args[0], filter->compilers))
     {
         // looking for source file
         char const * const * it = args;
         for (; *it; ++it)
         {
-            if ((0 == result) && (is_source_file(*it, config->extensions)))
+            if ((0 == result) && (is_source_file(*it, filter->extensions)))
             {
                 result = fix_path(*it, cwd);
             }

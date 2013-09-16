@@ -99,7 +99,7 @@ static volatile int      child_status = EXIT_FAILURE;
 // forward declare the used methods
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, bear_output_config_t const * cfg, int sync_fd);
+static void collect_messages(char const * socket, char const * output, bear_output_filter_t const * cfg, int sync_fd);
 static void update_environment(char const * key, char const * value);
 static void prepare_socket_file(bear_command_config_t *);
 static void teardown_socket_file(bear_command_config_t *);
@@ -109,13 +109,13 @@ static void parse(int argc, char * const argv[], bear_command_config_t * config)
 
 static void print_version();
 static void print_usage(char const * const name);
-static void print_known_compilers(bear_output_config_t const * config);
-static void print_known_extensions(bear_output_config_t const * config);
+static void print_known_compilers(bear_output_filter_t const * filter);
+static void print_known_extensions(bear_output_filter_t const * filter);
 
 
 int main(int argc, char * const argv[])
 {
-    bear_output_config_t config = {
+    bear_output_filter_t filter = {
         .compilers = compilers,
         .extensions = extensions
     };
@@ -134,12 +134,12 @@ int main(int argc, char * const argv[])
     parse(argc, argv, &commands);
     if (commands.print_compilers)
     {
-        print_known_compilers(&config);
+        print_known_compilers(&filter);
         exit(EXIT_SUCCESS);
     }
     if (commands.print_extensions)
     {
-        print_known_extensions(&config);
+        print_known_extensions(&filter);
         exit(EXIT_SUCCESS);
     }
     prepare_socket_file(&commands);
@@ -187,14 +187,14 @@ int main(int argc, char * const argv[])
         collect_messages(
             commands.socket_file,
             commands.output_file,
-            commands.debug ? 0 : &config,
+            commands.debug ? 0 : &filter,
             sync_fd[1]);
         teardown_socket_file(&commands);
     }
     return child_status;
 }
 
-static void collect_messages(char const * socket_file, char const * output_file, bear_output_config_t const * cfg, int sync_fd)
+static void collect_messages(char const * socket_file, char const * output_file, bear_output_filter_t const * cfg, int sync_fd)
 {
     bear_output_t * handle = bear_open_json_output(output_file, cfg);
     int s = bear_create_unix_socket(socket_file);
@@ -427,12 +427,12 @@ static void print_array(char const * const * const in)
     }
 }
 
-static void print_known_compilers(bear_output_config_t const * config)
+static void print_known_compilers(bear_output_filter_t const * filter)
 {
-    print_array(config->compilers);
+    print_array(filter->compilers);
 }
 
-static void print_known_extensions(bear_output_config_t const * config)
+static void print_known_extensions(bear_output_filter_t const * filter)
 {
-    print_array(config->extensions);
+    print_array(filter->extensions);
 }

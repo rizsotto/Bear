@@ -21,16 +21,16 @@
 
 #include "protocol.h"
 
-typedef struct bear_output_config_t
+typedef struct bear_output_filter_t
 {
     char const ** compilers;
     char const ** extensions;
-} bear_output_config_t;
+} bear_output_filter_t;
 
 typedef struct bear_output_t bear_output_t;
 
 
-bear_output_t * bear_open_json_output(char const * file, bear_output_config_t const *);
+bear_output_t * bear_open_json_output(char const * file, bear_output_filter_t const *);
 
 void bear_append_json_output(bear_output_t * handle, bear_message_t const * e);
 void bear_close_json_output(bear_output_t * handle);
