@@ -32,10 +32,20 @@
 #include <stddef.h>
 
 
-struct bear_output_t
+typedef struct bear_output_stream_t
 {
     int fd;
     size_t count;
+} bear_output_stream_t;
+
+static void stream_open(bear_output_stream_t *, char const * file);
+static void stream_close(bear_output_stream_t *);
+static void stream_separator(bear_output_stream_t *);
+
+
+struct bear_output_t
+{
+    bear_output_stream_t stream;
     bear_output_filter_t const * filter;
 };
 
@@ -49,24 +59,16 @@ bear_output_t * bear_open_json_output(char const * file, bear_output_filter_t co
         exit(EXIT_FAILURE);
     }
 
-    handle->count = 0;
     handle->filter = filter;
-    handle->fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
-    if (-1 == handle->fd)
-    {
-        perror("bear: open");
-        exit(EXIT_FAILURE);
-    }
-
-    dprintf(handle->fd, "[\n");
+    stream_open(& handle->stream, file);
 
     return handle;
 }
 
 void bear_close_json_output(bear_output_t * handle)
 {
-    dprintf(handle->fd, "]\n");
-    close(handle->fd);
+    stream_close(& handle->stream);
+
     free((void *)handle);
 }
 
@@ -74,17 +76,17 @@ static char const * get_source_file(char const * * cmd, char const * cwd, bear_o
 
 void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
+    bear_output_stream_t * const stream = & handle->stream;
+
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
     if (handle->filter)
     {
         char const * const src = get_source_file(e->cmd, e->cwd, handle->filter);
         if (src)
         {
-            if (handle->count++)
-            {
-                dprintf(handle->fd, ",\n");
-            }
-            dprintf(handle->fd,
+            stream_separator(stream);
+
+            dprintf(stream->fd,
                     "{\n"
                     "  \"directory\": \"%s\",\n"
                     "  \"command\": \"%s\",\n"
@@ -96,11 +98,9 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
     }
     else
     {
-        if (handle->count++)
-        {
-            dprintf(handle->fd, ",\n");
-        }
-        dprintf(handle->fd,
+        stream_separator(stream);
+
+        dprintf(stream->fd,
                 "{\n"
                 "  \"pid\": \"%d\",\n"
                 "  \"ppid\": \"%d\",\n"
@@ -111,6 +111,38 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
                 e->pid, e->ppid, e->fun, e->cwd, cmd);
     }
     free((void *)cmd);
+}
+
+static void stream_open(bear_output_stream_t * handle, char const * file)
+{
+    handle->count = 0;
+    handle->fd = open(file, O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+    if (-1 == handle->fd)
+    {
+        perror("bear: open");
+        exit(EXIT_FAILURE);
+    }
+
+    dprintf(handle->fd, "[\n");
+}
+
+static void stream_close(bear_output_stream_t * handle)
+{
+    dprintf(handle->fd, "]\n");
+
+    if (-1 == close(handle->fd))
+    {
+        perror("bear: close");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void stream_separator(bear_output_stream_t * handle)
+{
+    if (handle->count++)
+    {
+        dprintf(handle->fd, ",\n");
+    }
 }
 
 
