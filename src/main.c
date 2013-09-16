@@ -80,7 +80,7 @@ static char const * extensions[] =
     0
 };
 
-typedef struct bear_command_config_t
+typedef struct bear_commands_t
 {
     char const * output_file;
     char const * libear_file;
@@ -90,7 +90,7 @@ typedef struct bear_command_config_t
     int debug : 1;
     int print_compilers : 1;
     int print_extensions : 1;
-} bear_command_config_t;
+} bear_commands_t;
 
 // variables which are used in signal handler
 static volatile pid_t    child_pid;
@@ -99,13 +99,13 @@ static volatile int      child_status = EXIT_FAILURE;
 // forward declare the used methods
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, bear_output_filter_t const * cfg, int sync_fd);
+static void collect_messages(char const * socket, char const * output, bear_output_filter_t const * filter, int sync_fd);
 static void update_environment(char const * key, char const * value);
-static void prepare_socket_file(bear_command_config_t *);
-static void teardown_socket_file(bear_command_config_t *);
+static void prepare_socket_file(bear_commands_t *);
+static void teardown_socket_file(bear_commands_t *);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
-static void parse(int argc, char * const argv[], bear_command_config_t * config);
+static void parse(int argc, char * const argv[], bear_commands_t * commands);
 
 static void print_version();
 static void print_usage(char const * const name);
@@ -119,7 +119,7 @@ int main(int argc, char * const argv[])
         .compilers = compilers,
         .extensions = extensions
     };
-    bear_command_config_t commands = {
+    bear_commands_t commands = {
         .output_file = DEFAULT_OUTPUT_FILE,
         .libear_file = DEFAULT_PRELOAD_FILE,
         .socket_dir = 0,
@@ -194,9 +194,9 @@ int main(int argc, char * const argv[])
     return child_status;
 }
 
-static void collect_messages(char const * socket_file, char const * output_file, bear_output_filter_t const * cfg, int sync_fd)
+static void collect_messages(char const * socket_file, char const * output_file, bear_output_filter_t const * filter, int sync_fd)
 {
-    bear_output_t * handle = bear_open_json_output(output_file, cfg);
+    bear_output_t * handle = bear_open_json_output(output_file, filter);
     int s = bear_create_unix_socket(socket_file);
     notify_child(sync_fd);
     // receive messages
@@ -224,10 +224,10 @@ static void update_environment(char const * key, char const * value)
     }
 }
 
-static void prepare_socket_file(bear_command_config_t * config)
+static void prepare_socket_file(bear_commands_t * commands)
 {
     // create temporary directory for socket
-    if (0 == config->socket_file)
+    if (0 == commands->socket_file)
     {
         char template[] = "/tmp/bear-XXXXXX";
         char const * temp_dir = mkdtemp(template);
@@ -236,38 +236,38 @@ static void prepare_socket_file(bear_command_config_t * config)
             perror("bear: mkdtemp");
             exit(EXIT_FAILURE);
         }
-        if (-1 == asprintf((char **)&(config->socket_file), "%s/socket", temp_dir))
+        if (-1 == asprintf((char **)&(commands->socket_file), "%s/socket", temp_dir))
         {
             perror("bear: asprintf");
             exit(EXIT_FAILURE);
         }
-        config->socket_dir = strdup(temp_dir);
-        if (0 == config->socket_dir)
+        commands->socket_dir = strdup(temp_dir);
+        if (0 == commands->socket_dir)
         {
             perror("bear: strdup");
             exit(EXIT_FAILURE);
         }
     }
     // remove old socket file if any
-    if ((-1 == unlink(config->socket_file)) && (ENOENT != errno))
+    if ((-1 == unlink(commands->socket_file)) && (ENOENT != errno))
     {
         perror("bear: unlink");
         exit(EXIT_FAILURE);
     }
 }
 
-static void teardown_socket_file(bear_command_config_t * config)
+static void teardown_socket_file(bear_commands_t * commands)
 {
-    unlink(config->socket_file);
-    if (config->socket_dir)
+    unlink(commands->socket_file);
+    if (commands->socket_dir)
     {
-        rmdir(config->socket_dir);
-        free((void *)config->socket_dir);
-        free((void *)config->socket_file);
+        rmdir(commands->socket_dir);
+        free((void *)commands->socket_dir);
+        free((void *)commands->socket_file);
     }
 }
 
-static void parse(int argc, char * const argv[], bear_command_config_t * commands)
+static void parse(int argc, char * const argv[], bear_commands_t * commands)
 {
     // parse command line arguments.
     int opt;
