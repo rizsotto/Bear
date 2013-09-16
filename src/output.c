@@ -42,6 +42,8 @@ static void stream_open(bear_output_stream_t *, char const * file);
 static void stream_close(bear_output_stream_t *);
 static void stream_separator(bear_output_stream_t *);
 
+static char const * get_source_file(bear_output_filter_t const * filter, bear_message_t const * e);
+
 
 struct bear_output_t
 {
@@ -72,8 +74,6 @@ void bear_close_json_output(bear_output_t * handle)
     free((void *)handle);
 }
 
-static char const * get_source_file(char const * * cmd, char const * cwd, bear_output_filter_t const * filter);
-
 void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
     bear_output_stream_t * const stream = & handle->stream;
@@ -81,7 +81,7 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
     if (handle->filter)
     {
-        char const * const src = get_source_file(e->cmd, e->cwd, handle->filter);
+        char const * const src = get_source_file(handle->filter, e);
         if (src)
         {
             stream_separator(stream);
@@ -153,19 +153,19 @@ static int is_dependency_generation_flag(char const * const arg);
 static char const * fix_path(char const * file, char const * cwd);
 
 
-static char const * get_source_file(char const * * args, char const * cwd, bear_output_filter_t const * filter)
+static char const * get_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
 {
     char const * result = 0;
     // looking for compiler name
-    if ((args) && (args[0]) && is_known_compiler(args[0], filter->compilers))
+    if ((e->cmd) && (e->cmd[0]) && is_known_compiler(e->cmd[0], filter->compilers))
     {
         // looking for source file
-        char const * const * it = args;
+        char const * const * it = e->cmd;
         for (; *it; ++it)
         {
             if ((0 == result) && (is_source_file(*it, filter->extensions)))
             {
-                result = fix_path(*it, cwd);
+                result = fix_path(*it, e->cwd);
             }
             else if (is_dependency_generation_flag(*it))
             {
