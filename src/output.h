@@ -23,8 +23,6 @@
 
 typedef struct bear_output_config_t
 {
-    int debug;
-    int dependency_generation_filtered;
     char const ** compilers;
     char const ** extensions;
 } bear_output_config_t;

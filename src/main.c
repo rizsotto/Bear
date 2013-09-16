@@ -106,7 +106,6 @@ static void teardown_socket_file(bear_command_config_t *);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
 static void parse(int argc, char * const argv[], bear_command_config_t * config);
-static void update_output_config(bear_command_config_t const * commands, bear_output_config_t * config);
 
 static void print_version();
 static void print_usage(char const * const name);
@@ -117,8 +116,6 @@ static void print_known_extensions(bear_output_config_t const * config);
 int main(int argc, char * const argv[])
 {
     bear_output_config_t config = {
-        .debug = 0,
-        .dependency_generation_filtered = 1,
         .compilers = compilers,
         .extensions = extensions
     };
@@ -135,7 +132,6 @@ int main(int argc, char * const argv[])
     int sync_fd[2];
 
     parse(argc, argv, &commands);
-    update_output_config(&commands, &config);
     if (commands.print_compilers)
     {
         print_known_compilers(&config);
@@ -188,7 +184,11 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
         close(sync_fd[0]);
-        collect_messages(commands.socket_file, commands.output_file, &config, sync_fd[1]);
+        collect_messages(
+            commands.socket_file,
+            commands.output_file,
+            commands.debug ? 0 : &config,
+            sync_fd[1]);
         teardown_socket_file(&commands);
     }
     return child_status;
@@ -311,11 +311,6 @@ static void parse(int argc, char * const argv[], bear_command_config_t * command
         exit(EXIT_FAILURE);
     }
     commands->unprocessed_argv = &(argv[optind]);
-}
-
-static void update_output_config(bear_command_config_t const * commands, bear_output_config_t * config)
-{
-    config->debug = commands->debug;
 }
 
 static void handler(int signum)

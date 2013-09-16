@@ -74,9 +74,27 @@ static char const * get_source_file(char const * * cmd, char const * cwd, bear_o
 
 void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
-    char const * const src = get_source_file(e->cmd, e->cwd, handle->config);
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
-    if (handle->config->debug)
+    if (handle->config)
+    {
+        char const * const src = get_source_file(e->cmd, e->cwd, handle->config);
+        if (src)
+        {
+            if (handle->count++)
+            {
+                dprintf(handle->fd, ",\n");
+            }
+            dprintf(handle->fd,
+                    "{\n"
+                    "  \"directory\": \"%s\",\n"
+                    "  \"command\": \"%s\",\n"
+                    "  \"file\": \"%s\"\n"
+                    "}\n",
+                    e->cwd, cmd, src);
+        }
+        free((void *)src);
+    }
+    else
     {
         if (handle->count++)
         {
@@ -92,22 +110,7 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
                 "}\n",
                 e->pid, e->ppid, e->fun, e->cwd, cmd);
     }
-    else if (src)
-    {
-        if (handle->count++)
-        {
-            dprintf(handle->fd, ",\n");
-        }
-        dprintf(handle->fd,
-                "{\n"
-                "  \"directory\": \"%s\",\n"
-                "  \"command\": \"%s\",\n"
-                "  \"file\": \"%s\"\n"
-                "}\n",
-                e->cwd, cmd, src);
-    }
     free((void *)cmd);
-    free((void *)src);
 }
 
 
