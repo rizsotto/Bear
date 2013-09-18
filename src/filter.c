@@ -26,6 +26,12 @@
 #include <stdio.h>
 
 
+struct bear_output_filter_t
+{
+    char const ** compilers;
+    char const ** extensions;
+};
+
 static int is_known_compiler(char const * cmd, char const ** compilers);
 static int is_source_file(char const * const arg, char const ** extensions);
 static int is_dependency_generation_flag(char const * const arg);

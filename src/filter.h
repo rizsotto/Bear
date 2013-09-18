@@ -21,11 +21,7 @@
 
 #include "protocol.h"
 
-typedef struct bear_output_filter_t
-{
-    char const ** compilers;
-    char const ** extensions;
-} bear_output_filter_t;
+typedef struct bear_output_filter_t bear_output_filter_t;
 
 
 bear_output_filter_t * bear_filter_create();
