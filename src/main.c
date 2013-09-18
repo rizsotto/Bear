@@ -54,6 +54,7 @@ static void collect_messages(char const * socket, char const * output, bear_outp
 static void update_environment(char const * key, char const * value);
 static void prepare_socket_file(bear_commands_t *);
 static void teardown_socket_file(bear_commands_t *);
+static void release_commands(bear_commands_t *);
 static void notify_child(int fd);
 static void wait_for_parent(int fd);
 static void parse(int argc, char * const argv[], bear_commands_t * commands);
@@ -114,12 +115,6 @@ int main(int argc, char * const argv[])
 #ifdef ENV_FLAT
         update_environment(ENV_FLAT, "1");
 #endif
-        if (commands.socket_dir)
-        {
-            free((void *)commands.socket_dir);
-            free((void *)commands.socket_file);
-        }
-        bear_filter_delete(filter);
         if (-1 == execvp(*commands.unprocessed_argv, commands.unprocessed_argv))
         {
             perror("bear: execvp");
@@ -139,8 +134,9 @@ int main(int argc, char * const argv[])
             commands.debug ? 0 : filter,
             sync_fd[1]);
         teardown_socket_file(&commands);
-        bear_filter_delete(filter);
     }
+    bear_filter_delete(filter);
+    release_commands(&commands);
     return child_status;
 }
 
@@ -212,6 +208,13 @@ static void teardown_socket_file(bear_commands_t * commands)
     if (commands->socket_dir)
     {
         rmdir(commands->socket_dir);
+    }
+}
+
+static void release_commands(bear_commands_t * commands)
+{
+    if (commands->socket_dir)
+    {
         free((void *)commands->socket_dir);
         free((void *)commands->socket_file);
     }
