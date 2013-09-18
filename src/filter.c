@@ -20,72 +20,57 @@
 #include "filter.h"
 #include "stringarray.h"
 
-#include <libgen.h> // must be before string.h so we get POSIX basename
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <regex.h>
+
+
+typedef struct regex_list_t
+{
+    size_t    length;
+    regex_t * regexs;
+} regex_list_t;
+
+static void compile(char const ** regex, regex_list_t * prepared);
+static int  match(regex_list_t const * prepared, char const * input);
+static void release(regex_list_t * prepared);
 
 
 struct bear_output_filter_t
 {
-    char const ** compilers;
-    char const ** extensions;
+    regex_list_t compiler_regexs;
+    regex_list_t extension_regexs;
 };
 
-static int is_known_compiler(char const * cmd, char const ** compilers);
-static int is_source_file(char const * const arg, char const ** extensions);
 static int is_dependency_generation_flag(char const * const arg);
-static int is_source_file_extension(char const * arg, char const ** extensions);
 static char const * fix_path(char const * file, char const * cwd);
+
 
 static char const * compilers[] =
 {
-    "cc",
-    "gcc",
-    "gcc-4.1",
-    "gcc-4.2",
-    "gcc-4.3",
-    "gcc-4.4",
-    "gcc-4.5",
-    "gcc-4.6",
-    "gcc-4.7",
-    "gcc-4.8",
-    "llvm-gcc",
-    "clang",
-    "clang-3.0",
-    "clang-3.1",
-    "clang-3.2",
-    "clang-3.3",
-    "clang-3.4",
-    "c++",
-    "g++",
-    "g++-4.1",
-    "g++-4.2",
-    "g++-4.3",
-    "g++-4.4",
-    "g++-4.5",
-    "g++-4.6",
-    "g++-4.7",
-    "g++-4.8",
-    "llvm-g++",
-    "clang++",
+    "^([^/]*/)*cc$",
+    "^([^/]*/)*gcc$",
+    "^([^/]*/)*gcc-4.[012345678]$",
+    "^([^/]*/)*llvm-gcc$",
+    "^([^/]*/)*clang$",
+    "^([^/]*/)*clang-3.[01234]$",
+    "^([^/]*/)*[gc]\\+\\+$",
+    "^([^/]*/)*g\\+\\+-4.[012345678]$",
+    "^([^/]*/)*llvm-g\\+\\+$",
+    "^([^/]*/)*clang\\+\\+$",
     0
 };
 
 static char const * extensions[] =
 {
-    ".c",
-    ".C",
-    ".cc",
-    ".cxx",
-    ".c++",
-    ".C++",
-    ".cpp",
-    ".cp",
-    ".i",
-    ".ii",
-    ".m",
-    ".S",
+    ".*\\.[cC]$",
+    ".*\\.[cC]\\+\\+$",
+    ".*\\.cc$",
+    ".*\\.cxx$",
+    ".*\\.cpp$",
+    ".*\\.cp$",
     0
 };
 
@@ -99,14 +84,17 @@ bear_output_filter_t * bear_filter_create()
         exit(EXIT_FAILURE);
     }
 
-    filter->compilers = compilers;
-    filter->extensions = extensions;
+    compile(compilers, &filter->compiler_regexs);
+    compile(extensions, &filter->extension_regexs);
 
     return filter;
 }
 
 void bear_filter_delete(bear_output_filter_t * filter)
 {
+    release(&filter->compiler_regexs);
+    release(&filter->extension_regexs);
+
     free((void *)filter);
 }
 
@@ -114,13 +102,13 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
 {
     char const * result = 0;
     // looking for compiler name
-    if ((e->cmd) && (e->cmd[0]) && is_known_compiler(e->cmd[0], filter->compilers))
+    if ((e->cmd) && (e->cmd[0]) && match(&filter->compiler_regexs, e->cmd[0]))
     {
         // looking for source file
         char const * const * it = e->cmd;
         for (; *it; ++it)
         {
-            if ((0 == result) && (is_source_file(*it, filter->extensions)))
+            if ((0 == result) && match(&filter->extension_regexs, *it))
             {
                 result = fix_path(*it, e->cwd);
             }
@@ -136,6 +124,49 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
         }
     }
     return result;
+}
+
+
+static void compile(char const ** regex, regex_list_t * prepared)
+{
+    prepared->length = bear_strings_length(regex);
+    prepared->regexs = malloc(prepared->length * sizeof(regex_t));
+
+    char const ** it = regex;
+    regex_t * ot = prepared->regexs;
+    for (; (it) && (*it); ++it, ++ot)
+    {
+        if (0 != regcomp(ot, *it, REG_EXTENDED))
+        {
+            // TODO: use regerror
+            perror("bear: regcomp");
+            exit(EXIT_FAILURE);
+        }
+    }
+    ot = 0;
+}
+
+static int  match(regex_list_t const * prepared, char const * input)
+{
+    size_t idx = 0;
+    for (; idx < prepared->length; ++idx)
+    {
+        regex_t * ot = prepared->regexs + idx;
+        if (0 == regexec(ot, input, 0, 0, 0))
+            return 1;
+    }
+    return 0;
+}
+
+static void release(regex_list_t * prepared)
+{
+    size_t idx = 0;
+    for (; idx < prepared->length; ++idx)
+    {
+        regex_t * ot = prepared->regexs + idx;
+        regfree(ot);
+    }
+    free((void *)prepared->regexs);
 }
 
 
@@ -160,32 +191,6 @@ static char const * fix_path(char const * file, char const * cwd)
         }
     }
     return result;
-}
-
-static int is_known_compiler(char const * cmd, char const ** compilers)
-{
-    // looking for compiler name
-    // have to copy cmd since POSIX basename modifies input
-    char * local_cmd = strdup(cmd);
-    char * file = basename(local_cmd);
-    int result = (bear_strings_find(compilers, file)) ? 1 : 0;
-    free(local_cmd);
-    return result;
-}
-
-static int is_source_file(char const * const arg, char const ** extensions)
-{
-    char const * file_name = strrchr(arg, '/');
-    file_name = (file_name) ? file_name : arg;
-    char const * extension = strrchr(file_name, '.');
-    extension = (extension) ? extension : file_name;
-
-    return is_source_file_extension(extension, extensions);
-}
-
-static int is_source_file_extension(char const * arg, char const ** extensions)
-{
-    return (bear_strings_find(extensions, arg)) ? 1 : 0;
 }
 
 static int is_dependency_generation_flag(char const * const arg)
