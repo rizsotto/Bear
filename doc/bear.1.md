@@ -32,7 +32,7 @@ processes and writes the output file.
 :   Specify output file. Default value provided.
     (This option mainly for development purposes.)
 
--b *library*
+-l *library*
 :   Specify the preloaded library location. Default value provided.
     (This option mainly for development purposes.)
 

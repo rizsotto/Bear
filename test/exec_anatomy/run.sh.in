@@ -7,5 +7,5 @@ BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
 BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/libear@CMAKE_SHARED_LIBRARY_SUFFIX@"
 
 touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c execvP.c
-${BEAR_EXE} -b ${BEAR_LIB} -s ./socket -- ./exec_anatomy
+${BEAR_EXE} -l ${BEAR_LIB} -s ./socket -- ./exec_anatomy
 diff expected.json compile_commands.json
