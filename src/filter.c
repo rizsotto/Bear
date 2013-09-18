@@ -29,9 +29,80 @@
 static int is_known_compiler(char const * cmd, char const ** compilers);
 static int is_source_file(char const * const arg, char const ** extensions);
 static int is_dependency_generation_flag(char const * const arg);
-
+static int is_source_file_extension(char const * arg, char const ** extensions);
 static char const * fix_path(char const * file, char const * cwd);
 
+static char const * compilers[] =
+{
+    "cc",
+    "gcc",
+    "gcc-4.1",
+    "gcc-4.2",
+    "gcc-4.3",
+    "gcc-4.4",
+    "gcc-4.5",
+    "gcc-4.6",
+    "gcc-4.7",
+    "gcc-4.8",
+    "llvm-gcc",
+    "clang",
+    "clang-3.0",
+    "clang-3.1",
+    "clang-3.2",
+    "clang-3.3",
+    "clang-3.4",
+    "c++",
+    "g++",
+    "g++-4.1",
+    "g++-4.2",
+    "g++-4.3",
+    "g++-4.4",
+    "g++-4.5",
+    "g++-4.6",
+    "g++-4.7",
+    "g++-4.8",
+    "llvm-g++",
+    "clang++",
+    0
+};
+
+static char const * extensions[] =
+{
+    ".c",
+    ".C",
+    ".cc",
+    ".cxx",
+    ".c++",
+    ".C++",
+    ".cpp",
+    ".cp",
+    ".i",
+    ".ii",
+    ".m",
+    ".S",
+    0
+};
+
+
+bear_output_filter_t * bear_filter_create()
+{
+    bear_output_filter_t * filter = malloc(sizeof(bear_output_filter_t));
+    if (0 == filter)
+    {
+        perror("bear: malloc");
+        exit(EXIT_FAILURE);
+    }
+
+    filter->compilers = compilers;
+    filter->extensions = extensions;
+
+    return filter;
+}
+
+void bear_filter_delete(bear_output_filter_t * filter)
+{
+    free((void *)filter);
+}
 
 char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
 {
@@ -60,6 +131,7 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
     }
     return result;
 }
+
 
 static char const * fix_path(char const * file, char const * cwd)
 {
@@ -94,8 +166,6 @@ static int is_known_compiler(char const * cmd, char const ** compilers)
     free(local_cmd);
     return result;
 }
-
-static int is_source_file_extension(char const * arg, char const ** extensions);
 
 static int is_source_file(char const * const arg, char const ** extensions)
 {

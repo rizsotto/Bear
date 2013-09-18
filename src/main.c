@@ -20,6 +20,7 @@
 #include "config.h"
 #include "protocol.h"
 #include "output.h"
+#include "filter.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -29,56 +30,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-static char const * compilers[] =
-{
-    "cc",
-    "gcc",
-    "gcc-4.1",
-    "gcc-4.2",
-    "gcc-4.3",
-    "gcc-4.4",
-    "gcc-4.5",
-    "gcc-4.6",
-    "gcc-4.7",
-    "gcc-4.8",
-    "llvm-gcc",
-    "clang",
-    "clang-3.0",
-    "clang-3.1",
-    "clang-3.2",
-    "clang-3.3",
-    "clang-3.4",
-    "c++",
-    "g++",
-    "g++-4.1",
-    "g++-4.2",
-    "g++-4.3",
-    "g++-4.4",
-    "g++-4.5",
-    "g++-4.6",
-    "g++-4.7",
-    "g++-4.8",
-    "llvm-g++",
-    "clang++",
-    0
-};
-
-static char const * extensions[] =
-{
-    ".c",
-    ".C",
-    ".cc",
-    ".cxx",
-    ".c++",
-    ".C++",
-    ".cpp",
-    ".cp",
-    ".i",
-    ".ii",
-    ".m",
-    ".S",
-    0
-};
 
 typedef struct bear_commands_t
 {
@@ -115,10 +66,7 @@ static void print_known_extensions(bear_output_filter_t const * filter);
 
 int main(int argc, char * const argv[])
 {
-    bear_output_filter_t filter = {
-        .compilers = compilers,
-        .extensions = extensions
-    };
+    bear_output_filter_t * const filter = bear_filter_create();
     bear_commands_t commands = {
         .output_file = DEFAULT_OUTPUT_FILE,
         .libear_file = DEFAULT_PRELOAD_FILE,
@@ -134,12 +82,12 @@ int main(int argc, char * const argv[])
     parse(argc, argv, &commands);
     if (commands.print_compilers)
     {
-        print_known_compilers(&filter);
+        print_known_compilers(filter);
         exit(EXIT_SUCCESS);
     }
     if (commands.print_extensions)
     {
-        print_known_extensions(&filter);
+        print_known_extensions(filter);
         exit(EXIT_SUCCESS);
     }
     prepare_socket_file(&commands);
@@ -171,6 +119,7 @@ int main(int argc, char * const argv[])
             free((void *)commands.socket_dir);
             free((void *)commands.socket_file);
         }
+        bear_filter_delete(filter);
         if (-1 == execvp(*commands.unprocessed_argv, commands.unprocessed_argv))
         {
             perror("bear: execvp");
@@ -187,9 +136,10 @@ int main(int argc, char * const argv[])
         collect_messages(
             commands.socket_file,
             commands.output_file,
-            commands.debug ? 0 : &filter,
+            commands.debug ? 0 : filter,
             sync_fd[1]);
         teardown_socket_file(&commands);
+        bear_filter_delete(filter);
     }
     return child_status;
 }
