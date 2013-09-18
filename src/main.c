@@ -39,8 +39,6 @@ typedef struct bear_commands_t
     char const * socket_file;
     char * const * unprocessed_argv;
     int debug : 1;
-    int print_compilers : 1;
-    int print_extensions : 1;
 } bear_commands_t;
 
 // variables which are used in signal handler
@@ -61,8 +59,6 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands);
 
 static void print_version();
 static void print_usage(char const * const name);
-static void print_known_compilers(bear_output_filter_t const * filter);
-static void print_known_extensions(bear_output_filter_t const * filter);
 
 
 int main(int argc, char * const argv[])
@@ -74,23 +70,11 @@ int main(int argc, char * const argv[])
         .socket_dir = 0,
         .socket_file = 0,
         .unprocessed_argv = 0,
-        .debug = 0,
-        .print_compilers = 0,
-        .print_extensions = 0
+        .debug = 0
     };
     int sync_fd[2];
 
     parse(argc, argv, &commands);
-    if (commands.print_compilers)
-    {
-        print_known_compilers(filter);
-        exit(EXIT_SUCCESS);
-    }
-    if (commands.print_extensions)
-    {
-        print_known_extensions(filter);
-        exit(EXIT_SUCCESS);
-    }
     prepare_socket_file(&commands);
     // set up sync pipe
     if (-1 == pipe(sync_fd))
@@ -240,12 +224,6 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
         case 'd':
             commands->debug = 1;
             break;
-        case 'c':
-            commands->print_compilers = 1;
-            break;
-        case 'e':
-            commands->print_extensions = 1;
-            break;
         case 'v':
             print_version();
             exit(EXIT_SUCCESS);
@@ -362,30 +340,9 @@ static void print_usage(char const * const name)
             "   -b libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
             "   -d          debug output (default: disabled)\n"
-            "   -c          prints known compilers and exit\n"
-            "   -e          prints known source file extensions and exit\n"
             "   -v          prints Bear version and exit\n"
             "   -h          this message\n",
             name,
             DEFAULT_OUTPUT_FILE,
             DEFAULT_PRELOAD_FILE);
-}
-
-static void print_array(char const * const * const in)
-{
-    char const * const * it = in;
-    for (; *it; ++it)
-    {
-        printf("  %s\n",*it);
-    }
-}
-
-static void print_known_compilers(bear_output_filter_t const * filter)
-{
-    print_array(filter->compilers);
-}
-
-static void print_known_extensions(bear_output_filter_t const * filter)
-{
-    print_array(filter->extensions);
 }

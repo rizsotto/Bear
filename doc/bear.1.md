@@ -45,14 +45,6 @@ processes and writes the output file.
     It contains all available informations of the `exec` calls.
     (This option for those who want to extend functionality of bear.)
 
--c
-:   Prints known compilers, which are used at the post-processing step
-    and exit.
-
--e
-:   Prints known source file extensions, which are used at the
-    post-processing step and exit.
-
 -v
 :   Print out Bear version and exit.
 
