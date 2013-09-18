@@ -29,6 +29,7 @@ add_executable(bear
     protocol.c
     main.c
     output.c
+    filter.c
     json.c)
 set_target_properties(bear PROPERTIES
     COMPILE_DEFINITIONS "SERVER")

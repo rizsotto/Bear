@@ -19,17 +19,13 @@
 
 #include "output.h"
 #include "stringarray.h"
-#include "protocol.h"
 #include "json.h"
 
-#include <unistd.h>
-#include <libgen.h> // must be before string.h so we get POSIX basename
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <stddef.h>
+#include <sys/stat.h>
 
 
 typedef struct bear_output_stream_t
@@ -41,8 +37,6 @@ typedef struct bear_output_stream_t
 static void stream_open(bear_output_stream_t *, char const * file);
 static void stream_close(bear_output_stream_t *);
 static void stream_separator(bear_output_stream_t *);
-
-static char const * get_source_file(bear_output_filter_t const * filter, bear_message_t const * e);
 
 
 struct bear_output_t
@@ -81,7 +75,7 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
     char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
     if (handle->filter)
     {
-        char const * const src = get_source_file(handle->filter, e);
+        char const * const src = bear_filter_source_file(handle->filter, e);
         if (src)
         {
             stream_separator(stream);
@@ -145,94 +139,3 @@ static void stream_separator(bear_output_stream_t * handle)
     }
 }
 
-
-static int is_known_compiler(char const * cmd, char const ** compilers);
-static int is_source_file(char const * const arg, char const ** extensions);
-static int is_dependency_generation_flag(char const * const arg);
-
-static char const * fix_path(char const * file, char const * cwd);
-
-
-static char const * get_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
-{
-    char const * result = 0;
-    // looking for compiler name
-    if ((e->cmd) && (e->cmd[0]) && is_known_compiler(e->cmd[0], filter->compilers))
-    {
-        // looking for source file
-        char const * const * it = e->cmd;
-        for (; *it; ++it)
-        {
-            if ((0 == result) && (is_source_file(*it, filter->extensions)))
-            {
-                result = fix_path(*it, e->cwd);
-            }
-            else if (is_dependency_generation_flag(*it))
-            {
-                if (result)
-                {
-                    free((void *)result);
-                    result = 0;
-                }
-                break;
-            }
-        }
-    }
-    return result;
-}
-
-static char const * fix_path(char const * file, char const * cwd)
-{
-    char * result = 0;
-    if ('/' == file[0])
-    {
-        result = strdup(file);
-        if (0 == result)
-        {
-            perror("bear: strdup");
-            exit(EXIT_FAILURE);
-        }
-    }
-    else
-    {
-        if (-1 == asprintf(&result, "%s/%s", cwd, file))
-        {
-            perror("bear: asprintf");
-            exit(EXIT_FAILURE);
-        }
-    }
-    return result;
-}
-
-static int is_known_compiler(char const * cmd, char const ** compilers)
-{
-    // looking for compiler name
-    // have to copy cmd since POSIX basename modifies input
-    char * local_cmd = strdup(cmd);
-    char * file = basename(local_cmd);
-    int result = (bear_strings_find(compilers, file)) ? 1 : 0;
-    free(local_cmd);
-    return result;
-}
-
-static int is_source_file_extension(char const * arg, char const ** extensions);
-
-static int is_source_file(char const * const arg, char const ** extensions)
-{
-    char const * file_name = strrchr(arg, '/');
-    file_name = (file_name) ? file_name : arg;
-    char const * extension = strrchr(file_name, '.');
-    extension = (extension) ? extension : file_name;
-
-    return is_source_file_extension(extension, extensions);
-}
-
-static int is_source_file_extension(char const * arg, char const ** extensions)
-{
-    return (bear_strings_find(extensions, arg)) ? 1 : 0;
-}
-
-static int is_dependency_generation_flag(char const * const arg)
-{
-    return (2 <= strlen(arg)) && ('-' == arg[0]) && ('M' == arg[1]);
-}
