@@ -42,11 +42,8 @@ struct bear_output_filter_t
 {
     regex_list_t compiler_regexs;
     regex_list_t extension_regexs;
+    regex_list_t cancel_parameter_regexs;
 };
-
-static int is_dependency_generation_flag(char const * const arg);
-static char const * fix_path(char const * file, char const * cwd);
-
 
 static char const * compilers[] =
 {
@@ -63,6 +60,14 @@ static char const * extensions[] =
     0
 };
 
+static char const * cancel_parameters[] =
+{
+    "^-M",
+    0
+};
+
+
+static char const * fix_path(char const * file, char const * cwd);
 
 bear_output_filter_t * bear_filter_create()
 {
@@ -75,6 +80,7 @@ bear_output_filter_t * bear_filter_create()
 
     compile(compilers, &filter->compiler_regexs);
     compile(extensions, &filter->extension_regexs);
+    compile(cancel_parameters, &filter->cancel_parameter_regexs);
 
     return filter;
 }
@@ -83,9 +89,11 @@ void bear_filter_delete(bear_output_filter_t * filter)
 {
     release(&filter->compiler_regexs);
     release(&filter->extension_regexs);
+    release(&filter->cancel_parameter_regexs);
 
     free((void *)filter);
 }
+
 
 char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
 {
@@ -101,7 +109,7 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
             {
                 result = fix_path(*it, e->cwd);
             }
-            else if (is_dependency_generation_flag(*it))
+            else if (match(&filter->cancel_parameter_regexs, *it))
             {
                 if (result)
                 {
@@ -180,9 +188,4 @@ static char const * fix_path(char const * file, char const * cwd)
         }
     }
     return result;
-}
-
-static int is_dependency_generation_flag(char const * const arg)
-{
-    return (2 <= strlen(arg)) && ('-' == arg[0]) && ('M' == arg[1]);
 }
