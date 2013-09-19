@@ -333,23 +333,28 @@ static void print_version()
     fprintf(stdout,
             "Bear %s\n"
             "Copyright (C) 2012, 2013 by László Nagy\n"
-            "This is free software; see the source for copying conditions.  There is NO\n"
-            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+            "This is free software; see the source for copying conditions. "
+            "There is NO warranty; not even for MERCHANTABILITY or FITNESS "
+            "FOR A PARTICULAR PURPOSE.\n",
             BEAR_VERSION);
 }
 
 static void print_usage(char const * const name)
 {
-    fprintf(stderr,
-            "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
+    fprintf(stdout,
+            "Usage: %s [options] -- <build command>\n"
             "\n"
+            "options:\n"
             "   -c config   config file (default: %s)\n"
             "   -o output   output file (default: %s)\n"
             "   -l libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
             "   -d          debug output (default: disabled)\n"
             "   -v          prints Bear version and exit\n"
-            "   -h          this message\n",
+            "   -h          this message\n"
+            "\n"
+            "exit status: EXIT_FAILURE on any internal problem, "
+            "otherwise same as the build command exit status.\n",
             name,
             DEFAULT_CONFIG_FILE,
             DEFAULT_OUTPUT_FILE,

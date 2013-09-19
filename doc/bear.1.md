@@ -28,6 +28,9 @@ processes and writes the output file.
 
 # OPTIONS
 
+-c *config*
+:   Specify config file. Default value provided.
+
 -o *output*
 :   Specify output file. Default value provided.
     (This option mainly for development purposes.)
@@ -60,15 +63,15 @@ tooling. This goes like this:
       ...
     ]
 
-To achive this bear has to run some filtering and formating. One task
-is to find out about compiler invocation. Build tool execs many command
-during the build process. This is done by filtering out the executable
-name. Bear has a built in list of known compiler names. Second task is
-to find the source file name from the list of arguments. This is dones
-by looking for the arguemnts and check whether it has extension, and
-the extension is for a source file. Again, bear has a built in list of
-known source file extensions. Both built-in lists can be viewed but not
-modified.
+To achive this bear has to run some filtering and formating.
+Build tools exec many commands during the build process.
+Bear has to find was that a compiler call, and what was the source file?
+
+Filtering has three steps. It checks the executable name agains the
+known compiler names. It checks any of the arguments to match as source
+file. (Usually done by extension match.) And checks that there is no
+parameter which might considered as non compilation. (Like dependency
+file generation, which migth cause duplicates in the output.)
 
 Since the post process might be buggy, there is a way to see all exec
 calls. This gives opportunity to write custom post processing. The format
