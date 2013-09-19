@@ -19,10 +19,11 @@ endif()
 
 set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
 set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(BEAR_CFG ${CMAKE_CURRENT_SOURCE_DIR}/../../src/bear.conf)
 
 if(true)
   add_custom_target(run_shell_test
-    COMMAND ${BEAR_EXE} -l ${BEAR_LIB} -o shell.json -- ${CMAKE_CURRENT_SOURCE_DIR}/compile.sh ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -o shell.json -- ${CMAKE_CURRENT_SOURCE_DIR}/compile.sh ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < shell.json` -eq 4
     COMMENT "Running module tests with shell")
 
@@ -35,7 +36,7 @@ endif()
 
 if(SCONS_FOUND)
   add_custom_target(run_scons_test
-    COMMAND ${BEAR_EXE} -l ${BEAR_LIB} -o scons.json -- ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMAND ${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -o scons.json -- ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR}
     COMMAND ${SCONS_EXECUTABLE} -Y ${CMAKE_CURRENT_SOURCE_DIR} -c
     COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < scons.json` -eq 4
     COMMENT "Running module tests with scons")
@@ -50,7 +51,7 @@ endif()
 if(QMAKE_FOUND)
   add_custom_target(run_qmake_test
     COMMAND ${QMAKE_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/qmake.pro
-    COMMAND ${BEAR_EXE} -l ${BEAR_LIB} -o qmake.json -- make
+    COMMAND ${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -o qmake.json -- make
     COMMAND make distclean
     COMMAND test `python ${CMAKE_CURRENT_SOURCE_DIR}/validate_and_count.py < qmake.json` -eq 4
     COMMENT "Running module tests with qmake")
