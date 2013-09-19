@@ -40,9 +40,9 @@ static void release(regex_list_t * prepared);
 
 struct bear_output_filter_t
 {
-    regex_list_t compiler_regexs;
-    regex_list_t extension_regexs;
-    regex_list_t cancel_parameter_regexs;
+    regex_list_t compilers;
+    regex_list_t source_files;
+    regex_list_t cancel_parameters;
 };
 
 static char const * compilers[] =
@@ -54,7 +54,7 @@ static char const * compilers[] =
     0
 };
 
-static char const * extensions[] =
+static char const * source_files[] =
 {
     ".*\\.[cC]([cC]|\\+\\+|xx|pp|p|)$",
     0
@@ -78,38 +78,37 @@ bear_output_filter_t * bear_filter_create()
         exit(EXIT_FAILURE);
     }
 
-    compile(compilers, &filter->compiler_regexs);
-    compile(extensions, &filter->extension_regexs);
-    compile(cancel_parameters, &filter->cancel_parameter_regexs);
+    compile(compilers, &filter->compilers);
+    compile(source_files, &filter->source_files);
+    compile(cancel_parameters, &filter->cancel_parameters);
 
     return filter;
 }
 
 void bear_filter_delete(bear_output_filter_t * filter)
 {
-    release(&filter->compiler_regexs);
-    release(&filter->extension_regexs);
-    release(&filter->cancel_parameter_regexs);
+    release(&filter->compilers);
+    release(&filter->source_files);
+    release(&filter->cancel_parameters);
 
     free((void *)filter);
 }
-
 
 char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
 {
     char const * result = 0;
     // looking for compiler name
-    if ((e->cmd) && (e->cmd[0]) && match(&filter->compiler_regexs, e->cmd[0]))
+    if ((e->cmd) && (e->cmd[0]) && match(&filter->compilers, e->cmd[0]))
     {
         // looking for source file
         char const * const * it = e->cmd;
         for (; *it; ++it)
         {
-            if ((0 == result) && match(&filter->extension_regexs, *it))
+            if ((0 == result) && match(&filter->source_files, *it))
             {
                 result = fix_path(*it, e->cwd);
             }
-            else if (match(&filter->cancel_parameter_regexs, *it))
+            else if (match(&filter->cancel_parameters, *it))
             {
                 if (result)
                 {
