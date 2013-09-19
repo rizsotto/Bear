@@ -132,10 +132,13 @@ static void compile(char const ** regex, regex_list_t * prepared)
     regex_t * ot = prepared->regexs;
     for (; (it) && (*it); ++it, ++ot)
     {
-        if (0 != regcomp(ot, *it, REG_EXTENDED))
+        int const result = regcomp(ot, *it, REG_EXTENDED);
+        if (0 != result)
         {
-            // TODO: use regerror
-            perror("bear: regcomp");
+            size_t const errbuf_size = 256;
+            char errbuf[errbuf_size];
+            regerror(result, ot, errbuf, errbuf_size);
+            fprintf(stderr, "bear: regcomp: %s\n", errbuf);
             exit(EXIT_FAILURE);
         }
     }
