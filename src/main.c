@@ -113,6 +113,8 @@ int main(int argc, char * const argv[])
         install_signal_handler(SIGCHLD);
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
+        close(fileno(stdin));
+        close(fileno(stdout));
         close(sync_fd[0]);
         collect_messages(
             commands.socket_file,
