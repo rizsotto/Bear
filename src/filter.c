@@ -69,7 +69,7 @@ static char const * cancel_parameters[] =
 
 static char const * fix_path(char const * file, char const * cwd);
 
-bear_output_filter_t * bear_filter_create()
+bear_output_filter_t * bear_filter_create(char const * file)
 {
     bear_output_filter_t * filter = malloc(sizeof(bear_output_filter_t));
     if (0 == filter)

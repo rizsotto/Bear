@@ -24,7 +24,7 @@
 typedef struct bear_output_filter_t bear_output_filter_t;
 
 
-bear_output_filter_t * bear_filter_create();
+bear_output_filter_t * bear_filter_create(char const * file);
 
 void bear_filter_delete(bear_output_filter_t * filter);
 

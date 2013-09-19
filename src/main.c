@@ -33,6 +33,7 @@
 
 typedef struct bear_commands_t
 {
+    char const * config_file;
     char const * output_file;
     char const * libear_file;
     char const * socket_dir;
@@ -63,8 +64,8 @@ static void print_usage(char const * const name);
 
 int main(int argc, char * const argv[])
 {
-    bear_output_filter_t * const filter = bear_filter_create();
     bear_commands_t commands = {
+        .config_file = DEFAULT_CONFIG_FILE,
         .output_file = DEFAULT_OUTPUT_FILE,
         .libear_file = DEFAULT_PRELOAD_FILE,
         .socket_dir = 0,
@@ -76,6 +77,7 @@ int main(int argc, char * const argv[])
 
     parse(argc, argv, &commands);
     prepare_socket_file(&commands);
+    bear_output_filter_t * const filter = bear_filter_create(commands.config_file);
     // set up sync pipe
     if (-1 == pipe(sync_fd))
     {
@@ -208,10 +210,13 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
 {
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "o:l:s:dcevh?")) != -1)
+    while ((opt = getopt(argc, argv, "c:o:l:s:dcevh?")) != -1)
     {
         switch (opt)
         {
+        case 'c':
+            commands->config_file = optarg;
+            break;
         case 'o':
             commands->output_file = optarg;
             break;
@@ -336,6 +341,7 @@ static void print_usage(char const * const name)
     fprintf(stderr,
             "Usage: %s [-o output] [-b libear] [-d socket] -- command\n"
             "\n"
+            "   -c config   config file (default: %s)\n"
             "   -o output   output file (default: %s)\n"
             "   -l libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
@@ -343,6 +349,7 @@ static void print_usage(char const * const name)
             "   -v          prints Bear version and exit\n"
             "   -h          this message\n",
             name,
+            DEFAULT_CONFIG_FILE,
             DEFAULT_OUTPUT_FILE,
             DEFAULT_PRELOAD_FILE);
 }
