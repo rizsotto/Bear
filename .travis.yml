@@ -6,7 +6,7 @@ compiler:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq pandoc python libconfig-devel
+  - sudo apt-get install -qq pandoc python libconfig8-dev
 
 script:
   - cmake .
