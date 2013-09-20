@@ -34,6 +34,9 @@ add_executable(bear
     json.c)
 set_target_properties(bear PROPERTIES
     COMPILE_DEFINITIONS "SERVER")
+include_directories(${LIBCONFIG_INCLUDE_DIRS})
+target_link_libraries(bear ${LIBCONFIG_LIBRARIES})
+
 
 include(CheckFunctionExists)
 check_function_exists(vfork HAVE_VFORK)
