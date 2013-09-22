@@ -191,9 +191,24 @@ static config_setting_t const * get_setting(config_setting_t const * config, cha
     {
         fprintf(stderr, "bear: value for '%s' shall be array of strings in file %s at line %d.\n",
                 name,
-                config_setting_source_file(config),
-                config_setting_source_line(config));
+                config_setting_source_file(result),
+                config_setting_source_line(result));
         exit(EXIT_FAILURE);
+    }
+
+    size_t const size = config_setting_length(result);
+    size_t idx = 0;
+    for (; idx < size; ++idx)
+    {
+        config_setting_t * const elem = config_setting_get_elem(result, idx);
+        if (CONFIG_TYPE_STRING != config_setting_type(elem))
+        {
+            fprintf(stderr, "bear: value for '%s' shall be array of strings in file %s at line %d.\n",
+                    name,
+                    config_setting_source_file(elem),
+                    config_setting_source_line(elem));
+            exit(EXIT_FAILURE);
+        }
     }
     return result;
 }
