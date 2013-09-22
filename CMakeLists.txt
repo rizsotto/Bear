@@ -24,7 +24,7 @@ install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 find_package(PkgConfig)
-pkg_check_modules(LIBCONFIG REQUIRED libconfig)
+pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
 
 add_subdirectory(src)
 add_subdirectory(test)
