@@ -73,6 +73,10 @@ file. (Usually done by extension match.) And checks that there is no
 parameter which might considered as non compilation. (Like dependency
 file generation, which migth cause duplicates in the output.)
 
+Filters are specified in the config file. The syntax of the file defined
+by [libconfig][2]. The filter values are [extended POSIX regular
+expressions][3].
+
 Since the post process might be buggy, there is a way to see all exec
 calls. This gives opportunity to write custom post processing. The format
 of the debug output looks like this:
@@ -92,7 +96,7 @@ fields are as it was captured.
 
 # BUGS
 
-Compiler wrappers like [ccache][2] and [distcc][3] could cause duplicates
+Compiler wrappers like [ccache][4] and [distcc][5] could cause duplicates
 or missing items in the compilation database. Make sure you have been disabled
 before you run Bear.
 
@@ -101,5 +105,7 @@ before you run Bear.
 Copyright (C) 2012, 2013 by László Nagy <https://github.com/rizsotto/Bear>
 
 [1]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
-[2]: http://ccache.samba.org/
-[3]: http://code.google.com/p/distcc/
+[2]: http://www.hyperrealm.com/libconfig/
+[3]: http://en.wikipedia.org/wiki/Regular_expression
+[4]: http://ccache.samba.org/
+[5]: http://code.google.com/p/distcc/
