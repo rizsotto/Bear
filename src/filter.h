@@ -21,10 +21,13 @@
 
 #include "protocol.h"
 
+#include <libconfig.h>
+
 typedef struct bear_output_filter_t bear_output_filter_t;
 
 
-bear_output_filter_t * bear_filter_create(char const * file);
+bear_output_filter_t * bear_filter_read_from_file(char const * file);
+bear_output_filter_t * bear_filter_create(config_t const * config);
 
 void bear_filter_delete(bear_output_filter_t * filter);
 

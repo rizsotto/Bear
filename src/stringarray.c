@@ -99,7 +99,6 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
     result[size++] = 0;
     return result;
 }
-#endif
 
 size_t bear_strings_length(char const * const * const in)
 {
@@ -109,6 +108,7 @@ size_t bear_strings_length(char const * const * const in)
         ++result;
     return result;
 }
+#endif
 
 void bear_strings_release(char const ** in)
 {

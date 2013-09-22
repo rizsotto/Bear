@@ -33,9 +33,11 @@ typedef struct regex_list_t
     regex_t * regexs;
 } regex_list_t;
 
-static void compile(char const ** regex, regex_list_t * prepared);
+static void compile(config_setting_t const * array, regex_list_t * prepared);
 static int  match(regex_list_t const * prepared, char const * input);
 static void release(regex_list_t * prepared);
+
+static config_setting_t const * get_setting(config_setting_t const *, char const *);
 
 
 struct bear_output_filter_t
@@ -45,31 +47,28 @@ struct bear_output_filter_t
     regex_list_t cancel_parameters;
 };
 
-static char const * compilers[] =
-{
-    "^([^/]*/)*c(c|\\+\\+)$",
-    "^([^/]*/)*g(cc|\\+\\+)(-4.[012345678]|)$",
-    "^([^/]*/)*clang(\\+\\+|)(-3.[01234]|)$",
-    "^([^/]*/)*llvm-g(cc|\\+\\+)$",
-    0
-};
-
-static char const * source_files[] =
-{
-    ".*\\.[cC]([cC]|\\+\\+|xx|pp|p|)$",
-    0
-};
-
-static char const * cancel_parameters[] =
-{
-    "^-M",
-    0
-};
-
 
 static char const * fix_path(char const * file, char const * cwd);
 
-bear_output_filter_t * bear_filter_create(char const * file)
+bear_output_filter_t * bear_filter_read_from_file(char const * file)
+{
+    config_t config;
+    config_init(&config);
+    if (config_read_file(&config, file) == CONFIG_FALSE)
+    {
+        fprintf(stderr, "bear: failed to configure: '%s' in file %s at line %d\n",
+                config_error_text(&config),
+                config_error_file(&config),
+                config_error_line(&config));
+        exit(EXIT_FAILURE);
+    }
+    bear_output_filter_t * const result = bear_filter_create(&config);
+    config_destroy(&config);
+
+    return result;
+}
+
+bear_output_filter_t * bear_filter_create(config_t const * config)
 {
     bear_output_filter_t * filter = malloc(sizeof(bear_output_filter_t));
     if (0 == filter)
@@ -78,9 +77,16 @@ bear_output_filter_t * bear_filter_create(char const * file)
         exit(EXIT_FAILURE);
     }
 
-    compile(compilers, &filter->compilers);
-    compile(source_files, &filter->source_files);
-    compile(cancel_parameters, &filter->cancel_parameters);
+    config_setting_t * const group = config_lookup(config, "filter");
+    if (0 == group)
+    {
+        fprintf(stderr, "bear: found no filter group in config file.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    compile(get_setting(group, "compilers"), &filter->compilers);
+    compile(get_setting(group, "source_files"), &filter->source_files);
+    compile(get_setting(group, "cancel_parameters"), &filter->cancel_parameters);
 
     return filter;
 }
@@ -123,16 +129,20 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
 }
 
 
-static void compile(char const ** regex, regex_list_t * prepared)
+static void compile(config_setting_t const * array, regex_list_t * prepared)
 {
-    prepared->length = bear_strings_length(regex);
+    prepared->length = config_setting_length(array);
+    if (0 == prepared->length)
+        return;
+
     prepared->regexs = malloc(prepared->length * sizeof(regex_t));
 
-    char const ** it = regex;
+    size_t idx = 0;
     regex_t * ot = prepared->regexs;
-    for (; (it) && (*it); ++it, ++ot)
+    for (; idx < prepared->length; ++idx, ++ot)
     {
-        int const result = regcomp(ot, *it, REG_EXTENDED);
+        char const * const it = config_setting_get_string_elem(array, idx);
+        int const result = regcomp(ot, it, REG_EXTENDED);
         if (0 != result)
         {
             size_t const errbuf_size = 256;
@@ -142,7 +152,6 @@ static void compile(char const ** regex, regex_list_t * prepared)
             exit(EXIT_FAILURE);
         }
     }
-    ot = 0;
 }
 
 static int  match(regex_list_t const * prepared, char const * input)
@@ -168,6 +177,26 @@ static void release(regex_list_t * prepared)
     free((void *)prepared->regexs);
 }
 
+static config_setting_t const * get_setting(config_setting_t const * config, char const * name)
+{
+    config_setting_t const * const result = config_setting_get_member(config, name);
+    if (0 == result)
+    {
+        fprintf(stderr, "bear: could not find values for '%s' in file %s.\n",
+                name,
+                config_setting_source_file(config));
+        exit(EXIT_FAILURE);
+    }
+    if (! config_setting_is_array(result))
+    {
+        fprintf(stderr, "bear: value for '%s' shall be array of strings in file %s at line %d.\n",
+                name,
+                config_setting_source_file(config),
+                config_setting_source_line(config));
+        exit(EXIT_FAILURE);
+    }
+    return result;
+}
 
 static char const * fix_path(char const * file, char const * cwd)
 {

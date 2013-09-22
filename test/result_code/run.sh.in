@@ -16,4 +16,4 @@ if [ 0 = $rc ]; then
   echo "exit code was not captured" && false
 fi
 
-${BEAR_EXE} -l ${BEAR_LIB} -s ./socket -- true
+${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -s ./socket -- true

@@ -77,7 +77,7 @@ int main(int argc, char * const argv[])
 
     parse(argc, argv, &commands);
     prepare_socket_file(&commands);
-    bear_output_filter_t * const filter = bear_filter_create(commands.config_file);
+    bear_output_filter_t * const filter = bear_filter_read_from_file(commands.config_file);
     // set up sync pipe
     if (-1 == pipe(sync_fd))
     {
