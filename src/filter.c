@@ -148,7 +148,7 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
             size_t const errbuf_size = 256;
             char errbuf[errbuf_size];
             regerror(result, ot, errbuf, errbuf_size);
-            fprintf(stderr, "bear: regcomp: %s\n", errbuf);
+            fprintf(stderr, "bear: regcomp failed on '%s': %s\n", it, errbuf);
             exit(EXIT_FAILURE);
         }
     }
