@@ -93,6 +93,9 @@ bear_output_filter_t * bear_filter_create(config_t const * config)
 
 void bear_filter_delete(bear_output_filter_t * filter)
 {
+    if (0 == filter)
+        return;
+
     release(&filter->compilers);
     release(&filter->source_files);
     release(&filter->cancel_parameters);
