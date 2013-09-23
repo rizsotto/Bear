@@ -19,12 +19,17 @@ set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
 set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
 include(CPack)
 
+find_package(PkgConfig)
+pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
+
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
-find_package(PkgConfig)
-pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
+set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${EAR_LIB_FILE})
+set(DEFAULT_OUTPUT_FILE compile_commands.json)
+set(DEFAULT_CONFIG_FILE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_SYSCONFDIR}/bear.conf)
 
 add_subdirectory(src)
 add_subdirectory(test)

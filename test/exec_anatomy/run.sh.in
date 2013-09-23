@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 
 BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
-BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/libear@CMAKE_SHARED_LIBRARY_SUFFIX@"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/@EAR_LIB_FILE@"
 BEAR_CFG="@CMAKE_CURRENT_SOURCE_DIR@/../../src/bear.conf"
 
 touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c execvP.c

@@ -18,7 +18,7 @@ endif()
 
 
 set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
-set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/libear${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/${EAR_LIB_FILE})
 set(BEAR_CFG ${CMAKE_CURRENT_SOURCE_DIR}/../../src/bear.conf)
 
 if(true)

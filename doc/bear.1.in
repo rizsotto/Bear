@@ -1,0 +1,180 @@
+.TH BEAR 1 "September 22, 2013" "Bear User Manuals"
+.SH NAME
+.PP
+bear \- build ear
+.SH SYNOPSIS
+.PP
+bear [\f[I]options\f[]] \-\- [\f[I]build commands\f[]]
+.SH DESCRIPTION
+.PP
+Bear is a tool to generate compilation database for clang tooling.
+.PP
+The JSON compilation
+database (http://clang.llvm.org/docs/JSONCompilationDatabase.html) is
+used in clang project to provide information how a single compilation
+unit was processed.
+When that is available then it is easy to re\-run the compilation with
+different programs.
+.PP
+Bear execs the original build command and intercept the \f[C]exec\f[]
+calls.
+To achive that Bear uses the \f[C]LD_PRELOAD\f[] or
+\f[C]DYLD_INSERT_LIBRARIES\f[] mechanisms provided by the dynamic
+linker.
+There is a library which defines the \f[C]exec\f[] methods and used in
+every child processes of the build command.
+The executable itself sets the environment up to child processes and
+writes the output file.
+.SH OPTIONS
+.TP
+.B \-c \f[I]config\f[]
+Specify config file.
+Default value provided.
+.RS
+.RE
+.TP
+.B \-o \f[I]output\f[]
+Specify output file.
+Default value provided.
+(This option mainly for development purposes.)
+.RS
+.RE
+.TP
+.B \-l \f[I]library\f[]
+Specify the preloaded library location.
+Default value provided.
+(This option mainly for development purposes.)
+.RS
+.RE
+.TP
+.B \-s \f[I]socket\f[]
+Specify UNIX socket file.
+Default value provided.
+(This option mainly for development purposes.)
+.RS
+.RE
+.TP
+.B \-d
+Generate debug output.
+Debug output is also a \f[I]JSON\f[] formated file.
+It contains all available informations of the \f[C]exec\f[] calls.
+(This option for those who want to extend functionality of bear.)
+.RS
+.RE
+.TP
+.B \-v
+Print out Bear version and exit.
+.RS
+.RE
+.SH OUTPUT
+.PP
+There are two version of output formats.
+One is defined by the clang tooling.
+This goes like this:
+.IP
+.nf
+\f[C]
+[
+\ \ {\ "directory":\ "/home/user/llvm/build",
+\ \ \ \ "command":\ "clang++\ \-Irelative\ \-c\ \-o\ file.o\ file.cc",
+\ \ \ \ "file":\ "file.cc"\ },
+\ \ ...
+]
+\f[]
+.fi
+.PP
+To achive this bear has to run some filtering and formating.
+Build tools exec many commands during the build process.
+Bear has to find was that a compiler call, and what was the source file?
+.PP
+Filtering has three steps.
+It checks the executable name agains the known compiler names.
+It checks any of the arguments to match as source file.
+(Usually done by extension match.) And checks that there is no parameter
+which might considered as non compilation.
+(Like dependency file generation, which migth cause duplicates in the
+output.)
+.PP
+Filters are specified in the config file.
+The syntax of the file defined by
+libconfig (http://www.hyperrealm.com/libconfig/).
+The filter values are extended POSIX regular
+expressions (http://en.wikipedia.org/wiki/Regular_expression).
+.PP
+Since the post process might be buggy, there is a way to see all exec
+calls.
+This gives opportunity to write custom post processing.
+The format of the debug output looks like this:
+.IP
+.nf
+\f[C]
+[
+\ \ {\ "pid":\ "1234",
+\ \ \ \ "ppid":\ "100",
+\ \ \ \ "function":\ "execve",
+\ \ \ \ "directory":\ "/home/user/llvm/build",
+\ \ \ \ "command":\ "clang++\ \-Irelative\ \-c\ \-o\ file.o\ file.cc"\ },
+\ \ ...
+]
+\f[]
+.fi
+.PP
+Both output is JSON format, which means that \f[I]command\f[] field is
+escaped if one of the argument had space, slash or quote character.
+All the other fields are as it was captured.
+.SH EXIT STATUS
+.PP
+Bear exit status is the exit status of the build command.
+Except when bear crashes, then it sets to non zero.
+.SH ENVIRONMENT
+.TP
+.B BEAR_OUTPUT
+The place of the socket file where client shall report \f[C]exec\f[]
+calls.
+Value set by bear, overrides previous value for child processes.
+.RS
+.RE
+.TP
+.B LD_PRELOAD
+Used by the dynamic loader on Linux, FreeBSD and other UNIX OS.
+Value set by bear, overrides previous value for child processes.
+.RS
+.RE
+.TP
+.B DYLD_INSERT_LIBRARIES
+Used by the dynamic loader on OS X.
+Value set by bear, overrides previous value for child processes.
+.RS
+.RE
+.TP
+.B DYLD_FORCE_FLAT_NAMESPACE
+Used by the dynamic loader on OS X.
+Value set by bear, overrides previous value for child processes.
+.RS
+.RE
+.SH FILES
+.TP
+.B @DEFAULT_CONFIG_FILE@
+bear configuration file for post processing.
+.RS
+.RE
+.TP
+.B @DEFAULT_PRELOAD_FILE@
+bear library to implement \f[C]exec\f[] calls.
+.RS
+.RE
+.SH SEE ALSO
+.PP
+ld.so(8), exec(3)
+.SH BUGS
+.PP
+Compiler wrappers like ccache (http://ccache.samba.org/) and
+distcc (http://code.google.com/p/distcc/) could cause duplicates or
+missing items in the compilation database.
+Make sure you have been disabled before you run Bear.
+.SH COPYRIGHT
+.PP
+Copyright (C) 2012, 2013 by László Nagy
+<https://github.com/rizsotto/Bear>
+.SH AUTHORS
+László Nagy.

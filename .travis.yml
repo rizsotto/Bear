@@ -7,7 +7,7 @@ compiler:
 before_install:
   - sudo add-apt-repository -y ppa:xav0989/libconfig
   - sudo apt-get update -qq
-  - sudo apt-get install --allow-unauthenticated -qq pandoc python libconfig-dev
+  - sudo apt-get install --allow-unauthenticated -qq python libconfig-dev
 
 script:
   - cmake .
