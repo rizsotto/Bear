@@ -3,7 +3,7 @@
 Features:
 
   - dependency file generation compiler calls are _optionally_ filtered (#35, @lonico)
-  - use config file for compiler call filtering parameters (#38, @lonico)
+  - use config file for compiler call filtering parameters (#38, @lonico, @peti)
 
 Bugfixes:
 
@@ -33,6 +33,7 @@ Features:
 Bugfixes:
 
   - fix process syncronization problem (#33, @blowback)
+  - fix malloc/realloc usage (#34, @mlq)
 
 
 ## 0.5 (2013-06-09)
