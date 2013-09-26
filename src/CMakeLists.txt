@@ -21,6 +21,7 @@ else()
 endif()
 
 
+link_directories(${LIBCONFIG_LIBRARY_DIRS})
 add_executable(bear
     stringarray.c
     protocol.c

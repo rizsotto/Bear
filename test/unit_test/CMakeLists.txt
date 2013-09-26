@@ -1,3 +1,4 @@
+link_directories(${LIBCONFIG_LIBRARY_DIRS})
 add_executable(unit_test
     main.c
     ../../src/stringarray.c
