@@ -1,1 +1,1 @@
-bear: regcomp failed on '.*': Invalid preceding regular expression
+bear: regcomp failed on '.*': .*
