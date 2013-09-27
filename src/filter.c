@@ -35,6 +35,7 @@ typedef struct regex_list_t
 
 static void compile(config_setting_t const * array, regex_list_t * prepared);
 static int  match(regex_list_t const * prepared, char const * input);
+static int  is_empty(regex_list_t const * prepared);
 static void release(regex_list_t * prepared);
 
 static config_setting_t const * get_setting(config_setting_t const *, char const *);
@@ -87,6 +88,12 @@ bear_output_filter_t * bear_filter_create(config_t const * config)
     compile(get_setting(group, "compilers"), &filter->compilers);
     compile(get_setting(group, "source_files"), &filter->source_files);
     compile(get_setting(group, "cancel_parameters"), &filter->cancel_parameters);
+
+    if (is_empty(&filter->compilers) || is_empty(&filter->source_files))
+    {
+        fprintf(stderr, "bear: empty compilers or source files in config file will produce empty output.\n");
+        exit(EXIT_FAILURE);
+    }
 
     return filter;
 }
@@ -170,6 +177,11 @@ static int  match(regex_list_t const * prepared, char const * input)
             return 1;
     }
     return 0;
+}
+
+static int  is_empty(regex_list_t const * prepared)
+{
+    return (prepared->length == 0);
 }
 
 static void release(regex_list_t * prepared)

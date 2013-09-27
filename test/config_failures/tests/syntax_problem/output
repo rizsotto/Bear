@@ -1,1 +1,1 @@
-bear: failed to configure: 'syntax error' in file
+bear: failed to configure: 'syntax error' in file (.*)/config at line 3

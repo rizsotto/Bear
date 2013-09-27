@@ -1,1 +1,1 @@
-bear: failed to configure: 'file I/O error' in file (null) at line 0
+bear: failed to configure: 'file I/O error' in file (.*) at line 0

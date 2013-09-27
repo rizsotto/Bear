@@ -1,5 +1,7 @@
 filter: {
 
+    compilers = [];
+
     source_files = [
         ".*\\.[cC]([cC]|\\+\\+|xx|pp|p)?$"
     ];

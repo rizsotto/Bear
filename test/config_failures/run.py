@@ -23,7 +23,7 @@ def _read(path):
 def _evaulate(bear, path):
     result = _test(bear, path)
     regex = re.compile(_read(path).encode())
-    if (regex.match(result)):
+    if (None == regex.match(result)):
         logging.error('failed test: {}'.format(path))
         logging.info('stderr: {}'.format(result))
         return False
