@@ -1,5 +1,5 @@
 #include <foo.h>
-#include "boo.h"
+#include "boo.h++"
 
 void b1()
 {

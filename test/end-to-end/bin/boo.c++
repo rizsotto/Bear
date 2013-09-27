@@ -1,4 +1,4 @@
-#include "boo.h"
+#include "boo.h++"
 #include <foo.h>
 
 void t2(int i);

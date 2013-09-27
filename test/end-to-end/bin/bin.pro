@@ -4,7 +4,7 @@ TARGET = some_app
 INCLUDEPATH += ../lib
 LIBS += -L../lib -lsome_lib
 
-HEADERS += boo.h
+HEADERS += boo.h++
 
-SOURCES += boo.cpp
-SOURCES += far.cpp
+SOURCES += boo.c++
+SOURCES += far.cxx
