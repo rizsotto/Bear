@@ -136,7 +136,10 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
 {
     prepared->length = config_setting_length(array);
     if (0 == prepared->length)
+    {
+        prepared->regexs = 0;
         return;
+    }
 
     prepared->regexs = malloc(prepared->length * sizeof(regex_t));
 
