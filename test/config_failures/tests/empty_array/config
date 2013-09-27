@@ -1,0 +1,10 @@
+filter: {
+
+    source_files = [
+        ".*\\.[cC]([cC]|\\+\\+|xx|pp|p)?$"
+    ];
+
+    cancel_parameters = [
+        "^-M"
+    ];
+};
