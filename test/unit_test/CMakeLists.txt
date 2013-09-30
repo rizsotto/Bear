@@ -1,5 +1,5 @@
 link_directories(${LIBCONFIG_LIBRARY_DIRS})
-add_executable(unit_test
+add_executable(unit_test EXCLUDE_FROM_ALL
     main.c
     ../../src/stringarray.c
     ../../src/protocol.c
