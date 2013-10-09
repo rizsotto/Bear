@@ -112,7 +112,6 @@ int main(int argc, char * const argv[])
     {
         // parent process
         install_signal_handler(SIGCHLD);
-        install_signal_handler(SIGTSTP);
         install_signal_handler(SIGINT);
         mask_all_signals(SIG_BLOCK);
         close(fileno(stdin));
