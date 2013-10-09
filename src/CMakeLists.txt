@@ -1,4 +1,19 @@
-include(GNUInstallDirs)
+
+include(CheckFunctionExists)
+check_function_exists(vfork HAVE_VFORK)
+check_function_exists(execve HAVE_EXECVE)
+check_function_exists(execv HAVE_EXECV)
+check_function_exists(execvpe HAVE_EXECVPE)
+check_function_exists(execvp HAVE_EXECVP)
+check_function_exists(execvP HAVE_EXECVP2)
+check_function_exists(execl HAVE_EXECL)
+check_function_exists(execlp HAVE_EXECLP)
+check_function_exists(execle HAVE_EXECLE)
+include(CheckSymbolExists)
+check_symbol_exists(_NSGetEnviron crt_externs.h NEED_NSGETENVIRON)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 
 add_definitions(-D_GNU_SOURCE)
 
@@ -35,22 +50,7 @@ include_directories(${LIBCONFIG_INCLUDE_DIRS})
 target_link_libraries(bear ${LIBCONFIG_LIBRARIES})
 
 
-include(CheckFunctionExists)
-check_function_exists(vfork HAVE_VFORK)
-check_function_exists(execve HAVE_EXECVE)
-check_function_exists(execv HAVE_EXECV)
-check_function_exists(execvpe HAVE_EXECVPE)
-check_function_exists(execvp HAVE_EXECVP)
-check_function_exists(execvP HAVE_EXECVP2)
-check_function_exists(execl HAVE_EXECL)
-check_function_exists(execlp HAVE_EXECLP)
-check_function_exists(execle HAVE_EXECLE)
-include(CheckSymbolExists)
-check_symbol_exists(_NSGetEnviron crt_externs.h NEED_NSGETENVIRON)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-
+include(GNUInstallDirs)
 install(TARGETS bear ear
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
