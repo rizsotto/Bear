@@ -276,7 +276,7 @@ static void install_signal_handler(int signum)
 {
     struct sigaction action;
     action.sa_handler = handler;
-    action.sa_flags = 0;
+    action.sa_flags = SA_NOCLDSTOP;
     if (0 != sigemptyset(&action.sa_mask))
     {
         perror("bear: sigemptyset");
