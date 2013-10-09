@@ -1,3 +1,9 @@
+## 1.3
+
+Bugfixes:
+
+  - fix process stops when ctrl-z pressed (#40, @bbannier)
+
 ## 1.2 (2013-10-01)
 
 Features:
