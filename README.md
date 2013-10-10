@@ -47,7 +47,7 @@ It could be the best to build it in a separate build directory.
     make all
     make install # to install
     make check   # to run tests
-    make package # to create tgz, rpm, deb packages
+    make package # to make packages
 
 You can configure the build process with passing arguments to cmake.
 
