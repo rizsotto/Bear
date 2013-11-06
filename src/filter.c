@@ -31,10 +31,12 @@ typedef struct regex_list_t
 {
     size_t    length;
     regex_t * regexs;
+    size_t    total_count;
+    size_t    match_count;
 } regex_list_t;
 
 static void compile(config_setting_t const * array, regex_list_t * prepared);
-static int  match(regex_list_t const * prepared, char const * input);
+static int  match(regex_list_t * prepared, char const * input);
 static int  is_empty(regex_list_t const * prepared);
 static void release(regex_list_t * prepared);
 
@@ -98,6 +100,20 @@ bear_output_filter_t * bear_filter_create(config_t const * config)
     return filter;
 }
 
+void bear_filter_report(bear_output_filter_t * filter)
+{
+    if (0 == filter)
+        fprintf(stderr, "bear: filtering were not enabled.\n");
+    else
+    {
+        fprintf(stderr, "bear: filtering statistic:\n");
+        fprintf(stderr, "  total number of child processes : %u\n", filter->compilers.total_count);
+        fprintf(stderr, "  match as compiler               : %u\n", filter->compilers.match_count);
+        fprintf(stderr, "  match as source file            : %u\n", filter->source_files.match_count);
+        fprintf(stderr, "  match on cancel parameter       : %u\n", filter->cancel_parameters.match_count);
+    }
+}
+
 void bear_filter_delete(bear_output_filter_t * filter)
 {
     if (0 == filter)
@@ -110,7 +126,7 @@ void bear_filter_delete(bear_output_filter_t * filter)
     free((void *)filter);
 }
 
-char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_message_t const * e)
+char const * bear_filter_source_file(bear_output_filter_t * filter, bear_message_t const * e)
 {
     char const * result = 0;
     // looking for compiler name
@@ -141,6 +157,8 @@ char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_m
 
 static void compile(config_setting_t const * array, regex_list_t * prepared)
 {
+    prepared->total_count = 0;
+    prepared->match_count = 0;
     prepared->length = config_setting_length(array);
     if (0 == prepared->length)
     {
@@ -167,19 +185,23 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
     }
 }
 
-static int  match(regex_list_t const * prepared, char const * input)
+static int match(regex_list_t * prepared, char const * input)
 {
+    ++prepared->total_count;
     size_t idx = 0;
     for (; idx < prepared->length; ++idx)
     {
         regex_t * ot = prepared->regexs + idx;
         if (0 == regexec(ot, input, 0, 0, 0))
+        {
+            ++prepared->match_count;
             return 1;
+        }
     }
     return 0;
 }
 
-static int  is_empty(regex_list_t const * prepared)
+static int is_empty(regex_list_t const * prepared)
 {
     return (prepared->length == 0);
 }

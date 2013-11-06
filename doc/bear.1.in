@@ -58,7 +58,14 @@ Default value provided.
 Generate debug output.
 Debug output is also a \f[I]JSON\f[] formated file.
 It contains all available informations of the \f[C]exec\f[] calls.
-(This option for those who want to extend functionality of bear.)
+.RS
+.RE
+.TP
+.B \-x
+Verbose filter dump at the end.
+This option dump a short statistic about the filtering.
+Together with the debug output user could have an insight
+how the build process was going and how the filtering worked.
 .RS
 .RE
 .TP

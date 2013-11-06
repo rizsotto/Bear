@@ -42,11 +42,11 @@ static void stream_separator(bear_output_stream_t *);
 struct bear_output_t
 {
     bear_output_stream_t stream;
-    bear_output_filter_t const * filter;
+    bear_output_filter_t * filter;
 };
 
 
-bear_output_t * bear_open_json_output(char const * file, bear_output_filter_t const * filter)
+bear_output_t * bear_open_json_output(char const * file, bear_output_filter_t * filter)
 {
     bear_output_t * handle = malloc(sizeof(bear_output_t));
     if (0 == handle)

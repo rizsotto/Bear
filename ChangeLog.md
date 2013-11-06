@@ -1,5 +1,9 @@
 ## 1.3
 
+Features:
+
+  - implement verbose filter message at the end of the run (#41)
+
 Bugfixes:
 
   - fix process stops when ctrl-z pressed (#40, @bbannier)

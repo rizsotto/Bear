@@ -30,5 +30,6 @@ bear_output_filter_t * bear_filter_read_from_file(char const * file);
 bear_output_filter_t * bear_filter_create(config_t const * config);
 
 void bear_filter_delete(bear_output_filter_t * filter);
+void bear_filter_report(bear_output_filter_t * filter);
 
-char const * bear_filter_source_file(bear_output_filter_t const * filter, bear_message_t const * e);
+char const * bear_filter_source_file(bear_output_filter_t * filter, bear_message_t const * e);

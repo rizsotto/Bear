@@ -40,6 +40,7 @@ typedef struct bear_commands_t
     char const * socket_file;
     char * const * unprocessed_argv;
     int debug : 1;
+    int verbose : 1;
 } bear_commands_t;
 
 // variables which are used in signal handler
@@ -49,7 +50,7 @@ static volatile int      child_status = EXIT_FAILURE;
 // forward declare the used methods
 static void mask_all_signals(int command);
 static void install_signal_handler(int signum);
-static void collect_messages(char const * socket, char const * output, bear_output_filter_t const * filter, int sync_fd);
+static void collect_messages(char const * socket, char const * output, bear_output_filter_t * filter, int sync_fd);
 static void update_environment(char const * key, char const * value);
 static void prepare_socket_file(bear_commands_t *);
 static void teardown_socket_file(bear_commands_t *);
@@ -71,7 +72,8 @@ int main(int argc, char * const argv[])
         .socket_dir = 0,
         .socket_file = 0,
         .unprocessed_argv = 0,
-        .debug = 0
+        .debug = 0,
+        .verbose = 0
     };
     int sync_fd[2];
 
@@ -124,12 +126,14 @@ int main(int argc, char * const argv[])
             sync_fd[1]);
         teardown_socket_file(&commands);
     }
+    if (commands.verbose)
+        bear_filter_report(filter);
     bear_filter_delete(filter);
     release_commands(&commands);
     return child_status;
 }
 
-static void collect_messages(char const * socket_file, char const * output_file, bear_output_filter_t const * filter, int sync_fd)
+static void collect_messages(char const * socket_file, char const * output_file, bear_output_filter_t * filter, int sync_fd)
 {
     bear_output_t * handle = bear_open_json_output(output_file, filter);
     int s = bear_create_unix_socket(socket_file);
@@ -213,7 +217,7 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
 {
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "c:o:l:s:dcevh?")) != -1)
+    while ((opt = getopt(argc, argv, "c:o:l:s:dcexvh?")) != -1)
     {
         switch (opt)
         {
@@ -231,6 +235,9 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
             break;
         case 'd':
             commands->debug = 1;
+            break;
+        case 'x':
+            commands->verbose = 1;
             break;
         case 'v':
             print_version();
@@ -351,6 +358,7 @@ static void print_usage(char const * const name)
             "   -l libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
             "   -d          debug output (default: disabled)\n"
+            "   -x          verbose filter dump at the end (default: disabled)\n"
             "   -v          prints Bear version and exit\n"
             "   -h          this message\n"
             "\n"
