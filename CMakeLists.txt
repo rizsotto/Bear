@@ -21,6 +21,10 @@ include(CPack)
 find_package(PkgConfig)
 pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
+find_package(C99 REQUIRED)
+set(CMAKE_C_FLAGS ${C99_C_FLAGS})
+
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
