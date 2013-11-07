@@ -28,8 +28,7 @@
 
 char const * * bear_json_escape_strings(char const * * raw)
 {
-    char const * * it = raw;
-    for (; (raw) && (*it); ++it)
+    for (char const * * it = raw; (raw) && (*it); ++it)
     {
         char const * const new = bear_json_escape_string(*it);
         if (new)
@@ -93,13 +92,10 @@ static size_t count(char const * const begin,
                     int (*fp)(int))
 {
     size_t result = 0;
-    char const * it = begin;
-    for (; it != end; ++it)
+    for (char const * it = begin; it != end; ++it)
     {
         if (fp(*it))
-        {
             ++result;
-        }
     }
     return result;
 }

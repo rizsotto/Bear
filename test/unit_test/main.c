@@ -36,8 +36,7 @@ void assert_stringarray_equals(char const ** const lhs, char const ** const rhs)
 {
     assert(bear_strings_length(lhs) == bear_strings_length(rhs));
     size_t const length = bear_strings_length(lhs);
-    size_t i = 0;
-    for (; i < length; ++i)
+    for (size_t i = 0; i < length; ++i)
     {
         assert(0 == strcmp(lhs[i], rhs[i]));
     }

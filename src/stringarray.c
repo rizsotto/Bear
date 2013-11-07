@@ -28,9 +28,8 @@
 char const ** bear_strings_build(char const * const arg, va_list args)
 {
     char const ** result = 0;
-    char const * it = arg;
     size_t size = 0;
-    for (; it; it = va_arg(args, char const *))
+    for (char const * it = arg; it; it = va_arg(args, char const *))
     {
         result = realloc(result, (size + 1) * sizeof(char const *));
         if (0 == result)
@@ -68,9 +67,8 @@ char const ** bear_strings_copy(char const ** const in)
         exit(EXIT_FAILURE);
     }
 
-    char const * const * in_it = in;
     char const ** out_it = result;
-    for (; (in_it) && (*in_it); ++in_it, ++out_it)
+    for (char const * const * in_it = in; (in_it) && (*in_it); ++in_it, ++out_it)
     {
         *out_it = strdup(*in_it);
         if (0 == *out_it)
@@ -103,8 +101,7 @@ char const ** bear_strings_append(char const ** const in, char const * const e)
 size_t bear_strings_length(char const * const * const in)
 {
     size_t result = 0;
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
+    for (char const * const * it = in; (it) && (*it); ++it)
         ++result;
     return result;
 }
@@ -112,8 +109,7 @@ size_t bear_strings_length(char const * const * const in)
 
 void bear_strings_release(char const ** in)
 {
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
+    for (char const * const * it = in; (it) && (*it); ++it)
     {
         free((void *)*it);
     }
@@ -126,8 +122,7 @@ char const * bear_strings_find(char const * const * in, char const * const e)
     if (0 == e)
         return 0;
 
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
+    for (char const * const * it = in; (it) && (*it); ++it)
     {
         if (0 == strcmp(e, *it))
             return *it;
@@ -139,8 +134,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
 {
     // calculate the needed size
     size_t size = 0;
-    char const * const * it = in;
-    for (; (it) && (*it); ++it)
+    for (char const * const * it = in; (it) && (*it); ++it)
         size += strlen(*it) + 1;
     // allocate memory once
     char * result = (0 != size) ? malloc(size * sizeof(char)) : 0;
@@ -151,7 +145,7 @@ char const * bear_strings_fold(char const * const * in, char const separator)
     }
     // copy each row to the result
     char * result_ptr = result;
-    for (it = in; (it) && (*it); ++it)
+    for (char const * const * it = in; (it) && (*it); ++it)
     {
         size_t const it_size = strlen(*it);
 

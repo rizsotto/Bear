@@ -98,8 +98,7 @@ static char const * * read_string_array(int fd)
         perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
-    size_t it = 0;
-    for (; it < length; ++it)
+    for (size_t it = 0; it < length; ++it)
     {
         result[it] = read_string(fd);
     }
@@ -193,8 +192,7 @@ static void write_string_array(int fd, char const * const * message)
 {
     size_t const length = bear_strings_length(message);
     socket_write(fd, (void const *)&length, sizeof(size_t));
-    size_t it = 0;
-    for (; it < length; ++it)
+    for (size_t it = 0; it < length; ++it)
     {
         write_string(fd, message[it]);
     }

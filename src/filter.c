@@ -133,8 +133,7 @@ char const * bear_filter_source_file(bear_output_filter_t * filter, bear_message
     if ((e->cmd) && (e->cmd[0]) && match(&filter->compilers, e->cmd[0]))
     {
         // looking for source file
-        char const * const * it = e->cmd;
-        for (; *it; ++it)
+        for (char const * const * it = e->cmd; *it; ++it)
         {
             if ((0 == result) && match(&filter->source_files, *it))
             {
@@ -168,9 +167,8 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
 
     prepared->regexs = malloc(prepared->length * sizeof(regex_t));
 
-    size_t idx = 0;
     regex_t * ot = prepared->regexs;
-    for (; idx < prepared->length; ++idx, ++ot)
+    for (size_t idx = 0; idx < prepared->length; ++idx, ++ot)
     {
         char const * const it = config_setting_get_string_elem(array, idx);
         int const result = regcomp(ot, it, REG_EXTENDED);
@@ -188,8 +186,7 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
 static int match(regex_list_t * prepared, char const * input)
 {
     ++prepared->total_count;
-    size_t idx = 0;
-    for (; idx < prepared->length; ++idx)
+    for (size_t idx = 0; idx < prepared->length; ++idx)
     {
         regex_t * ot = prepared->regexs + idx;
         if (0 == regexec(ot, input, 0, 0, 0))
@@ -208,8 +205,7 @@ static int is_empty(regex_list_t const * prepared)
 
 static void release(regex_list_t * prepared)
 {
-    size_t idx = 0;
-    for (; idx < prepared->length; ++idx)
+    for (size_t idx = 0; idx < prepared->length; ++idx)
     {
         regex_t * ot = prepared->regexs + idx;
         regfree(ot);
@@ -237,8 +233,7 @@ static config_setting_t const * get_setting(config_setting_t const * config, cha
     }
 
     size_t const size = config_setting_length(result);
-    size_t idx = 0;
-    for (; idx < size; ++idx)
+    for (size_t idx = 0; idx < size; ++idx)
     {
         config_setting_t * const elem = config_setting_get_elem(result, idx);
         if (CONFIG_TYPE_STRING != config_setting_type(elem))
