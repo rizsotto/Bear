@@ -107,10 +107,10 @@ void bear_filter_report(bear_output_filter_t * filter)
     else
     {
         fprintf(stderr, "bear: filtering statistic:\n");
-        fprintf(stderr, "  total number of child processes : %u\n", filter->compilers.total_count);
-        fprintf(stderr, "  match as compiler               : %u\n", filter->compilers.match_count);
-        fprintf(stderr, "  match as source file            : %u\n", filter->source_files.match_count);
-        fprintf(stderr, "  match on cancel parameter       : %u\n", filter->cancel_parameters.match_count);
+        fprintf(stderr, "  total number of child processes : %zu\n", filter->compilers.total_count);
+        fprintf(stderr, "  match as compiler               : %zu\n", filter->compilers.match_count);
+        fprintf(stderr, "  match as source file            : %zu\n", filter->source_files.match_count);
+        fprintf(stderr, "  match on cancel parameter       : %zu\n", filter->cancel_parameters.match_count);
     }
 }
 
