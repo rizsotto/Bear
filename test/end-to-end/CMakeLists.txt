@@ -21,7 +21,7 @@ find_package(PythonInterp)
 
 set(BEAR_EXE ${CMAKE_CURRENT_BINARY_DIR}/../../src/bear)
 set(BEAR_LIB ${CMAKE_CURRENT_BINARY_DIR}/../../src/${EAR_LIB_FILE})
-set(BEAR_CFG ${CMAKE_CURRENT_SOURCE_DIR}/../../src/bear.conf)
+set(BEAR_CFG ${CMAKE_CURRENT_SOURCE_DIR}/bear.conf)
 
 if(PYTHONINTERP_FOUND)
   add_custom_target(run_shell_test
