@@ -2,6 +2,7 @@
 
 Features:
 
+  - set empty cancel parameter list as default (#39, #43)
   - implement verbose filter message at the end of the run (#41)
 
 Bugfixes:
