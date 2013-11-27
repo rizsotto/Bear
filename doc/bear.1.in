@@ -58,14 +58,15 @@ Default value provided.
 Generate debug output.
 Debug output is also a \f[I]JSON\f[] formated file.
 It contains all available informations of the \f[C]exec\f[] calls.
+And filtering is disabled implicitly by this flag.
 .RS
 .RE
 .TP
 .B \-x
 Verbose filter dump at the end.
-This option dump a short statistic about the filtering.
-Together with the debug output user could have an insight
-how the build process was going and how the filtering worked.
+This option dump a short statistic about the filtering. Might give some
+insight when the output is not what it expected or when config file were
+changed.
 .RS
 .RE
 .TP
