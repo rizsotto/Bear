@@ -8,6 +8,9 @@ Features:
 Bugfixes:
 
   - fix process stops when ctrl-z pressed (#40, @bbannier)
+  - fix broken build on OS X (#46, @breser)
+  - fix documentation (@mlq)
+
 
 ## 1.2 (2013-10-01)
 
