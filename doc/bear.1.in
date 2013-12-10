@@ -54,11 +54,12 @@ Default value provided.
 .RS
 .RE
 .TP
-.B \-d
-Generate debug output.
-Debug output is also a \f[I]JSON\f[] formated file.
-It contains all available informations of the \f[C]exec\f[] calls.
-And filtering is disabled implicitly by this flag.
+.B \-n
+Disable filter.
+The output is also a \f[I]JSON\f[] formated file. But the result is
+not a compilation database. It contains all available informations
+of the \f[C]exec\f[] calls.
+(This option mainly for development purposes.)
 .RS
 .RE
 .TP
@@ -112,7 +113,7 @@ expressions (http://en.wikipedia.org/wiki/Regular_expression).
 Since the post process might be buggy, there is a way to see all exec
 calls.
 This gives opportunity to write custom post processing.
-The format of the debug output looks like this:
+The format of the non filtered output looks like this:
 .IP
 .nf
 \f[C]

@@ -8,6 +8,7 @@ Features:
 Bugfixes:
 
   - fix process stops when ctrl-z pressed (#40, @bbannier)
+  - fix non filtered output option renamed from debug (#44, @mikemccracken)
   - fix broken build on OS X (#46, @breser)
   - fix documentation (@mlq)
 

@@ -217,7 +217,7 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
 {
     // parse command line arguments.
     int opt;
-    while ((opt = getopt(argc, argv, "c:o:l:s:dcexvh?")) != -1)
+    while ((opt = getopt(argc, argv, "c:o:l:s:ncexvh?")) != -1)
     {
         switch (opt)
         {
@@ -233,7 +233,7 @@ static void parse(int argc, char * const argv[], bear_commands_t * commands)
         case 's':
             commands->socket_file = optarg;
             break;
-        case 'd':
+        case 'n':
             commands->debug = 1;
             break;
         case 'x':
@@ -357,7 +357,7 @@ static void print_usage(char const * const name)
             "   -o output   output file (default: %s)\n"
             "   -l libear   library location (default: %s)\n"
             "   -s socket   multiplexing socket (default: randomly generated)\n"
-            "   -d          debug output (default: disabled)\n"
+            "   -n          disable filter, unformated output. (default: filtering)\n"
             "   -x          verbose filter dump at the end (default: disabled)\n"
             "   -v          prints Bear version and exit\n"
             "   -h          this message\n"
