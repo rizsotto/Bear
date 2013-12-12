@@ -30,6 +30,9 @@
 #cmakedefine HAVE_EXECL
 #cmakedefine HAVE_EXECLP
 #cmakedefine HAVE_EXECLE
+#cmakedefine HAVE_POSIX_SPAWN
+#cmakedefine HAVE_POSIX_SPAWNP
+
 #cmakedefine APPLE
 #cmakedefine NEED_NSGETENVIRON
 

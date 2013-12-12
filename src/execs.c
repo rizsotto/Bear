@@ -32,6 +32,10 @@
 
 #include <dlfcn.h>
 
+#if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
+#include <spawn.h>
+#endif
+
 
 static int already_reported = 0;
 
@@ -52,6 +56,23 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[]);
 #endif
+#ifdef HAVE_POSIX_SPAWN
+static int call_posix_spawn(pid_t *restrict pid,
+                            const char *restrict path,
+                            const posix_spawn_file_actions_t *file_actions,
+                            const posix_spawnattr_t *restrict attrp,
+                            char *const argv[restrict],
+                            char *const envp[restrict]);
+#endif
+#ifdef HAVE_POSIX_SPAWNP
+static int call_posix_spawnp(pid_t *restrict pid,
+                            const char *restrict file,
+                            const posix_spawn_file_actions_t *file_actions,
+                            const posix_spawnattr_t *restrict attrp,
+                            char *const argv[restrict],
+                            char * const envp[restrict]);
+#endif
+
 
 #ifdef HAVE_VFORK
 pid_t vfork(void)
@@ -184,6 +205,35 @@ int execle(const char * path, const char * arg, ...)
 }
 #endif
 
+#ifdef HAVE_POSIX_SPAWN
+int posix_spawn(pid_t *restrict pid,
+                const char *restrict path,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *restrict attrp,
+                char *const argv[restrict],
+                char *const envp[restrict])
+{
+    report_call("posix_spawn", (char const * const *)argv);
+    int const result = call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    report_failed_call("posix_spawn", result, 0);
+    return result;
+}
+#endif
+
+#ifdef HAVE_POSIX_SPAWNP
+int posix_spawnp(pid_t *restrict pid,
+                const char *restrict file,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *restrict attrp,
+                char *const argv[restrict],
+                char * const envp[restrict])
+{
+    report_call("posix_spawnp", (char const * const *)argv);
+    int const result = call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    report_failed_call("posix_spawnp", result, 0);
+    return result;
+}
+#endif
 
 #ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[])
@@ -244,6 +294,54 @@ static int call_execvP(const char * file, const char * search_path, char * const
     }
 
     return (*fp)(file, search_path, argv);
+}
+#endif
+
+#ifdef HAVE_POSIX_SPAWN
+static int call_posix_spawn(pid_t *restrict pid,
+                            const char *restrict path,
+                            const posix_spawn_file_actions_t *file_actions,
+                            const posix_spawnattr_t *restrict attrp,
+                            char *const argv[restrict],
+                            char *const envp[restrict])
+{
+    int (*fp)(pid_t *restrict,
+            const char *restrict,
+            const posix_spawn_file_actions_t *,
+            const posix_spawnattr_t *restrict,
+            char *const * restrict,
+            char *const * restrict) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "posix_spawn")))
+    {
+        perror("bear: dlsym");
+        exit(EXIT_FAILURE);
+    }
+
+    return (*fp)(pid, path, file_actions, attrp, argv, envp);
+}
+#endif
+
+#ifdef HAVE_POSIX_SPAWNP
+static int call_posix_spawnp(pid_t *restrict pid,
+                            const char *restrict file,
+                            const posix_spawn_file_actions_t *file_actions,
+                            const posix_spawnattr_t *restrict attrp,
+                            char *const argv[restrict],
+                            char * const envp[restrict])
+{
+    int (*fp)(pid_t *restrict,
+            const char *restrict,
+            const posix_spawn_file_actions_t *,
+            const posix_spawnattr_t *restrict,
+            char *const *restrict,
+            char * const *restrict) = 0;
+    if (0 == (fp = dlsym(RTLD_NEXT, "posix_spawnp")))
+    {
+        perror("bear: dlsym");
+        exit(EXIT_FAILURE);
+    }
+
+    return (*fp)(pid, file, file_actions, attrp, argv, envp);
 }
 #endif
 

@@ -25,6 +25,26 @@
 #include <stdlib.h>
 #include <paths.h>
 
+#if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
+#include <spawn.h>
+#endif
+
+#ifdef NEED_NSGETENVIRON
+#include <crt_externs.h>
+#else
+extern char **environ;
+#endif
+
+char ** getenviron()
+{
+#ifdef NEED_NSGETENVIRON
+    return *_NSGetEnviron();
+#else
+    return environ;
+#endif
+}
+
+
 typedef void (*exec_fun)();
 
 void fork_fun(exec_fun f)
@@ -195,6 +215,72 @@ void call_execle_and_printenv()
 }
 #endif
 
+#ifdef HAVE_POSIX_SPAWN
+void call_posix_spawn()
+{
+    char * const argv[] =
+    {
+        "cc",
+        "-c",
+        "posix_spawn.c",
+        0
+    };
+
+    pid_t child;
+    if (0 != posix_spawn(&child, "/usr/bin/cc", 0, 0, argv, getenviron()))
+    {
+        perror("posix_spawn");
+        exit(EXIT_FAILURE);
+    }
+
+    int status;
+    if (-1 == waitpid(child, &status, 0))
+    {
+        perror("wait");
+        exit(EXIT_FAILURE);
+    }
+    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+    if (exit_code)
+    {
+        fprintf(stderr, "children process has non zero exit code\n");
+        exit(EXIT_FAILURE);
+    }
+}
+#endif
+
+#ifdef HAVE_POSIX_SPAWNP
+void call_posix_spawnp()
+{
+    char * const argv[] =
+    {
+        "cc",
+        "-c",
+        "posix_spawnp.c",
+        0
+    };
+
+    pid_t child;
+    if (0 != posix_spawnp(&child, "cc", 0, 0, argv, getenviron()))
+    {
+        perror("posix_spawnp");
+        exit(EXIT_FAILURE);
+    }
+
+    int status;
+    if (-1 == waitpid(child, &status, 0))
+    {
+        perror("wait");
+        exit(EXIT_FAILURE);
+    }
+    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+    if (exit_code)
+    {
+        fprintf(stderr, "children process has non zero exit code\n");
+        exit(EXIT_FAILURE);
+    }
+}
+#endif
+
 void print_expected_output(FILE *fd, const char *cmd, const char *file, const char *cwd)
 {
     static int need_comma = 0;
@@ -249,6 +335,14 @@ int main()
 #ifdef HAVE_EXECLE
     print_expected_output(expected_out, "/usr/bin/cc", "execle.c", cwd);
     fork_fun(call_execle);
+#endif
+#ifdef HAVE_POSIX_SPAWN
+    print_expected_output(expected_out, "cc", "posix_spawn.c", cwd);
+    call_posix_spawn();
+#endif
+#ifdef HAVE_POSIX_SPAWNP
+    print_expected_output(expected_out, "cc", "posix_spawnp.c", cwd);
+    call_posix_spawnp();
 #endif
 #ifdef HAVE_EXECLE
     fork_fun(call_execle_and_printenv);

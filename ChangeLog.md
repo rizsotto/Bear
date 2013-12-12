@@ -11,6 +11,7 @@ Bugfixes:
   - fix non filtered output option renamed from debug (#44, @mikemccracken)
   - fix broken build on OS X (#46, @breser)
   - fix documentation (@mlq)
+  - fix posix_spawn* call not implemented (#43, @agentsim, @apoluektov)
 
 
 ## 1.2 (2013-10-01)
