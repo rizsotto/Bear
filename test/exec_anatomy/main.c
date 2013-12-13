@@ -29,6 +29,7 @@
 #include <spawn.h>
 #endif
 
+// ..:: environment access fixer - begin ::..
 #ifdef NEED_NSGETENVIRON
 #include <crt_externs.h>
 #else
@@ -43,9 +44,68 @@ char ** getenviron()
     return environ;
 #endif
 }
+// ..:: environment access fixer - end ::..
+
+// ..:: test fixtures - begin ::..
+static char const * cwd = NULL;
+static FILE * fd = NULL;
+static int need_comma = 0;
+
+void expected_out_open()
+{
+    cwd = getcwd(NULL, 0);
+    fd = fopen("expected.json", "w");
+    if (!fd)
+    {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+    fprintf(fd, "[\n");
+    need_comma = 0;
+}
+
+void expected_out_close()
+{
+    fprintf(fd, "]\n");
+    fclose(fd);
+
+    fd = NULL;
+    cwd = NULL;
+}
+
+void expected_out(const char *cmd, const char *file)
+{
+    if (need_comma)
+        fprintf(fd, ",\n");
+    else
+        need_comma = 1;
+
+    fprintf(fd, "{\n");
+    fprintf(fd, "  \"directory\": \"%s\",\n", cwd);
+    fprintf(fd, "  \"command\": \"%s -c %s\",\n", cmd, file);
+    fprintf(fd, "  \"file\": \"%s/%s\"\n", cwd, file);
+    fprintf(fd, "}\n");
+}
+// ..:: test fixtures - end ::..
 
 
 typedef void (*exec_fun)();
+
+void wait_for(pid_t child)
+{
+    int status;
+    if (-1 == waitpid(child, &status, 0))
+    {
+        perror("wait");
+        exit(EXIT_FAILURE);
+    }
+    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+    if (exit_code)
+    {
+        fprintf(stderr, "children process has non zero exit code\n");
+        exit(EXIT_FAILURE);
+    }
+}
 
 void fork_fun(exec_fun f)
 {
@@ -63,21 +123,9 @@ void fork_fun(exec_fun f)
     }
     else
     {
-        int status;
-        if (-1 == waitpid(child, &status, 0))
-        {
-            perror("wait");
-            exit(EXIT_FAILURE);
-        }
-        int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-        if (exit_code)
-        {
-            fprintf(stderr, "children process has non zero exit code\n");
-            exit(EXIT_FAILURE);
-        }
+        wait_for(child);
     }
 }
-
 
 #ifdef HAVE_EXECV
 void call_execv()
@@ -232,19 +280,7 @@ void call_posix_spawn()
         perror("posix_spawn");
         exit(EXIT_FAILURE);
     }
-
-    int status;
-    if (-1 == waitpid(child, &status, 0))
-    {
-        perror("wait");
-        exit(EXIT_FAILURE);
-    }
-    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-    if (exit_code)
-    {
-        fprintf(stderr, "children process has non zero exit code\n");
-        exit(EXIT_FAILURE);
-    }
+    wait_for(child);
 }
 #endif
 
@@ -265,89 +301,56 @@ void call_posix_spawnp()
         perror("posix_spawnp");
         exit(EXIT_FAILURE);
     }
-
-    int status;
-    if (-1 == waitpid(child, &status, 0))
-    {
-        perror("wait");
-        exit(EXIT_FAILURE);
-    }
-    int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-    if (exit_code)
-    {
-        fprintf(stderr, "children process has non zero exit code\n");
-        exit(EXIT_FAILURE);
-    }
+    wait_for(child);
 }
 #endif
-
-void print_expected_output(FILE *fd, const char *cmd, const char *file, const char *cwd)
-{
-    static int need_comma = 0;
-    if (need_comma)
-        fprintf(fd, ",\n");
-    fprintf(fd, "{\n");
-    fprintf(fd, "  \"directory\": \"%s\",\n", cwd);
-    fprintf(fd, "  \"command\": \"%s -c %s\",\n", cmd, file);
-    fprintf(fd, "  \"file\": \"%s/%s\"\n", cwd, file);
-    fprintf(fd, "}\n");
-    need_comma = 1;
-}
 
 int main()
 {
-    char * const cwd = getcwd(NULL, 0);
-    FILE *expected_out = fopen("expected.json", "w");
-    if (!expected_out)
-    {
-        perror("fopen");
-        exit(EXIT_FAILURE);
-    }
-    fprintf(expected_out, "[\n");
+    expected_out_open();
 #ifdef HAVE_EXECV
-    print_expected_output(expected_out, "cc", "execv.c", cwd);
     fork_fun(call_execv);
+    expected_out("cc", "execv.c");
 #endif
 #ifdef HAVE_EXECVE
-    print_expected_output(expected_out, "/usr/bin/cc", "execve.c", cwd);
     fork_fun(call_execve);
+    expected_out("/usr/bin/cc", "execve.c");
 #endif
 #ifdef HAVE_EXECVP
-    print_expected_output(expected_out, "cc", "execvp.c", cwd);
     fork_fun(call_execvp);
+    expected_out("cc", "execvp.c");
 #endif
 #ifdef HAVE_EXECVP2
-    print_expected_output(expected_out, "cc", "execvP.c", cwd);
     fork_fun(call_execvP);
+    expected_out("cc", "execvP.c");
 #endif
 #ifdef HAVE_EXECVPE
-    print_expected_output(expected_out, "/usr/bin/cc", "execvpe.c", cwd);
     fork_fun(call_execvpe);
+    expected_out("/usr/bin/cc", "execvpe.c");
 #endif
 #ifdef HAVE_EXECL
-    print_expected_output(expected_out, "cc", "execl.c", cwd);
     fork_fun(call_execl);
+    expected_out("cc", "execl.c");
 #endif
 #ifdef HAVE_EXECLP
-    print_expected_output(expected_out, "cc", "execlp.c", cwd);
     fork_fun(call_execlp);
+    expected_out("cc", "execlp.c");
 #endif
 #ifdef HAVE_EXECLE
-    print_expected_output(expected_out, "/usr/bin/cc", "execle.c", cwd);
     fork_fun(call_execle);
+    expected_out("/usr/bin/cc", "execle.c");
 #endif
 #ifdef HAVE_POSIX_SPAWN
-    print_expected_output(expected_out, "cc", "posix_spawn.c", cwd);
     call_posix_spawn();
+    expected_out("cc", "posix_spawn.c");
 #endif
 #ifdef HAVE_POSIX_SPAWNP
-    print_expected_output(expected_out, "cc", "posix_spawnp.c", cwd);
     call_posix_spawnp();
+    expected_out("cc", "posix_spawnp.c");
 #endif
 #ifdef HAVE_EXECLE
     fork_fun(call_execle_and_printenv);
 #endif
-    fprintf(expected_out, "]\n");
-    fclose(expected_out);
+    expected_out_close();
     return 0;
 }
