@@ -213,9 +213,11 @@ int posix_spawn(pid_t *restrict pid,
                 char *const argv[restrict],
                 char *const envp[restrict])
 {
+    int const report_state = already_reported;
+
     report_call("posix_spawn", (char const * const *)argv);
     int const result = call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    report_failed_call("posix_spawn", result, 0);
+    report_failed_call("posix_spawn", result, report_state);
     return result;
 }
 #endif
@@ -228,9 +230,11 @@ int posix_spawnp(pid_t *restrict pid,
                 char *const argv[restrict],
                 char * const envp[restrict])
 {
+    int const report_state = already_reported;
+
     report_call("posix_spawnp", (char const * const *)argv);
     int const result = call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
-    report_failed_call("posix_spawnp", result, 0);
+    report_failed_call("posix_spawnp", result, report_state);
     return result;
 }
 #endif
