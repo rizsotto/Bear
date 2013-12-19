@@ -57,7 +57,7 @@ Default value provided.
 .B \-n
 Disable filter.
 The output is also a \f[I]JSON\f[] formated file. But the result is
-not a compilation database. It contains all available informations
+not a compilation database. It contains all available information
 of the \f[C]exec\f[] calls.
 (This option mainly for development purposes.)
 .RS
