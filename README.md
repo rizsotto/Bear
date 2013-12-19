@@ -29,7 +29,7 @@ sets the environment up to child processes and writes the output file.
 How to build
 ------------
 
-Bear should be quiet portable on UNIX OSs, it has been tested on FreeBSD,
+Bear should be quite portable on UNIX OSs, it has been tested on FreeBSD,
 Linux and OS X only.
 
 ### Prerequisites
