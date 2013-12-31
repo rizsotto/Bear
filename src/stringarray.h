@@ -23,7 +23,7 @@
 
 #ifdef CLIENT
 #include <stdarg.h>
-char const ** bear_strings_build(char const * arg, va_list ap);
+char const ** bear_strings_build(char const * arg, va_list *ap);
 
 char const ** bear_strings_copy(char const ** const in);
 char const ** bear_strings_append(char const ** in, char const * e);

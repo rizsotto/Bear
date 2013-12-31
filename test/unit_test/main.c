@@ -137,7 +137,7 @@ char const ** bear_strings_build_stdarg_driver(char const * arg, ...)
     va_list args;
     va_start(args, arg);
 
-    char const ** result = bear_strings_build(arg, args);
+    char const ** result = bear_strings_build(arg, &args);
 
     va_end(args);
     return result;
