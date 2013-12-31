@@ -154,7 +154,7 @@ int execl(const char * path, const char * arg, ...)
 {
     va_list args;
     va_start(args, arg);
-    char const ** argv = bear_strings_build(arg, args);
+    char const ** argv = bear_strings_build(arg, &args);
     va_end(args);
 
     report_call("execl", (char const * const *)argv);
@@ -173,7 +173,7 @@ int execlp(const char * file, const char * arg, ...)
 {
     va_list args;
     va_start(args, arg);
-    char const ** argv = bear_strings_build(arg, args);
+    char const ** argv = bear_strings_build(arg, &args);
     va_end(args);
 
     report_call("execlp", (char const * const *)argv);
@@ -193,7 +193,7 @@ int execle(const char * path, const char * arg, ...)
 {
     va_list args;
     va_start(args, arg);
-    char const ** argv = bear_strings_build(arg, args);
+    char const ** argv = bear_strings_build(arg, &args);
     char const ** envp = va_arg(args, char const **);
     va_end(args);
 

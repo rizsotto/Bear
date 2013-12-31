@@ -25,11 +25,11 @@
 #include <stdlib.h>
 
 #ifdef CLIENT
-char const ** bear_strings_build(char const * const arg, va_list args)
+char const ** bear_strings_build(char const * const arg, va_list *args)
 {
     char const ** result = 0;
     size_t size = 0;
-    for (char const * it = arg; it; it = va_arg(args, char const *))
+    for (char const * it = arg; it; it = va_arg(*args, char const *))
     {
         result = realloc(result, (size + 1) * sizeof(char const *));
         if (0 == result)
