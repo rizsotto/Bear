@@ -1,3 +1,13 @@
+## 1.4
+
+Bugfixes:
+
+  - fix typo in the README.md (#48, @breser)
+  - fix typo in the man page (#49, @sebastinas)
+  - fix cmake file to honor given CFLAGS (#50, @sebastinas)
+  - fix execle causes segfault on 32 bit systems (#51, #52, @breser, @sebastinas)
+
+
 ## 1.3 (2013-12-18)
 
 Features:
