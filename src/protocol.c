@@ -29,7 +29,7 @@
 #include <sys/un.h>
 
 
-static size_t init_socket(char const * file, struct sockaddr_un * addr);
+static int init_socket(char const * file, struct sockaddr_un * addr);
 
 #ifdef SERVER
 static ssize_t socket_read(int fd, void * buf, size_t nbyte)
@@ -221,9 +221,9 @@ void bear_send_message(char const * file, bear_message_t const * msg)
 }
 #endif
 
-static size_t init_socket(char const * file, struct sockaddr_un * addr)
+static int init_socket(char const * file, struct sockaddr_un * addr)
 {
-    int s = socket(AF_UNIX, SOCK_STREAM, 0);
+    int const s = socket(AF_UNIX, SOCK_STREAM, 0);
     if (-1 == s)
     {
         perror("bear: socket");
