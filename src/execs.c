@@ -37,12 +37,28 @@
 #endif
 
 
-static int already_reported = 0;
-
 static char const * * update_environment(char * const envp[]);
 
 static void report_call(char const * fun, char const * const argv[]);
-static void report_failed_call(char const * fun, int result, int report_state);
+
+
+#ifdef EXEC_LOOP_ON_EXECVE
+    static int already_reported = 0;
+# define REPORT_CALL(ARGV_) \
+    int const report_state = already_reported; \
+    if (!already_reported) { \
+      report_call(__func__, (char const * const *)ARGV_); \
+      already_reported = 1; \
+    }
+# define REPORT_FAILED_CALL(RESULT_) \
+    if (!report_state) { \
+      already_reported = 0; \
+    }
+#else
+# define REPORT_CALL(ARGV_) report_call(__func__, (char const * const *)ARGV_);
+# define REPORT_FAILED_CALL(RESULT_)
+#endif
+
 
 #ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
@@ -74,7 +90,7 @@ static int call_posix_spawnp(pid_t *restrict pid,
 #endif
 
 
-#ifdef HAVE_VFORK
+#if defined HAVE_VFORK && defined EXEC_LOOP_ON_EXECVE
 pid_t vfork(void)
 {
     return fork();
@@ -84,11 +100,9 @@ pid_t vfork(void)
 #ifdef HAVE_EXECVE
 int execve(const char * path, char * const argv[], char * const envp[])
 {
-    int const report_state = already_reported;
-
-    report_call("execve", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execve(path, argv, envp);
-    report_failed_call("execve", result, report_state);
+    REPORT_FAILED_CALL(result);
 
     return result;
 }
@@ -100,11 +114,10 @@ int execve(const char * path, char * const argv[], char * const envp[])
 # endif
 int execv(const char * path, char * const argv[])
 {
-    int const report_state = already_reported;
-
-    report_call("execv", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execve(path, argv, bear_get_environ());
-    report_failed_call("execv", result, report_state);
+    REPORT_FAILED_CALL(result);
+
     return result;
 }
 #endif
@@ -112,11 +125,9 @@ int execv(const char * path, char * const argv[])
 #ifdef HAVE_EXECVPE
 int execvpe(const char * file, char * const argv[], char * const envp[])
 {
-    int const report_state = already_reported;
-
-    report_call("execvpe", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execvpe(file, argv, envp);
-    report_failed_call("execvpe", result, report_state);
+    REPORT_FAILED_CALL(result);
 
     return result;
 }
@@ -125,11 +136,10 @@ int execvpe(const char * file, char * const argv[], char * const envp[])
 #ifdef HAVE_EXECVP
 int execvp(const char * file, char * const argv[])
 {
-    int const report_state = already_reported;
-
-    report_call("execvp", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execvp(file, argv);
-    report_failed_call("execvp", result, report_state);
+    REPORT_FAILED_CALL(result);
+
     return result;
 }
 #endif
@@ -137,11 +147,10 @@ int execvp(const char * file, char * const argv[])
 #ifdef HAVE_EXECVP2
 int execvP(const char * file, const char * search_path, char * const argv[])
 {
-    int const report_state = already_reported;
-
-    report_call("execvP", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execvP(file, search_path, argv);
-    report_failed_call("execvP", result, report_state);
+    REPORT_FAILED_CALL(result);
+
     return result;
 }
 #endif
@@ -157,9 +166,10 @@ int execl(const char * path, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    report_call("execl", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execve(path, (char * const *)argv, bear_get_environ());
-    report_failed_call("execl", result, 0);
+    REPORT_FAILED_CALL(result);
+
     bear_strings_release(argv);
     return result;
 }
@@ -176,9 +186,10 @@ int execlp(const char * file, const char * arg, ...)
     char const ** argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    report_call("execlp", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execvp(file, (char * const *)argv);
-    report_failed_call("execlp", result, 0);
+    REPORT_FAILED_CALL(result);
+
     bear_strings_release(argv);
     return result;
 }
@@ -197,9 +208,10 @@ int execle(const char * path, const char * arg, ...)
     char const ** envp = va_arg(args, char const **);
     va_end(args);
 
-    report_call("execle", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_execve(path, (char * const *)argv, (char * const *)envp);
-    report_failed_call("execle", result, 0);
+    REPORT_FAILED_CALL(result);
+
     bear_strings_release(argv);
     return result;
 }
@@ -213,11 +225,10 @@ int posix_spawn(pid_t *restrict pid,
                 char *const argv[restrict],
                 char *const envp[restrict])
 {
-    int const report_state = already_reported;
-
-    report_call("posix_spawn", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    report_failed_call("posix_spawn", result, report_state);
+    REPORT_FAILED_CALL(result);
+
     return result;
 }
 #endif
@@ -230,11 +241,10 @@ int posix_spawnp(pid_t *restrict pid,
                 char *const argv[restrict],
                 char * const envp[restrict])
 {
-    int const report_state = already_reported;
-
-    report_call("posix_spawnp", (char const * const *)argv);
+    REPORT_CALL(argv);
     int const result = call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
-    report_failed_call("posix_spawnp", result, report_state);
+    REPORT_FAILED_CALL(result);
+
     return result;
 }
 #endif
@@ -378,10 +388,6 @@ static void report(send_message fp, char const * socket, char const * fun, char 
 
 static void report_call(char const * fun, char const * const argv[])
 {
-    if (already_reported)
-        return;
-    already_reported = 1;
-
     char * const socket = getenv(ENV_OUTPUT);
     if (0 == socket)
     {
@@ -389,11 +395,5 @@ static void report_call(char const * fun, char const * const argv[])
         exit(EXIT_FAILURE);
     }
 
-    return report(bear_send_message, socket, fun, argv);
-}
-
-static void report_failed_call(char const * fun, int result_code, int report_state)
-{
-    if (!report_state)
-        already_reported = 0;
+    report(bear_send_message, socket, fun, argv);
 }

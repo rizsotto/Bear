@@ -43,6 +43,7 @@
 #ifdef APPLE
 # define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
 # define ENV_FLAT    "DYLD_FORCE_FLAT_NAMESPACE"
+# define EXEC_LOOP_ON_EXECVE
 #else
 # define ENV_PRELOAD "LD_PRELOAD"
 #endif
