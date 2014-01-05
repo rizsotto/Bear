@@ -7,9 +7,8 @@ add_executable(unit_test EXCLUDE_FROM_ALL
     ../../src/environ.c
     )
 add_definitions(-D_GNU_SOURCE)
+add_definitions(-DCLIENT -DSERVER)
 include_directories(../../src ${CMAKE_CURRENT_BINARY_DIR}/../../src)
-set_target_properties(unit_test PROPERTIES
-    COMPILE_DEFINITIONS "CLIENT;SERVER")
 include_directories(${LIBCONFIG_INCLUDE_DIRS})
 target_link_libraries(unit_test ${LIBCONFIG_LIBRARIES})
 
