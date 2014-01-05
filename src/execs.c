@@ -60,6 +60,15 @@ static void report_call(char const * fun, char const * const argv[]);
 #endif
 
 
+#define DLSYM(TYPE_, VAR_, SYMBOL_) \
+    union { void * from; TYPE_ to; } cast; \
+    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) { \
+        perror("bear: dlsym"); \
+        exit(EXIT_FAILURE); \
+    } \
+    TYPE_ const VAR_ = cast.to;
+
+
 #ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[]);
 #endif
@@ -252,12 +261,9 @@ int posix_spawnp(pid_t *restrict pid,
 #ifdef HAVE_EXECVE
 static int call_execve(const char * path, char * const argv[], char * const envp[])
 {
-    int (*fp)(const char *, char * const *, char * const *) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "execve")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    typedef int (*func)(const char *, char * const *, char * const *);
+
+    DLSYM(func, fp, "execve");
 
     char const ** const menvp = update_environment(envp);
     int const result = (*fp)(path, argv, (char * const *)menvp);
@@ -269,12 +275,9 @@ static int call_execve(const char * path, char * const argv[], char * const envp
 #ifdef HAVE_EXECVPE
 static int call_execvpe(const char * file, char * const argv[], char * const envp[])
 {
-    int (*fp)(const char *, char * const *, char * const *) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "execvpe")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    typedef int (*func)(const char *, char * const *, char * const *);
+
+    DLSYM(func, fp, "execvpe");
 
     char const ** const menvp = update_environment(envp);
     int const result = (*fp)(file, argv, (char * const *)menvp);
@@ -286,12 +289,9 @@ static int call_execvpe(const char * file, char * const argv[], char * const env
 #ifdef HAVE_EXECVP
 static int call_execvp(const char * file, char * const argv[])
 {
-    int (*fp)(const char * file, char * const argv[]) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "execvp")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    typedef int (*func)(const char * file, char * const argv[]);
+
+    DLSYM(func, fp, "execvp");
     
     return (*fp)(file, argv);
 } 
@@ -300,12 +300,9 @@ static int call_execvp(const char * file, char * const argv[])
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[])
 {
-    int (*fp)(const char *, const char *, char * const *) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "execvP")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    int (*func)(const char *, const char *, char * const *);
+
+    DLSYM(func, fp, "execvP");
 
     return (*fp)(file, search_path, argv);
 }
@@ -319,17 +316,14 @@ static int call_posix_spawn(pid_t *restrict pid,
                             char *const argv[restrict],
                             char *const envp[restrict])
 {
-    int (*fp)(pid_t *restrict,
-            const char *restrict,
-            const posix_spawn_file_actions_t *,
-            const posix_spawnattr_t *restrict,
-            char *const * restrict,
-            char *const * restrict) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "posix_spawn")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    typedef int (*func)(pid_t *restrict,
+                    const char *restrict,
+                    const posix_spawn_file_actions_t *,
+                    const posix_spawnattr_t *restrict,
+                    char *const * restrict,
+                    char *const * restrict);
+
+    DLSYM(func, fp, "posix_spawn");
 
     return (*fp)(pid, path, file_actions, attrp, argv, envp);
 }
@@ -343,17 +337,14 @@ static int call_posix_spawnp(pid_t *restrict pid,
                             char *const argv[restrict],
                             char * const envp[restrict])
 {
-    int (*fp)(pid_t *restrict,
-            const char *restrict,
-            const posix_spawn_file_actions_t *,
-            const posix_spawnattr_t *restrict,
-            char *const *restrict,
-            char * const *restrict) = 0;
-    if (0 == (fp = dlsym(RTLD_NEXT, "posix_spawnp")))
-    {
-        perror("bear: dlsym");
-        exit(EXIT_FAILURE);
-    }
+    typedef int (*func)(pid_t *restrict,
+                    const char *restrict,
+                    const posix_spawn_file_actions_t *,
+                    const posix_spawnattr_t *restrict,
+                    char *const *restrict,
+                    char * const *restrict);
+
+    DLSYM(func, fp, "posix_spawnp");
 
     return (*fp)(pid, file, file_actions, attrp, argv, envp);
 }
