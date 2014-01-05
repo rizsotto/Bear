@@ -26,6 +26,8 @@
 #include <sys/types.h>
 #include <regex.h>
 
+#define ERRBUF_SIZE 256
+
 
 typedef struct regex_list_t
 {
@@ -174,9 +176,8 @@ static void compile(config_setting_t const * array, regex_list_t * prepared)
         int const result = regcomp(ot, it, REG_EXTENDED);
         if (0 != result)
         {
-            size_t const errbuf_size = 256;
-            char errbuf[errbuf_size];
-            regerror(result, ot, errbuf, errbuf_size);
+            char errbuf[ERRBUF_SIZE];
+            regerror(result, ot, errbuf, ERRBUF_SIZE);
             fprintf(stderr, "bear: regcomp failed on '%s': %s\n", it, errbuf);
             exit(EXIT_FAILURE);
         }

@@ -39,8 +39,8 @@ typedef struct bear_commands_t
     char const * socket_dir;
     char const * socket_file;
     char * const * unprocessed_argv;
-    int debug : 1;
-    int verbose : 1;
+    int debug;
+    int verbose;
 } bear_commands_t;
 
 // variables which are used in signal handler

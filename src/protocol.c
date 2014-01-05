@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -32,7 +33,7 @@
 static int init_socket(char const * file, struct sockaddr_un * addr);
 
 #ifdef SERVER
-static ssize_t socket_read(int fd, void * buf, size_t nbyte)
+static ssize_t socket_read(int fd, uint8_t * buf, ssize_t nbyte)
 {
     ssize_t sum = 0;
     while (sum != nbyte)
@@ -50,7 +51,7 @@ static ssize_t socket_read(int fd, void * buf, size_t nbyte)
 static pid_t read_pid(int fd)
 {
     pid_t result = 0;
-    if (-1 == socket_read(fd, (void *)&result, sizeof(pid_t)))
+    if (-1 == socket_read(fd, (uint8_t *)&result, sizeof(pid_t)))
     {
         perror("bear: read pid");
         exit(EXIT_FAILURE);
@@ -61,7 +62,7 @@ static pid_t read_pid(int fd)
 static char const * read_string(int fd)
 {
     size_t length = 0;
-    if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
+    if (-1 == socket_read(fd, (uint8_t *)&length, sizeof(size_t)))
     {
         perror("bear: read string length");
         exit(EXIT_FAILURE);
@@ -74,7 +75,7 @@ static char const * read_string(int fd)
     }
     if (length > 0)
     {
-        if (-1 == socket_read(fd, (void *)result, length))
+        if (-1 == socket_read(fd, (uint8_t *)result, length))
         {
             perror("bear: read string value");
             exit(EXIT_FAILURE);
@@ -87,7 +88,7 @@ static char const * read_string(int fd)
 static char const * * read_string_array(int fd)
 {
     size_t length = 0;
-    if (-1 == socket_read(fd, (void *)&length, sizeof(size_t)))
+    if (-1 == socket_read(fd, (uint8_t *)&length, sizeof(size_t)))
     {
         perror("bear: read string array length");
         exit(EXIT_FAILURE);
@@ -158,7 +159,7 @@ int bear_accept_message(int s, bear_message_t * msg)
 #endif
 
 #ifdef CLIENT
-static ssize_t socket_write(int fd, const void *buf, size_t nbyte)
+static ssize_t socket_write(int fd, uint8_t const * buf, ssize_t nbyte)
 {
     ssize_t sum = 0;
     while (sum != nbyte)
@@ -175,23 +176,23 @@ static ssize_t socket_write(int fd, const void *buf, size_t nbyte)
 
 static void write_pid(int fd, pid_t pid)
 {
-    socket_write(fd, (void const *)&pid, sizeof(pid_t));
+    socket_write(fd, (uint8_t const *)&pid, sizeof(pid_t));
 }
 
 static void write_string(int fd, char const * message)
 {
     size_t const length = (message) ? strlen(message) : 0;
-    socket_write(fd, (void const *)&length, sizeof(size_t));
+    socket_write(fd, (uint8_t const *)&length, sizeof(size_t));
     if (length > 0)
     {
-        socket_write(fd, (void const *)message, length);
+        socket_write(fd, (uint8_t const *)message, length);
     }
 }
 
 static void write_string_array(int fd, char const * const * message)
 {
     size_t const length = bear_strings_length(message);
-    socket_write(fd, (void const *)&length, sizeof(size_t));
+    socket_write(fd, (uint8_t const *)&length, sizeof(size_t));
     for (size_t it = 0; it < length; ++it)
     {
         write_string(fd, message[it]);
