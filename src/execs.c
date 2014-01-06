@@ -300,7 +300,7 @@ static int call_execvp(const char * file, char * const argv[])
 #ifdef HAVE_EXECVP2
 static int call_execvP(const char * file, const char * search_path, char * const argv[])
 {
-    int (*func)(const char *, const char *, char * const *);
+    typedef int (*func)(const char *, const char *, char * const *);
 
     DLSYM(func, fp, "execvP");
 
