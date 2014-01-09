@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012, 2013 by László Nagy
+/*  Copyright (C) 2012-2014 by László Nagy
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -340,7 +340,7 @@ static void print_version()
 {
     fprintf(stdout,
             "Bear %s\n"
-            "Copyright (C) 2012, 2013 by László Nagy\n"
+            "Copyright (C) 2012-2014 by László Nagy\n"
             "This is free software; see the source for copying conditions. "
             "There is NO warranty; not even for MERCHANTABILITY or FITNESS "
             "FOR A PARTICULAR PURPOSE.\n",
