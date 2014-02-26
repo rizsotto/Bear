@@ -52,6 +52,12 @@ It could be the best to build it in a separate build directory.
 
 You can configure the build process with passing arguments to cmake.
 
+You may need to set the `PKG_CONFIG_PATH` environment variable prior to running
+`cmake` in order for `cmake` to be able to find the libconfig library.
+For example:
+
+    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+
 
 How to use
 ----------
