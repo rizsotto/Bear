@@ -3,6 +3,7 @@
 Bugfixes:
 
   - fix output entries have c14n file path (#61, @nickhutchinson)
+  - fix error message on missing config file (#60, @viraptor)
 
 
 ## 1.4 (2014-01-12)

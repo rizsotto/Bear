@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <regex.h>
 
@@ -57,6 +58,13 @@ static char const * fix_path(char const * file, char const * cwd);
 
 bear_output_filter_t * bear_filter_read_from_file(char const * file)
 {
+    if(0 != access(file, R_OK))
+    {
+        fprintf(stderr, "bear: can't access config file '%s'", file);
+        perror(" ");
+        exit(EXIT_FAILURE);
+    }
+
     config_t config;
     config_init(&config);
     if (config_read_file(&config, file) == CONFIG_FALSE)
