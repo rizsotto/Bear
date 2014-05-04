@@ -1,5 +1,10 @@
 
 include(CheckFunctionExists)
+include(CheckSymbolExists)
+
+add_definitions(-D_GNU_SOURCE)
+list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+
 check_function_exists(vfork HAVE_VFORK)
 check_function_exists(execve HAVE_EXECVE)
 check_function_exists(execv HAVE_EXECV)
@@ -11,13 +16,11 @@ check_function_exists(execlp HAVE_EXECLP)
 check_function_exists(execle HAVE_EXECLE)
 check_function_exists(posix_spawn HAVE_POSIX_SPAWN)
 check_function_exists(posix_spawnp HAVE_POSIX_SPAWNP)
-include(CheckSymbolExists)
+check_function_exists(realpath HAVE_REALPATH)
 check_symbol_exists(_NSGetEnviron crt_externs.h NEED_NSGETENVIRON)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-
-add_definitions(-D_GNU_SOURCE)
 
 
 add_library(ear SHARED

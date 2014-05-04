@@ -16,8 +16,8 @@ g++ -I"$1/lib" "$1/lib/bar.cc" -M -o /dev/null
 true
 echo "gcc -invocation -look -like this.c"
 
-(g++ -c -I"$1/lib" -I"$1/bin" "$1/bin/boo.c++" -o /dev/null)
-(g++ -c -I"$1/lib" -I"$1/bin" "$1/bin/far.cxx" -o /dev/null)
+(g++ -c -I"$1/lib" -I"$1/bin" "$1/bin/./boo.c++" -o /dev/null)
+(g++ -c -I"$1/lib" -I"$1/bin" "$1/bin/../bin/far.cxx" -o /dev/null)
 
 # add noise to the compilation...
 echo "g++ -c bin/boo.cpp -o /dev/null"

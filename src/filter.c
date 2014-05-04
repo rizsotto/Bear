@@ -251,11 +251,11 @@ static config_setting_t const * get_setting(config_setting_t const * config, cha
 
 static char const * fix_path(char const * file, char const * cwd)
 {
-    char * result = 0;
+    char * path = 0;
     if ('/' == file[0])
     {
-        result = strdup(file);
-        if (0 == result)
+        path = strdup(file);
+        if (0 == path)
         {
             perror("bear: strdup");
             exit(EXIT_FAILURE);
@@ -263,11 +263,21 @@ static char const * fix_path(char const * file, char const * cwd)
     }
     else
     {
-        if (-1 == asprintf(&result, "%s/%s", cwd, file))
+        if (-1 == asprintf(&path, "%s/%s", cwd, file))
         {
             perror("bear: asprintf");
             exit(EXIT_FAILURE);
         }
+    }
+    char * const result = realpath(path, NULL);
+    if (0 == result)
+    {
+        perror("bear: realpath");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        free(path);
     }
     return result;
 }

@@ -32,6 +32,7 @@
 #cmakedefine HAVE_EXECLE
 #cmakedefine HAVE_POSIX_SPAWN
 #cmakedefine HAVE_POSIX_SPAWNP
+#cmakedefine HAVE_REALPATH
 
 #cmakedefine APPLE
 #cmakedefine NEED_NSGETENVIRON
@@ -49,3 +50,7 @@
 #endif
 
 #define ENV_OUTPUT "BEAR_OUTPUT"
+
+#ifndef HAVE_REALPATH
+# error 'realpath' function required to generate proper compilation database
+#endif

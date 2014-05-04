@@ -1,3 +1,10 @@
+## 1.4.1
+
+Bugfixes:
+
+  - fix output entries have c14n file path (#61, @nickhutchinson)
+
+
 ## 1.4 (2014-01-12)
 
 Bugfixes:
