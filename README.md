@@ -77,10 +77,18 @@ Known issues
 
 Compiler wrappers like [ccache][CCACHE] and [distcc][DISTCC] could cause
 duplicates or missing items in the compilation database. Make sure you have
-been disabled before you run Bear.
+been disabled before you run Bear. In case of duplicate entries, you might
+consider to edit the config file to filter out wrapper calls (by path, or
+by file name) or filter out the compiler calls (and collect the wrapper
+calls only).
 
   [CCACHE]: http://ccache.samba.org/
   [DISTCC]: http://code.google.com/p/distcc/
+
+Since the `bear` executable has runtime dependency (the `libconfig` library),
+you might suffer that the OS loader will not find it, if it is not installed
+into the search path. This case you need to extend the search path by define
+the related environment variables (`LD_LIBRARY_PATH` or `DYLD_LIBRARY_PATH`).
 
 
 Problem reports

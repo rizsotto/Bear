@@ -4,6 +4,7 @@ Bugfixes:
 
   - fix output entries have c14n file path (#61, @nickhutchinson)
   - fix error message on missing config file (#60, @viraptor)
+  - extend README file based on user feedbacks (#54, #55, #56, #59, @btorpey, @breser, @vguerra)
 
 
 ## 1.4 (2014-01-12)
