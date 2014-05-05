@@ -174,13 +174,17 @@ bear library to implement \f[C]exec\f[] calls.
 .RE
 .SH SEE ALSO
 .PP
-ld.so(8), exec(3)
+ld.so(8), exec(3), ld.so(8)
 .SH BUGS
 .PP
 Compiler wrappers like ccache (http://ccache.samba.org/) and
 distcc (http://code.google.com/p/distcc/) could cause duplicates or
 missing items in the compilation database.
 Make sure you have been disabled before you run Bear.
+.PP
+In case of duplicate entries, you might consider to edit the config
+file to filter out wrapper calls (by path, or by file name) or filter
+out the compiler calls (and collect the wrapper calls only).
 .SH COPYRIGHT
 .PP
 Copyright (C) 2012-2014 by László Nagy
