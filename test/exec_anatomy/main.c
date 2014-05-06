@@ -188,7 +188,7 @@ void call_execvP()
     {
         "cc",
         "-c",
-        "execvP.c",
+        "execv_p.c",
         0
     };
 
@@ -322,7 +322,7 @@ int main()
 #endif
 #ifdef HAVE_EXECVP2
     fork_fun(call_execvP);
-    expected_out("cc", "execvP.c");
+    expected_out("cc", "execv_p.c");
 #endif
 #ifdef HAVE_EXECVPE
     fork_fun(call_execvpe);

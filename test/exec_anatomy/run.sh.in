@@ -7,6 +7,6 @@ BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
 BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/@EAR_LIB_FILE@"
 BEAR_CFG="@CMAKE_CURRENT_SOURCE_DIR@/../../src/bear.conf"
 
-touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c execvP.c posix_spawn.c posix_spawnp.c
+touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c execv_p.c posix_spawn.c posix_spawnp.c
 ${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -s ./socket -- ./exec_anatomy
 diff expected.json compile_commands.json
