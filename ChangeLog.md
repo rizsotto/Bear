@@ -1,3 +1,9 @@
+## 1.4.2 (2014-05-19)
+
+Features:
+
+  - cross compilers recognised by bear (@nolange)
+
 ## 1.4.1 (2014-05-09)
 
 Bugfixes:
