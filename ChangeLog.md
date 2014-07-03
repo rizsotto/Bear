@@ -1,3 +1,10 @@
+## next
+
+Features:
+
+  - Automatically generate Debian package dependency list with cpack (#62, @bbannier)
+
+
 ## 1.4.2 (2014-05-19)
 
 Features:
