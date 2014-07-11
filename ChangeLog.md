@@ -1,4 +1,4 @@
-## next
+## 1.4.3 (2014-07-11)
 
 Features:
 
@@ -10,6 +10,7 @@ Features:
 Features:
 
   - cross compilers recognised by bear (@nolange)
+
 
 ## 1.4.1 (2014-05-09)
 
