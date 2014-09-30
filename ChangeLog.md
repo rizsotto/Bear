@@ -1,3 +1,10 @@
+## Next
+
+Features:
+
+  - Reword README file to be more english (#64, @libnoon)
+
+
 ## 1.4.3 (2014-07-11)
 
 Features:
