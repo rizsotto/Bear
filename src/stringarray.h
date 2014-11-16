@@ -36,4 +36,6 @@ void          bear_strings_release(char const **);
 #ifdef SERVER
 char const *  bear_strings_find(char const * const * in, char const * e);
 char const *  bear_strings_fold(char const * const * in, char const sep);
+char const * * bear_strings_transform(char const * * in,
+                                      char const * (* transform_one)(char const *));
 #endif

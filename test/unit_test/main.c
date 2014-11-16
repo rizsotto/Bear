@@ -203,7 +203,7 @@ void test_json()
         0
     };
     char const ** input = bear_strings_copy(input_const);
-    char const ** result = bear_json_escape_strings(input);
+    char const ** result = bear_strings_transform(input, bear_json_escape_string);
 
     char const * expected[] =
     {
