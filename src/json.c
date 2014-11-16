@@ -26,21 +26,6 @@
 #include <stdio.h>
 
 
-char const * * bear_json_escape_strings(char const * * raw)
-{
-    for (char const * * it = raw; (raw) && (*it); ++it)
-    {
-        char const * const new = bear_json_escape_string(*it);
-        if (new)
-        {
-            char const * const tmp = *it;
-            *it = new;
-            free((void *)tmp);
-        }
-    }
-    return raw;
-}
-
 static size_t count(char const * const begin,
                     char const * const end,
                     int(*fp)(int));

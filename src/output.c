@@ -72,7 +72,8 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
     bear_output_stream_t * const stream = & handle->stream;
 
-    char const * const cmd = bear_strings_fold(bear_json_escape_strings(e->cmd), ' ');
+    bear_strings_transform(e->cmd, bear_json_escape_string);
+    char const * const cmd = bear_strings_fold(e->cmd, ' ');
     if (handle->filter)
     {
         char const * const src = bear_filter_source_file(handle->filter, e);
