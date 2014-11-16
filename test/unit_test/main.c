@@ -192,7 +192,7 @@ void test_env_insert()
     bear_strings_release(result);
 }
 
-void test_json()
+void test_json_escape()
 {
     char const * input[] =
     {
@@ -211,6 +211,32 @@ void test_json()
         "symbolic: BS \\b FF \\f LF \\n CR \\r HT \\t slash \\\\ quote \\\"",
         "numeric: BEL \\u0007 VT \\u000b ESC \\u001b",
         "mix: \\u0007 \\b c",
+        0
+    };
+    assert_stringarray_equals(expected, result);
+
+    bear_strings_release(result);
+}
+
+void test_shell_escape()
+{
+    char const * input[] =
+    {
+        "$no_escaping(\r)",
+        "escaped:\"\\",
+        "quoted: \t\n",
+        "quoted\\and escaped",
+        0
+    };
+    char const ** result = bear_strings_copy(input);
+    bear_strings_transform(result, bear_string_shell_escape);
+
+    char const * expected[] =
+    {
+        "$no_escaping(\r)",
+        "escaped:\\\"\\\\",
+        "\"quoted: \t\n\"",
+        "\"quoted\\\\and escaped\"",
         0
     };
     assert_stringarray_equals(expected, result);
@@ -259,7 +285,8 @@ int main()
     test_strings_copy();
     test_strings_build();
     test_env_insert();
-    test_json();
+    test_json_escape();
+    test_shell_escape();
     test_protocol();
     return 0;
 }
