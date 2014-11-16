@@ -30,14 +30,16 @@ static size_t count(char const * const begin,
                     char const * const end,
                     int(*fp)(int));
 
-static int symbolic_escape(int);
-static int needs_numeric_escape(int);
+static int json_symbolic_escape(int);
+static int needs_json_numeric_escape(int);
+static int needs_shell_escape(int c);
+static int needs_shell_quote(int c);
 
 char const * bear_string_json_escape(char const * raw)
 {
     size_t const length = (raw) ? strlen(raw) : 0;
-    size_t const symbolic = count(raw, raw + length, symbolic_escape);
-    size_t const numeric = count(raw, raw + length, needs_numeric_escape);
+    size_t const symbolic = count(raw, raw + length, json_symbolic_escape);
+    size_t const numeric = count(raw, raw + length, needs_json_numeric_escape);
 
     if ((0 == symbolic) && (0 == numeric))
     {
@@ -53,14 +55,14 @@ char const * bear_string_json_escape(char const * raw)
     char * it = result;
     for (; (raw) && (*raw); ++raw)
     {
-        if (needs_numeric_escape(*raw))
+        if (needs_json_numeric_escape(*raw))
         {
             sprintf(it, "\\u%04x", *raw);
             it += 6;
         }
         else
         {
-            char escape = symbolic_escape(*raw);
+            char escape = json_symbolic_escape(*raw);
             if (escape)
             {
                 *it++ = '\\';
@@ -72,6 +74,48 @@ char const * bear_string_json_escape(char const * raw)
             }
         }
     }
+    *it = '\0';
+    return result;
+}
+
+char const * bear_string_shell_escape(char const * raw)
+{
+    /* This performs minimal shell escaping and/or quoting, as per the JSON
+       Compilation Database Format Specification. Only quotes and backslashes
+       are treated as special, as well as blanks and newlines (which would
+       delimit arguments if left as-is).
+
+       Quoting is only required for newlines (they can't be escaped), but we
+       also do it for blanks, because that looks better than escaping, and because
+       it makes the logic simpler (blanks can't be escaped inside quotes). */
+
+    size_t const length = (raw) ? strlen(raw) : 0;
+    size_t const escaped = count(raw, raw + length, needs_shell_escape);
+    size_t const quoted = count(raw, raw + length, needs_shell_quote);
+
+    if (0 == escaped && 0 == quoted)
+    {
+        return 0;
+    }
+
+    char * const result = malloc(length + escaped + (quoted == 0 ? 0 : 2) + 1);
+    if (0 == result)
+    {
+        perror("bear: malloc");
+        exit(EXIT_FAILURE);
+    }
+    char * it = result;
+
+    if (quoted != 0) *it++ = '\"';
+
+    for (; (raw) && (*raw); ++raw)
+    {
+        if (needs_shell_escape(*raw)) *it++ = '\\';
+        *it++ = *raw;
+    }
+
+    if (quoted != 0) *it++ = '\"';
+
     *it = '\0';
     return result;
 }
@@ -89,7 +133,7 @@ static size_t count(char const * const begin,
     return result;
 }
 
-static int symbolic_escape(int c)
+static int json_symbolic_escape(int c)
 {
     switch (c)
     {
@@ -104,7 +148,22 @@ static int symbolic_escape(int c)
     return 0;
 }
 
-static int needs_numeric_escape(int c)
+static int needs_json_numeric_escape(int c)
 {
-    return c > 0 && c < ' ' && !symbolic_escape(c);
+    return c > 0 && c < ' ' && !json_symbolic_escape(c);
+}
+
+static int needs_shell_escape(int c)
+{
+    switch (c)
+    {
+    case '\\': return 1;
+    case '\"': return 1;
+    }
+    return 0;
+}
+
+static int needs_shell_quote(int c)
+{
+    return isblank(c) || c == '\n';
 }

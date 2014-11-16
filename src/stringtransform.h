@@ -20,3 +20,4 @@
 #pragma once
 
 char const * bear_string_json_escape(char const *);
+char const * bear_string_shell_escape(char const *);
