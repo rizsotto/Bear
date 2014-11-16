@@ -19,7 +19,7 @@
 
 #include "output.h"
 #include "stringarray.h"
-#include "json.h"
+#include "stringtransform.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ void bear_append_json_output(bear_output_t * handle, bear_message_t const * e)
 {
     bear_output_stream_t * const stream = & handle->stream;
 
-    bear_strings_transform(e->cmd, bear_json_escape_string);
+    bear_strings_transform(e->cmd, bear_string_json_escape);
     char const * const cmd = bear_strings_fold(e->cmd, ' ');
     if (handle->filter)
     {
