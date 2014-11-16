@@ -45,43 +45,47 @@ static size_t count(char const * const begin,
                     char const * const end,
                     int(*fp)(int));
 
-static int needs_escape(int);
+static int symbolic_escape(int);
+static int needs_numeric_escape(int);
 
 char const * bear_json_escape_string(char const * raw)
 {
     size_t const length = (raw) ? strlen(raw) : 0;
-    size_t const spaces = count(raw, raw + length, isspace);
-    size_t const json = count(raw, raw + length, needs_escape);
+    size_t const symbolic = count(raw, raw + length, symbolic_escape);
+    size_t const numeric = count(raw, raw + length, needs_numeric_escape);
 
-    if ((0 == spaces) && (0 == json))
+    if ((0 == symbolic) && (0 == numeric))
     {
         return 0;
     }
 
-    char * const result = malloc(length + ((0 != spaces) * 4) + json + 1);
+    char * const result = malloc(length + symbolic + numeric * 5 + 1);
     if (0 == result)
     {
         perror("bear: malloc");
         exit(EXIT_FAILURE);
     }
     char * it = result;
-    if (spaces)
-    {
-        *it++ = '\\';
-        *it++ = '\"';
-    }
     for (; (raw) && (*raw); ++raw)
     {
-        if (needs_escape(*raw))
+        if (needs_numeric_escape(*raw))
         {
-            *it++ = '\\';
+            sprintf(it, "\\u%04x", *raw);
+            it += 6;
         }
-        *it++ = isspace(*raw) ? ' ' : *raw;
-    }
-    if (spaces)
-    {
-        *it++ = '\\';
-        *it++ = '\"';
+        else
+        {
+            char escape = symbolic_escape(*raw);
+            if (escape)
+            {
+                *it++ = '\\';
+                *it++ = escape;
+            }
+            else
+            {
+                *it++ = *raw;
+            }
+        }
     }
     *it = '\0';
     return result;
@@ -100,13 +104,22 @@ static size_t count(char const * const begin,
     return result;
 }
 
-static int needs_escape(int c)
+static int symbolic_escape(int c)
 {
     switch (c)
     {
-    case '\\':
-    case '\"':
-        return 1;
+    case '\\': return '\\';
+    case '\"': return '\"';
+    case '\b': return 'b';
+    case '\f': return 'f';
+    case '\n': return 'n';
+    case '\r': return 'r';
+    case '\t': return 't';
     }
     return 0;
+}
+
+static int needs_numeric_escape(int c)
+{
+    return c > 0 && c < ' ' && !symbolic_escape(c);
 }
