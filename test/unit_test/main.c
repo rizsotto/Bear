@@ -196,10 +196,10 @@ void test_json()
 {
     char const * input_const[] =
     {
-        "this",
-        "is my",
-        "message=\"shit\\gold\"",
-        "with\tall the\rbad\nwhitespaces",
+        "no escaping for this one",
+        "symbolic: BS \b FF \f LF \n CR \r HT \t slash \\ quote \"",
+        "numeric: BEL \a VT \v ESC \x1b",
+        "mix: \a \b c",
         0
     };
     char const ** input = bear_strings_copy(input_const);
@@ -207,10 +207,10 @@ void test_json()
 
     char const * expected[] =
     {
-        "this",
-        "\\\"is my\\\"",
-        "message=\\\"shit\\\\gold\\\"",
-        "\\\"with all the bad whitespaces\\\"",
+        "no escaping for this one",
+        "symbolic: BS \\b FF \\f LF \\n CR \\r HT \\t slash \\\\ quote \\\"",
+        "numeric: BEL \\u0007 VT \\u000b ESC \\u001b",
+        "mix: \\u0007 \\b c",
         0
     };
     assert_stringarray_equals(expected, result);
