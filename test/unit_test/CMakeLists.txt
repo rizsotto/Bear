@@ -3,7 +3,7 @@ add_executable(unit_test EXCLUDE_FROM_ALL
     main.c
     ../../src/stringarray.c
     ../../src/protocol.c
-    ../../src/json.c
+    ../../src/stringtransform.c
     ../../src/environ.c
     )
 add_definitions(-D_GNU_SOURCE)

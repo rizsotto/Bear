@@ -159,4 +159,20 @@ char const * bear_strings_fold(char const * const * in, char const separator)
 
     return result;
 }
+
+char const * * bear_strings_transform(char const * * in,
+                                      char const * (* transform_one)(char const *))
+{
+    for (char const * * it = in; (in) && (*it); ++it)
+    {
+        char const * const new = transform_one(*it);
+        if (new)
+        {
+            char const * const tmp = *it;
+            *it = new;
+            free((void *)tmp);
+        }
+    }
+    return in;
+}
 #endif
