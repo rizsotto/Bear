@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "json.h"
+#include "stringtransform.h"
 #include "stringarray.h"
 
 #include <string.h>
@@ -33,7 +33,7 @@ static size_t count(char const * const begin,
 static int symbolic_escape(int);
 static int needs_numeric_escape(int);
 
-char const * bear_json_escape_string(char const * raw)
+char const * bear_string_json_escape(char const * raw)
 {
     size_t const length = (raw) ? strlen(raw) : 0;
     size_t const symbolic = count(raw, raw + length, symbolic_escape);

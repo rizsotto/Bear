@@ -48,7 +48,7 @@ add_executable(bear
     main.c
     output.c
     filter.c
-    json.c)
+    stringtransform.c)
 set_target_properties(bear PROPERTIES
     COMPILE_DEFINITIONS "SERVER")
 include_directories(${LIBCONFIG_INCLUDE_DIRS})

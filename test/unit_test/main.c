@@ -31,7 +31,7 @@
 #include <stringarray.h>
 #include <environ.h>
 #include <protocol.h>
-#include <json.h>
+#include <stringtransform.h>
 
 void assert_stringarray_equals(char const ** const lhs, char const ** const rhs)
 {
@@ -203,7 +203,7 @@ void test_json()
         0
     };
     char const ** input = bear_strings_copy(input_const);
-    char const ** result = bear_strings_transform(input, bear_json_escape_string);
+    char const ** result = bear_strings_transform(input, bear_string_json_escape);
 
     char const * expected[] =
     {
