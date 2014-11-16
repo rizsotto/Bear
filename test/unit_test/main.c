@@ -194,7 +194,7 @@ void test_env_insert()
 
 void test_json()
 {
-    char const * input_const[] =
+    char const * input[] =
     {
         "no escaping for this one",
         "symbolic: BS \b FF \f LF \n CR \r HT \t slash \\ quote \"",
@@ -202,8 +202,8 @@ void test_json()
         "mix: \a \b c",
         0
     };
-    char const ** input = bear_strings_copy(input_const);
-    char const ** result = bear_strings_transform(input, bear_string_json_escape);
+    char const ** result = bear_strings_copy(input);
+    bear_strings_transform(result, bear_string_json_escape);
 
     char const * expected[] =
     {
@@ -215,7 +215,7 @@ void test_json()
     };
     assert_stringarray_equals(expected, result);
 
-    bear_strings_release(input);
+    bear_strings_release(result);
 }
 
 void assert_messages_equals(bear_message_t const * lhs,
