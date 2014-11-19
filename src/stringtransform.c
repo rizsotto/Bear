@@ -85,20 +85,22 @@ char const * bear_string_shell_escape(char const * raw)
        are treated as special, as well as blanks and newlines (which would
        delimit arguments if left as-is).
 
-       Quoting is only required for newlines (they can't be escaped), but we
-       also do it for blanks, because that looks better than escaping, and because
-       it makes the logic simpler (blanks can't be escaped inside quotes). */
+       Quoting is only required for newlines (they can't be escaped) and empty
+       arguments, but we also do it for blanks, because that looks better than
+       escaping, and because it makes the logic simpler (blanks can't be
+       escaped inside quotes). */
 
     size_t const length = (raw) ? strlen(raw) : 0;
     size_t const escaped = count(raw, raw + length, needs_shell_escape);
     size_t const quoted = count(raw, raw + length, needs_shell_quote);
+    int const need_quoting = quoted != 0 || length == 0;
 
-    if (0 == escaped && 0 == quoted)
+    if (0 == escaped && !need_quoting)
     {
         return 0;
     }
 
-    char * const result = malloc(length + escaped + (quoted == 0 ? 0 : 2) + 1);
+    char * const result = malloc(length + escaped + (need_quoting ? 2 : 0) + 1);
     if (0 == result)
     {
         perror("bear: malloc");
@@ -106,7 +108,7 @@ char const * bear_string_shell_escape(char const * raw)
     }
     char * it = result;
 
-    if (quoted != 0) *it++ = '\"';
+    if (need_quoting) *it++ = '\"';
 
     for (; (raw) && (*raw); ++raw)
     {
@@ -114,7 +116,7 @@ char const * bear_string_shell_escape(char const * raw)
         *it++ = *raw;
     }
 
-    if (quoted != 0) *it++ = '\"';
+    if (need_quoting) *it++ = '\"';
 
     *it = '\0';
     return result;

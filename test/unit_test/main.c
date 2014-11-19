@@ -226,6 +226,7 @@ void test_shell_escape()
         "escaped:\"\\",
         "quoted: \t\n",
         "quoted\\and escaped",
+        "",
         0
     };
     char const ** result = bear_strings_copy(input);
@@ -237,6 +238,7 @@ void test_shell_escape()
         "escaped:\\\"\\\\",
         "\"quoted: \t\n\"",
         "\"quoted\\\\and escaped\"",
+        "\"\"",
         0
     };
     assert_stringarray_equals(expected, result);
