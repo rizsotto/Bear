@@ -2,6 +2,7 @@
 
 Features:
 
+  - Improve escaping logic (#67, #68, @SpecLad)
   - Reword README file to be more english (#64, @libnoon)
 
 
