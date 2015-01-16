@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(bear C)
-set(BEAR_VERSION "1.4.4")
+set(BEAR_VERSION "2.0")
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
@@ -19,26 +19,34 @@ set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation databa
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 include(CPack)
 
+# TODO remove these
 find_package(PkgConfig)
 pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
-
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
-find_package(C99 REQUIRED)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${C99_C_FLAGS}")
-
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-endif()
 
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
+include(CheckCCompilerFlag)
+check_c_compiler_flag("-std=c99" C99_SUPPORTED)
+if (C99_SUPPORTED)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+endif()
+
+add_definitions(-D_GNU_SOURCE)
+list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
+
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif()
+
 set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
 set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_FULL_LIBDIR}/${EAR_LIB_FILE})
+# TODO remove these
 set(DEFAULT_OUTPUT_FILE compile_commands.json)
 set(DEFAULT_CONFIG_FILE ${CMAKE_INSTALL_FULL_SYSCONFDIR}/bear.conf)
 
+add_subdirectory(libear)
 add_subdirectory(src)
 add_subdirectory(test)
 add_subdirectory(doc)
