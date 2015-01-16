@@ -19,10 +19,6 @@ set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation databa
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 include(CPack)
 
-# TODO remove these
-find_package(PkgConfig)
-pkg_check_modules(LIBCONFIG REQUIRED libconfig>=1.4)
-
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -42,13 +38,8 @@ endif()
 
 set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
 set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_FULL_LIBDIR}/${EAR_LIB_FILE})
-# TODO remove these
-set(DEFAULT_OUTPUT_FILE compile_commands.json)
-set(DEFAULT_CONFIG_FILE ${CMAKE_INSTALL_FULL_SYSCONFDIR}/bear.conf)
 
 add_subdirectory(libear)
 add_subdirectory(bear)
-add_subdirectory(doc)
-# TODO remove these
-add_subdirectory(src)
 add_subdirectory(test)
+add_subdirectory(doc)

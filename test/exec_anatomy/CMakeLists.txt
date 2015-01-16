@@ -11,4 +11,3 @@ add_test(NAME run_exec_anatomy
 
 add_dependencies(check exec_anatomy)
 add_dependencies(exec_anatomy ear)
-add_dependencies(exec_anatomy bear)

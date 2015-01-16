@@ -16,9 +16,9 @@ check_symbol_exists(_NSGetEnviron crt_externs.h HAVE_NSGETENVIRON)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-add_library(eark SHARED ear.c)
-target_link_libraries(eark ${CMAKE_DL_LIBS})
+add_library(ear SHARED ear.c)
+target_link_libraries(ear ${CMAKE_DL_LIBS})
 
 include(GNUInstallDirs)
-install(TARGETS eark
+install(TARGETS ear
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -1,4 +1,0 @@
-# comment
-filter: {
-    compilers := [ }
-}

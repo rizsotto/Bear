@@ -94,6 +94,7 @@ def run(args):
     with TemporaryDirectory(prefix='bear-', dir=tempdir()) as tmpdir:
         # run the build command
         exit_code = run_build(args.build, tmpdir, args.libear)
+        logging.debug('build finished with exit code: {0}'.format(exit_code))
         # read the intercepted exec calls
         commands = map(parse_exec_trace,
                        glob.iglob(os.path.join(tmpdir, 'cmd.*')))
@@ -249,7 +250,7 @@ def create_parser():
         help="""Enable verbose output from '%(prog)s'. A second '-v' increases
                 verbosity.""")
     parser.add_argument(
-        '--cdb',
+        '--cdb', '-o',
         metavar='<file>',
         default="compile_commands.json",
         help="""The JSON compilation database.""")
@@ -510,4 +511,4 @@ def _is_cplusplus_compiler(name):
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

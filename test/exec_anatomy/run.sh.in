@@ -3,10 +3,9 @@
 set -o nounset
 set -o errexit
 
-BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
-BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/@EAR_LIB_FILE@"
-BEAR_CFG="@CMAKE_CURRENT_SOURCE_DIR@/../../src/bear.conf"
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
 
 touch execve.c execv.c execvpe.c execvp.c execl.c execlp.c execle.c execv_p.c posix_spawn.c posix_spawnp.c
-${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -s ./socket -- ./exec_anatomy expected.json
-diff expected.json compile_commands.json
+python ${BEAR_EXE} -l ${BEAR_LIB} ./exec_anatomy expected.json
+python "@CMAKE_CURRENT_SOURCE_DIR@/json_diff.py" expected.json compile_commands.json

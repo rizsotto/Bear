@@ -3,12 +3,11 @@
 set -o nounset
 set -o errexit
 
-BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../src/bear"
-BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../src/@EAR_LIB_FILE@"
-BEAR_CFG="@CMAKE_CURRENT_SOURCE_DIR@/../../src/bear.conf"
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
 
 set +o errexit
-${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -s ./socket -- false
+python ${BEAR_EXE} -l ${BEAR_LIB} false
 rc=$?
 set -o errexit
 
@@ -16,4 +15,4 @@ if [ 0 = $rc ]; then
   echo "exit code was not captured" && false
 fi
 
-${BEAR_EXE} -c ${BEAR_CFG} -l ${BEAR_LIB} -s ./socket -- true
+python ${BEAR_EXE} -l ${BEAR_LIB} true
