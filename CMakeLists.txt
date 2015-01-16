@@ -47,6 +47,8 @@ set(DEFAULT_OUTPUT_FILE compile_commands.json)
 set(DEFAULT_CONFIG_FILE ${CMAKE_INSTALL_FULL_SYSCONFDIR}/bear.conf)
 
 add_subdirectory(libear)
+add_subdirectory(bear)
+add_subdirectory(doc)
+# TODO remove these
 add_subdirectory(src)
 add_subdirectory(test)
-add_subdirectory(doc)
