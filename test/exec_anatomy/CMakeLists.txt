@@ -1,6 +1,5 @@
 add_executable(exec_anatomy EXCLUDE_FROM_ALL main.c)
-add_definitions(-D_GNU_SOURCE)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../src)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../libear)
 
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/run.sh.in
