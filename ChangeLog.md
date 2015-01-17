@@ -1,3 +1,16 @@
+## 2.0
+
+Features:
+
+  - Rewrite command `bear` from C to Python.
+  - Simplified build process with a single module for `libear`.
+
+Bugfixes:
+
+  - Work with empty environment (#69, @YorkZ)
+  - Filter out redundant entries (#66, @HongxuChen)
+  - Append to existing compilation database (#63, @p0rnfl4k3s)
+
 ## 1.4.4 (2015-01-09)
 
 Features:
