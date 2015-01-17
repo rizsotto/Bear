@@ -91,29 +91,6 @@ static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
 
 
-#ifdef __APPLE__
-#define EXEC_LOOP_ON_EXECVE
-#endif
-
-#ifdef EXEC_LOOP_ON_EXECVE
-static int already_reported = 0;
-#define REPORT_CALL(ARGV_)                                                     \
-    int const report_state = already_reported;                                 \
-    if (!already_reported) {                                                   \
-        bear_report_call(__func__, (char const *const *)ARGV_);                \
-        already_reported = 1;                                                  \
-    }
-#define REPORT_FAILED_CALL(RESULT_)                                            \
-    if (!report_state) {                                                       \
-        already_reported = 0;                                                  \
-    }
-#else
-#define REPORT_CALL(ARGV_)                                                     \
-    bear_report_call(__func__, (char const *const *)ARGV_);
-#define REPORT_FAILED_CALL(RESULT_)
-#endif
-
-
 #define DLSYM(TYPE_, VAR_, SYMBOL_)                                            \
     union {                                                                    \
         void *from;                                                            \
@@ -175,17 +152,10 @@ static void on_unload(void) {
 /* These are the methods we are try to hijack.
  */
 
-#if defined HAVE_VFORK && defined EXEC_LOOP_ON_EXECVE
-pid_t vfork(void) { return fork(); }
-#endif
-
 #ifdef HAVE_EXECVE
 int execve(const char *path, char *const argv[], char *const envp[]) {
-    REPORT_CALL(argv);
-    int const result = call_execve(path, argv, envp);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_execve(path, argv, envp);
 }
 #endif
 
@@ -194,41 +164,29 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 #error can not implement execv without execve
 #endif
 int execv(const char *path, char *const argv[]) {
-    REPORT_CALL(argv);
-    int const result = call_execve(path, argv, environ);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_execve(path, argv, environ);
 }
 #endif
 
 #ifdef HAVE_EXECVPE
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
-    REPORT_CALL(argv);
-    int const result = call_execvpe(file, argv, envp);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_execvpe(file, argv, envp);
 }
 #endif
 
 #ifdef HAVE_EXECVP
 int execvp(const char *file, char *const argv[]) {
-    REPORT_CALL(argv);
-    int const result = call_execvp(file, argv);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_execvp(file, argv);
 }
 #endif
 
 #ifdef HAVE_EXECVP2
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    REPORT_CALL(argv);
-    int const result = call_execvP(file, search_path, argv);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_execvP(file, search_path, argv);
 }
 #endif
 
@@ -242,10 +200,8 @@ int execl(const char *path, const char *arg, ...) {
     char const **argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    REPORT_CALL(argv);
-    int const result =
-        call_execve(path, (char *const *)argv, environ);
-    REPORT_FAILED_CALL(result);
+    bear_report_call(__func__, (char const *const *)argv);
+    int const result = call_execve(path, (char *const *)argv, environ);
 
     bear_strings_release(argv);
     return result;
@@ -262,9 +218,8 @@ int execlp(const char *file, const char *arg, ...) {
     char const **argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    REPORT_CALL(argv);
+    bear_report_call(__func__, (char const *const *)argv);
     int const result = call_execvp(file, (char *const *)argv);
-    REPORT_FAILED_CALL(result);
 
     bear_strings_release(argv);
     return result;
@@ -283,10 +238,9 @@ int execle(const char *path, const char *arg, ...) {
     char const **envp = va_arg(args, char const **);
     va_end(args);
 
-    REPORT_CALL(argv);
+    bear_report_call(__func__, (char const *const *)argv);
     int const result =
         call_execve(path, (char *const *)argv, (char *const *)envp);
-    REPORT_FAILED_CALL(result);
 
     bear_strings_release(argv);
     return result;
@@ -298,12 +252,8 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *restrict attrp,
                 char *const argv[restrict], char *const envp[restrict]) {
-    REPORT_CALL(argv);
-    int const result =
-        call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 #endif
 
@@ -312,12 +262,8 @@ int posix_spawnp(pid_t *restrict pid, const char *restrict file,
                  const posix_spawn_file_actions_t *file_actions,
                  const posix_spawnattr_t *restrict attrp,
                  char *const argv[restrict], char *const envp[restrict]) {
-    REPORT_CALL(argv);
-    int const result =
-        call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
-    REPORT_FAILED_CALL(result);
-
-    return result;
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 #endif
 

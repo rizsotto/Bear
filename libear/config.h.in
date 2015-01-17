@@ -7,7 +7,6 @@
 
 #pragma once
 
-#cmakedefine HAVE_VFORK
 #cmakedefine HAVE_EXECVE
 #cmakedefine HAVE_EXECV
 #cmakedefine HAVE_EXECVPE
