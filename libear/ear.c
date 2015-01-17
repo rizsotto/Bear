@@ -47,14 +47,6 @@ extern char **environ;
 
 typedef char const * bear_env_t[ENV_SIZE];
 
-typedef struct {
-    pid_t pid;
-    pid_t ppid;
-    char const *fun;
-    char const *cwd;
-    char const **cmd;
-} bear_message_t;
-
 static void bear_capture_env_t(bear_env_t *env);
 static int bear_is_valid_env_t(bear_env_t *env);
 static void bear_restore_env_t(bear_env_t *env);
@@ -62,8 +54,6 @@ static void bear_release_env_t(bear_env_t *env);
 static char const **bear_update_environment(char *const envp[], bear_env_t *env);
 static char const **bear_update_environ(char const **in, char const *key, char const *value);
 static void bear_report_call(char const *fun, char const *const argv[]);
-static void bear_write_message(int fd, bear_message_t const *e);
-static void bear_send_message(char const *destination, bear_message_t const *e);
 static char const **bear_strings_build(char const *arg, va_list *ap);
 static char const **bear_strings_copy(char const **const in);
 static char const **bear_strings_append(char const **in, char const *e);
@@ -375,9 +365,12 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 }
 #endif
 
-/* these methods are for to write log about the process creation. */
+/* this method is to write log about the process creation. */
 
 static void bear_report_call(char const *fun, char const *const argv[]) {
+    static int const RS = 0x1e;
+    static int const US = 0x1f;
+
     if (!bear_is_valid_env_t(&initial_env))
         return;
 
@@ -386,42 +379,27 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: getcwd");
         exit(EXIT_FAILURE);
     }
-
-    bear_message_t const msg = {getpid(), getppid(), fun, cwd,
-                                (char const **)argv};
-    bear_send_message(initial_env[0], &msg);
-
-    free((void *)cwd);
-}
-
-static void bear_write_message(int fd, bear_message_t const *e) {
-    static int const RS = 0x1e;
-    static int const US = 0x1f;
-    dprintf(fd, "%d%c", e->pid, RS);
-    dprintf(fd, "%d%c", e->ppid, RS);
-    dprintf(fd, "%s%c", e->fun, RS);
-    dprintf(fd, "%s%c", e->cwd, RS);
-    size_t const length = bear_strings_length(e->cmd);
-    for (size_t it = 0; it < length; ++it) {
-        dprintf(fd, "%s%c", e->cmd[it], US);
-    }
-}
-
-static void bear_send_message(char const *destination,
-                              bear_message_t const *msg) {
     char *filename = 0;
-    if (-1 == asprintf(&filename, "%s/cmd.XXXXXX", destination)) {
+    if (-1 == asprintf(&filename, "%s/cmd.XXXXXX", initial_env[0])) {
         perror("bear: asprintf");
         exit(EXIT_FAILURE);
     }
     int fd = mkstemp(filename);
-    free((void *)filename);
     if (-1 == fd) {
         perror("bear: open");
         exit(EXIT_FAILURE);
     }
-    bear_write_message(fd, msg);
+    dprintf(fd, "%d%c", getpid(), RS);
+    dprintf(fd, "%d%c", getppid(), RS);
+    dprintf(fd, "%s%c", fun, RS);
+    dprintf(fd, "%s%c", cwd, RS);
+    size_t const argc = bear_strings_length(argv);
+    for (size_t it = 0; it < argc; ++it) {
+        dprintf(fd, "%s%c", argv[it], US);
+    }
     close(fd);
+    free((void *)filename);
+    free((void *)cwd);
 }
 
 /* update environment assure that chilren processes will copy the desired
