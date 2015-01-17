@@ -5,11 +5,10 @@ compiler:
   - clang
 
 before_install:
-  - sudo add-apt-repository -y ppa:xav0989/libconfig
   - sudo apt-get update -qq
 
 install:
-  - sudo apt-get install --allow-unauthenticated -qq python libconfig-dev
+  - sudo apt-get install --allow-unauthenticated -qq python qt4-qmake
 
 script:
   - cmake . -DCPACK_GENERATOR="TGZ;DEB"
