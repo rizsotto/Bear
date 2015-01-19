@@ -23,6 +23,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <ctype.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -32,6 +33,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <time.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -379,12 +381,18 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: getcwd");
         exit(EXIT_FAILURE);
     }
+    struct timeval now;
+    if (0 != gettimeofday(&now, 0)) {
+        perror("bear: clock_gettime");
+        exit(EXIT_FAILURE);
+    }
     char *filename = 0;
-    if (-1 == asprintf(&filename, "%s/cmd.XXXXXX", initial_env[0])) {
+    if (-1 == asprintf(&filename, "%s/%ld.%d.%d.cmd",
+                       initial_env[0], now.tv_sec, now.tv_usec, getpid())) {
         perror("bear: asprintf");
         exit(EXIT_FAILURE);
     }
-    int fd = mkstemp(filename);
+    int fd = open(filename, O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP);
     if (-1 == fd) {
         perror("bear: open");
         exit(EXIT_FAILURE);
