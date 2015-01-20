@@ -35,8 +35,6 @@ import shlex
 import itertools
 
 
-LIBEAR_FILE = "@DEFAULT_PRELOAD_FILE@"
-
 ENVIRONMENTS = [("ENV_OUTPUT", "BEAR_OUTPUT")]
 
 if not '@APPLE@':
@@ -248,10 +246,14 @@ def create_parser():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
+        '--version',
+        action='version',
+        version='%(prog)s @BEAR_VERSION@')
+    parser.add_argument(
         '--verbose', '-v',
         action='count',
         default=0,
-        help="""Enable verbose output from '%(prog)s'. A second '-v' increases
+        help="""enable verbose output from '%(prog)s'. A second '-v' increases
                 verbosity.""")
     parser.add_argument(
         '--cdb', '-o',
@@ -259,27 +261,27 @@ def create_parser():
         default="compile_commands.json",
         help="""The JSON compilation database.""")
     parser.add_argument(
-        '--append',
+        '--append', '-a',
         action='store_true',
-        help="""Append new entries to existing compilation database.""")
+        help="""appends new entries to existing compilation database.""")
 
     testing = parser.add_argument_group('advanced options')
     testing.add_argument(
         '--disable-filter', '-n',
         dest='raw_entries',
         action='store_true',
-        help="""Disable filter, unformated output.""")
+        help="""disable filter, unformated output.""")
     testing.add_argument(
         '--libear', '-l',
         dest='libear',
-        default=LIBEAR_FILE,
+        default="@DEFAULT_PRELOAD_FILE@",
         action='store',
-        help="""Specify libear file location.""")
+        help="""specify libear file location.""")
 
     parser.add_argument(
         dest='build',
         nargs=argparse.REMAINDER,
-        help="""Command to run.""")
+        help="""command to run.""")
 
     return parser
 
