@@ -399,8 +399,8 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         exit(EXIT_FAILURE);
     }
     char *filename = 0;
-    if (-1 == asprintf(&filename, "%s/%ld.%d.%d.cmd",
-                       initial_env[0], now.tv_sec, now.tv_usec, getpid())) {
+    if (-1 == asprintf(&filename, "%s/%ld.%ld.%d.cmd",
+                       initial_env[0], now.tv_sec, (long)now.tv_usec, getpid())) {
         perror("bear: asprintf");
         exit(EXIT_FAILURE);
     }
