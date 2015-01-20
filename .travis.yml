@@ -1,16 +1,20 @@
-language: c
+language: python
 
-compiler:
-  - gcc
-  - clang
+python:
+  - 2.7
+  - 3.2
+  - 3.3
+  - 3.4
 
 before_install:
   - sudo apt-get update -qq
 
 install:
-  - sudo apt-get install --allow-unauthenticated -qq python qt4-qmake
+  - sudo apt-get install --allow-unauthenticated -qq qt4-qmake
+  - pip install pep8
 
 script:
+  - pep8 bear
   - cmake . -DCPACK_GENERATOR="TGZ;DEB"
   - make all
   - make check
