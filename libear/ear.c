@@ -450,8 +450,10 @@ static void bear_restore_env_t(bear_env_t *env) {
 }
 
 static void bear_release_env_t(bear_env_t *env) {
-    for (size_t it = 0; it < ENV_SIZE; ++it)
+    for (size_t it = 0; it < ENV_SIZE; ++it) {
         free((void *)*env[it]);
+        *env[it] = 0;
+    }
 }
 
 static char const **bear_update_environment(char *const envp[], bear_env_t *env) {
