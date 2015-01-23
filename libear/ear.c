@@ -456,9 +456,8 @@ static void bear_release_env_t(bear_env_t *env) {
 
 static char const **bear_update_environment(char *const envp[], bear_env_t *env) {
     char const **result = bear_strings_copy((char const **)envp);
-    if (bear_is_valid_env_t(env))
-        for (size_t it = 0; it < ENV_SIZE; ++it)
-            result = bear_update_environ(result, env_names[it], *env[it]);
+    for (size_t it = 0; it < ENV_SIZE && *env[it]; ++it)
+        result = bear_update_environ(result, env_names[it], *env[it]);
     return result;
 }
 
@@ -471,21 +470,18 @@ static char const **bear_update_environ(char const *envs[], char const *key, cha
             (strlen(*it) > key_length) && ('=' == (*it)[key_length]))
             break;
     }
-    // check the value might already correct
-    char const **result = envs;
-    if ((0 != it) && ((0 == *it) || (strcmp(*it + key_length + 1, value)))) {
-        char *env = 0;
-        if (-1 == asprintf(&env, "%s=%s", key, value)) {
-            perror("bear: asprintf");
-            exit(EXIT_FAILURE);
-        }
-        if (*it) {
-            free((void *)*it);
-            *it = env;
-        } else
-            result = bear_strings_append(envs, env);
+    // replace or append the new value
+    char *env = 0;
+    if (-1 == asprintf(&env, "%s=%s", key, value)) {
+        perror("bear: asprintf");
+        exit(EXIT_FAILURE);
     }
-    return result;
+    if (it && *it) {
+        free((void *)*it);
+        *it = env;
+	return envs;
+    }
+    return bear_strings_append(envs, env);
 }
 
 /* util methods to deal with string arrays. environment and process arguments
