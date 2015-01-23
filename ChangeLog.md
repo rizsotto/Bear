@@ -1,3 +1,10 @@
+## 2.0.1 (2015-01-23)
+
+Bugfixes:
+
+  - Double free problem fixed when descrutor called multiple times.
+
+
 ## 2.0 (2015-01-20)
 
 Features:
