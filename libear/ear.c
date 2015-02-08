@@ -428,21 +428,21 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
 static void bear_capture_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it) {
         char const * const env_value = getenv(env_names[it]);
-        *env[it] = (env_value) ? strdup(env_value) : env_value;
+        (*env)[it] = (env_value) ? strdup(env_value) : env_value;
     }
 }
 
 static int bear_is_valid_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it)
-        if (0 == *env[it])
+        if (0 == (*env)[it])
             return 0;
     return 1;
 }
 
 static void bear_restore_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it)
-        if ((*env[it])
-                ? setenv(env_names[it], *env[it], 1)
+        if (((*env)[it])
+                ? setenv(env_names[it], (*env)[it], 1)
                 : unsetenv(env_names[it])) {
             perror("bear: setenv");
             exit(EXIT_FAILURE);
@@ -451,15 +451,15 @@ static void bear_restore_env_t(bear_env_t *env) {
 
 static void bear_release_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it) {
-        free((void *)*env[it]);
-        *env[it] = 0;
+        free((void *)(*env)[it]);
+        (*env)[it] = 0;
     }
 }
 
 static char const **bear_update_environment(char *const envp[], bear_env_t *env) {
     char const **result = bear_strings_copy((char const **)envp);
-    for (size_t it = 0; it < ENV_SIZE && *env[it]; ++it)
-        result = bear_update_environ(result, env_names[it], *env[it]);
+    for (size_t it = 0; it < ENV_SIZE && (*env)[it]; ++it)
+        result = bear_update_environ(result, env_names[it], (*env)[it]);
     return result;
 }
 
