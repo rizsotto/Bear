@@ -434,9 +434,9 @@ static void bear_capture_env_t(bear_env_t *env) {
 
 static int bear_is_valid_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it)
-        if (*env[it])
-            return -1;
-    return 0;
+        if (0 == *env[it])
+            return 0;
+    return 1;
 }
 
 static void bear_restore_env_t(bear_env_t *env) {
