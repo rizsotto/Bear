@@ -1,3 +1,11 @@
+## 2.0.2 (2015-02-08)
+
+Bugfixes:
+
+  - Address Sanitizer error fixed.
+  - Fix some typos in man page (@sebastinas, #72)
+
+
 ## 2.0.1 (2015-01-23)
 
 Bugfixes:
