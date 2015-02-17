@@ -213,7 +213,7 @@ else:
         from the filesystem. """
         def __init__(self, **kwargs):
             from tempfile import mkdtemp
-            self.name = mkdtemp(*kwargs)
+            self.name = mkdtemp(**kwargs)
 
         def __enter__(self):
             return self.name
