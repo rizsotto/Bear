@@ -33,17 +33,13 @@
 
 #include "config.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/time.h>
-#include <ctype.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <dlfcn.h>
 #include <time.h>
 
@@ -407,20 +403,23 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: asprintf");
         exit(EXIT_FAILURE);
     }
-    int fd = open(filename, O_CREAT | O_APPEND | O_WRONLY, S_IRUSR | S_IWUSR | S_IRGRP);
-    if (-1 == fd) {
-        perror("bear: open");
+    FILE * fd = fopen(filename, "w");
+    if (0 == fd) {
+        perror("bear: fopen");
         exit(EXIT_FAILURE);
     }
-    dprintf(fd, "%d%c", getpid(), RS);
-    dprintf(fd, "%d%c", getppid(), RS);
-    dprintf(fd, "%s%c", fun, RS);
-    dprintf(fd, "%s%c", cwd, RS);
+    fprintf(fd, "%d%c", getpid(), RS);
+    fprintf(fd, "%d%c", getppid(), RS);
+    fprintf(fd, "%s%c", fun, RS);
+    fprintf(fd, "%s%c", cwd, RS);
     size_t const argc = bear_strings_length(argv);
     for (size_t it = 0; it < argc; ++it) {
-        dprintf(fd, "%s%c", argv[it], US);
+        fprintf(fd, "%s%c", argv[it], US);
     }
-    close(fd);
+    if (fclose(fd)) {
+        perror("bear: fclose");
+        exit(EXIT_FAILURE);
+    }
     free((void *)filename);
     free((void *)cwd);
 }
