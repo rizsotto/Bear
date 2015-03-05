@@ -397,10 +397,12 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: clock_gettime");
         exit(EXIT_FAILURE);
     }
-    char *filename = 0;
-    if (-1 == asprintf(&filename, "%s/%ld.%ld.%d.cmd",
-                       initial_env[0], now.tv_sec, (long)now.tv_usec, getpid())) {
-        perror("bear: asprintf");
+    char const * const out_dir = initial_env[0];
+    size_t const path_max_length = strlen(out_dir) + 64;
+    char filename[path_max_length];
+    if (-1 == snprintf(filename, path_max_length, "%s/%ld.%ld.%d.cmd",
+                       out_dir, now.tv_sec, (long)now.tv_usec, getpid())) {
+        perror("bear: snprintf");
         exit(EXIT_FAILURE);
     }
     FILE * fd = fopen(filename, "w");
@@ -420,7 +422,6 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: fclose");
         exit(EXIT_FAILURE);
     }
-    free((void *)filename);
     free((void *)cwd);
 }
 
@@ -471,12 +472,19 @@ static char const **bear_update_environ(char const *envs[], char const *key, cha
             (strlen(*it) > key_length) && ('=' == (*it)[key_length]))
             break;
     }
-    // replace or append the new value
-    char *env = 0;
-    if (-1 == asprintf(&env, "%s=%s", key, value)) {
-        perror("bear: asprintf");
+    // allocate a environment entry
+    size_t const value_length = strlen(value);
+    size_t const env_length = key_length + value_length + 2;
+    char *env = malloc(env_length);
+    if (0 == env) {
+        perror("bear: malloc [in env_update]");
         exit(EXIT_FAILURE);
     }
+    if (-1 == snprintf(env, env_length, "%s=%s", key, value)) {
+        perror("bear: snprintf");
+        exit(EXIT_FAILURE);
+    }
+    // replace or append the environment entry
     if (it && *it) {
         free((void *)*it);
         *it = env;
