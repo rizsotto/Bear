@@ -61,8 +61,7 @@ extern char **environ;
 
 typedef char const * bear_env_t[ENV_SIZE];
 
-static void bear_capture_env_t(bear_env_t *env);
-static int bear_is_valid_env_t(bear_env_t *env);
+static int bear_capture_env_t(bear_env_t *env);
 static void bear_restore_env_t(bear_env_t *env);
 static void bear_release_env_t(bear_env_t *env);
 static char const **bear_update_environment(char *const envp[], bear_env_t *env);
@@ -90,6 +89,8 @@ static bear_env_t initial_env =
     , 0
 #endif
     };
+
+static int initialized = 0;
 
 static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
@@ -145,11 +146,13 @@ static void on_load(void) {
 #ifdef HAVE_NSGETENVIRON
     environ = *_NSGetEnviron();
 #endif
-    bear_capture_env_t(&initial_env);
+    if (!initialized)
+        initialized = bear_capture_env_t(&initial_env);
 }
 
 static void on_unload(void) {
     bear_release_env_t(&initial_env);
+    initialized = 0;
 }
 
 
@@ -385,7 +388,7 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
     static int const RS = 0x1e;
     static int const US = 0x1f;
 
-    if (!bear_is_valid_env_t(&initial_env))
+    if (!initialized)
         return;
 
     const char *cwd = getcwd(NULL, 0);
@@ -425,18 +428,15 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
 /* update environment assure that chilren processes will copy the desired
  * behaviour */
 
-static void bear_capture_env_t(bear_env_t *env) {
+static int bear_capture_env_t(bear_env_t *env) {
+    int status = 1;
     for (size_t it = 0; it < ENV_SIZE; ++it) {
         char const * const env_value = getenv(env_names[it]);
-        (*env)[it] = (env_value) ? strdup(env_value) : env_value;
+        char const * const env_copy = (env_value) ? strdup(env_value) : env_value;
+        (*env)[it] = env_copy;
+        status &= (env_copy) ? 1 : 0;
     }
-}
-
-static int bear_is_valid_env_t(bear_env_t *env) {
-    for (size_t it = 0; it < ENV_SIZE; ++it)
-        if (0 == (*env)[it])
-            return 0;
-    return 1;
+    return status;
 }
 
 static void bear_restore_env_t(bear_env_t *env) {
