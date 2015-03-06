@@ -165,7 +165,7 @@ def format_entry(entry):
         fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
         return os.path.normpath(fullname)
 
-    atoms = classify_parameters(entry['command'])
+    atoms = classify_parameters(entry['command'], entry['directory'])
     if atoms['action'] == Action.Compile:
         for filename in atoms['files']:
             yield {'directory': entry['directory'],
@@ -316,7 +316,7 @@ class Action(object):
     Link, Compile, Preprocess, Info = range(4)
 
 
-def classify_parameters(command):
+def classify_parameters(command, directory):
     """ Parses the command line arguments of the given invocation.
 
     To run analysis from a compilation command, first it disassembles the
@@ -449,7 +449,7 @@ def classify_parameters(command):
 
     def take_from_file(*keys):
         def take(values, iterator, _match):
-            with open(iterator.next()) as handle:
+            with open(os.path.join(directory, iterator.next())) as handle:
                 current = [line.strip() for line in handle.readlines()]
                 for key in keys:
                     values[key] = current
