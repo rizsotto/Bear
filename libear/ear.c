@@ -33,7 +33,6 @@
 
 #include "config.h"
 
-#include <sys/time.h>
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -41,7 +40,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <dlfcn.h>
-#include <time.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -381,6 +379,7 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 /* this method is to write log about the process creation. */
 
 static void bear_report_call(char const *fun, char const *const argv[]) {
+    static int const GS = 0x1d;
     static int const RS = 0x1e;
     static int const US = 0x1f;
 
@@ -392,20 +391,14 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         perror("bear: getcwd");
         exit(EXIT_FAILURE);
     }
-    struct timeval now;
-    if (0 != gettimeofday(&now, 0)) {
-        perror("bear: clock_gettime");
-        exit(EXIT_FAILURE);
-    }
     char const * const out_dir = initial_env[0];
-    size_t const path_max_length = strlen(out_dir) + 64;
+    size_t const path_max_length = strlen(out_dir) + 32;
     char filename[path_max_length];
-    if (-1 == snprintf(filename, path_max_length, "%s/%ld.%ld.%d.cmd",
-                       out_dir, now.tv_sec, (long)now.tv_usec, getpid())) {
+    if (-1 == snprintf(filename, path_max_length, "%s/%d.cmd", out_dir, getpid())) {
         perror("bear: snprintf");
         exit(EXIT_FAILURE);
     }
-    FILE * fd = fopen(filename, "w");
+    FILE * fd = fopen(filename, "a+");
     if (0 == fd) {
         perror("bear: fopen");
         exit(EXIT_FAILURE);
@@ -418,6 +411,7 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
     for (size_t it = 0; it < argc; ++it) {
         fprintf(fd, "%s%c", argv[it], US);
     }
+    fprintf(fd, "%c", GS);
     if (fclose(fd)) {
         perror("bear: fclose");
         exit(EXIT_FAILURE);
