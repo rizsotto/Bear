@@ -156,11 +156,7 @@ def parse_exec_trace(filename):
 def format_entry(entry):
     """ Generate the desired fields for compilation database entries. """
     def join_command(args):
-        """ Create a single string from list.
-
-        The major challenge, to deal with white spaces. Which are used by
-        the shell as separator. (Eg.: -D_KEY="Value with spaces") """
-        return ' '.join(args)
+        return ' '.join([shell_escape(arg) for arg in args])
 
     def abspath(cwd, name):
         """ Create normalized absolute path from input filename. """
@@ -174,6 +170,18 @@ def format_entry(entry):
                 yield {'directory': entry['directory'],
                        'command': join_command(entry['command']),
                        'file': abspath(entry['directory'], filename)}
+
+
+def shell_escape(arg):
+    """ Create a single string from list.
+
+    The major challenge, to deal with white spaces. Which are used by
+    the shell as separator. (Eg.: -D_KEY="Value with spaces") """
+    def quote(arg):
+        table = {'\\': '\\\\', '"': '\\"', "'": "\\'"}
+        return '"' + ''.join([table.get(c, c) for c in arg]) + '"'
+
+    return quote(arg) if len(shlex.split(arg)) > 1 else arg
 
 
 def is_source_file(filename):
