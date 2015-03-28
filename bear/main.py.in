@@ -352,6 +352,7 @@ def classify_parameters(command):
             regex(r'^-(E|MM?)$', take_action(Action.Preprocess)),
             anyof({'-c'}, take_action(Action.Compile)),
             anyof({'-print-prog-name'}, take_action(Action.Info)),
+            anyof({'-cc1'}, take_action(Action.Info)),
             #
             anyof({'-arch'}, take_two('archs_seen')),
             #
