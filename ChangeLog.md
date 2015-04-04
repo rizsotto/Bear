@@ -1,3 +1,12 @@
+## 2.0.3 (2015-04-04)
+
+Bugfixes:
+
+  - Fix passing of arguments to mkdtemp (@kljohann, #75)
+  - Empty output when compiler used to link. (@QuaziRandom, #80)
+  - Bad escape of strings in compilation database. (@jumapico, #81)
+
+
 ## 2.0.2 (2015-02-08)
 
 Bugfixes:
