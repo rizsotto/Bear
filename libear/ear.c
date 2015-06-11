@@ -56,7 +56,6 @@ extern char **environ;
 typedef char const * bear_env_t[ENV_SIZE];
 
 static int bear_capture_env_t(bear_env_t *env);
-static void bear_restore_env_t(bear_env_t *env);
 static void bear_release_env_t(bear_env_t *env);
 static char const **bear_update_environment(char *const envp[], bear_env_t *env);
 static char const **bear_update_environ(char const **in, char const *key, char const *value);
@@ -305,12 +304,12 @@ static int call_execvp(const char *file, char *const argv[]) {
 
     DLSYM(func, fp, "execvp");
 
-    bear_env_t current;
-    bear_capture_env_t(&current);
-    bear_restore_env_t(&initial_env);
+    char **const original = environ;
+    char const **const modified = bear_update_environment(original, &initial_env);
+    environ = (char **)modified;
     int const result = (*fp)(file, argv);
-    bear_restore_env_t(&current);
-    bear_release_env_t(&current);
+    environ = original;
+    bear_strings_release(modified);
 
     return result;
 }
@@ -323,12 +322,12 @@ static int call_execvP(const char *file, const char *search_path,
 
     DLSYM(func, fp, "execvP");
 
-    bear_env_t current;
-    bear_capture_env_t(&current);
-    bear_restore_env_t(&initial_env);
+    char **const original = environ;
+    char const **const modified = bear_update_environment(original, &initial_env);
+    environ = (char **)modified;
     int const result = (*fp)(file, search_path, argv);
-    bear_restore_env_t(&current);
-    bear_release_env_t(&current);
+    environ = original;
+    bear_strings_release(modified);
 
     return result;
 }
@@ -431,16 +430,6 @@ static int bear_capture_env_t(bear_env_t *env) {
         status &= (env_copy) ? 1 : 0;
     }
     return status;
-}
-
-static void bear_restore_env_t(bear_env_t *env) {
-    for (size_t it = 0; it < ENV_SIZE; ++it)
-        if (((*env)[it])
-                ? setenv(env_names[it], (*env)[it], 1)
-                : unsetenv(env_names[it])) {
-            perror("bear: setenv");
-            exit(EXIT_FAILURE);
-        }
 }
 
 static void bear_release_env_t(bear_env_t *env) {
