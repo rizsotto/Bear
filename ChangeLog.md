@@ -1,3 +1,10 @@
+## 2.0.4 (2015-06-16)
+
+Bugfixes:
+
+  - Fix crash when make with -j option (@minhyuk, #87)
+
+
 ## 2.0.3 (2015-04-04)
 
 Bugfixes:
