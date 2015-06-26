@@ -179,9 +179,9 @@ def shell_escape(arg):
     the shell as separator. (Eg.: -D_KEY="Value with spaces") """
     def quote(arg):
         table = {'\\': '\\\\', '"': '\\"', "'": "\\'"}
-        return '"' + ''.join([table.get(c, c) for c in arg]) + '"'
+        return ''.join([table.get(c, c) for c in arg])
 
-    return quote(arg) if len(shlex.split(arg)) > 1 else arg
+    return '"' + quote(arg) + '"' if len(shlex.split(arg)) > 1 else quote(arg)
 
 
 def is_source_file(filename):
