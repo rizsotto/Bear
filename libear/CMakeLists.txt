@@ -1,3 +1,5 @@
+set(CMAKE_MACOSX_RPATH 1)
+
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 check_function_exists(execve HAVE_EXECVE)
@@ -17,6 +19,8 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(ear SHARED ear.c)
 target_link_libraries(ear ${CMAKE_DL_LIBS})
+
+set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
 
 include(GNUInstallDirs)
 install(TARGETS ear
