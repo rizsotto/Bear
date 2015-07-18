@@ -40,6 +40,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -382,8 +383,12 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
     static int const RS = 0x1e;
     static int const US = 0x1f;
 
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
     if (!initialized)
         return;
+
+    pthread_mutex_lock(&lock);
 
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd) {
@@ -416,6 +421,8 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         exit(EXIT_FAILURE);
     }
     free((void *)cwd);
+
+    pthread_mutex_unlock(&lock);
 }
 
 /* update environment assure that chilren processes will copy the desired
