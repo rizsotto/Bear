@@ -6,11 +6,16 @@ python:
   - 3.3
   - 3.4
 
-before_install:
-  - sudo apt-get update -qq
+sudo: false
+
+addons:
+  apt:
+    packages:
+      - cmake
+      - scons
+      - qt4-qmake
 
 install:
-  - sudo apt-get install --allow-unauthenticated -qq qt4-qmake
   - pip install pep8
 
 script:
@@ -21,6 +26,3 @@ script:
   - mkdir target_dir
   - DESTDIR=target_dir make install
   - make package
-
-after_success:
-  - sudo dpkg -i ./bear-*.deb
