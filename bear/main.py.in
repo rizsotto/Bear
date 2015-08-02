@@ -163,12 +163,16 @@ def format_entry(entry):
         fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
         return os.path.normpath(fullname)
 
+    def exclude_source_file_except(commands, keep):
+        """ Remove source file names from command, but keep the file that's being compiled"""
+        return [x for x in commands if not is_source_file(x)] + [keep]
+
     atoms = classify_parameters(entry['command'])
     if atoms['action'] <= Action.Compile:
         for filename in atoms.get('files', []):
             if is_source_file(filename):
                 yield {'directory': entry['directory'],
-                       'command': join_command(entry['command']),
+                       'command': join_command(exclude_source_file_except(entry['command'], filename)),
                        'file': abspath(entry['directory'], filename)}
 
 
