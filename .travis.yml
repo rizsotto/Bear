@@ -19,7 +19,7 @@ install:
   - pip install pep8
 
 script:
-  - pep8 bear
+  - pep8 bear/main.py.in
   - cmake . -DCPACK_GENERATOR="TGZ;DEB"
   - make all
   - make check
