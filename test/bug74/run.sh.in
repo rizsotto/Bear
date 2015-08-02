@@ -1,0 +1,13 @@
+#!/bin/sh
+
+set -o nounset
+set -o errexit
+
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
+
+RUN_TEST="cc -c -MMD @CMAKE_CURRENT_SOURCE_DIR@/foo.c"
+
+python ${BEAR_EXE} -l ${BEAR_LIB} --cdb out.json sh -c "$RUN_TEST"
+test `grep "command" out.json | wc -l` -eq 1
+test `cat out.json | grep "command" | grep "MMD" | wc -l` -eq 0
