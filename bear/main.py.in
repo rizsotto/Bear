@@ -165,11 +165,13 @@ def format_entry(entry):
 
     atoms = classify_parameters(entry['command'])
     if atoms['action'] <= Action.Compile:
-        for filename in atoms.get('files', []):
-            if is_source_file(filename):
-                yield {'directory': entry['directory'],
-                       'command': join_command(entry['command']),
-                       'file': abspath(entry['directory'], filename)}
+        sources = (file for file in atoms.get('files', []) if is_source(file))
+        for source in sources:
+            compiler = 'c++' if atoms['c++'] else 'cc'
+            command = [compiler, '-c'] + atoms['compile_options'] + [source]
+            yield {'directory': entry['directory'],
+                   'command': join_command(command),
+                   'file': abspath(entry['directory'], source)}
 
 
 def shell_escape(arg):
@@ -184,7 +186,7 @@ def shell_escape(arg):
     return quote(arg) if len(shlex.split(arg)) > 1 else arg
 
 
-def is_source_file(filename):
+def is_source(filename):
     """ A predicate to decide the filename is a source file or not. """
     accepted = {'.c', '.C', '.cc', '.CC', '.cxx', '.cp', '.cpp', '.c++',
                 '.m', '.mm',
@@ -499,7 +501,8 @@ def classify_parameters(command):
         return take
 
     state = {'action': Action.Link,
-             'cxx': _is_cplusplus_compiler(command[0])}
+             'compile_options': [],
+             'c++': cplusplus_compiler(command[0])}
 
     arguments = Arguments(command)
     for _ in arguments:
@@ -545,7 +548,7 @@ class Arguments(object):
             return self.__sequence[self.__current]
 
 
-def _is_cplusplus_compiler(name):
+def cplusplus_compiler(name):
     """ Returns true when the compiler name refer to a C++ compiler.
     """
     match = re.match(r'^([^/]*/)*(\w*-)*(\w+\+\+)(-(\d+(\.\d+){0,3}))?$', name)
