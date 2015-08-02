@@ -52,6 +52,27 @@ static char **environ;
 extern char **environ;
 #endif
 
+#define ENV_OUTPUT "BEAR_OUTPUT"
+#ifdef APPLE
+# define ENV_FLAT    "DYLD_FORCE_FLAT_NAMESPACE"
+# define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
+# define ENV_SIZE 3
+#else
+# define ENV_PRELOAD "LD_PRELOAD"
+# define ENV_SIZE 2
+#endif
+
+#define DLSYM(TYPE_, VAR_, SYMBOL_)                                            \
+    union {                                                                    \
+        void *from;                                                            \
+        TYPE_ to;                                                              \
+    } cast;                                                                    \
+    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {                        \
+        perror("bear: dlsym");                                                 \
+        exit(EXIT_FAILURE);                                                    \
+    }                                                                          \
+    TYPE_ const VAR_ = cast.to;
+
 
 typedef char const * bear_env_t[ENV_SIZE];
 
@@ -87,18 +108,6 @@ static int initialized = 0;
 
 static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
-
-
-#define DLSYM(TYPE_, VAR_, SYMBOL_)                                            \
-    union {                                                                    \
-        void *from;                                                            \
-        TYPE_ to;                                                              \
-    } cast;                                                                    \
-    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {                        \
-        perror("bear: dlsym");                                                 \
-        exit(EXIT_FAILURE);                                                    \
-    }                                                                          \
-    TYPE_ const VAR_ = cast.to;
 
 
 #ifdef HAVE_EXECVE

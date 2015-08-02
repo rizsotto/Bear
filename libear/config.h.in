@@ -20,14 +20,3 @@
 #cmakedefine HAVE_NSGETENVIRON
 
 #cmakedefine APPLE
-
-#define ENV_OUTPUT "BEAR_OUTPUT"
-
-#ifdef APPLE
-# define ENV_FLAT    "DYLD_FORCE_FLAT_NAMESPACE"
-# define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
-# define ENV_SIZE 3
-#else
-# define ENV_PRELOAD "LD_PRELOAD"
-# define ENV_SIZE 2
-#endif
