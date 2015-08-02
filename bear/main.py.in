@@ -94,9 +94,9 @@ def capture(args):
     with TemporaryDirectory(prefix='bear-', dir=tempdir()) as tmpdir:
         # run the build command
         environment = setup_environment(tmpdir, args.libear)
-        logging.debug('run build in environment: %s', environment)
+        logging.info('run build in environment: %s', environment)
         exit_code = subprocess.call(args.build, env=environment)
-        logging.debug('build finished with exit code: %s', exit_code)
+        logging.info('build finished with exit code: %s', exit_code)
         # read the intercepted exec calls
         commands = (parse_exec_trace(os.path.join(tmpdir, filename))
                     for filename in sorted(os.listdir(tmpdir)))
@@ -139,6 +139,8 @@ def parse_exec_trace(filename):
     GS = chr(0x1d)
     RS = chr(0x1e)
     US = chr(0x1f)
+
+    logging.debug('parse exec trace file: %s', filename)
     with open(filename, 'r') as handler:
         content = handler.read()
         for group in filter(bool, content.split(GS)):
@@ -163,12 +165,14 @@ def format_entry(entry):
         fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
         return os.path.normpath(fullname)
 
+    logging.debug('format this command: %s', entry['command'])
     atoms = classify_parameters(entry['command'])
     if atoms['action'] <= Action.Compile:
         sources = (file for file in atoms.get('files', []) if is_source(file))
         for source in sources:
             compiler = 'c++' if atoms['c++'] else 'cc'
             command = [compiler, '-c'] + atoms['compile_options'] + [source]
+            logging.debug('formated as: %s', command)
             yield {
                 'directory': entry['directory'],
                 'command': join_command(command),
