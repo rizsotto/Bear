@@ -7,6 +7,7 @@ Features:
 
 Bugfixes:
   - Get rid of cmake warnings on osx (@emlai, #90)
+  - Protect report generation in multithread build systems (@smoofra, #93)
 
 
 ## 2.0.4 (2015-06-16)

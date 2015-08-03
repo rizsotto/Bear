@@ -40,6 +40,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -105,6 +106,7 @@ static bear_env_t initial_env =
     };
 
 static int initialized = 0;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
@@ -145,16 +147,20 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
  */
 
 static void on_load(void) {
+    pthread_mutex_lock(&mutex);
 #ifdef HAVE_NSGETENVIRON
     environ = *_NSGetEnviron();
 #endif
     if (!initialized)
         initialized = bear_capture_env_t(&initial_env);
+    pthread_mutex_unlock(&mutex);
 }
 
 static void on_unload(void) {
+    pthread_mutex_lock(&mutex);
     bear_release_env_t(&initial_env);
     initialized = 0;
+    pthread_mutex_unlock(&mutex);
 }
 
 
@@ -394,6 +400,7 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
     if (!initialized)
         return;
 
+    pthread_mutex_lock(&mutex);
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd) {
         perror("bear: getcwd");
@@ -425,6 +432,7 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
         exit(EXIT_FAILURE);
     }
     free((void *)cwd);
+    pthread_mutex_unlock(&mutex);
 }
 
 /* update environment assure that chilren processes will copy the desired
