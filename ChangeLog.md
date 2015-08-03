@@ -1,3 +1,14 @@
+## 2.1.0
+
+Features:
+  - Ignore preprocessor flags for dependency generation (@jonthn, #74)
+  - Exclude irrelevant files names in command (@wweic, #94)
+  - Use docker build for travis-ci
+
+Bugfixes:
+  - Get rid of cmake warnings on osx (@emlai, #90)
+
+
 ## 2.0.4 (2015-06-16)
 
 Bugfixes:
