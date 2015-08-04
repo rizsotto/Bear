@@ -3,11 +3,11 @@ OBJ:=empty.o
 EXE:=empty
 
 test-in-one: $(SRC)
-	c++ -o $(EXE) $(SRC)
+	cc -o $(EXE) $(SRC)
 
 test-in-two: $(SRC)
-	c++ -c $(SRC)
-	c++ -o $(EXE) $(OBJ)
+	cc -c $(SRC)
+	cc -o $(EXE) $(OBJ)
 
 .PHONY: clean
 clean:
