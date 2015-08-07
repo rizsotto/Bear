@@ -3,6 +3,7 @@
 Features:
   - Ignore preprocessor flags for dependency generation (@jonthn, #74)
   - Exclude irrelevant files names in command (@wweic, #94)
+  - Support MetaWare toolkit (@twpedersen, #95)
   - Use docker build for travis-ci
 
 Bugfixes:
