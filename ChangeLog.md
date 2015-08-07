@@ -1,4 +1,4 @@
-## 2.1.0
+## 2.1.0 (2015.08.08)
 
 Features:
   - Ignore preprocessor flags for dependency generation (@jonthn, #74)
