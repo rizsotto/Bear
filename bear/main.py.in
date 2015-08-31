@@ -380,14 +380,14 @@ def classify_parameters(command):
         elif arg in {'-MD', '-MMD', '-MG', '-MP'}:
             pass
         elif arg in {'-MF', '-MT', '-MQ'}:
-            args.next()
+            next(args)
         # linker options are ignored...
         elif arg in {'-static', '-shared', '-s', '-rdynamic'}:
             pass
         elif re.match(r'^-[lL].+', arg):
             pass
         elif arg in {'-l', '-L', '-u', '-z', '-T', '-Xlinker'}:
-            args.next()
+            next(args)
         # optimalization and waring options are ignored...
         elif re.match(r'^-[mWO].+', arg):
             pass
