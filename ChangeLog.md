@@ -1,3 +1,9 @@
+## 2.1.1 (2015.08.31)
+
+Bugfixes:
+  - Fix iterator next method usage (@drvink, #97)
+
+
 ## 2.1.0 (2015.08.08)
 
 Features:
