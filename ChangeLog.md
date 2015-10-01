@@ -1,3 +1,9 @@
+## 2.1.2
+
+Bugfixes:
+  - Fix escaping quotes for shell too. (@zauguin, #88)
+
+
 ## 2.1.1 (2015.08.31)
 
 Bugfixes:
