@@ -157,9 +157,6 @@ def parse_exec_trace(filename):
 def format_entry(entry):
     """ Generate the desired fields for compilation database entries. """
 
-    def join_command(args):
-        return ' '.join([shell_escape(arg) for arg in args])
-
     def abspath(cwd, name):
         """ Create normalized absolute path from input filename. """
         fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
@@ -174,22 +171,50 @@ def format_entry(entry):
             logging.debug('formated as: %s', command)
             yield {
                 'directory': entry['directory'],
-                'command': join_command(command),
+                'command': shell_escape(command),
                 'file': abspath(entry['directory'], source)
             }
 
 
-def shell_escape(arg):
-    """ Create a single string from list.
+def shell_escape(command):
+    """ Takes a command as list and returns a string. """
 
-    The major challenge, to deal with white spaces. Which are used by
-    the shell as separator. (Eg.: -D_KEY="Value with spaces") """
+    def needs_quote(arg):
+        """ Returns true if arguments needs to be protected by quotes.
 
-    def quote(arg):
-        table = {'\\': '\\\\', '"': '\\"', "'": "\\'"}
-        return '"' + ''.join([table.get(c, c) for c in arg]) + '"'
+        Previous implementation was shlex.split method, but that's not good
+        for this job. Currently is running through the string with a basic
+        state checking. """
 
-    return quote(arg) if len(shlex.split(arg)) > 1 else arg
+        reserved = {' ', '$', '%', '&', '(', ')', '[', ']', '{', '}', '*', '|',
+                    '<', '>', '@', '?', '!'}
+        state = 0
+        for c in arg:
+            if state == 0 and c in reserved:
+                return True
+            elif state == 0 and c == '\\':
+                state = 1
+            elif state == 1 and c in reserved | {'\\'}:
+                state = 0
+            elif state == 0 and c == '"':
+                state = 2
+            elif state == 2 and c == '"':
+                state = 0
+            elif state == 0 and c == "'":
+                state = 3
+            elif state == 3 and c == "'":
+                state = 0
+        return state != 0
+
+    def escape(arg):
+        """ Do protect argument if that's needed. """
+
+        table = {'\\': '\\\\', '"': '\\"'}
+        escaped = ''.join([table.get(c, c) for c in arg])
+
+        return '"' + escaped + '"' if needs_quote(arg) else escaped
+
+    return " ".join([escape(arg) for arg in command])
 
 
 def is_source(filename):

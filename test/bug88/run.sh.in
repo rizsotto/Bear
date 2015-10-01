@@ -1,0 +1,15 @@
+#!/bin/sh
+
+set -o nounset
+set -o errexit
+
+BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
+BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
+
+RUN_TEST='cc "-DKEY=\"value with spaces\"" @CMAKE_CURRENT_SOURCE_DIR@/spaces.c -o space'
+
+python ${BEAR_EXE} -l ${BEAR_LIB} --cdb out.json sh -c "$RUN_TEST"
+
+[ "$(./space)" = "value with spaces" ] && echo "compiled correctly"
+[ "$(cat out.json | grep command | wc -l)" -eq 1 ] && echo "command captured"
+[ "$(cat out.json | grep command | sed 's/\s/\n/g' | uniq | grep -c -e \\\\\\\")" -eq 2 ] && echo "3 backslash is there"
