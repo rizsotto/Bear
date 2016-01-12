@@ -277,9 +277,9 @@ def duplicate_check(method):
     This method returns a method which can detect the duplicate values. """
 
     def predicate(entry):
-        entry_hash = predicate.unique(entry)
-        if entry_hash not in predicate.state:
-            predicate.state.add(entry_hash)
+        hash_value = predicate.unique(entry)
+        if hash_value not in predicate.state:
+            predicate.state.add(hash_value)
             return False
         return True
 
