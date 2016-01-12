@@ -52,8 +52,8 @@ def main():
         parser = create_parser()
         args = parser.parse_args()
 
-        logging.basicConfig(format='bear: %(message)s')
-        logging.getLogger().setLevel(to_logging_level(args.verbose))
+        level = logging.WARNING - min(logging.WARNING, (10 * args.verbose))
+        logging.basicConfig(format='bear: %(message)s', level=level)
         logging.debug(args)
 
         if not args.build:
@@ -358,16 +358,6 @@ def create_parser():
         help="""command to run.""")
 
     return parser
-
-
-def to_logging_level(num):
-    """ Convert the count of verbose flags to logging level. """
-    if 0 == num:
-        return logging.WARNING
-    elif 1 == num:
-        return logging.INFO
-    else:
-        return logging.DEBUG
 
 
 class Action(object):
