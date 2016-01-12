@@ -403,8 +403,8 @@ def classify_parameters(command):
             pass
         elif arg in {'-l', '-L', '-u', '-z', '-T', '-Xlinker'}:
             next(args)
-        # optimalization and waring options are ignored...
-        elif re.match(r'^-[mWO].+', arg):
+        # optimalization options are ignored...
+        elif re.match(r'^-[mO].+', arg):
             pass
         # parameters which looks source file are taken...
         elif re.match(r'^[^-].+', arg) and is_source(arg):
