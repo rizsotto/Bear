@@ -1,4 +1,11 @@
-## 2.1.2
+## 2.1.3 (2016.01.13)
+
+Bugfixes:
+  - warnings are not filtered from output (@velkyel, #106)
+  - support universal binaries (32 and 64) on x86 OS X (@DeanoC, #101)
+
+
+## 2.1.2 (2015.10.01)
 
 Bugfixes:
   - Fix escaping quotes for shell too. (@zauguin, #88)
