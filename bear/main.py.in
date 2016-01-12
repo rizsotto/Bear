@@ -35,8 +35,6 @@ and the post-processing of the output files, which will condensates into a
 (might be empty) compilation database. """
 
 import argparse
-import logging
-import functools
 import subprocess
 import json
 import sys
@@ -45,6 +43,10 @@ import os.path
 import re
 import shlex
 import itertools
+import tempfile
+import shutil
+import contextlib
+import logging
 
 
 def main():
@@ -71,6 +73,14 @@ def main():
 def capture(args):
     """ The entry point of build command interception. """
 
+    @contextlib.contextmanager
+    def temporary_directory(**kwargs):
+        name = tempfile.mkdtemp(**kwargs)
+        try:
+            yield name
+        finally:
+            shutil.rmtree(name)
+
     def post_processing(commands):
         # run post processing only if that was requested
         if not args.raw_entries:
@@ -91,7 +101,7 @@ def capture(args):
                     if os.path.exists(entry['file']) and not duplicate(entry))
         return commands
 
-    with TemporaryDirectory(prefix='bear-', dir=tempdir()) as tmpdir:
+    with temporary_directory(prefix='bear-', dir=tempdir()) as tmpdir:
         # run the build command
         environment = setup_environment(tmpdir, args.libear)
         logging.info('run build in environment: %s', environment)
@@ -255,34 +265,6 @@ def entry_hash(entry):
     command = ' '.join(shlex.split(entry['command'])[1:])
 
     return '<>'.join([filename, directory, command])
-
-
-if sys.version_info.major >= 3 and sys.version_info.minor >= 2:
-    from tempfile import TemporaryDirectory
-else:
-
-    class TemporaryDirectory(object):
-        """ This function creates a temporary directory using mkdtemp() (the
-        supplied arguments are passed directly to the underlying function).
-        The resulting object can be used as a context manager. On completion
-        of the context or destruction of the temporary directory object the
-        newly created temporary directory and all its contents are removed
-        from the filesystem. """
-
-        def __init__(self, **kwargs):
-            from tempfile import mkdtemp
-            self.name = mkdtemp(**kwargs)
-
-        def __enter__(self):
-            return self.name
-
-        def __exit__(self, _type, _value, _traceback):
-            self.cleanup()
-
-        def cleanup(self):
-            from shutil import rmtree
-            if self.name is not None:
-                rmtree(self.name)
 
 
 def duplicate_check(method):
