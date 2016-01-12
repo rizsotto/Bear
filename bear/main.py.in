@@ -65,7 +65,7 @@ def main():
         return capture(args)
     except KeyboardInterrupt:
         return 1
-    except Exception as exception:
+    except Exception:
         logging.exception("Something unexpected had happened.")
         return 127
 
