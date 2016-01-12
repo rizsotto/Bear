@@ -128,7 +128,7 @@ def setup_environment(destination, ear_library_path):
     environment = dict(os.environ)
     environment.update({'BEAR_OUTPUT': destination})
 
-    if 'darwin' == sys.platform:
+    if sys.platform == 'darwin':
         environment.update({
             'DYLD_INSERT_LIBRARIES': ear_library_path,
             'DYLD_FORCE_FLAT_NAMESPACE': '1'
