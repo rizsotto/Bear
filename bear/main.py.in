@@ -240,8 +240,8 @@ def is_source(filename):
     return ext.lower() in accepted
 
 
-def compiler_call(entry):
-    """ A predicate to decide the entry is a compiler call or not. """
+def compiler_executable(executable):
+    """ A predicate to decide the executable is a compiler or not. """
 
     patterns = [
         re.compile(r'^([^/]*/)*c(c|\+\+)$'),
@@ -249,8 +249,35 @@ def compiler_call(entry):
         re.compile(r'^([^/]*/)*([^-]*-)*clang(\+\+)?(-\d+(\.\d+){0,2})?$'),
         re.compile(r'^([^/]*/)*llvm-g(cc|\+\+)$'),
     ]
-    executable = entry['command'][0]
     return any((pattern.match(executable) for pattern in patterns))
+
+
+def shell_executable(executable):
+    """ A predicate to decide the executable is a shell. """
+
+    patterns = [
+        re.compile(r'^([^/]*/)*(ba|c|k|tc|z)?sh$')
+    ]
+    return any((pattern.match(executable) for pattern in patterns))
+
+
+def first_shellscript_executable(script):
+    lex = shlex.shlex(script, posix=True)
+    lex.whitespace_split = True
+    return lex.get_token()
+
+
+def compiler_call(entry):
+    """ A predicate to decide the entry is a compiler call. """
+    command = entry['command']
+
+    if shell_executable(command[0]):
+        return (len(command) >= 3 and
+                command[1] == '-c' and
+                compiler_executable(first_shellscript_executable(command[2]))
+                )
+    else:
+        return compiler_executable(command[0])
 
 
 def entry_hash(entry):
@@ -361,14 +388,21 @@ def classify_parameters(command, abspath):
         current = values.get('action', value)
         values.update({'action': max(current, value)})
 
+    if shell_executable(command[0]):
+        splitscript = shlex.split(command[2], comments=True)
+        compiler = splitscript[0]
+        args = iter(splitscript[1:])
+    else:
+        compiler = command[0]
+        args = iter(command[1:])
+
     state = {
         'action': Action.Link,
         'files': [],
         'compile_options': [],
-        'c++': cplusplus_compiler(command[0])
+        'c++': cplusplus_compiler(compiler)
     }
 
-    args = iter(command[1:])
     for arg in args:
         # compiler action parameters are the most important ones...
         if arg == '-c':
