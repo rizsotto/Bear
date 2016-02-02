@@ -166,7 +166,8 @@ def format_entry(entry):
     atoms = classify_parameters(entry['command'])
     if atoms['action'] <= Action.Compile:
         for source in atoms['files']:
-            compiler = 'c++' if atoms['c++'] else 'cc'
+            is_cpp = atoms['cpp_source'] or atoms['cpp_compiler']
+            compiler = 'c++' if is_cpp else 'cc'
             command = [compiler, '-c'] + atoms['compile_options'] + [source]
             logging.debug('formated as: %s', command)
             yield {
@@ -220,12 +221,16 @@ def shell_escape(command):
 def is_source(filename):
     """ A predicate to decide the filename is a source file or not. """
 
-    accepted = {
-        '.c', '.cc', '.cp', '.cpp', '.cxx', '.c++', '.m', '.mm', '.i', '.ii',
-        '.mii'
-    }
     __, ext = os.path.splitext(filename)
-    return ext.lower() in accepted
+    return ext.lower() in {'.c', '.m', '.mm', '.i', '.mii'}
+
+
+def is_cpp_source(name):
+    """ A predicate to decide if the filename is a cpp source file or not. """
+
+    # https://gcc.gnu.org/onlinedocs/gcc/Invoking-G_002b_002b.html
+    __, ext = os.path.splitext(name)
+    return ext in {'.C', '.cc', '.cpp', '.CPP', '.c++', '.cp', '.cxx', '.ii'}
 
 
 def compiler_call(entry):
@@ -391,7 +396,8 @@ def classify_parameters(command):
         'action': Action.Link,
         'files': [],
         'compile_options': [],
-        'c++': cplusplus_compiler(command[0])
+        'cpp_compiler':  is_cpp_compiler(command[0]),
+        'cpp_source': False,
     }
 
     args = iter(command[1:])
@@ -419,6 +425,9 @@ def classify_parameters(command):
         # parameters which looks source file are taken...
         elif re.match(r'^[^-].+', arg) and is_source(arg):
             take(state, 'files', arg)
+        elif re.match(r'^[^-].+', arg) and is_cpp_source(arg):
+            state['cpp_source'] = is_cpp_source(arg)
+            take(state, 'files', arg)
         # and consider everything else as compile option.
         else:
             take(state, 'compile_options', arg)
@@ -426,11 +435,10 @@ def classify_parameters(command):
     return state
 
 
-def cplusplus_compiler(name):
-    """ Returns true when the compiler name refer to a C++ compiler. """
-
-    match = re.match(r'^([^/]*/)*(\w*-)*(\w+\+\+)(-(\d+(\.\d+){0,3}))?$', name)
-    return False if match is None else True
+def is_cpp_compiler(name):
+    """ Returns true when name refers to a C++ compiler. """
+    program_name = os.path.basename(name)
+    return '++' in program_name
 
 
 if __name__ == "__main__":
