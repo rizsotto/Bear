@@ -168,13 +168,14 @@ def parse_exec_trace(filename):
 def format_entry(entry):
     """ Generate the desired fields for compilation database entries. """
 
-    def abspath(cwd, name):
+    def abspath(name):
         """ Create normalized absolute path from input filename. """
-        fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
+        fullname = name if os.path.isabs(
+            name) else os.path.join(entry['directory'], name)
         return os.path.normpath(fullname)
 
     logging.debug('format this command: %s', entry['command'])
-    atoms = classify_parameters(entry['command'])
+    atoms = classify_parameters(entry['command'], abspath)
     if atoms['action'] <= Action.Compile:
         for source in atoms['files']:
             compiler = 'c++' if atoms['c++'] else 'cc'
@@ -183,7 +184,7 @@ def format_entry(entry):
             yield {
                 'directory': entry['directory'],
                 'command': shell_escape(command),
-                'file': abspath(entry['directory'], source)
+                'file': abspath(source)
             }
 
 
@@ -349,7 +350,7 @@ class Action(object):
     Link, Compile, Ignored = range(3)
 
 
-def classify_parameters(command):
+def classify_parameters(command, abspath):
     """ Parses the command line arguments of the given invocation. """
 
     def take(values, key, iterator):
@@ -391,9 +392,13 @@ def classify_parameters(command):
             pass
         # parameters which looks source file are taken...
         elif re.match(r'^[^-].+', arg) and is_source(arg):
-            take(state, 'files', arg)
+            take(state, 'files', abspath(arg))
         # and consider everything else as compile option.
         else:
+            # make include paths absolute
+            match = re.match(r'^(-I)(.+)', arg)
+            if match:
+                arg = match.group(1) + abspath(match.group(2))
             take(state, 'compile_options', arg)
 
     return state
