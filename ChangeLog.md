@@ -1,3 +1,10 @@
+## 2.1.4 (2016.02.14)
+
+Bugfixes:
+  - Make paths to sources and include files absolute. (@svenpanne, #111)
+  - Extend known issues section of documentation (#112, #108, #105, #102)
+
+
 ## 2.1.3 (2016.01.13)
 
 Bugfixes:

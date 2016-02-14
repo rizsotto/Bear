@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 SET (CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
 
 project(bear C)
-set(BEAR_VERSION "2.1.3")
+set(BEAR_VERSION "2.1.4")
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
