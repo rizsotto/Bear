@@ -68,10 +68,30 @@ For more options you can check the man page or pass `--help` parameter.
 Known issues
 ------------
 
+### Environment overriding caused problems
+
 Because Bear uses `LD_PRELOAD` or `DYLD_INSERT_LIBRARIES` environment variables,
 it does not append to it, but overrides it. So builds which are using these
 variables might not work. (I don't know any build tool which does that, but
 please let me know if you do.)
+
+### Empty compilation database on OS X Captain or Fedora
+
+Security extension/modes on different operating systems might disable library
+preloads. This case Bear behaves normaly, but the result compilation database
+will be empty. (Please make sure it's not the case when reporting bugs.)
+Notable examples for enabled security modes are: OS X 10.11 (check with
+`csrutil status | grep 'System Integrity Protection'`), and Fedora, CentOS, RHEL
+(check with `sestatus | grep 'SELinux status'`).
+
+Workaround could be to disable the security feature while running Bear. (This
+might involve reboot of your computer, so might be heavy workaround.) The other
+option could be to use tools which are using compiler wrappers. (It inject a
+fake compiler which does record the compiler invocation and calls the real
+compiler too.) An example for such tool might be [scan-build][scanbuild]. The
+build system shall respect `CC` and `CXX` environment variables.
+
+  [scanbuild]: https://github.com/rizsotto/scan-build
 
 Problem reports
 ---------------
