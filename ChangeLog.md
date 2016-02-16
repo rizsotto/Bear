@@ -1,4 +1,4 @@
-## 2.1.5
+## 2.1.5 (2016.02.16)
 
 Bugfixes:
   - Stop filtering out `-m` options (@joshtriplett, #115)
