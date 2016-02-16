@@ -2,6 +2,7 @@
 
 Bugfixes:
   - Stop filtering out `-m` options (@joshtriplett, #115)
+  - Updated man page bugs section (#114)
 
 
 ## 2.1.4 (2016.02.14)
