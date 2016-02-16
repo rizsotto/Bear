@@ -1,3 +1,9 @@
+## 2.1.5
+
+Bugfixes:
+  - Stop filtering out `-m` options (@joshtriplett, #115)
+
+
 ## 2.1.4 (2016.02.14)
 
 Bugfixes:
