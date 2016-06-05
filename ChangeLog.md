@@ -1,3 +1,10 @@
+## 2.2.0 (2016.06.05)
+
+Bugfixes:
+  - Fix spelling mistakes in README file (@sebastinas, #116)
+  - Fix shell escaping to work with arguments which has space (@timangus, #124)
+
+
 ## 2.1.5 (2016.02.16)
 
 Bugfixes:
