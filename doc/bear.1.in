@@ -56,7 +56,7 @@ Default value provided.
 .TP
 .B \-n
 Disable filter.
-The output is also a \f[I]JSON\f[] formated file. But the result is
+The output is also a \f[I]JSON\f[] formatted file. But the result is
 not a compilation database. It contains all available information
 of the \f[C]exec\f[] calls.
 (This option mainly for development purposes.)
@@ -130,7 +130,7 @@ variables might not work. (I don't know any build tool which does that, but
 please let me know if you do.)
 .PP
 Security extension/modes on different operating systems might disable library
-preloads. This case Bear behaves normaly, but the result compilation database
+preloads. This case Bear behaves normally, but the result compilation database
 will be empty. (Please make sure it's not the case when reporting bugs.)
 Notable examples for enabled security modes are: SIP on OS X Captain and
 SELinux on Fedora, CentOS, RHEL.
