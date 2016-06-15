@@ -16,7 +16,7 @@ unit was processed.
 When that is available then it is easy to re\-run the compilation with
 different programs.
 .PP
-Bear execs the original build command and intercept the \f[C]exec\f[]
+Bear execs the original build command and intercepts the \f[C]exec\f[]
 calls.
 To achieve that Bear uses the \f[C]LD_PRELOAD\f[] or
 \f[C]DYLD_INSERT_LIBRARIES\f[] mechanisms provided by the dynamic

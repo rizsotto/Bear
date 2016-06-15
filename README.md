@@ -12,16 +12,15 @@ One way to get a compilation database is to use `cmake` as the build
 tool.  Passing `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` to cmake generates
 the `compile_commands.json` file into the current directory.
 
-For non-cmake projects, use Bear.  Bear generates the json file during
-the build process.
+For non-cmake projects, Bear generates the JSON file during the build process.
 
-The concept behind Bear is to execute the original build command and
-intercept the `exec` calls issued by the build tool.  To achieve that, Bear uses the
-`LD_PRELOAD` or `DYLD_INSERT_LIBRARIES` mechanisms provided by the dynamic
-linker.
+The concept behind Bear is: to execute the original build command and
+intercept the `exec` calls issued by the build tool. To achieve that,
+Bear uses the `LD_PRELOAD` or `DYLD_INSERT_LIBRARIES` mechanisms provided
+by the dynamic linker.
 
-Bear has two components: the library and the binary.  The library
-redefines the `exec` methods to be used by all child processes.  The
+Bear has two components: the library and the binary. The library
+redefines the `exec` methods to be used by all child processes. The
 executable enables the use of the library for child processes and
 writes the output file.
 
@@ -31,7 +30,7 @@ writes the output file.
 How to build
 ------------
 
-Bear should be quite portable on UNIX operating systems.  It has been
+Bear should be quite portable on UNIX operating systems. It has been
 tested on FreeBSD, GNU/Linux and OS X.
 
 ### Prerequisites
@@ -78,7 +77,7 @@ please let me know if you do.)
 ### Empty compilation database on OS X Captain or Fedora
 
 Security extension/modes on different operating systems might disable library
-preloads. This case Bear behaves normaly, but the result compilation database
+preloads. This case Bear behaves normally, but the result compilation database
 will be empty. (Please make sure it's not the case when reporting bugs.)
 Notable examples for enabled security modes are: OS X 10.11 (check with
 `csrutil status | grep 'System Integrity Protection'`), and Fedora, CentOS, RHEL
@@ -86,7 +85,7 @@ Notable examples for enabled security modes are: OS X 10.11 (check with
 
 Workaround could be to disable the security feature while running Bear. (This
 might involve reboot of your computer, so might be heavy workaround.) The other
-option could be to use tools which are using compiler wrappers. (It inject a
+option could be to use tools which are using compiler wrappers. (It injects a
 fake compiler which does record the compiler invocation and calls the real
 compiler too.) An example for such tool might be [scan-build][scanbuild]. The
 build system shall respect `CC` and `CXX` environment variables.

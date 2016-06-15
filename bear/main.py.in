@@ -192,7 +192,7 @@ def shell_escape(command):
     """ Takes a command as list and returns a string. """
 
     def needs_quote(word):
-        """ Returns true if worduments needs to be protected by quotes.
+        """ Returns true if arguments needs to be protected by quotes.
 
         Previous implementation was shlex.split method, but that's not good
         for this job. Currently is running through the string with a basic
@@ -274,7 +274,7 @@ def duplicate_check(method):
 
     Unique hash method can be use to detect duplicates. Entries are
     represented as dictionaries, which has no default hash method.
-    This implementation uses a set datatype to store the unique hash values.
+    This implementation uses a set data type to store the unique hash values.
 
     This method returns a method which can detect the duplicate values. """
 
@@ -291,7 +291,7 @@ def duplicate_check(method):
 
 
 def tempdir():
-    """ Return the default temorary directory. """
+    """ Return the default temporary directory. """
 
     from os import getenv
     return getenv('TMPDIR', getenv('TEMP', getenv('TMP', '/tmp')))
@@ -328,7 +328,7 @@ def create_parser():
         '--disable-filter', '-n',
         dest='raw_entries',
         action='store_true',
-        help="""disable filter, unformated output.""")
+        help="""disable filter, unformatted output.""")
     testing.add_argument(
         '--libear', '-l',
         dest='libear',
