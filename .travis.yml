@@ -1,14 +1,32 @@
 language: python
 
-python:
-  - "2.7"
-  - "3.2"
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "pypy"
-
-sudo: false
+matrix:
+  include:
+    - os: linux
+      sudo: false
+      python: 2.7
+    - os: linux
+      sudo: false
+      python: 3.2
+    - os: linux
+      sudo: false
+      python: 3.3
+    - os: linux
+      sudo: false
+      python: 3.4
+    - os: linux
+      sudo: false
+      python: 3.5
+    - os: linux
+      sudo: false
+      python: "pypy"
+    - os: linux
+      sudo: required
+      dist: trusty
+      python: 2.7
+    - os: osx
+      osx_image: xcode6.4
+      language: generic
 
 addons:
   apt:
@@ -17,14 +35,22 @@ addons:
       - scons
       - qt4-qmake
 
+before_install:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update;            fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install python;    fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install scons;     fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install qt;        fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install coreutils; fi
+
 install:
   - pip install pep8
 
 script:
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then csrutil status || true; fi
   - pep8 bear/main.py.in
-  - cmake . -DCPACK_GENERATOR="TGZ;DEB"
-  - make all
-  - make check
+  - cmake . -DCPACK_GENERATOR="TGZ"
+  - VERBOSE=1 make all
+  - VERBOSE=1 make check
   - mkdir target_dir
   - DESTDIR=target_dir make install
-  - make package
+  - VERBOSE=1 make package
