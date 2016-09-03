@@ -178,7 +178,6 @@ def format_entry(entry):
     atoms = classify_parameters(entry['command'], abspath)
     if atoms['action'] <= Action.Compile:
         for source in atoms['files']:
-            # compiler = 'c++' if atoms['c++'] else 'cc'
             compiler = atoms['compiler']
             command = [compiler, '-c'] + atoms['compile_options'] + [source]
             logging.debug('formated as: %s', command)
@@ -249,7 +248,7 @@ def compiler_call(entry):
         re.compile(r'^([^/]*/)*([^-]*-)*[mg](cc|\+\+)(-\d+(\.\d+){0,2})?$'),
         re.compile(r'^([^/]*/)*([^-]*-)*clang(\+\+)?(-\d+(\.\d+){0,2})?$'),
         re.compile(r'^([^/]*/)*llvm-g(cc|\+\+)$'),
-        re.compile(r'^([^/]*/)*([^-]*-)*i(cpc|cc)$'), # for intel compiler
+        re.compile(r'^([^/]*/)*([^-]*-)*i(cpc|cc)$'),
     ]
     executable = entry['command'][0]
     return any((pattern.match(executable) for pattern in patterns))
@@ -407,7 +406,6 @@ def classify_parameters(command, abspath):
 def cplusplus_compiler(name):
     """ Returns true when the compiler name refer to a C++ compiler. """
 
-    #match = re.match(r'^([^/]*/)*(\w*-)*(\w+\+\+)(-(\d+(\.\d+){0,3}))?$', name)
     match = re.match(r'^(icpc|g\+\+|c\+\+|clang\+\+)$', name)
     return False if match is None else True
 
