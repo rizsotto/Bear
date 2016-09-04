@@ -2,12 +2,15 @@
 
 set -o nounset
 set -o errexit
+set -o xtrace
 
 BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
 BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
 
 RUN_TEST="cc -c -MMD @CMAKE_CURRENT_SOURCE_DIR@/foo.c"
+RESULT_FILE=one.json
 
-python ${BEAR_EXE} -l ${BEAR_LIB} --cdb out.json sh -c "$RUN_TEST"
-test `grep "command" out.json | wc -l` -eq 1
-test `cat out.json | grep "command" | grep "MMD" | wc -l` -eq 0
+python ${BEAR_EXE} -l ${BEAR_LIB} --cdb $RESULT_FILE sh -c "$RUN_TEST"
+cat $RESULT_FILE
+[ $(grep "command" $RESULT_FILE | wc -l) -eq 1 ] && echo "has one entry"
+[ $(cat $RESULT_FILE | grep "command" | grep "MMD" | wc -l) -eq 0 ] && echo "has no MMD in flags"

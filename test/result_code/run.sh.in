@@ -2,6 +2,7 @@
 
 set -o nounset
 set -o errexit
+set -o xtrace
 
 BEAR_EXE="@CMAKE_CURRENT_BINARY_DIR@/../../bear/bear"
 BEAR_LIB="@CMAKE_CURRENT_BINARY_DIR@/../../libear/@EAR_LIB_FILE@"
