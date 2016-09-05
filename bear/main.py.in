@@ -35,6 +35,7 @@ and the post-processing of the output files, which will condensates into a
 (might be empty) compilation database. """
 
 import argparse
+import collections
 import subprocess
 import json
 import sys
@@ -47,6 +48,62 @@ import tempfile
 import shutil
 import contextlib
 import logging
+
+# Ignored compiler options map for compilation database creation.
+# The map is used in `split_command` method. (Which does ignore and classify
+# parameters.) Please note, that these are not the only parameters which
+# might be ignored.
+#
+# Keys are the option name, value number of options to skip
+IGNORED_FLAGS = {
+    # compiling only flag, ignored because the creator of compilation
+    # database will explicitly set it.
+    '-c': 0,
+    # preprocessor macros, ignored because would cause duplicate entries in
+    # the output (the only difference would be these flags). this is actual
+    # finding from users, who suffered longer execution time caused by the
+    # duplicates.
+    '-MD': 0,
+    '-MMD': 0,
+    '-MG': 0,
+    '-MP': 0,
+    '-MF': 1,
+    '-MT': 1,
+    '-MQ': 1,
+    # linker options, ignored because for compilation database will contain
+    # compilation commands only. so, the compiler would ignore these flags
+    # anyway. the benefit to get rid of them is to make the output more
+    # readable.
+    '-static': 0,
+    '-shared': 0,
+    '-s': 0,
+    '-rdynamic': 0,
+    '-l': 1,
+    '-L': 1,
+    '-u': 1,
+    '-z': 1,
+    '-T': 1,
+    '-Xlinker': 1
+}
+
+# Known C/C++ compiler wrapper name patterns
+COMPILER_WRAPPER_PATTERN = re.compile(r'^(distcc|ccache)$')
+
+# Known C/C++ compiler executable name patterns
+COMPILER_PATTERNS = frozenset([
+    re.compile(r'^(cc|c\+\+|cxx|CC)$'),
+    re.compile(r'^([^-]*-)*[mg](cc|\+\+)(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^([^-]*-)*clang(\+\+)?(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^llvm-g(cc|\+\+)$'),
+    re.compile(r'^i(cc|cpc)$'),
+    re.compile(r'^(g|)xl(c|C|c\+\+)$'),
+])
+
+# Known C++ compiler executable name patterns
+COMPILER_CPP_PATTERNS = frozenset([
+    re.compile(r'^(.+)(\+\+)(-.+|)$'),  # C++ compilers usually ends with '++'
+    re.compile(r'^(icpc|xlC|cxx|CC)$'),
+])
 
 
 def main():
@@ -66,8 +123,16 @@ def main():
     except KeyboardInterrupt:
         return 1
     except Exception:
-        logging.exception("Something unexpected had happened.")
+        logging.exception('Internal error.')
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.error("Please report this bug and attach the output "
+                          "to the bug report")
+        else:
+            logging.error("Please run this command again and turn on "
+                          "verbose mode (add '-vvvv' as argument).")
         return 127
+    finally:
+        logging.shutdown()
 
 
 def capture(args):
@@ -82,37 +147,45 @@ def capture(args):
             shutil.rmtree(name)
 
     def post_processing(commands):
-        # run post processing only if that was requested
-        if not args.raw_entries:
-            # create entries from the current run
-            current = itertools.chain.from_iterable(
-                # creates a sequence of entry generators from an exec,
-                # but filter out non compiler calls before.
-                (format_entry(x) for x in commands if compiler_call(x)))
-            # read entries from previous run
-            if args.append and os.path.exists(args.cdb):
-                with open(args.cdb) as handle:
-                    previous = iter(json.load(handle))
-            else:
-                previous = iter([])
-            # filter out duplicate entries from both
-            duplicate = duplicate_check(entry_hash)
-            return (entry
-                    for entry in itertools.chain(previous, current)
-                    if os.path.exists(entry['file']) and not duplicate(entry))
-        return commands
+        """ To make a compilation database, it needs to filter out commands
+        which are not compiler calls. Needs to find the source file name
+        from the arguments. And do shell escaping on the command.
 
-    with temporary_directory(prefix='bear-', dir=tempdir()) as tmpdir:
+        To support incremental builds, it is desired to read elements from
+        an existing compilation database from a previous run. These elements
+        shall be merged with the new elements. """
+
+        # create entries from the current run
+        current = itertools.chain.from_iterable(
+            # creates a sequence of entry generators from an exec,
+            format_entry(command) for command in commands)
+        # read entries from previous run
+        if args.append and os.path.isfile(args.cdb):
+            with open(args.cdb) as handle:
+                previous = iter(json.load(handle))
+        else:
+            previous = iter([])
+        # filter out duplicate entries from both
+        duplicate = duplicate_check(entry_hash)
+        return (entry
+                for entry in itertools.chain(previous, current)
+                if os.path.exists(entry['file']) and not duplicate(entry))
+
+    with temporary_directory(prefix='bear-') as tmp_dir:
         # run the build command
-        environment = setup_environment(tmpdir, args.libear)
+        environment = setup_environment(tmp_dir, args.libear)
         logging.info('run build in environment: %s', environment)
         exit_code = subprocess.call(args.build, env=environment)
         logging.info('build finished with exit code: %s', exit_code)
         # read the intercepted exec calls
-        commands = (parse_exec_trace(os.path.join(tmpdir, filename))
-                    for filename in sorted(os.listdir(tmpdir)))
-        # do post processing
-        entries = post_processing(itertools.chain.from_iterable(commands))
+        exec_traces = itertools.chain.from_iterable(
+            parse_exec_trace(os.path.join(tmp_dir, filename))
+            for filename in sorted(os.listdir(tmp_dir)))
+        # do post processing only if that was requested
+        if not args.raw_entries:
+            entries = post_processing(exec_traces)
+        else:
+            entries = exec_traces
         # dump the compilation database
         with open(args.cdb, 'w+') as handle:
             json.dump(list(entries), handle, sort_keys=True, indent=4)
@@ -165,26 +238,25 @@ def parse_exec_trace(filename):
             }
 
 
-def format_entry(entry):
+def format_entry(exec_trace):
     """ Generate the desired fields for compilation database entries. """
 
-    def abspath(name):
+    def abspath(cwd, name):
         """ Create normalized absolute path from input filename. """
-        fullname = name if os.path.isabs(
-            name) else os.path.join(entry['directory'], name)
+        fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
         return os.path.normpath(fullname)
 
-    logging.debug('format this command: %s', entry['command'])
-    atoms = classify_parameters(entry['command'], abspath)
-    if atoms['action'] <= Action.Compile:
-        for source in atoms['files']:
-            compiler = 'c++' if atoms['c++'] else 'cc'
-            command = [compiler, '-c'] + atoms['compile_options'] + [source]
+    logging.debug('format this command: %s', exec_trace['command'])
+    compilation = split_command(exec_trace['command'])
+    if compilation:
+        for source in compilation.files:
+            compiler = 'c++' if compilation.compiler == 'c++' else 'cc'
+            command = [compiler, '-c'] + compilation.flags + [source]
             logging.debug('formated as: %s', command)
             yield {
-                'directory': entry['directory'],
+                'directory': exec_trace['directory'],
                 'command': shell_escape(command),
-                'file': abspath(source)
+                'file': abspath(exec_trace['directory'], source)
             }
 
 
@@ -229,31 +301,6 @@ def shell_escape(command):
     return " ".join([escape(arg) for arg in command])
 
 
-def is_source(filename):
-    """ A predicate to decide the filename is a source file or not. """
-
-    accepted = {
-        '.C', '.c', '.cc', '.cp', '.cpp', '.cxx', '.c++', '.m', '.mm', '.i',
-        '.ii', '.mii'
-    }
-    __, ext = os.path.splitext(filename)
-    return ext.lower() in accepted
-
-
-def compiler_call(entry):
-    """ A predicate to decide the entry is a compiler call or not. """
-
-    patterns = [
-        re.compile(r'^([^/]*/)*c(c|\+\+)$'),
-        re.compile(r'^([^/]*/)*([^-]*-)*[mg](cc|\+\+)(-\d+(\.\d+){0,2})?$'),
-        re.compile(r'^([^/]*/)*([^-]*-)*clang(\+\+)?(-\d+(\.\d+){0,2})?$'),
-        re.compile(r'^([^/]*/)*llvm-g(cc|\+\+)$'),
-        re.compile(r'^([^/]*/)*ic(c|pc)$'),
-    ]
-    executable = entry['command'][0]
-    return any((pattern.match(executable) for pattern in patterns))
-
-
 def entry_hash(entry):
     """ Implement unique hash method for compilation database entries. """
 
@@ -270,32 +317,33 @@ def entry_hash(entry):
     return '<>'.join([filename, directory, command])
 
 
-def duplicate_check(method):
-    """ Predicate to detect duplicated entries.
+def duplicate_check(hash_function):
+    """ Workaround to detect duplicate dictionary values.
 
-    Unique hash method can be use to detect duplicates. Entries are
-    represented as dictionaries, which has no default hash method.
-    This implementation uses a set data type to store the unique hash values.
+    Python `dict` type has no `hash` method, which is required by the `set`
+    type to store elements.
 
-    This method returns a method which can detect the duplicate values. """
+    This solution still not store the `dict` as value in a `set`. Instead
+    it calculate a `string` hash and store that. Therefore it can only say
+    that hash is already taken or not.
+
+    This method is a factory method, which returns a predicate. """
 
     def predicate(entry):
-        hash_value = predicate.unique(entry)
-        if hash_value not in predicate.state:
-            predicate.state.add(hash_value)
+        """ The predicate which calculates and stores the hash of the given
+        entries. The entry type has to work with the given hash function.
+
+        :param entry: the questioned entry,
+        :return: true/false depends the hash value is already seen or not.
+        """
+        entry_hash = hash_function(entry)
+        if entry_hash not in state:
+            state.add(entry_hash)
             return False
         return True
 
-    predicate.unique = method
-    predicate.state = set()
+    state = set()
     return predicate
-
-
-def tempdir():
-    """ Return the default temporary directory. """
-
-    from os import getenv
-    return getenv('TMPDIR', getenv('TEMP', getenv('TMP', '/tmp')))
 
 
 def create_parser():
@@ -345,69 +393,95 @@ def create_parser():
     return parser
 
 
-class Action(object):
-    """ Enumeration class for compiler action. """
+def split_command(command):
+    """ Returns a value when the command is a compilation, None otherwise.
 
-    Link, Compile, Ignored = range(3)
+    The value on success is a named tuple with the following attributes:
 
+        files:    list of source files
+        flags:    list of compile options
+        compiler: string value of 'c' or 'c++' """
 
-def classify_parameters(command, abspath):
-    """ Parses the command line arguments of the given invocation. """
+    # quit right now, if the program was not a C/C++ compiler
+    compiler_and_arguments = split_compiler(command)
+    if compiler_and_arguments is None:
+        return None
 
-    def take(values, key, iterator):
-        current = values.get(key, [])
-        values.update({key: current + [iterator]})
-
-    def action(values, value):
-        current = values.get('action', value)
-        values.update({'action': max(current, value)})
-
-    state = {
-        'action': Action.Link,
-        'files': [],
-        'compile_options': [],
-        'c++': cplusplus_compiler(command[0])
-    }
-
-    args = iter(command[1:])
+    # the result of this method
+    result = collections.namedtuple('Compilation',
+                                    ['compiler', 'flags', 'files'])
+    result.compiler = compiler_and_arguments[0]
+    result.flags = []
+    result.files = []
+    # iterate on the compile options
+    args = iter(compiler_and_arguments[1])
     for arg in args:
-        # compiler action parameters are the most important ones...
-        if arg == '-c':
-            action(state, Action.Compile)
-        elif arg in {'-E', '-S', '-cc1', '-M', '-MM', '-###'}:
-            action(state, Action.Ignored)
-        # some preprocessor parameters are ignored...
-        elif arg in {'-MD', '-MMD', '-MG', '-MP'}:
+        # quit when compilation pass is not involved
+        if arg in {'-E', '-S', '-cc1', '-M', '-MM', '-###'}:
+            return None
+        # ignore some flags
+        elif arg in IGNORED_FLAGS:
+            count = IGNORED_FLAGS[arg]
+            for _ in range(count):
+                next(args)
+        elif re.match(r'^-(l|L|Wl,).+', arg):
             pass
-        elif arg in {'-MF', '-MT', '-MQ'}:
-            next(args)
-        # linker options are ignored...
-        elif arg in {'-static', '-shared', '-s', '-rdynamic'}:
-            pass
-        elif re.match(r'^-[lL].+', arg):
-            pass
-        elif arg in {'-l', '-L', '-u', '-z', '-T', '-Xlinker'}:
-            next(args)
-        # parameters which looks source file are taken...
+        # some parameters could look like filename, take as compile option
+        elif arg in {'-D', '-I'}:
+            result.flags.extend([arg, next(args)])
+        # parameter which looks source file is taken...
         elif re.match(r'^[^-].+', arg) and is_source(arg):
-            take(state, 'files', abspath(arg))
+            result.files.append(arg)
         # and consider everything else as compile option.
         else:
-            # make include paths absolute
-            match = re.match(r'^(-I)(.+)', arg)
-            if match:
-                arg = match.group(1) + abspath(match.group(2))
-            take(state, 'compile_options', arg)
-
-    return state
+            result.flags.append(arg)
+    # do extra check on number of source files
+    return result if result.files else None
 
 
-def cplusplus_compiler(name):
-    """ Returns true when the compiler name refer to a C++ compiler. """
+def split_compiler(command):
+    """ A predicate to decide the command is a compiler call or not.
 
-    match = re.match(r'^([^/]*/)*(\w*-)*(icpc|\w+\+\+)(-(\d+(\.\d+){0,3}))?$',
-                     name)
-    return False if match is None else True
+    :param command: the command to classify
+    :return:        None if the command is not a compilation
+                    (compiler_language, rest of the command) tuple if the
+                    command is a compilation. """
+
+    def is_wrapper(candidate):
+        return True if COMPILER_WRAPPER_PATTERN.match(candidate) else False
+
+    def is_compiler(candidate):
+        return any(pattern.match(candidate) for pattern in COMPILER_PATTERNS)
+
+    def is_cplusplus(candidate):
+        return any(pattern.match(candidate)
+                   for pattern in COMPILER_CPP_PATTERNS)
+
+    if command:  # not empty list will allow to index '0' and '1:'
+        executable = os.path.basename(command[0])
+        parameters = command[1:]
+        # 'wrapper' 'parameters' and
+        # 'wrapper' 'compiler' 'parameters' are valid.
+        # plus, a wrapper can wrap wrapper too.
+        if is_wrapper(executable):
+            result = split_compiler(parameters)
+            return ('c', parameters) if result is None else result
+        # and 'compiler' 'parameters' is valid.
+        elif is_compiler(executable):
+            language = 'c++' if is_cplusplus(executable) else 'c'
+            return language, parameters
+    return None
+
+
+def is_source(filename):
+    """ A predicate to decide the filename is a source file or not. """
+
+    accepted = [
+        '.c', '.cc', '.cp', '.cpp', '.cxx', '.c++', '.m', '.mm', '.i', '.ii',
+        '.mii'
+    ]
+    __, extension = os.path.splitext(os.path.basename(filename))
+    return extension.lower() in accepted
 
 
 if __name__ == "__main__":
