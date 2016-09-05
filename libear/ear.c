@@ -47,7 +47,7 @@
 #endif
 
 #if defined HAVE_NSGETENVIRON
-#include <crt_externs.h>
+# include <crt_externs.h>
 static char **environ;
 #else
 extern char **environ;
@@ -127,6 +127,10 @@ static int call_execvpe(const char *file, char *const argv[],
 static int call_execvP(const char *file, const char *search_path,
                        char *const argv[]);
 #endif
+#ifdef HAVE_EXECT
+static int call_exect(const char *path, char *const argv[],
+                      char *const envp[]);
+#endif
 #ifdef HAVE_POSIX_SPAWN
 static int call_posix_spawn(pid_t *restrict pid, const char *restrict path,
                             const posix_spawn_file_actions_t *file_actions,
@@ -205,10 +209,17 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
 }
 #endif
 
-#ifdef HAVE_EXECL
-#ifndef HAVE_EXECVE
-#error can not implement execl without execve
+#ifdef HAVE_EXECT
+int exect(const char *path, char *const argv[], char *const envp[]) {
+    bear_report_call(__func__, (char const *const *)argv);
+    return call_exect(path, argv, envp);
+}
 #endif
+
+#ifdef HAVE_EXECL
+# ifndef HAVE_EXECVE
+#  error can not implement execl without execve
+# endif
 int execl(const char *path, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
@@ -224,9 +235,9 @@ int execl(const char *path, const char *arg, ...) {
 #endif
 
 #ifdef HAVE_EXECLP
-#ifndef HAVE_EXECVP
-#error can not implement execlp without execvp
-#endif
+# ifndef HAVE_EXECVP
+#  error can not implement execlp without execvp
+# endif
 int execlp(const char *file, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
@@ -242,9 +253,9 @@ int execlp(const char *file, const char *arg, ...) {
 #endif
 
 #ifdef HAVE_EXECLE
-#ifndef HAVE_EXECVE
-#error can not implement execle without execve
-#endif
+# ifndef HAVE_EXECVE
+#  error can not implement execle without execve
+# endif
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 int execle(const char *path, const char *arg, ...) {
     va_list args;
@@ -344,6 +355,20 @@ static int call_execvP(const char *file, const char *search_path,
     environ = original;
     bear_strings_release(modified);
 
+    return result;
+}
+#endif
+
+#ifdef HAVE_EXECT
+static int call_exect(const char *path, char *const argv[],
+                      char *const envp[]) {
+    typedef int (*func)(const char *, char *const *, char *const *);
+
+    DLSYM(func, fp, "exect");
+
+    char const **const menvp = bear_update_environment(envp, &initial_env);
+    int const result = (*fp)(path, argv, (char *const *)menvp);
+    bear_strings_release(menvp);
     return result;
 }
 #endif
