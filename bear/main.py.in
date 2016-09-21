@@ -98,7 +98,7 @@ def capture(args):
             # filter out duplicate entries from both
             duplicate = duplicate_check(entry_hash)
             return (entry
-                    for entry in itertools.chain(previous, current)
+                    for entry in itertools.chain(current, previous)
                     if os.path.exists(entry['file']) and not duplicate(entry))
         return commands
 
