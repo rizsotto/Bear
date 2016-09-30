@@ -22,7 +22,9 @@ install:
 
 script:
   - pep8 bear/main.py.in
-  - cmake . -DCPACK_GENERATOR="TGZ;DEB"
+  - mkdir build
+  - cd build
+  - cmake .. -DCPACK_GENERATOR="TGZ;DEB"
   - make all
   - make check
   - mkdir target_dir

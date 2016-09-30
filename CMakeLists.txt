@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 2.8)
 
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+  message(FATAL_ERROR "
+    In-source builds are not allowed.
+    This process created the file 'CMakeCache.txt' and the directory 'CMakeFiles'. Please delete them.
+  ")
+endif()
+
 SET (CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
 
 project(bear C)
