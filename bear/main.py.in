@@ -113,6 +113,7 @@ def main():
 
         level = logging.WARNING - min(logging.WARNING, (10 * args.verbose))
         logging.basicConfig(format='bear: %(message)s', level=level)
+        logging.debug('version: @BEAR_VERSION@')
         logging.debug(args)
 
         if not args.build:
@@ -171,12 +172,20 @@ def capture(args):
                 for entry in itertools.chain(previous, current)
                 if os.path.exists(entry['file']) and not duplicate(entry))
 
+    def run_build(command, environment):
+        try:
+            logging.info('run build in environment: %s', environment)
+            exit_code = subprocess.call(command, env=environment)
+            logging.info('build finished with exit code: %s', exit_code)
+            return exit_code
+        except KeyboardInterrupt:
+            logging.warning('build interupted by user. (writing output)')
+            return 1
+
     with temporary_directory(prefix='bear-') as tmp_dir:
         # run the build command
         environment = setup_environment(tmp_dir, args.libear)
-        logging.info('run build in environment: %s', environment)
-        exit_code = subprocess.call(args.build, env=environment)
-        logging.info('build finished with exit code: %s', exit_code)
+        exit_code = run_build(args.build, environment)
         # read the intercepted exec calls
         exec_traces = itertools.chain.from_iterable(
             parse_exec_trace(os.path.join(tmp_dir, filename))
