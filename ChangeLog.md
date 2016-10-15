@@ -1,3 +1,14 @@
+## 2.2.1 (2016.10.15)
+
+Bugfixes:
+  - Fix spelling mistakes in man page (@sebastinas, #128)
+  - Fix support multiple compilers (@handrake0724, #136)
+
+Features:
+  - Finish writing output when the build was interupted by user.
+  - Travis-CI runs build against OSX machines
+
+
 ## 2.2.0 (2016.06.05)
 
 Bugfixes:
