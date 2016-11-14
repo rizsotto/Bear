@@ -435,6 +435,8 @@ def split_command(command):
                 next(args)
         elif re.match(r'^-(l|L|Wl,).+', arg):
             pass
+        elif re.match(r'^-Wp,-M.+', arg):
+            pass
         # some parameters could look like filename, take as compile option
         elif arg in {'-D', '-I'}:
             result.flags.extend([arg, next(args)])
