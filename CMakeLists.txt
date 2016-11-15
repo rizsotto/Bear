@@ -38,8 +38,14 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+option(USE_RELATIVE_LIB_PATH "Use relative path to libear")
+
 set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
-set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_FULL_LIBDIR}/${EAR_LIB_FILE})
+if (USE_RELATIVE_LIB_PATH)
+    set(DEFAULT_PRELOAD_FILE ${EAR_LIB_FILE})
+else()
+    set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_FULL_LIBDIR}/${EAR_LIB_FILE})
+endif()
 
 add_subdirectory(libear)
 add_subdirectory(bear)
