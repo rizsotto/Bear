@@ -90,6 +90,12 @@ Bear exit status is the exit status of the build command.
 Except when bear crashes, then it sets to non zero.
 .SH ENVIRONMENT
 .TP
+.B BEAR_LIBEAR_PATH
+Path to the bear preload library. Can be overriden by \f[C]\-l\f[]
+flag. When not set defaults to @DEFAULT_PRELOAD_FILE@
+.RS
+.RE
+.TP
 .B BEAR_OUTPUT
 The place of the temporary files where client shall report \f[C]exec\f[]
 calls. Value set by bear, overrides previous value for child processes.
