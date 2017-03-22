@@ -355,6 +355,10 @@ def duplicate_check(hash_function):
     return predicate
 
 
+def get_default_libear_path():
+    return os.getenv("BEAR_LIBEAR_PATH", "@DEFAULT_PRELOAD_FILE@")
+
+
 def create_parser():
     """ Parser factory method. """
 
@@ -390,7 +394,7 @@ def create_parser():
     testing.add_argument(
         '--libear', '-l',
         dest='libear',
-        default="@DEFAULT_PRELOAD_FILE@",
+        default=get_default_libear_path,
         action='store',
         help="""specify libear file location.""")
 
@@ -434,6 +438,8 @@ def split_command(command):
             for _ in range(count):
                 next(args)
         elif re.match(r'^-(l|L|Wl,).+', arg):
+            pass
+        elif re.match(r'^-Wp,-M.+', arg):
             pass
         # some parameters could look like filename, take as compile option
         elif arg in {'-D', '-I'}:
