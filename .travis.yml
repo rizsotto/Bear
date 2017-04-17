@@ -36,13 +36,16 @@ addons:
       - qt4-qmake
 
 before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update;            fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install python;    fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install scons;     fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install qt;        fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install coreutils; fi
+  - uname
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      csrutil status || true;
+      brew update;
+      command -v pip || { brew install python coreutils; };
+      brew install scons qt;
+    fi
 
 install:
+  - pip --version
   - pip install pep8
 
 script:
