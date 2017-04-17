@@ -338,15 +338,14 @@ def create_intercept_parser():
         compiler.""")
 
     advanced = parser.add_argument_group('advanced options')
-    group = advanced.add_mutually_exclusive_group()
-    group.add_argument(
+    advanced.add_argument(
         '--append', '-a',
         action='store_true',
         help="""Extend existing compilation database with new entries.
         Duplicate entries are detected and not present in the final output.
         The output is not continuously updated, it's done when the build
         command finished. """)
-    group.add_argument(
+    advanced.add_argument(
         '--libear', '-l',
         dest='libear',
         default="@DEFAULT_PRELOAD_FILE@",

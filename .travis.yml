@@ -46,11 +46,11 @@ before_install:
 
 install:
   - pip --version
+  - pip install lit
   - pip install pep8
 
 script:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then csrutil status || true; fi
-  - pep8 bear/main.py.in
   - cmake . -DCPACK_GENERATOR="TGZ"
   - VERBOSE=1 make all
   - VERBOSE=1 make check

@@ -1,0 +1,2 @@
+# REQUIRES: pep8
+# RUN: pep8 --show-source --show-pep8 ../bear/main.py.in

@@ -1,0 +1,1 @@
+# RUN: %{intercept-build} --help
