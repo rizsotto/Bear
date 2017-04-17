@@ -12,5 +12,5 @@ RESULT_FILE=one.json
 
 python ${BEAR_EXE} -l ${BEAR_LIB} --cdb $RESULT_FILE $RUN_MAKE
 cat $RESULT_FILE
-[ $(grep "command" $RESULT_FILE | wc -l) -eq 1 ] && echo "has only one entry"
+[ $(grep "file" $RESULT_FILE | wc -l) -eq 1 ] && echo "has only one entry"
 $RUN_MAKE clean

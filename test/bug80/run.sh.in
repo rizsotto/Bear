@@ -12,9 +12,9 @@ RUN_MAKE="make -C @CMAKE_CURRENT_SOURCE_DIR@ -f build.mk"
 python ${BEAR_EXE} -l ${BEAR_LIB} --cdb one.json $RUN_MAKE test-in-one
 cat one.json
 $RUN_MAKE clean
-[ $(grep "command" one.json | wc -l) -eq 1 ] && echo "has only one entry"
+[ $(grep "file" one.json | wc -l) -eq 1 ] && echo "has only one entry"
 
 python ${BEAR_EXE} -l ${BEAR_LIB} --cdb two.json $RUN_MAKE test-in-two
 cat two.json
 $RUN_MAKE clean
-[ $(grep "command" two.json | wc -l) -eq 1 ] && echo "has only one entry"
+[ $(grep "file" two.json | wc -l) -eq 1 ] && echo "has only one entry"

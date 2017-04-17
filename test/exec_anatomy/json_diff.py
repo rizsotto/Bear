@@ -1,31 +1,46 @@
 #!/usr/bin/env python
 
-import sys
+import argparse
 import json
+import sys
+import os.path
+
+
+def diff(lhs, rhs):
+    left = {smooth(entry): entry for entry in lhs}
+    right = {smooth(entry): entry for entry in rhs}
+    for key in left.keys():
+        if key not in right:
+            yield '> {}'.format(left[key])
+    for key in right.keys():
+        if key not in left:
+            yield '< {}'.format(right[key])
+
+
+def smooth(entry):
+    directory = os.path.normpath(entry['directory'])
+    source = entry['file'] if os.path.isabs(entry['file']) else \
+        os.path.normpath(os.path.join(directory, entry['file']))
+    arguments = entry['command'].split() if 'command' in entry else \
+        entry['arguments']
+    return '-'.join([source[::-1]] + arguments)
+
 
 def main():
-    try:
-        lhs = {pretty(entry) for entry in load(sys.argv[1])}
-        rhs = {pretty(entry) for entry in load(sys.argv[2])}
-        if len(lhs - rhs):
-            for e in lhs - rhs:
-                print('> {0}'.format(e))
-            for e in rhs - lhs:
-                print('< {0}'.format(e))
-            return 40
-        return 0
-    except Exception as ex:
-        print(ex)
-        return 50
-
-
-def load(filename):
-    with open(filename, 'r') as handler:
-        return json.load(handler)
-
-
-def pretty(entry):
-    return str(sorted(entry.items(), key=lambda x: x[0]))
+    """ Semantically diff two compilation databases. """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('left', type=argparse.FileType('r'))
+    parser.add_argument('right', type=argparse.FileType('r'))
+    args = parser.parse_args()
+    # files are open, parse the json content
+    lhs = json.load(args.left)
+    rhs = json.load(args.right)
+    # run the diff and print the result
+    count = 0
+    for result in diff(lhs, rhs):
+        print(result)
+        count += 1
+    return count
 
 
 if __name__ == '__main__':

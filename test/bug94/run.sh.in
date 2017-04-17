@@ -14,5 +14,5 @@ python ${BEAR_EXE} -l ${BEAR_LIB} --cdb $RESULT_FILE sh -c "$RUN_TEST"
 cat $RESULT_FILE
 
 [ $(grep "command" $RESULT_FILE | wc -l) -eq 2 ] && echo "has two entries"
-[ $(cat $RESULT_FILE | grep "command" | grep "foo.c" | wc -l) -eq 1 ] && echo "foo.c is one entry"
-[ $(cat $RESULT_FILE | grep "command" | grep "bar.c" | wc -l) -eq 1 ] && echo "bar.c is another entry"
+[ $(cat $RESULT_FILE | grep "file" | grep "foo.c" | wc -l) -eq 1 ] && echo "foo.c is one entry"
+[ $(cat $RESULT_FILE | grep "file" | grep "bar.c" | wc -l) -eq 1 ] && echo "bar.c is another entry"

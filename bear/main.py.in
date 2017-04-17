@@ -39,6 +39,7 @@ import collections
 import subprocess
 import json
 import sys
+import functools
 import os
 import os.path
 import re
@@ -50,7 +51,7 @@ import contextlib
 import logging
 
 # Ignored compiler options map for compilation database creation.
-# The map is used in `split_command` method. (Which does ignore and classify
+# The map is used in `_split_command` method. (Which does ignore and classify
 # parameters.) Please note, that these are not the only parameters which
 # might be ignored.
 #
@@ -87,276 +88,221 @@ IGNORED_FLAGS = {
 }
 
 # Known C/C++ compiler wrapper name patterns
-COMPILER_WRAPPER_PATTERN = re.compile(r'^(distcc|ccache)$')
+COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
-# Known C/C++ compiler executable name patterns
-COMPILER_PATTERNS = frozenset([
-    re.compile(r'^(cc|c\+\+|cxx|CC)$'),
-    re.compile(r'^([^-]*-)*[mg](cc|\+\+)(-\d+(\.\d+){0,2})?$'),
-    re.compile(r'^([^-]*-)*clang(\+\+)?(-\d+(\.\d+){0,2})?$'),
-    re.compile(r'^llvm-g(cc|\+\+)$'),
-    re.compile(r'^i(cc|cpc)$'),
-    re.compile(r'^(g|)xl(c|C|c\+\+)$'),
+# Known C compiler executable name patterns
+COMPILER_PATTERNS_CC = frozenset([
+    re.compile(r'^(|i|mpi)cc$'),
+    re.compile(r'^([^-]*-)*[mg]cc(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^([^-]*-)*clang(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^(g|)xlc$'),
 ])
 
 # Known C++ compiler executable name patterns
-COMPILER_CPP_PATTERNS = frozenset([
-    re.compile(r'^(.+)(\+\+)(-.+|)$'),  # C++ compilers usually ends with '++'
-    re.compile(r'^(icpc|xlC|cxx|CC)$'),
+COMPILER_PATTERNS_CXX = frozenset([
+    re.compile(r'^(c\+\+|cxx|CC)$'),
+    re.compile(r'^([^-]*-)*[mg]\+\+(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^(icpc|mpiCC|mpicxx|mpic\+\+)$'),
+    re.compile(r'^(g|)xl(C|c\+\+)$'),
 ])
 
+TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
-def main():
-    try:
-        parser = create_parser()
-        args = parser.parse_args()
+Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
 
-        level = logging.WARNING - min(logging.WARNING, (10 * args.verbose))
-        logging.basicConfig(format='bear: %(message)s', level=level)
-        logging.debug('version: @BEAR_VERSION@')
-        logging.debug(args)
+CompilationCommand = collections.namedtuple(
+    'CompilationCommand', ['compiler', 'flags', 'files'])
 
-        if not args.build:
-            parser.print_help()
-            return 0
 
-        return capture(args)
-    except KeyboardInterrupt:
-        return 1
-    except Exception:
-        logging.exception('Internal error.')
-        if logging.getLogger().isEnabledFor(logging.DEBUG):
-            logging.error("Please report this bug and attach the output "
-                          "to the bug report")
-        else:
-            logging.error("Please run this command again and turn on "
-                          "verbose mode (add '-vvvv' as argument).")
-        return 127
-    finally:
-        logging.shutdown()
+def command_entry_point(function):
+    """ Decorator for command entry methods.
+
+    The decorator initialize/shutdown logging and guard on programming
+    errors (catch exceptions).
+
+    The decorated method can have arbitrary parameters, the return value will
+    be the exit code of the process. """
+
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        """ Do housekeeping tasks and execute the wrapped method. """
+
+        try:
+            logging.basicConfig(format='%(name)s: %(message)s',
+                                level=logging.WARNING,
+                                stream=sys.stdout)
+            # this hack to get the executable name as %(name)
+            logging.getLogger().name = os.path.basename(sys.argv[0])
+            return function(*args, **kwargs)
+        except KeyboardInterrupt:
+            logging.warning('Keyboard interrupt')
+            return 130  # signal received exit code for bash
+        except Exception:
+            logging.exception('Internal error.')
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                logging.error("Please report this bug and attach the output "
+                              "to the bug report")
+            else:
+                logging.error("Please run this command again and turn on "
+                              "verbose mode (add '-vvvv' as argument).")
+            return 64  # some non used exit code for internal errors
+        finally:
+            logging.shutdown()
+
+    return wrapper
+
+
+def reconfigure_logging(verbose_level):
+    """ Reconfigure logging level and format based on the verbose flag.
+
+    :param verbose_level: number of `-v` flags received by the command
+    :return: no return value
+    """
+    # exit when nothing to do
+    if verbose_level == 0:
+        return
+
+    root = logging.getLogger()
+    # tune level
+    level = logging.WARNING - min(logging.WARNING, (10 * verbose_level))
+    root.setLevel(level)
+    # be verbose with messages
+    if verbose_level <= 3:
+        fmt_string = '%(name)s: %(levelname)s: %(message)s'
+    else:
+        fmt_string = '%(name)s: %(levelname)s: %(funcName)s: %(message)s'
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter(fmt=fmt_string))
+    root.handlers = [handler]
+
+
+@command_entry_point
+def intercept_build():
+    """ Entry point for 'intercept-build' command. """
+
+    args = parse_args_for_intercept_build()
+    exit_code, current = capture(args)
+
+    # To support incremental builds, it is desired to read elements from
+    # an existing compilation database from a previous run.
+    if args.append and os.path.isfile(args.cdb):
+        previous = CompilationDatabase.load(args.cdb)
+        entries = iter(set(itertools.chain(previous, current)))
+        CompilationDatabase.save(args.cdb, entries)
+    else:
+        CompilationDatabase.save(args.cdb, current)
+
+    return exit_code
 
 
 def capture(args):
-    """ The entry point of build command interception. """
+    """ Implementation of compilation database generation.
 
-    @contextlib.contextmanager
-    def temporary_directory(**kwargs):
-        name = tempfile.mkdtemp(**kwargs)
-        try:
-            yield name
-        finally:
-            shutil.rmtree(name)
+    :param args:    the parsed and validated command line arguments
+    :return:        the exit status of build process. """
 
-    def post_processing(commands):
-        """ To make a compilation database, it needs to filter out commands
-        which are not compiler calls. Needs to find the source file name
-        from the arguments. And do shell escaping on the command.
-
-        To support incremental builds, it is desired to read elements from
-        an existing compilation database from a previous run. These elements
-        shall be merged with the new elements. """
-
-        # create entries from the current run
-        current = itertools.chain.from_iterable(
-            # creates a sequence of entry generators from an exec,
-            format_entry(command) for command in commands)
-        # read entries from previous run
-        if args.append and os.path.isfile(args.cdb):
-            with open(args.cdb) as handle:
-                previous = iter(json.load(handle))
-        else:
-            previous = iter([])
-        # filter out duplicate entries from both
-        duplicate = duplicate_check(entry_hash)
-        return (entry
-                for entry in itertools.chain(previous, current)
-                if os.path.exists(entry['file']) and not duplicate(entry))
-
-    def run_build(command, environment):
-        try:
-            logging.info('run build in environment: %s', environment)
-            exit_code = subprocess.call(command, env=environment)
-            logging.info('build finished with exit code: %s', exit_code)
-            return exit_code
-        except KeyboardInterrupt:
-            logging.warning('build interupted by user. (writing output)')
-            return 1
-
-    with temporary_directory(prefix='bear-') as tmp_dir:
+    with temporary_directory(prefix='intercept-') as tmp_dir:
         # run the build command
-        environment = setup_environment(tmp_dir, args.libear)
-        exit_code = run_build(args.build, environment)
+        environment = setup_environment(args, tmp_dir)
+        exit_code = run_build(args.build, env=environment)
         # read the intercepted exec calls
-        exec_traces = itertools.chain.from_iterable(
-            parse_exec_trace(os.path.join(tmp_dir, filename))
-            for filename in sorted(os.listdir(tmp_dir)))
-        # do post processing only if that was requested
-        if not args.raw_entries:
-            entries = post_processing(exec_traces)
-        else:
-            entries = exec_traces
-        # dump the compilation database
-        with open(args.cdb, 'w+') as handle:
-            json.dump(list(entries), handle, sort_keys=True, indent=4)
-        return exit_code
+        calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
+        current = compilations(calls, args.cc, args.cxx)
+
+        return exit_code, iter(set(current))
 
 
-def setup_environment(destination, ear_library_path):
+def compilations(exec_calls, cc, cxx):
+    """ Needs to filter out commands which are not compiler calls. And those
+    compiler calls shall be compilation (not pre-processing or linking) calls.
+    Plus needs to find the source file name from the arguments.
+
+    :param exec_calls:  iterator of executions
+    :param cc:          user specified C compiler name
+    :param cxx:         user specified C++ compiler name
+    :return: stream of formatted compilation database entries """
+
+    for call in exec_calls:
+        for compilation in Compilation.iter_from_execution(call, cc, cxx):
+            yield compilation
+
+
+def setup_environment(args, destination):
     """ Sets up the environment for the build command.
 
-    It sets the required environment variables and execute the given command.
-    The exec calls will be logged by the 'libear' preloaded library or by the
-    'wrapper' programs. """
+    In order to capture the sub-commands (executed by the build process),
+    it needs to prepare the environment. It's either the compiler wrappers
+    shall be announce as compiler or the intercepting library shall be
+    announced for the dynamic linker.
+
+    :param args:        command line arguments
+    :param destination: directory path for the execution trace files
+    :return: a prepared set of environment variables. """
 
     environment = dict(os.environ)
-    environment.update({'BEAR_OUTPUT': destination})
+    environment.update({'INTERCEPT_BUILD_TARGET_DIR': destination})
 
     if sys.platform == 'darwin':
         environment.update({
-            'DYLD_INSERT_LIBRARIES': ear_library_path,
+            'DYLD_INSERT_LIBRARIES': args.libear,
             'DYLD_FORCE_FLAT_NAMESPACE': '1'
         })
     else:
-        environment.update({'LD_PRELOAD': ear_library_path})
+        environment.update({'LD_PRELOAD': args.libear})
 
     return environment
 
 
 def parse_exec_trace(filename):
-    """ Parse the file generated by the 'libear' preloaded library.
+    """ Parse execution report file.
 
     Given filename points to a file which contains the basic report
-    generated by the interception library or wrapper command. A single
-    report file _might_ contain multiple process creation info. """
+    generated by the interception library or compiler wrapper.
 
-    GS = chr(0x1d)
-    RS = chr(0x1e)
-    US = chr(0x1f)
+    :param filename: path to an execution trace file to read from,
+    :return: an Execution object. """
 
     logging.debug('parse exec trace file: %s', filename)
     with open(filename, 'r') as handler:
-        content = handler.read()
-        for group in filter(bool, content.split(GS)):
-            records = group.split(RS)
-            yield {
-                'pid': records[0],
-                'ppid': records[1],
-                'function': records[2],
-                'directory': records[3],
-                'command': records[4].split(US)[:-1]
-            }
+        entry = json.load(handler)
+        return Execution(
+            pid=entry['pid'],
+            cwd=entry['cwd'],
+            cmd=entry['cmd'])
 
 
-def format_entry(exec_trace):
-    """ Generate the desired fields for compilation database entries. """
+def exec_trace_files(directory):
+    """ Generates exec trace file names.
 
-    def abspath(cwd, name):
-        """ Create normalized absolute path from input filename. """
-        fullname = name if os.path.isabs(name) else os.path.join(cwd, name)
-        return os.path.normpath(fullname)
+    :param directory:   path to directory which contains the trace files.
+    :return:            a generator of file names (absolute path). """
 
-    logging.debug('format this command: %s', exec_trace['command'])
-    compilation = split_command(exec_trace['command'])
-    if compilation:
-        for source in compilation.files:
-            compiler = 'c++' if compilation.compiler == 'c++' else 'cc'
-            command = [compiler, '-c'] + compilation.flags + [source]
-            logging.debug('formated as: %s', command)
-            yield {
-                'directory': exec_trace['directory'],
-                'command': shell_escape(command),
-                'file': abspath(exec_trace['directory'], source)
-            }
+    for root, _, files in os.walk(directory):
+        for candidate in files:
+            if candidate.startswith(TRACE_FILE_PREFIX):
+                yield os.path.join(root, candidate)
 
 
-def shell_escape(command):
-    """ Takes a command as list and returns a string. """
+def parse_args_for_intercept_build():
+    """ Parse and validate command-line arguments for intercept-build. """
 
-    def needs_quote(word):
-        """ Returns true if arguments needs to be protected by quotes.
+    parser = create_intercept_parser()
+    args = parser.parse_args()
 
-        Previous implementation was shlex.split method, but that's not good
-        for this job. Currently is running through the string with a basic
-        state checking. """
+    reconfigure_logging(args.verbose)
+    logging.debug('Raw arguments %s', sys.argv)
 
-        reserved = {' ', '$', '%', '&', '(', ')', '[', ']', '{', '}', '*', '|',
-                    '<', '>', '@', '?', '!'}
-        state = 0
-        for current in word:
-            if state == 0 and current in reserved:
-                return True
-            elif state == 0 and current == '\\':
-                state = 1
-            elif state == 1 and current in reserved | {'\\'}:
-                state = 0
-            elif state == 0 and current == '"':
-                state = 2
-            elif state == 2 and current == '"':
-                state = 0
-            elif state == 0 and current == "'":
-                state = 3
-            elif state == 3 and current == "'":
-                state = 0
-        return state != 0
+    # short validation logic
+    if not args.build:
+        parser.error(message='missing build command')
 
-    def escape(word):
-        """ Do protect argument if that's needed. """
-
-        table = {'\\': '\\\\', '"': '\\"', ' ': '\\ '}
-        escaped = ''.join([table.get(c, c) for c in word])
-
-        return '"' + escaped + '"' if needs_quote(word) else escaped
-
-    return " ".join([escape(arg) for arg in command])
+    logging.debug('Parsed arguments: %s', args)
+    return args
 
 
-def entry_hash(entry):
-    """ Implement unique hash method for compilation database entries. """
-
-    # For faster lookup in set filename is reverted
-    filename = entry['file'][::-1]
-    # For faster lookup in set directory is reverted
-    directory = entry['directory'][::-1]
-    # On OS X the 'cc' and 'c++' compilers are wrappers for
-    # 'clang' therefore both call would be logged. To avoid
-    # this the hash does not contain the first word of the
-    # command.
-    command = ' '.join(shlex.split(entry['command'])[1:])
-
-    return '<>'.join([filename, directory, command])
-
-
-def duplicate_check(hash_function):
-    """ Workaround to detect duplicate dictionary values.
-
-    Python `dict` type has no `hash` method, which is required by the `set`
-    type to store elements.
-
-    This solution still not store the `dict` as value in a `set`. Instead
-    it calculate a `string` hash and store that. Therefore it can only say
-    that hash is already taken or not.
-
-    This method is a factory method, which returns a predicate. """
-
-    def predicate(entry):
-        """ The predicate which calculates and stores the hash of the given
-        entries. The entry type has to work with the given hash function.
-
-        :param entry: the questioned entry,
-        :return: true/false depends the hash value is already seen or not.
-        """
-        entry_hash = hash_function(entry)
-        if entry_hash not in state:
-            state.add(entry_hash)
-            return False
-        return True
-
-    state = set()
-    return predicate
-
-
-def create_parser():
-    """ Parser factory method. """
+def create_intercept_parser():
+    """ Creates a parser for command-line arguments to 'intercept'. """
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -369,25 +315,38 @@ def create_parser():
         '--verbose', '-v',
         action='count',
         default=0,
-        help="""enable verbose output from '%(prog)s'. A second '-v' increases
-                verbosity.""")
+        help="""Enable verbose output from '%(prog)s'. A second, third and
+        fourth flags increases verbosity.""")
     parser.add_argument(
         '--cdb', '-o',
         metavar='<file>',
         default="compile_commands.json",
         help="""The JSON compilation database.""")
     parser.add_argument(
+        '--use-cc',
+        metavar='<path>',
+        dest='cc',
+        default=os.getenv('CC', 'cc'),
+        help="""Hint '%(prog)s' to classify the given program name as C
+        compiler.""")
+    parser.add_argument(
+        '--use-c++',
+        metavar='<path>',
+        dest='cxx',
+        default=os.getenv('CXX', 'c++'),
+        help="""Hint '%(prog)s' to classify the given program name as C++
+        compiler.""")
+
+    advanced = parser.add_argument_group('advanced options')
+    group = advanced.add_mutually_exclusive_group()
+    group.add_argument(
         '--append', '-a',
         action='store_true',
-        help="""appends new entries to existing compilation database.""")
-
-    testing = parser.add_argument_group('advanced options')
-    testing.add_argument(
-        '--disable-filter', '-n',
-        dest='raw_entries',
-        action='store_true',
-        help="""disable filter, unformatted output.""")
-    testing.add_argument(
+        help="""Extend existing compilation database with new entries.
+        Duplicate entries are detected and not present in the final output.
+        The output is not continuously updated, it's done when the build
+        command finished. """)
+    group.add_argument(
         '--libear', '-l',
         dest='libear',
         default="@DEFAULT_PRELOAD_FILE@",
@@ -395,103 +354,243 @@ def create_parser():
         help="""specify libear file location.""")
 
     parser.add_argument(
-        dest='build',
-        nargs=argparse.REMAINDER,
-        help="""command to run.""")
-
+        dest='build', nargs=argparse.REMAINDER, help="""Command to run.""")
     return parser
 
 
-def split_command(command):
-    """ Returns a value when the command is a compilation, None otherwise.
+class Compilation:
+    def __init__(self, compiler, flags, source, directory):
+        """ Constructor for a single compilation.
 
-    The value on success is a named tuple with the following attributes:
+        This method just normalize the paths and initialize values. """
 
-        files:    list of source files
-        flags:    list of compile options
-        compiler: string value of 'c' or 'c++' """
+        self.compiler = compiler
+        self.flags = flags
+        self.directory = os.path.normpath(directory)
+        self.source = source if os.path.isabs(source) else \
+            os.path.normpath(os.path.join(self.directory, source))
 
-    # quit right now, if the program was not a C/C++ compiler
-    compiler_and_arguments = split_compiler(command)
-    if compiler_and_arguments is None:
+    def __hash__(self):
+        return hash((self.compiler, self.source, self.directory,
+                     ':'.join(self.flags)))
+
+    def __eq__(self, other):
+        return vars(self) == vars(other)
+
+    def as_dict(self):
+        """ This method dumps the object attributes into a dictionary. """
+
+        return vars(self)
+
+    def as_db_entry(self):
+        """ This method creates a compilation database entry. """
+
+        relative = os.path.relpath(self.source, self.directory)
+        compiler = 'cc' if self.compiler == 'c' else 'c++'
+        return {
+            'file': relative,
+            'arguments': [compiler, '-c'] + self.flags + [relative],
+            'directory': self.directory
+        }
+
+    @staticmethod
+    def from_db_entry(entry):
+        """ Parser method for compilation entry.
+
+        From compilation database entry it creates the compilation object.
+
+        :param entry:   the compilation database entry
+        :return: a single compilation object """
+
+        command = shell_split(entry['command']) if 'command' in entry else \
+            entry['arguments']
+        execution = Execution(cmd=command, cwd=entry['directory'], pid=0)
+        entries = list(Compilation.iter_from_execution(execution))
+        assert len(entries) == 1
+        return entries[0]
+
+    @staticmethod
+    def iter_from_execution(execution, cc='cc', cxx='c++'):
+        """ Generator method for compilation entries.
+
+        From a single compiler call it can generate zero or more entries.
+
+        :param execution:   executed command and working directory
+        :param cc:          user specified C compiler name
+        :param cxx:         user specified C++ compiler name
+        :return: stream of CompilationDbEntry objects """
+
+        candidate = Compilation._split_command(execution.cmd, cc, cxx)
+        for source in (candidate.files if candidate else []):
+            result = Compilation(directory=execution.cwd,
+                                 source=source,
+                                 compiler=candidate.compiler,
+                                 flags=candidate.flags)
+            if os.path.isfile(result.source):
+                yield result
+
+    @staticmethod
+    def _split_compiler(command, cc, cxx):
+        """ A predicate to decide the command is a compiler call or not.
+
+        :param command:     the command to classify
+        :param cc:          user specified C compiler name
+        :param cxx:         user specified C++ compiler name
+        :return: None if the command is not a compilation, or a tuple
+                (compiler_language, rest of the command) otherwise """
+
+        def is_wrapper(cmd):
+            return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
+
+        def is_c_compiler(cmd):
+            return os.path.basename(cc) == cmd or \
+                any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CC)
+
+        def is_cxx_compiler(cmd):
+            return os.path.basename(cxx) == cmd or \
+                any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CXX)
+
+        if command:  # not empty list will allow to index '0' and '1:'
+            executable = os.path.basename(command[0])
+            parameters = command[1:]
+            # 'wrapper' 'parameters' and
+            # 'wrapper' 'compiler' 'parameters' are valid.
+            # plus, a wrapper can wrap wrapper too.
+            if is_wrapper(executable):
+                result = Compilation._split_compiler(parameters, cc, cxx)
+                return ('c', parameters) if result is None else result
+            # and 'compiler' 'parameters' is valid.
+            elif is_c_compiler(executable):
+                return 'c', parameters
+            elif is_cxx_compiler(executable):
+                return 'c++', parameters
         return None
 
-    # the result of this method
-    result = collections.namedtuple('Compilation',
-                                    ['compiler', 'flags', 'files'])
-    result.compiler = compiler_and_arguments[0]
-    result.flags = []
-    result.files = []
-    # iterate on the compile options
-    args = iter(compiler_and_arguments[1])
-    for arg in args:
-        # quit when compilation pass is not involved
-        if arg in {'-E', '-S', '-cc1', '-M', '-MM', '-###'}:
+    @staticmethod
+    def _split_command(command, cc, cxx):
+        """ Returns a value when the command is a compilation, None otherwise.
+
+        :param command:     the command to classify
+        :param cc:          user specified C compiler name
+        :param cxx:         user specified C++ compiler name
+        :return: stream of CompilationCommand objects """
+
+        logging.debug('input was: %s', command)
+        # quit right now, if the program was not a C/C++ compiler
+        compiler_and_arguments = Compilation._split_compiler(command, cc, cxx)
+        if compiler_and_arguments is None:
             return None
-        # ignore some flags
-        elif arg in IGNORED_FLAGS:
-            count = IGNORED_FLAGS[arg]
-            for _ in range(count):
-                next(args)
-        elif re.match(r'^-(l|L|Wl,).+', arg):
-            pass
-        # some parameters could look like filename, take as compile option
-        elif arg in {'-D', '-I'}:
-            result.flags.extend([arg, next(args)])
-        # parameter which looks source file is taken...
-        elif re.match(r'^[^-].+', arg) and is_source(arg):
-            result.files.append(arg)
-        # and consider everything else as compile option.
-        else:
-            result.flags.append(arg)
-    # do extra check on number of source files
-    return result if result.files else None
+
+        # the result of this method
+        result = CompilationCommand(compiler=compiler_and_arguments[0],
+                                    flags=[],
+                                    files=[])
+        # iterate on the compile options
+        args = iter(compiler_and_arguments[1])
+        for arg in args:
+            # quit when compilation pass is not involved
+            if arg in {'-E', '-S', '-cc1', '-M', '-MM', '-###'}:
+                return None
+            # ignore some flags
+            elif arg in IGNORED_FLAGS:
+                count = IGNORED_FLAGS[arg]
+                for _ in range(count):
+                    next(args)
+            elif re.match(r'^-(l|L|Wl,).+', arg):
+                pass
+            # some parameters could look like filename, take as compile option
+            elif arg in {'-D', '-I'}:
+                result.flags.extend([arg, next(args)])
+            # parameter which looks source file is taken...
+            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+                result.files.append(arg)
+            # and consider everything else as compile option.
+            else:
+                result.flags.append(arg)
+        logging.debug('output is: %s', result)
+        # do extra check on number of source files
+        return result if result.files else None
 
 
-def split_compiler(command):
-    """ A predicate to decide the command is a compiler call or not.
+class CompilationDatabase:
+    @staticmethod
+    def save(filename, iterator):
+        entries = [entry.as_db_entry() for entry in iterator]
+        with open(filename, 'w+') as handle:
+            json.dump(entries, handle, sort_keys=True, indent=4)
 
-    :param command: the command to classify
-    :return:        None if the command is not a compilation
-                    (compiler_language, rest of the command) tuple if the
-                    command is a compilation. """
-
-    def is_wrapper(candidate):
-        return True if COMPILER_WRAPPER_PATTERN.match(candidate) else False
-
-    def is_compiler(candidate):
-        return any(pattern.match(candidate) for pattern in COMPILER_PATTERNS)
-
-    def is_cplusplus(candidate):
-        return any(pattern.match(candidate)
-                   for pattern in COMPILER_CPP_PATTERNS)
-
-    if command:  # not empty list will allow to index '0' and '1:'
-        executable = os.path.basename(command[0])
-        parameters = command[1:]
-        # 'wrapper' 'parameters' and
-        # 'wrapper' 'compiler' 'parameters' are valid.
-        # plus, a wrapper can wrap wrapper too.
-        if is_wrapper(executable):
-            result = split_compiler(parameters)
-            return ('c', parameters) if result is None else result
-        # and 'compiler' 'parameters' is valid.
-        elif is_compiler(executable):
-            language = 'c++' if is_cplusplus(executable) else 'c'
-            return language, parameters
-    return None
+    @staticmethod
+    def load(filename):
+        with open(filename, 'r') as handle:
+            for entry in json.load(handle):
+                yield Compilation.from_db_entry(entry)
 
 
-def is_source(filename):
-    """ A predicate to decide the filename is a source file or not. """
+def classify_source(filename, c_compiler=True):
+    """ Classify source file names and returns the presumed language,
+    based on the file name extension.
 
-    accepted = [
-        '.c', '.cc', '.cp', '.cpp', '.cxx', '.c++', '.m', '.mm', '.i', '.ii',
-        '.mii'
-    ]
+    :param filename:    the source file name
+    :param c_compiler:  indicate that the compiler is a C compiler,
+    :return: the language from file name extension. """
+
+    mapping = {
+        '.c': 'c' if c_compiler else 'c++',
+        '.i': 'c-cpp-output' if c_compiler else 'c++-cpp-output',
+        '.ii': 'c++-cpp-output',
+        '.m': 'objective-c',
+        '.mi': 'objective-c-cpp-output',
+        '.mm': 'objective-c++',
+        '.mii': 'objective-c++-cpp-output',
+        '.C': 'c++',
+        '.cc': 'c++',
+        '.CC': 'c++',
+        '.cp': 'c++',
+        '.cpp': 'c++',
+        '.cxx': 'c++',
+        '.c++': 'c++',
+        '.C++': 'c++',
+        '.txx': 'c++'
+    }
+
     __, extension = os.path.splitext(os.path.basename(filename))
-    return extension.lower() in accepted
+    return mapping.get(extension)
+
+
+def shell_split(string):
+    """ Takes a command string and returns as a list. """
+
+    def unescape(arg):
+        """ Gets rid of the escaping characters. """
+
+        if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
+            return re.sub(r'\\(["\\])', r'\1', arg[1:-1])
+        return re.sub(r'\\([\\ $%&\(\)\[\]\{\}\*|<>@?!])', r'\1', arg)
+
+    return [unescape(token) for token in shlex.split(string)]
+
+
+def run_build(command, *args, **kwargs):
+    """ Run and report build command execution
+
+    :param command: array of tokens
+    :return: exit code of the process
+    """
+    environment = kwargs.get('env', os.environ)
+    logging.debug('run build %s, in environment: %s', command, environment)
+    exit_code = subprocess.call(command, *args, **kwargs)
+    logging.debug('build finished with exit code: %d', exit_code)
+    return exit_code
+
+
+@contextlib.contextmanager
+def temporary_directory(**kwargs):
+    name = tempfile.mkdtemp(**kwargs)
+    try:
+        yield name
+    finally:
+        shutil.rmtree(name)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(intercept_build())

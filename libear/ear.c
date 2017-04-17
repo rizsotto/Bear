@@ -40,6 +40,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include <pthread.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
@@ -53,7 +56,7 @@ static char **environ;
 extern char **environ;
 #endif
 
-#define ENV_OUTPUT "BEAR_OUTPUT"
+#define ENV_OUTPUT "INTERCEPT_BUILD_TARGET_DIR"
 #ifdef APPLE
 # define ENV_FLAT    "DYLD_FORCE_FLAT_NAMESPACE"
 # define ENV_PRELOAD "DYLD_INSERT_LIBRARIES"
@@ -81,7 +84,9 @@ static int bear_capture_env_t(bear_env_t *env);
 static void bear_release_env_t(bear_env_t *env);
 static char const **bear_update_environment(char *const envp[], bear_env_t *env);
 static char const **bear_update_environ(char const **in, char const *key, char const *value);
-static void bear_report_call(char const *fun, char const *const argv[]);
+static void bear_report_call(char const *const argv[]);
+static int bear_write_json_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
+static int bear_encode_json_string(char const *src, char *dst, size_t dst_size);
 static char const **bear_strings_build(char const *arg, va_list *ap);
 static char const **bear_strings_copy(char const **const in);
 static char const **bear_strings_append(char const **in, char const *e);
@@ -173,7 +178,7 @@ static void on_unload(void) {
 
 #ifdef HAVE_EXECVE
 int execve(const char *path, char *const argv[], char *const envp[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_execve(path, argv, envp);
 }
 #endif
@@ -183,35 +188,35 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 #error can not implement execv without execve
 #endif
 int execv(const char *path, char *const argv[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_execve(path, argv, environ);
 }
 #endif
 
 #ifdef HAVE_EXECVPE
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_execvpe(file, argv, envp);
 }
 #endif
 
 #ifdef HAVE_EXECVP
 int execvp(const char *file, char *const argv[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_execvp(file, argv);
 }
 #endif
 
 #ifdef HAVE_EXECVP2
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_execvP(file, search_path, argv);
 }
 #endif
 
 #ifdef HAVE_EXECT
 int exect(const char *path, char *const argv[], char *const envp[]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_exect(path, argv, envp);
 }
 #endif
@@ -226,7 +231,7 @@ int execl(const char *path, const char *arg, ...) {
     char const **argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     int const result = call_execve(path, (char *const *)argv, environ);
 
     bear_strings_release(argv);
@@ -244,7 +249,7 @@ int execlp(const char *file, const char *arg, ...) {
     char const **argv = bear_strings_build(arg, &args);
     va_end(args);
 
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     int const result = call_execvp(file, (char *const *)argv);
 
     bear_strings_release(argv);
@@ -264,7 +269,7 @@ int execle(const char *path, const char *arg, ...) {
     char const **envp = va_arg(args, char const **);
     va_end(args);
 
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     int const result =
         call_execve(path, (char *const *)argv, (char *const *)envp);
 
@@ -278,7 +283,7 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *restrict attrp,
                 char *const argv[restrict], char *const envp[restrict]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 #endif
@@ -288,7 +293,7 @@ int posix_spawnp(pid_t *restrict pid, const char *restrict file,
                  const posix_spawn_file_actions_t *file_actions,
                  const posix_spawnattr_t *restrict attrp,
                  char *const argv[restrict], char *const envp[restrict]) {
-    bear_report_call(__func__, (char const *const *)argv);
+    bear_report_call((char const *const *)argv);
     return call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 #endif
@@ -417,11 +422,7 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 
 /* this method is to write log about the process creation. */
 
-static void bear_report_call(char const *fun, char const *const argv[]) {
-    static int const GS = 0x1d;
-    static int const RS = 0x1e;
-    static int const US = 0x1f;
-
+static void bear_report_call(char const *const argv[]) {
     if (!initialized)
         return;
 
@@ -434,30 +435,100 @@ static void bear_report_call(char const *fun, char const *const argv[]) {
     char const * const out_dir = initial_env[0];
     size_t const path_max_length = strlen(out_dir) + 32;
     char filename[path_max_length];
-    if (-1 == snprintf(filename, path_max_length, "%s/%d.cmd", out_dir, getpid())) {
+    if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir)) {
         perror("bear: snprintf");
         exit(EXIT_FAILURE);
     }
-    FILE * fd = fopen(filename, "a+");
-    if (0 == fd) {
-        perror("bear: fopen");
+    int fd = mkstemp((char *)&filename);
+    if (-1 == fd) {
+        perror("bear: mkstemp");
         exit(EXIT_FAILURE);
     }
-    fprintf(fd, "%d%c", getpid(), RS);
-    fprintf(fd, "%d%c", getppid(), RS);
-    fprintf(fd, "%s%c", fun, RS);
-    fprintf(fd, "%s%c", cwd, RS);
-    size_t const argc = bear_strings_length(argv);
-    for (size_t it = 0; it < argc; ++it) {
-        fprintf(fd, "%s%c", argv[it], US);
+    if (0 > bear_write_json_report(fd, argv, cwd, getpid())) {
+        perror("bear: writing json problem");
+        exit(EXIT_FAILURE);
     }
-    fprintf(fd, "%c", GS);
-    if (fclose(fd)) {
-        perror("bear: fclose");
+    if (close(fd)) {
+        perror("bear: close");
         exit(EXIT_FAILURE);
     }
     free((void *)cwd);
     pthread_mutex_unlock(&mutex);
+}
+
+static int bear_write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
+    if (0 > dprintf(fd, "{ \"pid\": %d, \"cmd\": [", pid))
+        return -1;
+
+    for (char const *const *it = cmd; (it) && (*it); ++it) {
+        char const *const sep = (it != cmd) ? "," : "";
+        const size_t buffer_size = 2 * strlen(*it);
+        char buffer[buffer_size];
+        if (-1 == bear_encode_json_string(*it, buffer, buffer_size))
+            return -1;
+        if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
+            return -1;
+    }
+    const size_t buffer_size = 2 * strlen(cwd);
+    char buffer[buffer_size];
+    if (-1 == bear_encode_json_string(cwd, buffer, buffer_size))
+        return -1;
+    if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
+        return -1;
+
+    return 0;
+}
+
+static int bear_encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
+    char const *src_it = src;
+    char const *const src_end = src + strlen(src);
+
+    char *dst_it = dst;
+    char *const dst_end = dst + dst_size;
+
+    for (; src_it != src_end; ++src_it, ++dst_it) {
+        if (dst_it == dst_end)
+            return -1;
+        // Insert an escape character before control characters.
+        switch (*src_it) {
+        case '\b':
+        case '\f':
+        case '\n':
+        case '\r':
+        case '\t':
+        case '"':
+        case '\\':
+            *dst_it++ = '\\';
+            break;
+        default:
+            break;
+        }
+        // Transform some of the control characters.
+        switch (*src_it) {
+        case '\b':
+            *dst_it = 'b';
+            break;
+        case '\f':
+            *dst_it = 'f';
+            break;
+        case '\n':
+            *dst_it = 'n';
+            break;
+        case '\r':
+            *dst_it = 'r';
+            break;
+        case '\t':
+            *dst_it = 't';
+            break;
+        default:
+            *dst_it = *src_it;
+        }
+    }
+    if (dst_it == dst_end)
+        return -1;
+    // Insert a terminating 0 value.
+    *dst_it = 0;
+    return 0;
 }
 
 /* update environment assure that chilren processes will copy the desired

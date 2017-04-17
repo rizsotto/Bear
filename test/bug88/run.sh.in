@@ -14,5 +14,5 @@ python ${BEAR_EXE} -l ${BEAR_LIB} --cdb $RESULT_FILE sh -c "$RUN_TEST"
 cat $RESULT_FILE
 
 [ "$(./space)" = "value with spaces" ] && echo "compiled correctly"
-[ "$(cat $RESULT_FILE | grep command | wc -l)" -eq 1 ] && echo "command captured"
-[ "$(cat $RESULT_FILE | grep command | sed 's/\s/\n/g' | grep -c -e \\\\\\\")" -gt 0 ] && echo "3 backslash is there"
+[ "$(cat $RESULT_FILE | grep "file" | wc -l)" -eq 1 ] && echo "command captured"
+[ "$(cat $RESULT_FILE | grep -c -e \\\\\\\")" -gt 0 ] && echo "3 backslash is there"
