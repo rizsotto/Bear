@@ -1,3 +1,15 @@
+## 2.3.0 (2017.04.20)
+
+Features:
+  - Rewrite functional test on lit.
+  - Write intermediate execution report in JSON format.
+  - Write compilation database with "arguments" instead of "command".
+  - Write compilation database with relative paths.
+
+Bugfixes:
+  - Compiler name can be specified as argument (@JakeFederico, #142)
+
+
 ## 2.2.1 (2016.10.15)
 
 Bugfixes:
