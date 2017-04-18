@@ -5,8 +5,6 @@ add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 add_dependencies(check ear)
 
 add_subdirectory(end-to-end)
-add_subdirectory(bug81)
-add_subdirectory(bug88)
 
 set(EAR_EXE ${CMAKE_BINARY_DIR}/bear/bear)
 set(EAR_LIB ${CMAKE_BINARY_DIR}/libear/${EAR_LIB_FILE})

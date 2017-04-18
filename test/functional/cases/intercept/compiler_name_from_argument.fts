@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# RUN: bash %s %T
-# RUN: cd %T; %{intercept-build} --use-cc=wrapper --use-c++=wrapper++ --cdb preload.json ./run.sh
-# RUN: cd %T; %{cdb_diff} preload.json expected.json
+# RUN: bash %s %T/compiler_name_from_argument
+# RUN: cd %T/compiler_name_from_argument; %{intercept-build} --use-cc=wrapper --use-c++=wrapper++ --cdb preload.json ./run.sh
+# RUN: cd %T/compiler_name_from_argument; %{cdb_diff} preload.json expected.json
 
 set -o errexit
 set -o nounset

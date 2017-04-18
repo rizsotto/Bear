@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+# RUN: bash %s %T/define_with_quote
+# RUN: cd %T/define_with_quote; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/define_with_quote; %{cdb_diff} result.json expected.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run.sh
+# ├── expected.json
+# └── src
+#    └── main.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+cat >> "${root_dir}/src/main.c" << EOF
+#include <cstdio>
+
+EXPORT void foo(void) {
+  printf("Hello world!\n");
+}
+
+int main() {
+  foo();
+}
+EOF
+
+
+build_file="${root_dir}/run.sh"
+cat >> ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+# set up unique names for this test
+
+\$CXX -DEXPORT="extern \"C\"" -o hello src/main.c
+EOF
+chmod +x ${build_file}
+
+cat >> "${root_dir}/expected.json" << EOF
+[
+    {
+        "arguments": ["c++", "-c", "-DEXPORT=extern \"C\"", "-o", "hello", "src/main.c"],
+        "directory": "${root_dir}",
+        "file": "src/main.c"
+    }
+]
+EOF
