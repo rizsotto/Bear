@@ -1,5 +1,0 @@
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bear.1.in ${CMAKE_CURRENT_BINARY_DIR}/bear.1)
-
-include(GNUInstallDirs)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/bear.1
-    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
