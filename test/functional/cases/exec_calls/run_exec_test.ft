@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # RUN: cmake -B%T -H%S
 # RUN: make -C %T
 # RUN: %{intercept-build} --cdb %T/result.json %T/exec -C %T -o expected.json
