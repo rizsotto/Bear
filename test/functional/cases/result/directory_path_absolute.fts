@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+# RUN: bash %s %T/directory_path_absolute
+# RUN: cd %T/directory_path_absolute; %{intercept-build} --cdb preload.json ./run.sh
+# RUN: cd %T/directory_path_absolute; %{python} is_dir.py preload.json
+# RUN: cd %T/directory_path_absolute; %{python} is_abs.py preload.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run.sh
+# ├── is_dir.py
+# ├── is_abs.py
+# └── src
+#    └── empty.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+touch "${root_dir}/src/empty.c"
+
+build_file="${root_dir}/run.sh"
+cat >> ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+\$CC -c -o src/empty.o -Dver=1 src/empty.c;
+\$CXX -c -o src/empty.o -Dver=2 src/empty.c;
+
+cd src
+
+\$CC -c -o empty.o -Dver=1 empty.c;
+\$CXX -c -o empty.o -Dver=2 empty.c;
+EOF
+chmod +x ${build_file}
+
+cat >> "${root_dir}/is_dir.py" << EOF
+#!/usr/bin/env python
+
+import argparse
+import json
+import sys
+import os.path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=argparse.FileType('r'))
+    args = parser.parse_args()
+    # file is open, parse the json content
+    input = json.load(args.input)
+    # just get directory paths
+    return [os.path.isdir(entry['directory']) for entry in input].count(False)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+EOF
+
+cat >> "${root_dir}/is_abs.py" << EOF
+#!/usr/bin/env python
+
+import argparse
+import json
+import sys
+import os.path
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input', type=argparse.FileType('r'))
+    args = parser.parse_args()
+    # file is open, parse the json content
+    input = json.load(args.input)
+    # just get directory paths
+    return [os.path.isabs(entry['directory']) for entry in input].count(False)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+EOF
