@@ -85,12 +85,14 @@ Notable examples for enabled security modes are: OS X 10.11 (check with
 (check with `sestatus | grep 'SELinux status'`).
 
 Workaround could be to disable the security feature while running Bear. (This
-might involve reboot of your computer, so might be heavy workaround.) The other
-option could be to use tools which are using compiler wrappers. (It injects a
-fake compiler which does record the compiler invocation and calls the real
-compiler too.) An example for such tool might be [scan-build][scanbuild]. The
-build system shall respect `CC` and `CXX` environment variables.
+might involve reboot of your computer, so might be heavy workaround.) Another
+option if the build tool is not installed under [certain][osx_sip] directories.
+Or use tools which are using compiler wrappers. (It injects a fake compiler
+which does record the compiler invocation and calls the real compiler too.)
+An example for such tool might be [scan-build][scanbuild]. The build system
+shall respect `CC` and `CXX` environment variables.
 
+  [osx_sip]: https://support.apple.com/en-us/HT204899
   [scanbuild]: https://github.com/rizsotto/scan-build
 
 Problem reports

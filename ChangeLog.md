@@ -8,6 +8,7 @@ Features:
 
 Bugfixes:
   - Compiler name can be specified as argument (@JakeFederico, #142)
+  - Update documentation about OSX SIP workaround (@isotes, #152)
 
 
 ## 2.2.1 (2016.10.15)
