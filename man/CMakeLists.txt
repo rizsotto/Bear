@@ -8,5 +8,5 @@
 # too much effort to generate a single text file.
 
 include(GNUInstallDirs)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/bear.1
+install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/bear.1
     DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
