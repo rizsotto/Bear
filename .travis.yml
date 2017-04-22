@@ -50,10 +50,11 @@ install:
   - pip install pep8
 
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then csrutil status || true; fi
-  - cmake . -DCPACK_GENERATOR="TGZ"
+  - mkdir "$HOME/build"; cd "$HOME/build"
+  - cmake $TRAVIS_BUILD_DIR -DCPACK_GENERATOR="TGZ"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
-  - mkdir target_dir
-  - DESTDIR=target_dir make install
+  - mkdir "$HOME/install"
+  - DESTDIR="$HOME/install" make install
+  - find "$HOME/install" -ls
   - VERBOSE=1 make package
