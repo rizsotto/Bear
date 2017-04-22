@@ -24,7 +24,7 @@ mkdir -p "${root_dir}/src"
 touch "${root_dir}/src/empty.c"
 
 wrapper_file="${root_dir}/wrapper"
-cat >> ${wrapper_file} << EOF
+cat > ${wrapper_file} << EOF
 #!/usr/bin/env bash
 
 true
@@ -40,7 +40,7 @@ EOF
 chmod +x ${wrapperxx_file}
 
 build_file="${root_dir}/run.sh"
-cat >> ${build_file} << EOF
+cat > ${build_file} << EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -55,7 +55,7 @@ ${wrapperxx_file} -c -o empty.o -Dver=4 empty.c;
 EOF
 chmod +x ${build_file}
 
-cat >> "${root_dir}/expected.json" << EOF
+cat > "${root_dir}/expected.json" << EOF
 [
 {
   "command": "cc -c -o src/empty.o -Dver=1 src/empty.c",

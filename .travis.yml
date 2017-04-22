@@ -24,6 +24,10 @@ matrix:
       sudo: required
       dist: trusty
       python: 2.7
+    - os: linux
+      sudo: required
+      dist: trusty
+      python: 3.5
     - os: osx
       osx_image: xcode6.4
       language: generic
@@ -37,7 +41,7 @@ addons:
 
 before_install:
   - uname
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then
       csrutil status || true;
       brew update;
       command -v pip || { brew install python coreutils; };
@@ -51,10 +55,12 @@ install:
 
 script:
   - mkdir "$HOME/build"; cd "$HOME/build"
-  - cmake $TRAVIS_BUILD_DIR -DCPACK_GENERATOR="TGZ"
+  - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
-  - mkdir "$HOME/install"
-  - DESTDIR="$HOME/install" make install
-  - find "$HOME/install" -ls
   - VERBOSE=1 make package
+  - if [ "$TRAVIS_SUDO" == "true" ]; then
+      sudo make install;
+      (cd "$TRAVIS_BUILD_DIR"; git clean -fdx;);
+      lit -v "$TRAVIS_BUILD_DIR/test";
+    fi

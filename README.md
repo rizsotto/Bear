@@ -75,6 +75,39 @@ it does not append to it, but overrides it. So builds which are using these
 variables might not work. (I don't know any build tool which does that, but
 please let me know if you do.)
 
+### Build with multiple architecture support
+
+Multilib is one of the solutions allowing users to run applications built
+for various application binary interfaces (ABIs) of the same architecture.
+The most common use of multilib is to run 32-bit applications on 64-bit
+kernel.
+
+For OSX this is not an issue. The build commands from previous section will
+work, Bear will intercept compiler calls for 32-bit and 64-bit applications.
+
+For Linux, a small tune is needed at build time. Need to compile `libear.so`
+libray for 32-bit and for 64-bit too. Then install these libraries to the OS
+preferred multilib directories. And replace the `libear.so` path default
+value with a single path, which matches both. (The match can be achieved by
+the `$LIB` token expansion from the dynamic loader. See `man ld.so` for more.)
+
+Debian derivatives are using `lib/i386-linux-gnu` and `lib/x86_64-linux-gnu`,
+while many other distributions are simple `lib` and `lib64`. Here comes an
+example build script to install a multilib capable Bear. It will install Bear
+under `/opt/bear` on a non Debian system.
+
+    (cd ~/build32; cmake "$BEAR_SOURCE_DIR" -DCMAKE_C_COMPILER_ARG1="-m32"; VERBOSE=1 make all;)
+    (cd ~/build64; cmake "$BEAR_SOURCE_DIR" -DCMAKE_C_COMPILER_ARG1="-m64"; VERBOSE=1 make all;)
+    sed -e 's:@DEFAULT_PRELOAD_FILE@:/opt/bear/$LIB/libear.so:g' "$BEAR_SOURCE_DIR/bear/main.py.in" > ~/build32/bear.py"
+    sudo install -m 0644 ~/build32/libear/libear.so /opt/bear/lib/libear.so
+    sudo install -m 0644 ~/build64/libear/libear.so /opt/bear/lib64/libear.so
+    sudo install -m 0555 "$HOME/build32/bear.py" /opt/bear/bin/bear
+
+To check you installation, install `lit` and run the test suite.
+
+    PATH=/opt/bear/bin:$PATH lit -v test
+    PATH=/opt/bear/bin:$PATH lit -v test -DMULTILIB=true
+
 ### Empty compilation database on OS X Captain or Fedora
 
 Security extension/modes on different operating systems might disable library

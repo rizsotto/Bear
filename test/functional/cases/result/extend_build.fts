@@ -29,7 +29,7 @@ mkdir -p "${root_dir}/src"
 touch "${root_dir}/src/empty.c"
 
 build_file="${root_dir}/run-one.sh"
-cat >> ${build_file} << EOF
+cat > ${build_file} << EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -43,7 +43,7 @@ EOF
 chmod +x ${build_file}
 
 build_file="${root_dir}/run-two.sh"
-cat >> ${build_file} << EOF
+cat > ${build_file} << EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -57,7 +57,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat >> "${root_dir}/one.json" << EOF
+cat > "${root_dir}/one.json" << EOF
 [
 {
   "command": "cc -c -o src/empty.o -Dver=1 src/empty.c",
@@ -73,7 +73,7 @@ cat >> "${root_dir}/one.json" << EOF
 ]
 EOF
 
-cat >> "${root_dir}/two.json" << EOF
+cat > "${root_dir}/two.json" << EOF
 [
 {
   "command": "cc -c -o empty.o -Dver=3 empty.c",
@@ -89,7 +89,7 @@ cat >> "${root_dir}/two.json" << EOF
 ]
 EOF
 
-cat >> "${root_dir}/sum.json" << EOF
+cat > "${root_dir}/sum.json" << EOF
 [
 {
   "command": "cc -c -o src/empty.o -Dver=1 src/empty.c",

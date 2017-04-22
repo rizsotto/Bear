@@ -20,11 +20,11 @@ set -o xtrace
 root_dir=$1
 mkdir -p "${root_dir}/src"
 
-cat >> "${root_dir}/src/lib.c" << EOF
+cat > "${root_dir}/src/lib.c" << EOF
 int foo() { return 2; }
 EOF
 
-cat >> "${root_dir}/src/main.c" << EOF
+cat > "${root_dir}/src/main.c" << EOF
 int main() { return 0; }
 EOF
 
@@ -39,7 +39,7 @@ fi
 
 
 build_file="${root_dir}/run.sh"
-cat >> ${build_file} << EOF
+cat > ${build_file} << EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -71,7 +71,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat >> "${root_dir}/expected.json" << EOF
+cat > "${root_dir}/expected.json" << EOF
 [
     {
         "command": "cc -c -o one.o -fpic lib.c",

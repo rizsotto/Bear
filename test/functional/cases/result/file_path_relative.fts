@@ -24,7 +24,7 @@ mkdir -p "${root_dir}/src"
 touch "${root_dir}/src/empty.c"
 
 build_file="${root_dir}/run.sh"
-cat >> ${build_file} << EOF
+cat > ${build_file} << EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -40,7 +40,7 @@ cd src
 EOF
 chmod +x ${build_file}
 
-cat >> "${root_dir}/is_file.py" << EOF
+cat > "${root_dir}/is_file.py" << EOF
 #!/usr/bin/env python
 
 import argparse
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     sys.exit(main())
 EOF
 
-cat >> "${root_dir}/is_rel.py" << EOF
+cat > "${root_dir}/is_rel.py" << EOF
 #!/usr/bin/env python
 
 import argparse
