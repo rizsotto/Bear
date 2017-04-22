@@ -1,3 +1,9 @@
+## 2.3.1 (2017.04.22)
+
+Bugfixes:
+  - Fix problem with `make install` (@ilovezfs, #153)
+
+
 ## 2.3.0 (2017.04.20)
 
 Features:
