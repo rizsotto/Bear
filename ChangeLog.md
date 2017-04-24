@@ -1,3 +1,9 @@
+## 2.3.2 (2017.04.24)
+
+Bugfixes:
+  - Make Bear work with 32-bit and 64-bit toolchains (@deb0ch, @andrey-desman, @nolange, #134)
+
+
 ## 2.3.1 (2017.04.22)
 
 Bugfixes:
