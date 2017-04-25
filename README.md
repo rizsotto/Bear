@@ -97,11 +97,10 @@ example build script to install a multilib capable Bear. It will install Bear
 under `/opt/bear` on a non Debian system.
 
     (cd ~/build32; cmake "$BEAR_SOURCE_DIR" -DCMAKE_C_COMPILER_ARG1="-m32"; VERBOSE=1 make all;)
-    (cd ~/build64; cmake "$BEAR_SOURCE_DIR" -DCMAKE_C_COMPILER_ARG1="-m64"; VERBOSE=1 make all;)
-    sed -e 's:@DEFAULT_PRELOAD_FILE@:/opt/bear/$LIB/libear.so:g' "$BEAR_SOURCE_DIR/bear/main.py.in" > ~/build32/bear.py"
+    (cd ~/build64; cmake "$BEAR_SOURCE_DIR" -DCMAKE_C_COMPILER_ARG1="-m64" -DDEFAULT_PRELOAD_FILE='/opt/bear/$LIB/libear.so'; VERBOSE=1 make all;)
     sudo install -m 0644 ~/build32/libear/libear.so /opt/bear/lib/libear.so
     sudo install -m 0644 ~/build64/libear/libear.so /opt/bear/lib64/libear.so
-    sudo install -m 0555 "$HOME/build32/bear.py" /opt/bear/bin/bear
+    sudo install -m 0555 ~/build64/bear/bear" /opt/bear/bin/bear
 
 To check you installation, install `lit` and run the test suite.
 
