@@ -1,3 +1,9 @@
+## 2.3.3 (2017.04.25)
+
+Bugfixes:
+  - Fix crashes caused by unicode command execution (@cgull, #141, @knowack1, #154)
+
+
 ## 2.3.2 (2017.04.24)
 
 Bugfixes:
