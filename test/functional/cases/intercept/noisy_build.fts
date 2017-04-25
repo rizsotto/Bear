@@ -30,6 +30,9 @@ set -o xtrace
 
 echo "hi there \"people\""
 echo "hi	again"
+echo "מה שלומך?"
+echo "Как дела?"
+echo "[1mThis line might cause an exception in json load[0m"
 
 "\$CC" -c -o src/empty.o -Dver=1 src/empty.c;
 "\$CXX" -c -o src/empty.o -Dver=2 src/empty.c;

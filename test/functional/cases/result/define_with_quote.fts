@@ -39,8 +39,6 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-# set up unique names for this test
-
 \$CXX -DEXPORT="extern \"C\"" -o hello src/main.cpp
 EOF
 chmod +x ${build_file}

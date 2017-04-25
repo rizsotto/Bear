@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+
+# RUN: bash %s %T/define_with_unicode
+# RUN: cd %T/define_with_unicode; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/define_with_unicode; %{cdb_diff} result.json expected.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run.sh
+# ├── expected.json
+# └── src
+#    └── main.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+cat > "${root_dir}/src/main.c" << EOF
+#include <stdio.h>
+
+static char const * const message = "MESSAGE";
+
+int main(void) {
+  printf("%s\n", message);
+  return 0;
+}
+EOF
+
+
+build_file="${root_dir}/run.sh"
+cat > ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+\$CC -DMESSAGE="מה שלומך?" -o hello src/main.c
+\$CC -DMESSAGE="Как дела?" -o hello src/main.c
+EOF
+chmod +x ${build_file}
+
+
+cat > "${root_dir}/expected.json" << EOF
+[
+    {
+        "arguments": ["cc", "-c", "-DMESSAGE=\u041a\u0430\u043a \u0434\u0435\u043b\u0430?", "-o", "hello", "src/main.c"],
+        "directory": "${root_dir}",
+        "file": "src/main.c"
+    },
+    {
+        "arguments": ["cc", "-c", "-DMESSAGE=\u05de\u05d4 \u05e9\u05dc\u05d5\u05de\u05da?", "-o", "hello", "src/main.c"],
+        "directory": "${root_dir}",
+        "file": "src/main.c"
+    }
+]
+EOF

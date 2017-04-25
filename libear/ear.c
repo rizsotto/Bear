@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <locale.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -427,6 +428,11 @@ static void bear_report_call(char const *const argv[]) {
         return;
 
     pthread_mutex_lock(&mutex);
+    char const * const saved_locale = strdup(setlocale(LC_ALL, NULL));
+    if (0 == saved_locale) {
+        perror("bear: strdup for locale");
+        exit(EXIT_FAILURE);
+    }
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd) {
         perror("bear: getcwd");
@@ -453,23 +459,28 @@ static void bear_report_call(char const *const argv[]) {
         exit(EXIT_FAILURE);
     }
     free((void *)cwd);
+    // Restore locale.
+    setlocale(LC_ALL, saved_locale);
+    free((void *)saved_locale);
     pthread_mutex_unlock(&mutex);
 }
 
 static int bear_write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
+    setlocale(LC_ALL, "en_US.UTF-8");
+
     if (0 > dprintf(fd, "{ \"pid\": %d, \"cmd\": [", pid))
         return -1;
 
     for (char const *const *it = cmd; (it) && (*it); ++it) {
         char const *const sep = (it != cmd) ? "," : "";
-        const size_t buffer_size = 2 * strlen(*it);
+        const size_t buffer_size = 6 * strlen(*it);
         char buffer[buffer_size];
         if (-1 == bear_encode_json_string(*it, buffer, buffer_size))
             return -1;
         if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
             return -1;
     }
-    const size_t buffer_size = 2 * strlen(cwd);
+    const size_t buffer_size = 6 * strlen(cwd);
     char buffer[buffer_size];
     if (-1 == bear_encode_json_string(cwd, buffer, buffer_size))
         return -1;
@@ -480,55 +491,60 @@ static int bear_write_json_report(int fd, char const *const cmd[], char const *c
 }
 
 static int bear_encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
-    char const *src_it = src;
-    char const *const src_end = src + strlen(src);
+    size_t const wsrc_length = mbstowcs(NULL, src, 0);
+    wchar_t wsrc[wsrc_length + 1];
+    if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
+        perror("bear: mbstowcs");
+        return -1;
+    }
+    wchar_t const *wsrc_it = (wchar_t const *)&wsrc;
+    wchar_t const *const wsrc_end = wsrc_it + wsrc_length;
 
     char *dst_it = dst;
     char *const dst_end = dst + dst_size;
 
-    for (; src_it != src_end; ++src_it, ++dst_it) {
-        if (dst_it == dst_end)
+    for (; wsrc_it != wsrc_end; ++wsrc_it) {
+        if (dst_it >= dst_end) {
             return -1;
-        // Insert an escape character before control characters.
-        switch (*src_it) {
-        case '\b':
-        case '\f':
-        case '\n':
-        case '\r':
-        case '\t':
-        case '"':
-        case '\\':
-            *dst_it++ = '\\';
-            break;
-        default:
-            break;
         }
-        // Transform some of the control characters.
-        switch (*src_it) {
-        case '\b':
-            *dst_it = 'b';
+        // Insert an escape character before control characters.
+        switch (*wsrc_it) {
+        case L'\b':
+            dst_it += snprintf(dst_it, 3, "\\b");
             break;
-        case '\f':
-            *dst_it = 'f';
+        case L'\f':
+            dst_it += snprintf(dst_it, 3, "\\f");
             break;
-        case '\n':
-            *dst_it = 'n';
+        case L'\n':
+            dst_it += snprintf(dst_it, 3, "\\n");
             break;
-        case '\r':
-            *dst_it = 'r';
+        case L'\r':
+            dst_it += snprintf(dst_it, 3, "\\r");
             break;
-        case '\t':
-            *dst_it = 't';
+        case L'\t':
+            dst_it += snprintf(dst_it, 3, "\\t");
+            break;
+        case L'"':
+            dst_it += snprintf(dst_it, 3, "\\\"");
+            break;
+        case L'\\':
+            dst_it += snprintf(dst_it, 3, "\\\\");
             break;
         default:
-            *dst_it = *src_it;
+            if ((*wsrc_it < L' ') || (*wsrc_it > 127)) {
+                dst_it += snprintf(dst_it, 7, "\\u%04x", (unsigned int)*wsrc_it);
+            } else {
+                *dst_it++ = (char)*wsrc_it;
+            }
+            break;
         }
     }
-    if (dst_it == dst_end)
-        return -1;
-    // Insert a terminating 0 value.
-    *dst_it = 0;
-    return 0;
+    if (dst_it < dst_end) {
+        // Insert a terminating 0 value.
+        *dst_it = 0;
+        return 0;
+    }
+    return -1;
 }
 
 /* update environment assure that chilren processes will copy the desired
