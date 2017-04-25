@@ -32,7 +32,7 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-"\$CC" -Dver=1 src/one.c src/two.c src/main.c;
+\$CC -Dver=1 src/one.c src/two.c src/main.c;
 
 true;
 EOF

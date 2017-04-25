@@ -34,13 +34,15 @@ echo "מה שלומך?"
 echo "Как дела?"
 echo "[1mThis line might cause an exception in json load[0m"
 
-"\$CC" -c -o src/empty.o -Dver=1 src/empty.c;
-"\$CXX" -c -o src/empty.o -Dver=2 src/empty.c;
+\$CC -c -Dver=1 src/empty.c &
+\$CXX -c -Dver=2 src/empty.c &
 
 bash -c "\
-mkdir -p ./this/that \
-touch ./this/that \
-rm -rf ./this"
+mkdir -p ./this/that; \
+touch ./this/that; \
+rm -rf ./this;"
+
+wait
 
 true;
 EOF
@@ -49,13 +51,13 @@ chmod +x ${build_file}
 cat > "${root_dir}/expected.json" << EOF
 [
 {
-  "command": "cc -c -o src/empty.o -Dver=1 src/empty.c",
+  "command": "cc -c -Dver=1 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }
 ,
 {
-  "command": "c++ -c -o src/empty.o -Dver=2 src/empty.c",
+  "command": "c++ -c -Dver=2 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }

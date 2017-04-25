@@ -57,9 +57,6 @@ import logging
 #
 # Keys are the option name, value number of options to skip
 IGNORED_FLAGS = {
-    # compiling only flag, ignored because the creator of compilation
-    # database will explicitly set it.
-    '-c': 0,
     # preprocessor macros, ignored because would cause duplicate entries in
     # the output (the only difference would be these flags). this is actual
     # finding from users, who suffered longer execution time caused by the
@@ -112,7 +109,7 @@ TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
 
 CompilationCommand = collections.namedtuple(
-    'CompilationCommand', ['compiler', 'flags', 'files'])
+    'CompilationCommand', ['compiler', 'phase', 'flags', 'files', 'output'])
 
 
 def command_entry_point(function):
@@ -266,10 +263,7 @@ def parse_exec_trace(filename):
     logging.debug('parse exec trace file: %s', filename)
     with open(filename, 'r') as handler:
         entry = json.load(handler)
-        return Execution(
-            pid=entry['pid'],
-            cwd=entry['cwd'],
-            cmd=entry['cmd'])
+        return Execution(pid=entry['pid'], cwd=entry['cwd'], cmd=entry['cmd'])
 
 
 def exec_trace_files(directory):
@@ -358,20 +352,22 @@ def create_intercept_parser():
 
 
 class Compilation:
-    def __init__(self, compiler, flags, source, directory):
+    def __init__(self, compiler, phase, flags, source, directory, output):
         """ Constructor for a single compilation.
 
         This method just normalize the paths and initialize values. """
 
         self.compiler = compiler
+        self.phase = phase
         self.flags = flags
         self.directory = os.path.normpath(directory)
         self.source = source if os.path.isabs(source) else \
             os.path.normpath(os.path.join(self.directory, source))
+        self.output = output
 
     def __hash__(self):
-        return hash((self.compiler, self.source, self.directory,
-                     ':'.join(self.flags)))
+        return hash((self.compiler, self.phase, self.source, self.directory,
+                     self.output, ':'.join(self.flags)))
 
     def __eq__(self, other):
         return vars(self) == vars(other)
@@ -386,9 +382,11 @@ class Compilation:
 
         relative = os.path.relpath(self.source, self.directory)
         compiler = 'cc' if self.compiler == 'c' else 'c++'
+        output = ['-o', self.output] if self.output else []
         return {
             'file': relative,
-            'arguments': [compiler, '-c'] + self.flags + [relative],
+            'arguments':
+                [compiler, self.phase] + self.flags + output + [relative],
             'directory': self.directory
         }
 
@@ -421,10 +419,14 @@ class Compilation:
 
         candidate = Compilation._split_command(execution.cmd, cc, cxx)
         for source in (candidate.files if candidate else []):
+            output = candidate.output[0] if candidate.output else None
+            phase = candidate.phase[0] if candidate.phase else '-c'
             result = Compilation(directory=execution.cwd,
                                  source=source,
                                  compiler=candidate.compiler,
-                                 flags=candidate.flags)
+                                 phase=phase,
+                                 flags=candidate.flags,
+                                 output=output)
             if os.path.isfile(result.source):
                 yield result
 
@@ -482,14 +484,18 @@ class Compilation:
 
         # the result of this method
         result = CompilationCommand(compiler=compiler_and_arguments[0],
+                                    phase=[],
                                     flags=[],
-                                    files=[])
+                                    files=[],
+                                    output=[])
         # iterate on the compile options
         args = iter(compiler_and_arguments[1])
         for arg in args:
             # quit when compilation pass is not involved
-            if arg in {'-E', '-S', '-cc1', '-M', '-MM', '-###'}:
+            if arg in {'-E', '-cc1', '-cc1as', '-M', '-MM', '-###'}:
                 return None
+            elif arg in {'-S', '-c'}:
+                result.phase.append(arg)
             # ignore some flags
             elif arg in IGNORED_FLAGS:
                 count = IGNORED_FLAGS[arg]
@@ -500,6 +506,9 @@ class Compilation:
             # some parameters could look like filename, take as compile option
             elif arg in {'-D', '-I'}:
                 result.flags.extend([arg, next(args)])
+            # get the output file separately
+            elif arg == '-o':
+                result.output.append(next(args))
             # parameter which looks source file is taken...
             elif re.match(r'^[^-].+', arg) and classify_source(arg):
                 result.files.append(arg)
@@ -549,7 +558,11 @@ def classify_source(filename, c_compiler=True):
         '.cxx': 'c++',
         '.c++': 'c++',
         '.C++': 'c++',
-        '.txx': 'c++'
+        '.txx': 'c++',
+        '.s': 'assembly',
+        '.S': 'assembly',
+        '.sx': 'assembly',
+        '.asm': 'assembly'
     }
 
     __, extension = os.path.splitext(os.path.basename(filename))

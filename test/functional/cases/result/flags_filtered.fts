@@ -20,13 +20,12 @@ set -o xtrace
 root_dir=$1
 mkdir -p "${root_dir}/src"
 
+cp "${test_input_dir}/main.c" "${root_dir}/src/main.c"
+
 cat > "${root_dir}/src/lib.c" << EOF
 int foo() { return 2; }
 EOF
 
-cat > "${root_dir}/src/main.c" << EOF
-int main() { return 0; }
-EOF
 
 
 # set up platform specific linker options
@@ -50,22 +49,21 @@ set -o xtrace
 cd src
 
 # non compilation calls shall not be in the result
-"\$CC" -### -c main.c 2> /dev/null
-"\$CC" -E -o "\$\$.i"       main.c
-"\$CC" -S -o "\$\$.asm"     main.c
-"\$CC" -c -o "\$\$.d"   -M  main.c
-"\$CC" -c -o "\$\$.d"   -MM main.c
+\$CC -### -c main.c 2> /dev/null
+\$CC -E -o "\$\$.i"       main.c
+\$CC -c -o "\$\$.d"   -M  main.c
+\$CC -c -o "\$\$.d"   -MM main.c
 
 # preprocessor flags shall be filtered
-"\$CC" -c -o one.o -fpic -MD  -MT target -MF one.d lib.c
-"\$CC" -c -o two.o -fpic -MMD -MQ target -MF two.d lib.c
+\$CC -c -o one.o -fpic -MD  -MT target -MF one.d lib.c
+\$CC -c -o two.o -fpic -MMD -MQ target -MF two.d lib.c
 
 # linking shall not in the result
-"\$CC" ${LD_FLAGS} one.o two.o
+\$CC ${LD_FLAGS} one.o two.o
 
 # linker flags shall be filtered
-"\$CC" -o "${PREFIX}_one" "-l${PREFIX}"  -L.  main.c
-"\$CC" -o "${PREFIX}_two" -l "${PREFIX}" -L . main.c
+\$CC -o "${PREFIX}_one" "-l${PREFIX}"  -L.  main.c
+\$CC -o "${PREFIX}_two" -l "${PREFIX}" -L . main.c
 
 true;
 EOF
@@ -74,12 +72,12 @@ chmod +x ${build_file}
 cat > "${root_dir}/expected.json" << EOF
 [
     {
-        "command": "cc -c -o one.o -fpic lib.c",
+        "command": "cc -c -fpic -o one.o lib.c",
         "directory": "${root_dir}/src",
         "file": "lib.c"
     },
     {
-        "command": "cc -c -o two.o -fpic lib.c",
+        "command": "cc -c -fpic -o two.o lib.c",
         "directory": "${root_dir}/src",
         "file": "lib.c"
     },

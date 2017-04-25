@@ -30,13 +30,13 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-\$CC -c -o src/empty.o -Dver=1 src/empty.c;
-\$CXX -c -o src/empty.o -Dver=2 src/empty.c;
+\$CC -c -Dver=1 src/empty.c;
+\$CXX -c -Dver=2 src/empty.c;
 
 cd src
 
-\$CC -c -o empty.o -Dver=1 empty.c;
-\$CXX -c -o empty.o -Dver=2 empty.c;
+\$CC -c -Dver=1 empty.c;
+\$CXX -c -Dver=2 empty.c;
 EOF
 chmod +x ${build_file}
 
