@@ -1,3 +1,9 @@
+## 2.3.4 (2017.04.25)
+
+Bugfixes:
+  - Include assembly language file extensions (@RichardsonAlex, @bstaletic, #146)
+
+
 ## 2.3.3 (2017.04.25)
 
 Bugfixes:

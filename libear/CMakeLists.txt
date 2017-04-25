@@ -1,5 +1,3 @@
-set(CMAKE_MACOSX_RPATH 1)
-
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 check_function_exists(execve HAVE_EXECVE)
@@ -30,6 +28,7 @@ if(CMAKE_THREAD_LIBS_INIT)
     target_link_libraries(ear "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
+set(CMAKE_MACOSX_RPATH 1)
 set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
 
 include(GNUInstallDirs)
