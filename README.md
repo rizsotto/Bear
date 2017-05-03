@@ -1,6 +1,8 @@
 Build EAR
 =========
 
+[![Join the chat at https://gitter.im/rizsotto/Bear](https://badges.gitter.im/rizsotto/Bear.svg)](https://gitter.im/rizsotto/Bear?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Bear is a tool that generates a compilation database for clang tooling.
 
 The [JSON compilation database][JSONCDB] is used in the clang project
