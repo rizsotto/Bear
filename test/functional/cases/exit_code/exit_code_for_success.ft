@@ -1,1 +1,2 @@
-# RUN: %{intercept-build} -o %T/success.json true
+# RUN: mkdir %T/exit_code_for_success
+# RUN: cd %T/exit_code_for_success; %{intercept-build} true
