@@ -473,7 +473,7 @@ static int bear_write_json_report(int fd, char const *const cmd[], char const *c
 
     for (char const *const *it = cmd; (it) && (*it); ++it) {
         char const *const sep = (it != cmd) ? "," : "";
-        const size_t buffer_size = 6 * strlen(*it);
+        const size_t buffer_size = 6 * (strlen(*it) + 1);
         char buffer[buffer_size];
         if (-1 == bear_encode_json_string(*it, buffer, buffer_size))
             return -1;
