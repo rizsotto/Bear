@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+# RUN: bash %s %T/empty_argument
+# RUN: cd %T/empty_argument; %{intercept-build} --cdb preload.json ./run.sh
+# RUN: cd %T/empty_argument; %{cdb_diff} preload.json expected.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run.sh
+# ├── expected.json
+# └── src
+#    └── empty.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+touch "${root_dir}/src/empty.c"
+
+build_file="${root_dir}/run.sh"
+cat > ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+# empty argument for a command
+true "" "";
+
+# empty argument for a compiler
+\$CC -c src/empty.c "";
+
+true;
+EOF
+chmod +x ${build_file}
+
+cat > "${root_dir}/expected.json" << EOF
+[
+{
+  "arguments": ["cc", "-c", "", "src/empty.c"],
+  "directory": "${root_dir}",
+  "file": "src/empty.c"
+}
+]
+EOF
