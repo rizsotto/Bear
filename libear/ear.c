@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <errno.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -450,7 +451,7 @@ static void bear_report_call(char const *const argv[]) {
         perror("bear: mkstemp");
         exit(EXIT_FAILURE);
     }
-    if (0 > bear_write_json_report(fd, argv, cwd, getpid())) {
+    if (0 > bear_write_json_report(fd, argv, cwd, getpid()) && errno) {
         perror("bear: writing json problem");
         exit(EXIT_FAILURE);
     }

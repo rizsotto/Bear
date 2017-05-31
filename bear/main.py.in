@@ -262,7 +262,11 @@ def parse_exec_trace(filename):
 
     logging.debug('parse exec trace file: %s', filename)
     with open(filename, 'r') as handler:
-        entry = json.load(handler)
+        try:
+            entry = json.load(handler)
+        except ValueError:
+            logging.debug('unable to parse: %s', filename)
+            return Execution(pid='', cwd='', cmd='')
         return Execution(pid=entry['pid'], cwd=entry['cwd'], cmd=entry['cmd'])
 
 
