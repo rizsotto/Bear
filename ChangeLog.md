@@ -1,3 +1,9 @@
+## 2.3.5 (2017.05.31)
+
+Bugfixes:
+  - Fix 0 length argument bug (@jaelsasser, @nickdesaulniers, #160, #161, #163, #164)
+
+
 ## 2.3.4 (2017.04.25)
 
 Bugfixes:
