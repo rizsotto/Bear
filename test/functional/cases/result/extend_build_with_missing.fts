@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+# RUN: bash %s %T/extend_build_with_missing
+# RUN: cd %T/extend_build_with_missing; %{intercept-build} --cdb result.json ./run-one.sh
+# RUN: cd %T/extend_build_with_missing; %{cdb_diff} result.json one.json
+# RUN: cd %T/extend_build_with_missing; rm src/one.c
+# RUN: cd %T/extend_build_with_missing; %{intercept-build} --cdb result.json --append ./run-two.sh
+# RUN: cd %T/extend_build_with_missing; %{cdb_diff} result.json two.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run-one.sh
+# ├── run-two.sh
+# ├── one.json
+# ├── two.json
+# ├── sum.json
+# └── src
+#    ├── one.c
+#    └── two.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+touch "${root_dir}/src/one.c"
+touch "${root_dir}/src/two.c"
+
+build_file="${root_dir}/run-one.sh"
+cat > ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+\$CC -c -Dver=1 src/one.c;
+\$CXX -c -Dver=2 src/one.c;
+
+true;
+EOF
+chmod +x ${build_file}
+
+build_file="${root_dir}/run-two.sh"
+cat > ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+cd src
+\$CC -c -Dver=3 two.c;
+\$CXX -c -Dver=4 two.c;
+
+true;
+EOF
+chmod +x ${build_file}
+
+cat > "${root_dir}/one.json" << EOF
+[
+{
+  "command": "cc -c -Dver=1 src/one.c",
+  "directory": "${root_dir}",
+  "file": "src/one.c"
+}
+,
+{
+  "command": "c++ -c -Dver=2 src/one.c",
+  "directory": "${root_dir}",
+  "file": "src/one.c"
+}
+]
+EOF
+
+cat > "${root_dir}/two.json" << EOF
+[
+{
+  "command": "cc -c -Dver=3 two.c",
+  "directory": "${root_dir}/src",
+  "file": "two.c"
+}
+,
+{
+  "command": "c++ -c -Dver=4 two.c",
+  "directory": "${root_dir}/src",
+  "file": "two.c"
+}
+]
+EOF
