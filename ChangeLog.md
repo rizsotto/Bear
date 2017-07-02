@@ -1,3 +1,9 @@
+## 2.3.6 (2017.07.02)
+
+Bugfixes:
+  - Fix assert when `--append` mode the file is missing for that entry.
+
+
 ## 2.3.5 (2017.05.31)
 
 Bugfixes:
