@@ -246,7 +246,7 @@ Features:
 
 Bugfixes:
 
-  - fix process syncronization problem (#33, @blowback)
+  - fix process synchronization problem (#33, @blowback)
   - fix malloc/realloc usage (#34, @mlq)
 
 
