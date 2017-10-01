@@ -429,11 +429,13 @@ static void bear_report_call(char const *const argv[]) {
         return;
 
     pthread_mutex_lock(&mutex);
+	/*
     char const * const saved_locale = strdup(setlocale(LC_ALL, NULL));
     if (0 == saved_locale) {
         perror("bear: strdup for locale");
         exit(EXIT_FAILURE);
     }
+	*/
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd) {
         perror("bear: getcwd");
@@ -461,13 +463,13 @@ static void bear_report_call(char const *const argv[]) {
     }
     free((void *)cwd);
     // Restore locale.
-    setlocale(LC_ALL, saved_locale);
-    free((void *)saved_locale);
+	//    setlocale(LC_ALL, saved_locale);
+	//    free((void *)saved_locale);
     pthread_mutex_unlock(&mutex);
 }
 
 static int bear_write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
-    setlocale(LC_ALL, "en_US.UTF-8");
+	//    setlocale(LC_ALL, "en_US.UTF-8");
 
     if (0 > dprintf(fd, "{ \"pid\": %d, \"cmd\": [", pid))
         return -1;
@@ -492,6 +494,12 @@ static int bear_write_json_report(int fd, char const *const cmd[], char const *c
 }
 
 static int bear_encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
+#if 1
+	// mbstowcs is MT-Unsafe, causing a hang
+	strncpy( dst, src, dst_size );
+	dst[dst_size-1] = '\0';
+	return 0;
+#else
     size_t const wsrc_length = mbstowcs(NULL, src, 0);
     wchar_t wsrc[wsrc_length + 1];
     if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
@@ -546,6 +554,7 @@ static int bear_encode_json_string(char const *const src, char *const dst, size_
         return 0;
     }
     return -1;
+#endif
 }
 
 /* update environment assure that chilren processes will copy the desired
