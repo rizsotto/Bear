@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/clean_env_build
 # RUN: cd %T/clean_env_build; %{intercept-build} --cdb result.json env - ./run.sh
 # RUN: cd %T/clean_env_build; %{cdb_diff} result.json expected.json

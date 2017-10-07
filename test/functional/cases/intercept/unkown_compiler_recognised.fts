@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # RUN: bash %s %T/unkown_compiler_recognised
-# RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-cc=wrapper --use-c++=wrapper++ --cdb preload.json ./run.sh
-# RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper.json ./run.sh
+# RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper.json expected.json
 
 set -o errexit
 set -o nounset
@@ -32,7 +32,7 @@ EOF
 chmod +x ${wrapper_file}
 
 wrapperxx_file="${root_dir}/wrapper++"
-cat >> ${wrapperxx_file} << EOF
+cat > ${wrapperxx_file} << EOF
 #!/usr/bin/env bash
 
 true
