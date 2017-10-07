@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/assembly_sources
 # RUN: cd %T/assembly_sources; %{intercept-build} --cdb preload.json make -C src
 # RUN: cd %T/assembly_sources; %{cdb_diff} preload.json expected.json

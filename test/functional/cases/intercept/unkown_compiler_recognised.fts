@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/unkown_compiler_recognised
 # RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper.json ./run.sh
 # RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper.json expected.json

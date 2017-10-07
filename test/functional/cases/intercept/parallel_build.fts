@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/parallel_build
 # RUN: cd %T/parallel_build; %{intercept-build} --cdb preload.json ./run.sh
 # RUN: cd %T/parallel_build; %{cdb_diff} preload.json expected.json

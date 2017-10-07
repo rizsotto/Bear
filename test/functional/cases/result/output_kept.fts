@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/output_kept
 # RUN: cd %T/output_kept; %{intercept-build} --cdb result.json ./run.sh
 # RUN: cd %T/output_kept; %{cdb_diff} result.json expected.json

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/duplicate_entries
 # RUN: cd %T/duplicate_entries; %{intercept-build} --cdb preload.json ./run.sh
 # RUN: cd %T/duplicate_entries; %{cdb_diff} preload.json expected.json

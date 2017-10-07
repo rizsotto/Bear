@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/extend_build_with_missing
 # RUN: cd %T/extend_build_with_missing; %{intercept-build} --cdb result.json ./run-one.sh
 # RUN: cd %T/extend_build_with_missing; %{cdb_diff} result.json one.json

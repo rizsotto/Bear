@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/directory_path_absolute
 # RUN: cd %T/directory_path_absolute; %{intercept-build} --cdb preload.json ./run.sh
 # RUN: cd %T/directory_path_absolute; %{python} is_dir.py preload.json

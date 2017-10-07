@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/file_path_relative
 # RUN: cd %T/file_path_relative; %{intercept-build} --cdb preload.json ./run.sh
 # RUN: cd %T/file_path_relative; %{python} is_file.py preload.json

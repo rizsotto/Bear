@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# REQUIRES: preload
 # RUN: bash %s %T/empty_argument
 # RUN: cd %T/empty_argument; %{intercept-build} --cdb preload.json ./run.sh
 # RUN: cd %T/empty_argument; %{cdb_diff} preload.json expected.json
