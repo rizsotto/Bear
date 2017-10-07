@@ -50,12 +50,13 @@ import shutil
 import contextlib
 import logging
 
-# Ignored compiler options map for compilation database creation.
-# The map is used in `_split_command` method. (Which does ignore and classify
-# parameters.) Please note, that these are not the only parameters which
-# might be ignored.
+# Map of ignored compiler option for the creation of a compilation database.
+# This map is used in _split_command method, which classifies the parameters
+# and ignores the selected ones. Please note that other parameters might be
+# ignored as well.
 #
-# Keys are the option name, value number of options to skip
+# Option names are mapped to the number of following arguments which should
+# be skipped.
 IGNORED_FLAGS = {
     # preprocessor macros, ignored because would cause duplicate entries in
     # the output (the only difference would be these flags). this is actual
@@ -81,28 +82,37 @@ IGNORED_FLAGS = {
     '-u': 1,
     '-z': 1,
     '-T': 1,
-    '-Xlinker': 1
-}
+    '-Xlinker': 1,
+    # clang-cl / msvc cl specific flags
+    # consider moving visual studio specific warning flags also
+    '-nologo': 0,
+    '-EHsc': 0,
+    '-EHa': 0
 
-# Known C/C++ compiler wrapper name patterns
+}  # type: Dict[str, int]
+
+# Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
-# Known C compiler executable name patterns
-COMPILER_PATTERNS_CC = frozenset([
-    re.compile(r'^(|i|mpi)cc$'),
+# Known MPI compiler wrapper name patterns.
+COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
+
+# Known C compiler executable name patterns.
+COMPILER_PATTERNS_CC = (
     re.compile(r'^([^-]*-)*[mg]cc(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^([^-]*-)*clang(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^(|i)cc$'),
     re.compile(r'^(g|)xlc$'),
-])
+)
 
-# Known C++ compiler executable name patterns
-COMPILER_PATTERNS_CXX = frozenset([
+# Known C++ compiler executable name patterns.
+COMPILER_PATTERNS_CXX = (
     re.compile(r'^(c\+\+|cxx|CC)$'),
     re.compile(r'^([^-]*-)*[mg]\+\+(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$'),
-    re.compile(r'^(icpc|mpiCC|mpicxx|mpic\+\+)$'),
+    re.compile(r'^icpc$'),
     re.compile(r'^(g|)xl(C|c\+\+)$'),
-])
+)
 
 TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
@@ -366,8 +376,7 @@ class Compilation:
         self.output = output
 
     def __hash__(self):
-        return hash((self.compiler, self.phase, self.source, self.directory,
-                     self.output, ':'.join(self.flags)))
+        return hash(str(self.as_dict()))
 
     def __eq__(self, other):
         return vars(self) == vars(other)
@@ -390,8 +399,8 @@ class Compilation:
             'directory': self.directory
         }
 
-    @staticmethod
-    def from_db_entry(entry):
+    @classmethod
+    def from_db_entry(cls, entry):
         """ Parser method for compilation entry.
 
         From compilation database entry it creates the compilation object.
@@ -402,10 +411,10 @@ class Compilation:
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
         execution = Execution(cmd=command, cwd=entry['directory'], pid=0)
-        return Compilation.iter_from_execution(execution)
+        return cls.iter_from_execution(execution)
 
-    @staticmethod
-    def iter_from_execution(execution, cc='cc', cxx='c++'):
+    @classmethod
+    def iter_from_execution(cls, execution, cc='cc', cxx='c++'):
         """ Generator method for compilation entries.
 
         From a single compiler call it can generate zero or more entries.
@@ -415,8 +424,8 @@ class Compilation:
         :param cxx:         user specified C++ compiler name
         :return: stream of CompilationDbEntry objects """
 
-        candidate = Compilation._split_command(execution.cmd, cc, cxx)
-        for source in (candidate.files if candidate else []):
+        candidate = cls._split_command(execution.cmd, cc, cxx)
+        for source in candidate.files if candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
             result = Compilation(directory=execution.cwd,
@@ -428,9 +437,9 @@ class Compilation:
             if os.path.isfile(result.source):
                 yield result
 
-    @staticmethod
-    def _split_compiler(command, cc, cxx):
-        """ A predicate to decide the command is a compiler call or not.
+    @classmethod
+    def _split_compiler(cls, command, cc, cxx):
+        """ A predicate to decide whether the command is a compiler call.
 
         :param command:     the command to classify
         :param cc:          user specified C compiler name
@@ -440,6 +449,9 @@ class Compilation:
 
         def is_wrapper(cmd):
             return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
+
+        def is_mpi_wrapper(cmd):
+            return True if COMPILER_PATTERNS_MPI_WRAPPER.match(cmd) else False
 
         def is_c_compiler(cmd):
             return os.path.basename(cc) == cmd or \
@@ -454,10 +466,15 @@ class Compilation:
             parameters = command[1:]
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
-            # plus, a wrapper can wrap wrapper too.
+            # Additionally, a wrapper can wrap another wrapper.
             if is_wrapper(executable):
-                result = Compilation._split_compiler(parameters, cc, cxx)
+                result = cls._split_compiler(parameters, cc, cxx)
+                # Compiler wrapper without compiler is a 'C' compiler.
                 return ('c', parameters) if result is None else result
+            # MPI compiler wrappers add extra parameters
+            elif is_mpi_wrapper(executable):
+                mpi_call = get_mpi_call(executable)  # type: List[str]
+                return cls._split_compiler(mpi_call + parameters, cc, cxx)
             # and 'compiler' 'parameters' is valid.
             elif is_c_compiler(executable):
                 return 'c', parameters
@@ -465,8 +482,8 @@ class Compilation:
                 return 'c++', parameters
         return None
 
-    @staticmethod
-    def _split_command(command, cc, cxx):
+    @classmethod
+    def _split_command(cls, command, cc, cxx):
         """ Returns a value when the command is a compilation, None otherwise.
 
         :param command:     the command to classify
@@ -476,7 +493,7 @@ class Compilation:
 
         logging.debug('input was: %s', command)
         # quit right now, if the program was not a C/C++ compiler
-        compiler_and_arguments = Compilation._split_compiler(command, cc, cxx)
+        compiler_and_arguments = cls._split_compiler(command, cc, cxx)
         if compiler_and_arguments is None:
             return None
 
@@ -501,7 +518,7 @@ class Compilation:
                     next(args)
             elif re.match(r'^-(l|L|Wl,).+', arg):
                 pass
-            # some parameters could look like filename, take as compile option
+            # some parameters look like a filename, take those explicitly
             elif arg in {'-D', '-I'}:
                 result.flags.extend([arg, next(args)])
             # get the output file separately
@@ -519,14 +536,26 @@ class Compilation:
 
 
 class CompilationDatabase:
+    """ Compilation Database persistence methods. """
+
     @staticmethod
     def save(filename, iterator):
+        """ Saves compilations to given file.
+
+        :param filename: the destination file name
+        :param iterator: iterator of Compilation objects. """
+
         entries = [entry.as_db_entry() for entry in iterator]
-        with open(filename, 'w+') as handle:
+        with open(filename, 'w') as handle:
             json.dump(entries, handle, sort_keys=True, indent=4)
 
     @staticmethod
     def load(filename):
+        """ Load compilations from file.
+
+        :param filename: the file to read from
+        :returns: iterator of Compilation objects. """
+
         with open(filename, 'r') as handle:
             for entry in json.load(handle):
                 for compilation in Compilation.from_db_entry(entry):
@@ -566,6 +595,21 @@ def classify_source(filename, c_compiler=True):
 
     __, extension = os.path.splitext(os.path.basename(filename))
     return mapping.get(extension)
+
+
+def get_mpi_call(wrapper):
+    """ Provide information on how the underlying compiler would have been
+    invoked without the MPI compiler wrapper. """
+
+    for query_flags in [['-show'], ['--showme']]:
+        try:
+            output = run_command([wrapper] + query_flags)
+            if output:
+                return shell_split(output[0])
+        except:
+            pass
+    # Fail loud
+    raise RuntimeError("Could not determinate MPI flags.")
 
 
 def shell_split(string):
