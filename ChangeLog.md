@@ -1,3 +1,12 @@
+## 2.3.7 (2017.10.07)
+
+Features:
+  - Support OpenMPI compiler wrapper
+
+Bugfixes:
+  - Fix multithreading build tools problem. (@TTimo, #173)
+
+
 ## 2.3.6 (2017.07.02)
 
 Bugfixes:
