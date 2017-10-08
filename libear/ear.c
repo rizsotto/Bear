@@ -91,18 +91,18 @@ extern char **environ;
 
 typedef char const * bear_env_t[ENV_SIZE];
 
-static int bear_capture_env_t(bear_env_t *env);
-static void bear_release_env_t(bear_env_t *env);
-static char const **bear_update_environment(char *const envp[], bear_env_t *env);
-static char const **bear_update_environ(char const **in, char const *key, char const *value);
-static void bear_report_call(char const *const argv[]);
-static int bear_write_json_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
-static int bear_encode_json_string(char const *src, char *dst, size_t dst_size);
-static char const **bear_strings_build(char const *arg, va_list *ap);
-static char const **bear_strings_copy(char const **const in);
-static char const **bear_strings_append(char const **in, char const *e);
-static size_t bear_strings_length(char const *const *in);
-static void bear_strings_release(char const **);
+static int capture_env_t(bear_env_t *env);
+static void release_env_t(bear_env_t *env);
+static char const **string_array_partial_update(char *const envp[], bear_env_t *env);
+static char const **string_array_single_update(char const **in, char const *key, char const *value);
+static void report_call(char const *const argv[]);
+static int write_json_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
+static int encode_json_string(char const *src, char *dst, size_t dst_size);
+static char const **string_array_from_varargs(char const *arg, va_list *ap);
+static char const **string_array_copy(char const **const in);
+static char const **string_array_append(char const **in, char const *e);
+static size_t string_array_length(char const *const *in);
+static void string_array_release(char const **);
 
 
 static bear_env_t env_names =
@@ -198,7 +198,7 @@ static int mt_safe_on_load() {
         return 0;
     }
     // Capture current relevant environment variables
-    if (0 == bear_capture_env_t(&initial_env))
+    if (0 == capture_env_t(&initial_env))
         return 0;
     // Well done
     return 1;
@@ -206,7 +206,7 @@ static int mt_safe_on_load() {
 
 static void mt_safe_on_unload() {
     freelocale(utf_locale);
-    bear_release_env_t(&initial_env);
+    release_env_t(&initial_env);
 }
 
 
@@ -215,7 +215,7 @@ static void mt_safe_on_unload() {
 
 #ifdef HAVE_EXECVE
 int execve(const char *path, char *const argv[], char *const envp[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_execve(path, argv, envp);
 }
 #endif
@@ -225,35 +225,35 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 #error can not implement execv without execve
 #endif
 int execv(const char *path, char *const argv[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_execve(path, argv, environ);
 }
 #endif
 
 #ifdef HAVE_EXECVPE
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_execvpe(file, argv, envp);
 }
 #endif
 
 #ifdef HAVE_EXECVP
 int execvp(const char *file, char *const argv[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_execvp(file, argv);
 }
 #endif
 
 #ifdef HAVE_EXECVP2
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_execvP(file, search_path, argv);
 }
 #endif
 
 #ifdef HAVE_EXECT
 int exect(const char *path, char *const argv[], char *const envp[]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_exect(path, argv, envp);
 }
 #endif
@@ -265,13 +265,13 @@ int exect(const char *path, char *const argv[], char *const envp[]) {
 int execl(const char *path, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
-    char const **argv = bear_strings_build(arg, &args);
+    char const **argv = string_array_from_varargs(arg, &args);
     va_end(args);
 
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     int const result = call_execve(path, (char *const *)argv, environ);
 
-    bear_strings_release(argv);
+    string_array_release(argv);
     return result;
 }
 #endif
@@ -283,13 +283,13 @@ int execl(const char *path, const char *arg, ...) {
 int execlp(const char *file, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
-    char const **argv = bear_strings_build(arg, &args);
+    char const **argv = string_array_from_varargs(arg, &args);
     va_end(args);
 
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     int const result = call_execvp(file, (char *const *)argv);
 
-    bear_strings_release(argv);
+    string_array_release(argv);
     return result;
 }
 #endif
@@ -302,15 +302,15 @@ int execlp(const char *file, const char *arg, ...) {
 int execle(const char *path, const char *arg, ...) {
     va_list args;
     va_start(args, arg);
-    char const **argv = bear_strings_build(arg, &args);
+    char const **argv = string_array_from_varargs(arg, &args);
     char const **envp = va_arg(args, char const **);
     va_end(args);
 
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     int const result =
         call_execve(path, (char *const *)argv, (char *const *)envp);
 
-    bear_strings_release(argv);
+    string_array_release(argv);
     return result;
 }
 #endif
@@ -320,7 +320,7 @@ int posix_spawn(pid_t *restrict pid, const char *restrict path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *restrict attrp,
                 char *const argv[restrict], char *const envp[restrict]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 #endif
@@ -330,7 +330,7 @@ int posix_spawnp(pid_t *restrict pid, const char *restrict file,
                  const posix_spawn_file_actions_t *file_actions,
                  const posix_spawnattr_t *restrict attrp,
                  char *const argv[restrict], char *const envp[restrict]) {
-    bear_report_call((char const *const *)argv);
+    report_call((char const *const *)argv);
     return call_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 #endif
@@ -345,9 +345,9 @@ static int call_execve(const char *path, char *const argv[],
 
     DLSYM(func, fp, "execve");
 
-    char const **const menvp = bear_update_environment(envp, &initial_env);
+    char const **const menvp = string_array_partial_update(envp, &initial_env);
     int const result = (*fp)(path, argv, (char *const *)menvp);
-    bear_strings_release(menvp);
+    string_array_release(menvp);
     return result;
 }
 #endif
@@ -359,9 +359,9 @@ static int call_execvpe(const char *file, char *const argv[],
 
     DLSYM(func, fp, "execvpe");
 
-    char const **const menvp = bear_update_environment(envp, &initial_env);
+    char const **const menvp = string_array_partial_update(envp, &initial_env);
     int const result = (*fp)(file, argv, (char *const *)menvp);
-    bear_strings_release(menvp);
+    string_array_release(menvp);
     return result;
 }
 #endif
@@ -373,11 +373,11 @@ static int call_execvp(const char *file, char *const argv[]) {
     DLSYM(func, fp, "execvp");
 
     char **const original = environ;
-    char const **const modified = bear_update_environment(original, &initial_env);
+    char const **const modified = string_array_partial_update(original, &initial_env);
     environ = (char **)modified;
     int const result = (*fp)(file, argv);
     environ = original;
-    bear_strings_release(modified);
+    string_array_release(modified);
 
     return result;
 }
@@ -391,11 +391,11 @@ static int call_execvP(const char *file, const char *search_path,
     DLSYM(func, fp, "execvP");
 
     char **const original = environ;
-    char const **const modified = bear_update_environment(original, &initial_env);
+    char const **const modified = string_array_partial_update(original, &initial_env);
     environ = (char **)modified;
     int const result = (*fp)(file, search_path, argv);
     environ = original;
-    bear_strings_release(modified);
+    string_array_release(modified);
 
     return result;
 }
@@ -408,9 +408,9 @@ static int call_exect(const char *path, char *const argv[],
 
     DLSYM(func, fp, "exect");
 
-    char const **const menvp = bear_update_environment(envp, &initial_env);
+    char const **const menvp = string_array_partial_update(envp, &initial_env);
     int const result = (*fp)(path, argv, (char *const *)menvp);
-    bear_strings_release(menvp);
+    string_array_release(menvp);
     return result;
 }
 #endif
@@ -428,10 +428,10 @@ static int call_posix_spawn(pid_t *restrict pid, const char *restrict path,
 
     DLSYM(func, fp, "posix_spawn");
 
-    char const **const menvp = bear_update_environment(envp, &initial_env);
+    char const **const menvp = string_array_partial_update(envp, &initial_env);
     int const result =
         (*fp)(pid, path, file_actions, attrp, argv, (char *const *restrict)menvp);
-    bear_strings_release(menvp);
+    string_array_release(menvp);
     return result;
 }
 #endif
@@ -449,17 +449,17 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 
     DLSYM(func, fp, "posix_spawnp");
 
-    char const **const menvp = bear_update_environment(envp, &initial_env);
+    char const **const menvp = string_array_partial_update(envp, &initial_env);
     int const result =
         (*fp)(pid, file, file_actions, attrp, argv, (char *const *restrict)menvp);
-    bear_strings_release(menvp);
+    string_array_release(menvp);
     return result;
 }
 #endif
 
 /* this method is to write log about the process creation. */
 
-static void bear_report_call(char const *const argv[]) {
+static void report_call(char const *const argv[]) {
     if (!initialized)
         return;
 
@@ -478,7 +478,7 @@ static void bear_report_call(char const *const argv[]) {
     int fd = mkstemp((char *)&filename);
     if (-1 == fd)
         ERROR_AND_EXIT("mkstemp");
-    if (0 > bear_write_json_report(fd, argv, cwd, getpid()))
+    if (0 > write_json_report(fd, argv, cwd, getpid()))
         ERROR_AND_EXIT("writing json problem");
     if (close(fd))
         ERROR_AND_EXIT("close");
@@ -489,7 +489,7 @@ static void bear_report_call(char const *const argv[]) {
         ERROR_AND_EXIT("uselocale");
 }
 
-static int bear_write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
+static int write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
     if (0 > dprintf(fd, "{ \"pid\": %d, \"cmd\": [", pid))
         return -1;
 
@@ -497,14 +497,14 @@ static int bear_write_json_report(int fd, char const *const cmd[], char const *c
         char const *const sep = (it != cmd) ? "," : "";
         const size_t buffer_size = (6 * strlen(*it)) + 1;
         char buffer[buffer_size];
-        if (-1 == bear_encode_json_string(*it, buffer, buffer_size))
+        if (-1 == encode_json_string(*it, buffer, buffer_size))
             return -1;
         if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
             return -1;
     }
     const size_t buffer_size = 6 * strlen(cwd);
     char buffer[buffer_size];
-    if (-1 == bear_encode_json_string(cwd, buffer, buffer_size))
+    if (-1 == encode_json_string(cwd, buffer, buffer_size))
         return -1;
     if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
         return -1;
@@ -512,7 +512,7 @@ static int bear_write_json_report(int fd, char const *const cmd[], char const *c
     return 0;
 }
 
-static int bear_encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
+static int encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
     size_t const wsrc_length = mbstowcs(NULL, src, 0);
     wchar_t wsrc[wsrc_length + 1];
     if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
@@ -572,7 +572,7 @@ static int bear_encode_json_string(char const *const src, char *const dst, size_
 /* update environment assure that chilren processes will copy the desired
  * behaviour */
 
-static int bear_capture_env_t(bear_env_t *env) {
+static int capture_env_t(bear_env_t *env) {
     int status = 1;
     for (size_t it = 0; it < ENV_SIZE; ++it) {
         char const * const env_value = getenv(env_names[it]);
@@ -586,21 +586,21 @@ static int bear_capture_env_t(bear_env_t *env) {
     return status;
 }
 
-static void bear_release_env_t(bear_env_t *env) {
+static void release_env_t(bear_env_t *env) {
     for (size_t it = 0; it < ENV_SIZE; ++it) {
         free((void *)(*env)[it]);
         (*env)[it] = 0;
     }
 }
 
-static char const **bear_update_environment(char *const envp[], bear_env_t *env) {
-    char const **result = bear_strings_copy((char const **)envp);
+static char const **string_array_partial_update(char *const envp[], bear_env_t *env) {
+    char const **result = string_array_copy((char const **)envp);
     for (size_t it = 0; it < ENV_SIZE && (*env)[it]; ++it)
-        result = bear_update_environ(result, env_names[it], (*env)[it]);
+        result = string_array_single_update(result, env_names[it], (*env)[it]);
     return result;
 }
 
-static char const **bear_update_environ(char const *envs[], char const *key, char const * const value) {
+static char const **string_array_single_update(char const *envs[], char const *key, char const * const value) {
     // find the key if it's there
     size_t const key_length = strlen(key);
     char const **it = envs;
@@ -623,13 +623,13 @@ static char const **bear_update_environ(char const *envs[], char const *key, cha
         *it = env;
 	    return envs;
     }
-    return bear_strings_append(envs, env);
+    return string_array_append(envs, env);
 }
 
 /* util methods to deal with string arrays. environment and process arguments
  * are both represented as string arrays. */
 
-static char const **bear_strings_build(char const *const arg, va_list *args) {
+static char const **string_array_from_varargs(char const *const arg, va_list *args) {
     char const **result = 0;
     size_t size = 0;
     for (char const *it = arg; it; it = va_arg(*args, char const *)) {
@@ -649,8 +649,8 @@ static char const **bear_strings_build(char const *const arg, va_list *args) {
     return result;
 }
 
-static char const **bear_strings_copy(char const **const in) {
-    size_t const size = bear_strings_length(in);
+static char const **string_array_copy(char const **const in) {
+    size_t const size = string_array_length(in);
 
     char const **const result = malloc((size + 1) * sizeof(char const *));
     if (0 == result)
@@ -667,9 +667,9 @@ static char const **bear_strings_copy(char const **const in) {
     return result;
 }
 
-static char const **bear_strings_append(char const **const in,
+static char const **string_array_append(char const **const in,
                                         char const *const e) {
-    size_t size = bear_strings_length(in);
+    size_t size = string_array_length(in);
     char const **result = realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result)
         ERROR_AND_EXIT("realloc");
@@ -678,14 +678,14 @@ static char const **bear_strings_append(char const **const in,
     return result;
 }
 
-static size_t bear_strings_length(char const *const *const in) {
+static size_t string_array_length(char const *const *const in) {
     size_t result = 0;
     for (char const *const *it = in; (it) && (*it); ++it)
         ++result;
     return result;
 }
 
-static void bear_strings_release(char const **in) {
+static void string_array_release(char const **in) {
     for (char const *const *it = in; (it) && (*it); ++it) {
         free((void *)*it);
     }
