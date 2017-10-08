@@ -73,17 +73,19 @@ extern char **environ;
 #define TOSTRING(x) STRINGIFY(x)
 #define AT "libear: (" __FILE__ ":" TOSTRING(__LINE__) ") "
 
-#define ERROR_AND_EXIT(msg) do { perror(AT msg); exit(EXIT_FAILURE); } while (0)
+#define PERROR(msg) do { perror(AT msg); } while (0)
 
-#define DLSYM(TYPE_, VAR_, SYMBOL_)                                            \
-    union {                                                                    \
-        void *from;                                                            \
-        TYPE_ to;                                                              \
-    } cast;                                                                    \
-    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {                        \
-        perror(AT "dlsym");                                                    \
-        exit(EXIT_FAILURE);                                                    \
-    }                                                                          \
+#define ERROR_AND_EXIT(msg) do { PERROR(msg); exit(EXIT_FAILURE); } while (0)
+
+#define DLSYM(TYPE_, VAR_, SYMBOL_)                                 \
+    union {                                                         \
+        void *from;                                                 \
+        TYPE_ to;                                                   \
+    } cast;                                                         \
+    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {             \
+        PERROR("dlsym");                                            \
+        exit(EXIT_FAILURE);                                         \
+    }                                                               \
     TYPE_ const VAR_ = cast.to;
 
 
@@ -121,9 +123,13 @@ static bear_env_t initial_env =
 
 static int initialized = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static locale_t utf_locale;
 
 static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
+
+static int mt_safe_on_load();
+static void mt_safe_on_unload();
 
 
 #ifdef HAVE_EXECVE
@@ -166,19 +172,41 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 
 static void on_load(void) {
     pthread_mutex_lock(&mutex);
-#ifdef HAVE_NSGETENVIRON
-    environ = *_NSGetEnviron();
-#endif
-    if (!initialized)
-        initialized = bear_capture_env_t(&initial_env);
+    if ((!initialized) && (mt_safe_on_load()))
+        initialized = 1;
     pthread_mutex_unlock(&mutex);
 }
 
 static void on_unload(void) {
     pthread_mutex_lock(&mutex);
-    bear_release_env_t(&initial_env);
+    if (initialized)
+        mt_safe_on_unload();
     initialized = 0;
     pthread_mutex_unlock(&mutex);
+}
+
+static int mt_safe_on_load() {
+#ifdef HAVE_NSGETENVIRON
+    environ = *_NSGetEnviron();
+    if (0 == environ)
+        return 0;
+#endif
+    // Create locale to encode UTF-8 characters
+    utf_locale = newlocale(LC_ALL_MASK, "en_US.UTF-8", (locale_t)0);
+    if ((locale_t)0 == utf_locale) {
+        PERROR("newlocale");
+        return 0;
+    }
+    // Capture current relevant environment variables
+    if (0 == bear_capture_env_t(&initial_env))
+        return 0;
+    // Well done
+    return 1;
+}
+
+static void mt_safe_on_unload() {
+    freelocale(utf_locale);
+    bear_release_env_t(&initial_env);
 }
 
 
@@ -435,9 +463,6 @@ static void bear_report_call(char const *const argv[]) {
     if (!initialized)
         return;
 
-    const locale_t utf_locale = newlocale(LC_ALL_MASK, "en_US.UTF-8", (locale_t)0);
-    if ((locale_t)0 == utf_locale)
-        ERROR_AND_EXIT("newlocale");
     const locale_t saved_locale = uselocale(utf_locale);
     if ((locale_t)0 == saved_locale)
         ERROR_AND_EXIT("uselocale");
@@ -462,7 +487,6 @@ static void bear_report_call(char const *const argv[]) {
     const locale_t restored_locale = uselocale(saved_locale);
     if ((locale_t)0 == restored_locale)
         ERROR_AND_EXIT("uselocale");
-    freelocale(utf_locale);
 }
 
 static int bear_write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
@@ -492,7 +516,7 @@ static int bear_encode_json_string(char const *const src, char *const dst, size_
     size_t const wsrc_length = mbstowcs(NULL, src, 0);
     wchar_t wsrc[wsrc_length + 1];
     if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
-        perror(AT "mbstowcs");
+        PERROR("mbstowcs");
         return -1;
     }
     wchar_t const *wsrc_it = (wchar_t const *)&wsrc;
@@ -555,6 +579,9 @@ static int bear_capture_env_t(bear_env_t *env) {
         char const * const env_copy = (env_value) ? strdup(env_value) : env_value;
         (*env)[it] = env_copy;
         status &= (env_copy) ? 1 : 0;
+        // Just report the problem, but don't roll back.
+        if (0 == status)
+            PERROR("strdup");
     }
     return status;
 }
