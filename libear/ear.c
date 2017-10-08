@@ -39,7 +39,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
-#include <xlocale.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
