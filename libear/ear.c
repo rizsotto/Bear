@@ -96,6 +96,7 @@ static void release_env_t(bear_env_t *env);
 static char const **string_array_partial_update(char *const envp[], bear_env_t *env);
 static char const **string_array_single_update(char const **in, char const *key, char const *value);
 static void report_call(char const *const argv[]);
+static void write_report(int fd, char const *const argv[]);
 static int write_json_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
 static int encode_json_string(char const *src, char *dst, size_t dst_size);
 static char const **string_array_from_varargs(char const *arg, va_list *ap);
@@ -461,7 +462,24 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 static void report_call(char const *const argv[]) {
     if (!initialized)
         return;
+    // Create report file name
+    char const * const out_dir = initial_env[0];
+    size_t const path_max_length = strlen(out_dir) + 32;
+    char filename[path_max_length];
+    if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
+        ERROR_AND_EXIT("snprintf");
+    // Create report file
+    int fd = mkstemp((char *)&filename);
+    if (-1 == fd)
+        ERROR_AND_EXIT("mkstemp");
+    // Write report file
+    write_report(fd, argv);
+    // Close report file
+    if (close(fd))
+        ERROR_AND_EXIT("close");
+}
 
+static void write_report(int fd, char const *const argv[]) {
     const locale_t saved_locale = uselocale(utf_locale);
     if ((locale_t)0 == saved_locale)
         ERROR_AND_EXIT("uselocale");
@@ -469,18 +487,8 @@ static void report_call(char const *const argv[]) {
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd)
         ERROR_AND_EXIT("getcwd");
-    char const * const out_dir = initial_env[0];
-    size_t const path_max_length = strlen(out_dir) + 32;
-    char filename[path_max_length];
-    if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
-        ERROR_AND_EXIT("snprintf");
-    int fd = mkstemp((char *)&filename);
-    if (-1 == fd)
-        ERROR_AND_EXIT("mkstemp");
-    if (0 > write_json_report(fd, argv, cwd, getpid()))
+    if (write_json_report(fd, argv, cwd, getpid()))
         ERROR_AND_EXIT("writing json problem");
-    if (close(fd))
-        ERROR_AND_EXIT("close");
     free((void *)cwd);
 
     const locale_t restored_locale = uselocale(saved_locale);
