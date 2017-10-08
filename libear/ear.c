@@ -69,18 +69,22 @@ extern char **environ;
 # define ENV_SIZE 2
 #endif
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define AT "libear: (" __FILE__ ":" TOSTRING(__LINE__) ") "
+
+#define ERROR_AND_EXIT(msg) do { perror(AT msg); exit(EXIT_FAILURE); } while (0)
+
 #define DLSYM(TYPE_, VAR_, SYMBOL_)                                            \
     union {                                                                    \
         void *from;                                                            \
         TYPE_ to;                                                              \
     } cast;                                                                    \
     if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {                        \
-        perror("bear: dlsym");                                                 \
+        perror(AT "dlsym");                                                    \
         exit(EXIT_FAILURE);                                                    \
     }                                                                          \
     TYPE_ const VAR_ = cast.to;
-
-#define ERROR_AND_EXIT(msg) do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
 typedef char const * bear_env_t[ENV_SIZE];
@@ -433,31 +437,31 @@ static void bear_report_call(char const *const argv[]) {
 
     const locale_t utf_locale = newlocale(LC_ALL_MASK, "en_US.UTF-8", (locale_t)0);
     if ((locale_t)0 == utf_locale)
-        ERROR_AND_EXIT("bear: newlocale");
+        ERROR_AND_EXIT("newlocale");
     const locale_t saved_locale = uselocale(utf_locale);
     if ((locale_t)0 == saved_locale)
-        ERROR_AND_EXIT("bear: uselocale");
+        ERROR_AND_EXIT("uselocale");
 
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd)
-        ERROR_AND_EXIT("bear: getcwd");
+        ERROR_AND_EXIT("getcwd");
     char const * const out_dir = initial_env[0];
     size_t const path_max_length = strlen(out_dir) + 32;
     char filename[path_max_length];
     if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
-        ERROR_AND_EXIT("bear: snprintf");
+        ERROR_AND_EXIT("snprintf");
     int fd = mkstemp((char *)&filename);
     if (-1 == fd)
-        ERROR_AND_EXIT("bear: mkstemp");
+        ERROR_AND_EXIT("mkstemp");
     if (0 > bear_write_json_report(fd, argv, cwd, getpid()))
-        ERROR_AND_EXIT("bear: writing json problem");
+        ERROR_AND_EXIT("writing json problem");
     if (close(fd))
-        ERROR_AND_EXIT("bear: close");
+        ERROR_AND_EXIT("close");
     free((void *)cwd);
 
     const locale_t restored_locale = uselocale(saved_locale);
     if ((locale_t)0 == restored_locale)
-        ERROR_AND_EXIT("bear: uselocale");
+        ERROR_AND_EXIT("uselocale");
     freelocale(utf_locale);
 }
 
@@ -488,7 +492,7 @@ static int bear_encode_json_string(char const *const src, char *const dst, size_
     size_t const wsrc_length = mbstowcs(NULL, src, 0);
     wchar_t wsrc[wsrc_length + 1];
     if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
-        perror("bear: mbstowcs");
+        perror(AT "mbstowcs");
         return -1;
     }
     wchar_t const *wsrc_it = (wchar_t const *)&wsrc;
@@ -583,14 +587,14 @@ static char const **bear_update_environ(char const *envs[], char const *key, cha
     size_t const env_length = key_length + value_length + 2;
     char *env = malloc(env_length);
     if (0 == env)
-        ERROR_AND_EXIT("bear: malloc [in env_update]");
+        ERROR_AND_EXIT("malloc");
     if (-1 == snprintf(env, env_length, "%s=%s", key, value))
-        ERROR_AND_EXIT("bear: snprintf");
+        ERROR_AND_EXIT("snprintf");
     // replace or append the environment entry
     if (it && *it) {
         free((void *)*it);
         *it = env;
-	return envs;
+	    return envs;
     }
     return bear_strings_append(envs, env);
 }
@@ -604,15 +608,15 @@ static char const **bear_strings_build(char const *const arg, va_list *args) {
     for (char const *it = arg; it; it = va_arg(*args, char const *)) {
         result = realloc(result, (size + 1) * sizeof(char const *));
         if (0 == result)
-            ERROR_AND_EXIT("bear: realloc");
+            ERROR_AND_EXIT("realloc");
         char const *copy = strdup(it);
         if (0 == copy)
-            ERROR_AND_EXIT("bear: strdup");
+            ERROR_AND_EXIT("strdup");
         result[size++] = copy;
     }
     result = realloc(result, (size + 1) * sizeof(char const *));
     if (0 == result)
-        ERROR_AND_EXIT("bear: realloc");
+        ERROR_AND_EXIT("realloc");
     result[size++] = 0;
 
     return result;
@@ -623,14 +627,14 @@ static char const **bear_strings_copy(char const **const in) {
 
     char const **const result = malloc((size + 1) * sizeof(char const *));
     if (0 == result)
-        ERROR_AND_EXIT("bear: malloc");
+        ERROR_AND_EXIT("malloc");
 
     char const **out_it = result;
     for (char const *const *in_it = in; (in_it) && (*in_it);
          ++in_it, ++out_it) {
         *out_it = strdup(*in_it);
         if (0 == *out_it)
-            ERROR_AND_EXIT("bear: strdup");
+            ERROR_AND_EXIT("strdup");
     }
     *out_it = 0;
     return result;
@@ -641,7 +645,7 @@ static char const **bear_strings_append(char const **const in,
     size_t size = bear_strings_length(in);
     char const **result = realloc(in, (size + 2) * sizeof(char const *));
     if (0 == result)
-        ERROR_AND_EXIT("bear: realloc");
+        ERROR_AND_EXIT("realloc");
     result[size++] = e;
     result[size++] = 0;
     return result;
