@@ -100,7 +100,6 @@ static int write_json_report(int fd, char const *const cmd[], char const *cwd, p
 static int encode_json_string(char const *src, char *dst, size_t dst_size);
 static char const **string_array_from_varargs(char const *arg, va_list *ap);
 static char const **string_array_copy(char const **const in);
-static char const **string_array_append(char const **in, char const *e);
 static size_t string_array_length(char const *const *in);
 static void string_array_release(char const **);
 
@@ -622,8 +621,15 @@ static char const **string_array_single_update(char const *envs[], char const *k
         free((void *)*it);
         *it = env;
 	    return envs;
+    } else {
+        size_t const size = string_array_length(envs);
+        char const **result = realloc(envs, (size + 2) * sizeof(char const *));
+        if (0 == result)
+            ERROR_AND_EXIT("realloc");
+        result[size] = env;
+        result[size + 1] = 0;
+        return result;
     }
-    return string_array_append(envs, env);
 }
 
 /* util methods to deal with string arrays. environment and process arguments
@@ -664,17 +670,6 @@ static char const **string_array_copy(char const **const in) {
             ERROR_AND_EXIT("strdup");
     }
     *out_it = 0;
-    return result;
-}
-
-static char const **string_array_append(char const **const in,
-                                        char const *const e) {
-    size_t size = string_array_length(in);
-    char const **result = realloc(in, (size + 2) * sizeof(char const *));
-    if (0 == result)
-        ERROR_AND_EXIT("realloc");
-    result[size++] = e;
-    result[size++] = 0;
     return result;
 }
 
