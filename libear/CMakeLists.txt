@@ -1,5 +1,6 @@
 include(CheckFunctionExists)
 include(CheckSymbolExists)
+include(CheckIncludeFile)
 check_function_exists(execve HAVE_EXECVE)
 check_function_exists(execv HAVE_EXECV)
 check_function_exists(execvpe HAVE_EXECVPE)
@@ -12,6 +13,7 @@ check_function_exists(execle HAVE_EXECLE)
 check_function_exists(posix_spawn HAVE_POSIX_SPAWN)
 check_function_exists(posix_spawnp HAVE_POSIX_SPAWNP)
 check_symbol_exists(_NSGetEnviron crt_externs.h HAVE_NSGETENVIRON)
+check_include_file(xlocale.h HAVE_XLOCALE_HEADER)
 
 find_package(Threads REQUIRED)
 

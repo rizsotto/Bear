@@ -39,7 +39,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
-#include <xlocale.h>
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/stat.h>
@@ -47,6 +46,10 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
+
+#if defined HAVE_XLOCALE_HEADER
+#include <xlocale.h>
+#endif
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
