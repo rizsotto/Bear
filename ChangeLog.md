@@ -1,3 +1,9 @@
+## 2.3.8 (2017.10.16)
+
+Bugfixes:
+  - Fix compilation issue against libc 2.26 (@ffuugoo, #176)
+
+
 ## 2.3.7 (2017.10.07)
 
 Features:
