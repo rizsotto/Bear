@@ -209,16 +209,19 @@ def capture(args):
     :param args:    the parsed and validated command line arguments
     :return:        the exit status of build process. """
 
-    with temporary_directory(prefix='intercept-') as tmp_dir:
-        # run the build command
-        environment = setup_environment(args, tmp_dir)
-        exit_code = run_build(args.build, env=environment)
-        # read the intercepted exec calls
-        calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
-        current = compilations(calls, args.cc, args.cxx)
+    tmp_dir = tempfile.mkdtemp(prefix='intercept-')
 
-        return exit_code, iter(set(current))
+    # run the build command
+    environment = setup_environment(args, tmp_dir)
+    exit_code = run_build(args.build, env=environment)
+    # read the intercepted exec calls
+    calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
+    current = compilations(calls, args.cc, args.cxx)
 
+    # only remove the commands directory if we reach here without raising an exception
+    shutil.rmtree(tmp_dir)
+
+    return exit_code, iter(set(current))
 
 def compilations(exec_calls, cc, cxx):
     """ Needs to filter out commands which are not compiler calls. And those
