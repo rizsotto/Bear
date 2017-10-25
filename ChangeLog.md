@@ -1,3 +1,9 @@
+## 2.3.9 (2017.10.25)
+
+Bugfixes:
+  - Fix newlocale problem (@bartlibert, #182)
+
+
 ## 2.3.8 (2017.10.16)
 
 Bugfixes:
