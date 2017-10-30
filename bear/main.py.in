@@ -215,7 +215,8 @@ def capture(args):
         exit_code = run_build(args.build, env=environment)
         # read the intercepted exec calls
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
-        current = compilations(calls, args.cc, args.cxx)
+        safe_calls = (x for x in calls if x is not None)
+        current = compilations(safe_calls, args.cc, args.cxx)
 
         return exit_code, iter(set(current))
 
@@ -272,8 +273,14 @@ def parse_exec_trace(filename):
 
     logging.debug('parse exec trace file: %s', filename)
     with open(filename, 'r') as handler:
-        entry = json.load(handler)
-        return Execution(pid=entry['pid'], cwd=entry['cwd'], cmd=entry['cmd'])
+        try:
+            entry = json.load(handler)
+            return Execution(pid=entry['pid'],
+                             cwd=entry['cwd'],
+                             cmd=entry['cmd'])
+        except ValueError:
+            logging.warning('parse exec trace file: %s FAILED', filename)
+            return None
 
 
 def exec_trace_files(directory):
