@@ -3,7 +3,6 @@
 # REQUIRES: preload
 # RUN: bash %s %T/define_with_nonutf_encode
 # RUN: cd %T/define_with_nonutf_encode; %{intercept-build} --cdb result.json ./run.sh
-# RUN: cd %T/define_with_nonutf_encode; %{cdb_diff} result.json expected.json
 
 set -o errexit
 set -o nounset
@@ -13,24 +12,9 @@ set -o xtrace
 #
 # ${root_dir}
 # +-- run.sh
-# +-- expected.json
-# +-- src
-#    +-- main.c
 
 root_dir=$1
-mkdir -p "${root_dir}/src"
-
-cat > "${root_dir}/src/main.c" << EOF
-#include <stdio.h>
-
-static char const * const message = "MESSAGE";
-
-int main(void) {
-  printf("%s\n", message);
-  return 0;
-}
-EOF
-
+mkdir -p "${root_dir}"
 
 build_file="${root_dir}/run.sh"
 cat > ${build_file} << EOF
@@ -39,19 +23,7 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-\$CC -DMESSAGE="©" -o hello src/main.c
-
-true
+echo "©";
+true;
 EOF
 chmod +x ${build_file}
-
-
-cat > "${root_dir}/expected.json" << EOF
-[
-    {
-        "arguments": ["cc", "-c", "-DMESSAGE=", "-o", "hello", "src/main.c"],
-        "directory": "${root_dir}",
-        "file": "src/main.c"
-    }
-]
-EOF
