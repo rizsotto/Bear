@@ -32,6 +32,7 @@ endif()
 
 set(CMAKE_MACOSX_RPATH 1)
 set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+set_target_properties(ear PROPERTIES VERSION ${BEAR_VERSION} SOVERSION ${BEAR_VERSION_MAJOR})
 
 include(GNUInstallDirs)
 install(TARGETS ear
