@@ -16,6 +16,7 @@ set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
 set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
 set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "/usr/share/man" "/usr/share/man/man1")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 include(CPack)
 

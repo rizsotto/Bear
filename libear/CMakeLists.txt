@@ -31,7 +31,9 @@ if(CMAKE_THREAD_LIBS_INIT)
 endif()
 
 set(CMAKE_MACOSX_RPATH 1)
-set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 include(GNUInstallDirs)
 install(TARGETS ear
