@@ -122,6 +122,82 @@ CompilationCommand = collections.namedtuple(
     'CompilationCommand', ['compiler', 'phase', 'flags', 'files', 'output'])
 
 
+def shell_split(string):
+    """ Takes a command string and returns as a list. """
+
+    def unescape(arg):
+        """ Gets rid of the escaping characters. """
+
+        if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
+            return re.sub(r'\\(["\\])', r'\1', arg[1:-1])
+        return re.sub(r'\\([\\ $%&\(\)\[\]\{\}\*|<>@?!])', r'\1', arg)
+
+    return [unescape(token) for token in shlex.split(string)]
+
+
+def run_build(command, *args, **kwargs):
+    """ Run and report build command execution
+
+    :param command: list of tokens
+    :return: exit code of the process
+    """
+    environment = kwargs.get('env', os.environ)
+    logging.debug('run build %s, in environment: %s', command, environment)
+    exit_code = subprocess.call(command, *args, **kwargs)
+    logging.debug('build finished with exit code: %d', exit_code)
+    return exit_code
+
+
+def run_command(command, cwd=None):
+    """ Run a given command and report the execution.
+
+    :param command: array of tokens
+    :param cwd: the working directory where the command will be executed
+    :return: output of the command
+    """
+    def decode_when_needed(result):
+        # type: (Any) -> str
+        """ check_output returns bytes or string depend on python version """
+        if not isinstance(result, str):
+            return result.decode('utf-8')
+        return result
+
+    try:
+        directory = os.path.abspath(cwd) if cwd else os.getcwd()
+        logging.debug('exec command %s in %s', command, directory)
+        output = subprocess.check_output(command,
+                                         cwd=directory,
+                                         stderr=subprocess.STDOUT)
+        return decode_when_needed(output).splitlines()
+    except subprocess.CalledProcessError as ex:
+        ex.output = decode_when_needed(ex.output).splitlines()
+        raise ex
+
+
+def reconfigure_logging(verbose_level):
+    """ Reconfigure logging level and format based on the verbose flag.
+
+    :param verbose_level: number of `-v` flags received by the command
+    :return: no return value
+    """
+    # exit when nothing to do
+    if verbose_level == 0:
+        return
+
+    root = logging.getLogger()
+    # tune level
+    level = logging.WARNING - min(logging.WARNING, (10 * verbose_level))
+    root.setLevel(level)
+    # be verbose with messages
+    if verbose_level <= 3:
+        fmt_string = '%(name)s: %(levelname)s: %(message)s'
+    else:
+        fmt_string = '%(name)s: %(levelname)s: %(funcName)s: %(message)s'
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter(fmt=fmt_string))
+    root.handlers = [handler]
+
+
 def command_entry_point(function):
     """ Decorator for command entry methods.
 
@@ -158,30 +234,6 @@ def command_entry_point(function):
             logging.shutdown()
 
     return wrapper
-
-
-def reconfigure_logging(verbose_level):
-    """ Reconfigure logging level and format based on the verbose flag.
-
-    :param verbose_level: number of `-v` flags received by the command
-    :return: no return value
-    """
-    # exit when nothing to do
-    if verbose_level == 0:
-        return
-
-    root = logging.getLogger()
-    # tune level
-    level = logging.WARNING - min(logging.WARNING, (10 * verbose_level))
-    root.setLevel(level)
-    # be verbose with messages
-    if verbose_level <= 3:
-        fmt_string = '%(name)s: %(levelname)s: %(message)s'
-    else:
-        fmt_string = '%(name)s: %(levelname)s: %(funcName)s: %(message)s'
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(fmt=fmt_string))
-    root.handlers = [handler]
 
 
 @command_entry_point
@@ -617,58 +669,6 @@ def get_mpi_call(wrapper):
             pass
     # Fail loud
     raise RuntimeError("Could not determinate MPI flags.")
-
-
-def shell_split(string):
-    """ Takes a command string and returns as a list. """
-
-    def unescape(arg):
-        """ Gets rid of the escaping characters. """
-
-        if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
-            return re.sub(r'\\(["\\])', r'\1', arg[1:-1])
-        return re.sub(r'\\([\\ $%&\(\)\[\]\{\}\*|<>@?!])', r'\1', arg)
-
-    return [unescape(token) for token in shlex.split(string)]
-
-
-def run_build(command, *args, **kwargs):
-    """ Run and report build command execution
-
-    :param command: array of tokens
-    :return: exit code of the process
-    """
-    environment = kwargs.get('env', os.environ)
-    logging.debug('run build %s, in environment: %s', command, environment)
-    exit_code = subprocess.call(command, *args, **kwargs)
-    logging.debug('build finished with exit code: %d', exit_code)
-    return exit_code
-
-
-def run_command(command, cwd=None):
-    """ Run a given command and report the execution.
-
-    :param command: array of tokens
-    :param cwd: the working directory where the command will be executed
-    :return: output of the command
-    """
-    def decode_when_needed(result):
-        # type: (Any) -> str
-        """ check_output returns bytes or string depend on python version """
-        if not isinstance(result, str):
-            return result.decode('utf-8')
-        return result
-
-    try:
-        directory = os.path.abspath(cwd) if cwd else os.getcwd()
-        logging.debug('exec command %s in %s', command, directory)
-        output = subprocess.check_output(command,
-                                         cwd=directory,
-                                         stderr=subprocess.STDOUT)
-        return decode_when_needed(output).splitlines()
-    except subprocess.CalledProcessError as ex:
-        ex.output = decode_when_needed(ex.output).splitlines()
-        raise ex
 
 
 @contextlib.contextmanager
