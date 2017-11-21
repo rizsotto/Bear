@@ -551,7 +551,9 @@ class Compilation:
                 return ('c', parameters) if result is None else result
             # MPI compiler wrappers add extra parameters
             elif is_mpi_wrapper(executable):
-                mpi_call = get_mpi_call(executable)  # type: List[str]
+                # Pass the executable with full path to avoid pick different
+                # executable from PATH.
+                mpi_call = get_mpi_call(command[0])  # type: List[str]
                 return cls._split_compiler(mpi_call + parameters, cc, cxx)
             # and 'compiler' 'parameters' is valid.
             elif is_c_compiler(executable):
