@@ -1,3 +1,10 @@
+## 2.3.10
+
+Bugfixes:
+  - Fix MPI wrapper problem (@ffevotte, #193)
+  - Not crash on invalid execution trace file (@dengste, #195)
+
+
 ## 2.3.9 (2017.10.25)
 
 Bugfixes:

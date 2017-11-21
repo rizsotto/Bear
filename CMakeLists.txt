@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(bear C)
-set(BEAR_VERSION "2.3.9")
+set(BEAR_VERSION "2.3.10")
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
