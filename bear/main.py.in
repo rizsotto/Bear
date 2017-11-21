@@ -645,6 +645,32 @@ def run_build(command, *args, **kwargs):
     return exit_code
 
 
+def run_command(command, cwd=None):
+    """ Run a given command and report the execution.
+
+    :param command: array of tokens
+    :param cwd: the working directory where the command will be executed
+    :return: output of the command
+    """
+    def decode_when_needed(result):
+        # type: (Any) -> str
+        """ check_output returns bytes or string depend on python version """
+        if not isinstance(result, str):
+            return result.decode('utf-8')
+        return result
+
+    try:
+        directory = os.path.abspath(cwd) if cwd else os.getcwd()
+        logging.debug('exec command %s in %s', command, directory)
+        output = subprocess.check_output(command,
+                                         cwd=directory,
+                                         stderr=subprocess.STDOUT)
+        return decode_when_needed(output).splitlines()
+    except subprocess.CalledProcessError as ex:
+        ex.output = decode_when_needed(ex.output).splitlines()
+        raise ex
+
+
 @contextlib.contextmanager
 def temporary_directory(**kwargs):
     name = tempfile.mkdtemp(**kwargs)
