@@ -123,9 +123,11 @@ CompilationCommand = collections.namedtuple(
 
 
 def shell_split(string):
+    # type: (str) -> List[str]
     """ Takes a command string and returns as a list. """
 
     def unescape(arg):
+        # type: (str) -> str
         """ Gets rid of the escaping characters. """
 
         if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
@@ -136,6 +138,7 @@ def shell_split(string):
 
 
 def run_build(command, *args, **kwargs):
+    # type: (...) -> int
     """ Run and report build command execution
 
     :param command: list of tokens
@@ -149,6 +152,7 @@ def run_build(command, *args, **kwargs):
 
 
 def run_command(command, cwd=None):
+    # type: (List[str], str) -> List[str]
     """ Run a given command and report the execution.
 
     :param command: array of tokens
@@ -199,6 +203,7 @@ def reconfigure_logging(verbose_level):
 
 
 def command_entry_point(function):
+    # type: (Callable[[], int]) -> Callable[[], int]
     """ Decorator for command entry methods.
 
     The decorator initialize/shutdown logging and guard on programming
@@ -221,7 +226,7 @@ def command_entry_point(function):
         except KeyboardInterrupt:
             logging.warning('Keyboard interrupt')
             return 130  # signal received exit code for bash
-        except Exception:
+        except (OSError, subprocess.CalledProcessError):
             logging.exception('Internal error.')
             if logging.getLogger().isEnabledFor(logging.DEBUG):
                 logging.error("Please report this bug and attach the output "
@@ -238,6 +243,7 @@ def command_entry_point(function):
 
 @command_entry_point
 def intercept_build():
+    # type: () -> int
     """ Entry point for 'intercept-build' command. """
 
     args = parse_args_for_intercept_build()
@@ -256,6 +262,7 @@ def intercept_build():
 
 
 def capture(args):
+    # type: (argparse.Namespace) -> Tuple[int, Iterable[Compilation]]
     """ Implementation of compilation database generation.
 
     :param args:    the parsed and validated command line arguments
@@ -274,6 +281,7 @@ def capture(args):
 
 
 def compilations(exec_calls, cc, cxx):
+    # type: (Iterable[Execution], str, str) -> Iterable[Compilation]
     """ Needs to filter out commands which are not compiler calls. And those
     compiler calls shall be compilation (not pre-processing or linking) calls.
     Plus needs to find the source file name from the arguments.
@@ -289,6 +297,7 @@ def compilations(exec_calls, cc, cxx):
 
 
 def setup_environment(args, destination):
+    # type: (argparse.Namespace, str) -> Dict[str, str]
     """ Sets up the environment for the build command.
 
     In order to capture the sub-commands (executed by the build process),
@@ -315,6 +324,7 @@ def setup_environment(args, destination):
 
 
 def parse_exec_trace(filename):
+    # type: (str) -> Execution
     """ Parse execution report file.
 
     Given filename points to a file which contains the basic report
@@ -435,17 +445,21 @@ class Compilation:
         self.output = output
 
     def __hash__(self):
+        # type: (Compilation) -> int
         return hash(str(self.as_dict()))
 
     def __eq__(self, other):
+        # type: (Compilation, object) -> bool
         return vars(self) == vars(other)
 
     def as_dict(self):
+        # type: (Compilation) -> Dict[str, str]
         """ This method dumps the object attributes into a dictionary. """
 
         return vars(self)
 
     def as_db_entry(self):
+        # type: (Compilation) -> Dict[str, Any]
         """ This method creates a compilation database entry. """
 
         relative = os.path.relpath(self.source, self.directory)
@@ -460,6 +474,7 @@ class Compilation:
 
     @classmethod
     def from_db_entry(cls, entry):
+        # type: (Type[Compilation], Dict[str, str]) -> Iterable[Compilation]
         """ Parser method for compilation entry.
 
         From compilation database entry it creates the compilation object.
@@ -507,22 +522,26 @@ class Compilation:
                 (compiler_language, rest of the command) otherwise """
 
         def is_wrapper(cmd):
+            # type: (str) -> bool
             return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
 
         def is_mpi_wrapper(cmd):
+            # type: (str) -> bool
             return True if COMPILER_PATTERNS_MPI_WRAPPER.match(cmd) else False
 
         def is_c_compiler(cmd):
+            # type: (str) -> bool
             return os.path.basename(cc) == cmd or \
                 any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CC)
 
         def is_cxx_compiler(cmd):
+            # type: (str) -> bool
             return os.path.basename(cxx) == cmd or \
                 any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CXX)
 
         if command:  # not empty list will allow to index '0' and '1:'
-            executable = os.path.basename(command[0])
-            parameters = command[1:]
+            executable = os.path.basename(command[0])  # type: str
+            parameters = command[1:]  # type: List[str]
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
             # Additionally, a wrapper can wrap another wrapper.
@@ -599,6 +618,7 @@ class CompilationDatabase:
 
     @staticmethod
     def save(filename, iterator):
+        # type: (str, Iterable[Compilation]) -> None
         """ Saves compilations to given file.
 
         :param filename: the destination file name
@@ -610,6 +630,7 @@ class CompilationDatabase:
 
     @staticmethod
     def load(filename):
+        # type: (str) -> Iterable[Compilation]
         """ Load compilations from file.
 
         :param filename: the file to read from
@@ -622,6 +643,7 @@ class CompilationDatabase:
 
 
 def classify_source(filename, c_compiler=True):
+    # type: (str, bool) -> str
     """ Classify source file names and returns the presumed language,
     based on the file name extension.
 
@@ -657,6 +679,7 @@ def classify_source(filename, c_compiler=True):
 
 
 def get_mpi_call(wrapper):
+    # type: (str) -> List[str]
     """ Provide information on how the underlying compiler would have been
     invoked without the MPI compiler wrapper. """
 
