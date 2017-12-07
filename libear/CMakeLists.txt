@@ -30,8 +30,10 @@ if(CMAKE_THREAD_LIBS_INIT)
     target_link_libraries(ear "${CMAKE_THREAD_LIBS_INIT}")
 endif()
 
-set(CMAKE_MACOSX_RPATH 1)
-set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+if(APPLE)
+    set(CMAKE_MACOSX_RPATH 1)
+    set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS ear
