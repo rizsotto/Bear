@@ -1,4 +1,11 @@
-## 2.3.10
+## 2.3.11 (2018.01.04)
+
+Bugfixes:
+  - Fix CPack RPM problems on CentOS7 (@antmak, #191, #192)
+  - Change libear.so location to $LIBDIR/bear to avoid direct linking. (@morxa, #189)
+
+
+## 2.3.10 (2017.12.07)
 
 Bugfixes:
   - Fix MPI wrapper problem (@ffevotte, #193)
