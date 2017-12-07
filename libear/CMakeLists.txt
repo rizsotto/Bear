@@ -32,9 +32,8 @@ endif()
 
 if(APPLE)
     set(CMAKE_MACOSX_RPATH 1)
-    set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${CMAKE_INSTALL_LIBDIR}")
+    set_target_properties(ear PROPERTIES INSTALL_RPATH "@loader_path/${EAR_LIB_PATH}")
 endif()
 
-include(GNUInstallDirs)
 install(TARGETS ear
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    LIBRARY DESTINATION ${EAR_LIB_PATH})
