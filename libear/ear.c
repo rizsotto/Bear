@@ -80,6 +80,42 @@ extern char **environ;
 
 #define ERROR_AND_EXIT(msg) do { PERROR(msg); exit(EXIT_FAILURE); } while (0)
 
+
+#ifdef __CYGWIN__
+#include <sys/cygwin.h>
+void *RTLD_NEXT=NULL;
+
+#define DLSYM(TYPE_, VAR_, SYMBOL_)                                 \
+    union {                                                         \
+        void *from;                                                 \
+        TYPE_ to;                                                   \
+    } cast;                                                         \
+    if (!RTLD_NEXT) {                                               \
+        RTLD_NEXT = dlopen("cygwin1.dll", 0);                       \
+    }                                                               \
+    if (0 == (cast.from = dlsym(RTLD_NEXT, SYMBOL_))) {             \
+        PERROR("dlsym");                                            \
+        exit(EXIT_FAILURE);                                         \
+    }                                                               \
+    TYPE_ const VAR_ = cast.to;
+
+
+__attribute__((constructor))
+void _init(void) {
+    cygwin_internal(CW_HOOK, "execl", execl);
+    cygwin_internal(CW_HOOK, "execle", execle);
+    cygwin_internal(CW_HOOK, "execlp", execlp);
+    cygwin_internal(CW_HOOK, "execv", execv);
+    cygwin_internal(CW_HOOK, "execve", execve);
+    cygwin_internal(CW_HOOK, "execvp", execvp);
+    cygwin_internal(CW_HOOK, "execvpe", execvpe);
+    cygwin_internal(CW_HOOK, "posix_spawn", posix_spawn);
+    cygwin_internal(CW_HOOK, "posix_spawnp", posix_spawnp);
+}
+
+
+#else
+
 #define DLSYM(TYPE_, VAR_, SYMBOL_)                                 \
     union {                                                         \
         void *from;                                                 \
@@ -90,6 +126,8 @@ extern char **environ;
         exit(EXIT_FAILURE);                                         \
     }                                                               \
     TYPE_ const VAR_ = cast.to;
+
+#endif // __CYGWIN__
 
 
 typedef char const * bear_env_t[ENV_SIZE];
