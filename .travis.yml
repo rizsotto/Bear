@@ -29,6 +29,8 @@ addons:
   apt:
     packages:
       - cmake
+      - libc6-dev
+      - libgtest-dev
       - scons
       - qt4-qmake
 
