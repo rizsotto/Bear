@@ -26,32 +26,32 @@ class Result {
 private:
     using Error = const char *;
     using State = std::variant<T, Error>;
-    State state;
+    State state_;
 
 public:
     Result() = delete;
 
 private:
     explicit Result(const T &other) noexcept
-            : state(State(other)) {
+            : state_(State(other)) {
     }
 
     explicit Result(Error const error) noexcept
-            : state(State(error)) {
+            : state_(State(error)) {
     }
 
 public:
     Result(const Result &other) noexcept = delete;
 
     Result(Result &&other) noexcept {
-        state = other.state;
+        state_ = other.state_;
     }
 
     Result &operator=(const Result &other) = delete;
 
     Result &operator=(Result &&other) noexcept {
         if (this != &other) {
-            state = other.state;
+            state_ = other.state_;
         }
         return *this;
     }
@@ -70,24 +70,24 @@ public:
 public:
     template<typename U>
     Result<U> map(U (*f)(const T &)) const noexcept {
-        if (auto ptr = std::get_if<T>(&state)) {
+        if (auto ptr = std::get_if<T>(&state_)) {
             return Result<U>::success(f(*ptr));
-        } else if (auto error = std::get_if<Error>(&state)) {
+        } else if (auto error = std::get_if<Error>(&state_)) {
             return Result<U>::failure(*error);
         }
     }
 
     template<typename U>
     Result<U> bind(Result<U> (*f)(const T &)) const noexcept {
-        if (auto ptr = std::get_if<T>(&state)) {
+        if (auto ptr = std::get_if<T>(&state_)) {
             return f(*ptr);
-        } else if (auto error = std::get_if<Error>(&state)) {
+        } else if (auto error = std::get_if<Error>(&state_)) {
             return Result<U>::failure(*error);
         }
     }
 
     T get_or_else(const T &value) const noexcept {
-        if (auto ptr = std::get_if<T>(&state)) {
+        if (auto ptr = std::get_if<T>(&state_)) {
             return *ptr;
         } else {
             return value;
@@ -95,7 +95,7 @@ public:
     }
 
     void handle_with(void (*f)(const char *)) const noexcept {
-        if (auto error = std::get_if<Error>(&state)) {
+        if (auto error = std::get_if<Error>(&state_)) {
             f(*error);
         };
     }
