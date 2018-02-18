@@ -20,6 +20,7 @@
 #pragma once
 
 #include <variant>
+#include <functional>
 
 template<typename T>
 class Result {
@@ -69,7 +70,7 @@ public:
 
 public:
     template<typename U>
-    Result<U> map(U (*f)(const T &)) const noexcept {
+    Result<U> map(std::function<U(const T &)> &&f) const noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
             return Result<U>::success(f(*ptr));
         } else if (auto error = std::get_if<Error>(&state_)) {
@@ -78,7 +79,7 @@ public:
     }
 
     template<typename U>
-    Result<U> bind(Result<U> (*f)(const T &)) const noexcept {
+    Result<U> bind(std::function<Result<U>(const T &)> &&f) const noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
             return f(*ptr);
         } else if (auto error = std::get_if<Error>(&state_)) {
@@ -94,7 +95,7 @@ public:
         }
     }
 
-    void handle_with(void (*f)(const char *)) const noexcept {
+    void handle_with(std::function<void(const char *)> &&f) const noexcept {
         if (auto error = std::get_if<Error>(&state_)) {
             f(*error);
         };
