@@ -25,6 +25,7 @@
 # include <spawn.h>
 #endif
 
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
@@ -57,7 +58,7 @@ extern "C" void on_load() {
     if (loaded.exchange(true))
         return;
 
-    auto current = ::ear::DynamicLinker::environment();
+    auto current = ::ear::Environment::current();
     state_ptr = ::ear::Environment::create(current, placeholder);
 }
 

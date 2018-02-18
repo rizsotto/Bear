@@ -24,6 +24,12 @@
 
 #include "String.h"
 
+#if defined HAVE_NSGETENVIRON
+# include <crt_externs.h>
+#else
+# include "DynamicLinker.h"
+#endif
+
 namespace ear {
 
     constexpr char target_env_key[] = "BEAR_TARGET";
@@ -32,6 +38,8 @@ namespace ear {
 
     class Environment {
     public:
+        static const char **current() noexcept;
+
         static Environment* create(const char**, void *) noexcept;
 
         ~Environment() noexcept = default;
@@ -65,6 +73,16 @@ namespace ear {
         ::ear::String<8192> library_;
         ::ear::String<8192> wrapper_;
     };
+
+
+    inline
+    const char **Environment::current() noexcept {
+#ifdef HAVE_NSGETENVIRON
+        return const_cast<const char **>(*_NSGetEnviron());
+#else
+        return ::ear::DynamicLinker::environment();
+#endif
+    }
 
     inline
     Environment* Environment::create(const char** current, void* place) noexcept {

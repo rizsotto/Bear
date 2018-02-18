@@ -25,9 +25,6 @@
 #if defined HAVE_SPAWN_HEADER
 # include <spawn.h>
 #endif
-#if defined HAVE_NSGETENVIRON
-# include <crt_externs.h>
-#endif
 
 namespace ear {
 
@@ -105,12 +102,9 @@ namespace ear {
         }
 #endif
 
-        static const char **environment() noexcept {
-#ifdef HAVE_NSGETENVIRON
-            return *_NSGetEnviron();
-#else
-            return typed_dlsym<const char **>("environ");
-#endif
+        using environ_t = const char **;
+        static environ_t environment() noexcept {
+            return typed_dlsym<environ_t >("environ");
         }
     };
 }
