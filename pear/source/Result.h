@@ -22,23 +22,22 @@
 #include <variant>
 #include <functional>
 
-template<typename T>
+
+template<typename T, typename E>
 class Result {
 private:
-    using Error = const char *;
-    using State = std::variant<T, Error>;
-    State state_;
+    std::variant<T, E> state_;
 
 public:
     Result() = delete;
 
 private:
     explicit Result(const T &other) noexcept
-            : state_(State(other)) {
+            : state_(other) {
     }
 
-    explicit Result(Error const error) noexcept
-            : state_(State(error)) {
+    explicit Result(E const &error) noexcept
+            : state_(error) {
     }
 
 public:
@@ -64,26 +63,26 @@ public:
         return Result(value);
     }
 
-    static Result failure(Error const value) noexcept {
+    static Result failure(const E &value) noexcept {
         return Result(value);
     }
 
 public:
     template<typename U>
-    Result<U> map(std::function<U(const T &)> &&f) const noexcept {
+    Result<U, E> map(std::function<U(const T &)> &&f) const noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
-            return Result<U>::success(f(*ptr));
-        } else if (auto error = std::get_if<Error>(&state_)) {
-            return Result<U>::failure(*error);
+            return Result<U, E>::success(f(*ptr));
+        } else if (auto error = std::get_if<E>(&state_)) {
+            return Result<U, E>::failure(*error);
         }
     }
 
     template<typename U>
-    Result<U> bind(std::function<Result<U>(const T &)> &&f) const noexcept {
+    Result<U, E> bind(std::function<Result<U, E>(const T &)> &&f) const noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
             return f(*ptr);
-        } else if (auto error = std::get_if<Error>(&state_)) {
-            return Result<U>::failure(*error);
+        } else if (auto error = std::get_if<E>(&state_)) {
+            return Result<U, E>::failure(*error);
         }
     }
 
@@ -96,7 +95,7 @@ public:
     }
 
     void handle_with(std::function<void(const char *)> &&f) const noexcept {
-        if (auto error = std::get_if<Error>(&state_)) {
+        if (auto error = std::get_if<E>(&state_)) {
             f(*error);
         };
     }

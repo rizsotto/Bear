@@ -29,7 +29,7 @@ struct State {
     char **command;
 };
 
-Result<State> parse(int argc, char *argv[]) {
+Result<State, const char *> parse(int argc, char *argv[]) {
     State result = {nullptr, nullptr, nullptr};
 
     int opt;
@@ -42,7 +42,7 @@ Result<State> parse(int argc, char *argv[]) {
                 result.target = optarg;
                 break;
             default: /* '?' */
-                return Result<State>::failure(
+                return Result<State, const char *>::failure(
                         // todo: get process name from `argv[0]`.
                         "Usage: pear [-t target_url] [-l path_to_libear] command"
                 );
@@ -50,18 +50,18 @@ Result<State> parse(int argc, char *argv[]) {
     }
 
     if (optind >= argc) {
-        return Result<State>::failure(
+        return Result<State, const char *>::failure(
                 "Expected argument after options"
         );
     } else {
         result.command = argv + optind;
     }
 
-    return Result<State>::success(result);
+    return Result<State, const char *>::success(result);
 }
 
 int main(int argc, char *argv[], char *envp[]) {
-    const Result<State> &args = parse(argc, argv);
+    const Result<State, const char *> &args = parse(argc, argv);
 
     args.handle_with([](const char *const message) {
         fprintf(stderr, "%s\n", message);
