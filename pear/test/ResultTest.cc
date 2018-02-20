@@ -5,6 +5,7 @@
 namespace {
 
     using Error = const char *;
+    using namespace ear;
 
     TEST(result, get_or_else_on_success) {
         EXPECT_EQ(2,
