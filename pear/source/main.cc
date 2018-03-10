@@ -109,9 +109,15 @@ pear::Result<Arguments> parse(int argc, char *argv[]) {
     }
 }
 
-pear::Result<pid_t> spawn(const char *argv[], const char *envp[]) noexcept {
+pear::Result<pid_t> spawn(const ExecutionConfig &config,
+                          const pear::EnvironmentPtr &environment) noexcept {
+    char **envp = const_cast<char **>(environment->as_array());
+    char **argv = const_cast<char **>(config.command);
+
+    // TODO: use other execution config parameters.
+
     pid_t child;
-    if (0 != posix_spawn(&child, argv[0], 0, 0, const_cast<char **>(argv), const_cast<char **>(envp))) {
+    if (0 != posix_spawn(&child, config.command[0], 0, 0, argv, envp)) {
         return failure<pid_t>("posix_spawn", errno);
     } else {
         return pear::Result<pid_t>::success(std::move(child));
@@ -160,7 +166,7 @@ int main(int argc, char *argv[], char *envp[]) {
                         .build();
                 auto reporter = pear::Reporter::tempfile(state.forward.target);
 
-                pear::Result<pid_t> child = spawn(state.execution.command, environment->as_array());
+                pear::Result<pid_t> child = spawn(state.execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
                     report_start(pid, state.execution.command, reporter);
                     pear::Result<int> status = wait_pid(pid);
