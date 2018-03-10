@@ -277,7 +277,7 @@ namespace ear {
 #endif
 
     private:
-        const ::ear::Environment *const state_;
+        const ::ear::Environment *const state_{};
     };
 
 }

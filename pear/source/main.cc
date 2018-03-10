@@ -21,6 +21,7 @@
 #include <wait.h>
 #include <spawn.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -49,37 +50,62 @@ pear::Result<T> failure(const char *message, int errnum) noexcept {
     return pear::Result<T>::failure(result);
 };
 
-
-struct State {
+struct EarLibraryConfig {
     char *wrapper;
     char *library;
     char *target;
-    const char **command;
 };
 
-pear::Result<State> parse(int argc, char *argv[]) {
-    State result = {nullptr, nullptr, nullptr, nullptr};
+struct ExecutionConfig {
+    const char **command;
+    char *method;
+    char *file;
+    char *search_path;
+};
+
+struct Arguments {
+    EarLibraryConfig forward;
+    ExecutionConfig execution;
+};
+
+pear::Result<Arguments> parse(int argc, char *argv[]) {
+    Arguments result = {nullptr, nullptr, nullptr, nullptr};
 
     int opt;
-    while ((opt = getopt(argc, argv, "l:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "t:l:m:f:s:")) != -1) {
         switch (opt) {
-            case 'l':
-                result.library = optarg;
-                break;
             case 't':
-                result.target = optarg;
+                result.forward.target = optarg;
+                break;
+            case 'l':
+                result.forward.library = optarg;
+                break;
+            case 'm':
+                result.execution.method = optarg;
+                break;
+            case 'f':
+                result.execution.file = optarg;
+                break;
+            case 's':
+                result.execution.search_path = optarg;
                 break;
             default: /* '?' */
-                return failure<State>("Usage: pear [-t target_url] [-l path_to_libear] command");
+                return failure<Arguments>(
+                        "Usage: pear [-t target_url]\n"
+                        "            [-l path_to_libear]\n"
+                        "            [-m method]\n"
+                        "            [-f file]\n"
+                        "            [-s search_path]\n"
+                        "            -- command");
         }
     }
 
     if (optind >= argc) {
-        return failure<State>("Expected argument after options");
+        return failure<Arguments>("Expected argument after options");
     } else {
-        result.wrapper = argv[0];
-        result.command = const_cast<const char **>(argv + optind);
-        return pear::Result<State>::success(std::move(result));
+        result.forward.wrapper = argv[0];
+        result.execution.command = const_cast<const char **>(argv + optind);
+        return pear::Result<Arguments>::success(std::move(result));
     }
 }
 
@@ -110,7 +136,7 @@ void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexc
                             fprintf(stderr, "%s\n", message);
                         })
                         .get_or_else(0);
-    });
+            });
 }
 
 void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
@@ -121,22 +147,22 @@ void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
                             fprintf(stderr, "%s\n", message);
                         })
                         .get_or_else(0);
-    });
+            });
 }
 
 int main(int argc, char *argv[], char *envp[]) {
     return parse(argc, argv)
             .bind<int>([&envp](auto &state) {
                 auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
-                        .add_library(state.library)
-                        .add_target(state.target)
-                        .add_wrapper(state.wrapper)
+                        .add_library(state.forward.library)
+                        .add_target(state.forward.target)
+                        .add_wrapper(state.forward.wrapper)
                         .build();
-                auto reporter = pear::Reporter::tempfile(state.target);
+                auto reporter = pear::Reporter::tempfile(state.forward.target);
 
-                pear::Result<pid_t> child = spawn(state.command, environment->as_array());
+                pear::Result<pid_t> child = spawn(state.execution.command, environment->as_array());
                 return child.map<int>([&reporter, &state](auto &pid) {
-                    report_start(pid, state.command, reporter);
+                    report_start(pid, state.execution.command, reporter);
                     pear::Result<int> status = wait_pid(pid);
                     return status
                             .map<int>([&reporter, &pid](auto &exit) {
