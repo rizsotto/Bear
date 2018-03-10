@@ -126,7 +126,7 @@ void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
 
 int main(int argc, char *argv[], char *envp[]) {
     return parse(argc, argv)
-            .bind<pid_t>([&envp](auto &state) {
+            .bind<int>([&envp](auto &state) {
                 auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
                         .add_library(state.library)
                         .add_target(state.target)
@@ -134,15 +134,16 @@ int main(int argc, char *argv[], char *envp[]) {
                         .build();
                 auto reporter = pear::Reporter::tempfile(state.target);
 
-                pear::Result<pid_t> p = spawn(state.command, environment->envp());
-                return p.map<pid_t>([&reporter, &state](auto &pid) {
+                pear::Result<pid_t> child = spawn(state.command, environment->as_array());
+                return child.map<int>([&reporter, &state](auto &pid) {
                     report_start(pid, state.command, reporter);
-                    pear::Result<int> e = wait_pid(pid);
-                    e.map<int>([&reporter, &pid](auto &exit) {
-                        report_exit(pid, exit, reporter);
-                        return exit;
-                    });
-                    return pid;
+                    pear::Result<int> status = wait_pid(pid);
+                    return status
+                            .map<int>([&reporter, &pid](auto &exit) {
+                                report_exit(pid, exit, reporter);
+                                return exit;
+                            })
+                            .get_or_else(EXIT_FAILURE);
                 });
             })
             .handle_with([](auto const &message) {

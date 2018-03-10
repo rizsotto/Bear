@@ -46,7 +46,7 @@ namespace pear {
         environment_ = nullptr;
     }
 
-    const char **Environment::envp() const noexcept {
+    const char **Environment::as_array() const noexcept {
         return environment_;
     }
 

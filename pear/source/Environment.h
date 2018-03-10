@@ -26,7 +26,7 @@ namespace pear {
     public:
         class Builder;
 
-        const char **envp() const noexcept;
+        const char **as_array() const noexcept;
 
         ~Environment() noexcept;
 
