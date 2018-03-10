@@ -29,28 +29,6 @@ namespace ear {
     template<typename T, typename E>
     class Result {
     public:
-        using Error = E;
-
-    private:
-        std::variant<T, E> state_;
-
-        explicit Result(T &&other) noexcept;
-
-        explicit Result(E const &error) noexcept;
-
-    public:
-        Result() = delete;
-
-        Result(const Result &other) noexcept = delete;
-
-        Result(Result &&other) noexcept;
-
-        Result &operator=(const Result &other) = delete;
-
-        Result &operator=(Result &&other) noexcept;
-
-        ~Result() noexcept = default;
-
         static Result success(T &&value) noexcept;
 
         static Result failure(const E &value) noexcept;
@@ -64,12 +42,29 @@ namespace ear {
         T get_or_else(const T &value) const noexcept;
 
         Result<T, E> const &handle_with(std::function<void(const E &)> &&f) const noexcept;
+
+    public:
+        Result(Result &&other) noexcept;
+
+        Result &operator=(Result &&other) noexcept;
+
+        ~Result() noexcept = default;
+
+    public:
+        Result() = delete;
+
+        Result(const Result &other) noexcept = delete;
+
+        Result &operator=(const Result &other) = delete;
+
+    private:
+        std::variant<T, E> state_;
+
+        explicit Result(T &&other) noexcept;
+
+        explicit Result(E const &error) noexcept;
     };
 
-
-    template<typename T, typename E>
-    Result<T, E>::Result(T &&other) noexcept
-            : state_(std::move(other)) {}
 
     template<typename T, typename E>
     Result<T, E>::Result(const E &error) noexcept
@@ -78,6 +73,10 @@ namespace ear {
     template<typename T, typename E>
     Result<T, E>::Result(Result &&other) noexcept
             : state_(std::move(other.state_)) {}
+
+    template<typename T, typename E>
+    Result<T, E>::Result(T &&other) noexcept
+            : state_(std::move(other)) {}
 
     template<typename T, typename E>
     Result<T, E> &Result<T, E>::operator=(Result &&other) noexcept {

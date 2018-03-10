@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <bits/unique_ptr.h>
+#include <memory>
 
 namespace pear {
 
@@ -26,33 +26,21 @@ namespace pear {
     public:
         class Builder;
 
-    private:
-        const char **environment_;
-
-        explicit Environment(const char **environment) noexcept;
-
-    public:
         const char **envp() const noexcept;
 
-        Environment(Environment &&) noexcept;
-
-        Environment(Environment const &) = delete;
-
-        Environment &operator=(Environment &&) noexcept = delete;
-
-        Environment &operator=(Environment const &) = delete;
-
         ~Environment() noexcept;
+
+    private:
+        explicit Environment(const char **environment) noexcept;
+
+    private:
+        const char **environment_;
     };
 
     using EnvironmentPtr = std::unique_ptr<Environment>;
 
 
     class Environment::Builder {
-    private:
-//        std::vector<std::string> environment_;
-//        std::map<std::string, std::string> environment_;
-
     public:
         Builder() noexcept;
 
@@ -60,6 +48,15 @@ namespace pear {
 
         ~Builder() noexcept = default;
 
+        Builder &add_wrapper(const char *wrapper) noexcept;
+
+        Builder &add_target(const char *target) noexcept;
+
+        Builder &add_library(const char *library) noexcept;
+
+        EnvironmentPtr build() const noexcept;
+
+    public:
         Builder(Builder &&) noexcept = delete;
 
         Builder(Builder const &) = delete;
@@ -68,13 +65,8 @@ namespace pear {
 
         Builder &operator=(Builder const &) = delete;
 
-    public:
-        Builder &add_wrapper(const char *wrapper) noexcept;
-
-        Builder &add_target(const char *target) noexcept;
-
-        Builder &add_library(const char *library) noexcept;
-
-        EnvironmentPtr build() const noexcept;
+    private:
+//        std::vector<std::string> environment_;
+//        std::map<std::string, std::string> environment_;
     };
 }

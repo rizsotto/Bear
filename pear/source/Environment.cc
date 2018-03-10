@@ -35,11 +35,6 @@ namespace pear {
             : environment_(environment)
     { }
 
-    Environment::Environment(Environment &&other) noexcept
-            : environment_(other.environment_) {
-        other.environment_ = nullptr;
-    }
-
     Environment::~Environment() noexcept {
         if (environment_ == nullptr)
             return;
