@@ -137,6 +137,6 @@ namespace ear {
 namespace pear {
 
     template <typename T>
-    using Result = ::ear::Result<T, std::string>;
+    using Result = ::ear::Result<T, std::runtime_error>;
 
 }

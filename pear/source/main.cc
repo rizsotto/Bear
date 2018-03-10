@@ -18,10 +18,7 @@
  */
 
 #include <unistd.h>
-#include <wait.h>
-#include <spawn.h>
 
-#include <cerrno>
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -29,25 +26,12 @@
 #include "Result.h"
 #include "Environment.h"
 #include "Reporter.h"
+#include "SystemCalls.h"
 
 
 template <typename T>
 pear::Result<T> failure(const char *message) noexcept {
-    return pear::Result<T>::failure(std::string(message));
-};
-
-template <typename T>
-pear::Result<T> failure(const char *message, int errnum) noexcept {
-    std::string result = message != nullptr ? std::string(message) : std::string();
-
-    const size_t buffer_length = 1024 + strlen(message);
-    char buffer[buffer_length] = { ':', ' ', '\0' };
-    if (0 == strerror_r(errnum, buffer + 2, buffer_length - 2)) {
-        result += std::string(buffer);
-    } else {
-        result += std::string(": Couldn't get error message.");
-    }
-    return pear::Result<T>::failure(result);
+    return pear::Result<T>::failure(std::runtime_error(message));
 };
 
 struct EarLibraryConfig {
@@ -111,27 +95,9 @@ pear::Result<Arguments> parse(int argc, char *argv[]) {
 
 pear::Result<pid_t> spawn(const ExecutionConfig &config,
                           const pear::EnvironmentPtr &environment) noexcept {
-    char **envp = const_cast<char **>(environment->as_array());
-    char **argv = const_cast<char **>(config.command);
-
     // TODO: use other execution config parameters.
 
-    pid_t child;
-    if (0 != posix_spawn(&child, config.command[0], 0, 0, argv, envp)) {
-        return failure<pid_t>("posix_spawn", errno);
-    } else {
-        return pear::Result<pid_t>::success(std::move(child));
-    }
-}
-
-pear::Result<int> wait_pid(pid_t pid) noexcept {
-    int status;
-    if (-1 == waitpid(pid, &status, 0)) {
-        return failure<int>("waitpid", errno);
-    } else {
-        int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-        return pear::Result<int>::success(std::move(result));
-    }
+    return pear::spawn(config.command, environment->as_array());
 }
 
 void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
@@ -169,7 +135,7 @@ int main(int argc, char *argv[], char *envp[]) {
                 pear::Result<pid_t> child = spawn(state.execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
                     report_start(pid, state.execution.command, reporter);
-                    pear::Result<int> status = wait_pid(pid);
+                    pear::Result<int> status = pear::wait_pid(pid);
                     return status
                             .map<int>([&reporter, &pid](auto &exit) {
                                 report_exit(pid, exit, reporter);

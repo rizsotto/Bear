@@ -8,6 +8,8 @@ add_executable(pear
         Reporter.h
         Reporter.cc
         Result.h
+        SystemCalls.h
+        SystemCalls.cc
 )
 
 include(GNUInstallDirs)

@@ -18,8 +18,7 @@
  */
 
 #include "Reporter.h"
-
-#include <unistd.h>
+#include "SystemCalls.h"
 
 #include <string>
 #include <chrono>
@@ -46,29 +45,80 @@ namespace {
     };
 
     struct ProcessStartEvent : public TimedEvent {
-        pid_t pid_;
-        pid_t ppid_;
+        pid_t child_;
+        pid_t supervisor_;
+        pid_t parent_;
         std::string cwd_;
-        std::vector<std::string_view> cmd_;
+        //std::vector<std::string_view> cmd_;
+        const char **cmd_;
 
-        ProcessStartEvent(pid_t pid_,
-                          pid_t ppid_,
-                          std::string cwd_,
-                          std::vector<std::string_view> cmd_)
+        ProcessStartEvent(pid_t child,
+                          pid_t supervisor,
+                          pid_t parent,
+                          std::string cwd,
+                          const char **cmd)
                 : TimedEvent()
-                , pid_(pid_)
-                , ppid_(ppid_)
-                , cwd_(std::move(cwd_))
-                , cmd_(std::move(cmd_))
+                , child_(child)
+                , supervisor_(supervisor)
+                , parent_(parent)
+                , cwd_(std::move(cwd))
+                , cmd_(cmd)
         {}
 
         std::ostream &to_json(std::ostream &os) const override {
-            // TODO
+            // TODO: do json escaping of strings.
+            // TODO: serialize other attributes too.
+
+            os << R"({ "pid": )" << child_
+               << R"(, "cwd": ")" << cwd_ << '\"'
+               << R"(, "cmd": )";
+
+            to_json(os, cmd_);
+
+            os << "}";
+
+            return os;
+        }
+
+        static std::ostream &to_json(std::ostream &os, const char **array) {
+            os << "[";
+            for (const char **it = array; *it != nullptr; ++it) {
+                if (it != array)
+                    os << ", ";
+                os << '\"' << *it << '\"';
+            }
+            os << "]";
+
             return os;
         }
     };
 
-    class TempfileReporter : public pear::Reporter{
+    struct ProcessStopEvent : public TimedEvent {
+        pid_t child_;
+        pid_t supervisor_;
+        int exit_;
+
+        ProcessStopEvent(pid_t child,
+                         pid_t supervisor,
+                         int exit)
+                : TimedEvent()
+                , child_(child)
+                , supervisor_(supervisor)
+                , exit_(exit)
+        {}
+
+        std::ostream &to_json(std::ostream &os) const override {
+            // TODO: serialize other attributes too.
+
+            os << R"({ "pid": )" << child_
+               << R"(, "exit": )" << exit_
+               << "}";
+
+            return os;
+        }
+    };
+
+    class TempfileReporter : public pear::Reporter {
     public:
         explicit TempfileReporter(const char *target) noexcept;
 
@@ -76,30 +126,39 @@ namespace {
     };
 
     TempfileReporter::TempfileReporter(const char *target) noexcept {
-
+        // TODO
     }
 
     pear::Result<int> TempfileReporter::send(pear::EventPtr &event) noexcept {
-        return pear::Result<int>::failure("");
+        // TODO
+        return pear::Result<int>::failure(std::runtime_error(""));
     }
 }
 
 
 namespace pear {
 
-
     Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
-        // TODO
-        return Result<EventPtr>::failure("");
+        Result<pid_t> current_pid = get_pid();
+        return current_pid.bind<EventPtr>([&pid, &cmd](auto &current) {
+            Result<pid_t> parent_pid = get_ppid();
+            return parent_pid.bind<EventPtr>([&pid, &cmd, &current](auto &parent){
+                Result<std::string> working_dir = get_cwd();
+                return working_dir.map<EventPtr>([&pid, &cmd, &current, &parent](auto &cwd){
+                    return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
+                });
+            });
+        });
     };
 
     Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept {
-        // TODO
-        return Result<EventPtr>::failure("");
+        Result<pid_t> current_pid = get_pid();
+        return current_pid.map<EventPtr>([&pid, &exit](auto &current) {
+            return EventPtr(new ProcessStopEvent(pid, current, exit));
+        });
     }
 
     ReporterPtr Reporter::tempfile(char const *dir_name) noexcept {
-        // TODO
         return std::make_unique<TempfileReporter>(dir_name);
     }
 }

@@ -21,40 +21,18 @@
 
 #include <unistd.h>
 
-#include <ostream>
-#include <utility>
-#include <memory>
-
 #include "Result.h"
-
 
 namespace pear {
 
-    class Event;
-    using EventPtr = std::unique_ptr<Event>;
+    Result<pid_t> spawn(const char **argv, const char **envp) noexcept;
 
-    class Event {
-    public:
-        virtual ~Event() noexcept = default;
+    Result<int> wait_pid(pid_t pid) noexcept;
 
-        virtual std::ostream &to_json(std::ostream &) const = 0;
+    Result<pid_t> get_pid() noexcept;
 
-    public:
-        static Result<EventPtr> start(pid_t pid, const char **cmd) noexcept;
-        static Result<EventPtr> stop(pid_t pid, int exit) noexcept;
-    };
+    Result<pid_t> get_ppid() noexcept;
 
+    Result<std::string> get_cwd() noexcept;
 
-    class Reporter;
-    using ReporterPtr = std::shared_ptr<Reporter>;
-
-    class Reporter {
-    public:
-        virtual ~Reporter() noexcept = default;
-
-        virtual Result<int> send(EventPtr &event) noexcept = 0;
-
-    public:
-        static ReporterPtr tempfile(char const *) noexcept;
-    };
 }
