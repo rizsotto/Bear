@@ -29,11 +29,6 @@
 #include "SystemCalls.h"
 
 
-template <typename T>
-pear::Result<T> failure(const char *message) noexcept {
-    return pear::Result<T>::failure(std::runtime_error(message));
-};
-
 struct EarLibraryConfig {
     char *wrapper;
     char *library;
@@ -74,18 +69,22 @@ pear::Result<Arguments> parse(int argc, char *argv[]) {
                 result.execution.search_path = optarg;
                 break;
             default: /* '?' */
-                return failure<Arguments>(
-                        "Usage: pear [-t target_url]\n"
-                        "            [-l path_to_libear]\n"
-                        "            [-m method]\n"
-                        "            [-f file]\n"
-                        "            [-s search_path]\n"
-                        "            -- command");
+                return pear::Result<Arguments>::failure(
+                        std::runtime_error(
+                                "Usage: pear [OPTION]... -- command\n\n"
+                                "  -t <target url>       where to send execution reports\n"
+                                "  -l <path to libear>   where to find the ear libray\n"
+                                "  -m <method>           what was the execution method\n"
+                                "  -f <file>             file parameter\n"
+                                "  -s <search_path>      search path parameter\n"));
         }
     }
 
     if (optind >= argc) {
-        return failure<Arguments>("Expected argument after options");
+        return pear::Result<Arguments>::failure(
+                std::runtime_error(
+                        "Usage: pear [OPTION]... -- command\n"
+                        "Expected argument after options"));
     } else {
         result.forward.wrapper = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
@@ -145,7 +144,7 @@ int main(int argc, char *argv[], char *envp[]) {
                 });
             })
             .handle_with([](auto const &message) {
-                fprintf(stderr, "%s\n", message);
+                fprintf(stderr, "%s\n", message.what());
                 exit(EXIT_FAILURE);
             })
             .get_or_else(EXIT_FAILURE);

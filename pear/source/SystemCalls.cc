@@ -78,7 +78,7 @@ namespace pear {
     }
 
     Result<std::string> get_cwd() noexcept {
-        constexpr static const size_t buffer_size = 1024;
+        constexpr static const size_t buffer_size = 8192;
 
         char buffer[buffer_size];
         if (nullptr == getcwd(buffer, buffer_size)) {
