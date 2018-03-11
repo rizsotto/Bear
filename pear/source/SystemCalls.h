@@ -20,6 +20,7 @@
 #pragma once
 
 #include <unistd.h>
+#include <memory>
 
 #include "Result.h"
 
@@ -34,5 +35,7 @@ namespace pear {
     Result<pid_t> get_ppid() noexcept;
 
     Result<std::string> get_cwd() noexcept;
+
+    Result<std::shared_ptr<std::ostream>> temp_file(const char *prefix, const char *suffix) noexcept;
 
 }

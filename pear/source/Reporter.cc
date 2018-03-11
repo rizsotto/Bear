@@ -56,7 +56,7 @@ namespace {
                           pid_t supervisor,
                           pid_t parent,
                           std::string cwd,
-                          const char **cmd)
+                          const char **cmd) noexcept
                 : TimedEvent()
                 , child_(child)
                 , supervisor_(supervisor)
@@ -100,7 +100,7 @@ namespace {
 
         ProcessStopEvent(pid_t child,
                          pid_t supervisor,
-                         int exit)
+                         int exit) noexcept
                 : TimedEvent()
                 , child_(child)
                 , supervisor_(supervisor)
@@ -123,15 +123,24 @@ namespace {
         explicit TempfileReporter(const char *target) noexcept;
 
         pear::Result<int> send(pear::EventPtr &event) noexcept override;
+
+    private:
+        std::string const target_;
     };
 
-    TempfileReporter::TempfileReporter(const char *target) noexcept {
-        // TODO
-    }
+    TempfileReporter::TempfileReporter(const char *target) noexcept
+            : pear::Reporter()
+            , target_(target)
+    {}
 
     pear::Result<int> TempfileReporter::send(pear::EventPtr &event) noexcept {
-        // TODO
-        return pear::Result<int>::failure(std::runtime_error(""));
+        const std::string prefix = target_ + std::string("/execution.");
+        pear::Result<std::shared_ptr<std::ostream>> stream_result =
+                pear::temp_file(prefix.c_str(), ".json");
+        return stream_result.map<int>([&event](auto &stream){
+            event->to_json(*stream);
+            return 0;
+        });
     }
 }
 
