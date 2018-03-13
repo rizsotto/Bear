@@ -3,24 +3,9 @@ cmake_minimum_required(VERSION 2.8)
 project(bear C CXX)
 set(BEAR_VERSION "3.0.0")
 
-include(GNUInstallDirs)
-install(FILES COPYING README.md ChangeLog.md
-  DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-include(CheckCCompilerFlag)
-check_c_compiler_flag("-std=c99" C99_SUPPORTED)
-if (C99_SUPPORTED)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-endif()
-
-add_definitions(-D_GNU_SOURCE)
-list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
-
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
-
-set(CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
 
 set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
 set(EAR_LIB_PATH "${CMAKE_INSTALL_LIBDIR}/bear")
@@ -35,6 +20,11 @@ add_subdirectory(test)
 add_subdirectory(man)
 add_subdirectory(libear_s)
 add_subdirectory(pear)
+
+
+include(GNUInstallDirs)
+install(FILES COPYING README.md ChangeLog.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
