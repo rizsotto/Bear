@@ -1,9 +1,6 @@
-find_package(GTest REQUIRED)
-
-add_executable(pear_test
-        ./ResultTest.cc
-        ../source/Result.h)
-target_link_libraries(pear_test GTest::GTest GTest::Main)
+file(GLOB SRCS *.cc)
+add_executable(pear_test ${SRCS})
+target_link_libraries(pear_test libgtest)
 
 enable_testing()
 add_test(NAME PearUnitTests COMMAND pear_test)
