@@ -41,9 +41,8 @@ set_target_properties(libgmock PROPERTIES
         "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
         )
 
-# I couldn't make it work with INTERFACE_INCLUDE_DIRECTORIES
-include_directories("${source_dir}/googletest/include"
-        "${source_dir}/googlemock/include")
+set(GOOGLE_TEST_INCLUDE_DIR "${source_dir}/googletest/include")
+set(GOOGLE_MOCK_INCLUDE_DIR "${source_dir}/googlemock/include")
 
 
 if (NOT CMAKE_BUILD_TYPE)

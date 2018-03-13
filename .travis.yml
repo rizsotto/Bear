@@ -28,10 +28,20 @@ matrix:
 addons:
   apt:
     packages:
+      - clang-5.0
+      - libclang-5.0-dev
+      - python-pip
       - cmake
       - libc6-dev
       - scons
       - qt4-qmake
+    sources:
+      - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main'
+        key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+
+before_script:
+  - mkdir -p "$HOME/install" "$HOME/build"
+  - env
 
 before_install:
   - uname
@@ -47,11 +57,12 @@ install:
   - pip install lit pycodestyle
 
 script:
-  - mkdir "$HOME/build"; cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ"
+  - cd "$HOME/build"
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-5.0 -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
+  - VERBOSE=1 DESTDIR="$HOME/install" make install
   - if [ "$TRAVIS_SUDO" == "true" ]; then
       sudo make install;
       (cd "$TRAVIS_BUILD_DIR"; git clean -fdx;);
