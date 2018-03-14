@@ -104,7 +104,7 @@ void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexc
             .map<int>([&reporter](auto &eptr) {
                 return reporter->send(eptr)
                         .handle_with([](auto &message) {
-                            fprintf(stderr, "%s\n", message);
+                            fprintf(stderr, "%s\n", message.what());
                         })
                         .get_or_else(0);
             });
@@ -115,7 +115,7 @@ void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
             .map<int>([&reporter](auto &eptr) {
                 return reporter->send(eptr)
                         .handle_with([](auto &message) {
-                            fprintf(stderr, "%s\n", message);
+                            fprintf(stderr, "%s\n", message.what());
                         })
                         .get_or_else(0);
             });

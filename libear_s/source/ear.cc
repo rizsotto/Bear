@@ -162,7 +162,7 @@ int execl(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1] = {nullptr};
+    char *argv[argc + 1];
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
@@ -182,7 +182,7 @@ int execlp(const char *file, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1] = {nullptr};
+    char *argv[argc + 1];
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
@@ -203,7 +203,7 @@ int execle(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1] = {nullptr};
+    char *argv[argc + 1];
     va_copy_n(ap, argv, argc);
     char **envp = va_arg(ap, char **);
     va_end(ap);

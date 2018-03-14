@@ -33,8 +33,9 @@ namespace {
         std::string result = message != nullptr ? std::string(message) : std::string();
 
         const size_t buffer_length = 1024 + strlen(message);
-        char buffer[buffer_length] = { ':', ' ', '\0' };
+        char buffer[buffer_length];
         if (0 == strerror_r(errnum, buffer + 2, buffer_length - 2)) {
+            result += std::string(": ");
             result += std::string(buffer);
         } else {
             result += std::string(": Couldn't get error message.");

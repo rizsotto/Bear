@@ -65,17 +65,18 @@ namespace ear {
                 return fp(path, argv, envp);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 8;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="execve"
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[7], dst + argv_length);
+            const char *dst[argv_length + 8];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "execve";
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             return fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
         }
@@ -91,17 +92,18 @@ namespace ear {
                 return fp(path, argv);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 8;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="execv"
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[7], dst + argv_length);
+            const char *dst[argv_length + 8];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "execv";
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             return fp(state_->wrapper(), const_cast<char *const *>(dst));
         }
@@ -115,19 +117,20 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 10;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="execvpe",
-                    [7]=file_flag,
-                    [8]=file
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[9], dst + argv_length);
+            const char *dst[argv_length + 10];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "execvpe";
+            *it++ = file_flag;
+            *it++ = file;
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
             return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
@@ -142,19 +145,20 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 10;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="execvp",
-                    [7]=file_flag,
-                    [8]=file
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[9], dst + argv_length);
+            const char *dst[argv_length + 10];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "execvp";
+            *it++ = file_flag;
+            *it++ = file;
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
             return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst));
@@ -169,21 +173,22 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 12;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="execvP",
-                    [7]=file_flag,
-                    [8]=file,
-                    [9]=search_flag,
-                    [10]=search_path
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[11], dst + argv_length);
+            const char *dst[argv_length + 12];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "execvP";
+            *it++ = file_flag;
+            *it++ = file;
+            *it++ = search_flag;
+            *it++ = search_path;
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
             return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst));
@@ -198,17 +203,18 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 8;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="exect"
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[7], dst + argv_length);
+            const char *dst[argv_length + 8];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "exect";
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
             return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
@@ -230,17 +236,18 @@ namespace ear {
                 return fp(pid, path, file_actions, attrp, argv, envp);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 8;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="posix_spawn"
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[7], dst + argv_length);
+            const char *dst[argv_length + 8];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "posix_spawn";
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             return fp(pid, state_->wrapper(), file_actions, attrp, const_cast<char *const *>(dst), envp);
         }
@@ -258,17 +265,18 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 8;
-            const char *dst[dst_length] = {
-                    [0]=state_->wrapper(),
-                    [1]=target_flag,
-                    [2]=state_->target(),
-                    [3]=library_flag,
-                    [4]=state_->library(),
-                    [5]=function_flag,
-                    [6]="posix_spawnp"
-            };
-            ::ear::array::copy(argv, argv + argv_length, &dst[7], dst + argv_length);
+            const char *dst[argv_length + 8];
+
+            const char **it = dst;
+            *it++ = state_->wrapper();
+            *it++ = target_flag;
+            *it++ = state_->target();
+            *it++ = library_flag;
+            *it++ = state_->library();
+            *it++ = function_flag;
+            *it++ = "posix_spawnp";
+
+            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::posix_spawn();
             return (fp == nullptr) ? -1 : fp(pid, state_->wrapper(), file_actions, attrp,
