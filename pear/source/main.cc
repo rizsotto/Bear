@@ -47,7 +47,7 @@ struct Arguments {
     ExecutionConfig execution;
 };
 
-pear::Result<Arguments> parse(int argc, char *argv[]) {
+pear::Result<Arguments> parse(int argc, char *argv[]) noexcept {
     Arguments result = {nullptr, nullptr, nullptr, nullptr};
 
     int opt;
@@ -86,6 +86,7 @@ pear::Result<Arguments> parse(int argc, char *argv[]) {
                         "Usage: pear [OPTION]... -- command\n"
                         "Expected argument after options"));
     } else {
+        // TODO: do validation!!!
         result.forward.wrapper = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
         return pear::Result<Arguments>::success(std::move(result));

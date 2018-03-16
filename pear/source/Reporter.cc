@@ -20,7 +20,6 @@
 #include "Reporter.h"
 #include "SystemCalls.h"
 
-#include <string>
 #include <chrono>
 
 namespace {
@@ -75,19 +74,19 @@ namespace {
 
             to_json(os, cmd_);
 
-            os << "}";
+            os << " }";
 
             return os;
         }
 
         static std::ostream &to_json(std::ostream &os, const char **array) {
-            os << "[";
+            os << "[ ";
             for (const char **it = array; *it != nullptr; ++it) {
                 if (it != array)
                     os << ", ";
                 os << '\"' << *it << '\"';
             }
-            os << "]";
+            os << " ]";
 
             return os;
         }
@@ -112,7 +111,7 @@ namespace {
 
             os << R"({ "pid": )" << child_
                << R"(, "exit": )" << exit_
-               << "}";
+               << " }";
 
             return os;
         }
@@ -131,7 +130,7 @@ namespace {
     TempfileReporter::TempfileReporter(const char *target) noexcept
             : pear::Reporter()
             , target_(target)
-    {}
+    { }
 
     pear::Result<int> TempfileReporter::send(pear::EventPtr &event) noexcept {
         const std::string prefix = target_ + std::string("/execution.");
@@ -168,6 +167,8 @@ namespace pear {
     }
 
     ReporterPtr Reporter::tempfile(char const *dir_name) noexcept {
+        // TODO: check if dir_name is not null
+        // TODO: check if dir_name is exists
         return std::make_unique<TempfileReporter>(dir_name);
     }
 }

@@ -71,7 +71,8 @@ namespace {
         // TODO: don't overwrite, but extend the list
         // TODO: make it work on OSX too
         std::vector<std::string> result;
-        result.emplace_back(env_key_value(glibc_preload_key, library));
+        if (!library.empty())
+            result.emplace_back(env_key_value(glibc_preload_key, library));
         return result;
     }
 }
