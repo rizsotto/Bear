@@ -19,6 +19,7 @@
  */
 
 #include <memory>
+#include <vector>
 
 namespace pear {
 
@@ -28,13 +29,14 @@ namespace pear {
 
         const char **as_array() const noexcept;
 
-        ~Environment() noexcept;
+        ~Environment() noexcept = default;
 
     private:
-        explicit Environment(const char **environment) noexcept;
+        explicit Environment(std::vector<std::string> &&environ) noexcept;
 
     private:
-        const char **environment_;
+        std::vector<std::string> const environ_;
+        std::vector<const char*> rendered_;
     };
 
     using EnvironmentPtr = std::unique_ptr<Environment>;
@@ -66,7 +68,9 @@ namespace pear {
         Builder &operator=(Builder const &) = delete;
 
     private:
-//        std::vector<std::string> environment_;
-//        std::map<std::string, std::string> environment_;
+        std::vector<std::string> environ_;
+        std::string wrapper_;
+        std::string target_;
+        std::string library_;
     };
 }
