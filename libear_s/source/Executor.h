@@ -65,7 +65,7 @@ namespace ear {
                 return fp(path, argv, envp);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 8];
+            const char *dst[argv_length + 9];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -75,6 +75,7 @@ namespace ear {
             *it++ = state_->library();
             *it++ = function_flag;
             *it++ = "execve";
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -92,7 +93,7 @@ namespace ear {
                 return fp(path, argv);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 8];
+            const char *dst[argv_length + 9];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -102,6 +103,7 @@ namespace ear {
             *it++ = state_->library();
             *it++ = function_flag;
             *it++ = "execv";
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -117,7 +119,7 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 10];
+            const char *dst[argv_length + 11];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -129,6 +131,7 @@ namespace ear {
             *it++ = "execvpe";
             *it++ = file_flag;
             *it++ = file;
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -145,7 +148,7 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 10];
+            const char *dst[argv_length + 11];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -157,6 +160,7 @@ namespace ear {
             *it++ = "execvp";
             *it++ = file_flag;
             *it++ = file;
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -173,7 +177,7 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 12];
+            const char *dst[argv_length + 13];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -187,6 +191,7 @@ namespace ear {
             *it++ = file;
             *it++ = search_flag;
             *it++ = search_path;
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -203,7 +208,7 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 8];
+            const char *dst[argv_length + 9];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -213,6 +218,7 @@ namespace ear {
             *it++ = state_->library();
             *it++ = function_flag;
             *it++ = "exect";
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -236,7 +242,7 @@ namespace ear {
                 return fp(pid, path, file_actions, attrp, argv, envp);
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 8];
+            const char *dst[argv_length + 9];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -246,6 +252,7 @@ namespace ear {
             *it++ = state_->library();
             *it++ = function_flag;
             *it++ = "posix_spawn";
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -265,7 +272,7 @@ namespace ear {
             }
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 8];
+            const char *dst[argv_length + 9];
 
             const char **it = dst;
             *it++ = state_->wrapper();
@@ -275,6 +282,7 @@ namespace ear {
             *it++ = state_->library();
             *it++ = function_flag;
             *it++ = "posix_spawnp";
+            *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 

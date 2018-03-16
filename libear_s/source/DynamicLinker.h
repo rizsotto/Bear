@@ -102,9 +102,5 @@ namespace ear {
         }
 #endif
 
-        using environ_t = const char **;
-        static environ_t environment() noexcept {
-            return typed_dlsym<environ_t >("environ");
-        }
     };
 }

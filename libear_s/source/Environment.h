@@ -27,7 +27,7 @@
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
 #else
-# include "DynamicLinker.h"
+extern "C" char **environ;
 #endif
 
 namespace ear {
@@ -80,12 +80,13 @@ namespace ear {
 #ifdef HAVE_NSGETENVIRON
         return const_cast<const char **>(*_NSGetEnviron());
 #else
-        return ::ear::DynamicLinker::environment();
+        return const_cast<const char **>(environ);
 #endif
     }
 
     inline
     Environment* Environment::create(const char** current, void* place) noexcept {
+
         if (current == nullptr)
             return nullptr;
 
