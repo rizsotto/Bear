@@ -58,10 +58,9 @@ set(CMAKE_CTEST_COMMAND ctest -V)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 
 add_subdirectory(bear)
+add_subdirectory(source)
 add_subdirectory(test)
 add_subdirectory(man)
-add_subdirectory(libear_s)
-add_subdirectory(pear)
 
 
 include(GNUInstallDirs)

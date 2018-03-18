@@ -1,10 +1,10 @@
 add_library(ear SHARED
-        ./ear.cc
-        ./Array.h
-        ./String.h
-        ./Environment.h
-        ./DynamicLinker.h
-        ./Executor.h)
+        ear.cc
+        Array.h
+        String.h
+        Environment.h
+        DynamicLinker.h
+        Executor.h)
 target_link_libraries(ear ${CMAKE_DL_LIBS})
 set_target_properties(ear PROPERTIES LINKER_LANGUAGE C)
 

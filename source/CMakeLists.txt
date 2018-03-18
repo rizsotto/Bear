@@ -1,3 +1,8 @@
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
+
 include(CheckFunctionExists)
 include(CheckSymbolExists)
 include(CheckIncludeFile)
@@ -17,3 +22,9 @@ check_include_file(xlocale.h HAVE_XLOCALE_HEADER)
 check_include_file(spawn.h HAVE_SPAWN_HEADER)
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
+add_subdirectory(libear)
+add_subdirectory(libear_test)
+add_subdirectory(pear)
+add_subdirectory(pear_test)

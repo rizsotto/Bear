@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../source/String.h"
+#include "../libear/String.h"
 
 namespace {
 
