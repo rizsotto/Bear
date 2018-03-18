@@ -23,10 +23,10 @@
 #include <cstdio>
 #include <cstring>
 
-#include "Result.h"
-#include "Environment.h"
-#include "Reporter.h"
-#include "SystemCalls.h"
+#include "libpear_a/Result.h"
+#include "libpear_a/Environment.h"
+#include "libpear_a/Reporter.h"
+#include "libpear_a/SystemCalls.h"
 
 
 struct EarLibraryConfig {

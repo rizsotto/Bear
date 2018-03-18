@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../libear/Environment.h"
+#include "../libear_a/Environment.h"
 
 namespace {
 

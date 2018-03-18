@@ -10,9 +10,11 @@ if (LIT_EXECUTABLE)
 endif()
 
 if(LIT_FOUND)
-  set(EAR_EXE ${CMAKE_BINARY_DIR}/bear/bear)
-  set(EAR_LIB ${CMAKE_BINARY_DIR}/libear/${EAR_LIB_FILE})
+  set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
+  set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/bear/bear)
+  set(PEAR_EXE ${CMAKE_BINARY_DIR}/source/pear/pear)
+  set(EAR_LIB ${CMAKE_BINARY_DIR}/source/libear/${EAR_LIB_FILE})
 
   add_test(NAME func_test
-    COMMAND lit -DEAR_EXE=${EAR_EXE} -DEAR_LIB=${EAR_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
+    COMMAND lit -DEAR_EXE=${BEAR_EXE} -DPEAR_EXE=${PEAR_EXE} -DEAR_LIB=${EAR_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

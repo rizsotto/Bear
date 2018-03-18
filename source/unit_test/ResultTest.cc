@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../pear/Result.h"
+#include "libpear_a/Result.h"
 
 namespace {
 

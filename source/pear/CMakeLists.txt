@@ -3,14 +3,9 @@ set(CMAKE_EXE_LINKER_FLAGS "-static")
 
 add_executable(pear
         main.cc
-        Environment.h
-        Environment.cc
-        Reporter.h
-        Reporter.cc
-        Result.h
-        SystemCalls.h
-        SystemCalls.cc
 )
+
+target_link_libraries(pear pear_a)
 
 include(GNUInstallDirs)
 install(TARGETS pear

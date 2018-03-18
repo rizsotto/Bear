@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
-#include "../libear/Environment.h"
-#include "../libear/Executor.h"
+#include "../libear_a/Environment.h"
+#include "../libear_a/Executor.h"
 
 namespace {
 

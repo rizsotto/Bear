@@ -31,11 +31,11 @@
 #include <cstdarg>
 #include <atomic>
 
-#include "Array.h"
-#include "DynamicLinker.h"
-#include "String.h"
-#include "Environment.h"
-#include "Executor.h"
+#include "libear_a/Array.h"
+#include "libear_a/DynamicLinker.h"
+#include "libear_a/String.h"
+#include "libear_a/Environment.h"
+#include "libear_a/Executor.h"
 
 
 namespace {
