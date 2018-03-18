@@ -74,7 +74,7 @@ namespace {
 
             to_json(os, cmd_);
 
-            os << " }";
+            os << " }\n";
 
             return os;
         }
@@ -111,7 +111,7 @@ namespace {
 
             os << R"({ "pid": )" << child_
                << R"(, "exit": )" << exit_
-               << " }";
+               << " }\n";
 
             return os;
         }
