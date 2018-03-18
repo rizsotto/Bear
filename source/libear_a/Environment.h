@@ -19,10 +19,12 @@
 
 #pragma once
 
+#include "config.h"
+
 #include <cstddef>
 #include <algorithm>
 
-#include "String.h"
+#include "libear_a/String.h"
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>

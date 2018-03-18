@@ -17,17 +17,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Environment.h"
+#include "config.h"
 
 #include <unistd.h>
 #include <algorithm>
 
-namespace {
-    constexpr char target_env_key[] = "BEAR_TARGET";
-    constexpr char library_env_key[] = "BEAR_LIBRARY";
-    constexpr char wrapper_env_key[] = "BEAR_WRAPPER";
+#include "libpear_a/Environment.h"
+#include "libear_a/Environment.h"
 
+namespace {
+
+#ifdef APPLE
+    constexpr char osx_preload_key[] = "DYLD_INSERT_LIBRARIES";
+    constexpr char osx_namespace_key[] = "DYLD_FORCE_FLAT_NAMESPACE";
+#else
     constexpr char glibc_preload_key[] = "LD_PRELOAD";
+#endif
 
     std::vector<const char *> render(std::vector<std::string> const &input) noexcept {
         std::vector<const char *> result;
@@ -62,17 +67,26 @@ namespace {
     };
 
     constexpr bool loader_related(const std::string_view &input) noexcept {
-        // TODO: make it work on OSX too.
+#ifdef APPLE
+        return input == osx_preload_key
+            || input == osx_namespace_key;
+#else
         return input == glibc_preload_key;
+#endif
     }
 
     std::vector<std::string> update_loader_related(std::vector<std::string> const &input,
                                                    std::string const &library) noexcept {
         // TODO: don't overwrite, but extend the list
-        // TODO: make it work on OSX too
         std::vector<std::string> result;
-        if (!library.empty())
+        if (!library.empty()) {
+#ifdef APPLE
+            result.emplace_back(env_key_value(osx_preload_key, library));
+            result.emplace_back(env_key_value(osx_namespace_key, std::string("1")));
+#else
             result.emplace_back(env_key_value(glibc_preload_key, library));
+#endif
+        }
         return result;
     }
 }
@@ -123,20 +137,20 @@ namespace pear {
                             [](auto &str) {
                                 auto key_value = env_key_value(str);
                                 auto key = std::get<0>(key_value);
-                                return key != target_env_key
-                                    && key != library_env_key
-                                    && key != wrapper_env_key
+                                return key != ::ear::target_env_key
+                                    && key != ::ear::library_env_key
+                                    && key != ::ear::wrapper_env_key
                                     && !loader_related(key);
                             });
         // overwrite the pear ones
         if (!wrapper_.empty()) {
-            result.emplace_back(env_key_value(wrapper_env_key, wrapper_));
+            result.emplace_back(env_key_value(::ear::wrapper_env_key, wrapper_));
         }
         if (!target_.empty()) {
-            result.emplace_back(env_key_value(target_env_key, target_));
+            result.emplace_back(env_key_value(::ear::target_env_key, target_));
         }
         if (!library_.empty()) {
-            result.emplace_back(env_key_value(library_env_key, library_));
+            result.emplace_back(env_key_value(::ear::library_env_key, library_));
         }
         // add the loader ones
         auto loader_related = update_loader_related(affected, library_);
