@@ -72,11 +72,9 @@ namespace {
                     EXPECT_STREQ(target_str, argv[2]);
                     EXPECT_STREQ("-l", argv[3]);
                     EXPECT_STREQ(library_str, argv[4]);
-                    EXPECT_STREQ("-m", argv[5]);
-                    EXPECT_STREQ("execve", argv[6]);
-                    EXPECT_STREQ("--", argv[7]);
-                    EXPECT_STREQ(ls_argv[0], argv[8]);
-                    EXPECT_STREQ(ls_argv[1], argv[9]);
+                    EXPECT_STREQ("--", argv[5]);
+                    EXPECT_STREQ(ls_argv[0], argv[6]);
+                    EXPECT_STREQ(ls_argv[1], argv[7]);
                     EXPECT_EQ(ls_envp, envp);
                     return success;
                 };

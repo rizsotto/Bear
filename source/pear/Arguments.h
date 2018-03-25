@@ -29,7 +29,6 @@ namespace pear {
 
     struct ExecutionConfig {
         const char **command;
-        const char *method;
         const char *file;
         const char *search_path;
     };
@@ -40,4 +39,6 @@ namespace pear {
         bool verbose;
     };
 
+    using continuation_t = int (*)(const char **);
+    int call(Arguments const &args, continuation_t forward) noexcept;
 }

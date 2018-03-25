@@ -34,16 +34,13 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
     pear::Arguments result = {nullptr, nullptr, nullptr, nullptr};
 
     int opt;
-    while ((opt = getopt(argc, argv, "t:l:m:f:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
         switch (opt) {
             case 't':
                 result.forward.target = optarg;
                 break;
             case 'l':
                 result.forward.library = optarg;
-                break;
-            case 'm':
-                result.execution.method = optarg;
                 break;
             case 'f':
                 result.execution.file = optarg;
@@ -57,7 +54,6 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
                                 "Usage: pear [OPTION]... -- command\n\n"
                                 "  -t <target url>       where to send execution reports\n"
                                 "  -l <path to libear>   where to find the ear libray\n"
-                                "  -m <method>           what was the execution method\n"
                                 "  -f <file>             file parameter\n"
                                 "  -s <search_path>      search path parameter\n"));
         }
