@@ -21,24 +21,24 @@
 
 namespace pear {
 
-    struct LibraryConfig {
-        const char *wrapper;
-        const char *library;
-        const char *target;
-    };
+    struct ReportParameters {
+        struct LibraryParameters {
+            const char *wrapper;
+            const char *library;
+            const char *target;
+            bool verbose;
+        };
 
-    struct ExecutionConfig {
-        const char **command;
-        const char *file;
-        const char *search_path;
-    };
+        struct ExecutionParameters {
+            const char **command;
+            const char *file;
+            const char *search_path;
+        };
 
-    struct Arguments {
-        LibraryConfig forward;
-        ExecutionConfig execution;
-        bool verbose;
+        LibraryParameters forward;
+        ExecutionParameters execution;
     };
 
     using continuation_t = int (*)(const char **);
-    int call(Arguments const &args, continuation_t forward) noexcept;
+    int call(ReportParameters const &args, continuation_t forward) noexcept;
 }

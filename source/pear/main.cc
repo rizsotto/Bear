@@ -23,15 +23,15 @@
 #include <cstdio>
 #include <cstring>
 
-#include "Arguments.h"
+#include "ReportParameters.h"
 #include "libpear_a/Result.h"
 #include "libpear_a/Environment.h"
 #include "libpear_a/Reporter.h"
 #include "libpear_a/SystemCalls.h"
 
 
-pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
-    pear::Arguments result = {nullptr, nullptr, nullptr, nullptr};
+pear::Result<pear::ReportParameters> parse(int argc, char *argv[]) noexcept {
+    pear::ReportParameters result;
 
     int opt;
     while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
@@ -49,7 +49,7 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
                 result.execution.search_path = optarg;
                 break;
             default: /* '?' */
-                return pear::Result<pear::Arguments>::failure(
+                return pear::Result<pear::ReportParameters>::failure(
                         std::runtime_error(
                                 "Usage: pear [OPTION]... -- command\n\n"
                                 "  -t <target url>       where to send execution reports\n"
@@ -60,7 +60,7 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
     }
 
     if (optind >= argc) {
-        return pear::Result<pear::Arguments>::failure(
+        return pear::Result<pear::ReportParameters>::failure(
                 std::runtime_error(
                         "Usage: pear [OPTION]... -- command\n"
                                 "Expected argument after options"));
@@ -68,11 +68,11 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
         // TODO: do validation!!!
         result.forward.wrapper = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
-        return pear::Result<pear::Arguments>::success(std::move(result));
+        return pear::Result<pear::ReportParameters>::success(std::move(result));
     }
 }
 
-pear::Result<pid_t> spawnp(const pear::ExecutionConfig &config,
+pear::Result<pid_t> spawnp(const pear::ReportParameters::ExecutionParameters &config,
                           const pear::EnvironmentPtr &environment) noexcept {
     // TODO: use other execution config parameters.
 
