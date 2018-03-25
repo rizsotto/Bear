@@ -23,32 +23,15 @@
 #include <cstdio>
 #include <cstring>
 
+#include "Arguments.h"
 #include "libpear_a/Result.h"
 #include "libpear_a/Environment.h"
 #include "libpear_a/Reporter.h"
 #include "libpear_a/SystemCalls.h"
 
 
-struct EarLibraryConfig {
-    char *wrapper;
-    char *library;
-    char *target;
-};
-
-struct ExecutionConfig {
-    const char **command;
-    char *method;
-    char *file;
-    char *search_path;
-};
-
-struct Arguments {
-    EarLibraryConfig forward;
-    ExecutionConfig execution;
-};
-
-pear::Result<Arguments> parse(int argc, char *argv[]) noexcept {
-    Arguments result = {nullptr, nullptr, nullptr, nullptr};
+pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
+    pear::Arguments result = {nullptr, nullptr, nullptr, nullptr};
 
     int opt;
     while ((opt = getopt(argc, argv, "t:l:m:f:s:")) != -1) {
@@ -69,31 +52,31 @@ pear::Result<Arguments> parse(int argc, char *argv[]) noexcept {
                 result.execution.search_path = optarg;
                 break;
             default: /* '?' */
-                return pear::Result<Arguments>::failure(
+                return pear::Result<pear::Arguments>::failure(
                         std::runtime_error(
                                 "Usage: pear [OPTION]... -- command\n\n"
-                                "  -t <target url>       where to send execution reports\n"
-                                "  -l <path to libear>   where to find the ear libray\n"
-                                "  -m <method>           what was the execution method\n"
-                                "  -f <file>             file parameter\n"
-                                "  -s <search_path>      search path parameter\n"));
+                                        "  -t <target url>       where to send execution reports\n"
+                                        "  -l <path to libear>   where to find the ear libray\n"
+                                        "  -m <method>           what was the execution method\n"
+                                        "  -f <file>             file parameter\n"
+                                        "  -s <search_path>      search path parameter\n"));
         }
     }
 
     if (optind >= argc) {
-        return pear::Result<Arguments>::failure(
+        return pear::Result<pear::Arguments>::failure(
                 std::runtime_error(
                         "Usage: pear [OPTION]... -- command\n"
-                        "Expected argument after options"));
+                                "Expected argument after options"));
     } else {
         // TODO: do validation!!!
         result.forward.wrapper = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
-        return pear::Result<Arguments>::success(std::move(result));
+        return pear::Result<pear::Arguments>::success(std::move(result));
     }
 }
 
-pear::Result<pid_t> spawn(const ExecutionConfig &config,
+pear::Result<pid_t> spawn(const pear::ExecutionConfig &config,
                           const pear::EnvironmentPtr &environment) noexcept {
     // TODO: use other execution config parameters.
 
