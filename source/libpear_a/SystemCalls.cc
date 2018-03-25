@@ -48,7 +48,7 @@ namespace {
 
 namespace pear {
 
-    Result<int> spawn(const char **argv, const char **envp) noexcept {
+    Result<int> spawnp(const char **argv, const char **envp) noexcept {
         pid_t child;
         if (0 != posix_spawnp(&child,
                              argv[0],

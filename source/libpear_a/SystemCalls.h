@@ -26,7 +26,7 @@
 
 namespace pear {
 
-    Result<pid_t> spawn(const char **argv, const char **envp) noexcept;
+    Result<pid_t> spawnp(const char **argv, const char **envp) noexcept;
 
     Result<int> wait_pid(pid_t pid) noexcept;
 

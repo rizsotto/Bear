@@ -55,11 +55,11 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
                 return pear::Result<pear::Arguments>::failure(
                         std::runtime_error(
                                 "Usage: pear [OPTION]... -- command\n\n"
-                                        "  -t <target url>       where to send execution reports\n"
-                                        "  -l <path to libear>   where to find the ear libray\n"
-                                        "  -m <method>           what was the execution method\n"
-                                        "  -f <file>             file parameter\n"
-                                        "  -s <search_path>      search path parameter\n"));
+                                "  -t <target url>       where to send execution reports\n"
+                                "  -l <path to libear>   where to find the ear libray\n"
+                                "  -m <method>           what was the execution method\n"
+                                "  -f <file>             file parameter\n"
+                                "  -s <search_path>      search path parameter\n"));
         }
     }
 
@@ -76,11 +76,11 @@ pear::Result<pear::Arguments> parse(int argc, char *argv[]) noexcept {
     }
 }
 
-pear::Result<pid_t> spawn(const pear::ExecutionConfig &config,
+pear::Result<pid_t> spawnp(const pear::ExecutionConfig &config,
                           const pear::EnvironmentPtr &environment) noexcept {
     // TODO: use other execution config parameters.
 
-    return pear::spawn(config.command, environment->as_array());
+    return pear::spawnp(config.command, environment->as_array());
 }
 
 void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
@@ -115,7 +115,7 @@ int main(int argc, char *argv[], char *envp[]) {
                         .build();
                 auto reporter = pear::Reporter::tempfile(state.forward.target);
 
-                pear::Result<pid_t> child = spawn(state.execution, environment);
+                pear::Result<pid_t> child = spawnp(state.execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
                     report_start(pid, state.execution.command, reporter);
                     pear::Result<int> status = pear::wait_pid(pid);
