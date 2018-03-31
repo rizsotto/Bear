@@ -23,24 +23,24 @@
 #include <cstdio>
 #include <cstring>
 
-#include "libpear_a/ReportParameters.h"
+#include "libpear_a/Parameters.h"
 #include "libpear_a/Result.h"
 #include "libpear_a/Environment.h"
 #include "libpear_a/Reporter.h"
 #include "libpear_a/SystemCalls.h"
 
 
-pear::Result<pear::ReportParameters> parse(int argc, char *argv[]) noexcept {
-    pear::ReportParameters result;
+pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
+    pear::Parameters result;
 
     int opt;
     while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
         switch (opt) {
             case 't':
-                result.forward.target = optarg;
+                result.target.destination = optarg;
                 break;
             case 'l':
-                result.forward.library = optarg;
+                result.library = optarg;
                 break;
             case 'f':
                 result.execution.file = optarg;
@@ -49,7 +49,7 @@ pear::Result<pear::ReportParameters> parse(int argc, char *argv[]) noexcept {
                 result.execution.search_path = optarg;
                 break;
             default: /* '?' */
-                return pear::Result<pear::ReportParameters>::failure(
+                return pear::Result<pear::Parameters>::failure(
                         std::runtime_error(
                                 "Usage: pear [OPTION]... -- command\n\n"
                                 "  -t <target url>       where to send execution reports\n"
@@ -60,20 +60,20 @@ pear::Result<pear::ReportParameters> parse(int argc, char *argv[]) noexcept {
     }
 
     if (optind >= argc) {
-        return pear::Result<pear::ReportParameters>::failure(
+        return pear::Result<pear::Parameters>::failure(
                 std::runtime_error(
                         "Usage: pear [OPTION]... -- command\n"
                                 "Expected argument after options"));
     } else {
         // TODO: do validation!!!
-        result.forward.wrapper = argv[0];
+        result.wrapper = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
-        return pear::Result<pear::ReportParameters>::success(std::move(result));
+        return pear::Result<pear::Parameters>::success(std::move(result));
     }
 }
 
-pear::Result<pid_t> spawnp(const pear::ReportParameters::ExecutionParameters &config,
-                          const pear::EnvironmentPtr &environment) noexcept {
+pear::Result<pid_t> spawnp(const pear::Parameters::Execution &config,
+                           const pear::EnvironmentPtr &environment) noexcept {
     // TODO: use other execution config parameters.
 
     return pear::spawnp(config.command, environment->as_array());
@@ -105,11 +105,11 @@ int main(int argc, char *argv[], char *envp[]) {
     return parse(argc, argv)
             .bind<int>([&envp](auto &state) {
                 auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
-                        .add_library(state.forward.library)
-                        .add_target(state.forward.target)
-                        .add_wrapper(state.forward.wrapper)
+                        .add_target(state.target.destination)
+                        .add_library(state.library)
+                        .add_wrapper(state.wrapper)
                         .build();
-                auto reporter = pear::Reporter::tempfile(state.forward.target);
+                auto reporter = pear::Reporter::tempfile(state.target.destination);
 
                 pear::Result<pid_t> child = spawnp(state.execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
