@@ -38,22 +38,9 @@ namespace ear {
     template<typename Resolver>
     class Executor {
     public:
-        Executor() noexcept = delete;
-
         explicit Executor(const ::ear::Environment *state) noexcept
                 : state_(state) {}
 
-        Executor(const Executor &) = delete;
-
-        Executor(Executor &&) noexcept = delete;
-
-        ~Executor() noexcept = default;
-
-        Executor &operator=(const Executor &) = delete;
-
-        Executor &operator=(Executor &&) noexcept = delete;
-
-    public:
 #ifdef HAVE_EXECVE
         int execve(const char *path, char *const argv[], char *const envp[]) const noexcept {
             auto fp = Resolver::execve();
@@ -274,6 +261,19 @@ namespace ear {
                                              const_cast<char *const *>(dst), envp);
         }
 #endif
+
+    public:
+        Executor() noexcept = delete;
+
+        Executor(const Executor &) = delete;
+
+        Executor(Executor &&) noexcept = delete;
+
+        ~Executor() noexcept = default;
+
+        Executor &operator=(const Executor &) = delete;
+
+        Executor &operator=(Executor &&) noexcept = delete;
 
     private:
         const ::ear::Environment *const state_{};
