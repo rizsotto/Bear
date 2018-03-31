@@ -26,14 +26,10 @@
 #endif
 
 #include "Array.h"
+#include "Report.h"
 #include "Environment.h"
 
 namespace ear {
-
-    constexpr char target_flag[] = "-t";
-    constexpr char library_flag[] = "-l";
-    constexpr char file_flag[] = "-f";
-    constexpr char search_flag[] = "-s";
 
     template<typename Resolver>
     class Executor {
@@ -55,7 +51,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -81,7 +77,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -105,7 +101,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -132,7 +128,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -159,7 +155,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -188,7 +184,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -220,7 +216,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
@@ -248,7 +244,7 @@ namespace ear {
 
             const char **it = dst;
             *it++ = state_->reporter();
-            *it++ = target_flag;
+            *it++ = destination_flag;
             *it++ = state_->target();
             *it++ = library_flag;
             *it++ = state_->library();
