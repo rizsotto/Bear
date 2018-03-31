@@ -54,7 +54,7 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -63,7 +63,7 @@ namespace ear {
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
+            return fp(state_->reporter(), const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -80,7 +80,7 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -89,7 +89,7 @@ namespace ear {
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(state_->wrapper(), const_cast<char *const *>(dst));
+            return fp(state_->reporter(), const_cast<char *const *>(dst));
         }
 #endif
 
@@ -104,7 +104,7 @@ namespace ear {
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -116,7 +116,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
-            return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
+            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -131,7 +131,7 @@ namespace ear {
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -143,7 +143,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
-            return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst));
+            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst));
         }
 #endif
 
@@ -158,7 +158,7 @@ namespace ear {
             const char *dst[argv_length + 11];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -172,7 +172,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
-            return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst));
+            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst));
         }
 #endif
 
@@ -187,7 +187,7 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -197,7 +197,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
-            return (fp == nullptr) ? -1 : fp(state_->wrapper(), const_cast<char *const *>(dst), envp);
+            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -219,7 +219,7 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -228,7 +228,7 @@ namespace ear {
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(pid, state_->wrapper(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+            return fp(pid, state_->reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -247,7 +247,7 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->wrapper();
+            *it++ = state_->reporter();
             *it++ = target_flag;
             *it++ = state_->target();
             *it++ = library_flag;
@@ -257,7 +257,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::posix_spawn();
-            return (fp == nullptr) ? -1 : fp(pid, state_->wrapper(), file_actions, attrp,
+            return (fp == nullptr) ? -1 : fp(pid, state_->reporter(), file_actions, attrp,
                                              const_cast<char *const *>(dst), envp);
         }
 #endif

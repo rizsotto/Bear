@@ -45,9 +45,9 @@ namespace {
     TEST(capture_env, capture_correct_env_values) {
         char buffer[sizeof(::ear::Environment)];
         const char *input[] = {
-                "BEAR_TARGET=/tmp/pear.random",
-                "BEAR_LIBRARY=/usr/libexec/libear.so",
-                "BEAR_WRAPPER=/usr/bin/pear",
+                "EAR_TARGET=/tmp/pear.random",
+                "EAR_LIBRARY=/usr/libexec/libear.so",
+                "EAR_REPORTER=/usr/bin/pear",
                 nullptr
         };
 
@@ -56,7 +56,7 @@ namespace {
         EXPECT_EQ(reinterpret_cast<::ear::Environment*>(buffer), result);
         EXPECT_STREQ("/tmp/pear.random", result->target());
         EXPECT_STREQ("/usr/libexec/libear.so", result->library());
-        EXPECT_STREQ("/usr/bin/pear", result->wrapper());
+        EXPECT_STREQ("/usr/bin/pear", result->reporter());
     }
 
 }

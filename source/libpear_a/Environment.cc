@@ -108,13 +108,13 @@ namespace pear {
 
     Environment::Builder::Builder(const char **environment) noexcept
             : environ_(copy(environment))
-            , wrapper_()
+            , reporter_()
             , target_()
             , library_()
     { }
 
-    Environment::Builder &Environment::Builder::add_wrapper(const char *wrapper) noexcept {
-        wrapper_ = (wrapper != nullptr) ? std::string(wrapper) : std::string();
+    Environment::Builder &Environment::Builder::add_reporter(const char *reporter) noexcept {
+        reporter_ = (reporter != nullptr) ? std::string(reporter) : std::string();
         return *this;
     }
 
@@ -139,12 +139,12 @@ namespace pear {
                                 auto key = std::get<0>(key_value);
                                 return key != ::ear::target_env_key
                                     && key != ::ear::library_env_key
-                                    && key != ::ear::wrapper_env_key
+                                    && key != ::ear::reporter_env_key
                                     && !loader_related(key);
                             });
         // overwrite the pear ones
-        if (!wrapper_.empty()) {
-            result.emplace_back(env_key_value(::ear::wrapper_env_key, wrapper_));
+        if (!reporter_.empty()) {
+            result.emplace_back(env_key_value(::ear::reporter_env_key, reporter_));
         }
         if (!target_.empty()) {
             result.emplace_back(env_key_value(::ear::target_env_key, target_));

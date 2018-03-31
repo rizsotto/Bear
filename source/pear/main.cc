@@ -66,7 +66,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
                                 "Expected argument after options"));
     } else {
         // TODO: do validation!!!
-        result.wrapper = argv[0];
+        result.reporter = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
         return pear::Result<pear::Parameters>::success(std::move(result));
     }
@@ -107,7 +107,7 @@ int main(int argc, char *argv[], char *envp[]) {
                 auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
                         .add_target(state.target.destination)
                         .add_library(state.library)
-                        .add_wrapper(state.wrapper)
+                        .add_reporter(state.reporter)
                         .build();
                 auto reporter = pear::Reporter::tempfile(state.target.destination);
 

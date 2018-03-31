@@ -18,7 +18,7 @@ namespace {
 
     constexpr char target_str[] = "/tmp/pear.random";
     constexpr char library_str[] = "/usr/libexec/libear.so";
-    constexpr char wrapper_str[] = "/usr/bin/pear";
+    constexpr char reporter_str[] = "/usr/bin/pear";
 
     constexpr int failure = -1;
     constexpr int success = 0;
@@ -28,7 +28,7 @@ namespace {
             , public ::testing::Test {
     public:
         ExecutorTest()
-                : ::ear::Environment(target_str, library_str, wrapper_str)
+                : ::ear::Environment(target_str, library_str, reporter_str)
         {}
     };
 
@@ -66,8 +66,8 @@ namespace {
         struct Validator {
             static auto execve() {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
-                    EXPECT_STREQ(wrapper_str, path);
-                    EXPECT_STREQ(wrapper_str, argv[0]);
+                    EXPECT_STREQ(reporter_str, path);
+                    EXPECT_STREQ(reporter_str, argv[0]);
                     EXPECT_STREQ("-t", argv[1]);
                     EXPECT_STREQ(target_str, argv[2]);
                     EXPECT_STREQ("-l", argv[3]);

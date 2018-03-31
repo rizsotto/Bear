@@ -35,7 +35,7 @@ namespace pear {
 
         Target target;
         Execution execution;
-        const char *wrapper;
+        const char *reporter;
         const char *library;
     };
 

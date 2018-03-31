@@ -34,9 +34,9 @@ extern "C" char **environ;
 
 namespace ear {
 
-    constexpr char target_env_key[] = "BEAR_TARGET";
-    constexpr char library_env_key[] = "BEAR_LIBRARY";
-    constexpr char wrapper_env_key[] = "BEAR_WRAPPER";
+    constexpr char target_env_key[] = "EAR_TARGET";
+    constexpr char library_env_key[] = "EAR_LIBRARY";
+    constexpr char reporter_env_key[] = "EAR_REPORTER";
 
     class Environment {
     public:
@@ -46,7 +46,7 @@ namespace ear {
 
         ~Environment() noexcept = default;
 
-        const char *wrapper() const noexcept;
+        const char *reporter() const noexcept;
 
         const char *target() const noexcept;
 
@@ -66,14 +66,14 @@ namespace ear {
     protected:
         Environment(const char *target,
                     const char *library,
-                    const char *wrapper) noexcept;
+                    const char *reporter) noexcept;
 
         static const char *get_env(const char **, const char *) noexcept;
 
     private:
-        ::ear::String<1024> target_;
+        ::ear::String<4096> target_;
         ::ear::String<8192> library_;
-        ::ear::String<8192> wrapper_;
+        ::ear::String<8192> reporter_;
     };
 
 
@@ -94,25 +94,25 @@ namespace ear {
 
         auto target_env = Environment::get_env(current, ::ear::target_env_key);
         auto libray_env = Environment::get_env(current, ::ear::library_env_key);
-        auto wrapper_env = Environment::get_env(current, ::ear::wrapper_env_key);
-        if (target_env == nullptr || libray_env == nullptr || wrapper_env == nullptr)
+        auto reporter_env = Environment::get_env(current, ::ear::reporter_env_key);
+        if (target_env == nullptr || libray_env == nullptr || reporter_env == nullptr)
             return nullptr;
 
-        return new(place) ::ear::Environment(target_env, libray_env, wrapper_env);
+        return new(place) ::ear::Environment(target_env, libray_env, reporter_env);
     }
 
     inline
     Environment::Environment(const char *target,
                 const char *library,
-                const char *wrapper) noexcept
+                const char *reporter) noexcept
             : target_(target)
             , library_(library)
-            , wrapper_(wrapper) {
+            , reporter_(reporter) {
     }
 
     inline
-    const char *Environment::wrapper() const noexcept {
-        return wrapper_.begin();
+    const char *Environment::reporter() const noexcept {
+        return reporter_.begin();
     }
 
     inline

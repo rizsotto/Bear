@@ -50,7 +50,7 @@ namespace pear {
 
         ~Builder() noexcept = default;
 
-        Builder &add_wrapper(const char *wrapper) noexcept;
+        Builder &add_reporter(const char *reporter) noexcept;
 
         Builder &add_target(const char *target) noexcept;
 
@@ -69,7 +69,7 @@ namespace pear {
 
     private:
         std::vector<std::string> environ_;
-        std::string wrapper_;
+        std::string reporter_;
         std::string target_;
         std::string library_;
     };
