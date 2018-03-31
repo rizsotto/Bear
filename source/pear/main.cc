@@ -23,7 +23,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "ReportParameters.h"
+#include "libpear_a/ReportParameters.h"
 #include "libpear_a/Result.h"
 #include "libpear_a/Environment.h"
 #include "libpear_a/Reporter.h"
