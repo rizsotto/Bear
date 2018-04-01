@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <functional>
+
 namespace ear {
 
     constexpr char library_flag[] = "-l";
@@ -27,21 +29,70 @@ namespace ear {
     constexpr char file_flag[] = "-f";
     constexpr char search_flag[] = "-s";
 
-    struct Report {
-        struct Parameters {
+    class Serializable {
+    public:
+        virtual ~Serializable() noexcept = default;
+
+        virtual size_t estimate() const noexcept = 0;
+
+        virtual const char **copy(const char **dst) const noexcept = 0;
+
+    public:
+        Serializable() noexcept = default;
+
+        Serializable(Serializable const &) = delete;
+
+        Serializable(Serializable &&) noexcept = delete;
+
+        Serializable &operator=(Serializable const &) = delete;
+
+        Serializable &operator=(Serializable &&) noexcept = delete;
+    };
+
+    class Serializer {
+    public:
+        explicit Serializer(Serializable const &) noexcept;
+
+        int forward(std::function<int (const char **)>) const noexcept;
+
+    public:
+        Serializer() noexcept = delete;
+
+        Serializer(Serializer const &) = delete;
+
+        Serializer(Serializer &&) noexcept = delete;
+
+        ~Serializer() noexcept = default;
+
+        Serializer &operator=(Serializer const &) = delete;
+
+        Serializer &operator=(Serializer &&) noexcept = delete;
+    };
+
+    struct Report : public Serializable {
+        struct Library : public Serializable {
             const char *reporter;
             const char *library;
             const char *destination;
             bool verbose;
+
+            size_t estimate() const noexcept override;
+            const char **copy(const char **dst) const noexcept override;
         };
-        struct Execution {
+        struct Execution : public Serializable {
             const char **command;
             const char *file;
             const char *search_path;
+
+            size_t estimate() const noexcept override;
+            const char **copy(const char **dst) const noexcept override;
         };
 
-        Parameters parameters;
+        Library library;
         Execution execution;
+
+        size_t estimate() const noexcept override;
+        const char **copy(const char **dst) const noexcept override;
     };
 
 }
