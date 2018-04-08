@@ -46,20 +46,22 @@ namespace ear {
             if (state_ == nullptr)
                 return fp(path, argv, envp);
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(state_->reporter(), const_cast<char *const *>(dst), envp);
+            return fp(parameters.reporter, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -72,20 +74,22 @@ namespace ear {
             if (state_ == nullptr)
                 return fp(path, argv);
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(state_->reporter(), const_cast<char *const *>(dst));
+            return fp(parameters.reporter, const_cast<char *const *>(dst));
         }
 #endif
 
@@ -96,15 +100,17 @@ namespace ear {
                 return (fp == nullptr) ? -1 : fp(file, argv, envp);
             }
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = file_flag;
             *it++ = file;
             *it++ = "--";
@@ -112,7 +118,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
-            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst), envp);
+            return (fp == nullptr) ? -1 : fp(parameters.reporter, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -123,15 +129,17 @@ namespace ear {
                 return (fp == nullptr) ? -1 : fp(file, argv);
             }
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = file_flag;
             *it++ = file;
             *it++ = "--";
@@ -139,7 +147,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
-            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst));
+            return (fp == nullptr) ? -1 : fp(parameters.reporter, const_cast<char *const *>(dst));
         }
 #endif
 
@@ -150,15 +158,17 @@ namespace ear {
                 return (fp == nullptr) ? -1 : fp(file, search_path, argv);
             }
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 11];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = file_flag;
             *it++ = file;
             *it++ = search_flag;
@@ -168,7 +178,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
-            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst));
+            return (fp == nullptr) ? -1 : fp(parameters.reporter, const_cast<char *const *>(dst));
         }
 #endif
 
@@ -179,21 +189,23 @@ namespace ear {
                 return (fp == nullptr) ? -1 : fp(path, argv, envp);
             }
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
-            return (fp == nullptr) ? -1 : fp(state_->reporter(), const_cast<char *const *>(dst), envp);
+            return (fp == nullptr) ? -1 : fp(parameters.reporter, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -211,20 +223,22 @@ namespace ear {
             if (state_ == nullptr)
                 return fp(pid, path, file_actions, attrp, argv, envp);
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(pid, state_->reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+            return fp(pid, parameters.reporter, file_actions, attrp, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -239,21 +253,23 @@ namespace ear {
                 return (fp == nullptr) ? -1 : fp(pid, file, file_actions, attrp, argv, envp);
             }
 
+            auto parameters = state_->get_input();
+
             const size_t argv_length = ::ear::array::length(argv);
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = state_->reporter();
+            *it++ = parameters.reporter;
             *it++ = destination_flag;
-            *it++ = state_->target();
+            *it++ = parameters.destination;
             *it++ = library_flag;
-            *it++ = state_->library();
+            *it++ = parameters.library;
             *it++ = "--";
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::posix_spawn();
-            return (fp == nullptr) ? -1 : fp(pid, state_->reporter(), file_actions, attrp,
+            return (fp == nullptr) ? -1 : fp(pid, parameters.reporter, file_actions, attrp,
                                              const_cast<char *const *>(dst), envp);
         }
 #endif

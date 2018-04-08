@@ -28,7 +28,7 @@ namespace {
             , public ::testing::Test {
     public:
         ExecutorTest()
-                : ::ear::State(target_str, library_str, reporter_str)
+                : ::ear::State(target_str, library_str, reporter_str, false)
         {}
     };
 

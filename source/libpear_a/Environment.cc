@@ -137,7 +137,7 @@ namespace pear {
                             [](auto &str) {
                                 auto key_value = env_key_value(str);
                                 auto key = std::get<0>(key_value);
-                                return key != ::ear::target_env_key
+                                return key != ::ear::destination_env_key
                                     && key != ::ear::library_env_key
                                     && key != ::ear::reporter_env_key
                                     && !loader_related(key);
@@ -147,7 +147,7 @@ namespace pear {
             result.emplace_back(env_key_value(::ear::reporter_env_key, reporter_));
         }
         if (!target_.empty()) {
-            result.emplace_back(env_key_value(::ear::target_env_key, target_));
+            result.emplace_back(env_key_value(::ear::destination_env_key, target_));
         }
         if (!library_.empty()) {
             result.emplace_back(env_key_value(::ear::library_env_key, library_));

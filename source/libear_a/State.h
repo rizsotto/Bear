@@ -37,22 +37,14 @@ namespace ear {
 
     class State {
     public:
-        static const char **current() noexcept;
-
-        static State* create(const char**, void *) noexcept;
-
         static State* capture(void *) noexcept;
 
-        ~State() noexcept = default;
-
-        const char *reporter() const noexcept;
-
-        const char *target() const noexcept;
-
-        const char *library() const noexcept;
+        Input get_input() const noexcept;
 
     public:
         State() noexcept = delete;
+
+        ~State() noexcept = default;
 
         State(const State &) = delete;
 
@@ -64,8 +56,13 @@ namespace ear {
 
     protected:
         State(const char *target,
-                    const char *library,
-                    const char *reporter) noexcept;
+              const char *library,
+              const char *reporter,
+              bool verbose) noexcept;
+
+        static const char **current() noexcept;
+
+        static State* create(const char**, void *) noexcept;
 
         static const char *get_env(const char **, const char *) noexcept;
 
@@ -73,6 +70,7 @@ namespace ear {
         ::ear::String<4096> target_;
         ::ear::String<8192> library_;
         ::ear::String<8192> reporter_;
+        bool verbose_;
     };
 
 
@@ -91,13 +89,15 @@ namespace ear {
         if (current == nullptr)
             return nullptr;
 
-        auto target_env = State::get_env(current, ::ear::target_env_key);
+        auto target_env = State::get_env(current, ::ear::destination_env_key);
         auto libray_env = State::get_env(current, ::ear::library_env_key);
         auto reporter_env = State::get_env(current, ::ear::reporter_env_key);
+        auto verbose_env = State::get_env(current, ::ear::verbose_env_key);
         if (target_env == nullptr || libray_env == nullptr || reporter_env == nullptr)
             return nullptr;
 
-        return new(place) ::ear::State(target_env, libray_env, reporter_env);
+        return new(place) ::ear::State(target_env, libray_env, reporter_env,
+                                       verbose_env != nullptr);
     }
 
     inline
@@ -109,25 +109,22 @@ namespace ear {
     inline
     State::State(const char *target,
                 const char *library,
-                const char *reporter) noexcept
+                const char *reporter,
+                bool verbose) noexcept
             : target_(target)
             , library_(library)
-            , reporter_(reporter) {
+            , reporter_(reporter)
+            , verbose_(verbose) {
     }
 
     inline
-    const char *State::reporter() const noexcept {
-        return reporter_.begin();
-    }
-
-    inline
-    const char *State::target() const noexcept {
-        return target_.begin();
-    }
-
-    inline
-    const char *State::library() const noexcept {
-        return library_.begin();
+    Input State::get_input() const noexcept {
+        return Input {
+                reporter_.begin(),
+                library_.begin(),
+                target_.begin(),
+                verbose_
+        };
     }
 
     inline
