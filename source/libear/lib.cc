@@ -34,7 +34,7 @@
 #include "libear_a/Array.h"
 #include "libear_a/DynamicLinker.h"
 #include "libear_a/String.h"
-#include "libear_a/Environment.h"
+#include "libear_a/Catcher.h"
 #include "libear_a/Executor.h"
 
 
@@ -43,8 +43,8 @@ namespace {
 
     std::atomic<bool> loaded = false;
 
-    char placeholder[sizeof(::ear::Environment)];
-    ::ear::Environment *state_ptr = nullptr;
+    char placeholder[sizeof(::ear::Catcher)];
+    ::ear::Catcher *state_ptr = nullptr;
 }
 
 /**
@@ -58,8 +58,8 @@ extern "C" void on_load() {
     if (loaded.exchange(true))
         return;
 
-    auto current = ::ear::Environment::current();
-    state_ptr = ::ear::Environment::create(current, placeholder);
+    auto current = ::ear::Catcher::current();
+    state_ptr = ::ear::Catcher::create(current, placeholder);
 }
 
 /**
@@ -74,7 +74,7 @@ extern "C" void on_unload() {
         return;
 
     if (state_ptr != nullptr) {
-        state_ptr->~Environment();
+        state_ptr->~Catcher();
         state_ptr = nullptr;
     }
 }

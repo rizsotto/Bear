@@ -2,7 +2,7 @@ add_library(ear SHARED
         lib.cc
         ../libear_a/Array.h
         ../libear_a/String.h
-        ../libear_a/Environment.h
+        ../libear_a/Catcher.h
         ../libear_a/DynamicLinker.h
         ../libear_a/Executor.h
         ../libear_a/Report.h

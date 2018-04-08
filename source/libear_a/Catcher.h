@@ -38,13 +38,13 @@ namespace ear {
     constexpr char library_env_key[] = "EAR_LIBRARY";
     constexpr char reporter_env_key[] = "EAR_REPORTER";
 
-    class Environment {
+    class Catcher {
     public:
         static const char **current() noexcept;
 
-        static Environment* create(const char**, void *) noexcept;
+        static Catcher* create(const char**, void *) noexcept;
 
-        ~Environment() noexcept = default;
+        ~Catcher() noexcept = default;
 
         const char *reporter() const noexcept;
 
@@ -53,18 +53,18 @@ namespace ear {
         const char *library() const noexcept;
 
     public:
-        Environment() noexcept = delete;
+        Catcher() noexcept = delete;
 
-        Environment(const Environment &) = delete;
+        Catcher(const Catcher &) = delete;
 
-        Environment(Environment &&) noexcept = delete;
+        Catcher(Catcher &&) noexcept = delete;
 
-        Environment &operator=(const Environment &) = delete;
+        Catcher &operator=(const Catcher &) = delete;
 
-        Environment &operator=(Environment &&) noexcept = delete;
+        Catcher &operator=(Catcher &&) noexcept = delete;
 
     protected:
-        Environment(const char *target,
+        Catcher(const char *target,
                     const char *library,
                     const char *reporter) noexcept;
 
@@ -78,7 +78,7 @@ namespace ear {
 
 
     inline
-    const char **Environment::current() noexcept {
+    const char **Catcher::current() noexcept {
 #ifdef HAVE_NSGETENVIRON
         return const_cast<const char **>(*_NSGetEnviron());
 #else
@@ -87,22 +87,22 @@ namespace ear {
     }
 
     inline
-    Environment* Environment::create(const char** current, void* place) noexcept {
+    Catcher* Catcher::create(const char** current, void* place) noexcept {
 
         if (current == nullptr)
             return nullptr;
 
-        auto target_env = Environment::get_env(current, ::ear::target_env_key);
-        auto libray_env = Environment::get_env(current, ::ear::library_env_key);
-        auto reporter_env = Environment::get_env(current, ::ear::reporter_env_key);
+        auto target_env = Catcher::get_env(current, ::ear::target_env_key);
+        auto libray_env = Catcher::get_env(current, ::ear::library_env_key);
+        auto reporter_env = Catcher::get_env(current, ::ear::reporter_env_key);
         if (target_env == nullptr || libray_env == nullptr || reporter_env == nullptr)
             return nullptr;
 
-        return new(place) ::ear::Environment(target_env, libray_env, reporter_env);
+        return new(place) ::ear::Catcher(target_env, libray_env, reporter_env);
     }
 
     inline
-    Environment::Environment(const char *target,
+    Catcher::Catcher(const char *target,
                 const char *library,
                 const char *reporter) noexcept
             : target_(target)
@@ -111,22 +111,22 @@ namespace ear {
     }
 
     inline
-    const char *Environment::reporter() const noexcept {
+    const char *Catcher::reporter() const noexcept {
         return reporter_.begin();
     }
 
     inline
-    const char *Environment::target() const noexcept {
+    const char *Catcher::target() const noexcept {
         return target_.begin();
     }
 
     inline
-    const char *Environment::library() const noexcept {
+    const char *Catcher::library() const noexcept {
         return library_.begin();
     }
 
     inline
-    const char *Environment::get_env(const char **envp, const char *key) noexcept {
+    const char *Catcher::get_env(const char **envp, const char *key) noexcept {
         const size_t key_size = ::ear::string::length(key);
 
         for (const char **it = envp; *it != nullptr; ++it) {

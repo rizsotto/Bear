@@ -27,14 +27,14 @@
 
 #include "Array.h"
 #include "Report.h"
-#include "Environment.h"
+#include "Catcher.h"
 
 namespace ear {
 
     template<typename Resolver>
     class Executor {
     public:
-        explicit Executor(const ::ear::Environment *state) noexcept
+        explicit Executor(const ::ear::Catcher *state) noexcept
                 : state_(state) {}
 
 #ifdef HAVE_EXECVE
@@ -272,7 +272,7 @@ namespace ear {
         Executor &operator=(Executor &&) noexcept = delete;
 
     private:
-        const ::ear::Environment *const state_{};
+        const ::ear::Catcher *const state_{};
     };
 
 }
