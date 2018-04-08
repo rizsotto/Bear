@@ -25,6 +25,7 @@
 #include <algorithm>
 
 #include "libear_a/String.h"
+#include "libear_a/Input.h"
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
@@ -33,10 +34,6 @@ extern "C" char **environ;
 #endif
 
 namespace ear {
-
-    constexpr char target_env_key[] = "EAR_TARGET";
-    constexpr char library_env_key[] = "EAR_LIBRARY";
-    constexpr char reporter_env_key[] = "EAR_REPORTER";
 
     class Catcher {
     public:

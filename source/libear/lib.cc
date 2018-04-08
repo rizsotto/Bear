@@ -34,6 +34,7 @@
 #include "libear_a/Array.h"
 #include "libear_a/DynamicLinker.h"
 #include "libear_a/String.h"
+#include "libear_a/Input.h"
 #include "libear_a/Catcher.h"
 #include "libear_a/Executor.h"
 

@@ -21,18 +21,21 @@
 
 #include <functional>
 
-#include "libear_a/Input.h"
-
 namespace ear {
 
-    constexpr char file_flag[] = "-f";
-    constexpr char search_flag[] = "-s";
+    constexpr char library_flag[] = "-l";
+    constexpr char destination_flag[] = "-t";
+    constexpr char verbose_flag[] = "-v";
 
-    struct Execution {
-        const char **command;
-        const char *file;
-        const char *search_path;
+    constexpr char target_env_key[] = "EAR_TARGET";
+    constexpr char library_env_key[] = "EAR_LIBRARY";
+    constexpr char reporter_env_key[] = "EAR_REPORTER";
+
+    struct Input {
+        const char *reporter;
+        const char *library;
+        const char *destination;
+        bool verbose;
     };
 
-    int serialize(Input const &, Execution const &, std::function<int (const char **)> forward) noexcept;
 }
