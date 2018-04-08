@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../libear_a/Catcher.h"
+#include "libear_a/State.h"
 #include "../libear_a/Executor.h"
 
 namespace {
@@ -24,11 +24,11 @@ namespace {
     constexpr int success = 0;
 
     class ExecutorTest
-            : public ::ear::Catcher
+            : public ::ear::State
             , public ::testing::Test {
     public:
         ExecutorTest()
-                : ::ear::Catcher(target_str, library_str, reporter_str)
+                : ::ear::State(target_str, library_str, reporter_str)
         {}
     };
 

@@ -3,7 +3,7 @@ add_library(ear SHARED
         ../libear_a/Array.h
         ../libear_a/String.h
         ../libear_a/Input.h
-        ../libear_a/Catcher.h
+        ../libear_a/State.h
         ../libear_a/DynamicLinker.h
         ../libear_a/Executor.h
         ../libear_a/Report.h

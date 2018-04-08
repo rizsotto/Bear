@@ -35,7 +35,7 @@
 #include "libear_a/DynamicLinker.h"
 #include "libear_a/String.h"
 #include "libear_a/Input.h"
-#include "libear_a/Catcher.h"
+#include "libear_a/State.h"
 #include "libear_a/Executor.h"
 
 
@@ -44,8 +44,8 @@ namespace {
 
     std::atomic<bool> loaded = false;
 
-    char placeholder[sizeof(::ear::Catcher)];
-    ::ear::Catcher *state_ptr = nullptr;
+    char placeholder[sizeof(::ear::State)];
+    ::ear::State *state_ptr = nullptr;
 }
 
 /**
@@ -59,8 +59,7 @@ extern "C" void on_load() {
     if (loaded.exchange(true))
         return;
 
-    auto current = ::ear::Catcher::current();
-    state_ptr = ::ear::Catcher::create(current, placeholder);
+    state_ptr = ::ear::State::capture(placeholder);
 }
 
 /**
@@ -75,7 +74,7 @@ extern "C" void on_unload() {
         return;
 
     if (state_ptr != nullptr) {
-        state_ptr->~Catcher();
+        state_ptr->~State();
         state_ptr = nullptr;
     }
 }
