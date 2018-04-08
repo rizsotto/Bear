@@ -29,70 +29,18 @@ namespace ear {
     constexpr char file_flag[] = "-f";
     constexpr char search_flag[] = "-s";
 
-    class Serializable {
-    public:
-        virtual ~Serializable() noexcept = default;
-
-        virtual size_t estimate() const noexcept = 0;
-
-        virtual const char **copy(const char **dst) const noexcept = 0;
-
-    public:
-        Serializable() noexcept = default;
-
-        Serializable(Serializable const &) = delete;
-
-        Serializable(Serializable &&) noexcept = delete;
-
-        Serializable &operator=(Serializable const &) = delete;
-
-        Serializable &operator=(Serializable &&) noexcept = delete;
+    struct Input {
+        const char *reporter;
+        const char *library;
+        const char *destination;
+        bool verbose;
     };
 
-    class Serializer {
-    public:
-        explicit Serializer(Serializable const &) noexcept;
-
-        int forward(std::function<int (const char **)>) const noexcept;
-
-    public:
-        Serializer() noexcept = delete;
-
-        Serializer(Serializer const &) = delete;
-
-        Serializer(Serializer &&) noexcept = delete;
-
-        ~Serializer() noexcept = default;
-
-        Serializer &operator=(Serializer const &) = delete;
-
-        Serializer &operator=(Serializer &&) noexcept = delete;
+    struct Execution {
+        const char **command;
+        const char *file;
+        const char *search_path;
     };
 
-    struct Report : public Serializable {
-        struct Library : public Serializable {
-            const char *reporter;
-            const char *library;
-            const char *destination;
-            bool verbose;
-
-            size_t estimate() const noexcept override;
-            const char **copy(const char **dst) const noexcept override;
-        };
-        struct Execution : public Serializable {
-            const char **command;
-            const char *file;
-            const char *search_path;
-
-            size_t estimate() const noexcept override;
-            const char **copy(const char **dst) const noexcept override;
-        };
-
-        Library library;
-        Execution execution;
-
-        size_t estimate() const noexcept override;
-        const char **copy(const char **dst) const noexcept override;
-    };
-
+    int serialize(Input const &, Execution const &, std::function<int (const char **)> forward) noexcept;
 }
