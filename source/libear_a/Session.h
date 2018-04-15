@@ -23,14 +23,16 @@
 
 namespace ear {
 
-    constexpr char library_flag[]        = "-l";
     constexpr char destination_flag[]    = "-t";
     constexpr char verbose_flag[]        = "-v";
+    constexpr char library_flag[]        = "-l";
 
     constexpr char reporter_env_key[]    = "EAR_REPORTER";
-    constexpr char library_env_key[]     = "EAR_LIBRARY";
     constexpr char destination_env_key[] = "EAR_DESTINATION";
     constexpr char verbose_env_key[]     = "EAR_VERBOSE";
+    constexpr char library_env_key[]     = "EAR_LIBRARY";
+    constexpr char cc_env_key[]          = "EAR_CC";
+    constexpr char cxx_env_key[]         = "EAR_CXX";
 
     struct Session {
         char const *reporter;

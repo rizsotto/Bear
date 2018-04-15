@@ -6,7 +6,7 @@ add_library(ear SHARED
         ../libear_a/State.h
         ../libear_a/DynamicLinker.h
         ../libear_a/Executor.h
-        ../libear_a/Report.h
+        ../libear_a/Execution.h
 )
 target_link_libraries(ear ${CMAKE_DL_LIBS})
 set_target_properties(ear PROPERTIES LINKER_LANGUAGE C)
