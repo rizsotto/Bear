@@ -32,19 +32,19 @@ namespace ear {
     constexpr char destination_env_key[] = "EAR_DESTINATION";
     constexpr char verbose_env_key[]     = "EAR_VERBOSE";
 
-    struct Input {
+    struct Session {
         char const *reporter;
         char const *destination;
         bool verbose;
     };
 
-    struct LibraryInput {
-        Input reporter;
+    struct LibrarySession {
+        Session session;
         char const *library;
     };
 
-    struct WrapperInput {
-        Input reporter;
+    struct WrapperSession {
+        Session session;
         char const *cc;
         char const *cxx;
     };

@@ -25,7 +25,7 @@
 #include <algorithm>
 
 #include "libear_a/String.h"
-#include "libear_a/Input.h"
+#include "libear_a/Session.h"
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
@@ -39,7 +39,7 @@ namespace ear {
     public:
         static State* capture(void *) noexcept;
 
-        LibraryInput get_input() const noexcept;
+        LibrarySession get_input() const noexcept;
 
     public:
         State() noexcept = delete;
@@ -118,9 +118,9 @@ namespace ear {
     }
 
     inline
-    LibraryInput State::get_input() const noexcept {
-        return LibraryInput {
-                Input {
+    LibrarySession State::get_input() const noexcept {
+        return LibrarySession {
+                Session {
                         reporter_.begin(),
                         target_.begin(),
                         verbose_

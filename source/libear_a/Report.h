@@ -21,7 +21,7 @@
 
 #include <functional>
 
-#include "libear_a/Input.h"
+#include "libear_a/Session.h"
 
 namespace ear {
 
@@ -34,5 +34,5 @@ namespace ear {
         const char *search_path;
     };
 
-    int serialize(Input const &, Execution const &, std::function<int (const char **)> forward) noexcept;
+    int serialize(Session const &, Execution const &, std::function<int (const char **)> forward) noexcept;
 }
