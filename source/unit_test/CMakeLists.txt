@@ -46,6 +46,7 @@ add_executable(unit_test ${SRCS})
 
 include_directories(${GOOGLE_TEST_INCLUDE_DIR})
 target_link_libraries(unit_test libgtest)
+target_link_libraries(unit_test ear_a)
 
 enable_testing()
 add_test(NAME UnitTests COMMAND unit_test)

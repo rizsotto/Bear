@@ -71,7 +71,11 @@ namespace ear {
             auto dst_it = dst_begin;
             for (; src_it != src_end && dst_it != dst_end;)
                 *dst_it++ = *src_it++;
-            *dst_it++ = 0;
+
+            if (dst_it != dst_end)
+                *dst_it++ = 0;
+            else
+                return nullptr;
 
             return dst_it;
         }

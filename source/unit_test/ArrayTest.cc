@@ -44,4 +44,21 @@ namespace {
         EXPECT_EQ(2, ::ear::array::length(input));
     }
 
+    TEST(array_copy, does_copy_elements_over) {
+        const char src[5] = {'o', 't', 't', 'o', '\0'};
+        char dst[8] = {};
+
+        auto result = ::ear::array::copy(src, src + 5, dst, dst + 8);
+        EXPECT_TRUE(result != nullptr);
+        EXPECT_STREQ(src, dst);
+    }
+
+    TEST(array_copy, stops_when_short) {
+        const char src[5] = {'o', 't', 't', 'o', '\0'};
+        char dst[8] = {};
+
+        auto result = ::ear::array::copy(src, src + 5, dst, dst + 3);
+        EXPECT_EQ(nullptr, result);
+    }
+
 }

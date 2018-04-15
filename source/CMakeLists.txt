@@ -35,7 +35,7 @@ set(PEAR_EXE ${CMAKE_INSTALL_LIBEXECDIR}/pear
         CACHE STRING "Default path to pear")
 
 
-#add_subdirectory(libear_a)
+add_subdirectory(libear_a)
 add_subdirectory(libear)
 add_subdirectory(libpear_a)
 add_subdirectory(pear)
