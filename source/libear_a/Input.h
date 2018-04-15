@@ -33,10 +33,20 @@ namespace ear {
     constexpr char verbose_env_key[]     = "EAR_VERBOSE";
 
     struct Input {
-        const char *reporter;
-        const char *library;
-        const char *destination;
+        char const *reporter;
+        char const *destination;
         bool verbose;
+    };
+
+    struct LibraryInput {
+        Input reporter;
+        char const *library;
+    };
+
+    struct WrapperInput {
+        Input reporter;
+        char const *cc;
+        char const *cxx;
     };
 
 }

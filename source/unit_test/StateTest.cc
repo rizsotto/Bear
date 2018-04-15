@@ -56,9 +56,9 @@ namespace {
         EXPECT_EQ(reinterpret_cast<::ear::State*>(buffer), sut);
 
         auto result = sut->get_input();
-        EXPECT_STREQ("/tmp/pear.random", result.destination);
+        EXPECT_STREQ("/tmp/pear.random", result.reporter.destination);
         EXPECT_STREQ("/usr/libexec/libear.so", result.library);
-        EXPECT_STREQ("/usr/bin/pear", result.reporter);
+        EXPECT_STREQ("/usr/bin/pear", result.reporter.reporter);
     }
 
 }

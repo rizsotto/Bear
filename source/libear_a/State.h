@@ -39,7 +39,7 @@ namespace ear {
     public:
         static State* capture(void *) noexcept;
 
-        Input get_input() const noexcept;
+        LibraryInput get_input() const noexcept;
 
     public:
         State() noexcept = delete;
@@ -118,12 +118,14 @@ namespace ear {
     }
 
     inline
-    Input State::get_input() const noexcept {
-        return Input {
-                reporter_.begin(),
+    LibraryInput State::get_input() const noexcept {
+        return LibraryInput {
+                Input {
+                        reporter_.begin(),
+                        target_.begin(),
+                        verbose_
+                },
                 library_.begin(),
-                target_.begin(),
-                verbose_
         };
     }
 
