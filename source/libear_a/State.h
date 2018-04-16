@@ -21,17 +21,8 @@
 
 #include "config.h"
 
-#include <cstddef>
-#include <algorithm>
-
 #include "libear_a/String.h"
 #include "libear_a/Session.h"
-
-#if defined HAVE_NSGETENVIRON
-# include <crt_externs.h>
-#else
-extern "C" char **environ;
-#endif
 
 namespace ear {
 
@@ -72,79 +63,5 @@ namespace ear {
         ::ear::String<8192> reporter_;
         bool verbose_;
     };
-
-
-    inline
-    const char **State::current() noexcept {
-#ifdef HAVE_NSGETENVIRON
-        return const_cast<const char **>(*_NSGetEnviron());
-#else
-        return const_cast<const char **>(environ);
-#endif
-    }
-
-    inline
-    State* State::create(const char** current, void* place) noexcept {
-
-        if (current == nullptr)
-            return nullptr;
-
-        auto target_env = State::get_env(current, ::ear::destination_env_key);
-        auto libray_env = State::get_env(current, ::ear::library_env_key);
-        auto reporter_env = State::get_env(current, ::ear::reporter_env_key);
-        auto verbose_env = State::get_env(current, ::ear::verbose_env_key);
-        if (target_env == nullptr || libray_env == nullptr || reporter_env == nullptr)
-            return nullptr;
-
-        return new(place) ::ear::State(target_env, libray_env, reporter_env,
-                                       verbose_env != nullptr);
-    }
-
-    inline
-    State *State::capture(void *place) noexcept {
-        auto current = State::current();
-        return State::create(current, place);
-    }
-
-    inline
-    State::State(const char *target,
-                const char *library,
-                const char *reporter,
-                bool verbose) noexcept
-            : target_(target)
-            , library_(library)
-            , reporter_(reporter)
-            , verbose_(verbose) {
-    }
-
-    inline
-    LibrarySession State::get_input() const noexcept {
-        return LibrarySession {
-                Session {
-                        reporter_.begin(),
-                        target_.begin(),
-                        verbose_
-                },
-                library_.begin(),
-        };
-    }
-
-    inline
-    const char *State::get_env(const char **envp, const char *key) noexcept {
-        const size_t key_size = ::ear::string::length(key);
-
-        for (const char **it = envp; *it != nullptr; ++it) {
-            const char *const current = *it;
-            // Is the key a prefix of the pointed string?
-            if (not ::ear::string::equal(key, current, key_size))
-                continue;
-            // Is the next character is the equal sign in the pointed string?
-            if (current[key_size] != '=')
-                continue;
-            // It must be the one! Calculate the address of the value string.
-            return current + key_size + 1;
-        }
-        return nullptr;
-    }
 
 }
