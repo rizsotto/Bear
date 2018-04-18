@@ -19,6 +19,8 @@
 
 #include "State.h"
 
+#include <new>
+
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
 #else
@@ -37,7 +39,6 @@ namespace ear {
     }
 
     State* State::create(const char** current, void* place) noexcept {
-
         if (current == nullptr)
             return nullptr;
 
@@ -74,7 +75,7 @@ namespace ear {
                         target_.begin(),
                         verbose_
                 },
-                library_.begin(),
+                library_.begin()
         };
     }
 

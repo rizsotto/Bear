@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include <functional>
-
 namespace ear {
 
     constexpr char destination_flag[]    = "-t";
