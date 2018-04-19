@@ -19,6 +19,11 @@
 
 #pragma once
 
+#include <unistd.h>
+#if defined HAVE_SPAWN_HEADER
+# include <spawn.h>
+#endif
+
 #include "libear_a/State.h"
 #include "libear_a/SessionSerializer.h"
 #include "libear_a/DynamicLinker.h"
@@ -51,6 +56,83 @@ namespace ear {
 
     private:
         const char *path_;
+        const char **argv_;
+        const char **envp_;
+    };
+
+    class Execvpe : public Execution {
+    public:
+        Execvpe(const char *file, char *const argv[], char *const envp[]) noexcept;
+
+    protected:
+        int apply(DynamicLinker const &linker) noexcept override;
+
+        int apply(DynamicLinker const &linker, Serializable const &session) noexcept override;
+
+    private:
+        const char *file_;
+        const char **argv_;
+        const char **envp_;
+    };
+
+    class ExecvP : public Execution {
+    public:
+        ExecvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) noexcept;
+
+    protected:
+        int apply(DynamicLinker const &linker) noexcept override;
+
+        int apply(DynamicLinker const &linker, Serializable const &session) noexcept override;
+
+    private:
+        const char *file_;
+        const char *search_path_;
+        const char **argv_;
+        const char **envp_;
+    };
+
+    class Spawn : public Execution {
+    public:
+        Spawn(pid_t *pid,
+              const char *path,
+              const posix_spawn_file_actions_t *file_actions,
+              const posix_spawnattr_t *attrp,
+              char *const argv[],
+              char *const envp[]) noexcept;
+
+    protected:
+        int apply(DynamicLinker const &linker) noexcept override;
+
+        int apply(DynamicLinker const &linker, Serializable const &session) noexcept override;
+
+    private:
+        pid_t *pid_;
+        const char *path_;
+        const posix_spawn_file_actions_t *file_actions_;
+        const posix_spawnattr_t *attrp_;
+        const char **argv_;
+        const char **envp_;
+    };
+
+    class Spawnp : public Execution {
+    public:
+        Spawnp(pid_t *pid,
+               const char *file,
+               const posix_spawn_file_actions_t *file_actions,
+               const posix_spawnattr_t *attrp,
+               char *const argv[],
+               char *const envp[]) noexcept;
+
+    protected:
+        int apply(DynamicLinker const &linker) noexcept override;
+
+        int apply(DynamicLinker const &linker, Serializable const &session) noexcept override;
+
+    private:
+        pid_t *pid_;
+        const char *file_;
+        const posix_spawn_file_actions_t *file_actions_;
+        const posix_spawnattr_t *attrp_;
         const char **argv_;
         const char **envp_;
     };
