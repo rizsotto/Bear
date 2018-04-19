@@ -68,3 +68,8 @@ script:
       (cd "$TRAVIS_BUILD_DIR"; git clean -fdx;);
       lit -v "$TRAVIS_BUILD_DIR/test";
     fi
+
+branches:
+  except:
+    - 3.x
+    - experimental
