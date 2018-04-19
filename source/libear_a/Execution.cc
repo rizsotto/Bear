@@ -62,7 +62,7 @@ namespace {
         return function(dst[0], dst);
     }
 
-    int forward(ear::DynamicLinker const &linker,
+    int forward(ear::Resolver const &linker,
                 ear::Serializable const &session,
                 ear::Serializable const &execution,
                 char const **envp) noexcept {
@@ -81,7 +81,7 @@ namespace {
 
 namespace ear {
 
-    int Execution::apply(DynamicLinker const &linker, State const *state) noexcept {
+    int Execution::apply(Resolver const &linker, State const *state) noexcept {
         return (state == nullptr)
                ? this->apply(linker)
                : this->apply(linker, LibrarySessionSerializer(state->get_input()));
@@ -93,12 +93,12 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Execve::apply(DynamicLinker const &linker) noexcept {
+    int Execve::apply(Resolver const &linker) noexcept {
         auto fp = linker.execve();
         return fp(path_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
     }
 
-    int Execve::apply(DynamicLinker const &linker, Serializable const &session) noexcept {
+    int Execve::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 2;
@@ -121,12 +121,12 @@ namespace ear {
             , envp_(const_cast<char const **>(envp))
     { }
 
-    int Execvpe::apply(DynamicLinker const &linker) noexcept {
+    int Execvpe::apply(Resolver const &linker) noexcept {
         auto fp = linker.execvpe();
         return fp(file_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
     }
 
-    int Execvpe::apply(DynamicLinker const &linker, Serializable const &session) noexcept {
+    int Execvpe::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 4;
@@ -152,12 +152,12 @@ namespace ear {
             , envp_(const_cast<char const **>(envp))
     { }
 
-    int ExecvP::apply(DynamicLinker const &linker) noexcept {
+    int ExecvP::apply(Resolver const &linker) noexcept {
         auto fp = linker.execvP();
         return fp(file_, search_path_, const_cast<char *const *>(argv_));
     }
 
-    int ExecvP::apply(DynamicLinker const &linker, Serializable const &session) noexcept {
+    int ExecvP::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 6;
@@ -188,12 +188,12 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Spawn::apply(DynamicLinker const &linker) noexcept {
+    int Spawn::apply(Resolver const &linker) noexcept {
         auto fp = linker.posix_spawn();
         return fp(pid_, path_, file_actions_, attrp_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
     }
 
-    int Spawn::apply(DynamicLinker const &linker, Serializable const &session) noexcept {
+    int Spawn::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 2;
@@ -230,12 +230,12 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Spawnp::apply(DynamicLinker const &linker) noexcept {
+    int Spawnp::apply(Resolver const &linker) noexcept {
         auto fp = linker.posix_spawnp();
         return fp(pid_, file_, file_actions_, attrp_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
     }
 
-    int Spawnp::apply(DynamicLinker const &linker, Serializable const &session) noexcept {
+    int Spawnp::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 4;

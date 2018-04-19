@@ -8,6 +8,7 @@ add_library(ear_a STATIC
         Execution.h
         Executor.h
         Execution.cc
+        Resolver.h
         Session.h
         SessionSerializer.h
         SessionSerializer.cc
