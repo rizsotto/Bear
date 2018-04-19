@@ -7,6 +7,7 @@ add_library(ear_a STATIC
         DynamicLinker.h
         Execution.h
         Executor.h
+        Execution.cc
         Session.h
         SessionSerializer.h
         SessionSerializer.cc
