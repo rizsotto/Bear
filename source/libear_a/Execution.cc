@@ -19,8 +19,6 @@
 
 #include "libear_a/Execution.h"
 
-#include <functional>
-
 #include "libear_a/Array.h"
 
 namespace {
@@ -47,7 +45,7 @@ namespace {
         Copier const &copier_;
     };
 
-    // TODO: use result type for this method (to do proper error handling).
+
     int forward(ear::Serializable const &session,
                 ear::Serializable const &execution,
                 std::function<int(const char *, const char **)> const &function) noexcept {
@@ -62,18 +60,20 @@ namespace {
         return function(dst[0], dst);
     }
 
-    int forward(ear::Resolver const &linker,
-                ear::Serializable const &session,
-                ear::Serializable const &execution,
-                char const **envp) noexcept {
-        auto fp = linker.execve();
-        return ::forward(session,
-                       execution,
-                       [envp, &fp](auto cmd, auto args) {
-                           return fp(cmd,
-                                     const_cast<char *const *>(args),
-                                     const_cast<char *const *>(envp));
-                       });
+    ear::Result<int> forward(ear::Resolver const &linker,
+                             ear::Serializable const &session,
+                             ear::Serializable const &execution,
+                             char const **envp) noexcept {
+        return linker.execve()
+                .map<int>([&session, &execution, &envp](auto fp) {
+                    return ::forward(session,
+                                     execution,
+                                     [envp, &fp](auto cmd, auto args) {
+                                         return fp(cmd,
+                                                   const_cast<char *const *>(args),
+                                                   const_cast<char *const *>(envp));
+                                     });
+                });
     }
 
 }
@@ -81,7 +81,7 @@ namespace {
 
 namespace ear {
 
-    int Execution::apply(Resolver const &linker, State const *state) noexcept {
+    Result<int> Execution::apply(Resolver const &linker, State const *state) noexcept {
         return (state == nullptr)
                ? this->apply(linker)
                : this->apply(linker, LibrarySessionSerializer(state->get_input()));
@@ -93,12 +93,16 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Execve::apply(Resolver const &linker) noexcept {
-        auto fp = linker.execve();
-        return fp(path_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
+    Result<int> Execve::apply(Resolver const &linker) noexcept {
+        return linker.execve()
+                .map<int>([this](auto fp) {
+                    return fp(path_,
+                              const_cast<char *const *>(argv_),
+                              const_cast<char *const *>(envp_));
+                });
     }
 
-    int Execve::apply(Resolver const &linker, Serializable const &session) noexcept {
+    Result<int> Execve::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 2;
@@ -121,12 +125,16 @@ namespace ear {
             , envp_(const_cast<char const **>(envp))
     { }
 
-    int Execvpe::apply(Resolver const &linker) noexcept {
-        auto fp = linker.execvpe();
-        return fp(file_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
+    Result<int> Execvpe::apply(Resolver const &linker) noexcept {
+        return linker.execvpe()
+                .map<int>([this](auto fp) {
+                    return fp(file_,
+                              const_cast<char *const *>(argv_),
+                              const_cast<char *const *>(envp_));
+                });
     }
 
-    int Execvpe::apply(Resolver const &linker, Serializable const &session) noexcept {
+    Result<int> Execvpe::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 4;
@@ -152,12 +160,14 @@ namespace ear {
             , envp_(const_cast<char const **>(envp))
     { }
 
-    int ExecvP::apply(Resolver const &linker) noexcept {
-        auto fp = linker.execvP();
-        return fp(file_, search_path_, const_cast<char *const *>(argv_));
+    Result<int> ExecvP::apply(Resolver const &linker) noexcept {
+        return linker.execvP()
+                .map<int>([this](auto fp) {
+                    return fp(file_, search_path_, const_cast<char *const *>(argv_));
+                });
     }
 
-    int ExecvP::apply(Resolver const &linker, Serializable const &session) noexcept {
+    Result<int> ExecvP::apply(Resolver const &linker, Serializable const &session) noexcept {
         ExecutionSerializer execution(
                 [this]() {
                     return ::ear::array::length(argv_) + 6;
@@ -188,36 +198,45 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Spawn::apply(Resolver const &linker) noexcept {
-        auto fp = linker.posix_spawn();
-        return fp(pid_, path_, file_actions_, attrp_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
+    Result<int> Spawn::apply(Resolver const &linker) noexcept {
+        return linker.posix_spawn()
+                .map<int>([this](auto fp) {
+                    return fp(pid_,
+                              path_,
+                              file_actions_,
+                              attrp_,
+                              const_cast<char *const *>(argv_),
+                              const_cast<char *const *>(envp_));
+                });
     }
 
-    int Spawn::apply(Resolver const &linker, Serializable const &session) noexcept {
-        ExecutionSerializer execution(
-                [this]() {
-                    return ::ear::array::length(argv_) + 2;
-                },
-                [this](auto begin, auto end) {
-                    const char **argv_begin = argv_;
-                    const char **argv_end = argv_begin + ::ear::array::length(argv_);
+    Result<int> Spawn::apply(Resolver const &linker, Serializable const &session) noexcept {
+        return linker.posix_spawn()
+                .map<int>([this, &session](auto fp) {
+                    ExecutionSerializer execution(
+                            [this]() {
+                                return ::ear::array::length(argv_) + 2;
+                            },
+                            [this](auto begin, auto end) {
+                                const char **argv_begin = argv_;
+                                const char **argv_end = argv_begin + ::ear::array::length(argv_);
 
-                    auto it = begin;
-                    *it++ = command_separator;
-                    return ::ear::array::copy(argv_begin, argv_end, it, end);
-                }
-        );
-        auto fp = linker.posix_spawn();
-        return ::forward(session,
-                         execution,
-                         [this, &fp](auto cmd, auto args) {
-                             return fp(pid_,
-                                       cmd,
-                                       file_actions_,
-                                       attrp_,
-                                       const_cast<char *const *>(args),
-                                       const_cast<char *const *>(envp_));
-                         });
+                                auto it = begin;
+                                *it++ = command_separator;
+                                return ::ear::array::copy(argv_begin, argv_end, it, end);
+                            }
+                    );
+                    return ::forward(session,
+                                     execution,
+                                     [this, &fp](auto cmd, auto args) {
+                                         return fp(pid_,
+                                                   cmd,
+                                                   file_actions_,
+                                                   attrp_,
+                                                   const_cast<char *const *>(args),
+                                                   const_cast<char *const *>(envp_));
+                                     });
+                });
     }
 
     Spawnp::Spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t *file_actions,
@@ -230,37 +249,46 @@ namespace ear {
             , envp_(const_cast<const char **>(envp))
     { }
 
-    int Spawnp::apply(Resolver const &linker) noexcept {
-        auto fp = linker.posix_spawnp();
-        return fp(pid_, file_, file_actions_, attrp_, const_cast<char *const *>(argv_), const_cast<char *const *>(envp_));
+    Result<int> Spawnp::apply(Resolver const &linker) noexcept {
+        return linker.posix_spawnp()
+                .map<int>([this](auto fp) {
+                    return fp(pid_,
+                              file_,
+                              file_actions_,
+                              attrp_,
+                              const_cast<char *const *>(argv_),
+                              const_cast<char *const *>(envp_));
+                });
     }
 
-    int Spawnp::apply(Resolver const &linker, Serializable const &session) noexcept {
-        ExecutionSerializer execution(
-                [this]() {
-                    return ::ear::array::length(argv_) + 4;
-                },
-                [this](auto begin, auto end) {
-                    const char **argv_begin = argv_;
-                    const char **argv_end = argv_begin + ::ear::array::length(argv_);
+    Result<int> Spawnp::apply(Resolver const &linker, Serializable const &session) noexcept {
+        return linker.posix_spawn()
+                .map<int>([this, &session](auto fp) {
+                    ExecutionSerializer execution(
+                            [this]() {
+                                return ::ear::array::length(argv_) + 4;
+                            },
+                            [this](auto begin, auto end) {
+                                const char **argv_begin = argv_;
+                                const char **argv_end = argv_begin + ::ear::array::length(argv_);
 
-                    auto it = begin;
-                    *it++ = file_flag;
-                    *it++ = file_;
-                    *it++ = command_separator;
-                    return ::ear::array::copy(argv_begin, argv_end, it, end);
-                }
-        );
-        auto fp = linker.posix_spawn();
-        return ::forward(session,
-                         execution,
-                         [this, &fp](auto cmd, auto args) {
-                             return fp(pid_,
-                                       cmd,
-                                       file_actions_,
-                                       attrp_,
-                                       const_cast<char *const *>(args),
-                                       const_cast<char *const *>(envp_));
-                         });
+                                auto it = begin;
+                                *it++ = file_flag;
+                                *it++ = file_;
+                                *it++ = command_separator;
+                                return ::ear::array::copy(argv_begin, argv_end, it, end);
+                            }
+                    );
+                    return ::forward(session,
+                                     execution,
+                                     [this, &fp](auto cmd, auto args) {
+                                         return fp(pid_,
+                                                   cmd,
+                                                   file_actions_,
+                                                   attrp_,
+                                                   const_cast<char *const *>(args),
+                                                   const_cast<char *const *>(envp_));
+                                     });
+                });
     }
 }

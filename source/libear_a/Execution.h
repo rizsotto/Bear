@@ -26,6 +26,7 @@
 
 #include "libear_a/State.h"
 #include "libear_a/SessionSerializer.h"
+#include "libear_a/Result.h"
 #include "libear_a/Resolver.h"
 
 namespace ear {
@@ -36,12 +37,12 @@ namespace ear {
 
     class Execution {
     public:
-        int apply(Resolver const &linker, State const *state) noexcept;
+        Result<int> apply(Resolver const &linker, State const *state) noexcept;
 
     protected:
-        virtual int apply(Resolver const &) noexcept = 0;
+        virtual Result<int> apply(Resolver const &) noexcept = 0;
 
-        virtual int apply(Resolver const &, Serializable const &) noexcept = 0;
+        virtual Result<int> apply(Resolver const &, Serializable const &) noexcept = 0;
     };
 
 
@@ -50,9 +51,9 @@ namespace ear {
         Execve(const char *path, char *const argv[], char *const envp[]) noexcept;
 
     protected:
-        int apply(Resolver const &linker) noexcept override;
+        Result<int> apply(Resolver const &linker) noexcept override;
 
-        int apply(Resolver const &linker, Serializable const &session) noexcept override;
+        Result<int> apply(Resolver const &linker, Serializable const &session) noexcept override;
 
     private:
         const char *path_;
@@ -65,9 +66,9 @@ namespace ear {
         Execvpe(const char *file, char *const argv[], char *const envp[]) noexcept;
 
     protected:
-        int apply(Resolver const &linker) noexcept override;
+        Result<int> apply(Resolver const &linker) noexcept override;
 
-        int apply(Resolver const &linker, Serializable const &session) noexcept override;
+        Result<int> apply(Resolver const &linker, Serializable const &session) noexcept override;
 
     private:
         const char *file_;
@@ -80,9 +81,9 @@ namespace ear {
         ExecvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) noexcept;
 
     protected:
-        int apply(Resolver const &linker) noexcept override;
+        Result<int> apply(Resolver const &linker) noexcept override;
 
-        int apply(Resolver const &linker, Serializable const &session) noexcept override;
+        Result<int> apply(Resolver const &linker, Serializable const &session) noexcept override;
 
     private:
         const char *file_;
@@ -101,9 +102,9 @@ namespace ear {
               char *const envp[]) noexcept;
 
     protected:
-        int apply(Resolver const &linker) noexcept override;
+        Result<int> apply(Resolver const &linker) noexcept override;
 
-        int apply(Resolver const &linker, Serializable const &session) noexcept override;
+        Result<int> apply(Resolver const &linker, Serializable const &session) noexcept override;
 
     private:
         pid_t *pid_;
@@ -124,9 +125,9 @@ namespace ear {
                char *const envp[]) noexcept;
 
     protected:
-        int apply(Resolver const &linker) noexcept override;
+        Result<int> apply(Resolver const &linker) noexcept override;
 
-        int apply(Resolver const &linker, Serializable const &session) noexcept override;
+        Result<int> apply(Resolver const &linker, Serializable const &session) noexcept override;
 
     private:
         pid_t *pid_;

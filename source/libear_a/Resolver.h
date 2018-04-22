@@ -26,6 +26,8 @@
 
 #include <functional>
 
+#include "libear_a/Result.h"
+
 namespace ear {
 
     class Resolver {
@@ -41,15 +43,15 @@ namespace ear {
 
         virtual ~Resolver() noexcept = default;
 
-        virtual Execve execve() const noexcept = 0;
+        virtual Result<Execve> execve() const noexcept = 0;
 
-        virtual Execve execvpe() const noexcept = 0;
+        virtual Result<Execve> execvpe() const noexcept = 0;
 
-        virtual ExecvP execvP() const noexcept = 0;
+        virtual Result<ExecvP> execvP() const noexcept = 0;
 
-        virtual Spawn posix_spawn() const noexcept = 0;
+        virtual Result<Spawn> posix_spawn() const noexcept = 0;
 
-        virtual Spawn posix_spawnp() const noexcept = 0;
+        virtual Result<Spawn> posix_spawnp() const noexcept = 0;
     };
 
 }
