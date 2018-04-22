@@ -4,7 +4,6 @@ add_library(pear_a STATIC
         Reporter.h
         Reporter.cc
         Parameters.h
-        Result.h
         SystemCalls.h
         SystemCalls.cc
 )

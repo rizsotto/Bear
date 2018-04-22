@@ -1,11 +1,11 @@
 #include "gtest/gtest.h"
 
-#include "libpear_a/Result.h"
+#include "libear_a/Result.h"
 
 namespace {
 
     using Error = const char *;
-    using namespace ear;
+    using namespace ear::impl;
 
     TEST(result, get_or_else_on_success) {
         EXPECT_EQ(2,
