@@ -34,14 +34,14 @@ namespace ear {
         static Result failure(const E &value) noexcept;
 
         template<typename U>
-        Result<U, E> map(std::function<U(T &)> &&f) noexcept;
+        Result<U, E> map(std::function<U(T &)> const &f) noexcept;
 
         template<typename U>
-        Result<U, E> bind(std::function<Result<U, E>(T &)> &&f) noexcept;
+        Result<U, E> bind(std::function<Result<U, E>(T &)> const &f) noexcept;
 
         T get_or_else(const T &value) const noexcept;
 
-        Result<T, E> const &handle_with(std::function<void(const E &)> &&f) const noexcept;
+        Result<T, E> const &handle_with(std::function<void(const E &)> const &f) const noexcept;
 
     public:
         Result(Result &&other) noexcept;
@@ -98,7 +98,7 @@ namespace ear {
 
     template<typename T, typename E>
     template<typename U>
-    Result<U, E> Result<T, E>::map(std::function<U(T &)> &&f) noexcept {
+    Result<U, E> Result<T, E>::map(std::function<U(T &)> const &f) noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
             return Result<U, E>::success(std::move(f(*ptr)));
         } else if (auto error = std::get_if<E>(&state_)) {
@@ -108,7 +108,7 @@ namespace ear {
 
     template<typename T, typename E>
     template<typename U>
-    Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(T &)> &&f) noexcept {
+    Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(T &)> const &f) noexcept {
         if (auto ptr = std::get_if<T>(&state_)) {
             return f(*ptr);
         } else if (auto error = std::get_if<E>(&state_)) {
@@ -126,7 +126,7 @@ namespace ear {
     }
 
     template<typename T, typename E>
-    Result<T, E> const &Result<T, E>::handle_with(std::function<void(const E &)> &&f) const noexcept {
+    Result<T, E> const &Result<T, E>::handle_with(std::function<void(const E &)> const &f) const noexcept {
         if (auto error = std::get_if<E>(&state_)) {
             f(*error);
         };
