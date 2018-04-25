@@ -48,11 +48,11 @@ namespace ear {
     { }
 
     std::size_t LibrarySessionSerializer::estimate() const noexcept {
-        return SessionSerializer(session_.session).estimate() + 2;
+        return SessionSerializer(session_).estimate() + 2;
     }
 
     char const **LibrarySessionSerializer::copy(char const **begin, char const **end) const noexcept {
-        char const **it = SessionSerializer(session_.session).copy(begin, end);
+        char const **it = SessionSerializer(session_).copy(begin, end);
         *it++ = library_flag;
         *it++ = session_.library;
         return it;

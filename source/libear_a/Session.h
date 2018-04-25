@@ -36,15 +36,15 @@ namespace ear {
         char const *reporter;
         char const *destination;
         bool verbose;
+
+        virtual ~Session() noexcept = default;
     };
 
-    struct LibrarySession {
-        Session session;
+    struct LibrarySession : public Session {
         char const *library;
     };
 
-    struct WrapperSession {
-        Session session;
+    struct WrapperSession : public Session {
         char const *cc;
         char const *cxx;
     };

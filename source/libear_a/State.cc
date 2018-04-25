@@ -69,14 +69,12 @@ namespace ear {
     }
 
     LibrarySession State::get_input() const noexcept {
-        return LibrarySession {
-                Session {
-                        reporter_.begin(),
-                        target_.begin(),
-                        verbose_
-                },
-                library_.begin()
-        };
+        LibrarySession result;
+        result.reporter = reporter_.begin();
+        result.destination = target_.begin();
+        result.verbose = verbose_;
+        result.library = library_.begin();
+        return result;
     }
 
     const char *State::get_env(const char **envp, const char *key) noexcept {
