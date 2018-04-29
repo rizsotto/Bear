@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "config.h"
+
 #include <unistd.h>
 #if defined HAVE_SPAWN_HEADER
 # include <spawn.h>
@@ -34,6 +36,41 @@ namespace ear {
     constexpr char command_separator[] = "--";
     constexpr char file_flag[] = "-f";
     constexpr char search_flag[] = "-s";
+
+    struct Execution_Z {
+        const char **argv_;
+        const char **envp_;
+
+        virtual ~Execution_Z() noexcept = default;
+    };
+
+    struct Execve_Z : public Execution_Z {
+        const char *path_;
+    };
+
+    struct Execvpe_Z : public Execution_Z {
+        const char *file_;
+    };
+
+    struct ExecvP_Z : public Execution_Z {
+        const char *file_;
+        const char *search_path_;
+    };
+
+    struct ExecutionWithoutFork_Z : public Execution_Z {
+        pid_t *pid_;
+        const posix_spawn_file_actions_t *file_actions_;
+        const posix_spawnattr_t *attrp_;
+    };
+
+    struct Spawn_Z : public ExecutionWithoutFork_Z {
+        const char *path_;
+    };
+
+    struct Spawnp_Z : public ExecutionWithoutFork_Z {
+        const char *file_;
+    };
+
 
     class Execution {
     public:

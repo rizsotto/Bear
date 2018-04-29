@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "config.h"
+
 #include <unistd.h>
 #if defined HAVE_SPAWN_HEADER
 # include <spawn.h>
@@ -32,6 +34,12 @@ namespace ear {
 
     class Resolver {
     public:
+        using Execution = std::function<int ()>;
+
+        template <typename S, typename E>
+        Result<Execution> resolve(const S *session, const E &execution) const noexcept;
+
+    public: // TODO: make them protected
         using Execve = std::function<int (const char *, char *const *, char *const *)>;
         using ExecvP = std::function<int (const char *, const char *, char *const *)>;
         using Spawn  = std::function<int (pid_t *,
