@@ -26,6 +26,9 @@
 # include <spawn.h>
 #endif
 
+#include "libear_a/Result.h"
+#include "libear_a/Resolver.h"
+
 namespace ear {
 
     template <typename F>
@@ -85,6 +88,49 @@ namespace ear {
         static posix_spawnp_t posix_spawnp() noexcept {
             return typed_dlsym<posix_spawnp_t>("posix_spawnp");
         }
+    };
+
+    struct DynamicLinker_Z : public Resolver {
+        Result<Execve> execve() const noexcept override {
+            constexpr char execve_name[] = "execve";
+            return typed_dlsym_Z<Execve, Execve_Fp>(execve_name);
+        }
+
+        Result<Execve> execvpe() const noexcept override {
+            constexpr char execvpe_name[] = "execvpe";
+            return typed_dlsym_Z<Execve, Execve_Fp>(execvpe_name);
+        }
+
+        Result<ExecvP> execvP() const noexcept override {
+            constexpr char execvp_name[] = "execvP";
+            return typed_dlsym_Z<ExecvP, ExecvP_Fp>(execvp_name);
+        }
+
+        Result<Spawn> posix_spawn() const noexcept override {
+            constexpr char posix_spawn_name[] = "posix_spawn";
+            return typed_dlsym_Z<Spawn, Spawn_Fp>(posix_spawn_name);
+        }
+
+        Result<Spawn> posix_spawnp() const noexcept override {
+            constexpr char posix_spawnp_name[] = "posix_spawnp";
+            return typed_dlsym_Z<Spawn, Spawn_Fp>(posix_spawnp_name);
+        }
+
+    private:
+        template <typename F, typename S>
+        static Result<F> typed_dlsym_Z(const char *name) {
+            // TODO: create a new exception type to store the symbol name
+            void *symbol = dlsym(RTLD_NEXT, name);
+            if (symbol == nullptr)
+                return Result<F>::failure(std::runtime_error("Couldn't resolve symbol"));
+
+            auto result = reinterpret_cast<S>(symbol);
+            if (result == nullptr)
+                return Result<F>::failure(std::runtime_error("Couldn't cast symbol"));
+
+            return Result<F>::success(F(result));
+        }
 
     };
+
 }

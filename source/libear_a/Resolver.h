@@ -40,6 +40,14 @@ namespace ear {
         Result<Execution> resolve(const S *session, const E &execution) const noexcept;
 
     public: // TODO: make them protected
+        using Execve_Fp = int (*)(const char *, char *const *, char *const *);
+        using ExecvP_Fp = int (*)(const char *, const char *, char *const *);
+        using Spawn_Fp  = int (*)(pid_t *,
+                                const char *,
+                                const posix_spawn_file_actions_t *,
+                                const posix_spawnattr_t *,
+                                char *const *,
+                                char *const *);
         using Execve = std::function<int (const char *, char *const *, char *const *)>;
         using ExecvP = std::function<int (const char *, const char *, char *const *)>;
         using Spawn  = std::function<int (pid_t *,
