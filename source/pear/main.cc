@@ -30,6 +30,39 @@
 #include "libpear_a/SystemCalls.h"
 
 
+namespace {
+
+    pear::Result<pid_t> spawnp(const pear::Parameters::Execution &config,
+                               const pear::EnvironmentPtr &environment) noexcept {
+        // TODO: use other execution config parameters.
+
+        return pear::spawnp(config.command, environment->as_array());
+    }
+
+    void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
+        pear::Event::start(pid, cmd)
+                .map<int>([&reporter](const pear::EventPtr &eptr) {
+                    return reporter->send(eptr)
+                            .handle_with([](auto message) {
+                                fprintf(stderr, "%s\n", message.what());
+                            })
+                            .get_or_else(0);
+                });
+    }
+
+    void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
+        pear::Event::stop(pid, exit)
+                .map<int>([&reporter](const pear::EventPtr &eptr) {
+                    return reporter->send(eptr)
+                            .handle_with([](auto message) {
+                                fprintf(stderr, "%s\n", message.what());
+                            })
+                            .get_or_else(0);
+                });
+    }
+
+}
+
 pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
     pear::Parameters result;
 
@@ -70,35 +103,6 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
         result.execution.command = const_cast<const char **>(argv + optind);
         return pear::Result<pear::Parameters>::success(std::move(result));
     }
-}
-
-pear::Result<pid_t> spawnp(const pear::Parameters::Execution &config,
-                           const pear::EnvironmentPtr &environment) noexcept {
-    // TODO: use other execution config parameters.
-
-    return pear::spawnp(config.command, environment->as_array());
-}
-
-void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
-    pear::Event::start(pid, cmd)
-            .map<int>([&reporter](auto &eptr) {
-                return reporter->send(eptr)
-                        .handle_with([](auto &message) {
-                            fprintf(stderr, "%s\n", message.what());
-                        })
-                        .get_or_else(0);
-            });
-}
-
-void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
-    pear::Event::stop(pid, exit)
-            .map<int>([&reporter](auto &eptr) {
-                return reporter->send(eptr)
-                        .handle_with([](auto &message) {
-                            fprintf(stderr, "%s\n", message.what());
-                        })
-                        .get_or_else(0);
-            });
 }
 
 int main(int argc, char *argv[], char *envp[]) {

@@ -121,7 +121,7 @@ namespace {
     public:
         explicit TempfileReporter(const char *target) noexcept;
 
-        pear::Result<int> send(pear::EventPtr &event) noexcept override;
+        pear::Result<int> send(const pear::EventPtr &event) noexcept override;
 
     private:
         std::string const target_;
@@ -132,7 +132,7 @@ namespace {
             , target_(target)
     { }
 
-    pear::Result<int> TempfileReporter::send(pear::EventPtr &event) noexcept {
+    pear::Result<int> TempfileReporter::send(const pear::EventPtr &event) noexcept {
         const std::string prefix = target_ + std::string("/execution.");
         pear::Result<std::shared_ptr<std::ostream>> stream_result =
                 pear::temp_file(prefix.c_str(), ".json");

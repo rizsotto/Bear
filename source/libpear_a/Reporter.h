@@ -52,7 +52,7 @@ namespace pear {
     public:
         virtual ~Reporter() noexcept = default;
 
-        virtual Result<int> send(EventPtr &event) noexcept = 0;
+        virtual Result<int> send(const EventPtr &event) noexcept = 0;
 
     public:
         static ReporterPtr tempfile(char const *) noexcept;
