@@ -90,52 +90,17 @@ namespace ear {
         }
     };
 
-    struct DynamicLinker_Z : public Resolver {
-        Result<Execve> execve() const noexcept override {
-            constexpr char execve_name[] = "execve";
-            return typed_dlsym_Z<Execve_Fp>(execve_name)
-                    .map<Execve>([](const Execve_Fp &fp) { return Execve(fp); });
-        }
+    class DynamicLinker_Z : public Resolver {
+    public:
+        Result<Execve> execve() const noexcept override;
 
-        Result<Execve> execvpe() const noexcept override {
-            constexpr char execvpe_name[] = "execvpe";
-            return typed_dlsym_Z<Execve_Fp>(execvpe_name)
-                    .map<Execve>([](const Execve_Fp &fp) { return Execve(fp); });
-        }
+        Result<Execve> execvpe() const noexcept override;
 
-        Result<ExecvP> execvP() const noexcept override {
-            constexpr char execvp_name[] = "execvP";
-            return typed_dlsym_Z<ExecvP_Fp>(execvp_name)
-                    .map<ExecvP>([](const ExecvP_Fp &fp) { return ExecvP(fp); });
-        }
+        Result<ExecvP> execvP() const noexcept override;
 
-        Result<Spawn> posix_spawn() const noexcept override {
-            constexpr char posix_spawn_name[] = "posix_spawn";
-            return typed_dlsym_Z<Spawn_Fp>(posix_spawn_name)
-                    .map<Spawn>([](const Spawn_Fp &fp) { return Spawn(fp); });
-        }
+        Result<Spawn> posix_spawn() const noexcept override;
 
-        Result<Spawn> posix_spawnp() const noexcept override {
-            constexpr char posix_spawnp_name[] = "posix_spawnp";
-            return typed_dlsym_Z<Spawn_Fp>(posix_spawnp_name)
-                    .map<Spawn>([](const Spawn_Fp &fp) { return Spawn(fp); });
-        }
-
-    private:
-        template <typename F>
-        static Result<F> typed_dlsym_Z(const char *name) {
-            // TODO: create a new exception type to store the symbol name
-            void *symbol = dlsym(RTLD_NEXT, name);
-            if (symbol == nullptr)
-                return Result<F>::failure(std::runtime_error("Couldn't resolve symbol"));
-
-            auto result = reinterpret_cast<F>(symbol);
-            if (result == nullptr)
-                return Result<F>::failure(std::runtime_error("Couldn't cast symbol"));
-
-            return Result<F>::success(result);
-        }
-
+        Result<Spawn> posix_spawnp() const noexcept override;
     };
 
 }

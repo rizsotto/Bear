@@ -5,6 +5,7 @@ set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 add_library(ear_a STATIC
         Array.h
         DynamicLinker.h
+        DynamicLinker.cc
         Execution.h
         Executor.h
         Resolver.h

@@ -177,6 +177,90 @@ namespace {
                 });
     }
 
+    template<>
+    ear::Result<ear::Resolver::Execution>
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Execvpe_Z const &execution) noexcept {
+        auto execution_functions = std::make_pair(
+                [&execution]() { return ear::array::length(execution.argv_) + 3; },
+                [&execution](const char **begin, const char **end) {
+                    *begin++ = ear::file_flag;
+                    *begin++ = execution.file_;
+                    *begin++ = ear::command_separator;
+                    return ear::array::copy(execution.argv_,
+                                            execution.argv_ + ear::array::length(execution.argv_),
+                                            begin,
+                                            end);
+                });
+
+        return bind_execve_(resolver, execution)
+                .map<ear::Resolver::Execution>([&session, &execution_functions](auto fp) {
+                    return bind_(fp, session, execution_functions);
+                });
+    }
+
+    template<>
+    ear::Result<ear::Resolver::Execution>
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::ExecvP_Z const &execution) noexcept {
+        auto execution_functions = std::make_pair(
+                [&execution]() { return ear::array::length(execution.argv_) + 5; },
+                [&execution](const char **begin, const char **end) {
+                    *begin++ = ear::search_flag;
+                    *begin++ = execution.search_path_;
+                    *begin++ = ear::file_flag;
+                    *begin++ = execution.file_;
+                    *begin++ = ear::command_separator;
+                    return ear::array::copy(execution.argv_,
+                                            execution.argv_ + ear::array::length(execution.argv_),
+                                            begin,
+                                            end);
+                });
+
+        return bind_execve_(resolver, execution)
+                .map<ear::Resolver::Execution>([&session, &execution_functions](auto fp) {
+                    return bind_(fp, session, execution_functions);
+                });
+    }
+
+    template<>
+    ear::Result<ear::Resolver::Execution>
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawn_Z const &execution) noexcept {
+        auto execution_functions = std::make_pair(
+                [&execution]() { return ear::array::length(execution.argv_) + 1; },
+                [&execution](const char **begin, const char **end) {
+                    *begin++ = ear::command_separator;
+                    return ear::array::copy(execution.argv_,
+                                            execution.argv_ + ear::array::length(execution.argv_),
+                                            begin,
+                                            end);
+                });
+
+        return bind_spawn(resolver, execution)
+                .map<ear::Resolver::Execution>([&session, &execution_functions](auto fp) {
+                    return bind_(fp, session, execution_functions);
+                });
+    }
+
+    template<>
+    ear::Result<ear::Resolver::Execution>
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawnp_Z const &execution) noexcept {
+        auto execution_functions = std::make_pair(
+                [&execution]() { return ear::array::length(execution.argv_) + 3; },
+                [&execution](const char **begin, const char **end) {
+                    *begin++ = ear::file_flag;
+                    *begin++ = execution.file_;
+                    *begin++ = ear::command_separator;
+                    return ear::array::copy(execution.argv_,
+                                            execution.argv_ + ear::array::length(execution.argv_),
+                                            begin,
+                                            end);
+                });
+
+        return bind_spawn(resolver, execution)
+                .map<ear::Resolver::Execution>([&session, &execution_functions](auto fp) {
+                    return bind_(fp, session, execution_functions);
+                });
+    }
+
     template<typename S, typename E>
     ear::Result<ear::Resolver::Execution>
     resolve_(ear::Resolver const &resolver, S const &session, E const &execution) noexcept;
