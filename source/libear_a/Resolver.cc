@@ -18,6 +18,8 @@
  */
 
 #include "libear_a/Resolver.h"
+
+#include "libear_a/Session.h"
 #include "libear_a/Execution.h"
 #include "libear_a/Array.h"
 

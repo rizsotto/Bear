@@ -26,10 +26,6 @@
 # include <spawn.h>
 #endif
 
-#include "libear_a/State.h"
-#include "libear_a/Result.h"
-#include "libear_a/Resolver.h"
-
 namespace ear {
 
     constexpr char command_separator[] = "--";
@@ -40,33 +36,88 @@ namespace ear {
         const char **argv_;
         const char **envp_;
 
+        Execution_Z(const char **argv, const char **envp)
+                : argv_(argv)
+                , envp_(envp)
+        { }
+
         virtual ~Execution_Z() noexcept = default;
     };
 
     struct Execve_Z : public Execution_Z {
+        Execve_Z(const char *path, char *const *argv, char *const *envp)
+                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
+                , path_(path)
+        { }
+
         const char *path_;
     };
 
     struct Execvpe_Z : public Execution_Z {
+        Execvpe_Z(const char *file, char *const *argv, char *const *envp)
+                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
+                , file_(file)
+        { }
+
         const char *file_;
     };
 
     struct ExecvP_Z : public Execution_Z {
+        ExecvP_Z(const char *file, const char *search_path, char *const *argv)
+                : Execution_Z(const_cast<const char **>(argv), nullptr)
+                , file_(file)
+                , search_path_(search_path)
+        { }
+
         const char *file_;
         const char *search_path_;
     };
 
     struct ExecutionWithoutFork_Z : public Execution_Z {
+        ExecutionWithoutFork_Z(
+                pid_t *pid,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *attrp,
+                char *const *argv,
+                char *const *envp)
+                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
+                , pid_(pid)
+                , file_actions_(file_actions)
+                , attrp_(attrp)
+        { }
+
         pid_t *pid_;
         const posix_spawn_file_actions_t *file_actions_;
         const posix_spawnattr_t *attrp_;
     };
 
     struct Spawn_Z : public ExecutionWithoutFork_Z {
+        Spawn_Z(
+                pid_t *pid,
+                const char *path,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *attrp,
+                char *const *argv,
+                char *const *envp)
+                : ExecutionWithoutFork_Z(pid, file_actions, attrp, argv, envp)
+                , path_(path)
+        { }
+
         const char *path_;
     };
 
     struct Spawnp_Z : public ExecutionWithoutFork_Z {
+        Spawnp_Z(
+                pid_t *pid,
+                const char *file,
+                const posix_spawn_file_actions_t *file_actions,
+                const posix_spawnattr_t *attrp,
+                char *const *argv,
+                char *const *envp)
+                : ExecutionWithoutFork_Z(pid, file_actions, attrp, argv, envp)
+                , file_(file)
+        { }
+
         const char *file_;
     };
 
