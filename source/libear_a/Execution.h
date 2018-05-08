@@ -27,7 +27,6 @@
 #endif
 
 #include "libear_a/State.h"
-#include "libear_a/SessionSerializer.h"
 #include "libear_a/Result.h"
 #include "libear_a/Resolver.h"
 

@@ -12,8 +12,6 @@ add_library(ear_a STATIC
         Resolver.cc
         Result.h
         Session.h
-        SessionSerializer.h
-        SessionSerializer.cc
         State.h
         State.cc
         String.h
