@@ -40,67 +40,67 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, ear::Execve_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, ear::Execve const &execution) noexcept {
         return resolver.execve()
                 .map<ear::Resolver::Execution>([&execution](auto fp) {
                     return std::bind(fp,
-                                     execution.path_,
-                                     const_cast<char *const *>(execution.argv_),
-                                     const_cast<char *const *>(execution.envp_));
+                                     execution.path,
+                                     const_cast<char *const *>(execution.argv),
+                                     const_cast<char *const *>(execution.envp));
                 });
     }
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, ear::Execvpe_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, ear::Execvpe const &execution) noexcept {
         return resolver.execvpe()
                 .map<ear::Resolver::Execution>([&execution](auto fp) {
                     return std::bind(fp,
-                                     execution.file_,
-                                     const_cast<char *const *>(execution.argv_),
-                                     const_cast<char *const *>(execution.envp_));
+                                     execution.file,
+                                     const_cast<char *const *>(execution.argv),
+                                     const_cast<char *const *>(execution.envp));
                 });
     }
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, ear::ExecvP_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, ear::ExecvP const &execution) noexcept {
         return resolver.execvP()
                 .map<ear::Resolver::Execution>([&execution](auto fp) {
                     return std::bind(fp,
-                                     execution.file_,
-                                     execution.search_path_,
-                                     const_cast<char *const *>(execution.argv_));
+                                     execution.file,
+                                     execution.search_path,
+                                     const_cast<char *const *>(execution.argv));
                 });
     }
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, ear::Spawn_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, ear::Spawn const &execution) noexcept {
         return resolver.posix_spawn()
                 .map<ear::Resolver::Execution>([&execution](auto fp) {
                     return std::bind(fp,
                                      execution.pid_,
-                                     execution.path_,
-                                     execution.file_actions_,
-                                     execution.attrp_,
-                                     const_cast<char *const *>(execution.argv_),
-                                     const_cast<char *const *>(execution.envp_));
+                                     execution.path,
+                                     execution.file_actions,
+                                     execution.attrp,
+                                     const_cast<char *const *>(execution.argv),
+                                     const_cast<char *const *>(execution.envp));
                 });
     }
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, ear::Spawnp_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, ear::Spawnp const &execution) noexcept {
         return resolver.posix_spawn()
                 .map<ear::Resolver::Execution>([&execution](auto fp) {
                     return std::bind(fp,
                                      execution.pid_,
-                                     execution.file_,
-                                     execution.file_actions_,
-                                     execution.attrp_,
-                                     const_cast<char *const *>(execution.argv_),
-                                     const_cast<char *const *>(execution.envp_));
+                                     execution.file,
+                                     execution.file_actions,
+                                     execution.attrp,
+                                     const_cast<char *const *>(execution.argv),
+                                     const_cast<char *const *>(execution.envp));
                 });
     }
 
@@ -109,28 +109,28 @@ namespace {
     using PartialExecution = std::function<int (const char **)>;
 
     ear::Result<PartialExecution>
-    bind_execve_(ear::Resolver const &resolver, ear::Execution_Z const &execution) noexcept {
+    bind_execve_(ear::Resolver const &resolver, ear::Execution const &execution) noexcept {
         return resolver.execve()
                 .map<PartialExecution>([&execution](auto fp) {
                     return [&execution, &fp](const char **args) {
                         return fp(args[0],
                                   const_cast<char *const *>(args),
-                                  const_cast<char *const *>(execution.envp_));
+                                  const_cast<char *const *>(execution.envp));
                     };
                 });
     }
 
     ear::Result<PartialExecution>
-    bind_spawn(ear::Resolver const &resolver, ear::ExecutionWithoutFork_Z const &execution) noexcept {
+    bind_spawn(ear::Resolver const &resolver, ear::ExecutionWithoutFork const &execution) noexcept {
         return resolver.posix_spawn()
                 .map<PartialExecution>([&execution](auto fp) {
                     return [&execution, &fp](const char **args) {
                         return fp(execution.pid_,
                                   args[0],
-                                  execution.file_actions_,
-                                  execution.attrp_,
+                                  execution.file_actions,
+                                  execution.attrp,
                                   const_cast<char *const *>(args),
-                                  const_cast<char *const *>(execution.envp_));
+                                  const_cast<char *const *>(execution.envp));
                     };
                 });
     }
@@ -162,13 +162,13 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Execve_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Execve const &execution) noexcept {
         auto execution_functions = std::make_pair(
-                [&execution]() { return ear::array::length(execution.argv_) + 1; },
+                [&execution]() { return ear::array::length(execution.argv) + 1; },
                 [&execution](const char **begin, const char **end) {
                     *begin++ = ear::command_separator;
-                    return ear::array::copy(execution.argv_,
-                                            execution.argv_ + ear::array::length(execution.argv_),
+                    return ear::array::copy(execution.argv,
+                                            execution.argv + ear::array::length(execution.argv),
                                             begin,
                                             end);
                 });
@@ -181,15 +181,15 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Execvpe_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Execvpe const &execution) noexcept {
         auto execution_functions = std::make_pair(
-                [&execution]() { return ear::array::length(execution.argv_) + 3; },
+                [&execution]() { return ear::array::length(execution.argv) + 3; },
                 [&execution](const char **begin, const char **end) {
                     *begin++ = ear::file_flag;
-                    *begin++ = execution.file_;
+                    *begin++ = execution.file;
                     *begin++ = ear::command_separator;
-                    return ear::array::copy(execution.argv_,
-                                            execution.argv_ + ear::array::length(execution.argv_),
+                    return ear::array::copy(execution.argv,
+                                            execution.argv + ear::array::length(execution.argv),
                                             begin,
                                             end);
                 });
@@ -202,17 +202,17 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::ExecvP_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::ExecvP const &execution) noexcept {
         auto execution_functions = std::make_pair(
-                [&execution]() { return ear::array::length(execution.argv_) + 5; },
+                [&execution]() { return ear::array::length(execution.argv) + 5; },
                 [&execution](const char **begin, const char **end) {
                     *begin++ = ear::search_flag;
-                    *begin++ = execution.search_path_;
+                    *begin++ = execution.search_path;
                     *begin++ = ear::file_flag;
-                    *begin++ = execution.file_;
+                    *begin++ = execution.file;
                     *begin++ = ear::command_separator;
-                    return ear::array::copy(execution.argv_,
-                                            execution.argv_ + ear::array::length(execution.argv_),
+                    return ear::array::copy(execution.argv,
+                                            execution.argv + ear::array::length(execution.argv),
                                             begin,
                                             end);
                 });
@@ -225,13 +225,13 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawn_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawn const &execution) noexcept {
         auto execution_functions = std::make_pair(
-                [&execution]() { return ear::array::length(execution.argv_) + 1; },
+                [&execution]() { return ear::array::length(execution.argv) + 1; },
                 [&execution](const char **begin, const char **end) {
                     *begin++ = ear::command_separator;
-                    return ear::array::copy(execution.argv_,
-                                            execution.argv_ + ear::array::length(execution.argv_),
+                    return ear::array::copy(execution.argv,
+                                            execution.argv + ear::array::length(execution.argv),
                                             begin,
                                             end);
                 });
@@ -244,15 +244,15 @@ namespace {
 
     template<>
     ear::Result<ear::Resolver::Execution>
-    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawnp_Z const &execution) noexcept {
+    resolve_(ear::Resolver const &resolver, BufferOps const &session, ear::Spawnp const &execution) noexcept {
         auto execution_functions = std::make_pair(
-                [&execution]() { return ear::array::length(execution.argv_) + 3; },
+                [&execution]() { return ear::array::length(execution.argv) + 3; },
                 [&execution](const char **begin, const char **end) {
                     *begin++ = ear::file_flag;
-                    *begin++ = execution.file_;
+                    *begin++ = execution.file;
                     *begin++ = ear::command_separator;
-                    return ear::array::copy(execution.argv_,
-                                            execution.argv_ + ear::array::length(execution.argv_),
+                    return ear::array::copy(execution.argv,
+                                            execution.argv + ear::array::length(execution.argv),
                                             begin,
                                             end);
                 });

@@ -32,93 +32,93 @@ namespace ear {
     constexpr char file_flag[] = "-f";
     constexpr char search_flag[] = "-s";
 
-    struct Execution_Z {
-        const char **argv_;
-        const char **envp_;
+    struct Execution {
+        const char **argv;
+        const char **envp;
 
-        Execution_Z(const char **argv, const char **envp)
-                : argv_(argv)
-                , envp_(envp)
+        Execution(char *const *argv, char *const *envp)
+                : argv(const_cast<const char **>(argv))
+                , envp(const_cast<const char **>(envp))
         { }
 
-        virtual ~Execution_Z() noexcept = default;
+        virtual ~Execution() noexcept = default;
     };
 
-    struct Execve_Z : public Execution_Z {
-        Execve_Z(const char *path, char *const *argv, char *const *envp)
-                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
-                , path_(path)
+    struct Execve : public Execution {
+        Execve(const char *path, char *const *argv, char *const *envp)
+                : Execution(argv, envp)
+                , path(path)
         { }
 
-        const char *path_;
+        const char *path;
     };
 
-    struct Execvpe_Z : public Execution_Z {
-        Execvpe_Z(const char *file, char *const *argv, char *const *envp)
-                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
-                , file_(file)
+    struct Execvpe : public Execution {
+        Execvpe(const char *file, char *const *argv, char *const *envp)
+                : Execution(argv, envp)
+                , file(file)
         { }
 
-        const char *file_;
+        const char *file;
     };
 
-    struct ExecvP_Z : public Execution_Z {
-        ExecvP_Z(const char *file, const char *search_path, char *const *argv)
-                : Execution_Z(const_cast<const char **>(argv), nullptr)
-                , file_(file)
-                , search_path_(search_path)
+    struct ExecvP : public Execution {
+        ExecvP(const char *file, const char *search_path, char *const *argv)
+                : Execution(argv, nullptr)
+                , file(file)
+                , search_path(search_path)
         { }
 
-        const char *file_;
-        const char *search_path_;
+        const char *file;
+        const char *search_path;
     };
 
-    struct ExecutionWithoutFork_Z : public Execution_Z {
-        ExecutionWithoutFork_Z(
+    struct ExecutionWithoutFork : public Execution {
+        ExecutionWithoutFork(
                 pid_t *pid,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *attrp,
                 char *const *argv,
                 char *const *envp)
-                : Execution_Z(const_cast<const char **>(argv), const_cast<const char **>(envp))
+                : Execution(argv, envp)
                 , pid_(pid)
-                , file_actions_(file_actions)
-                , attrp_(attrp)
+                , file_actions(file_actions)
+                , attrp(attrp)
         { }
 
         pid_t *pid_;
-        const posix_spawn_file_actions_t *file_actions_;
-        const posix_spawnattr_t *attrp_;
+        const posix_spawn_file_actions_t *file_actions;
+        const posix_spawnattr_t *attrp;
     };
 
-    struct Spawn_Z : public ExecutionWithoutFork_Z {
-        Spawn_Z(
+    struct Spawn : public ExecutionWithoutFork {
+        Spawn(
                 pid_t *pid,
                 const char *path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *attrp,
                 char *const *argv,
                 char *const *envp)
-                : ExecutionWithoutFork_Z(pid, file_actions, attrp, argv, envp)
-                , path_(path)
+                : ExecutionWithoutFork(pid, file_actions, attrp, argv, envp)
+                , path(path)
         { }
 
-        const char *path_;
+        const char *path;
     };
 
-    struct Spawnp_Z : public ExecutionWithoutFork_Z {
-        Spawnp_Z(
+    struct Spawnp : public ExecutionWithoutFork {
+        Spawnp(
                 pid_t *pid,
                 const char *file,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *attrp,
                 char *const *argv,
                 char *const *envp)
-                : ExecutionWithoutFork_Z(pid, file_actions, attrp, argv, envp)
-                , file_(file)
+                : ExecutionWithoutFork(pid, file_actions, attrp, argv, envp)
+                , file(file)
         { }
 
-        const char *file_;
+        const char *file;
     };
 
 }
