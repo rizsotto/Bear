@@ -28,20 +28,8 @@ namespace ear {
         using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
         static execve_t execve() noexcept;
 
-        using execv_t = int (*)(const char *path, char *const argv[]);
-        static execv_t execv() noexcept;
-
         using execvpe_t = int (*)(const char *file, char *const argv[], char *const envp[]);
         static execve_t execvpe() noexcept;
-
-        using execvp_t = int (*)(const char *file, char *const argv[]);
-        static execvp_t execvp() noexcept;
-
-        using execvP_t = int (*)(const char *file, const char *search_path, char *const argv[]);
-        static execvP_t execvP() noexcept;
-
-        using exect_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-        static exect_t exect() noexcept;
 
         using posix_spawn_t = int (*)(pid_t *pid,
                                       const char *path,
@@ -51,13 +39,6 @@ namespace ear {
                                       char *const envp[]);
         static posix_spawn_t posix_spawn() noexcept;
 
-        using posix_spawnp_t = int (*)(pid_t *pid,
-                                       const char *file,
-                                       const posix_spawn_file_actions_t *file_actions,
-                                       const posix_spawnattr_t *attrp,
-                                       char *const argv[],
-                                       char *const envp[]);
-        static posix_spawnp_t posix_spawnp() noexcept;
     };
 
 }

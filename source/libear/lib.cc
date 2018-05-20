@@ -77,61 +77,44 @@ extern "C" void on_unload() {
 }
 
 
-#ifdef HAVE_EXECVE
-
 extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
     return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
-#endif
-
-// TODO: implement `fexecve` too.
-
-#ifdef HAVE_EXECV
 
 extern "C"
 int execv(const char *path, char *const argv[]) {
-    return DynamicLinkerExecutor(session_ptr).execv(path, argv);
+    auto envp = const_cast<char *const *>(::ear::environment::current());
+    return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECVPE
 
 extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
     return DynamicLinkerExecutor(session_ptr).execvpe(file, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECVP
 
 extern "C"
 int execvp(const char *file, char *const argv[]) {
-    return DynamicLinkerExecutor(session_ptr).execvp(file, argv);
+    auto envp = const_cast<char *const *>(::ear::environment::current());
+    return DynamicLinkerExecutor(session_ptr).execvpe(file, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECVP2
 
 extern "C"
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    return DynamicLinkerExecutor(session_ptr).execvP(file, search_path, argv);
+    auto envp = const_cast<char *const *>(::ear::environment::current());
+    return DynamicLinkerExecutor(session_ptr).execvP(file, search_path, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECT
 
 extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
     return DynamicLinkerExecutor(session_ptr).exect(path, argv, envp);
 }
 
-#endif
 
 namespace {
     constexpr auto va_length = [](va_list &args) -> size_t {
@@ -148,7 +131,6 @@ namespace {
     };
 }
 
-#ifdef HAVE_EXECL
 
 extern "C"
 int execl(const char *path, const char *arg, ...) {
@@ -163,12 +145,10 @@ int execl(const char *path, const char *arg, ...) {
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
-    return DynamicLinkerExecutor(session_ptr).execv(path, argv);
+    auto envp = const_cast<char *const *>(::ear::environment::current());
+    return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECLP
 
 extern "C"
 int execlp(const char *file, const char *arg, ...) {
@@ -183,12 +163,10 @@ int execlp(const char *file, const char *arg, ...) {
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
-    return DynamicLinkerExecutor(session_ptr).execvp(file, argv);
+    auto envp = const_cast<char *const *>(::ear::environment::current());
+    return DynamicLinkerExecutor(session_ptr).execvpe(file, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_EXECLE
 
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 extern "C"
@@ -208,9 +186,6 @@ int execle(const char *path, const char *arg, ...) {
     return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_POSIX_SPAWN
 
 extern "C"
 int posix_spawn(pid_t *pid, const char *path,
@@ -220,9 +195,6 @@ int posix_spawn(pid_t *pid, const char *path,
     return DynamicLinkerExecutor(session_ptr).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
-#endif
-
-#ifdef HAVE_POSIX_SPAWNP
 
 extern "C"
 int posix_spawnp(pid_t *pid, const char *file,
@@ -231,5 +203,3 @@ int posix_spawnp(pid_t *pid, const char *file,
                  char *const argv[], char *const envp[]) {
     return DynamicLinkerExecutor(session_ptr).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
-
-#endif

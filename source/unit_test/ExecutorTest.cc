@@ -63,7 +63,7 @@ namespace {
         using Sut = ::ear::Executor < Validator>;
 
         auto result = Sut(nullptr).execve(ls_path, ls_argv, ls_envp);
-        EXPECT_EQ(success, result);
+        EXPECT_EQ(failure, result);
     }
 
     TEST_F(ExecutorTest, execve_return_result_with_env) {

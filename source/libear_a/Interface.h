@@ -23,6 +23,7 @@
      constexpr char verbose_flag[]        = "-v";
      constexpr char library_flag[]        = "-l";
      constexpr char file_flag[]           = "-f";
+     constexpr char search_flag[]         = "-s";
      constexpr char command_flag[]        = "--";
 
      constexpr char reporter_env_key[]    = "EAR_REPORTER";
