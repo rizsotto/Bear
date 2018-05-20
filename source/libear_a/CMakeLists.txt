@@ -14,6 +14,8 @@ add_library(ear_a STATIC
         Session.h
         State.h
         State.cc
+        Storage.h
+        Storage.cc
         String.h
 )
 

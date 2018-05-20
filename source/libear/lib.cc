@@ -36,6 +36,7 @@
 #include "libear_a/String.h"
 #include "libear_a/Session.h"
 #include "libear_a/State.h"
+#include "libear_a/Storage.h"
 #include "libear_a/Executor.h"
 
 
@@ -44,6 +45,7 @@ namespace {
 
     std::atomic<bool> loaded = false;
 
+    ::ear::Storage storage;
     char placeholder[sizeof(::ear::State)];
     ::ear::State *state_ptr = nullptr;
 }
