@@ -23,6 +23,7 @@
 #include <algorithm>
 
 #include "libpear_a/Environment.h"
+#include "libear_a/Interface.h"
 #include "libear_a/Session.h"
 
 namespace {

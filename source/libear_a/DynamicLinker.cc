@@ -19,64 +19,50 @@
 
 #include "libear_a/DynamicLinker.h"
 
+#include <dlfcn.h>
+
 namespace {
 
-    using Execve_Fp = int (*)(const char *, char *const *, char *const *);
-    using ExecvP_Fp = int (*)(const char *, const char *, char *const *);
-    using Spawn_Fp  = int (*)(pid_t *,
-                              const char *,
-                              const posix_spawn_file_actions_t *,
-                              const posix_spawnattr_t *,
-                              char *const *,
-                              char *const *);
-
-
-    template<typename F>
-    ear::Result<F> typed_dlsym_Z(const char *name) {
-        // TODO: create a new exception type to store the symbol name
+    template <typename F>
+    F typed_dlsym(const char *const name) {
         void *symbol = dlsym(RTLD_NEXT, name);
-        if (symbol == nullptr)
-            return ear::Result<F>::failure(std::runtime_error("Couldn't resolve symbol"));
-
-        auto result = reinterpret_cast<F>(symbol);
-        if (result == nullptr)
-            return ear::Result<F>::failure(std::runtime_error("Couldn't cast symbol"));
-
-        return ear::Result<F>::success(result);
+        return reinterpret_cast<F>(symbol);
     }
 
 }
 
 namespace ear {
 
-    Result<Resolver::Execve> DynamicLinker_Z::execve() const noexcept {
-        constexpr char execve_name[] = "execve";
-        return typed_dlsym_Z<Execve_Fp>(execve_name)
-                .map<Execve>([](const Execve_Fp &fp) { return Execve(fp); });
+    DynamicLinker::execve_t DynamicLinker::execve() noexcept {
+        return typed_dlsym<DynamicLinker::execve_t>("execve");
     }
 
-    Result<Resolver::Execve> DynamicLinker_Z::execvpe() const noexcept {
-        constexpr char execvpe_name[] = "execvpe";
-        return typed_dlsym_Z<Execve_Fp>(execvpe_name)
-                .map<Execve>([](const Execve_Fp &fp) { return Execve(fp); });
+    DynamicLinker::execv_t DynamicLinker::execv() noexcept {
+        return typed_dlsym<DynamicLinker::execv_t>("execv");
     }
 
-    Result<Resolver::ExecvP> DynamicLinker_Z::execvP() const noexcept {
-        constexpr char execvp_name[] = "execvP";
-        return typed_dlsym_Z<ExecvP_Fp>(execvp_name)
-                .map<ExecvP>([](const ExecvP_Fp &fp) { return ExecvP(fp); });
+    DynamicLinker::execve_t DynamicLinker::execvpe() noexcept {
+        return typed_dlsym<DynamicLinker::execvpe_t>("execvpe");
     }
 
-    Result<Resolver::Spawn> DynamicLinker_Z::posix_spawn() const noexcept {
-        constexpr char posix_spawn_name[] = "posix_spawn";
-        return typed_dlsym_Z<Spawn_Fp>(posix_spawn_name)
-                .map<Spawn>([](const Spawn_Fp &fp) { return Spawn(fp); });
+    DynamicLinker::execvp_t DynamicLinker::execvp() noexcept {
+        return typed_dlsym<DynamicLinker::execvp_t>("execvp");
     }
 
-    Result<Resolver::Spawn> DynamicLinker_Z::posix_spawnp() const noexcept {
-        constexpr char posix_spawnp_name[] = "posix_spawnp";
-        return typed_dlsym_Z<Spawn_Fp>(posix_spawnp_name)
-                .map<Spawn>([](const Spawn_Fp &fp) { return Spawn(fp); });
+    DynamicLinker::execvP_t DynamicLinker::execvP() noexcept {
+        return typed_dlsym<DynamicLinker::execvP_t>("execvP");
+    }
+
+    DynamicLinker::exect_t DynamicLinker::exect() noexcept {
+        return typed_dlsym<DynamicLinker::exect_t>("exect");
+    }
+
+    DynamicLinker::posix_spawn_t DynamicLinker::posix_spawn() noexcept {
+        return typed_dlsym<DynamicLinker::posix_spawn_t>("posix_spawn");
+    }
+
+    DynamicLinker::posix_spawnp_t DynamicLinker::posix_spawnp() noexcept {
+        return typed_dlsym<DynamicLinker::posix_spawnp_t>("posix_spawnp");
     }
 
 }

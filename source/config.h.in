@@ -16,3 +16,10 @@
 #cmakedefine HAVE_SPAWN_HEADER
 
 #cmakedefine APPLE
+
+
+#include <unistd.h>
+
+#if defined HAVE_SPAWN_HEADER
+# include <spawn.h>
+#endif

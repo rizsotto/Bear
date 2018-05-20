@@ -19,13 +19,6 @@
 
 #include "config.h"
 
-#include <unistd.h>
-
-#if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
-#endif
-
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>

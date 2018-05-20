@@ -24,7 +24,7 @@
 #include <cstring>
 
 #include "libpear_a/Parameters.h"
-#include "libear_a/Result.h"
+#include "libpear_a/Result.h"
 #include "libpear_a/Environment.h"
 #include "libpear_a/Reporter.h"
 #include "libpear_a/SystemCalls.h"

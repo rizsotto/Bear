@@ -6,11 +6,8 @@ add_library(ear_a STATIC
         Array.h
         DynamicLinker.h
         DynamicLinker.cc
-        Execution.h
         Executor.h
-        Resolver.h
-        Resolver.cc
-        Result.h
+        Interface.h
         Session.h
         State.h
         State.cc

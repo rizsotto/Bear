@@ -21,13 +21,9 @@
 
 #include "config.h"
 
-#if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
-#endif
-
-#include "Array.h"
-#include "Execution.h"
-#include "State.h"
+#include "libear_a/Array.h"
+#include "libear_a/State.h"
+#include "libear_a/Interface.h"
 
 namespace ear {
 
@@ -57,7 +53,7 @@ namespace ear {
             *it++ = parameters.destination;
             *it++ = library_flag;
             *it++ = parameters.library;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -85,7 +81,7 @@ namespace ear {
             *it++ = parameters.destination;
             *it++ = library_flag;
             *it++ = parameters.library;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -113,7 +109,7 @@ namespace ear {
             *it++ = parameters.library;
             *it++ = file_flag;
             *it++ = file;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -142,7 +138,7 @@ namespace ear {
             *it++ = parameters.library;
             *it++ = file_flag;
             *it++ = file;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -173,7 +169,7 @@ namespace ear {
             *it++ = file;
             *it++ = search_flag;
             *it++ = search_path;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -200,7 +196,7 @@ namespace ear {
             *it++ = parameters.destination_;
             *it++ = library_flag;
             *it++ = parameters.library;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -234,7 +230,7 @@ namespace ear {
             *it++ = parameters.destination;
             *it++ = library_flag;
             *it++ = parameters.library;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
@@ -264,7 +260,7 @@ namespace ear {
             *it++ = parameters.destination;
             *it++ = library_flag;
             *it++ = parameters.library;
-            *it++ = "--";
+            *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 

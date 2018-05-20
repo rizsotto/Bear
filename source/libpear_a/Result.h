@@ -175,13 +175,6 @@ namespace ear {
 
 #include <stdexcept>
 
-namespace ear {
-
-    template <typename T>
-    using Result = ::ear::impl::Result<T, std::runtime_error>;
-
-}
-
 namespace pear {
 
     template <typename T>

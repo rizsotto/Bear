@@ -21,53 +21,27 @@
 
 #include "config.h"
 
-#include <dlfcn.h>
-#if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
-#endif
-
-#include "libear_a/Result.h"
-#include "libear_a/Resolver.h"
-
 namespace ear {
-
-    template <typename F>
-    F typed_dlsym(const char *const name) {
-        void *symbol = dlsym(RTLD_NEXT, name);
-        return reinterpret_cast<F>(symbol);
-    }
 
     struct DynamicLinker {
 
         using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-        static execve_t execve() noexcept {
-            return typed_dlsym<execve_t>("execve");
-        }
+        static execve_t execve() noexcept;
 
         using execv_t = int (*)(const char *path, char *const argv[]);
-        static execv_t execv() noexcept {
-            return typed_dlsym<execv_t>("execv");
-        }
+        static execv_t execv() noexcept;
 
         using execvpe_t = int (*)(const char *file, char *const argv[], char *const envp[]);
-        static execve_t execvpe() noexcept {
-            return typed_dlsym<execvpe_t>("execvpe");
-        }
+        static execve_t execvpe() noexcept;
 
         using execvp_t = int (*)(const char *file, char *const argv[]);
-        static execvp_t execvp() noexcept {
-            return typed_dlsym<execvp_t>("execvp");
-        }
+        static execvp_t execvp() noexcept;
 
         using execvP_t = int (*)(const char *file, const char *search_path, char *const argv[]);
-        static execvP_t execvP() noexcept {
-            return typed_dlsym<execvP_t>("execvP");
-        }
+        static execvP_t execvP() noexcept;
 
         using exect_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-        static exect_t exect() noexcept {
-            return typed_dlsym<exect_t>("exect");
-        }
+        static exect_t exect() noexcept;
 
         using posix_spawn_t = int (*)(pid_t *pid,
                                       const char *path,
@@ -75,9 +49,7 @@ namespace ear {
                                       const posix_spawnattr_t *attrp,
                                       char *const argv[],
                                       char *const envp[]);
-        static posix_spawn_t posix_spawn() noexcept {
-            return typed_dlsym<posix_spawn_t>("posix_spawn");
-        }
+        static posix_spawn_t posix_spawn() noexcept;
 
         using posix_spawnp_t = int (*)(pid_t *pid,
                                        const char *file,
@@ -85,22 +57,7 @@ namespace ear {
                                        const posix_spawnattr_t *attrp,
                                        char *const argv[],
                                        char *const envp[]);
-        static posix_spawnp_t posix_spawnp() noexcept {
-            return typed_dlsym<posix_spawnp_t>("posix_spawnp");
-        }
-    };
-
-    class DynamicLinker_Z : public Resolver {
-    public:
-        Result<Execve> execve() const noexcept override;
-
-        Result<Execve> execvpe() const noexcept override;
-
-        Result<ExecvP> execvP() const noexcept override;
-
-        Result<Spawn> posix_spawn() const noexcept override;
-
-        Result<Spawn> posix_spawnp() const noexcept override;
+        static posix_spawnp_t posix_spawnp() noexcept;
     };
 
 }

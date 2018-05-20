@@ -17,7 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "State.h"
+#include "libear_a/State.h"
+#include "libear_a/Interface.h"
 
 #include <new>
 
@@ -26,7 +27,6 @@
 #else
 extern "C" char **environ;
 #endif
-
 
 namespace ear {
 

@@ -17,11 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Storage.h"
-
 #include <algorithm>
 
-#include "Array.h"
+#include "libear_a/Storage.h"
+#include "libear_a/Array.h"
 
 
 namespace ear {
