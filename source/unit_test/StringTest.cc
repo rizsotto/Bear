@@ -59,14 +59,4 @@ namespace {
         EXPECT_FALSE(::ear::string::equal("this", "th", 4));
     }
 
-    TEST(string_constructor, copy_content) {
-        const char input[] = "Lorem ipsum dolor sit amet";
-        EXPECT_STREQ(input, ::ear::String<128>(input).begin());
-    }
-
-    TEST(string_constructor, null_for_long_content) {
-        const char input[] = "Lorem ipsum dolor sit amet";
-        EXPECT_STREQ("", ::ear::String<16>(input).begin());
-    }
-
 }

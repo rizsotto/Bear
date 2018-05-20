@@ -39,8 +39,6 @@ namespace ear {
         Storage &operator=(Storage &&) noexcept = delete;
 
     private:
-        static constexpr unsigned int size_ = 16 * 1024;
-
         char *const begin_;
         char *const end_;
         char *top_;
