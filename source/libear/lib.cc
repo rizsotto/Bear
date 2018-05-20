@@ -28,7 +28,7 @@
 #include "libear_a/DynamicLinker.h"
 #include "libear_a/String.h"
 #include "libear_a/Session.h"
-#include "libear_a/State.h"
+#include "libear_a/Environment.h"
 #include "libear_a/Storage.h"
 #include "libear_a/Executor.h"
 
@@ -39,8 +39,9 @@ namespace {
     std::atomic<bool> loaded = false;
 
     ::ear::Storage storage;
-    char placeholder[sizeof(::ear::State)];
-    ::ear::State *state_ptr = nullptr;
+    ::ear::LibrarySession session;
+
+    ::ear::LibrarySession const *session_ptr;
 }
 
 /**
@@ -54,7 +55,8 @@ extern "C" void on_load() {
     if (loaded.exchange(true))
         return;
 
-    state_ptr = ::ear::State::capture(placeholder);
+    auto environment = ::ear::environment::current();
+    session_ptr = ::ear::environment::capture(session, storage, environment);
 }
 
 /**
@@ -68,10 +70,8 @@ extern "C" void on_unload() {
     if (not loaded.exchange(false))
         return;
 
-    if (state_ptr != nullptr) {
-        state_ptr->~State();
-        state_ptr = nullptr;
-    }
+    if (session_ptr != nullptr)
+        session_ptr = nullptr;
 }
 
 
@@ -79,7 +79,7 @@ extern "C" void on_unload() {
 
 extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(state_ptr).execve(path, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
 #endif
@@ -90,7 +90,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 
 extern "C"
 int execv(const char *path, char *const argv[]) {
-    return DynamicLinkerExecutor(state_ptr).execv(path, argv);
+    return DynamicLinkerExecutor(session_ptr).execv(path, argv);
 }
 
 #endif
@@ -99,7 +99,7 @@ int execv(const char *path, char *const argv[]) {
 
 extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(state_ptr).execvpe(file, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).execvpe(file, argv, envp);
 }
 
 #endif
@@ -108,7 +108,7 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
 
 extern "C"
 int execvp(const char *file, char *const argv[]) {
-    return DynamicLinkerExecutor(state_ptr).execvp(file, argv);
+    return DynamicLinkerExecutor(session_ptr).execvp(file, argv);
 }
 
 #endif
@@ -117,7 +117,7 @@ int execvp(const char *file, char *const argv[]) {
 
 extern "C"
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    return DynamicLinkerExecutor(state_ptr).execvP(file, search_path, argv);
+    return DynamicLinkerExecutor(session_ptr).execvP(file, search_path, argv);
 }
 
 #endif
@@ -126,7 +126,7 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
 
 extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(state_ptr).exect(path, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).exect(path, argv, envp);
 }
 
 #endif
@@ -161,7 +161,7 @@ int execl(const char *path, const char *arg, ...) {
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
-    return DynamicLinkerExecutor(state_ptr).execv(path, argv);
+    return DynamicLinkerExecutor(session_ptr).execv(path, argv);
 }
 
 #endif
@@ -181,7 +181,7 @@ int execlp(const char *file, const char *arg, ...) {
     va_copy_n(ap, argv, argc);
     va_end(ap);
 
-    return DynamicLinkerExecutor(state_ptr).execvp(file, argv);
+    return DynamicLinkerExecutor(session_ptr).execvp(file, argv);
 }
 
 #endif
@@ -203,7 +203,7 @@ int execle(const char *path, const char *arg, ...) {
     char **envp = va_arg(ap, char **);
     va_end(ap);
 
-    return DynamicLinkerExecutor(state_ptr).execve(path, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
 #endif
@@ -215,7 +215,7 @@ int posix_spawn(pid_t *pid, const char *path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *attrp,
                 char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(state_ptr).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
 #endif
@@ -227,7 +227,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  const posix_spawn_file_actions_t *file_actions,
                  const posix_spawnattr_t *attrp,
                  char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(state_ptr).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 
 #endif

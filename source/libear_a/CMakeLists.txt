@@ -9,8 +9,8 @@ add_library(ear_a STATIC
         Executor.h
         Interface.h
         Session.h
-        State.h
-        State.cc
+        Environment.h
+        Environment.cc
         Storage.h
         Storage.cc
         String.h

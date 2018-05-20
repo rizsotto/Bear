@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
-#include "libear_a/State.h"
-#include "../libear_a/Executor.h"
+#include "libear_a/Environment.h"
+#include "libear_a/Executor.h"
 
 namespace {
 
@@ -16,7 +16,7 @@ namespace {
             nullptr
     };
 
-    constexpr char target_str[] = "/tmp/pear.random";
+    constexpr char destination_str[] = "/tmp/pear.random";
     constexpr char library_str[] = "/usr/libexec/libear.so";
     constexpr char reporter_str[] = "/usr/bin/pear";
 
@@ -24,12 +24,16 @@ namespace {
     constexpr int success = 0;
 
     class ExecutorTest
-            : public ::ear::State
+            : public ::ear::LibrarySession
             , public ::testing::Test {
     public:
         ExecutorTest()
-                : ::ear::State(target_str, library_str, reporter_str, false)
-        {}
+        {
+            reporter = reporter_str;
+            destination = destination_str;
+            verbose = true;
+            library = library_str;
+        }
     };
 
     TEST_F(ExecutorTest, execve_return_error_without_env) {
@@ -69,7 +73,7 @@ namespace {
                     EXPECT_STREQ(reporter_str, path);
                     EXPECT_STREQ(reporter_str, argv[0]);
                     EXPECT_STREQ("-t", argv[1]);
-                    EXPECT_STREQ(target_str, argv[2]);
+                    EXPECT_STREQ(destination_str, argv[2]);
                     EXPECT_STREQ("-l", argv[3]);
                     EXPECT_STREQ(library_str, argv[4]);
                     EXPECT_STREQ("--", argv[5]);
