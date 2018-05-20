@@ -52,7 +52,6 @@ namespace {
 
 
 namespace ear {
-
     namespace environment {
 
         const char **current() noexcept {
@@ -80,5 +79,4 @@ namespace ear {
         }
 
     }
-
 }
