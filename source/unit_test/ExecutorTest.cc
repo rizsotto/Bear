@@ -29,9 +29,9 @@ namespace {
     public:
         ExecutorTest()
         {
-            reporter = reporter_str;
-            destination = destination_str;
-            verbose = true;
+            session.reporter = reporter_str;
+            session.destination = destination_str;
+            session.verbose = true;
             library = library_str;
         }
     };

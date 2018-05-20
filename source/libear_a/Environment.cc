@@ -68,14 +68,14 @@ namespace ear {
             if (nullptr == environment)
                 return nullptr;
 
-            session.destination = storage.store(get_env(environment, ::ear::destination_env_key));
-            session.library     = storage.store(get_env(environment, ::ear::library_env_key));
-            session.reporter    = storage.store(get_env(environment, ::ear::reporter_env_key));
-            session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
+            session.session.destination = storage.store(get_env(environment, ::ear::destination_env_key));
+            session.library             = storage.store(get_env(environment, ::ear::library_env_key));
+            session.session.reporter    = storage.store(get_env(environment, ::ear::reporter_env_key));
+            session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
 
-            return (session.destination == nullptr ||
+            return (session.session.destination == nullptr ||
                     session.library == nullptr ||
-                    session.reporter == nullptr)
+                    session.session.reporter == nullptr)
                 ? nullptr : &session;
         }
 

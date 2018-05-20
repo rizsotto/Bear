@@ -46,16 +46,16 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(session_->reporter, const_cast<char *const *>(dst), envp);
+            return fp(session_->session.reporter, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -72,16 +72,16 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(session_->reporter, const_cast<char *const *>(dst));
+            return fp(session_->session.reporter, const_cast<char *const *>(dst));
         }
 #endif
 
@@ -96,9 +96,9 @@ namespace ear {
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = file_flag;
@@ -108,7 +108,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execve();
-            return (fp == nullptr) ? -1 : fp(session_->reporter, const_cast<char *const *>(dst), envp);
+            return (fp == nullptr) ? -1 : fp(session_->session.reporter, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -123,9 +123,9 @@ namespace ear {
             const char *dst[argv_length + 9];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = file_flag;
@@ -135,7 +135,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::execv();
-            return (fp == nullptr) ? -1 : fp(session_->reporter, const_cast<char *const *>(dst));
+            return (fp == nullptr) ? -1 : fp(session_->session.reporter, const_cast<char *const *>(dst));
         }
 #endif
 
@@ -211,16 +211,16 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = command_flag;
 
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
-            return fp(pid, session_->reporter, file_actions, attrp, const_cast<char *const *>(dst), envp);
+            return fp(pid, session_->session.reporter, file_actions, attrp, const_cast<char *const *>(dst), envp);
         }
 #endif
 
@@ -239,9 +239,9 @@ namespace ear {
             const char *dst[argv_length + 7];
 
             const char **it = dst;
-            *it++ = session_->reporter;
+            *it++ = session_->session.reporter;
             *it++ = destination_flag;
-            *it++ = session_->destination;
+            *it++ = session_->session.destination;
             *it++ = library_flag;
             *it++ = session_->library;
             *it++ = command_flag;
@@ -249,7 +249,7 @@ namespace ear {
             ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
 
             auto fp = Resolver::posix_spawn();
-            return (fp == nullptr) ? -1 : fp(pid, session_->reporter, file_actions, attrp,
+            return (fp == nullptr) ? -1 : fp(pid, session_->session.reporter, file_actions, attrp,
                                              const_cast<char *const *>(dst), envp);
         }
 #endif

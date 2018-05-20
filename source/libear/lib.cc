@@ -38,7 +38,9 @@ namespace {
 
     std::atomic<bool> loaded = false;
 
-    ::ear::Storage storage;
+    constexpr size_t buffer_size = 16 * 1024;
+    char buffer[buffer_size];
+    ::ear::Storage storage(buffer, buffer + buffer_size);
     ::ear::LibrarySession session;
 
     ::ear::LibrarySession const *session_ptr;

@@ -25,18 +25,18 @@
 
 namespace ear {
 
-    Storage::Storage() noexcept
-            : buffer_()
-            , top_(buffer_)
+    Storage::Storage(char *const begin, char *const end) noexcept
+            : begin_(begin)
+            , end_(end)
+            , top_(begin)
     { }
 
     char const *Storage::store(char const *const input) noexcept {
         if (input == nullptr)
             return nullptr;
 
-        char *const buffer_end = buffer_ + size_;
         auto input_end = ::ear::array::end(input) + 1;  // include the zero element
-        auto top = ::ear::array::copy(input, input_end, top_, buffer_end);
+        auto top = ::ear::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);
         return top;

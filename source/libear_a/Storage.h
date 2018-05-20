@@ -23,7 +23,7 @@ namespace ear {
 
     class Storage {
     public:
-        Storage() noexcept;
+        Storage(char *begin, char *end) noexcept;
 
         ~Storage() noexcept = default;
 
@@ -41,7 +41,8 @@ namespace ear {
     private:
         static constexpr unsigned int size_ = 16 * 1024;
 
-        char buffer_[size_];
+        char *const begin_;
+        char *const end_;
         char *top_;
     };
 
