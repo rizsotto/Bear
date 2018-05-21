@@ -8,3 +8,5 @@ add_library(pear_a STATIC
         SystemCalls.h
         SystemCalls.cc
 )
+
+add_subdirectory(test)

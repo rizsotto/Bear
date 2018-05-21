@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../libear_a/Array.h"
+#include "../Array.h"
 
 namespace {
 

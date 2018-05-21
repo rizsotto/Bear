@@ -36,17 +36,13 @@ set_target_properties(libgmock PROPERTIES
         "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
         )
 
-set(GOOGLE_TEST_INCLUDE_DIR "${source_dir}/googletest/include")
-set(GOOGLE_MOCK_INCLUDE_DIR "${source_dir}/googlemock/include")
+set(GOOGLE_TEST_INCLUDE_DIR "${source_dir}/googletest/include" PARENT_SCOPE)
+set(GOOGLE_MOCK_INCLUDE_DIR "${source_dir}/googlemock/include" PARENT_SCOPE)
 
 
 # Use the gtest framework for unit testing
-file(GLOB SRCS *.cc)
-add_executable(unit_test ${SRCS})
+add_library(gtest_main_a STATIC
+        main.cc
+)
 
 include_directories(${GOOGLE_TEST_INCLUDE_DIR})
-target_link_libraries(unit_test libgtest)
-target_link_libraries(unit_test ear_a)
-
-enable_testing()
-add_test(NAME UnitTests COMMAND unit_test)
