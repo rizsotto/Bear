@@ -112,7 +112,7 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
 
 extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
-    return DynamicLinkerExecutor(session_ptr).exect(path, argv, envp);
+    return DynamicLinkerExecutor(session_ptr).execve(path, argv, envp);
 }
 
 

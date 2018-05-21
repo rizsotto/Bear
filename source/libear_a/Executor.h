@@ -42,7 +42,8 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 7];
+            const size_t dst_length = argv_length + 7;
+            const char *dst[dst_length] = {};
 
             const char **it = dst;
             *it++ = session_->session.reporter;
@@ -52,7 +53,7 @@ namespace ear {
             *it++ = session_->library;
             *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
+            ::ear::array::copy(argv, argv + argv_length, it, dst + dst_length);
 
             return fp(session_->session.reporter, const_cast<char *const *>(dst), envp);
         }
@@ -66,7 +67,8 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 9];
+            const size_t dst_length = argv_length + 9;
+            const char *dst[dst_length] = {};
 
             const char **it = dst;
             *it++ = session_->session.reporter;
@@ -78,7 +80,7 @@ namespace ear {
             *it++ = file;
             *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
+            ::ear::array::copy(argv, argv + argv_length, it, dst + dst_length);
 
             return fp(session_->session.reporter, const_cast<char *const *>(dst), envp);
         }
@@ -92,7 +94,8 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 11];
+            const size_t dst_length = argv_length + 11;
+            const char *dst[dst_length] = {};
 
             const char **it = dst;
             *it++ = session_->session.reporter;
@@ -106,13 +109,9 @@ namespace ear {
             *it++ = search_path;
             *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
+            ::ear::array::copy(argv, argv + argv_length, it, dst + dst_length);
 
             return fp(session_->session.reporter, const_cast<char *const *>(dst), envp);
-        }
-
-        int exect(const char *path, char *const argv[], char *const envp[]) const noexcept {
-            return execve(path, argv, envp);
         }
 
         int posix_spawn(pid_t *pid, const char *path,
@@ -128,7 +127,8 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 7];
+            const size_t dst_length = argv_length + 7;
+            const char *dst[dst_length] = {};
 
             const char **it = dst;
             *it++ = session_->session.reporter;
@@ -138,7 +138,7 @@ namespace ear {
             *it++ = session_->library;
             *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
+            ::ear::array::copy(argv, argv + argv_length, it, dst + dst_length);
 
             return fp(pid, session_->session.reporter, file_actions, attrp,
                       const_cast<char *const *>(dst), envp);
@@ -157,7 +157,8 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const char *dst[argv_length + 9];
+            const size_t dst_length = argv_length + 9;
+            const char *dst[dst_length] = {};
 
             const char **it = dst;
             *it++ = session_->session.reporter;
@@ -169,7 +170,7 @@ namespace ear {
             *it++ = file;
             *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length, it, it + argv_length);
+            ::ear::array::copy(argv, argv + argv_length, it, dst + dst_length);
 
             return fp(pid, session_->session.reporter, file_actions, attrp,
                       const_cast<char *const *>(dst), envp);
