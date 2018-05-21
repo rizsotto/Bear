@@ -28,9 +28,6 @@ namespace ear {
         using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
         static execve_t execve() noexcept;
 
-        using execvpe_t = int (*)(const char *file, char *const argv[], char *const envp[]);
-        static execve_t execvpe() noexcept;
-
         using posix_spawn_t = int (*)(pid_t *pid,
                                       const char *path,
                                       const posix_spawn_file_actions_t *file_actions,

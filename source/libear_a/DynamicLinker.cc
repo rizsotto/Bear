@@ -37,10 +37,6 @@ namespace ear {
         return typed_dlsym<DynamicLinker::execve_t>("execve");
     }
 
-    DynamicLinker::execve_t DynamicLinker::execvpe() noexcept {
-        return typed_dlsym<DynamicLinker::execvpe_t>("execvpe");
-    }
-
     DynamicLinker::posix_spawn_t DynamicLinker::posix_spawn() noexcept {
         return typed_dlsym<DynamicLinker::posix_spawn_t>("posix_spawn");
     }
