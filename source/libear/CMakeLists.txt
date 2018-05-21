@@ -1,3 +1,7 @@
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
+
 add_library(ear SHARED
         lib.cc
 )

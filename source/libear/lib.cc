@@ -36,7 +36,7 @@
 namespace {
     using DynamicLinkerExecutor = ::ear::Executor<::ear::DynamicLinker>;
 
-    std::atomic<bool> loaded = false;
+    std::atomic<bool> loaded(false);
 
     constexpr size_t buffer_size = 16 * 1024;
     char buffer[buffer_size];
@@ -117,15 +117,14 @@ int exect(const char *path, char *const argv[], char *const envp[]) {
 
 
 namespace {
-    constexpr auto va_length = [](va_list &args) -> size_t {
+    size_t va_length(va_list &args) {
         size_t arg_count = 0;
         while (va_arg(args, const char *) != nullptr)
             ++arg_count;
         return arg_count;
     };
 
-    constexpr auto va_copy_n =
-            [](va_list &args, char *argv[], size_t const argc) -> void {
+    void va_copy_n(va_list &args, char *argv[], size_t const argc) {
         for (size_t idx = 0; idx <= argc; ++idx)
             argv[idx] = va_arg(args, char *);
     };
