@@ -32,9 +32,9 @@ namespace {
 
     TEST_F(Environment, capture_correct_env_values) {
         const char *envp[] = {
-                "EAR_DESTINATION=/tmp/pear.random",
-                "EAR_LIBRARY=/usr/libexec/libear.so",
-                "EAR_REPORTER=/usr/bin/pear",
+                "EAR_REPORT_DESTINATION=/tmp/pear.random",
+                "EAR_SESSION_LIBRARY=/usr/libexec/libear.so",
+                "EAR_REPORT_COMMAND=/usr/bin/pear",
                 nullptr
         };
 

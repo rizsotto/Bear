@@ -1,5 +1,6 @@
 #include "gtest/gtest.h"
 
+#include "libear_a/Interface.h"
 #include "libear_a/Environment.h"
 #include "libear_a/Executor.h"
 
@@ -72,11 +73,11 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(reporter_str, path);
                     EXPECT_STREQ(reporter_str, argv[0]);
-                    EXPECT_STREQ("-t", argv[1]);
+                    EXPECT_STREQ(ear::destination_flag, argv[1]);
                     EXPECT_STREQ(destination_str, argv[2]);
-                    EXPECT_STREQ("-l", argv[3]);
+                    EXPECT_STREQ(ear::library_flag, argv[3]);
                     EXPECT_STREQ(library_str, argv[4]);
-                    EXPECT_STREQ("--", argv[5]);
+                    EXPECT_STREQ(ear::command_flag, argv[5]);
                     EXPECT_STREQ(ls_argv[0], argv[6]);
                     EXPECT_STREQ(ls_argv[1], argv[7]);
                     EXPECT_EQ(ls_envp, envp);

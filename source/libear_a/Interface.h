@@ -17,20 +17,24 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+ #pragma once
+
  namespace ear {
 
-     constexpr char destination_flag[]    = "-t";
-     constexpr char verbose_flag[]        = "-v";
-     constexpr char library_flag[]        = "-l";
-     constexpr char file_flag[]           = "-f";
-     constexpr char search_flag[]         = "-s";
-     constexpr char command_flag[]        = "--";
+     constexpr char destination_flag[]    = "--report-destination";
+     constexpr char verbose_flag[]        = "--report-verbose";
+     constexpr char library_flag[]        = "--session-library";
+     constexpr char cc_flag[]             = "--session-wrapper-cc";
+     constexpr char cxx_flag[]            = "--session-wrapper-cxx";
+     constexpr char file_flag[]           = "--exec-file";
+     constexpr char search_flag[]         = "--exec-search_path";
+     constexpr char command_flag[]        = "--exec-command";
 
-     constexpr char reporter_env_key[]    = "EAR_REPORTER";
-     constexpr char destination_env_key[] = "EAR_DESTINATION";
-     constexpr char verbose_env_key[]     = "EAR_VERBOSE";
-     constexpr char library_env_key[]     = "EAR_LIBRARY";
-     constexpr char cc_env_key[]          = "EAR_CC";
-     constexpr char cxx_env_key[]         = "EAR_CXX";
+     constexpr char reporter_env_key[]    = "EAR_REPORT_COMMAND";
+     constexpr char destination_env_key[] = "EAR_REPORT_DESTINATION";
+     constexpr char verbose_env_key[]     = "EAR_REPORT_VERBOSE";
+     constexpr char library_env_key[]     = "EAR_SESSION_LIBRARY";
+     constexpr char cc_env_key[]          = "EAR_SESSION_WRAPPER_CC";
+     constexpr char cxx_env_key[]         = "EAR_SESSION_WRAPPER_CXX";
 
  }
