@@ -67,15 +67,33 @@ namespace ear {
             if (nullptr == environment)
                 return nullptr;
 
-            session.session.destination = storage.store(get_env(environment, ::ear::destination_env_key));
-            session.library             = storage.store(get_env(environment, ::ear::library_env_key));
             session.session.reporter    = storage.store(get_env(environment, ::ear::reporter_env_key));
+            session.session.destination = storage.store(get_env(environment, ::ear::destination_env_key));
             session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
+            session.library             = storage.store(get_env(environment, ::ear::library_env_key));
 
-            return (session.session.destination == nullptr ||
-                    session.library == nullptr ||
-                    session.session.reporter == nullptr)
+            return (session.session.reporter == nullptr ||
+                    session.session.destination == nullptr ||
+                    session.library == nullptr)
                 ? nullptr : &session;
+        }
+
+        const WrapperSession *
+        capture(WrapperSession &session, const char **environment) noexcept {
+            if (nullptr == environment)
+                return nullptr;
+
+            session.session.reporter    = get_env(environment, ::ear::reporter_env_key);
+            session.session.destination = get_env(environment, ::ear::destination_env_key);
+            session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
+            session.cc                  = get_env(environment, ::ear::cc_env_key);
+            session.cxx                 = get_env(environment, ::ear::cxx_env_key);
+
+            return (session.session.reporter == nullptr ||
+                    session.session.destination == nullptr ||
+                    session.cc == nullptr ||
+                    session.cxx == nullptr)
+                   ? nullptr : &session;
         }
 
     }

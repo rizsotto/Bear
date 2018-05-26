@@ -40,19 +40,20 @@ namespace {
     TEST_F(ExecutorTest, execve_return_error_without_env) {
         struct Validator {
             using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-            static execve_t execve() {
+            static execve_t resolve_execve() {
                 return nullptr;
             }
         };
         using Sut = ::ear::Executor < Validator>;
+        const ::ear::LibrarySession *session_ptr = nullptr;
 
-        auto result = Sut(nullptr).execve(ls_path, ls_argv, ls_envp);
+        auto result = Sut(session_ptr).execve(ls_path, ls_argv, ls_envp);
         EXPECT_EQ(failure, result);
     }
 
     TEST_F(ExecutorTest, execve_return_result_without_env) {
         struct Validator {
-            static auto execve() {
+            static auto resolve_execve() {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_EQ(ls_path, path);
                     EXPECT_EQ(ls_argv, argv);
@@ -62,14 +63,15 @@ namespace {
             }
         };
         using Sut = ::ear::Executor < Validator>;
+        const ::ear::LibrarySession *session_ptr = nullptr;
 
-        auto result = Sut(nullptr).execve(ls_path, ls_argv, ls_envp);
+        auto result = Sut(session_ptr).execve(ls_path, ls_argv, ls_envp);
         EXPECT_EQ(failure, result);
     }
 
     TEST_F(ExecutorTest, execve_return_result_with_env) {
         struct Validator {
-            static auto execve() {
+            static auto resolve_execve() {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(reporter_str, path);
                     EXPECT_STREQ(reporter_str, argv[0]);

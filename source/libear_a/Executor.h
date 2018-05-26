@@ -21,6 +21,8 @@
 
 #include "config.h"
 
+#include <algorithm>
+
 #include "libear_a/Array.h"
 #include "libear_a/Environment.h"
 #include "libear_a/Interface.h"
@@ -34,7 +36,7 @@ namespace ear {
             if (! initialized_)
                 return -1;
 
-            auto fp = Resolver::execve();
+            auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
 
@@ -55,7 +57,7 @@ namespace ear {
             if (! initialized_)
                 return -1;
 
-            auto fp = Resolver::execve();
+            auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
 
@@ -78,7 +80,7 @@ namespace ear {
             if (! initialized_)
                 return -1;
 
-            auto fp = Resolver::execve();
+            auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
 
@@ -107,7 +109,7 @@ namespace ear {
             if (! initialized_)
                 return -1;
 
-            auto fp = Resolver::posix_spawn();
+            auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
 
@@ -132,7 +134,7 @@ namespace ear {
             if (! initialized_)
                 return -1;
 
-            auto fp = Resolver::posix_spawn();
+            auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
 
@@ -153,12 +155,22 @@ namespace ear {
 
     public:
         explicit Executor(const ::ear::LibrarySession *session) noexcept
-                : session_ {
-            (session != nullptr) ? session->session.reporter : nullptr,
-            (session != nullptr) ? destination_flag : nullptr,
-            (session != nullptr) ? session->session.destination : nullptr,
-            (session != nullptr) ? library_flag : nullptr,
-            (session != nullptr) ? session->library : nullptr }
+                : size_(SESSION_LIBRARY_SIZE)
+                , session_ {
+                        (session != nullptr) ? session->session.reporter : nullptr,
+                        (session != nullptr) ? destination_flag : nullptr,
+                        (session != nullptr) ? session->session.destination : nullptr,
+                        (session != nullptr) ? library_flag : nullptr,
+                        (session != nullptr) ? session->library : nullptr }
+                , initialized_(session != nullptr)
+        { }
+
+        explicit Executor(const ::ear::Session *session) noexcept
+                : size_(SESSION_WRAPPER_SIZE)
+                , session_ {
+                        (session != nullptr) ? session->reporter : nullptr,
+                        (session != nullptr) ? destination_flag : nullptr,
+                        (session != nullptr) ? session->destination : nullptr }
                 , initialized_(session != nullptr)
         { }
 
@@ -184,11 +196,16 @@ namespace ear {
         }
 
         const char **session_end() const noexcept {
-            return const_cast<const char **>(session_ + 5);
+            return const_cast<const char **>(session_ + size_);
         }
 
     private:
-        const char *session_[5];
+        static constexpr size_t SESSION_LIBRARY_SIZE = 5;
+        static constexpr size_t SESSION_WRAPPER_SIZE = 3;
+        static constexpr size_t SESSION_SIZE = std::max(SESSION_LIBRARY_SIZE, SESSION_WRAPPER_SIZE);
+
+        size_t size_;
+        const char *session_[SESSION_SIZE];
         bool initialized_;
     };
 

@@ -34,7 +34,7 @@
      constexpr char destination_env_key[] = "EAR_REPORT_DESTINATION";
      constexpr char verbose_env_key[]     = "EAR_REPORT_VERBOSE";
      constexpr char library_env_key[]     = "EAR_SESSION_LIBRARY";
-     constexpr char cc_env_key[]          = "EAR_SESSION_WRAPPER_CC";
-     constexpr char cxx_env_key[]         = "EAR_SESSION_WRAPPER_CXX";
+     constexpr char cc_env_key[]          = "EAR_SESSION_CC";
+     constexpr char cxx_env_key[]         = "EAR_SESSION_CXX";
 
  }

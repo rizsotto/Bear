@@ -33,11 +33,11 @@ namespace {
 
 namespace ear {
 
-    DynamicLinker::execve_t DynamicLinker::execve() noexcept {
+    DynamicLinker::execve_t DynamicLinker::resolve_execve() noexcept {
         return typed_dlsym<DynamicLinker::execve_t>("execve");
     }
 
-    DynamicLinker::posix_spawn_t DynamicLinker::posix_spawn() noexcept {
+    DynamicLinker::posix_spawn_t DynamicLinker::resolve_spawn() noexcept {
         return typed_dlsym<DynamicLinker::posix_spawn_t>("posix_spawn");
     }
 

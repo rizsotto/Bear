@@ -26,7 +26,7 @@ namespace ear {
     struct DynamicLinker {
 
         using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-        static execve_t execve() noexcept;
+        static execve_t resolve_execve() noexcept;
 
         using posix_spawn_t = int (*)(pid_t *pid,
                                       const char *path,
@@ -34,7 +34,7 @@ namespace ear {
                                       const posix_spawnattr_t *attrp,
                                       char *const argv[],
                                       char *const envp[]);
-        static posix_spawn_t posix_spawn() noexcept;
+        static posix_spawn_t resolve_spawn() noexcept;
 
     };
 

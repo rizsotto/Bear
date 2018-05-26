@@ -32,5 +32,8 @@ namespace ear {
         const LibrarySession *
         capture(LibrarySession &session, Storage &storage, const char **environment) noexcept;
 
+        const WrapperSession *
+        capture(WrapperSession &session, const char **environment) noexcept;
+
     }
 }
