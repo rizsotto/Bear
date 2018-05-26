@@ -21,7 +21,6 @@
 
 #include "config.h"
 
-#include "libear_a/Storage.h"
 #include "libear_a/Session.h"
 
 namespace ear {
@@ -30,7 +29,7 @@ namespace ear {
         const char **current() noexcept;
 
         const LibrarySession *
-        capture(LibrarySession &session, Storage &storage, const char **environment) noexcept;
+        capture(LibrarySession &session, const char **environment) noexcept;
 
         const WrapperSession *
         capture(WrapperSession &session, const char **environment) noexcept;

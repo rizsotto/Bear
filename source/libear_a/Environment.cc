@@ -63,14 +63,14 @@ namespace ear {
         }
 
         const LibrarySession *
-        capture(LibrarySession &session, Storage &storage, const char **environment) noexcept {
+        capture(LibrarySession &session, const char **environment) noexcept {
             if (nullptr == environment)
                 return nullptr;
 
-            session.session.reporter    = storage.store(get_env(environment, ::ear::reporter_env_key));
-            session.session.destination = storage.store(get_env(environment, ::ear::destination_env_key));
+            session.session.reporter    = get_env(environment, ::ear::reporter_env_key);
+            session.session.destination = get_env(environment, ::ear::destination_env_key);
             session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
-            session.library             = storage.store(get_env(environment, ::ear::library_env_key));
+            session.library             = get_env(environment, ::ear::library_env_key);
 
             return (session.session.reporter == nullptr ||
                     session.session.destination == nullptr ||

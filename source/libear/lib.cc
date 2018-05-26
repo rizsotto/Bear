@@ -41,8 +41,8 @@ namespace {
     constexpr size_t buffer_size = 16 * 1024;
     char buffer[buffer_size];
     ::ear::Storage storage(buffer, buffer + buffer_size);
-    ::ear::LibrarySession session;
 
+    ::ear::LibrarySession session {};
     ::ear::LibrarySession const *session_ptr;
 }
 
@@ -58,7 +58,8 @@ extern "C" void on_load() {
         return;
 
     auto environment = ::ear::environment::current();
-    session_ptr = ::ear::environment::capture(session, storage, environment);
+    session_ptr = ::ear::environment::capture(session, environment);
+    session_ptr = storage.store(session_ptr);
 }
 
 /**
