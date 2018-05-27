@@ -21,8 +21,6 @@
 
 #include "config.h"
 
-#include <algorithm>
-
 #include "libexec_a/Array.h"
 #include "libexec_a/Environment.h"
 #include "libexec_a/Interface.h"
@@ -155,22 +153,26 @@ namespace ear {
 
     public:
         explicit Executor(const ::ear::LibrarySession *session) noexcept
-                : size_(SESSION_LIBRARY_SIZE)
-                , session_ {
+                : session_ {
                         (session != nullptr) ? session->session.reporter : nullptr,
                         (session != nullptr) ? destination_flag : nullptr,
                         (session != nullptr) ? session->session.destination : nullptr,
                         (session != nullptr) ? library_flag : nullptr,
-                        (session != nullptr) ? session->library : nullptr }
+                        (session != nullptr) ? session->library : nullptr,
+                        (session != nullptr && session->session.verbose) ? verbose_flag : nullptr,
+                        nullptr }
+                , session_end_(::ear::array::end(session_))
                 , initialized_(session != nullptr)
         { }
 
         explicit Executor(const ::ear::Session *session) noexcept
-                : size_(SESSION_WRAPPER_SIZE)
-                , session_ {
+                : session_ {
                         (session != nullptr) ? session->reporter : nullptr,
                         (session != nullptr) ? destination_flag : nullptr,
-                        (session != nullptr) ? session->destination : nullptr }
+                        (session != nullptr) ? session->destination : nullptr,
+                        (session != nullptr && session->verbose) ? verbose_flag : nullptr,
+                        nullptr }
+                , session_end_(::ear::array::end(session_))
                 , initialized_(session != nullptr)
         { }
 
@@ -196,16 +198,14 @@ namespace ear {
         }
 
         const char **session_end() const noexcept {
-            return const_cast<const char **>(session_ + size_);
+            return session_end_;
         }
 
     private:
-        static constexpr size_t SESSION_LIBRARY_SIZE = 5;
-        static constexpr size_t SESSION_WRAPPER_SIZE = 3;
-        static constexpr size_t SESSION_SIZE = std::max(SESSION_LIBRARY_SIZE, SESSION_WRAPPER_SIZE);
+        static constexpr size_t SESSION_SIZE = 10;
 
-        size_t size_;
         const char *session_[SESSION_SIZE];
+        const char **const session_end_;
         bool initialized_;
     };
 
