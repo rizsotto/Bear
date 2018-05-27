@@ -26,9 +26,9 @@ namespace {
 
     TEST_F(Environment, capture_correct_env_values) {
         const char *envp[] = {
-                "EAR_REPORT_DESTINATION=/tmp/intercept.random",
-                "EAR_SESSION_LIBRARY=/usr/libexec/libexec.so",
-                "EAR_REPORT_COMMAND=/usr/bin/intercept",
+                "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
+                "INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so",
+                "INTERCEPT_REPORT_COMMAND=/usr/bin/intercept",
                 nullptr
         };
 

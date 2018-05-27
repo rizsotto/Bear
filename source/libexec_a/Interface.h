@@ -21,20 +21,19 @@
 
  namespace ear {
 
+     constexpr char verbose_flag[]        = "--verbose";
      constexpr char destination_flag[]    = "--report-destination";
-     constexpr char verbose_flag[]        = "--report-verbose";
      constexpr char library_flag[]        = "--session-library";
-     constexpr char cc_flag[]             = "--session-wrapper-cc";
-     constexpr char cxx_flag[]            = "--session-wrapper-cxx";
+     constexpr char wrapper_flag[]        = "--session-wrapper";
      constexpr char file_flag[]           = "--exec-file";
      constexpr char search_flag[]         = "--exec-search_path";
      constexpr char command_flag[]        = "--exec-command";
 
-     constexpr char reporter_env_key[]    = "EAR_REPORT_COMMAND";
-     constexpr char destination_env_key[] = "EAR_REPORT_DESTINATION";
-     constexpr char verbose_env_key[]     = "EAR_REPORT_VERBOSE";
-     constexpr char library_env_key[]     = "EAR_SESSION_LIBRARY";
-     constexpr char cc_env_key[]          = "EAR_SESSION_CC";
-     constexpr char cxx_env_key[]         = "EAR_SESSION_CXX";
+     constexpr char reporter_env_key[]    = "INTERCEPT_REPORT_COMMAND";
+     constexpr char destination_env_key[] = "INTERCEPT_REPORT_DESTINATION";
+     constexpr char verbose_env_key[]     = "INTERCEPT_VERBOSE";
+     constexpr char library_env_key[]     = "INTERCEPT_SESSION_LIBRARY";
+     constexpr char cc_env_key[]          = "INTERCEPT_SESSION_CC";
+     constexpr char cxx_env_key[]         = "INTERCEPT_SESSION_CXX";
 
  }
