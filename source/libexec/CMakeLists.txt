@@ -13,8 +13,8 @@ set_target_properties(exec PROPERTIES LINKER_LANGUAGE C)
 if(APPLE)
     set(CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
     set(CMAKE_MACOSX_RPATH 1)
-    set_target_properties(exec PROPERTIES INSTALL_RPATH "@loader_path/${EAR_LIB_PATH}")
+    set_target_properties(exec PROPERTIES INSTALL_RPATH "@loader_path/${EXEC_LIB_PATH}")
 endif()
 
 install(TARGETS exec
-    LIBRARY DESTINATION ${EAR_LIB_PATH})
+    LIBRARY DESTINATION ${EXEC_LIB_PATH})
