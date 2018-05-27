@@ -23,8 +23,8 @@
 #include <algorithm>
 
 #include "intercept_a/Environment.h"
-#include "libear_a/Interface.h"
-#include "libear_a/Session.h"
+#include "libexec_a/Interface.h"
+#include "libexec_a/Session.h"
 
 namespace {
 

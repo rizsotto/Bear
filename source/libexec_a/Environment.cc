@@ -19,9 +19,9 @@
 
 #include "config.h"
 
-#include "libear_a/Environment.h"
-#include "libear_a/String.h"
-#include "libear_a/Interface.h"
+#include "libexec_a/Environment.h"
+#include "libexec_a/String.h"
+#include "libexec_a/Interface.h"
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>

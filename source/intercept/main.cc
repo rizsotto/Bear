@@ -86,7 +86,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
                         std::runtime_error(
                                 "Usage: intercept [OPTION]... -- command\n\n"
                                 "  -t <target url>       where to send execution reports\n"
-                                "  -l <path to libear>   where to find the ear libray\n"
+                                "  -l <path to libexec>   where to find the ear libray\n"
                                 "  -f <file>             file parameter\n"
                                 "  -s <search_path>      search path parameter\n"));
         }

@@ -11,16 +11,18 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 
-set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
+set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}exec{CMAKE_SHARED_LIBRARY_SUFFIX})
 set(EAR_LIB_PATH "${CMAKE_INSTALL_LIBDIR}/bear")
 set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_PREFIX}/${EAR_LIB_PATH}/${EAR_LIB_FILE}
-        CACHE STRING "Default path to libear.")
-set(PEAR_EXE ${CMAKE_INSTALL_LIBEXECDIR}/pear
-        CACHE STRING "Default path to pear")
+        CACHE STRING "Default path to libexec.")
+set(INTERCEPT_EXE ${CMAKE_INSTALL_LIBEXECDIR}/intercept
+        CACHE STRING "Default path to intercept")
+set(INTERCEPT_CC_EXE ${CMAKE_INSTALL_LIBEXECDIR}/intercept-cc
+        CACHE STRING "Default path to intercept-cc")
 
 
-add_subdirectory(libear_a)
-add_subdirectory(libear)
+add_subdirectory(libexec_a)
+add_subdirectory(libexec)
 add_subdirectory(intercept_a)
 add_subdirectory(intercept)
 add_subdirectory(intercept-cc)

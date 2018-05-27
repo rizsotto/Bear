@@ -17,22 +17,29 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include <algorithm>
 
-#include "config.h"
+#include "libexec_a/Storage.h"
+#include "libexec_a/Array.h"
 
-#include "libear_a/Session.h"
 
 namespace ear {
-    namespace environment {
 
-        const char **current() noexcept;
+    Storage::Storage(char *const begin, char *const end) noexcept
+            : begin_(begin)
+            , end_(end)
+            , top_(begin)
+    { }
 
-        const LibrarySession *
-        capture(LibrarySession &session, const char **environment) noexcept;
+    char const *Storage::store(char const *const input) noexcept {
+        if (input == nullptr)
+            return nullptr;
 
-        const WrapperSession *
-        capture(WrapperSession &session, const char **environment) noexcept;
-
+        auto input_end = ::ear::array::end(input) + 1;  // include the zero element
+        auto top = ::ear::array::copy(input, input_end, top_, end_);
+        if (top != nullptr)
+            std::swap(top_, top);
+        return top;
     }
+
 }

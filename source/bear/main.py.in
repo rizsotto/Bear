@@ -23,14 +23,14 @@ build process. The result of that should be a compilation database.
 
 This implementation is using the LD_PRELOAD or DYLD_INSERT_LIBRARIES
 mechanisms provided by the dynamic linker. The related library is implemented
-in C language and can be found under 'libear' directory.
+in C language and can be found under 'libexec' directory.
 
-The 'libear' library is capturing all child process creation and logging the
+The 'libexec' library is capturing all child process creation and logging the
 relevant information about it into separate files in a specified directory.
 The input of the library is therefore the output directory which is passed
 as an environment variable.
 
-This module implements the build command execution with the 'libear' library
+This module implements the build command execution with the 'libexec' library
 and the post-processing of the output files, which will condensates into a
 (might be empty) compilation database. """
 
@@ -465,11 +465,11 @@ def create_intercept_parser():
         The output is not continuously updated, it's done when the build
         command finished. """)
     advanced.add_argument(
-        '--libear', '-l',
-        dest='libear',
+        '--libexec', '-l',
+        dest='libexec',
         default="@DEFAULT_PRELOAD_FILE@",
         action='store',
-        help="""specify libear file location.""")
+        help="""specify libexec file location.""")
 
     parser.add_argument(
         dest='build', nargs=argparse.REMAINDER, help="""Command to run.""")

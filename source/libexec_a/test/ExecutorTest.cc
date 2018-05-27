@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
 
-#include "libear_a/Interface.h"
-#include "libear_a/Environment.h"
-#include "libear_a/Executor.h"
+#include "../Interface.h"
+#include "../Environment.h"
+#include "../Executor.h"
 
 namespace {
 
@@ -18,7 +18,7 @@ namespace {
     };
 
     constexpr char destination_str[] = "/tmp/intercept.random";
-    constexpr char library_str[] = "/usr/libexec/libear.so";
+    constexpr char library_str[] = "/usr/libexec/libexec.so";
     constexpr char reporter_str[] = "/usr/bin/intercept";
 
     constexpr int failure = -1;

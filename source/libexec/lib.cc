@@ -24,13 +24,13 @@
 #include <cstdarg>
 #include <atomic>
 
-#include "libear_a/Array.h"
-#include "libear_a/DynamicLinker.h"
-#include "libear_a/String.h"
-#include "libear_a/Session.h"
-#include "libear_a/Environment.h"
-#include "libear_a/Storage.h"
-#include "libear_a/Executor.h"
+#include "libexec_a/Array.h"
+#include "libexec_a/DynamicLinker.h"
+#include "libexec_a/String.h"
+#include "libexec_a/Session.h"
+#include "libexec_a/Environment.h"
+#include "libexec_a/Storage.h"
+#include "libexec_a/Executor.h"
 
 
 namespace {

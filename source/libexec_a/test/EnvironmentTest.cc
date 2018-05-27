@@ -1,8 +1,8 @@
 #include "gtest/gtest.h"
 
-#include "libear_a/Storage.h"
-#include "libear_a/Session.h"
-#include "libear_a/Environment.h"
+#include "../Storage.h"
+#include "../Session.h"
+#include "../Environment.h"
 
 namespace {
 
@@ -27,7 +27,7 @@ namespace {
     TEST_F(Environment, capture_correct_env_values) {
         const char *envp[] = {
                 "EAR_REPORT_DESTINATION=/tmp/intercept.random",
-                "EAR_SESSION_LIBRARY=/usr/libexec/libear.so",
+                "EAR_SESSION_LIBRARY=/usr/libexec/libexec.so",
                 "EAR_REPORT_COMMAND=/usr/bin/intercept",
                 nullptr
         };
@@ -35,7 +35,7 @@ namespace {
         EXPECT_EQ(&session, ::ear::environment::capture(session, envp));
 
         EXPECT_STREQ("/tmp/intercept.random", session.session.destination);
-        EXPECT_STREQ("/usr/libexec/libear.so", session.library);
+        EXPECT_STREQ("/usr/libexec/libexec.so", session.library);
         EXPECT_STREQ("/usr/bin/intercept", session.session.reporter);
     }
 

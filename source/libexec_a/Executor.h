@@ -23,9 +23,9 @@
 
 #include <algorithm>
 
-#include "libear_a/Array.h"
-#include "libear_a/Environment.h"
-#include "libear_a/Interface.h"
+#include "libexec_a/Array.h"
+#include "libexec_a/Environment.h"
+#include "libexec_a/Interface.h"
 
 namespace ear {
 

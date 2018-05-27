@@ -19,11 +19,11 @@
 
 #include <unistd.h>
 
-#include "libear_a/Interface.h"
-#include "libear_a/Environment.h"
-#include "libear_a/Executor.h"
-#include "libear_a/Session.h"
-#include "libear_a/String.h"
+#include "libexec_a/Interface.h"
+#include "libexec_a/Environment.h"
+#include "libexec_a/Executor.h"
+#include "libexec_a/Session.h"
+#include "libexec_a/String.h"
 
 namespace {
 
