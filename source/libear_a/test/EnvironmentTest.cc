@@ -26,17 +26,17 @@ namespace {
 
     TEST_F(Environment, capture_correct_env_values) {
         const char *envp[] = {
-                "EAR_REPORT_DESTINATION=/tmp/pear.random",
+                "EAR_REPORT_DESTINATION=/tmp/intercept.random",
                 "EAR_SESSION_LIBRARY=/usr/libexec/libear.so",
-                "EAR_REPORT_COMMAND=/usr/bin/pear",
+                "EAR_REPORT_COMMAND=/usr/bin/intercept",
                 nullptr
         };
 
         EXPECT_EQ(&session, ::ear::environment::capture(session, envp));
 
-        EXPECT_STREQ("/tmp/pear.random", session.session.destination);
+        EXPECT_STREQ("/tmp/intercept.random", session.session.destination);
         EXPECT_STREQ("/usr/libexec/libear.so", session.library);
-        EXPECT_STREQ("/usr/bin/pear", session.session.reporter);
+        EXPECT_STREQ("/usr/bin/intercept", session.session.reporter);
     }
 
 }

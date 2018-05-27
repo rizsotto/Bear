@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "SystemCalls.h"
+#include "intercept_a/SystemCalls.h"
 
 #include <wait.h>
 #include <spawn.h>

@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <algorithm>
 
-#include "libpear_a/Environment.h"
+#include "intercept_a/Environment.h"
 #include "libear_a/Interface.h"
 #include "libear_a/Session.h"
 
@@ -132,7 +132,7 @@ namespace pear {
     EnvironmentPtr Environment::Builder::build() const noexcept {
         std::vector<std::string> result;
         std::vector<std::string> affected;
-        // copy those which are not relevant to pear
+        // copy those which are not relevant to intercept
         std::partition_copy(environ_.begin(), environ_.end(),
                             std::back_inserter(result), std::back_inserter(affected),
                             [](auto &str) {
@@ -143,7 +143,7 @@ namespace pear {
                                     && key != ::ear::reporter_env_key
                                     && !loader_related(key);
                             });
-        // overwrite the pear ones
+        // overwrite the intercept ones
         if (!reporter_.empty()) {
             result.emplace_back(env_key_value(::ear::reporter_env_key, reporter_));
         }

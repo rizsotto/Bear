@@ -17,9 +17,9 @@ namespace {
             nullptr
     };
 
-    constexpr char destination_str[] = "/tmp/pear.random";
+    constexpr char destination_str[] = "/tmp/intercept.random";
     constexpr char library_str[] = "/usr/libexec/libear.so";
-    constexpr char reporter_str[] = "/usr/bin/pear";
+    constexpr char reporter_str[] = "/usr/bin/intercept";
 
     constexpr int failure = -1;
     constexpr int success = 0;

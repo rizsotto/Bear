@@ -21,8 +21,8 @@ set(PEAR_EXE ${CMAKE_INSTALL_LIBEXECDIR}/pear
 
 add_subdirectory(libear_a)
 add_subdirectory(libear)
-add_subdirectory(libpear_a)
-add_subdirectory(pear)
-add_subdirectory(cpear)
+add_subdirectory(intercept_a)
+add_subdirectory(intercept)
+add_subdirectory(intercept-cc)
 add_subdirectory(bear)
 add_subdirectory(gtest_main_a)

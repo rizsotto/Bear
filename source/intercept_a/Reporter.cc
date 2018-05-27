@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Reporter.h"
-#include "SystemCalls.h"
+#include "intercept_a/Reporter.h"
+#include "intercept_a/SystemCalls.h"
 
 #include <chrono>
 

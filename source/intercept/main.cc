@@ -23,11 +23,11 @@
 #include <cstdio>
 #include <cstring>
 
-#include "libpear_a/Parameters.h"
-#include "libpear_a/Result.h"
-#include "libpear_a/Environment.h"
-#include "libpear_a/Reporter.h"
-#include "libpear_a/SystemCalls.h"
+#include "intercept_a/Parameters.h"
+#include "intercept_a/Result.h"
+#include "intercept_a/Environment.h"
+#include "intercept_a/Reporter.h"
+#include "intercept_a/SystemCalls.h"
 
 
 namespace {
@@ -84,7 +84,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
             default: /* '?' */
                 return pear::Result<pear::Parameters>::failure(
                         std::runtime_error(
-                                "Usage: pear [OPTION]... -- command\n\n"
+                                "Usage: intercept [OPTION]... -- command\n\n"
                                 "  -t <target url>       where to send execution reports\n"
                                 "  -l <path to libear>   where to find the ear libray\n"
                                 "  -f <file>             file parameter\n"
@@ -95,7 +95,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
     if (optind >= argc) {
         return pear::Result<pear::Parameters>::failure(
                 std::runtime_error(
-                        "Usage: pear [OPTION]... -- command\n"
+                        "Usage: intercept [OPTION]... -- command\n"
                                 "Expected argument after options"));
     } else {
         // TODO: do validation!!!
