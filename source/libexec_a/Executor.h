@@ -39,7 +39,7 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 7;
+            const size_t dst_length = argv_length + session_size_ + 2;
             const char *dst[dst_length] = {};
 
             const char **const dst_end = dst + dst_length;
@@ -60,7 +60,7 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 9;
+            const size_t dst_length = argv_length + session_size_ + 4;
             const char *dst[dst_length] = {};
 
             const char **const dst_end = dst + dst_length;
@@ -83,7 +83,7 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 11;
+            const size_t dst_length = argv_length + session_size_ + 6;
             const char *dst[dst_length] = {};
 
             const char **const dst_end = dst + dst_length;
@@ -112,7 +112,7 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 7;
+            const size_t dst_length = argv_length + session_size_ + 2;
             const char *dst[dst_length] = {};
 
             const char **const dst_end = dst + dst_length;
@@ -137,7 +137,7 @@ namespace ear {
                 return -1;
 
             const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + 9;
+            const size_t dst_length = argv_length + session_size_ + 4;
             const char *dst[dst_length] = {};
 
             const char **const dst_end = dst + dst_length;
@@ -161,7 +161,7 @@ namespace ear {
                         (session != nullptr) ? session->library : nullptr,
                         (session != nullptr && session->session.verbose) ? verbose_flag : nullptr,
                         nullptr }
-                , session_end_(::ear::array::end(session_))
+                , session_size_(::ear::array::length(session_))
                 , initialized_(session != nullptr)
         { }
 
@@ -172,7 +172,7 @@ namespace ear {
                         (session != nullptr) ? session->destination : nullptr,
                         (session != nullptr && session->verbose) ? verbose_flag : nullptr,
                         nullptr }
-                , session_end_(::ear::array::end(session_))
+                , session_size_(::ear::array::length(session_))
                 , initialized_(session != nullptr)
         { }
 
@@ -198,14 +198,14 @@ namespace ear {
         }
 
         const char **session_end() const noexcept {
-            return session_end_;
+            return session_begin() + session_size_;
         }
 
     private:
-        static constexpr size_t SESSION_SIZE = 10;
+        static constexpr size_t SESSION_SIZE = 8;
 
         const char *session_[SESSION_SIZE];
-        const char **const session_end_;
+        const size_t session_size_;
         bool initialized_;
     };
 
