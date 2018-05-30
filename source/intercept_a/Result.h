@@ -53,11 +53,11 @@ namespace ear {
 
             Result() = delete;
 
-            Result(Result &&other) noexcept;
+            Result(Result &&other) noexcept = default;
 
-            Result(const Result &other);
+            Result(const Result &other) = delete;
 
-            Result &operator=(Result &&other) noexcept;
+            Result &operator=(Result &&other) noexcept = default;
 
             Result &operator=(const Result &other) = delete;
 
@@ -98,30 +98,24 @@ namespace ear {
         template<typename T, typename E>
         template<typename U>
         Result<U, E> Result<T, E>::map(std::function<U(const T &)> const &f) const noexcept {
-            if (auto ptr = std::get_if<T>(&state_)) {
-                return Result<U, E>::success(std::move(f(*ptr)));
-            } else if (auto error = std::get_if<E>(&state_)) {
-                return Result<U, E>::failure(*error);
-            }
+            return (std::holds_alternative<T>(state_))
+                ? Result<U, E>::success(f(std::get<T>(state_)))
+                : Result<U, E>::failure(std::get<E>(state_));
         }
 
         template<typename T, typename E>
         template<typename U>
         Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(const T &)> const &f) const noexcept {
-            if (auto ptr = std::get_if<T>(&state_)) {
-                return f(*ptr);
-            } else if (auto error = std::get_if<E>(&state_)) {
-                return Result<U, E>::failure(*error);
-            }
+            return (std::holds_alternative<T>(state_))
+                ? f(std::get<T>(state_))
+                : Result<U, E>::failure(std::get<E>(state_));
         }
 
         template<typename T, typename E>
         const T &Result<T, E>::get_or_else(const T &value) const noexcept {
-            if (auto ptr = std::get_if<T>(&state_)) {
-                return *ptr;
-            } else {
-                return value;
-            }
+            return (std::holds_alternative<T>(state_))
+                ? std::get<T>(state_)
+                : value;
         }
 
         template<typename T, typename E>
@@ -129,23 +123,6 @@ namespace ear {
             if (auto error = std::get_if<E>(&state_)) {
                 f(*error);
             };
-            return *this;
-        }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(Result &&other) noexcept
-                : state_(std::move(other))
-        { }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(const Result &other)
-                : state_(other)
-        { }
-
-        template<typename T, typename E>
-        Result<T, E> &Result<T, E>::operator=(Result &&other) noexcept {
-            if (this != &other)
-                state_ = other.state_;
             return *this;
         }
 
