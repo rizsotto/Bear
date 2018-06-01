@@ -203,3 +203,19 @@ int posix_spawnp(pid_t *pid, const char *file,
                  char *const argv[], char *const envp[]) {
     return DynamicLinkerExecutor(session_ptr).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
+
+//extern "C"
+//FILE *popen(const char *command, const char *type) {
+//}
+
+//extern "C"
+//int execveat(int dirfd,
+//             const char *pathname,
+//             char *const argv[],
+//             char *const envp[],
+//             int flags) {
+//}
+
+//extern "C"
+//int fexecve(int fd, char *const argv[], char *const envp[]) {
+//}
