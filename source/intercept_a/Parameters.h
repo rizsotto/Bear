@@ -24,10 +24,8 @@
 namespace pear {
 
     struct Parameters {
-
-        ::ear::Session target;
+        ::ear::Session session;
         ::ear::Execution execution;
-        const char *reporter;
         const char *library;
     };
 

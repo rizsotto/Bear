@@ -71,7 +71,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
     while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
         switch (opt) {
             case 't':
-                result.target.destination = optarg;
+                result.session.destination = optarg;
                 break;
             case 'l':
                 result.library = optarg;
@@ -100,7 +100,7 @@ pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
                                 "Expected argument after options"));
     } else {
         // TODO: do validation!!!
-        result.reporter = argv[0];
+        result.session.reporter = argv[0];
         result.execution.command = const_cast<const char **>(argv + optind);
         return pear::Result<pear::Parameters>::success(std::move(result));
     }
@@ -110,11 +110,11 @@ int main(int argc, char *argv[], char *envp[]) {
     return parse(argc, argv)
             .bind<int>([&envp](auto &state) {
                 auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
-                        .add_target(state.target.destination)
+                        .add_target(state.session.destination)
                         .add_library(state.library)
-                        .add_reporter(state.reporter)
+                        .add_reporter(state.session.reporter)
                         .build();
-                auto reporter = pear::Reporter::tempfile(state.target.destination);
+                auto reporter = pear::Reporter::tempfile(state.session.destination);
 
                 pear::Result<pid_t> child = spawnp(state.execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
