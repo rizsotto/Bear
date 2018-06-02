@@ -19,22 +19,14 @@
 
 #pragma once
 
+#include "libexec_a/Interface.h"
+
 namespace pear {
 
     struct Parameters {
-        struct Target {
-            const char *destination;
-            bool verbose;
-        };
 
-        struct Execution {
-            const char **command;
-            const char *file;
-            const char *search_path;
-        };
-
-        Target target;
-        Execution execution;
+        ::ear::Session target;
+        ::ear::Execution execution;
         const char *reporter;
         const char *library;
     };

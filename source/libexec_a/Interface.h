@@ -36,4 +36,28 @@
      constexpr char cc_env_key[]          = "INTERCEPT_SESSION_CC";
      constexpr char cxx_env_key[]         = "INTERCEPT_SESSION_CXX";
 
+
+     struct Session {
+         char const *reporter;
+         char const *destination;
+         bool verbose;
+     };
+
+     struct LibrarySession {
+         Session session;
+         char const *library;
+     };
+
+     struct WrapperSession {
+         Session session;
+         char const *cc;
+         char const *cxx;
+     };
+
+     struct Execution {
+         const char **command;
+         const char *file;
+         const char *search_path;
+     };
+
  }

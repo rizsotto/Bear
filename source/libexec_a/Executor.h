@@ -25,6 +25,31 @@
 #include "libexec_a/Environment.h"
 #include "libexec_a/Interface.h"
 
+namespace {
+
+    size_t length(const ::ear::Execution &execution) noexcept {
+        return ((execution.file != nullptr) ? 2 : 0) +
+               ((execution.search_path != nullptr) ? 2 : 0) +
+               ::ear::array::length(execution.command) +
+               2;
+    }
+
+    const char **copy(const ::ear::Execution &execution, const char **it, const char **it_end) noexcept {
+        if (execution.file != nullptr) {
+            *it++ = ::ear::file_flag;
+            *it++ = execution.file;
+        }
+        if (execution.search_path != nullptr) {
+            *it++ = ::ear::search_flag;
+            *it++ = execution.search_path;
+        }
+        *it++ = ::ear::command_flag;
+        const size_t command_size = ::ear::array::length(execution.command);
+        const char **const command_end = execution.command + (command_size + 1);
+        return ::ear::array::copy(execution.command, command_end, it, it_end);
+    }
+}
+
 namespace ear {
 
     template<typename Resolver>
@@ -38,15 +63,15 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + session_size_ + 2;
+            const Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+
+            const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
-
             const char **const dst_end = dst + dst_length;
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length + 1, it, dst_end);
+            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+            if (copy(execution, it, dst_end) == nullptr)
+                return -1;
 
             return fp(reporter(), const_cast<char *const *>(dst), envp);
         }
@@ -59,17 +84,15 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + session_size_ + 4;
+            const Execution execution = { const_cast<const char **>(argv), file, nullptr };
+
+            const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
-
             const char **const dst_end = dst + dst_length;
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            *it++ = file_flag;
-            *it++ = file;
-            *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length + 1, it, dst + dst_length);
+            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+            if (copy(execution, it, dst_end) == nullptr)
+                return -1;
 
             return fp(reporter(), const_cast<char *const *>(dst), envp);
         }
@@ -82,19 +105,15 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + session_size_ + 6;
+            const Execution execution = { const_cast<const char **>(argv), file, search_path };
+
+            const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
-
             const char **const dst_end = dst + dst_length;
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            *it++ = file_flag;
-            *it++ = file;
-            *it++ = search_flag;
-            *it++ = search_path;
-            *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length + 1, it, dst + dst_length);
+            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+            if (copy(execution, it, dst_end) == nullptr)
+                return -1;
 
             return fp(reporter(), const_cast<char *const *>(dst), envp);
         }
@@ -111,15 +130,15 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + session_size_ + 2;
+            const Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+
+            const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
-
             const char **const dst_end = dst + dst_length;
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length + 1, it, dst + dst_length);
+            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+            if (copy(execution, it, dst_end) == nullptr)
+                return -1;
 
             return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
         }
@@ -136,17 +155,15 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const size_t argv_length = ::ear::array::length(argv);
-            const size_t dst_length = argv_length + session_size_ + 4;
+            const Execution execution = { const_cast<const char **>(argv), file, nullptr };
+
+            const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
-
             const char **const dst_end = dst + dst_length;
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            *it++ = file_flag;
-            *it++ = file;
-            *it++ = command_flag;
 
-            ::ear::array::copy(argv, argv + argv_length + 1, it, dst + dst_length);
+            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+            if (copy(execution, it, dst_end) == nullptr)
+                return -1;
 
             return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
         }

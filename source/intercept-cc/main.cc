@@ -22,7 +22,6 @@
 #include "libexec_a/Interface.h"
 #include "libexec_a/Environment.h"
 #include "libexec_a/Executor.h"
-#include "libexec_a/Session.h"
 #include "libexec_a/String.h"
 
 namespace {

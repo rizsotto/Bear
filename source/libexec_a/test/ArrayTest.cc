@@ -57,7 +57,17 @@ namespace {
         char dst[8] = {};
 
         auto result = ::ear::array::copy(src, src + 5, dst, dst + 8);
-        EXPECT_TRUE(result != nullptr);
+        EXPECT_NE(result, nullptr);
+        EXPECT_EQ((dst + 5), result);
+        EXPECT_STREQ(src, dst);
+    }
+
+    TEST(array_copy, does_copy_elements_into_same_size) {
+        const char src[5] = "this";
+        char dst[5] = {};
+
+        auto result = ::ear::array::copy(src, src + 5, dst, dst + 5);
+        EXPECT_NE(result, nullptr);
         EXPECT_EQ((dst + 5), result);
         EXPECT_STREQ(src, dst);
     }

@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "libexec_a/Interface.h"
 #include "intercept_a/Parameters.h"
 #include "intercept_a/Result.h"
 #include "intercept_a/Environment.h"
@@ -32,7 +33,7 @@
 
 namespace {
 
-    pear::Result<pid_t> spawnp(const pear::Parameters::Execution &config,
+    pear::Result<pid_t> spawnp(const ear::Execution &config,
                                const pear::EnvironmentPtr &environment) noexcept {
         // TODO: use other execution config parameters.
 

@@ -21,7 +21,7 @@
 
 #include "config.h"
 
-#include "libexec_a/Session.h"
+#include "libexec_a/Interface.h"
 
 namespace ear {
     namespace environment {

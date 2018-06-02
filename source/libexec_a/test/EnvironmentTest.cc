@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "../Storage.h"
-#include "../Session.h"
+#include "../Interface.h"
 #include "../Environment.h"
 
 namespace {
