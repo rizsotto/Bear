@@ -9,7 +9,8 @@ add_library(intercept_a STATIC
         Reporter.h
         Reporter.cc
         Result.h
-        Parameters.h
+        Session.h
+        Session.cc
         SystemCalls.h
         SystemCalls.cc
 )

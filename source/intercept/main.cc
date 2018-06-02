@@ -24,7 +24,7 @@
 #include <cstring>
 
 #include "libexec_a/Interface.h"
-#include "intercept_a/Parameters.h"
+#include "intercept_a/Session.h"
 #include "intercept_a/Result.h"
 #include "intercept_a/Environment.h"
 #include "intercept_a/Reporter.h"
@@ -64,61 +64,16 @@ namespace {
 
 }
 
-pear::Result<pear::Parameters> parse(int argc, char *argv[]) noexcept {
-    pear::Parameters result;
-
-    int opt;
-    while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
-        switch (opt) {
-            case 't':
-                result.session.destination = optarg;
-                break;
-            case 'l':
-                result.library = optarg;
-                break;
-            case 'f':
-                result.execution.file = optarg;
-                break;
-            case 's':
-                result.execution.search_path = optarg;
-                break;
-            default: /* '?' */
-                return pear::Result<pear::Parameters>::failure(
-                        std::runtime_error(
-                                "Usage: intercept [OPTION]... -- command\n\n"
-                                "  -t <target url>       where to send execution reports\n"
-                                "  -l <path to libexec>   where to find the ear libray\n"
-                                "  -f <file>             file parameter\n"
-                                "  -s <search_path>      search path parameter\n"));
-        }
-    }
-
-    if (optind >= argc) {
-        return pear::Result<pear::Parameters>::failure(
-                std::runtime_error(
-                        "Usage: intercept [OPTION]... -- command\n"
-                                "Expected argument after options"));
-    } else {
-        // TODO: do validation!!!
-        result.session.reporter = argv[0];
-        result.execution.command = const_cast<const char **>(argv + optind);
-        return pear::Result<pear::Parameters>::success(std::move(result));
-    }
-}
-
 int main(int argc, char *argv[], char *envp[]) {
-    return parse(argc, argv)
+    return ::pear::Session::parse(argc, argv)
             .bind<int>([&envp](auto &state) {
-                auto environment = pear::Environment::Builder(const_cast<const char **>(envp))
-                        .add_target(state.session.destination)
-                        .add_library(state.library)
-                        .add_reporter(state.session.reporter)
-                        .build();
-                auto reporter = pear::Reporter::tempfile(state.session.destination);
+                auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
+                auto environment = state->set(builder).build();
+                auto reporter = pear::Reporter::tempfile(state->session.destination);
 
-                pear::Result<pid_t> child = spawnp(state.execution, environment);
+                pear::Result<pid_t> child = spawnp(state->execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
-                    report_start(pid, state.execution.command, reporter);
+                    report_start(pid, state->execution.command, reporter);
                     pear::Result<int> status = pear::wait_pid(pid);
                     return status
                             .map<int>([&reporter, &pid](auto &exit) {
