@@ -29,9 +29,6 @@ namespace ear {
 
         char const *store(char const *input) noexcept;
 
-        template<typename T>
-        T *store(T *input) noexcept;
-
     public:
         Storage(Storage const &) = delete;
 
@@ -46,23 +43,4 @@ namespace ear {
         char *const end_;
         char *top_;
     };
-}
-
-
-#include "libexec_a/Interface.h"
-
-namespace ear {
-
-    template<>
-    inline LibrarySession *Storage::store(LibrarySession *input) noexcept {
-        input->session.destination = store(input->session.destination);
-        input->session.reporter = store(input->session.reporter);
-        input->library = store(input->library);
-
-        return (input->session.destination != nullptr &&
-                input->session.reporter != nullptr &&
-                input->library != nullptr)
-               ? input : nullptr;
-    }
-
 }

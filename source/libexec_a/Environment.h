@@ -28,10 +28,10 @@ namespace ear {
 
         const char **current() noexcept;
 
-        const LibrarySession *
+        LibrarySession *
         capture(LibrarySession &session, const char **environment) noexcept;
 
-        const WrapperSession *
+        WrapperSession *
         capture(WrapperSession &session, const char **environment) noexcept;
 
     }

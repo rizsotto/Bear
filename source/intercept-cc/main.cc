@@ -45,7 +45,7 @@ namespace {
 
 int main(int argc, char *argv[], char *envp[]) {
     ::ear::WrapperSession session {};
-    ::ear::WrapperSession const *session_ptr =
+    ::ear::WrapperSession const *const session_ptr =
             ::ear::environment::capture(session, const_cast<const char **>(envp));
     if (session_ptr == nullptr)
         return -1;

@@ -43,7 +43,19 @@ namespace {
     ::ear::Storage storage(buffer, buffer + buffer_size);
 
     ::ear::LibrarySession session {};
-    ::ear::LibrarySession const *session_ptr;
+    ::ear::LibrarySession *session_ptr;
+
+    ::ear::LibrarySession *store(::ear::Storage &storage, ::ear::LibrarySession *input) noexcept {
+        input->session.destination = storage.store(input->session.destination);
+        input->session.reporter = storage.store(input->session.reporter);
+        input->library = storage.store(input->library);
+
+        return (input->session.destination != nullptr &&
+                input->session.reporter != nullptr &&
+                input->library != nullptr)
+               ? input : nullptr;
+    }
+
 }
 
 /**
@@ -59,7 +71,7 @@ extern "C" void on_load() {
 
     auto environment = ::ear::environment::current();
     session_ptr = ::ear::environment::capture(session, environment);
-    session_ptr = storage.store(session_ptr);
+    session_ptr = store(storage, session_ptr);
 }
 
 /**

@@ -62,7 +62,7 @@ namespace ear {
 #endif
         }
 
-        const LibrarySession *
+        LibrarySession *
         capture(LibrarySession &session, const char **environment) noexcept {
             if (nullptr == environment)
                 return nullptr;
@@ -78,7 +78,7 @@ namespace ear {
                 ? nullptr : &session;
         }
 
-        const WrapperSession *
+        WrapperSession *
         capture(WrapperSession &session, const char **environment) noexcept {
             if (nullptr == environment)
                 return nullptr;
