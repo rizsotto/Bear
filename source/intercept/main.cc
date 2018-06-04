@@ -23,7 +23,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "libexec_a/Interface.h"
+#include "intercept_a/Interface.h"
 #include "intercept_a/Session.h"
 #include "intercept_a/Result.h"
 #include "intercept_a/Environment.h"
@@ -33,8 +33,8 @@
 
 namespace {
 
-    pear::Result<pid_t> spawnp(const ear::Execution &config,
-                               const pear::EnvironmentPtr &environment) noexcept {
+    pear::Result<pid_t> spawnp(const ::pear::Execution &config,
+                               const ::pear::EnvironmentPtr &environment) noexcept {
         // TODO: use other execution config parameters.
 
         return pear::spawnp(config.command, environment->as_array());
@@ -69,7 +69,7 @@ int main(int argc, char *argv[], char *envp[]) {
             .bind<int>([&envp](auto &state) {
                 auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
                 auto environment = state->set(builder).build();
-                auto reporter = pear::Reporter::tempfile(state->session.destination);
+                auto reporter = pear::Reporter::tempfile(state->context.destination);
 
                 pear::Result<pid_t> child = spawnp(state->execution, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {

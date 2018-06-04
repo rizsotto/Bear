@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libexec_a/Interface.h"
 #include "intercept_a/Session.h"
 
 namespace pear {

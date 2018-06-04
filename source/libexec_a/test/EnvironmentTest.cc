@@ -46,10 +46,10 @@ namespace {
 
         EXPECT_EQ(&librarySession, ::ear::environment::capture(librarySession, envp));
 
-        EXPECT_STREQ("/tmp/intercept.random", librarySession.session.destination);
+        EXPECT_STREQ("/tmp/intercept.random", librarySession.context.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", librarySession.library);
-        EXPECT_STREQ("/usr/bin/intercept", librarySession.session.reporter);
-        EXPECT_EQ(false, librarySession.session.verbose);
+        EXPECT_STREQ("/usr/bin/intercept", librarySession.context.reporter);
+        EXPECT_EQ(false, librarySession.context.verbose);
     }
 
     TEST_F(Environment, capture_4_wrapper) {
@@ -63,9 +63,9 @@ namespace {
 
         EXPECT_EQ(&wrapperSession, ::ear::environment::capture(wrapperSession, envp));
 
-        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.session.destination);
-        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.session.reporter);
-        EXPECT_EQ(false, wrapperSession.session.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.context.destination);
+        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.context.reporter);
+        EXPECT_EQ(false, wrapperSession.context.verbose);
         EXPECT_STREQ("/usr/bin/cc", wrapperSession.cc);
         EXPECT_STREQ("/usr/bin/c++", wrapperSession.cxx);
     }
@@ -81,10 +81,10 @@ namespace {
 
         EXPECT_EQ(&librarySession, ::ear::environment::capture(librarySession, envp));
 
-        EXPECT_STREQ("/tmp/intercept.random", librarySession.session.destination);
+        EXPECT_STREQ("/tmp/intercept.random", librarySession.context.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", librarySession.library);
-        EXPECT_STREQ("/usr/bin/intercept", librarySession.session.reporter);
-        EXPECT_EQ(true, librarySession.session.verbose);
+        EXPECT_STREQ("/usr/bin/intercept", librarySession.context.reporter);
+        EXPECT_EQ(true, librarySession.context.verbose);
     }
 
     TEST_F(Environment, capture_verbose_4_wrapper) {
@@ -99,9 +99,9 @@ namespace {
 
         EXPECT_EQ(&wrapperSession, ::ear::environment::capture(wrapperSession, envp));
 
-        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.session.destination);
-        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.session.reporter);
-        EXPECT_EQ(true, wrapperSession.session.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.context.destination);
+        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.context.reporter);
+        EXPECT_EQ(true, wrapperSession.context.verbose);
         EXPECT_STREQ("/usr/bin/cc", wrapperSession.cc);
         EXPECT_STREQ("/usr/bin/c++", wrapperSession.cxx);
     }

@@ -4,6 +4,7 @@ set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
 
 add_library(exec_a STATIC
+        ../intercept_a/Interface.h
         Array.h
         DynamicLinker.h
         DynamicLinker.cc

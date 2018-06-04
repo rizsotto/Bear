@@ -55,6 +55,6 @@ int main(int argc, char *argv[], char *envp[]) {
         return -1;
     argv[0] = const_cast<char *>((is_cxx(argv[0])) ? session.cxx : session.cc);
 
-    const Executor executor(&session.session);
+    const Executor executor(&session);
     return executor.execve(argv[0], argv, envp);
 }

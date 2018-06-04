@@ -23,7 +23,7 @@
 #include <algorithm>
 
 #include "intercept_a/Environment.h"
-#include "libexec_a/Interface.h"
+#include "intercept_a/Interface.h"
 
 namespace {
 
@@ -137,20 +137,20 @@ namespace pear {
                             [](auto &str) {
                                 auto key_value = env_key_value(str);
                                 auto key = std::get<0>(key_value);
-                                return key != ::ear::destination_env_key
-                                    && key != ::ear::library_env_key
-                                    && key != ::ear::reporter_env_key
+                                return key != ::pear::env::destination_key
+                                    && key != ::pear::env::library_key
+                                    && key != ::pear::env::reporter_key
                                     && !loader_related(key);
                             });
         // overwrite the intercept ones
         if (!reporter_.empty()) {
-            result.emplace_back(env_key_value(::ear::reporter_env_key, reporter_));
+            result.emplace_back(env_key_value(::pear::env::reporter_key, reporter_));
         }
         if (!target_.empty()) {
-            result.emplace_back(env_key_value(::ear::destination_env_key, target_));
+            result.emplace_back(env_key_value(::pear::env::destination_key, target_));
         }
         if (!library_.empty()) {
-            result.emplace_back(env_key_value(::ear::library_env_key, library_));
+            result.emplace_back(env_key_value(::pear::env::library_key, library_));
         }
         // add the loader ones
         auto loader_related = update_loader_related(affected, library_);

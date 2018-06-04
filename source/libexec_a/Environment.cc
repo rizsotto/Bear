@@ -67,13 +67,13 @@ namespace ear {
             if (nullptr == environment)
                 return nullptr;
 
-            session.session.reporter    = get_env(environment, ::ear::reporter_env_key);
-            session.session.destination = get_env(environment, ::ear::destination_env_key);
-            session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
-            session.library             = get_env(environment, ::ear::library_env_key);
+            session.context.reporter    = get_env(environment, ::pear::env::reporter_key);
+            session.context.destination = get_env(environment, ::pear::env::destination_key);
+            session.context.verbose     = get_env(environment, ::pear::env::verbose_key) != nullptr;
+            session.library             = get_env(environment, ::pear::env::library_key);
 
-            return (session.session.reporter == nullptr ||
-                    session.session.destination == nullptr ||
+            return (session.context.reporter == nullptr ||
+                    session.context.destination == nullptr ||
                     session.library == nullptr)
                 ? nullptr : &session;
         }
@@ -83,14 +83,14 @@ namespace ear {
             if (nullptr == environment)
                 return nullptr;
 
-            session.session.reporter    = get_env(environment, ::ear::reporter_env_key);
-            session.session.destination = get_env(environment, ::ear::destination_env_key);
-            session.session.verbose     = get_env(environment, ::ear::verbose_env_key) != nullptr;
-            session.cc                  = get_env(environment, ::ear::cc_env_key);
-            session.cxx                 = get_env(environment, ::ear::cxx_env_key);
+            session.context.reporter    = get_env(environment, ::pear::env::reporter_key);
+            session.context.destination = get_env(environment, ::pear::env::destination_key);
+            session.context.verbose     = get_env(environment, ::pear::env::verbose_key) != nullptr;
+            session.cc                  = get_env(environment, ::pear::env::cc_key);
+            session.cxx                 = get_env(environment, ::pear::env::cxx_key);
 
-            return (session.session.reporter == nullptr ||
-                    session.session.destination == nullptr ||
+            return (session.context.reporter == nullptr ||
+                    session.context.destination == nullptr ||
                     session.cc == nullptr ||
                     session.cxx == nullptr)
                    ? nullptr : &session;

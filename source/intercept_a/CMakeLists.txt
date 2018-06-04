@@ -6,6 +6,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
 add_library(intercept_a STATIC
         Environment.h
         Environment.cc
+        Interface.h
         Reporter.h
         Reporter.cc
         Result.h

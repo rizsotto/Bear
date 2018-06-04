@@ -17,47 +17,20 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
- #pragma once
+#pragma once
 
- namespace ear {
+#include "intercept_a/Interface.h"
 
-     constexpr char verbose_flag[]        = "--verbose";
-     constexpr char destination_flag[]    = "--report-destination";
-     constexpr char library_flag[]        = "--session-library";
-     constexpr char wrapper_flag[]        = "--session-wrapper";
-     constexpr char file_flag[]           = "--exec-file";
-     constexpr char search_flag[]         = "--exec-search_path";
-     constexpr char command_flag[]        = "--exec-command";
+namespace ear {
 
-     constexpr char reporter_env_key[]    = "INTERCEPT_REPORT_COMMAND";
-     constexpr char destination_env_key[] = "INTERCEPT_REPORT_DESTINATION";
-     constexpr char verbose_env_key[]     = "INTERCEPT_VERBOSE";
-     constexpr char library_env_key[]     = "INTERCEPT_SESSION_LIBRARY";
-     constexpr char cc_env_key[]          = "INTERCEPT_SESSION_CC";
-     constexpr char cxx_env_key[]         = "INTERCEPT_SESSION_CXX";
+    struct LibrarySession {
+        ::pear::Context context;
+        char const *library;
+    };
 
-
-     struct Session {
-         char const *reporter;
-         char const *destination;
-         bool verbose;
-     };
-
-     struct LibrarySession {
-         Session session;
-         char const *library;
-     };
-
-     struct WrapperSession {
-         Session session;
-         char const *cc;
-         char const *cxx;
-     };
-
-     struct Execution {
-         const char **command;
-         const char *file;
-         const char *search_path;
-     };
-
- }
+    struct WrapperSession {
+        ::pear::Context context;
+        char const *cc;
+        char const *cxx;
+    };
+}

@@ -27,23 +27,23 @@
 
 namespace {
 
-    size_t length(const ::ear::Execution &execution) noexcept {
+    size_t length(const ::pear::Execution &execution) noexcept {
         return ((execution.file != nullptr) ? 2 : 0) +
                ((execution.search_path != nullptr) ? 2 : 0) +
                ::ear::array::length(execution.command) +
                2;
     }
 
-    const char **copy(const ::ear::Execution &execution, const char **it, const char **it_end) noexcept {
+    const char **copy(const ::pear::Execution &execution, const char **it, const char **it_end) noexcept {
         if (execution.file != nullptr) {
-            *it++ = ::ear::file_flag;
+            *it++ = ::pear::flag::file;
             *it++ = execution.file;
         }
         if (execution.search_path != nullptr) {
-            *it++ = ::ear::search_flag;
+            *it++ = ::pear::flag::search_path;
             *it++ = execution.search_path;
         }
-        *it++ = ::ear::command_flag;
+        *it++ = ::pear::flag::command;
         const size_t command_size = ::ear::array::length(execution.command);
         const char **const command_end = execution.command + (command_size + 1);
         return ::ear::array::copy(execution.command, command_end, it, it_end);
@@ -63,7 +63,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
@@ -84,7 +84,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const Execution execution = { const_cast<const char **>(argv), file, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
@@ -105,7 +105,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const Execution execution = { const_cast<const char **>(argv), file, search_path };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), file, search_path };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
@@ -130,7 +130,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
@@ -155,7 +155,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const Execution execution = { const_cast<const char **>(argv), file, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length] = {};
@@ -171,23 +171,23 @@ namespace ear {
     public:
         explicit Executor(const ::ear::LibrarySession *session) noexcept
                 : session_ {
-                        (session != nullptr) ? session->session.reporter : nullptr,
-                        (session != nullptr) ? destination_flag : nullptr,
-                        (session != nullptr) ? session->session.destination : nullptr,
-                        (session != nullptr) ? library_flag : nullptr,
+                        (session != nullptr) ? session->context.reporter : nullptr,
+                        (session != nullptr) ? ::pear::flag::destination : nullptr,
+                        (session != nullptr) ? session->context.destination : nullptr,
+                        (session != nullptr) ? ::pear::flag::library : nullptr,
                         (session != nullptr) ? session->library : nullptr,
-                        (session != nullptr && session->session.verbose) ? verbose_flag : nullptr,
+                        (session != nullptr && session->context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
                 , initialized_(session != nullptr)
         { }
 
-        explicit Executor(const ::ear::Session *session) noexcept
+        explicit Executor(const ::ear::WrapperSession *session) noexcept
                 : session_ {
-                        (session != nullptr) ? session->reporter : nullptr,
-                        (session != nullptr) ? destination_flag : nullptr,
-                        (session != nullptr) ? session->destination : nullptr,
-                        (session != nullptr && session->verbose) ? verbose_flag : nullptr,
+                        (session != nullptr) ? session->context.reporter : nullptr,
+                        (session != nullptr) ? ::pear::flag::destination : nullptr,
+                        (session != nullptr) ? session->context.destination : nullptr,
+                        (session != nullptr && session->context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
                 , initialized_(session != nullptr)

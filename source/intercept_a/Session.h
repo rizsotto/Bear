@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "libexec_a/Interface.h"
+#include "intercept_a/Interface.h"
 #include "intercept_a/Result.h"
 #include "intercept_a/Environment.h"
 
@@ -29,8 +29,8 @@ namespace pear {
     using SessionPtr = std::unique_ptr<Session>;
 
     struct Session {
-        ::ear::Session session;
-        ::ear::Execution execution;
+        ::pear::Context context;
+        ::pear::Execution execution;
 
         virtual ~Session() noexcept = default;
 
