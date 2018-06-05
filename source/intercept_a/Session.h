@@ -28,6 +28,7 @@ namespace pear {
     struct Session;
     using SessionPtr = std::unique_ptr<Session>;
 
+    /// Used by `intercept-cc` to report single execution.
     struct Session {
         ::pear::Context context;
         ::pear::Execution execution;
@@ -35,11 +36,11 @@ namespace pear {
         virtual ~Session() noexcept = default;
 
         virtual ::pear::Environment::Builder &
-        set(::pear::Environment::Builder &builder) const noexcept = 0;
-
-        static pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept;
+        set(::pear::Environment::Builder &builder) const noexcept;
     };
 
+    /// Used by `intercept-build` and `libexec` to report execution
+    /// and prepare for more executions.
     struct LibrarySession : public ::pear::Session {
         const char *library;
 
@@ -49,6 +50,8 @@ namespace pear {
         set(::pear::Environment::Builder &builder) const noexcept override;
     };
 
+    /// Used by `intercept-build` to report single execution
+    /// and prepare for `intercept-cc`.
     struct WrapperSession : public ::pear::Session {
         const char *cc;
         const char *cxx;
@@ -60,5 +63,8 @@ namespace pear {
         ::pear::Environment::Builder &
         set(::pear::Environment::Builder &builder) const noexcept override;
     };
+
+
+    pear::Result<pear::SessionPtr> parse(int argc, char *argv[], char *envp[]) noexcept;
 
 }

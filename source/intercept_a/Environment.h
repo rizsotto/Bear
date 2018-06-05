@@ -54,7 +54,13 @@ namespace pear {
 
         Builder &add_target(const char *target) noexcept;
 
+        Builder &add_verbose(bool verbose) noexcept;
+
         Builder &add_library(const char *library) noexcept;
+
+        Builder &add_compilers(const char *cc, const char *cxx) noexcept;
+
+        Builder &add_wrappers(const char *cc, const char *cxx) noexcept;
 
         EnvironmentPtr build() const noexcept;
 
@@ -71,6 +77,11 @@ namespace pear {
         std::vector<std::string> environ_;
         std::string reporter_;
         std::string target_;
+        bool verbose_;
         std::string library_;
+        std::string cc_;
+        std::string cxx_;
+        std::string cc_wrapper_;
+        std::string cxx_wrapper_;
     };
 }

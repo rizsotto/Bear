@@ -63,17 +63,33 @@ namespace pear {
 //        }
 //    }
 
-    pear::Result<pear::SessionPtr> Session::parse(int argc, char **argv) noexcept {
-        return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
+    ::pear::Environment::Builder &
+    Session::set(::pear::Environment::Builder &builder) const noexcept {
+        return builder;
     }
 
     ::pear::Environment::Builder &
     LibrarySession::set(::pear::Environment::Builder &builder) const noexcept {
+        builder.add_reporter(context.reporter);
+        builder.add_target(context.destination);
+        builder.add_verbose(context.verbose);
+        builder.add_library(library);
         return builder;
     }
 
     ::pear::Environment::Builder &
     WrapperSession::set(::pear::Environment::Builder &builder) const noexcept {
+        builder.add_reporter(context.reporter);
+        builder.add_target(context.destination);
+        builder.add_verbose(context.verbose);
+        builder.add_compilers(cc, cxx);
+        builder.add_wrappers(cc_wrapper, cxx_wrapper);
         return builder;
     }
+
+    pear::Result<pear::SessionPtr> parse(int argc, char *argv[], char *envp[]) noexcept {
+        // TODO: implement it.
+        return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
+    }
+
 }

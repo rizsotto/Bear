@@ -89,6 +89,15 @@ namespace {
         }
         return result;
     }
+
+    std::vector<std::string> update_wrapper_related(std::vector<std::string> const &input,
+                                                    std::string const &cc,
+                                                    std::string const &cxx,
+                                                    std::string const &cc_wrapper,
+                                                    std::string const &cxx_wrapper) noexcept {
+        // TODO: implement it
+        return input;
+    }
 }
 
 namespace pear {
@@ -123,8 +132,25 @@ namespace pear {
         return *this;
     }
 
+    Environment::Builder &Environment::Builder::add_verbose(bool verbose) noexcept {
+        verbose_ = verbose;
+        return *this;
+    }
+
     Environment::Builder &Environment::Builder::add_library(const char *library) noexcept {
         library_= (library != nullptr) ? std::string(library) : std::string();
+        return *this;
+    }
+
+    Environment::Builder &Environment::Builder::add_compilers(const char *cc, const char *cxx) noexcept {
+        cc_ = (cc != nullptr) ? std::string(cc) : std::string();
+        cxx_ = (cxx != nullptr) ? std::string(cxx) : std::string();
+        return *this;
+    }
+
+    Environment::Builder &Environment::Builder::add_wrappers(const char *cc, const char *cxx) noexcept {
+        cc_wrapper_ = (cc != nullptr) ? std::string(cc) : std::string();
+        cxx_wrapper_ = (cxx != nullptr) ? std::string(cxx) : std::string();
         return *this;
     }
 
@@ -137,9 +163,10 @@ namespace pear {
                             [](auto &str) {
                                 auto key_value = env_key_value(str);
                                 auto key = std::get<0>(key_value);
-                                return key != ::pear::env::destination_key
+                                return key != ::pear::env::reporter_key
+                                    && key != ::pear::env::destination_key
+                                    && key != ::pear::env::verbose_key
                                     && key != ::pear::env::library_key
-                                    && key != ::pear::env::reporter_key
                                     && !loader_related(key);
                             });
         // overwrite the intercept ones
@@ -149,12 +176,18 @@ namespace pear {
         if (!target_.empty()) {
             result.emplace_back(env_key_value(::pear::env::destination_key, target_));
         }
+        if (verbose_) {
+            result.emplace_back(env_key_value(::pear::env::verbose_key, "true"));
+        }
         if (!library_.empty()) {
             result.emplace_back(env_key_value(::pear::env::library_key, library_));
         }
         // add the loader ones
         auto loader_related = update_loader_related(affected, library_);
         std::copy(loader_related.begin(), loader_related.end(), std::back_inserter(result));
+        // add wrapper related ones
+        auto wrapper_related = update_wrapper_related(affected, cc_, cxx_, cc_wrapper_, cxx_wrapper_);
+        std::copy(wrapper_related.begin(), wrapper_related.end(), std::back_inserter(result));
 
         return std::unique_ptr<Environment>(new Environment(std::move(result)));
     }
