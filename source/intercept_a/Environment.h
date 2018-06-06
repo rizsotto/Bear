@@ -19,7 +19,7 @@
  */
 
 #include <memory>
-#include <vector>
+#include <map>
 
 namespace pear {
 
@@ -27,16 +27,26 @@ namespace pear {
     public:
         class Builder;
 
-        const char **as_array() const noexcept;
+        const char **data() const noexcept;
 
-        ~Environment() noexcept = default;
+    public:
+        Environment() = delete;
+
+        ~Environment() noexcept;
+
+        Environment(Environment &&) noexcept = delete;
+
+        Environment(Environment const &) = delete;
+
+        Environment &operator=(Environment &&) noexcept = delete;
+
+        Environment &operator=(Environment const &) = delete;
 
     private:
-        explicit Environment(std::vector<std::string> &&environ) noexcept;
+        explicit Environment(const std::map<std::string, std::string> &environ) noexcept;
 
     private:
-        std::vector<std::string> const environ_;
-        std::vector<const char*> rendered_;
+        char **const data_;
     };
 
     using EnvironmentPtr = std::unique_ptr<Environment>;
@@ -44,27 +54,27 @@ namespace pear {
 
     class Environment::Builder {
     public:
-        Builder() noexcept;
-
-        explicit Builder(const char ** environment) noexcept;
-
-        ~Builder() noexcept = default;
+        explicit Builder(const char **environment) noexcept;
 
         Builder &add_reporter(const char *reporter) noexcept;
 
-        Builder &add_target(const char *target) noexcept;
+        Builder &add_destination(const char *target) noexcept;
 
         Builder &add_verbose(bool verbose) noexcept;
 
         Builder &add_library(const char *library) noexcept;
 
-        Builder &add_compilers(const char *cc, const char *cxx) noexcept;
+        Builder &add_cc_compiler(const char *compiler, const char *wrapper) noexcept;
 
-        Builder &add_wrappers(const char *cc, const char *cxx) noexcept;
+        Builder &add_cxx_compiler(const char *compiler, const char *wrapper) noexcept;
 
         EnvironmentPtr build() const noexcept;
 
     public:
+        Builder() noexcept = delete;
+
+        ~Builder() noexcept = default;
+
         Builder(Builder &&) noexcept = delete;
 
         Builder(Builder const &) = delete;
@@ -74,14 +84,6 @@ namespace pear {
         Builder &operator=(Builder const &) = delete;
 
     private:
-        std::vector<std::string> environ_;
-        std::string reporter_;
-        std::string target_;
-        bool verbose_;
-        std::string library_;
-        std::string cc_;
-        std::string cxx_;
-        std::string cc_wrapper_;
-        std::string cxx_wrapper_;
+        std::map<std::string, std::string> environ_;
     };
 }

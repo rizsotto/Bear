@@ -19,177 +19,160 @@
 
 #include "config.h"
 
-#include <unistd.h>
+#include <list>
 #include <algorithm>
+#include <numeric>
+#include <cstring>
 
 #include "intercept_a/Environment.h"
 #include "intercept_a/Interface.h"
 
 namespace {
 
-#ifdef APPLE
     constexpr char osx_preload_key[] = "DYLD_INSERT_LIBRARIES";
     constexpr char osx_namespace_key[] = "DYLD_FORCE_FLAT_NAMESPACE";
-#else
     constexpr char glibc_preload_key[] = "LD_PRELOAD";
-#endif
+    constexpr char cc_key[] = "CC";
+    constexpr char cxx_key[] = "CXX";
 
-    std::vector<const char *> render(std::vector<std::string> const &input) noexcept {
-        std::vector<const char *> result;
-        result.reserve(input.size() + 1);
-        std::transform(input.begin(), input.end(), std::back_inserter(result),
-                       [](auto &str) { return str.c_str(); });
-        result.push_back(nullptr);
+
+    char **to_c_array(const std::map<std::string, std::string> &input) {
+        const size_t result_size = input.size() + 1;
+        auto const result = new char *[result_size];
+        auto result_it = result;
+        for (auto &it : input) {
+            const size_t entry_size = it.first.size() + it.second.size() + 2;
+            auto entry = new char [entry_size];
+
+            auto key = std::copy(it.first.begin(), it.first.end(), entry);
+            *key++ = '=';
+            auto value = std::copy(it.second.begin(), it.second.end(), key);
+            *value = '\0';
+
+            *result_it++ = entry;
+        }
+        *result_it = nullptr;
         return result;
     }
 
-    std::vector<std::string> copy(const char **const input) noexcept {
-        std::vector<std::string> result;
+    std::map<std::string, std::string> to_map(const char **const input) noexcept {
+        std::map<std::string, std::string> result;
+        if (input == nullptr)
+            return result;
+
         for (const char **it = input; *it != nullptr; ++it) {
-            result.emplace_back(std::string(*it));
+            auto end = *it + std::strlen(*it);
+            auto sep = std::find(*it, end, '=');
+            const std::string key = (sep != end) ? std::string(*it, sep) : std::string(*it, end);
+            const std::string value = (sep != end) ? std::string(sep + 1, end) : std::string();
+            result.emplace(key, value);
         }
         return result;
     }
 
-    std::string env_key_value(const char *const key, std::string const &value) noexcept {
-        return std::string(key) + '=' + value;
-    }
+    std::list<std::string> split(const std::string &input, const char sep) noexcept {
+        std::list<std::string> result;
 
-    std::tuple<std::string_view, std::string_view> env_key_value(const std::string &input) noexcept {
-        auto equal_pos = input.find_first_of('=', 0);
-        return (equal_pos == std::string::npos)
-               ? std::tuple<std::string_view, std::string_view>(
-                        std::string_view(input.c_str(), input.size()),
-                        std::string_view())
-               : std::tuple<std::string_view, std::string_view>(
-                        std::string_view(input.c_str(), equal_pos),
-                        std::string_view(input.c_str() + equal_pos, input.size() - (equal_pos + 1)));
-    };
+        std::string::size_type previous = 0;
+        do {
+            const std::string::size_type current = input.find(sep, previous);
+            result.emplace_back(input.substr(previous, current - previous));
+            previous = (current != std::string::npos) ? current + 1 : current;
+        } while (previous != std::string::npos);
 
-    constexpr bool loader_related(const std::string_view &input) noexcept {
-#ifdef APPLE
-        return input == osx_preload_key
-            || input == osx_namespace_key;
-#else
-        return input == glibc_preload_key;
-#endif
-    }
-
-    std::vector<std::string> update_loader_related(std::vector<std::string> const &input,
-                                                   std::string const &library) noexcept {
-        // TODO: don't overwrite, but extend the list
-        std::vector<std::string> result;
-        if (!library.empty()) {
-#ifdef APPLE
-            result.emplace_back(env_key_value(osx_preload_key, library));
-            result.emplace_back(env_key_value(osx_namespace_key, std::string("1")));
-#else
-            result.emplace_back(env_key_value(glibc_preload_key, library));
-#endif
-        }
         return result;
     }
 
-    std::vector<std::string> update_wrapper_related(std::vector<std::string> const &input,
-                                                    std::string const &cc,
-                                                    std::string const &cxx,
-                                                    std::string const &cc_wrapper,
-                                                    std::string const &cxx_wrapper) noexcept {
-        // TODO: implement it
-        return input;
-    }
 }
 
 namespace pear {
-    Environment::Environment(std::vector<std::string> &&environ) noexcept
-            : environ_(environ)
-            , rendered_(render(environ_))
+
+    Environment::Environment(const std::map<std::string, std::string> &environ) noexcept
+            : data_(to_c_array(environ))
     { }
 
-    const char **Environment::as_array() const noexcept {
-        return const_cast<const char **>(rendered_.data());
+    Environment::~Environment() noexcept {
+        for (char **it = data_; *it != nullptr; ++it) {
+            delete [] *it;
+        }
+        delete [] data_;
     }
 
+    const char **Environment::data() const noexcept {
+        return const_cast<const char **>(data_);
+    }
 
-    Environment::Builder::Builder() noexcept
-            : Environment::Builder(const_cast<const char **>(environ))
-    { }
 
     Environment::Builder::Builder(const char **environment) noexcept
-            : environ_(copy(environment))
-            , reporter_()
-            , target_()
-            , library_()
+            : environ_(to_map(environment))
     { }
 
-    Environment::Builder &Environment::Builder::add_reporter(const char *reporter) noexcept {
-        reporter_ = (reporter != nullptr) ? std::string(reporter) : std::string();
+    Environment::Builder &
+    Environment::Builder::add_reporter(const char *reporter) noexcept {
+        environ_.insert_or_assign(::pear::env::reporter_key, reporter);
         return *this;
     }
 
-    Environment::Builder &Environment::Builder::add_target(const char *target) noexcept {
-        target_ = (target != nullptr) ? std::string(target) : std::string();
+    Environment::Builder &
+    Environment::Builder::add_destination(const char *destination) noexcept {
+        environ_.insert_or_assign(::pear::env::destination_key, destination);
         return *this;
     }
 
-    Environment::Builder &Environment::Builder::add_verbose(bool verbose) noexcept {
-        verbose_ = verbose;
+    Environment::Builder &
+    Environment::Builder::add_verbose(bool verbose) noexcept {
+        if (verbose) {
+            environ_.insert_or_assign(::pear::env::verbose_key, "1");
+        }
         return *this;
     }
 
-    Environment::Builder &Environment::Builder::add_library(const char *library) noexcept {
-        library_= (library != nullptr) ? std::string(library) : std::string();
+    Environment::Builder &
+    Environment::Builder::add_library(const char *library) noexcept {
+#ifdef APPLE
+        const std::string key = osx_preload_key;
+#else
+        const std::string key = glibc_preload_key;
+#endif
+        const std::string value = library;
+        auto preloads = environ_.find(key);
+        if (preloads != environ_.end()) {
+            auto paths = split(preloads->second, ':');
+            if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
+                paths.emplace_front(value);
+                const std::string updated =
+                        std::accumulate(paths.begin(), paths.end(),
+                                        std::string(),
+                                        [](std::string acc, std::string item) {
+                                            return (acc.empty()) ? item : acc + ':' + item;
+                                        });
+                preloads->second = updated;
+            }
+        } else {
+            environ_.emplace(key, value);
+        }
+#ifdef APPLE
+        environ_.insert_or_assign(osx_namespace_key, "1");
+#endif
         return *this;
     }
 
-    Environment::Builder &Environment::Builder::add_compilers(const char *cc, const char *cxx) noexcept {
-        cc_ = (cc != nullptr) ? std::string(cc) : std::string();
-        cxx_ = (cxx != nullptr) ? std::string(cxx) : std::string();
+    Environment::Builder &
+    Environment::Builder::add_cc_compiler(const char *compiler, const char *wrapper) noexcept {
+        environ_.insert_or_assign(cc_key, wrapper);
+        environ_.insert_or_assign(::pear::env::cc_key, compiler);
         return *this;
     }
 
-    Environment::Builder &Environment::Builder::add_wrappers(const char *cc, const char *cxx) noexcept {
-        cc_wrapper_ = (cc != nullptr) ? std::string(cc) : std::string();
-        cxx_wrapper_ = (cxx != nullptr) ? std::string(cxx) : std::string();
+    Environment::Builder &
+    Environment::Builder::add_cxx_compiler(const char *compiler, const char *wrapper) noexcept {
+        environ_.insert_or_assign(cxx_key, wrapper);
+        environ_.insert_or_assign(::pear::env::cxx_key, compiler);
         return *this;
     }
 
     EnvironmentPtr Environment::Builder::build() const noexcept {
-        std::vector<std::string> result;
-        std::vector<std::string> affected;
-        // copy those which are not relevant to intercept
-        std::partition_copy(environ_.begin(), environ_.end(),
-                            std::back_inserter(result), std::back_inserter(affected),
-                            [](auto &str) {
-                                auto key_value = env_key_value(str);
-                                auto key = std::get<0>(key_value);
-                                return key != ::pear::env::reporter_key
-                                    && key != ::pear::env::destination_key
-                                    && key != ::pear::env::verbose_key
-                                    && key != ::pear::env::library_key
-                                    && !loader_related(key);
-                            });
-        // overwrite the intercept ones
-        if (!reporter_.empty()) {
-            result.emplace_back(env_key_value(::pear::env::reporter_key, reporter_));
-        }
-        if (!target_.empty()) {
-            result.emplace_back(env_key_value(::pear::env::destination_key, target_));
-        }
-        if (verbose_) {
-            result.emplace_back(env_key_value(::pear::env::verbose_key, "true"));
-        }
-        if (!library_.empty()) {
-            result.emplace_back(env_key_value(::pear::env::library_key, library_));
-        }
-        // add the loader ones
-        auto loader_related = update_loader_related(affected, library_);
-        std::copy(loader_related.begin(), loader_related.end(), std::back_inserter(result));
-        // add wrapper related ones
-        auto wrapper_related = update_wrapper_related(affected, cc_, cxx_, cc_wrapper_, cxx_wrapper_);
-        std::copy(wrapper_related.begin(), wrapper_related.end(), std::back_inserter(result));
-
-        return std::unique_ptr<Environment>(new Environment(std::move(result)));
+        return std::unique_ptr<Environment>(new Environment(environ_));
     }
 
 }

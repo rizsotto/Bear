@@ -40,34 +40,40 @@ namespace {
 
     class ExecutorTest : public ::testing::Test {
     public:
-        static constexpr ::pear::Context silent_session = {
-                "/usr/bin/intercept",
-                "/tmp/intercept.random",
-                false
-        };
-        static constexpr ::pear::Context verbose_session = {
-                "/usr/bin/intercept",
-                "/tmp/intercept.random",
-                true
-        };
-        static constexpr ::ear::LibrarySession silent_library_session = {
-                silent_session,
-                "/usr/libexec/libexec.so"
-        };
-        static constexpr ::ear::LibrarySession verbose_library_session = {
-                verbose_session,
-                "/usr/libexec/libexec.so"
-        };
-        static constexpr ::ear::WrapperSession silent_wrapper_session = {
-                silent_session,
-                "cc",
-                "c++"
-        };
-        static constexpr ::ear::WrapperSession verbose_wrapper_session = {
-                verbose_session,
-                "cc",
-                "c++"
-        };
+        static const ::pear::Context silent_session;
+        static const ::pear::Context verbose_session;
+        static const ::ear::LibrarySession silent_library_session;
+        static const ::ear::LibrarySession verbose_library_session;
+        static const ::ear::WrapperSession silent_wrapper_session;
+        static const ::ear::WrapperSession verbose_wrapper_session;
+    };
+    const ::pear::Context ExecutorTest::silent_session = {
+            "/usr/bin/intercept",
+            "/tmp/intercept.random",
+            false
+    };
+    const ::pear::Context ExecutorTest::verbose_session = {
+            "/usr/bin/intercept",
+            "/tmp/intercept.random",
+            true
+    };
+    const ::ear::LibrarySession ExecutorTest::silent_library_session = {
+            silent_session,
+            "/usr/libexec/libexec.so"
+    };
+    const ::ear::LibrarySession ExecutorTest::verbose_library_session = {
+            verbose_session,
+            "/usr/libexec/libexec.so"
+    };
+    const ::ear::WrapperSession ExecutorTest::silent_wrapper_session = {
+            silent_session,
+            "cc",
+            "c++"
+    };
+    const ::ear::WrapperSession ExecutorTest::verbose_wrapper_session = {
+            verbose_session,
+            "cc",
+            "c++"
     };
 
     TEST_F(ExecutorTest, execve_fails_without_env) {

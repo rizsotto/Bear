@@ -71,7 +71,7 @@ namespace pear {
     ::pear::Environment::Builder &
     LibrarySession::set(::pear::Environment::Builder &builder) const noexcept {
         builder.add_reporter(context.reporter);
-        builder.add_target(context.destination);
+        builder.add_destination(context.destination);
         builder.add_verbose(context.verbose);
         builder.add_library(library);
         return builder;
@@ -80,10 +80,10 @@ namespace pear {
     ::pear::Environment::Builder &
     WrapperSession::set(::pear::Environment::Builder &builder) const noexcept {
         builder.add_reporter(context.reporter);
-        builder.add_target(context.destination);
+        builder.add_destination(context.destination);
         builder.add_verbose(context.verbose);
-        builder.add_compilers(cc, cxx);
-        builder.add_wrappers(cc_wrapper, cxx_wrapper);
+        builder.add_cc_compiler(cc, cc_wrapper);
+        builder.add_cxx_compiler(cxx, cxx_wrapper);
         return builder;
     }
 

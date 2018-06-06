@@ -37,7 +37,7 @@ namespace {
                                const ::pear::EnvironmentPtr &environment) noexcept {
         // TODO: use other execution config parameters.
 
-        return pear::spawnp(config.command, environment->as_array());
+        return pear::spawnp(config.command, environment->data());
     }
 
     void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {

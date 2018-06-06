@@ -19,14 +19,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include "intercept_a/Interface.h"
 #include "intercept_a/Result.h"
 #include "intercept_a/Environment.h"
 
 namespace pear {
-
-    struct Session;
-    using SessionPtr = std::unique_ptr<Session>;
 
     /// Used by `intercept-cc` to report single execution.
     struct Session {
@@ -65,6 +64,7 @@ namespace pear {
     };
 
 
+    using SessionPtr = std::unique_ptr<Session>;
     pear::Result<pear::SessionPtr> parse(int argc, char *argv[], char *envp[]) noexcept;
 
 }
