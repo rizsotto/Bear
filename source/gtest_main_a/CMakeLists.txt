@@ -38,11 +38,3 @@ set_target_properties(libgmock PROPERTIES
 
 set(GOOGLE_TEST_INCLUDE_DIR "${source_dir}/googletest/include" PARENT_SCOPE)
 set(GOOGLE_MOCK_INCLUDE_DIR "${source_dir}/googlemock/include" PARENT_SCOPE)
-
-
-# Use the gtest framework for unit testing
-add_library(gtest_main_a STATIC
-        main.cc
-)
-
-include_directories(${GOOGLE_TEST_INCLUDE_DIR})
