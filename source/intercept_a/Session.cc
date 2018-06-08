@@ -18,50 +18,110 @@
  */
 
 #include "intercept_a/Session.h"
+#include "intercept_a/Interface.h"
+
+#include <cstring>
+#include <string_view>
+#include <list>
+#include <vector>
+#include <initializer_list>
+#include <algorithm>
+
+namespace {
+
+    struct Description {
+        const char *flag;
+        int arguments;
+        const char *help;
+
+        bool match(const char **input) const noexcept {
+            return (std::strcmp(*input, flag) == 0);
+        }
+
+        const char **take(const char **input) const noexcept {
+            if (arguments < 0) {
+                while (*input != nullptr)
+                    ++input;
+            } else {
+                for (int idx = arguments; idx != 0; --idx) {
+                    if (*input == nullptr)
+                        return nullptr;
+                    else
+                        ++input;
+                }
+            }
+            return input;
+        }
+    };
+
+    using Parameter = std::vector<const char *>;
+    using Parameters = std::map<std::string_view, Parameter>;
+
+    class Parser {
+    public:
+        Parser(const char *name, std::initializer_list<Description> options)
+                : name_(name)
+                , options_(options)
+        { }
+
+        ::pear::Result<Parameters> parse(const char **args) const noexcept {
+            auto exit = [](auto message) {
+                return ::pear::Result<Parameters >::failure(std::runtime_error(message));
+            };
+
+            Parameters result;
+            for (const char **args_it = args; *args_it != nullptr; ) {
+                bool match = false;
+                for (auto option : options_) {
+                    match = option.match(args_it);
+                    if (!match)
+                        continue;
+
+                    const char *flag = *args_it++;
+                    const char **begin = args_it;
+                    const char **end = option.take(args_it);
+                    if (end == nullptr) {
+                        return exit(std::string("Not enough parameters for flag: ") + flag);
+                    }
+                    result.emplace(Parameters::key_type(flag), Parameter(begin, end));
+                    args_it = end;
+                    break;
+                }
+                if ((!match) && (*args_it != nullptr)) {
+                    return exit(std::string("Unrecognized parameter: ") + *args_it);
+                }
+            }
+            return ::pear::Result<Parameters>::success(result);
+        }
+
+        std::string help() const noexcept {
+            std::string result;
+            result += std::string("Usage: ") + name_ + std::string(" [OPTION]\n\n");
+            // TODO: do better formating
+            std::for_each(options_.begin(), options_.end(), [&result](auto it) {
+                result += "  " + std::string(it.flag) + "  " + std::string(it.help) + "\n";
+            });
+            return result;
+        }
+
+    private:
+        const char *name_;
+        const std::vector<Description> options_;
+    };
+
+    ::pear::Result<::pear::Context> make_context(const Parameters &parameters, const char *reporter) noexcept {
+        // TODO
+        return ::pear::Result<::pear::Context>::failure(std::runtime_error("placeholder"));
+    }
+
+    ::pear::Result<::pear::Execution> make_execution(const Parameters &parameters) noexcept {
+        // TODO
+        return ::pear::Result<::pear::Execution>::failure(std::runtime_error("placeholder"));
+    }
+
+}
 
 namespace pear {
-
-//    pear::Result<pear::Session> parse(int argc, char *argv[]) noexcept {
-//        pear::Session result;
-//
-//        int opt;
-//        while ((opt = getopt(argc, argv, "t:l:f:s:")) != -1) {
-//            switch (opt) {
-//                case 't':
-//                    result.session.destination = optarg;
-//                    break;
-//                case 'l':
-//                    result.library = optarg;
-//                    break;
-//                case 'f':
-//                    result.execution.file = optarg;
-//                    break;
-//                case 's':
-//                    result.execution.search_path = optarg;
-//                    break;
-//                default: /* '?' */
-//                    return pear::Result<pear::Session>::failure(
-//                            std::runtime_error(
-//                                    "Usage: intercept [OPTION]... -- command\n\n"
-//                                    "  -t <target url>       where to send execution reports\n"
-//                                    "  -l <path to libexec>   where to find the ear libray\n"
-//                                    "  -f <file>             file parameter\n"
-//                                    "  -s <search_path>      search path parameter\n"));
-//            }
-//        }
-//
-//        if (optind >= argc) {
-//            return pear::Result<pear::Session>::failure(
-//                    std::runtime_error(
-//                            "Usage: intercept [OPTION]... -- command\n"
-//                            "Expected argument after options"));
-//        } else {
-//            // TODO: do validation!!!
-//            result.session.reporter = argv[0];
-//            result.execution.command = const_cast<const char **>(argv + optind);
-//            return pear::Result<pear::Session>::success(std::move(result));
-//        }
-//    }
 
     ::pear::Environment::Builder &
     Session::set(::pear::Environment::Builder &builder) const noexcept {
@@ -87,9 +147,28 @@ namespace pear {
         return builder;
     }
 
-    pear::Result<pear::SessionPtr> parse(int argc, char *argv[], char *envp[]) noexcept {
-        // TODO: implement it.
-        return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
+    pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept {
+        auto reporter = argv[0];
+        const Parser parser(argv[0], {
+            { ::pear::flag::help,        0, "this message" },
+            { ::pear::flag::verbose,     0, "make the interception run verbose" },
+            { ::pear::flag::destination, 1, "path to report directory" },
+            { ::pear::flag::library,     1, "path to the intercept library" },
+            { ::pear::flag::wrapper_cc,  2, "path to the C compiler and the wrapper" },
+            { ::pear::flag::wrapper_cxx, 2, "path to the C++ compiler and the wrapper", },
+            { ::pear::flag::file,        1, "the file name for the command" },
+            { ::pear::flag::search_path, 1, "the search path for the command" },
+            { ::pear::flag::command,    -1, "the executed command" }
+        });
+        return parser.parse(const_cast<const char **>(++argv))
+                .bind<::pear::SessionPtr>([&parser](auto params) {
+                    if (params.find(::pear::flag::help) != params.end()) {
+                        auto lines = parser.help();
+                        return pear::Result<pear::SessionPtr>::failure(std::runtime_error(lines));
+                    }
+                    // TODO
+                    return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
+                });
     }
 
 }

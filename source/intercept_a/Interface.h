@@ -22,10 +22,12 @@
 namespace pear {
     namespace flag {
 
+        constexpr char help[]           = "--help";
         constexpr char verbose[]        = "--verbose";
         constexpr char destination[]    = "--report-destination";
         constexpr char library[]        = "--session-library";
-        constexpr char wrapper[]        = "--session-wrapper";
+        constexpr char wrapper_cc[]     = "--session-cc-wrapper";
+        constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
         constexpr char file[]           = "--exec-file";
         constexpr char search_path[]    = "--exec-search_path";
         constexpr char command[]        = "--exec-command";

@@ -65,7 +65,7 @@ namespace {
 }
 
 int main(int argc, char *argv[], char *envp[]) {
-    return ::pear::parse(argc, argv, envp)
+    return ::pear::parse(argc, argv)
             .bind<int>([&envp](auto &state) {
                 auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
                 auto environment = state->set(builder).build();
