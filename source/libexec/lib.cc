@@ -45,7 +45,11 @@ namespace {
     ::ear::LibrarySession session {};
     ::ear::LibrarySession *session_ptr;
 
+
     ::ear::LibrarySession *store(::ear::Storage &storage, ::ear::LibrarySession *input) noexcept {
+        if (input == nullptr)
+            return nullptr;
+
         input->context.destination = storage.store(input->context.destination);
         input->context.reporter = storage.store(input->context.reporter);
         input->library = storage.store(input->library);
