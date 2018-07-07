@@ -99,7 +99,7 @@ COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
 
 # Known C compiler executable name patterns.
 COMPILER_PATTERNS_CC = (
-    re.compile(r'^([^-]*-)*[mg]cc(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$'),
     re.compile(r'^([^-]*-)*clang(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^(|i)cc$'),
     re.compile(r'^(g|)xlc$'),
@@ -108,7 +108,7 @@ COMPILER_PATTERNS_CC = (
 # Known C++ compiler executable name patterns.
 COMPILER_PATTERNS_CXX = (
     re.compile(r'^(c\+\+|cxx|CC)$'),
-    re.compile(r'^([^-]*-)*[mg]\+\+(-\d+(\.\d+){0,2})?$'),
+    re.compile(r'^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$'),
     re.compile(r'^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^icpc$'),
     re.compile(r'^(g|)xl(C|c\+\+)$'),
