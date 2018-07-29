@@ -59,11 +59,17 @@ How to use
 
 After installation the usage is like this:
 
-    bear make
+    bear <your-build-command>
 
 The output file called `compile_commands.json` found  in current directory.
 
 For more options you can check the man page or pass `--help` parameter.
+
+Side note: Since `bear` is executing the build command only those commands
+will be recorded which were actually executed. Which means if you were already
+built your project and you re-run the build command with Bear you probably end
+up to have an empty output. (Practically it means you need to run `make clean`
+before you run `bear make`.)
 
 Known issues
 ------------
