@@ -116,10 +116,13 @@ COMPILER_PATTERNS_CXX = (
 
 TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
+C_LANG, CPLUSPLUS_LANG, OTHER = range(3)
+
 Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
 
 CompilationCommand = collections.namedtuple(
-    'CompilationCommand', ['compiler', 'phase', 'flags', 'files', 'output'])
+    'CompilationCommand',
+    ['compiler', 'language', 'phase', 'flags', 'files', 'output'])
 
 
 def shell_split(string):
@@ -431,12 +434,14 @@ def create_intercept_parser():
 
 
 class Compilation:
-    def __init__(self, compiler, phase, flags, source, directory, output):
+    def __init__(self,
+                 compiler, language, phase, flags, source, directory, output):
         """ Constructor for a single compilation.
 
         This method just normalize the paths and initialize values. """
 
         self.compiler = compiler
+        self.language = language
         self.phase = phase
         self.flags = flags
         self.directory = os.path.normpath(directory)
@@ -462,13 +467,13 @@ class Compilation:
         # type: (Compilation) -> Dict[str, Any]
         """ This method creates a compilation database entry. """
 
-        relative = os.path.relpath(self.source, self.directory)
-        compiler = 'cc' if self.compiler == 'c' else 'c++'
+        source = os.path.relpath(self.source, self.directory)
         output = ['-o', self.output] if self.output else []
+        compiler = 'cc' if self.language == C_LANG else 'c++'
         return {
-            'file': relative,
+            'file': source,
             'arguments':
-                [compiler, self.phase] + self.flags + output + [relative],
+                [compiler, self.phase] + self.flags + output + [source],
             'directory': self.directory
         }
 
@@ -505,6 +510,7 @@ class Compilation:
             result = Compilation(directory=execution.cwd,
                                  source=source,
                                  compiler=candidate.compiler,
+                                 language=candidate.language,
                                  phase=phase,
                                  flags=candidate.flags,
                                  output=output)
@@ -557,9 +563,9 @@ class Compilation:
                 return cls._split_compiler(mpi_call + parameters, cc, cxx)
             # and 'compiler' 'parameters' is valid.
             elif is_c_compiler(executable):
-                return 'c', parameters
+                return command[0], C_LANG, parameters
             elif is_cxx_compiler(executable):
-                return 'c++', parameters
+                return command[0], CPLUSPLUS_LANG, parameters
         return None
 
     @classmethod
@@ -579,12 +585,13 @@ class Compilation:
 
         # the result of this method
         result = CompilationCommand(compiler=compiler_and_arguments[0],
+                                    language=compiler_and_arguments[1],
                                     phase=[],
                                     flags=[],
                                     files=[],
                                     output=[])
         # iterate on the compile options
-        args = iter(compiler_and_arguments[1])
+        args = iter(compiler_and_arguments[2])
         for arg in args:
             # quit when compilation pass is not involved
             if arg in {'-E', '-cc1', '-cc1as', '-M', '-MM', '-###'}:
