@@ -469,11 +469,10 @@ class Compilation:
 
         source = os.path.relpath(self.source, self.directory)
         output = ['-o', self.output] if self.output else []
-        compiler = 'cc' if self.language == C_LANG else 'c++'
         return {
             'file': source,
             'arguments':
-                [compiler, self.phase] + self.flags + output + [source],
+                [self.compiler, self.phase] + self.flags + output + [source],
             'directory': self.directory
         }
 

@@ -71,7 +71,7 @@ void expected_out_close() {
     cwd = NULL;
 }
 
-void expected_out(const char *file) {
+void expected_out(const char * compiler, const char *file) {
     if (need_comma)
         fprintf(fd, ",\n");
     else
@@ -79,7 +79,7 @@ void expected_out(const char *file) {
 
     fprintf(fd, "{\n");
     fprintf(fd, "  \"directory\": \"%s\",\n", cwd);
-    fprintf(fd, "  \"command\": \"cc -c %s\",\n", file);
+    fprintf(fd, "  \"command\": \"%s -c %s\",\n", compiler, file);
     fprintf(fd, "  \"file\": \"%s\"\n", file);
     fprintf(fd, "}\n");
 }
@@ -125,11 +125,12 @@ void wait_for(pid_t child) {
 
 #ifdef HAVE_EXECV
 void call_execv() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execv.c";
     char *const compiler = "/usr/bin/cc";
-    char *const argv[] = {"cc", "-c", file, 0};
+    char *const argv[] = {compiler, "-c", file, 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execv(compiler, argv);)
@@ -138,12 +139,13 @@ void call_execv() {
 
 #ifdef HAVE_EXECVE
 void call_execve() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execve.c";
     char *const compiler = "/usr/bin/cc";
     char *const argv[] = {compiler, "-c", file, 0};
     char *const envp[] = {"THIS=THAT", 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execve(compiler, argv, envp);)
@@ -152,11 +154,12 @@ void call_execve() {
 
 #ifdef HAVE_EXECVP
 void call_execvp() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execvp.c";
     char *const compiler = "cc";
     char *const argv[] = {compiler, "-c", file, 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execvp(compiler, argv);)
@@ -165,11 +168,12 @@ void call_execvp() {
 
 #ifdef HAVE_EXECVP2
 void call_execvP() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execv_p.c";
     char *const compiler = "cc";
     char *const argv[] = {compiler, "-c", file, 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execvP(compiler, _PATH_DEFPATH, argv);)
@@ -178,12 +182,13 @@ void call_execvP() {
 
 #ifdef HAVE_EXECVPE
 void call_execvpe() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execvpe.c";
-    char *const compiler = "cc";
-    char *const argv[] = {"/usr/bin/cc", "-c", file, 0};
+    char *const compiler = "/usr/bin/cc";
+    char *const argv[] = {compiler, "-c", file, 0};
     char *const envp[] = {"THIS=THAT", 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execvpe(compiler, argv, envp);)
@@ -192,12 +197,13 @@ void call_execvpe() {
 
 #ifdef HAVE_EXECT
 void call_exect() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "exect.c";
     char *const compiler = "/usr/bin/cc";
     char *const argv[] = {compiler, "-c", file, 0};
     char *const envp[] = {"THIS=THAT", 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(exect(compiler, argv, envp);)
@@ -206,10 +212,11 @@ void call_exect() {
 
 #ifdef HAVE_EXECL
 void call_execl() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execl.c";
     char *const compiler = "/usr/bin/cc";
 
-    expected_out(file);
+    expected_out("cc", file);
     create_source(file);
 
     FORK(execl(compiler, "cc", "-c", file, (char *)0);)
@@ -218,10 +225,11 @@ void call_execl() {
 
 #ifdef HAVE_EXECLP
 void call_execlp() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execlp.c";
     char *const compiler = "cc";
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execlp(compiler, compiler, "-c", file, (char *)0);)
@@ -230,11 +238,12 @@ void call_execlp() {
 
 #ifdef HAVE_EXECLE
 void call_execle() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "execle.c";
     char *const compiler = "/usr/bin/cc";
     char *const envp[] = {"THIS=THAT", 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execle(compiler, compiler, "-c", file, (char *)0, envp);)
@@ -243,11 +252,12 @@ void call_execle() {
 
 #ifdef HAVE_POSIX_SPAWN
 void call_posix_spawn() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "posix_spawn.c";
     char *const compiler = "cc";
     char *const argv[] = {compiler, "-c", file, 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     pid_t child;
@@ -261,11 +271,12 @@ void call_posix_spawn() {
 
 #ifdef HAVE_POSIX_SPAWNP
 void call_posix_spawnp() {
+    fprintf(stderr, "%s\n", __PRETTY_FUNCTION__);
     char *const file = "posix_spawnp.c";
     char *const compiler = "cc";
     char *const argv[] = {compiler, "-c", file, 0};
 
-    expected_out(file);
+    expected_out(compiler, file);
     create_source(file);
 
     pid_t child;

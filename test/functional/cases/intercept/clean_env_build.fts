@@ -46,25 +46,25 @@ chmod +x ${build_file}
 cat > "${root_dir}/expected.json" << EOF
 [
 {
-  "command": "cc -c -Dver=1 src/empty.c",
+  "command": "${clang} -c -Dver=1 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }
 ,
 {
-  "command": "c++ -c -Dver=2 src/empty.c",
+  "command": "${clangpp} -c -Dver=2 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }
 ,
 {
-  "command": "cc -c -Dver=3 empty.c",
+  "command": "${clang} -c -Dver=3 empty.c",
   "directory": "${root_dir}/src",
   "file": "empty.c"
 }
 ,
 {
-  "command": "c++ -c -Dver=4 empty.c",
+  "command": "${clangpp} -c -Dver=4 empty.c",
   "directory": "${root_dir}/src",
   "file": "empty.c"
 }
