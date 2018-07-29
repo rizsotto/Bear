@@ -133,6 +133,16 @@ shall respect `CC` and `CXX` environment variables.
   [osx_sip]: https://support.apple.com/en-us/HT204899
   [scanbuild]: https://github.com/rizsotto/scan-build
 
+### Bazel builds produce empty outputs
+
+The two main constraints to intercept compiler execution from bazel builds are:
+bazel runs a daemon which runs the compilations, and it creates an isolated
+environment to run the compiler. These problems are not just hard to circumvent,
+but the workaround would not be stable to support it by this tool.
+
+The good news is: there are extensions for bazel to generate the compilation
+database.
+
 Problem reports
 ---------------
 
