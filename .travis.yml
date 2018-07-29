@@ -43,7 +43,7 @@ before_install:
 install:
   - pip --version
   - pip install --upgrade pip
-  - pip install lit pep8
+  - pip install lit pycodestyle
 
 script:
   - mkdir "$HOME/build"; cd "$HOME/build"
