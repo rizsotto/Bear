@@ -143,6 +143,12 @@ but the workaround would not be stable to support it by this tool.
 The good news is: there are extensions for bazel to generate the compilation
 database.
 
+### Static build tool produce empty output
+
+Currently Bear based on dynamic linker load mechanism, executions made by
+statically linked binaries are not captured. It means, if the build tool is
+statically linked binary, compiler calls won't be recorded by Bear.
+
 Problem reports
 ---------------
 
