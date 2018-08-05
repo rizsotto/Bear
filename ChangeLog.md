@@ -1,3 +1,12 @@
+## 2.3.12 (2018.08.06)
+
+Bugfixes:
+  - Accept compiler name version without hyphen separator (#216, @Jehops)
+  - Keep original compiler name (#211, @TomMD)
+  - Readme file updates on known issues (#208, @matanster)
+  - Filter extra compilation if requested (#218, @jkbbwr)
+
+
 ## 2.3.11 (2018.01.04)
 
 Bugfixes:
