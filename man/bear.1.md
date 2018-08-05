@@ -47,6 +47,9 @@ writes the output file.
 \--use-c++ *program*
 :	Hint Bear to classify the given program name as C++ compiler.
 
+\--use-only
+:	Force to use only the `--use-cc` and `--use-c++` given compilers.
+
 -a, \--append
 :	Use previously generated output file and append the new entries to it.
 	This way you can run Bear continuously during work, and it keeps the

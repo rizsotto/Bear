@@ -125,6 +125,43 @@ CompilationCommand = collections.namedtuple(
     ['compiler', 'language', 'phase', 'flags', 'files', 'output'])
 
 
+class Category:
+
+    def __init__(self, only_use, c_compilers, cxx_compilers):
+        self.ignore = only_use
+        self.c_compilers = [os.path.basename(cc) for cc in c_compilers]
+        self.cxx_compilers = [os.path.basename(cc) for cc in cxx_compilers]
+
+    def is_wrapper(self, cmd):
+        # type: (Category, str) -> bool
+        return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
+
+    def is_mpi_wrapper(self, cmd):
+        # type: (Category, str) -> bool
+        return True if COMPILER_PATTERNS_MPI_WRAPPER.match(cmd) else False
+
+    def is_c_compiler(self, cmd):
+        # type: (Category, str) -> bool
+        use_match = Category._is_sting_match(cmd, self.c_compilers)
+        pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CC)
+        return use_match if self.ignore else (use_match or pattern_match)
+
+    def is_cxx_compiler(self, cmd):
+        # type: (Category, str) -> bool
+        use_match = Category._is_sting_match(cmd, self.cxx_compilers)
+        pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CXX)
+        return use_match if self.ignore else (use_match or pattern_match)
+
+    @classmethod
+    def _is_sting_match(cls, candidate, compilers):
+        # type (Type[Category], str, Iterable[str) -> bool
+        return any((candidate == compiler) for compiler in compilers)
+
+    @classmethod
+    def _is_pattern_match(cls, candidate, patterns):
+        return any(pattern.match(candidate) for pattern in patterns)
+
+
 def shell_split(string):
     # type: (str) -> List[str]
     """ Takes a command string and returns as a list. """
@@ -250,12 +287,13 @@ def intercept_build():
     """ Entry point for 'intercept-build' command. """
 
     args = parse_args_for_intercept_build()
-    exit_code, current = capture(args)
+    category = Category(args.use_only, args.use_cc, args.use_cxx)
+    exit_code, current = capture(args, category)
 
     # To support incremental builds, it is desired to read elements from
     # an existing compilation database from a previous run.
     if args.append and os.path.isfile(args.cdb):
-        previous = CompilationDatabase.load(args.cdb)
+        previous = CompilationDatabase.load(args.cdb, category)
         entries = iter(set(itertools.chain(previous, current)))
         CompilationDatabase.save(args.cdb, entries)
     else:
@@ -264,12 +302,12 @@ def intercept_build():
     return exit_code
 
 
-def capture(args):
-    # type: (argparse.Namespace) -> Tuple[int, Iterable[Compilation]]
+def capture(args, category):
     """ Implementation of compilation database generation.
 
-    :param args:    the parsed and validated command line arguments
-    :return:        the exit status of build process. """
+    :param args:        the parsed and validated command line arguments
+    :param category:    helper object to detect compiler
+    :return:            the exit status of build process. """
 
     with temporary_directory(prefix='intercept-') as tmp_dir:
         # run the build command
@@ -278,24 +316,23 @@ def capture(args):
         # read the intercepted exec calls
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
-        current = compilations(safe_calls, args.cc, args.cxx)
+        current = compilations(safe_calls, category)
 
         return exit_code, iter(set(current))
 
 
-def compilations(exec_calls, cc, cxx):
-    # type: (Iterable[Execution], str, str) -> Iterable[Compilation]
+def compilations(exec_calls, category):
+    # type: (Iterable[Execution], Category) -> Iterable[Compilation]
     """ Needs to filter out commands which are not compiler calls. And those
     compiler calls shall be compilation (not pre-processing or linking) calls.
     Plus needs to find the source file name from the arguments.
 
     :param exec_calls:  iterator of executions
-    :param cc:          user specified C compiler name
-    :param cxx:         user specified C++ compiler name
+    :param category:    helper object to detect compiler
     :return: stream of formatted compilation database entries """
 
     for call in exec_calls:
-        for compilation in Compilation.iter_from_execution(call, cc, cxx):
+        for compilation in Compilation.iter_from_execution(call, category):
             yield compilation
 
 
@@ -401,17 +438,23 @@ def create_intercept_parser():
     parser.add_argument(
         '--use-cc',
         metavar='<path>',
-        dest='cc',
-        default=os.getenv('CC', 'cc'),
+        dest='use_cc',
+        action='append',
+        default=[os.getenv('CC', 'cc')],
         help="""Hint '%(prog)s' to classify the given program name as C
         compiler.""")
     parser.add_argument(
         '--use-c++',
         metavar='<path>',
-        dest='cxx',
-        default=os.getenv('CXX', 'c++'),
+        dest='use_cxx',
+        action='append',
+        default=[os.getenv('CXX', 'c++')],
         help="""Hint '%(prog)s' to classify the given program name as C++
         compiler.""")
+    parser.add_argument(
+        '--use-only',
+        action='store_true',
+        help="""The JSON compilation database.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
@@ -477,32 +520,32 @@ class Compilation:
         }
 
     @classmethod
-    def from_db_entry(cls, entry):
+    def from_db_entry(cls, entry, category):
         # type: (Type[Compilation], Dict[str, str]) -> Iterable[Compilation]
         """ Parser method for compilation entry.
 
         From compilation database entry it creates the compilation object.
 
-        :param entry:   the compilation database entry
+        :param entry:       the compilation database entry
+        :param category:    helper object to detect compiler
         :return: stream of CompilationDbEntry objects """
 
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
         execution = Execution(cmd=command, cwd=entry['directory'], pid=0)
-        return cls.iter_from_execution(execution)
+        return cls.iter_from_execution(execution, category)
 
     @classmethod
-    def iter_from_execution(cls, execution, cc='cc', cxx='c++'):
+    def iter_from_execution(cls, execution, category):
         """ Generator method for compilation entries.
 
         From a single compiler call it can generate zero or more entries.
 
         :param execution:   executed command and working directory
-        :param cc:          user specified C compiler name
-        :param cxx:         user specified C++ compiler name
+        :param category:    helper object to detect compiler
         :return: stream of CompilationDbEntry objects """
 
-        candidate = cls._split_command(execution.cmd, cc, cxx)
+        candidate = cls._split_command(execution.cmd, category)
         for source in candidate.files if candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
@@ -517,32 +560,13 @@ class Compilation:
                 yield result
 
     @classmethod
-    def _split_compiler(cls, command, cc, cxx):
+    def _split_compiler(cls, command, category):
         """ A predicate to decide whether the command is a compiler call.
 
         :param command:     the command to classify
-        :param cc:          user specified C compiler name
-        :param cxx:         user specified C++ compiler name
+        :param category:    helper object to detect compiler
         :return: None if the command is not a compilation, or a tuple
                 (compiler_language, rest of the command) otherwise """
-
-        def is_wrapper(cmd):
-            # type: (str) -> bool
-            return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
-
-        def is_mpi_wrapper(cmd):
-            # type: (str) -> bool
-            return True if COMPILER_PATTERNS_MPI_WRAPPER.match(cmd) else False
-
-        def is_c_compiler(cmd):
-            # type: (str) -> bool
-            return os.path.basename(cc) == cmd or \
-                any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CC)
-
-        def is_cxx_compiler(cmd):
-            # type: (str) -> bool
-            return os.path.basename(cxx) == cmd or \
-                any(pattern.match(cmd) for pattern in COMPILER_PATTERNS_CXX)
 
         if command:  # not empty list will allow to index '0' and '1:'
             executable = os.path.basename(command[0])  # type: str
@@ -550,35 +574,34 @@ class Compilation:
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
             # Additionally, a wrapper can wrap another wrapper.
-            if is_wrapper(executable):
-                result = cls._split_compiler(parameters, cc, cxx)
+            if category.is_wrapper(executable):
+                result = cls._split_compiler(parameters, category)
                 # Compiler wrapper without compiler is a 'C' compiler.
                 return ('c', parameters) if result is None else result
             # MPI compiler wrappers add extra parameters
-            elif is_mpi_wrapper(executable):
+            elif category.is_mpi_wrapper(executable):
                 # Pass the executable with full path to avoid pick different
                 # executable from PATH.
                 mpi_call = get_mpi_call(command[0])  # type: List[str]
-                return cls._split_compiler(mpi_call + parameters, cc, cxx)
+                return cls._split_compiler(mpi_call + parameters, category)
             # and 'compiler' 'parameters' is valid.
-            elif is_c_compiler(executable):
+            elif category.is_c_compiler(executable):
                 return command[0], C_LANG, parameters
-            elif is_cxx_compiler(executable):
+            elif category.is_cxx_compiler(executable):
                 return command[0], CPLUSPLUS_LANG, parameters
         return None
 
     @classmethod
-    def _split_command(cls, command, cc, cxx):
+    def _split_command(cls, command, category):
         """ Returns a value when the command is a compilation, None otherwise.
 
         :param command:     the command to classify
-        :param cc:          user specified C compiler name
-        :param cxx:         user specified C++ compiler name
+        :param category:    helper object to detect compiler
         :return: stream of CompilationCommand objects """
 
         logging.debug('input was: %s', command)
         # quit right now, if the program was not a C/C++ compiler
-        compiler_and_arguments = cls._split_compiler(command, cc, cxx)
+        compiler_and_arguments = cls._split_compiler(command, category)
         if compiler_and_arguments is None:
             return None
 
@@ -637,16 +660,17 @@ class CompilationDatabase:
             json.dump(entries, handle, sort_keys=True, indent=4)
 
     @staticmethod
-    def load(filename):
-        # type: (str) -> Iterable[Compilation]
+    def load(filename, category):
+        # type: (str, Category) -> Iterable[Compilation]
         """ Load compilations from file.
 
         :param filename: the file to read from
+        :param category: helper object to detect compiler
         :returns: iterator of Compilation objects. """
 
         with open(filename, 'r') as handle:
             for entry in json.load(handle):
-                for compilation in Compilation.from_db_entry(entry):
+                for compilation in Compilation.from_db_entry(entry, category):
                     yield compilation
 
 

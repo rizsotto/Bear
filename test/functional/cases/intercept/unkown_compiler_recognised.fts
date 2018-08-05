@@ -4,6 +4,8 @@
 # RUN: bash %s %T/unkown_compiler_recognised
 # RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper.json ./run.sh
 # RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper.json expected.json
+# RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-only --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper_only.json ./run.sh
+# RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper_only.json expected_wrapper_only.json
 
 set -o errexit
 set -o nounset
@@ -18,6 +20,9 @@ set -o xtrace
 # ├── expected.json
 # └── src
 #    └── empty.c
+
+clang="clang"
+clangpp="clang++"
 
 root_dir=$1
 mkdir -p "${root_dir}/src"
@@ -47,8 +52,8 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-${wrapper_file} -c -Dver=1 src/empty.c;
-${wrapperxx_file} -c -Dver=2 src/empty.c;
+${clang} -c -Dver=1 src/empty.c;
+${clangpp} -c -Dver=2 src/empty.c;
 
 cd src
 ${wrapper_file} -c -Dver=3 empty.c;
@@ -59,17 +64,33 @@ chmod +x ${build_file}
 cat > "${root_dir}/expected.json" << EOF
 [
 {
-  "command": "${wrapper_file} -c -Dver=1 src/empty.c",
+  "command": "${clang} -c -Dver=1 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }
 ,
 {
-  "command": "${wrapperxx_file} -c -Dver=2 src/empty.c",
+  "command": "${clangpp} -c -Dver=2 src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c"
 }
 ,
+{
+  "command": "${wrapper_file} -c -Dver=3 empty.c",
+  "directory": "${root_dir}/src",
+  "file": "empty.c"
+}
+,
+{
+  "command": "${wrapperxx_file} -c -Dver=4 empty.c",
+  "directory": "${root_dir}/src",
+  "file": "empty.c"
+}
+]
+EOF
+
+cat > "${root_dir}/expected_wrapper_only.json" << EOF
+[
 {
   "command": "${wrapper_file} -c -Dver=3 empty.c",
   "directory": "${root_dir}/src",
