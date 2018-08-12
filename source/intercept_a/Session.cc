@@ -54,7 +54,7 @@ namespace {
         }
     };
 
-    using Parameter = std::vector<const char *>;
+    using Parameter = std::tuple<const char **, const char **>;
     using Parameters = std::map<std::string_view, Parameter>;
 
     class Parser {
@@ -83,7 +83,7 @@ namespace {
                     if (end == nullptr) {
                         return exit(std::string("Not enough parameters for flag: ") + flag);
                     }
-                    result.emplace(Parameters::key_type(flag), Parameter(begin, end));
+                    result.emplace(Parameters::key_type(flag), std::make_tuple(begin, end));
                     args_it = end;
                     break;
                 }
@@ -110,13 +110,34 @@ namespace {
     };
 
     ::pear::Result<::pear::Context> make_context(const Parameters &parameters, const char *reporter) noexcept {
-        // TODO
-        return ::pear::Result<::pear::Context>::failure(std::runtime_error("placeholder"));
+        if (auto destination_it = parameters.find(::pear::flag::destination); destination_it != parameters.end()) {
+            auto const [ destination, _ ] = destination_it->second;
+            const bool verbose = (parameters.find(::pear::flag::verbose) != parameters.end());
+            return ::pear::Result<::pear::Context>::success({ reporter, *destination, verbose });
+        } else {
+            return ::pear::Result<::pear::Context>::failure(std::runtime_error("Missing destination.\n"));
+        }
     }
 
     ::pear::Result<::pear::Execution> make_execution(const Parameters &parameters) noexcept {
-        // TODO
-        return ::pear::Result<::pear::Execution>::failure(std::runtime_error("placeholder"));
+        auto get_optional = [&parameters](const char *const name) -> const char * {
+            if (auto it = parameters.find(name); it != parameters.end()) {
+                auto [ result, _ ] = it->second;
+                return *result;
+            } else {
+                return nullptr;
+            }
+        };
+
+        auto const nowhere = parameters.end();
+        if (auto command_it = parameters.find(::pear::flag::command); command_it != nowhere) {
+            auto [ command, _ ] = command_it->second;
+            auto file = get_optional(::pear::flag::file);
+            auto search_path = get_optional(::pear::flag::search_path);
+            return ::pear::Result<::pear::Execution>::success({ command, file, search_path });
+        } else {
+            return ::pear::Result<::pear::Execution>::failure(std::runtime_error("Missing command.\n"));
+        }
     }
 
 }
@@ -163,11 +184,21 @@ namespace pear {
         return parser.parse(const_cast<const char **>(++argv))
                 .bind<::pear::SessionPtr>([&parser](auto params) {
                     if (params.find(::pear::flag::help) != params.end()) {
-                        auto lines = parser.help();
-                        return pear::Result<pear::SessionPtr>::failure(std::runtime_error(lines));
+                        return pear::Result<pear::SessionPtr>::failure(std::runtime_error(""));
+                    } else if (params.find(::pear::flag::library) != params.end()) {
+                        // TODO: create library session
+                    } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
+                               (params.find(::pear::flag::wrapper_cxx) != params.end())) {
+                        // TODO: create wrapper session
+                    } else {
+                        // TODO: create session
                     }
-                    // TODO
                     return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
+//                })
+//                .handle_with([&parser](auto error) {
+//                    auto prefix = error.what();
+//                    auto lines = parser.help();
+//                    return pear::Result<pear::SessionPtr>::failure(std::runtime_error(prefix + lines));
                 });
     }
 
