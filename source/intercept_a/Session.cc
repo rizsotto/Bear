@@ -151,18 +151,18 @@ namespace pear {
 
     ::pear::Environment::Builder &
     LibrarySession::set(::pear::Environment::Builder &builder) const noexcept {
-        builder.add_reporter(context.reporter);
-        builder.add_destination(context.destination);
-        builder.add_verbose(context.verbose);
+        builder.add_reporter(context_.reporter);
+        builder.add_destination(context_.destination);
+        builder.add_verbose(context_.verbose);
         builder.add_library(library);
         return builder;
     }
 
     ::pear::Environment::Builder &
     WrapperSession::set(::pear::Environment::Builder &builder) const noexcept {
-        builder.add_reporter(context.reporter);
-        builder.add_destination(context.destination);
-        builder.add_verbose(context.verbose);
+        builder.add_reporter(context_.reporter);
+        builder.add_destination(context_.destination);
+        builder.add_verbose(context_.verbose);
         builder.add_cc_compiler(cc, cc_wrapper);
         builder.add_cxx_compiler(cxx, cxx_wrapper);
         return builder;
@@ -185,16 +185,34 @@ namespace pear {
                 .bind<::pear::SessionPtr>([&parser](auto params) {
                     if (params.find(::pear::flag::help) != params.end()) {
                         return pear::Result<pear::SessionPtr>::failure(std::runtime_error(""));
-                    } else if (params.find(::pear::flag::library) != params.end()) {
-                        // TODO: create library session
-                    } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
-                               (params.find(::pear::flag::wrapper_cxx) != params.end())) {
-                        // TODO: create wrapper session
                     } else {
-                        // TODO: create session
+                        // TODO: pass program name
+                        return merge(make_context(params, nullptr), make_execution(params))
+                                .template map<::pear::SessionPtr>([&params](auto &in) {
+                                    auto [ context, execution ] = in;
+                                    if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
+                                        auto [ library, _ ] = library_it->second;
+                                        auto result = std::make_unique<LibrarySession>(context, execution);
+                                        result->library = *library;
+                                        return SessionPtr(result.release());
+                                    } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
+                                               (params.find(::pear::flag::wrapper_cxx) != params.end())) {
+                                        auto [ wrapper_cc_begin, wrapper_cc_end ] =
+                                                params.find(::pear::flag::wrapper_cc)->second;
+                                        auto [ wrapper_cxx_begin, wrapper_cxx_end ] =
+                                                params.find(::pear::flag::wrapper_cxx)->second;
+                                        auto result = std::make_unique<WrapperSession>(context, execution);
+                                        result->cc = *wrapper_cc_begin++;
+                                        result->cc_wrapper = *wrapper_cc_begin;
+                                        result->cxx = *wrapper_cxx_begin++;
+                                        result->cxx_wrapper = *wrapper_cxx_begin;
+                                        return SessionPtr(result.release());
+                                    } else {
+                                        return std::make_unique<Session>(context, execution);
+                                    }
+                                });
                     }
-                    return pear::Result<pear::SessionPtr>::failure(std::runtime_error("placeholder"));
-//                })
+                    // TODO: add help for every failure
 //                .handle_with([&parser](auto error) {
 //                    auto prefix = error.what();
 //                    auto lines = parser.help();

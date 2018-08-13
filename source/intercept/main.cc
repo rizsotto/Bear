@@ -69,11 +69,11 @@ int main(int argc, char *argv[], char *envp[]) {
             .bind<int>([&envp](auto &state) {
                 auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
                 auto environment = state->set(builder).build();
-                auto reporter = pear::Reporter::tempfile(state->context.destination);
+                auto reporter = pear::Reporter::tempfile(state->context_.destination);
 
-                pear::Result<pid_t> child = spawnp(state->execution, environment);
+                pear::Result<pid_t> child = spawnp(state->execution_, environment);
                 return child.map<int>([&reporter, &state](auto &pid) {
-                    report_start(pid, state->execution.command, reporter);
+                    report_start(pid, state->execution_.command, reporter);
                     pear::Result<int> status = pear::wait_pid(pid);
                     return status
                             .map<int>([&reporter, &pid](auto &exit) {

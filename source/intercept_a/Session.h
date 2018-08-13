@@ -29,8 +29,13 @@ namespace pear {
 
     /// Used by `intercept-cc` to report single execution.
     struct Session {
-        ::pear::Context context;
-        ::pear::Execution execution;
+        ::pear::Context context_;
+        ::pear::Execution execution_;
+
+        Session(const ::pear::Context &context, const ::pear::Execution &execution)
+                : context_(context)
+                , execution_(execution)
+        { }
 
         virtual ~Session() noexcept = default;
 
@@ -42,6 +47,11 @@ namespace pear {
     /// and prepare for more executions.
     struct LibrarySession : public ::pear::Session {
         const char *library;
+
+        LibrarySession(const ::pear::Context &context, const ::pear::Execution &execution)
+                : Session(context, execution)
+                , library(nullptr)
+        { }
 
         ~LibrarySession() noexcept override = default;
 
@@ -56,6 +66,14 @@ namespace pear {
         const char *cxx;
         const char *cc_wrapper;
         const char *cxx_wrapper;
+
+        WrapperSession(const ::pear::Context &context, const ::pear::Execution &execution)
+                : Session(context, execution)
+                , cc(nullptr)
+                , cxx(nullptr)
+                , cc_wrapper(nullptr)
+                , cxx_wrapper(nullptr)
+        { }
 
         ~WrapperSession() noexcept override = default;
 
