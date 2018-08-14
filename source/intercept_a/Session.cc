@@ -57,11 +57,12 @@ namespace {
     using Parameter = std::tuple<const char **, const char **>;
     using Parameters = std::map<std::string_view, Parameter>;
 
+    constexpr char program_key[] = "program";
+
     class Parser {
     public:
-        Parser(const char *name, std::initializer_list<Description> options)
-                : name_(name)
-                , options_(options)
+        Parser(std::initializer_list<Description> options)
+                : options_(options)
         { }
 
         ::pear::Result<Parameters> parse(const char **args) const noexcept {
@@ -70,6 +71,10 @@ namespace {
             };
 
             Parameters result;
+            if (args == nullptr || *args == nullptr) {
+                return exit("Empty parameter list.");
+            }
+            result.emplace(Parameters::key_type(program_key), std::make_tuple(args, ++args));
             for (const char **args_it = args; *args_it != nullptr; ) {
                 bool match = false;
                 for (auto option : options_) {
@@ -94,9 +99,9 @@ namespace {
             return ::pear::Result<Parameters>::success(result);
         }
 
-        std::string help() const noexcept {
+        std::string help(const char *const name) const noexcept {
             std::string result;
-            result += std::string("Usage: ") + name_ + std::string(" [OPTION]\n\n");
+            result += std::string("Usage: ") + name + std::string(" [OPTION]\n\n");
             // TODO: do better formating
             std::for_each(options_.begin(), options_.end(), [&result](auto it) {
                 result += "  " + std::string(it.flag) + "  " + std::string(it.help) + "\n";
@@ -105,15 +110,15 @@ namespace {
         }
 
     private:
-        const char *name_;
         const std::vector<Description> options_;
     };
 
-    ::pear::Result<::pear::Context> make_context(const Parameters &parameters, const char *reporter) noexcept {
+    ::pear::Result<::pear::Context> make_context(const Parameters &parameters) noexcept {
         if (auto destination_it = parameters.find(::pear::flag::destination); destination_it != parameters.end()) {
             auto const [ destination, _ ] = destination_it->second;
             const bool verbose = (parameters.find(::pear::flag::verbose) != parameters.end());
-            return ::pear::Result<::pear::Context>::success({ reporter, *destination, verbose });
+            auto const [ reporter, __ ] = parameters.find(program_key)->second;
+            return ::pear::Result<::pear::Context>::success({ *reporter, *destination, verbose });
         } else {
             return ::pear::Result<::pear::Context>::failure(std::runtime_error("Missing destination.\n"));
         }
@@ -169,8 +174,7 @@ namespace pear {
     }
 
     pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept {
-        auto reporter = argv[0];
-        const Parser parser(argv[0], {
+        const Parser parser({
             { ::pear::flag::help,        0, "this message" },
             { ::pear::flag::verbose,     0, "make the interception run verbose" },
             { ::pear::flag::destination, 1, "path to report directory" },
@@ -181,13 +185,12 @@ namespace pear {
             { ::pear::flag::search_path, 1, "the search path for the command" },
             { ::pear::flag::command,    -1, "the executed command" }
         });
-        return parser.parse(const_cast<const char **>(++argv))
+        return parser.parse(const_cast<const char **>(argv))
                 .bind<::pear::SessionPtr>([&parser](auto params) {
                     if (params.find(::pear::flag::help) != params.end()) {
                         return pear::Result<pear::SessionPtr>::failure(std::runtime_error(""));
                     } else {
-                        // TODO: pass program name
-                        return merge(make_context(params, nullptr), make_execution(params))
+                        return merge(make_context(params), make_execution(params))
                                 .template map<::pear::SessionPtr>([&params](auto &in) {
                                     auto [ context, execution ] = in;
                                     if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
