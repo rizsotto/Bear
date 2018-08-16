@@ -46,7 +46,7 @@ namespace ear {
 
             const T &get_or_else(const T &value) const noexcept;
 
-            Result<T, E> const &handle_with(std::function<void(const E &)> const &f) const noexcept;
+            Result<T, E> const & handle_with(std::function<void(const E &)> const &f) const noexcept;
 
         public:
             ~Result() noexcept = default;
@@ -119,7 +119,7 @@ namespace ear {
         }
 
         template<typename T, typename E>
-        Result<T, E> const &Result<T, E>::handle_with(std::function<void(const E &)> const &f) const noexcept {
+        Result<T, E> const & Result<T, E>::handle_with(std::function<void(const E &)> const &f) const noexcept {
             if (auto error = std::get_if<E>(&state_)) {
                 f(*error);
             };

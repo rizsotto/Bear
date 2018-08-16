@@ -42,24 +42,24 @@ namespace {
 
     void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
         pear::Event::start(pid, cmd)
-                .map<int>([&reporter](const pear::EventPtr &eptr) {
-                    return reporter->send(eptr)
-                            .handle_with([](auto message) {
-                                fprintf(stderr, "%s\n", message.what());
-                            })
-                            .get_or_else(0);
-                });
+                .bind<int>([&reporter](const pear::EventPtr &eptr) {
+                    return reporter->send(eptr);
+                })
+                .handle_with([](auto message) {
+                    fprintf(stderr, "%s\n", message.what());
+                })
+                .get_or_else(0);
     }
 
     void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
         pear::Event::stop(pid, exit)
-                .map<int>([&reporter](const pear::EventPtr &eptr) {
-                    return reporter->send(eptr)
-                            .handle_with([](auto message) {
-                                fprintf(stderr, "%s\n", message.what());
-                            })
-                            .get_or_else(0);
-                });
+                .bind<int>([&reporter](const pear::EventPtr &eptr) {
+                    return reporter->send(eptr);
+                })
+                .handle_with([](auto message) {
+                    fprintf(stderr, "%s\n", message.what());
+                })
+                .get_or_else(0);
     }
 
 }
@@ -85,7 +85,6 @@ int main(int argc, char *argv[], char *envp[]) {
             })
             .handle_with([](auto const &message) {
                 fprintf(stderr, "%s\n", message.what());
-                exit(EXIT_FAILURE);
             })
             .get_or_else(EXIT_FAILURE);
 }
