@@ -39,8 +39,7 @@ namespace pear {
 
         virtual ~Session() noexcept = default;
 
-        virtual ::pear::Environment::Builder &
-        set(::pear::Environment::Builder &builder) const noexcept;
+        virtual void configure(::pear::Environment::Builder &builder) const noexcept;
     };
 
     /// Used by `intercept-build` and `libexec` to report execution
@@ -55,8 +54,7 @@ namespace pear {
 
         ~LibrarySession() noexcept override = default;
 
-        ::pear::Environment::Builder &
-        set(::pear::Environment::Builder &builder) const noexcept override;
+        void configure(::pear::Environment::Builder &builder) const noexcept override;
     };
 
     /// Used by `intercept-build` to report single execution
@@ -77,8 +75,7 @@ namespace pear {
 
         ~WrapperSession() noexcept override = default;
 
-        ::pear::Environment::Builder &
-        set(::pear::Environment::Builder &builder) const noexcept override;
+        void configure(::pear::Environment::Builder &builder) const noexcept override;
     };
 
 

@@ -64,19 +64,23 @@ namespace {
                 .get_or_else(0);
     }
 
+    ::pear::EnvironmentPtr create_environment(char *original[], const ::pear::SessionPtr &session) {
+        auto builder = pear::Environment::Builder(const_cast<const char **>(original));
+        session->configure(builder);
+        return builder.build();
+    }
+
 }
 
 int main(int argc, char *argv[], char *envp[]) {
     return ::pear::parse(argc, argv)
-            .bind<int>([&envp](auto &state) {
-                auto reporter = pear::Reporter::tempfile(state->context_.destination);
+            .bind<int>([&envp](auto &arguments) {
+                auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
 
-                auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
-                auto environment = state->set(builder).build();
-
-                return spawnp(state->execution_, environment)
-                        .template map<pid_t>([&state, &reporter](auto &pid) {
-                            report_start(reporter, pid, state->execution_.command);
+                auto environment = create_environment(envp, arguments);
+                return spawnp(arguments->execution_, environment)
+                        .template map<pid_t>([&arguments, &reporter](auto &pid) {
+                            report_start(reporter, pid, arguments->execution_.command);
                             return pid;
                         })
                         .template bind<std::tuple<pid_t, int>>([](auto &pid) {

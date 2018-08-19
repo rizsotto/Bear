@@ -149,28 +149,24 @@ namespace {
 
 namespace pear {
 
-    ::pear::Environment::Builder &
-    Session::set(::pear::Environment::Builder &builder) const noexcept {
-        return builder;
-    }
-
-    ::pear::Environment::Builder &
-    LibrarySession::set(::pear::Environment::Builder &builder) const noexcept {
+    void
+    Session::configure(::pear::Environment::Builder &builder) const noexcept {
         builder.add_reporter(context_.reporter);
         builder.add_destination(context_.destination);
         builder.add_verbose(context_.verbose);
+    }
+
+    void
+    LibrarySession::configure(::pear::Environment::Builder &builder) const noexcept {
+        Session::configure(builder);
         builder.add_library(library);
-        return builder;
     }
 
-    ::pear::Environment::Builder &
-    WrapperSession::set(::pear::Environment::Builder &builder) const noexcept {
-        builder.add_reporter(context_.reporter);
-        builder.add_destination(context_.destination);
-        builder.add_verbose(context_.verbose);
+    void
+    WrapperSession::configure(::pear::Environment::Builder &builder) const noexcept {
+        Session::configure(builder);
         builder.add_cc_compiler(cc, cc_wrapper);
         builder.add_cxx_compiler(cxx, cxx_wrapper);
-        return builder;
     }
 
     pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept {
