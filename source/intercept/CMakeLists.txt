@@ -11,6 +11,7 @@ add_executable(intercept
 )
 
 target_link_libraries(intercept intercept_a)
+target_link_libraries(intercept stdc++fs)
 
 include(GNUInstallDirs)
 install(TARGETS intercept

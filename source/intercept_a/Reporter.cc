@@ -21,6 +21,7 @@
 #include "intercept_a/SystemCalls.h"
 
 #include <chrono>
+#include <filesystem>
 
 namespace {
 
@@ -164,9 +165,13 @@ namespace pear {
                 });
     }
 
-    ReporterPtr Reporter::tempfile(char const *dir_name) noexcept {
-        // TODO: check if dir_name is not null
-        // TODO: check if dir_name is exists
-        return std::make_unique<ReporterImpl>(dir_name);
+    Result<ReporterPtr> Reporter::tempfile(char const *dir_name) noexcept {
+        if (std::filesystem::is_directory(dir_name)) {
+            const ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
+            return Result<ReporterPtr>::success(result);
+        } else {
+            const std::string message = std::string("Directory does not exists: ") + dir_name;
+            return Result<ReporterPtr>::failure(std::runtime_error(message));
+        }
     }
 }

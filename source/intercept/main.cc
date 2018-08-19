@@ -40,10 +40,11 @@ namespace {
         return pear::spawnp(config.command, environment->data());
     }
 
-    void report_start(pid_t pid, const char **cmd, pear::ReporterPtr reporter) noexcept {
-        pear::Event::start(pid, cmd)
-                .bind<int>([&reporter](const pear::EventPtr &eptr) {
-                    return reporter->send(eptr);
+    void report_start(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, const char **cmd) noexcept {
+        ::pear::merge(reporter, ::pear::Event::start(pid, cmd))
+                .bind<int>([](auto tuple) {
+                    auto [ rptr, eptr ] = tuple;
+                    return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
                     fprintf(stderr, "%s\n", message.what());
@@ -51,10 +52,11 @@ namespace {
                 .get_or_else(0);
     }
 
-    void report_exit(pid_t pid, int exit, pear::ReporterPtr reporter) noexcept {
-        pear::Event::stop(pid, exit)
-                .bind<int>([&reporter](const pear::EventPtr &eptr) {
-                    return reporter->send(eptr);
+    void report_exit(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, int exit) noexcept {
+        ::pear::merge(reporter, ::pear::Event::stop(pid, exit))
+                .bind<int>([](auto tuple) {
+                    auto [ rptr, eptr ] = tuple;
+                    return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
                     fprintf(stderr, "%s\n", message.what());
@@ -69,15 +71,16 @@ int main(int argc, char *argv[], char *envp[]) {
             .bind<int>([&envp](auto &state) {
                 auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
                 auto environment = state->set(builder).build();
-                auto reporter = pear::Reporter::tempfile(state->context_.destination);
 
                 pear::Result<pid_t> child = spawnp(state->execution_, environment);
-                return child.map<int>([&reporter, &state](auto &pid) {
-                    report_start(pid, state->execution_.command, reporter);
+                return child.map<int>([&state](auto &pid) {
+                    auto reporter = pear::Reporter::tempfile(state->context_.destination);
+                    report_start(reporter, pid, state->execution_.command);
+
                     pear::Result<int> status = pear::wait_pid(pid);
                     return status
                             .map<int>([&reporter, &pid](auto &exit) {
-                                report_exit(pid, exit, reporter);
+                                report_exit(reporter, pid, exit);
                                 return exit;
                             })
                             .get_or_else(EXIT_FAILURE);

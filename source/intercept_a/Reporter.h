@@ -31,7 +31,7 @@
 namespace pear {
 
     class Event;
-    using EventPtr = std::unique_ptr<Event>;
+    using EventPtr = std::shared_ptr<Event>;
 
     class Event {
     public:
@@ -55,6 +55,6 @@ namespace pear {
         virtual Result<int> send(const EventPtr &event) noexcept = 0;
 
     public:
-        static ReporterPtr tempfile(char const *) noexcept;
+        static Result<ReporterPtr> tempfile(char const *) noexcept;
     };
 }
