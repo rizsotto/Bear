@@ -29,17 +29,18 @@
 namespace {
 
     template <typename T>
-    pear::Result<T> failure(const char *message, int errnum) noexcept {
+    pear::Result<T> failure(const char *message) noexcept {
         std::string result = message != nullptr ? std::string(message) : std::string();
 
         const size_t buffer_length = 1024 + strlen(message);
         char buffer[buffer_length];
-        if (0 == strerror_r(errnum, buffer + 2, buffer_length - 2)) {
+        if (0 == strerror_r(errno, buffer, buffer_length)) {
             result += std::string(": ");
             result += std::string(buffer);
         } else {
-            result += std::string(": Couldn't get error message.");
+            result += std::string(": unkown error.");
         }
+        errno = ENOENT;
         return pear::Result<T>::failure(std::runtime_error(result));
     };
 
@@ -56,19 +57,19 @@ namespace pear {
                              nullptr,
                              const_cast<char **>(argv),
                              const_cast<char **>(envp))) {
-            return failure<pid_t>("posix_spawn", errno);
+            return failure<pid_t>("posix_spawn");
         } else {
-            return pear::Result<pid_t>::success(std::move(child));
+            return pear::Result<pid_t>::success(child);
         }
     }
 
     Result<int> wait_pid(pid_t pid) noexcept {
         int status;
         if (-1 == waitpid(pid, &status, 0)) {
-            return failure<int>("waitpid", errno);
+            return failure<int>("waitpid");
         } else {
-            int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return pear::Result<int>::success(std::move(result));
+            const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
+            return pear::Result<int>::success(result);
         }
     }
 
@@ -85,7 +86,7 @@ namespace pear {
 
         char buffer[buffer_size];
         if (nullptr == getcwd(buffer, buffer_size)) {
-            return failure<std::string>("getcwd", errno);
+            return failure<std::string>("getcwd");
         } else {
             return pear::Result<std::string>::success(std::string(buffer));
         }
@@ -102,7 +103,7 @@ namespace pear {
         std::copy_n(uniq_pattern, uniq_pattern_length, it);
 
         if (-1 == mkstemp(prefix_copy)) {
-            return failure<std::shared_ptr<std::ostream>>("mkstemp", errno);
+            return failure<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
             std::string const result = std::string(prefix_copy) + std::string(suffix);
             return pear::Result<std::shared_ptr<std::ostream>>::success(

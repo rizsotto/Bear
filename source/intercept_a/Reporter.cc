@@ -24,11 +24,6 @@
 
 namespace {
 
-    inline
-    std::ostream &operator<<(std::ostream &os, pear::Event &event) {
-        return event.to_json(os);
-    }
-
     class TimedEvent : public pear::Event {
     private:
         std::chrono::system_clock::time_point const when_;
@@ -48,7 +43,6 @@ namespace {
         pid_t supervisor_;
         pid_t parent_;
         std::string cwd_;
-        //std::vector<std::string_view> cmd_;
         const char **cmd_;
 
         ProcessStartEvent(pid_t child,
@@ -62,7 +56,7 @@ namespace {
                 , parent_(parent)
                 , cwd_(std::move(cwd))
                 , cmd_(cmd)
-        {}
+        { }
 
         std::ostream &to_json(std::ostream &os) const override {
             // TODO: do json escaping of strings.
@@ -104,7 +98,7 @@ namespace {
                 , child_(child)
                 , supervisor_(supervisor)
                 , exit_(exit)
-        {}
+        { }
 
         std::ostream &to_json(std::ostream &os) const override {
             // TODO: serialize other attributes too.
@@ -117,29 +111,35 @@ namespace {
         }
     };
 
-    class TempfileReporter : public pear::Reporter {
+
+    class ReporterImpl : public pear::Reporter {
     public:
-        explicit TempfileReporter(const char *target) noexcept;
+        explicit ReporterImpl(const char *target) noexcept;
 
         pear::Result<int> send(const pear::EventPtr &event) noexcept override;
 
     private:
+        pear::Result<std::shared_ptr<std::ostream>> create_stream() const;
+
         std::string const target_;
     };
 
-    TempfileReporter::TempfileReporter(const char *target) noexcept
+    ReporterImpl::ReporterImpl(const char *target) noexcept
             : pear::Reporter()
             , target_(target)
     { }
 
-    pear::Result<int> TempfileReporter::send(const pear::EventPtr &event) noexcept {
+    pear::Result<int> ReporterImpl::send(const pear::EventPtr &event) noexcept {
+        return create_stream()
+                .map<int>([&event](auto &stream){
+                    event->to_json(*stream);
+                    return 0;
+                });
+    }
+
+    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream() const {
         const std::string prefix = target_ + std::string("/execution.");
-        pear::Result<std::shared_ptr<std::ostream>> stream_result =
-                pear::temp_file(prefix.c_str(), ".json");
-        return stream_result.map<int>([&event](auto &stream){
-            event->to_json(*stream);
-            return 0;
-        });
+        return pear::temp_file(prefix.c_str(), ".json");
     }
 }
 
@@ -147,28 +147,26 @@ namespace {
 namespace pear {
 
     Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
-        Result<pid_t> current_pid = get_pid();
-        return current_pid.bind<EventPtr>([&pid, &cmd](auto &current) {
-            Result<pid_t> parent_pid = get_ppid();
-            return parent_pid.bind<EventPtr>([&pid, &cmd, &current](auto &parent){
-                Result<std::string> working_dir = get_cwd();
-                return working_dir.map<EventPtr>([&pid, &cmd, &current, &parent](auto &cwd){
+        const Result<pid_t> current_pid = get_pid();
+        const Result<pid_t> parent_pid = get_ppid();
+        const Result<std::string> working_dir = get_cwd();
+        return merge(current_pid, parent_pid, working_dir)
+                .map<EventPtr>([&pid, &cmd](auto tuple) {
+                    auto [ current, parent, cwd ] = tuple;
                     return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
                 });
-            });
-        });
     };
 
     Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept {
-        Result<pid_t> current_pid = get_pid();
-        return current_pid.map<EventPtr>([&pid, &exit](auto &current) {
-            return EventPtr(new ProcessStopEvent(pid, current, exit));
-        });
+        return get_pid()
+                .map<EventPtr>([&pid, &exit](auto &current) {
+                    return EventPtr(new ProcessStopEvent(pid, current, exit));
+                });
     }
 
     ReporterPtr Reporter::tempfile(char const *dir_name) noexcept {
         // TODO: check if dir_name is not null
         // TODO: check if dir_name is exists
-        return std::make_unique<TempfileReporter>(dir_name);
+        return std::make_unique<ReporterImpl>(dir_name);
     }
 }

@@ -135,8 +135,7 @@ namespace pear {
         const std::string key = glibc_preload_key;
 #endif
         const std::string value = library;
-        auto preloads = environ_.find(key);
-        if (preloads != environ_.end()) {
+        if (auto preloads = environ_.find(key); preloads != environ_.end()) {
             auto paths = split(preloads->second, ':');
             if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
                 paths.emplace_front(value);

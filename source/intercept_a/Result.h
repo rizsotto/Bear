@@ -168,9 +168,11 @@ namespace pear {
 
     template <typename T1, typename T2, typename T3>
     Result<std::tuple<T1, T2, T3>> merge(const Result<T1> &t1, const Result<T2> &t2, const Result<T3> &t3) {
-        return merge(t1, t2).template bind<std::tuple<T1, T2, T3>>([&t3](auto &t12_value) {
-            return t3.template map<std::tuple<T1, T2, T3>>([&t12_value](auto &t3_value) {
-                return std::tuple_cat(t12_value, t3_value);
+        return t1.template bind<std::tuple<T1, T2, T3>>([&t2, &t3](auto &t1_value) {
+            return t2.template bind<std::tuple<T1, T2, T3>>([&t1_value, &t3](auto &t2_value) {
+                return t3.template map<std::tuple<T1, T2, T3>>([&t1_value, &t2_value](auto &t3_value) {
+                    return std::make_tuple(t1_value, t2_value, t3_value);
+                });
             });
         });
     }
