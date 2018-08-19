@@ -1,6 +1,7 @@
 add_executable(libintercept_unit_test
         EnvironmentTest.cc
         ResultTest.cc
+        SessionTest.cc
 )
 
 target_link_libraries(libintercept_unit_test libgtest)

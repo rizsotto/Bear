@@ -74,8 +74,8 @@ namespace {
             if (args == nullptr || *args == nullptr) {
                 return exit("Empty parameter list.");
             }
-            result.emplace(Parameters::key_type(program_key), std::make_tuple(args, ++args));
-            for (const char **args_it = args; *args_it != nullptr; ) {
+            result.emplace(Parameters::key_type(program_key), std::make_tuple(args, args + 1));
+            for (const char **args_it = ++args; *args_it != nullptr; ) {
                 bool match = false;
                 for (auto option : options_) {
                     match = option.match(args_it);
