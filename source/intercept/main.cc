@@ -69,22 +69,27 @@ namespace {
 int main(int argc, char *argv[], char *envp[]) {
     return ::pear::parse(argc, argv)
             .bind<int>([&envp](auto &state) {
+                auto reporter = pear::Reporter::tempfile(state->context_.destination);
+
                 auto builder = pear::Environment::Builder(const_cast<const char **>(envp));
                 auto environment = state->set(builder).build();
 
-                pear::Result<pid_t> child = spawnp(state->execution_, environment);
-                return child.map<int>([&state](auto &pid) {
-                    auto reporter = pear::Reporter::tempfile(state->context_.destination);
-                    report_start(reporter, pid, state->execution_.command);
-
-                    pear::Result<int> status = pear::wait_pid(pid);
-                    return status
-                            .map<int>([&reporter, &pid](auto &exit) {
-                                report_exit(reporter, pid, exit);
-                                return exit;
-                            })
-                            .get_or_else(EXIT_FAILURE);
-                });
+                return spawnp(state->execution_, environment)
+                        .template map<pid_t>([&state, &reporter](auto &pid) {
+                            report_start(reporter, pid, state->execution_.command);
+                            return pid;
+                        })
+                        .template bind<std::tuple<pid_t, int>>([](auto &pid) {
+                            return pear::wait_pid(pid)
+                                    .template map<std::tuple<pid_t, int>>([&pid](auto &exit) {
+                                        return std::make_tuple(pid, exit);
+                                    });
+                        })
+                        .template map<int>([&reporter](auto &tuple) {
+                            auto [pid, exit] = tuple;
+                            report_exit(reporter, pid, exit);
+                            return exit;
+                        });
             })
             .handle_with([](auto const &message) {
                 fprintf(stderr, "%s\n", message.what());
