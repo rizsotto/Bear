@@ -132,7 +132,7 @@ namespace {
 
     pear::Result<int> ReporterImpl::send(const pear::EventPtr &event) noexcept {
         return create_stream()
-                .map<int>([&event](auto &stream){
+                .map<int>([&event](auto &stream) {
                     event->to_json(*stream);
                     return 0;
                 });
@@ -167,11 +167,11 @@ namespace pear {
 
     Result<ReporterPtr> Reporter::tempfile(char const *dir_name) noexcept {
         if (std::filesystem::is_directory(dir_name)) {
-            const ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-            return Result<ReporterPtr>::success(result);
+            ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
+            return Ok(result);
         } else {
             const std::string message = std::string("Directory does not exists: ") + dir_name;
-            return Result<ReporterPtr>::failure(std::runtime_error(message));
+            return Err(std::runtime_error(message));
         }
     }
 }

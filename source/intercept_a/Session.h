@@ -79,7 +79,7 @@ namespace pear {
     };
 
 
-    using SessionPtr = std::unique_ptr<Session>;
+    using SessionPtr = std::shared_ptr<Session>;
     pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept;
 
 }

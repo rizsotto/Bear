@@ -19,6 +19,7 @@
 
 #include "intercept_a/Session.h"
 #include "intercept_a/Interface.h"
+#include "intercept_a/Result.h"
 
 #include <cstring>
 #include <string_view>
@@ -66,13 +67,9 @@ namespace {
         { }
 
         ::pear::Result<Parameters> parse(const char **args) const noexcept {
-            auto exit = [](auto message) {
-                return ::pear::Result<Parameters >::failure(std::runtime_error(message));
-            };
-
             Parameters result;
             if (args == nullptr || *args == nullptr) {
-                return exit("Empty parameter list.");
+                return ::pear::Err(std::runtime_error("Empty parameter list."));
             }
             result.emplace(Parameters::key_type(program_key), std::make_tuple(args, args + 1));
             for (const char **args_it = ++args; *args_it != nullptr; ) {
@@ -86,17 +83,17 @@ namespace {
                     const char **begin = args_it;
                     const char **end = option.take(args_it);
                     if (end == nullptr) {
-                        return exit(std::string("Not enough parameters for flag: ") + flag);
+                        return ::pear::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + flag)));
                     }
                     result.emplace(Parameters::key_type(flag), std::make_tuple(begin, end));
                     args_it = end;
                     break;
                 }
                 if ((!match) && (*args_it != nullptr)) {
-                    return exit(std::string("Unrecognized parameter: ") + *args_it);
+                    return ::pear::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
                 }
             }
-            return ::pear::Result<Parameters>::success(result);
+            return ::pear::Ok(result);
         }
 
         std::string help(const char *const name) const noexcept {
@@ -118,9 +115,9 @@ namespace {
             auto const [ destination, _ ] = destination_it->second;
             const bool verbose = (parameters.find(::pear::flag::verbose) != parameters.end());
             auto const [ reporter, __ ] = parameters.find(program_key)->second;
-            return ::pear::Result<::pear::Context>::success({ *reporter, *destination, verbose });
+            return ::pear::Ok<::pear::Context>({ *reporter, *destination, verbose });
         } else {
-            return ::pear::Result<::pear::Context>::failure(std::runtime_error("Missing destination.\n"));
+            return ::pear::Err(std::runtime_error("Missing destination.\n"));
         }
     }
 
@@ -139,9 +136,9 @@ namespace {
             auto [ command, _ ] = command_it->second;
             auto file = get_optional(::pear::flag::file);
             auto search_path = get_optional(::pear::flag::search_path);
-            return ::pear::Result<::pear::Execution>::success({ command, file, search_path });
+            return ::pear::Ok<::pear::Execution>({ command, file, search_path });
         } else {
-            return ::pear::Result<::pear::Execution>::failure(std::runtime_error("Missing command.\n"));
+            return ::pear::Err(std::runtime_error("Missing command.\n"));
         }
     }
 
@@ -182,34 +179,34 @@ namespace pear {
             { ::pear::flag::command,    -1, "the executed command" }
         });
         return parser.parse(const_cast<const char **>(argv))
-                .bind<::pear::SessionPtr>([&parser, &argv](auto params) {
-                    return (params.find(::pear::flag::help) != params.end())
-                                   ? pear::Result<pear::SessionPtr>::failure(std::runtime_error(parser.help(argv[0])))
-                                   : merge(make_context(params), make_execution(params))
-                                           .template map<::pear::SessionPtr>([&params](auto &in) {
-                                               auto[context, execution] = in;
-                                               if (auto library_it = params.find(::pear::flag::library); library_it !=
-                                                                                                         params.end()) {
-                                                   auto[library, _] = library_it->second;
-                                                   auto result = std::make_unique<LibrarySession>(context, execution);
-                                                   result->library = *library;
-                                                   return SessionPtr(result.release());
-                                               } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
-                                                          (params.find(::pear::flag::wrapper_cxx) != params.end())) {
-                                                   auto [wrapper_cc_begin, wrapper_cc_end] =
-                                                        params.find(::pear::flag::wrapper_cc)->second;
-                                                   auto [wrapper_cxx_begin, wrapper_cxx_end] =
-                                                        params.find(::pear::flag::wrapper_cxx)->second;
-                                                   auto result = std::make_unique<WrapperSession>(context, execution);
-                                                   result->cc = *wrapper_cc_begin++;
-                                                   result->cc_wrapper = *wrapper_cc_begin;
-                                                   result->cxx = *wrapper_cxx_begin++;
-                                                   result->cxx_wrapper = *wrapper_cxx_begin;
-                                                   return SessionPtr(result.release());
-                                               } else {
-                                                   return std::make_unique<Session>(context, execution);
-                                               }
-                                           });
+                .bind<::pear::SessionPtr>([&parser, &argv](auto &params) -> Result<::pear::SessionPtr> {
+                    if (params.find(::pear::flag::help) != params.end())
+                        return Err(std::runtime_error(parser.help(argv[0])));
+                    else
+                        return merge(make_context(params), make_execution(params))
+                            .template map<::pear::SessionPtr>([&params](auto &in) -> ::pear::SessionPtr {
+                                auto [context, execution] = in;
+                                if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
+                                    auto[library, _] = library_it->second;
+                                    auto result = std::make_unique<LibrarySession>(context, execution);
+                                    result->library = *library;
+                                    return SessionPtr(result.release());
+                                } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
+                                           (params.find(::pear::flag::wrapper_cxx) != params.end())) {
+                                    auto [wrapper_cc_begin, wrapper_cc_end] =
+                                         params.find(::pear::flag::wrapper_cc)->second;
+                                    auto [wrapper_cxx_begin, wrapper_cxx_end] =
+                                         params.find(::pear::flag::wrapper_cxx)->second;
+                                    auto result = std::make_unique<WrapperSession>(context, execution);
+                                    result->cc = *wrapper_cc_begin++;
+                                    result->cc_wrapper = *wrapper_cc_begin;
+                                    result->cxx = *wrapper_cxx_begin++;
+                                    result->cxx_wrapper = *wrapper_cxx_begin;
+                                    return SessionPtr(result.release());
+                                } else {
+                                    return std::make_shared<Session>(context, execution);
+                                }
+                            });
                 });
     }
 

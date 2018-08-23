@@ -41,7 +41,7 @@ namespace {
             result += std::string(": unkown error.");
         }
         errno = ENOENT;
-        return pear::Result<T>::failure(std::runtime_error(result));
+        return ::pear::Err(std::runtime_error(result));
     };
 
 }
@@ -59,7 +59,7 @@ namespace pear {
                              const_cast<char **>(envp))) {
             return failure<pid_t>("posix_spawn");
         } else {
-            return pear::Result<pid_t>::success(child);
+            return Ok(child);
         }
     }
 
@@ -69,16 +69,16 @@ namespace pear {
             return failure<int>("waitpid");
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return pear::Result<int>::success(result);
+            return Ok(result);
         }
     }
 
     Result<pid_t> get_pid() noexcept {
-        return pear::Result<pid_t>::success(getpid());
+        return Ok(getpid());
     }
 
     Result<pid_t> get_ppid() noexcept {
-        return pear::Result<pid_t>::success(getppid());
+        return Ok(getppid());
     }
 
     Result<std::string> get_cwd() noexcept {
@@ -88,7 +88,7 @@ namespace pear {
         if (nullptr == getcwd(buffer, buffer_size)) {
             return failure<std::string>("getcwd");
         } else {
-            return pear::Result<std::string>::success(std::string(buffer));
+            return Ok(std::string(buffer));
         }
     }
 
@@ -106,9 +106,7 @@ namespace pear {
             return failure<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
             std::string const result = std::string(prefix_copy) + std::string(suffix);
-            return pear::Result<std::shared_ptr<std::ostream>>::success(
-                    std::dynamic_pointer_cast<std::ostream>(
-                            std::make_shared<std::ofstream>(result)));
+            return Ok(std::dynamic_pointer_cast<std::ostream>(std::make_shared<std::ofstream>(result)));
         }
     }
 

@@ -25,17 +25,50 @@
 
 namespace pear {
 
+    namespace types {
+
+        template <typename T>
+        struct Ok {
+            explicit Ok(const T& value)
+                    : value_(value)
+            { }
+
+            explicit Ok(T&& value) noexcept
+                    : value_(value)
+            { }
+
+            T value_;
+        };
+
+        template <typename E>
+        struct Err {
+            explicit Err(const E& value)
+                    : value_(value)
+            { }
+
+            explicit Err(E&& value) noexcept
+                    : value_(value)
+            { }
+
+            E value_;
+        };
+
+    }
+
+    template<typename T, typename CleanT = typename std::decay<T>::type>
+    types::Ok<CleanT> Ok(T&& val) {
+        return types::Ok<CleanT>(std::forward<T>(val));
+    }
+
+    template<typename E, typename CleanE = typename std::decay<E>::type>
+    types::Err<CleanE> Err(E&& val) {
+        return types::Err<CleanE>(std::forward<E>(val));
+    }
+
+
     template<typename T, typename E = std::runtime_error>
     class Result {
     public:
-        static Result success(T &&value) noexcept;
-
-        static Result success(const T &value) noexcept;
-
-        static Result failure(E &&value) noexcept;
-
-        static Result failure(const E &value) noexcept;
-
         template<typename U>
         Result<U, E> map(std::function<U(const T &)> const &f) const noexcept;
 
@@ -59,14 +92,9 @@ namespace pear {
 
         Result &operator=(const Result &other) = delete;
 
-    private:
-        explicit Result(T &&other) noexcept;
+        Result(types::Ok<T>&& ok) noexcept;  // NOLINT
 
-        explicit Result(const T &other) noexcept;
-
-        explicit Result(E &&error) noexcept;
-
-        explicit Result(const E &error) noexcept;
+        Result(types::Err<E>&& err) noexcept;  // NOLINT
 
     private:
         std::variant<T, E> state_;
@@ -74,39 +102,21 @@ namespace pear {
 
 
     template<typename T, typename E>
-    Result<T, E> Result<T, E>::success(T &&value) noexcept {
-        return Result(std::move(value));
-    }
-
-    template<typename T, typename E>
-    Result<T, E> Result<T, E>::success(const T &value) noexcept {
-        return Result(value);
-    }
-
-    template<typename T, typename E>
-    Result<T, E> Result<T, E>::failure(E &&value) noexcept {
-        return Result(std::move(value));
-    }
-
-    template<typename T, typename E>
-    Result<T, E> Result<T, E>::failure(const E &value) noexcept {
-        return Result(value);
-    }
-
-    template<typename T, typename E>
     template<typename U>
     Result<U, E> Result<T, E>::map(std::function<U(const T &)> const &f) const noexcept {
-        return (std::holds_alternative<T>(state_))
-            ? Result<U, E>::success(f(std::get<T>(state_)))
-            : Result<U, E>::failure(std::get<E>(state_));
+        if (std::holds_alternative<T>(state_))
+            return Ok(f(std::get<T>(state_)));
+        else
+            return Err(std::get<E>(state_));
     }
 
     template<typename T, typename E>
     template<typename U>
     Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(const T &)> const &f) const noexcept {
-        return (std::holds_alternative<T>(state_))
-            ? f(std::get<T>(state_))
-            : Result<U, E>::failure(std::get<E>(state_));
+        if (std::holds_alternative<T>(state_))
+            return f(std::get<T>(state_));
+        else
+            return Err(std::get<E>(state_));
     }
 
     template<typename T, typename E>
@@ -125,23 +135,13 @@ namespace pear {
     }
 
     template<typename T, typename E>
-    Result<T, E>::Result(T &&other) noexcept
-            : state_(std::move(other))
+    Result<T, E>::Result(types::Ok<T> &&ok) noexcept
+            : state_(ok.value_)
     { }
 
     template<typename T, typename E>
-    Result<T, E>::Result(const T &other) noexcept
-            : state_(other)
-    { }
-
-    template<typename T, typename E>
-    Result<T, E>::Result(E &&error) noexcept
-            : state_(std::move(error))
-    { }
-
-    template<typename T, typename E>
-    Result<T, E>::Result(const E &error) noexcept
-            : state_(error)
+    Result<T, E>::Result(types::Err<E> &&err) noexcept
+            : state_(err.value_)
     { }
 
 
