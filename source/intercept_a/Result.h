@@ -21,141 +21,129 @@
 
 #include <variant>
 #include <functional>
-
-
-namespace ear {
-
-    namespace impl {
-
-        template<typename T, typename E>
-        class Result {
-        public:
-            static Result success(T &&value) noexcept;
-
-            static Result success(const T &value) noexcept;
-
-            static Result failure(E &&value) noexcept;
-
-            static Result failure(const E &value) noexcept;
-
-            template<typename U>
-            Result<U, E> map(std::function<U(const T &)> const &f) const noexcept;
-
-            template<typename U>
-            Result<U, E> bind(std::function<Result<U, E>(const T &)> const &f) const noexcept;
-
-            const T &get_or_else(const T &value) const noexcept;
-
-            Result<T, E> const & handle_with(std::function<void(const E &)> const &f) const noexcept;
-
-        public:
-            ~Result() noexcept = default;
-
-            Result() = delete;
-
-            Result(Result &&other) noexcept = default;
-
-            Result(const Result &other) = delete;
-
-            Result &operator=(Result &&other) noexcept = default;
-
-            Result &operator=(const Result &other) = delete;
-
-        private:
-            explicit Result(T &&other) noexcept;
-
-            explicit Result(const T &other) noexcept;
-
-            explicit Result(E &&error) noexcept;
-
-            explicit Result(const E &error) noexcept;
-
-        private:
-            std::variant<T, E> state_;
-        };
-
-
-        template<typename T, typename E>
-        Result<T, E> Result<T, E>::success(T &&value) noexcept {
-            return Result(std::move(value));
-        }
-
-        template<typename T, typename E>
-        Result<T, E> Result<T, E>::success(const T &value) noexcept {
-            return Result(value);
-        }
-
-        template<typename T, typename E>
-        Result<T, E> Result<T, E>::failure(E &&value) noexcept {
-            return Result(std::move(value));
-        }
-
-        template<typename T, typename E>
-        Result<T, E> Result<T, E>::failure(const E &value) noexcept {
-            return Result(value);
-        }
-
-        template<typename T, typename E>
-        template<typename U>
-        Result<U, E> Result<T, E>::map(std::function<U(const T &)> const &f) const noexcept {
-            return (std::holds_alternative<T>(state_))
-                ? Result<U, E>::success(f(std::get<T>(state_)))
-                : Result<U, E>::failure(std::get<E>(state_));
-        }
-
-        template<typename T, typename E>
-        template<typename U>
-        Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(const T &)> const &f) const noexcept {
-            return (std::holds_alternative<T>(state_))
-                ? f(std::get<T>(state_))
-                : Result<U, E>::failure(std::get<E>(state_));
-        }
-
-        template<typename T, typename E>
-        const T &Result<T, E>::get_or_else(const T &value) const noexcept {
-            return (std::holds_alternative<T>(state_))
-                ? std::get<T>(state_)
-                : value;
-        }
-
-        template<typename T, typename E>
-        Result<T, E> const & Result<T, E>::handle_with(std::function<void(const E &)> const &f) const noexcept {
-            if (auto error = std::get_if<E>(&state_)) {
-                f(*error);
-            };
-            return *this;
-        }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(T &&other) noexcept
-                : state_(std::move(other))
-        { }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(const T &other) noexcept
-                : state_(other)
-        { }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(E &&error) noexcept
-                : state_(std::move(error))
-        { }
-
-        template<typename T, typename E>
-        Result<T, E>::Result(const E &error) noexcept
-                : state_(error)
-        { }
-
-    }
-}
-
-
 #include <stdexcept>
 
 namespace pear {
 
-    template <typename T>
-    using Result = ::ear::impl::Result<T, std::runtime_error>;
+    template<typename T, typename E = std::runtime_error>
+    class Result {
+    public:
+        static Result success(T &&value) noexcept;
+
+        static Result success(const T &value) noexcept;
+
+        static Result failure(E &&value) noexcept;
+
+        static Result failure(const E &value) noexcept;
+
+        template<typename U>
+        Result<U, E> map(std::function<U(const T &)> const &f) const noexcept;
+
+        template<typename U>
+        Result<U, E> bind(std::function<Result<U, E>(const T &)> const &f) const noexcept;
+
+        const T &get_or_else(const T &value) const noexcept;
+
+        Result<T, E> const & handle_with(std::function<void(const E &)> const &f) const noexcept;
+
+    public:
+        ~Result() noexcept = default;
+
+        Result() = delete;
+
+        Result(Result &&other) noexcept = default;
+
+        Result(const Result &other) = delete;
+
+        Result &operator=(Result &&other) noexcept = default;
+
+        Result &operator=(const Result &other) = delete;
+
+    private:
+        explicit Result(T &&other) noexcept;
+
+        explicit Result(const T &other) noexcept;
+
+        explicit Result(E &&error) noexcept;
+
+        explicit Result(const E &error) noexcept;
+
+    private:
+        std::variant<T, E> state_;
+    };
+
+
+    template<typename T, typename E>
+    Result<T, E> Result<T, E>::success(T &&value) noexcept {
+        return Result(std::move(value));
+    }
+
+    template<typename T, typename E>
+    Result<T, E> Result<T, E>::success(const T &value) noexcept {
+        return Result(value);
+    }
+
+    template<typename T, typename E>
+    Result<T, E> Result<T, E>::failure(E &&value) noexcept {
+        return Result(std::move(value));
+    }
+
+    template<typename T, typename E>
+    Result<T, E> Result<T, E>::failure(const E &value) noexcept {
+        return Result(value);
+    }
+
+    template<typename T, typename E>
+    template<typename U>
+    Result<U, E> Result<T, E>::map(std::function<U(const T &)> const &f) const noexcept {
+        return (std::holds_alternative<T>(state_))
+            ? Result<U, E>::success(f(std::get<T>(state_)))
+            : Result<U, E>::failure(std::get<E>(state_));
+    }
+
+    template<typename T, typename E>
+    template<typename U>
+    Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(const T &)> const &f) const noexcept {
+        return (std::holds_alternative<T>(state_))
+            ? f(std::get<T>(state_))
+            : Result<U, E>::failure(std::get<E>(state_));
+    }
+
+    template<typename T, typename E>
+    const T &Result<T, E>::get_or_else(const T &value) const noexcept {
+        return (std::holds_alternative<T>(state_))
+            ? std::get<T>(state_)
+            : value;
+    }
+
+    template<typename T, typename E>
+    Result<T, E> const & Result<T, E>::handle_with(std::function<void(const E &)> const &f) const noexcept {
+        if (auto error = std::get_if<E>(&state_)) {
+            f(*error);
+        };
+        return *this;
+    }
+
+    template<typename T, typename E>
+    Result<T, E>::Result(T &&other) noexcept
+            : state_(std::move(other))
+    { }
+
+    template<typename T, typename E>
+    Result<T, E>::Result(const T &other) noexcept
+            : state_(other)
+    { }
+
+    template<typename T, typename E>
+    Result<T, E>::Result(E &&error) noexcept
+            : state_(std::move(error))
+    { }
+
+    template<typename T, typename E>
+    Result<T, E>::Result(const E &error) noexcept
+            : state_(error)
+    { }
+
 
     template <typename T1, typename T2>
     Result<std::tuple<T1, T2>> merge(const Result<T1> &t1, const Result<T2> &t2) {
