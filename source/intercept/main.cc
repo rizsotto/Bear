@@ -94,7 +94,7 @@ int main(int argc, char *argv[], char *envp[]) {
                                     });
                         })
                         .template map<int>([&reporter](auto &tuple) {
-                            auto [pid, exit] = tuple;
+                            const auto& [pid, exit] = tuple;
                             report_exit(reporter, pid, exit);
                             return exit;
                         });
