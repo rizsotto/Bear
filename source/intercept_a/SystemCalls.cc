@@ -49,14 +49,31 @@ namespace {
 
 namespace pear {
 
-    Result<int> spawnp(const char **argv, const char **envp) noexcept {
+    Result<pid_t>
+    fork_with_execvp(const char *file, const char *search_path, const char **argv, const char **envp) noexcept {
+#ifdef HAVE_EXECVP2
+        // TODO: implement it
+#else
+        return spawnp(file, argv, envp);
+#endif
+    }
+
+    Result<int> spawn(const char **argv, const char **envp) noexcept {
         pid_t child;
-        if (0 != posix_spawnp(&child,
-                             argv[0],
-                             nullptr,
-                             nullptr,
-                             const_cast<char **>(argv),
-                             const_cast<char **>(envp))) {
+        if (0 != posix_spawn(&child, argv[0], nullptr, nullptr,
+                              const_cast<char **>(argv),
+                              const_cast<char **>(envp))) {
+            return failure<pid_t>("posix_spawn");
+        } else {
+            return Ok(child);
+        }
+    }
+
+    Result<int> spawnp(const char *file, const char **argv, const char **envp) noexcept {
+        pid_t child;
+        if (0 != posix_spawnp(&child, file, nullptr, nullptr,
+                              const_cast<char **>(argv),
+                              const_cast<char **>(envp))) {
             return failure<pid_t>("posix_spawn");
         } else {
             return Ok(child);
@@ -69,7 +86,7 @@ namespace pear {
             return failure<int>("waitpid");
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return Ok(std::move(result));
+            return Ok(result);
         }
     }
 
