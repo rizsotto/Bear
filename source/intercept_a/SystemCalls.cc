@@ -69,7 +69,7 @@ namespace pear {
             return failure<int>("waitpid");
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return Ok(result);
+            return Ok(std::move(result));
         }
     }
 

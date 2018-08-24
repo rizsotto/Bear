@@ -43,7 +43,7 @@ namespace {
     void report_start(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, const char **cmd) noexcept {
         ::pear::merge(reporter, ::pear::Event::start(pid, cmd))
                 .bind<int>([](auto tuple) {
-                    auto [ rptr, eptr ] = tuple;
+                    const auto& [ rptr, eptr ] = tuple;
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
@@ -55,7 +55,7 @@ namespace {
     void report_exit(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, int exit) noexcept {
         ::pear::merge(reporter, ::pear::Event::stop(pid, exit))
                 .bind<int>([](auto tuple) {
-                    auto [ rptr, eptr ] = tuple;
+                    const auto& [ rptr, eptr ] = tuple;
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {

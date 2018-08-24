@@ -153,7 +153,7 @@ namespace pear {
         const Result<std::string> working_dir = get_cwd();
         return merge(current_pid, parent_pid, working_dir)
                 .map<EventPtr>([&pid, &cmd](auto tuple) {
-                    auto [ current, parent, cwd ] = tuple;
+                    const auto& [ current, parent, cwd ] = tuple;
                     return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
                 });
     };
@@ -168,7 +168,7 @@ namespace pear {
     Result<ReporterPtr> Reporter::tempfile(char const *dir_name) noexcept {
         if (std::filesystem::is_directory(dir_name)) {
             ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-            return Ok(result);
+            return Ok(std::move(result));
         } else {
             const std::string message = std::string("Directory does not exists: ") + dir_name;
             return Err(std::runtime_error(message));

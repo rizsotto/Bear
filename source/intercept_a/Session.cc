@@ -93,7 +93,7 @@ namespace {
                     return ::pear::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
                 }
             }
-            return ::pear::Ok(result);
+            return ::pear::Ok(std::move(result));
         }
 
         std::string help(const char *const name) const noexcept {
@@ -185,7 +185,7 @@ namespace pear {
                     else
                         return merge(make_context(params), make_execution(params))
                             .template map<::pear::SessionPtr>([&params](auto &in) -> ::pear::SessionPtr {
-                                auto [context, execution] = in;
+                                const auto& [context, execution] = in;
                                 if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
                                     auto[library, _] = library_it->second;
                                     auto result = std::make_unique<LibrarySession>(context, execution);
