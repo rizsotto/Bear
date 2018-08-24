@@ -148,6 +148,7 @@ namespace {
 namespace pear {
 
     Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
+        // TODO: decode strings
         const Result<pid_t> current_pid = get_pid();
         const Result<pid_t> parent_pid = get_ppid();
         const Result<std::string> working_dir = get_cwd();
