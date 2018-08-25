@@ -130,7 +130,7 @@ namespace {
     private:
         pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string &) const;
 
-        std::string const target_;
+        std::filesystem::path const target_;
     };
 
     ReporterImpl::ReporterImpl(const char *target) noexcept
@@ -147,8 +147,7 @@ namespace {
     }
 
     pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string &prefix) const {
-        const std::string path = target_ + "/" + prefix + ".";
-        return pear::temp_file(prefix.c_str(), ".json");
+        return pear::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }
 }
 

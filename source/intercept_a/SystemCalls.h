@@ -40,6 +40,6 @@ namespace pear {
 
     Result<std::string> get_cwd() noexcept;
 
-    Result<std::shared_ptr<std::ostream>> temp_file(const char *prefix, const char *suffix) noexcept;
+    Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept;
 
 }

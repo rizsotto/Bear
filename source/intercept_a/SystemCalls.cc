@@ -25,6 +25,7 @@
 #include <cstring>
 #include <memory>
 #include <fstream>
+#include <filesystem>
 
 namespace {
 
@@ -109,21 +110,14 @@ namespace pear {
         }
     }
 
-    Result<std::shared_ptr<std::ostream>> temp_file(const char *prefix, const char *suffix) noexcept {
-        constexpr const char uniq_pattern[] = "XXXXXX";
-        constexpr const size_t uniq_pattern_length = sizeof(uniq_pattern)/sizeof(char);
-
-        const size_t prefix_length = strlen(prefix);
-        char prefix_copy[prefix_length + uniq_pattern_length];
-
-        char *it = std::copy_n(prefix, prefix_length, prefix_copy);
-        std::copy_n(uniq_pattern, uniq_pattern_length, it);
-
-        if (-1 == mkstemp(prefix_copy)) {
+    Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept {
+        auto path = std::filesystem::path(dir) / "XXXXXX";
+        if (-1 == mkstemp(const_cast<char *>(path.c_str()))) {
             return failure<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
-            std::string const result = std::string(prefix_copy) + std::string(suffix);
-            return Ok(std::dynamic_pointer_cast<std::ostream>(std::make_shared<std::ofstream>(result)));
+            const auto &new_file = path.filename().string() + suffix;
+            auto result = std::make_shared<std::ofstream>(path.replace_filename(new_file));
+            return Ok(std::dynamic_pointer_cast<std::ostream>(result));
         }
     }
 
