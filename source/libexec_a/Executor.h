@@ -66,7 +66,7 @@ namespace ear {
             const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length] = {};
+            const char *dst[dst_length];
             const char **const dst_end = dst + dst_length;
 
             const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
@@ -87,7 +87,7 @@ namespace ear {
             const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length] = {};
+            const char *dst[dst_length];
             const char **const dst_end = dst + dst_length;
 
             const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
@@ -108,7 +108,7 @@ namespace ear {
             const ::pear::Execution execution = { const_cast<const char **>(argv), file, search_path };
 
             const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length] = {};
+            const char *dst[dst_length];
             const char **const dst_end = dst + dst_length;
 
             const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
@@ -133,7 +133,7 @@ namespace ear {
             const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length] = {};
+            const char *dst[dst_length];
             const char **const dst_end = dst + dst_length;
 
             const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
@@ -158,7 +158,7 @@ namespace ear {
             const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length] = {};
+            const char *dst[dst_length];
             const char **const dst_end = dst + dst_length;
 
             const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
