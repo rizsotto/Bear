@@ -24,6 +24,7 @@
 
 #include <cstring>
 #include <memory>
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 
@@ -90,12 +91,17 @@ namespace pear {
     }
 
     Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept {
-        auto path = std::filesystem::path(dir) / "XXXXXX";
-        if (-1 == mkstemp(const_cast<char *>(path.c_str()))) {
+        auto path = std::filesystem::path(dir) / (std::string("XXXXXX") + suffix);
+        // create char buffer with this filename.
+        const auto path_str = path.string();
+        const size_t buffer_size = path_str.length() + 1;
+        char buffer[buffer_size];
+        std::copy(path_str.c_str(), path_str.c_str() + path_str.length() + 1, (char *)buffer);
+        // create the temporary file.
+        if (-1 == mkstemps(buffer, strlen(suffix))) {
             return Err<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
-            const auto &new_file = path.filename().string() + suffix;
-            auto result = std::make_shared<std::ofstream>(path.replace_filename(new_file));
+            auto result = std::make_shared<std::ofstream>(std::filesystem::path(buffer));
             return Ok(std::dynamic_pointer_cast<std::ostream>(result));
         }
     }
