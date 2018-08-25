@@ -101,7 +101,7 @@ namespace {
     void json_attribute(std::ostream &os, const char *key, const char **value) {
         os << '"' << key << '"' << ':';
         os << '[';
-        for (const char **it = value; it != nullptr; ++it) {
+        for (const char **it = value; *it != nullptr; ++it) {
             if (it != value)
                 os << ',';
             json_string(os, *it);
