@@ -25,6 +25,35 @@
 
 namespace {
 
+    void json_string(std::ostream &os, const char *value) {
+        // TODO: decode strings
+        os << '"' << value << '"';
+    }
+
+    void json_attribute(std::ostream &os, const char *key, const char *value) {
+        json_string(os, key);
+        os << ':';
+        json_string(os, value);
+    }
+
+    void json_attribute(std::ostream &os, const char *key, const char **value) {
+        json_string(os, key);
+        os << ':';
+        os << '[';
+        for (const char **it = value; it != nullptr; ++it) {
+            if (it != value)
+                os << ',';
+            json_string(os, *it);
+        }
+        os << ']';
+    }
+
+    void json_attribute(std::ostream &os, const char *key, const int value) {
+        json_string(os, key);
+        os << ':';
+        os << value;
+    }
+
     class TimedEvent : public pear::Event {
     private:
         std::chrono::system_clock::time_point const when_;
@@ -64,28 +93,17 @@ namespace {
         }
 
         std::ostream &to_json(std::ostream &os) const override {
-            // TODO: do json escaping of strings.
-            // TODO: serialize other attributes too.
-
-            os << R"({ "pid": )" << child_
-               << R"(, "cwd": ")" << cwd_ << '\"'
-               << R"(, "cmd": )";
-
-            to_json(os, cmd_);
-
-            os << " }\n";
-
-            return os;
-        }
-
-        static std::ostream &to_json(std::ostream &os, const char **array) {
-            os << "[ ";
-            for (const char **it = array; *it != nullptr; ++it) {
-                if (it != array)
-                    os << ", ";
-                os << '\"' << *it << '\"';
-            }
-            os << " ]";
+            os << '{';
+            json_attribute(os, "pid", child_);
+            os << ',';
+            json_attribute(os, "ppid", supervisor_);
+            os << ',';
+            json_attribute(os, "pppid", parent_);
+            os << ',';
+            json_attribute(os, "cwd", cwd_.c_str());
+            os << ',';
+            json_attribute(os, "cmd", cmd_);
+            os << '}';
 
             return os;
         }
@@ -110,11 +128,13 @@ namespace {
         }
 
         std::ostream &to_json(std::ostream &os) const override {
-            // TODO: serialize other attributes too.
-
-            os << R"({ "pid": )" << child_
-               << R"(, "exit": )" << exit_
-               << " }\n";
+            os << '{';
+            json_attribute(os, "pid", child_);
+            os << ',';
+            json_attribute(os, "ppid", supervisor_);
+            os << ',';
+            json_attribute(os, "exit", exit_);
+            os << '}';
 
             return os;
         }
@@ -155,7 +175,6 @@ namespace {
 namespace pear {
 
     Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
-        // TODO: decode strings
         const Result<pid_t> current_pid = get_pid();
         const Result<pid_t> parent_pid = get_ppid();
         const Result<std::string> working_dir = get_cwd();
