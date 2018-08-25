@@ -27,27 +27,6 @@
 #include <fstream>
 #include <filesystem>
 
-namespace {
-
-    template <typename T>
-    pear::Result<T> failure(const char *message) noexcept {
-        std::string result = message != nullptr ? std::string(message) : std::string();
-
-        const size_t buffer_length = 1024 + strlen(message);
-        char buffer[buffer_length];
-        if (0 == strerror_r(errno, buffer, buffer_length)) {
-            result += std::string(": ");
-            result += std::string(buffer);
-        } else {
-            result += std::string(": unkown error.");
-        }
-        errno = ENOENT;
-        return ::pear::Err(std::runtime_error(result));
-    };
-
-}
-
-
 namespace pear {
 
     Result<pid_t>
@@ -64,7 +43,7 @@ namespace pear {
         if (0 != posix_spawn(&child, argv[0], nullptr, nullptr,
                               const_cast<char **>(argv),
                               const_cast<char **>(envp))) {
-            return failure<pid_t>("posix_spawn");
+            return Err<pid_t>("posix_spawn");
         } else {
             return Ok(child);
         }
@@ -75,7 +54,7 @@ namespace pear {
         if (0 != posix_spawnp(&child, file, nullptr, nullptr,
                               const_cast<char **>(argv),
                               const_cast<char **>(envp))) {
-            return failure<pid_t>("posix_spawn");
+            return Err<pid_t>("posix_spawn");
         } else {
             return Ok(child);
         }
@@ -84,7 +63,7 @@ namespace pear {
     Result<int> wait_pid(pid_t pid) noexcept {
         int status;
         if (-1 == waitpid(pid, &status, 0)) {
-            return failure<int>("waitpid");
+            return Err<int>("waitpid");
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
             return Ok(result);
@@ -104,7 +83,7 @@ namespace pear {
 
         char buffer[buffer_size];
         if (nullptr == getcwd(buffer, buffer_size)) {
-            return failure<std::string>("getcwd");
+            return Err<std::string>("getcwd");
         } else {
             return Ok(std::string(buffer));
         }
@@ -113,7 +92,7 @@ namespace pear {
     Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept {
         auto path = std::filesystem::path(dir) / "XXXXXX";
         if (-1 == mkstemp(const_cast<char *>(path.c_str()))) {
-            return failure<std::shared_ptr<std::ostream>>("mkstemp");
+            return Err<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
             const auto &new_file = path.filename().string() + suffix;
             auto result = std::make_shared<std::ofstream>(path.replace_filename(new_file));

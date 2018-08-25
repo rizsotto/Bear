@@ -22,6 +22,8 @@
 #include <variant>
 #include <functional>
 #include <stdexcept>
+#include <cstring>
+#include <string>
 
 namespace pear {
 
@@ -164,5 +166,21 @@ namespace pear {
             });
         });
     }
+
+    template <typename T>
+    pear::Result<T> Err(const char *message) noexcept {
+        std::string result = message != nullptr ? std::string(message) : std::string();
+
+        const size_t buffer_length = 1024 + std::strlen(message);
+        char buffer[buffer_length];
+        if (0 == strerror_r(errno, buffer, buffer_length)) {
+            result += std::string(": ");
+            result += std::string(buffer);
+        } else {
+            result += std::string(": unkown error.");
+        }
+        errno = ENOENT;
+        return ::pear::Err(std::runtime_error(result));
+    };
 
 }

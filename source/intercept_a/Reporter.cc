@@ -18,27 +18,88 @@
  */
 
 #include "intercept_a/Reporter.h"
+#include "intercept_a/Result.h"
 #include "intercept_a/SystemCalls.h"
 
 #include <chrono>
 #include <filesystem>
+#include <iostream>
 
 namespace {
 
+    pear::Result<std::wstring> to_wstring(const char *value) {
+        std::mbstate_t state = std::mbstate_t();
+        const std::size_t wsrc_length = std::mbsrtowcs(nullptr, &value, 0, &state);
+
+        wchar_t wsrc[wsrc_length + 1];
+        return (std::mbsrtowcs((wchar_t *)&wsrc, &value, wsrc_length + 1, &state) != wsrc_length)
+                ? pear::Err<std::wstring>("mbstrtowcs")
+                : pear::Ok(std::wstring(wsrc));
+    }
+
+    std::string to_json_string(const std::wstring &value) {
+        std::string result;
+
+        wchar_t const *wsrc_it = value.c_str();
+        wchar_t const *const wsrc_end = wsrc_it + value.length();
+
+        for (; wsrc_it != wsrc_end; ++wsrc_it) {
+            // Insert an escape character before control characters.
+            switch (*wsrc_it) {
+                case L'\b':
+                    result += "\\b";
+                    break;
+                case L'\f':
+                    result += "\\f";
+                    break;
+                case L'\n':
+                    result += "\\n";
+                    break;
+                case L'\r':
+                    result += "\\r";
+                    break;
+                case L'\t':
+                    result += "\\t";
+                    break;
+                case L'"':
+                    result += "\\\"";
+                    break;
+                case L'\\':
+                    result += "\\\\";
+                    break;
+                default:
+                    if ((*wsrc_it < L' ') || (*wsrc_it > 127)) {
+                        char buffer[7];
+                        snprintf(buffer, 7, "\\u%04x", (unsigned int)*wsrc_it);
+                        result += buffer;
+                    } else {
+                        result += char(*wsrc_it);
+                    }
+                    break;
+            }
+        }
+        return result;
+    }
+
     void json_string(std::ostream &os, const char *value) {
-        // TODO: decode strings
-        os << '"' << value << '"';
+        to_wstring(value)
+                .map<std::string>(to_json_string)
+                .map<std::string>([&os](auto string) {
+                    os << '"' << string << '"';
+                    return string;
+                })
+                .handle_with([](auto error) {
+                    std::cerr << error.what() << std::endl;
+                });
     }
 
     void json_attribute(std::ostream &os, const char *key, const char *value) {
-        json_string(os, key);
-        os << ':';
+        os << '"' << key << '"' << ':';
         json_string(os, value);
     }
 
     void json_attribute(std::ostream &os, const char *key, const char **value) {
-        json_string(os, key);
-        os << ':';
+        os << '"' << key << '"' << ':';
         os << '[';
         for (const char **it = value; it != nullptr; ++it) {
             if (it != value)
@@ -49,10 +110,9 @@ namespace {
     }
 
     void json_attribute(std::ostream &os, const char *key, const int value) {
-        json_string(os, key);
-        os << ':';
-        os << value;
+        os << '"' << key << '"' << ':'<< value;
     }
+
 
     class TimedEvent : public pear::Event {
     private:
