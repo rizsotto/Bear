@@ -30,7 +30,15 @@
 
 namespace {
 
-    struct Description {
+    std::string spaces(size_t num) {
+        std::string result;
+        for (; num > 0; --num)
+            result += ' ';
+        return result;
+    };
+
+
+    struct Option {
         const char *flag;
         int arguments;
         const char *help;
@@ -53,6 +61,20 @@ namespace {
             }
             return input;
         }
+
+        std::string format_option_line() const noexcept {
+            const size_t flag_size = std::strlen(flag);
+
+            std::string result;
+            result += spaces(2);
+            result += flag;
+            result += (flag_size > 22)
+                    ? "\n" + spaces(15)
+                    : spaces(23 - flag_size);
+            result += std::string(help) + "\n";
+            return result;
+        }
+
     };
 
     using Parameter = std::tuple<const char **, const char **>;
@@ -60,9 +82,10 @@ namespace {
 
     constexpr char program_key[] = "program";
 
+
     class Parser {
     public:
-        Parser(std::initializer_list<Description> options)
+        Parser(std::initializer_list<Option> options)
                 : options_(options)
         { }
 
@@ -99,15 +122,14 @@ namespace {
         std::string help(const char *const name) const noexcept {
             std::string result;
             result += std::string("Usage: ") + name + std::string(" [OPTION]\n\n");
-            // TODO: do better formating
             std::for_each(options_.begin(), options_.end(), [&result](auto it) {
-                result += "  " + std::string(it.flag) + "  " + std::string(it.help) + "\n";
+                result += it.format_option_line();
             });
             return result;
         }
 
     private:
-        const std::vector<Description> options_;
+        const std::vector<Option> options_;
     };
 
     ::pear::Result<::pear::Context> make_context(const Parameters &parameters) noexcept {
