@@ -132,7 +132,7 @@ namespace {
 
     pear::Result<int> ReporterImpl::send(const pear::EventPtr &event) noexcept {
         return create_stream()
-                .map<int>([&event](auto &stream) {
+                .map<int>([&event](auto stream) {
                     event->to_json(*stream);
                     return 0;
                 });
@@ -161,7 +161,7 @@ namespace pear {
 
     Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept {
         return get_pid()
-                .map<EventPtr>([&pid, &exit](auto &current) {
+                .map<EventPtr>([&pid, &exit](auto current) {
                     return EventPtr(new ProcessStopEvent(pid, current, exit));
                 });
     }

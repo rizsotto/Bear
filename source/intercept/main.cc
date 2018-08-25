@@ -78,7 +78,7 @@ namespace {
 
 int main(int argc, char *argv[], char *envp[]) {
     return ::pear::parse(argc, argv)
-            .bind<int>([&envp](auto &arguments) {
+            .bind<int>([&envp](auto arguments) {
                 auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
 
                 auto environment = create_environment(envp, arguments);
@@ -87,19 +87,19 @@ int main(int argc, char *argv[], char *envp[]) {
                             report_start(reporter, pid, arguments->execution_.command);
                             return pid;
                         })
-                        .template bind<std::tuple<pid_t, int>>([](auto &pid) {
+                        .template bind<std::tuple<pid_t, int>>([](auto pid) {
                             return pear::wait_pid(pid)
-                                    .template map<std::tuple<pid_t, int>>([&pid](auto &exit) {
+                                    .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                                         return std::make_tuple(pid, exit);
                                     });
                         })
-                        .template map<int>([&reporter](auto &tuple) {
+                        .template map<int>([&reporter](auto tuple) {
                             const auto& [pid, exit] = tuple;
                             report_exit(reporter, pid, exit);
                             return exit;
                         });
             })
-            .handle_with([](auto const &message) {
+            .handle_with([](auto message) {
                 fprintf(stderr, "%s\n", message.what());
             })
             .get_or_else(EXIT_FAILURE);

@@ -38,9 +38,9 @@ namespace {
 
     char **to_c_array(const std::map<std::string, std::string> &input) {
         const size_t result_size = input.size() + 1;
-        auto const result = new char *[result_size];
+        const auto result = new char *[result_size];
         auto result_it = result;
-        for (auto &it : input) {
+        for (const auto &it : input) {
             const size_t entry_size = it.first.size() + it.second.size() + 2;
             auto entry = new char [entry_size];
 
@@ -61,8 +61,8 @@ namespace {
             return result;
 
         for (const char **it = input; *it != nullptr; ++it) {
-            auto end = *it + std::strlen(*it);
-            auto sep = std::find(*it, end, '=');
+            const auto end = *it + std::strlen(*it);
+            const auto sep = std::find(*it, end, '=');
             const std::string key = (sep != end) ? std::string(*it, sep) : std::string(*it, end);
             const std::string value = (sep != end) ? std::string(sep + 1, end) : std::string();
             result.emplace(key, value);

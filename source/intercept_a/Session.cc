@@ -179,29 +179,29 @@ namespace pear {
             { ::pear::flag::command,    -1, "the executed command" }
         });
         return parser.parse(const_cast<const char **>(argv))
-                .bind<::pear::SessionPtr>([&parser, &argv](auto &params) -> Result<::pear::SessionPtr> {
+                .bind<::pear::SessionPtr>([&parser, &argv](auto params) -> Result<::pear::SessionPtr> {
                     if (params.find(::pear::flag::help) != params.end())
                         return Err(std::runtime_error(parser.help(argv[0])));
                     else
                         return merge(make_context(params), make_execution(params))
-                            .template map<::pear::SessionPtr>([&params](auto &in) -> ::pear::SessionPtr {
+                            .template map<::pear::SessionPtr>([&params](auto in) -> ::pear::SessionPtr {
                                 const auto& [context, execution] = in;
                                 if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
-                                    auto[library, _] = library_it->second;
+                                    const auto& [library, _] = library_it->second;
                                     auto result = std::make_unique<LibrarySession>(context, execution);
                                     result->library = *library;
                                     return SessionPtr(result.release());
                                 } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
                                            (params.find(::pear::flag::wrapper_cxx) != params.end())) {
-                                    auto [wrapper_cc_begin, wrapper_cc_end] =
+                                    const auto& [wrapper_cc_begin, wrapper_cc_end] =
                                          params.find(::pear::flag::wrapper_cc)->second;
-                                    auto [wrapper_cxx_begin, wrapper_cxx_end] =
+                                    const auto& [wrapper_cxx_begin, wrapper_cxx_end] =
                                          params.find(::pear::flag::wrapper_cxx)->second;
                                     auto result = std::make_unique<WrapperSession>(context, execution);
-                                    result->cc = *wrapper_cc_begin++;
-                                    result->cc_wrapper = *wrapper_cc_begin;
-                                    result->cxx = *wrapper_cxx_begin++;
-                                    result->cxx_wrapper = *wrapper_cxx_begin;
+                                    result->cc = *wrapper_cc_begin;
+                                    result->cc_wrapper = *(wrapper_cc_begin + 1);
+                                    result->cxx = *wrapper_cxx_begin;
+                                    result->cxx_wrapper = *(wrapper_cxx_begin + 1);
                                     return SessionPtr(result.release());
                                 } else {
                                     return std::make_shared<Session>(context, execution);
