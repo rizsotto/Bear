@@ -30,12 +30,10 @@
 
 namespace {
 
-    std::string spaces(size_t num) {
-        std::string result;
-        for (; num > 0; --num)
-            result += ' ';
-        return result;
-    };
+    using Parameter = std::tuple<const char **, const char **>;
+    using Parameters = std::map<std::string_view, Parameter>;
+
+    constexpr char program_key[] = "program";
 
 
     struct Option {
@@ -43,23 +41,17 @@ namespace {
         int arguments;
         const char *help;
 
-        bool match(const char **input) const noexcept {
-            return (std::strcmp(*input, flag) == 0);
+        bool match(const char *input) const noexcept {
+            return (std::strcmp(input, flag) == 0);
         }
 
-        const char **take(const char **input) const noexcept {
-            if (arguments < 0) {
-                while (*input != nullptr)
-                    ++input;
-            } else {
-                for (int idx = arguments; idx != 0; --idx) {
-                    if (*input == nullptr)
-                        return nullptr;
-                    else
-                        ++input;
-                }
-            }
-            return input;
+        std::optional<Parameter>
+        take(const char **const begin, const char **const end) const noexcept {
+            return (arguments < 0)
+                ? std::optional(std::make_tuple(begin, end))
+                : (begin + arguments > end)
+                        ? std::optional<Parameter>()
+                        : std::optional(std::make_tuple(begin, begin + arguments));
         }
 
         std::string format_option_line() const noexcept {
@@ -75,12 +67,13 @@ namespace {
             return result;
         }
 
+        static std::string spaces(size_t num) noexcept {
+            std::string result;
+            for (; num > 0; --num)
+                result += ' ';
+            return result;
+        }
     };
-
-    using Parameter = std::tuple<const char **, const char **>;
-    using Parameters = std::map<std::string_view, Parameter>;
-
-    constexpr char program_key[] = "program";
 
 
     class Parser {
@@ -89,30 +82,25 @@ namespace {
                 : options_(options)
         { }
 
-        ::pear::Result<Parameters> parse(const char **args) const noexcept {
+        ::pear::Result<Parameters> parse(const int argc, const char **argv) const noexcept {
             Parameters result;
-            if (args == nullptr || *args == nullptr) {
+            if (argc < 2 || argv == nullptr) {
                 return ::pear::Err(std::runtime_error("Empty parameter list."));
             }
-            result.emplace(Parameters::key_type(program_key), std::make_tuple(args, args + 1));
-            for (const char **args_it = ++args; *args_it != nullptr; ) {
-                bool match = false;
-                for (auto option : options_) {
-                    match = option.match(args_it);
-                    if (!match)
-                        continue;
-
-                    const char *flag = *args_it++;
-                    const char **begin = args_it;
-                    const char **end = option.take(args_it);
-                    if (end == nullptr) {
-                        return ::pear::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + flag)));
+            result.emplace(Parameters::key_type(program_key), std::make_tuple(argv, argv + 1));
+            const char **const args_end = argv + argc;
+            for (const char **args_it = ++argv; args_it != args_end; ) {
+                // find which option is it.
+                if (auto option = std::find_if(options_.begin(), options_.end(), [&args_it](const auto &option) {
+                    return option.match(*args_it);
+                }); option != options_.end()) {
+                    if (const auto params = option->take(args_it + 1, args_end); params) {
+                        result.emplace(Parameters::key_type(*args_it), params.value());
+                        args_it = std::get<1>(params.value());
+                    } else {
+                        return ::pear::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
                     }
-                    result.emplace(Parameters::key_type(flag), std::make_tuple(begin, end));
-                    args_it = end;
-                    break;
-                }
-                if ((!match) && (*args_it != nullptr)) {
+                } else {
                     return ::pear::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
                 }
             }
@@ -200,7 +188,7 @@ namespace pear {
             { ::pear::flag::search_path, 1, "the search path for the command" },
             { ::pear::flag::command,    -1, "the executed command" }
         });
-        return parser.parse(const_cast<const char **>(argv))
+        return parser.parse(argc, const_cast<const char **>(argv))
                 .bind<::pear::SessionPtr>([&parser, &argv](auto params) -> Result<::pear::SessionPtr> {
                     if (params.find(::pear::flag::help) != params.end())
                         return Err(std::runtime_error(parser.help(argv[0])));
