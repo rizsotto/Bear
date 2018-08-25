@@ -37,6 +37,8 @@ namespace pear {
     public:
         virtual ~Event() noexcept = default;
 
+        virtual const char *name() const = 0;
+
         virtual std::ostream &to_json(std::ostream &) const = 0;
 
     public:

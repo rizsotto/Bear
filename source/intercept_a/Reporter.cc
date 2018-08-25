@@ -59,6 +59,10 @@ namespace {
                 , cmd_(cmd)
         { }
 
+        const char *name() const override {
+            return "process_start";
+        }
+
         std::ostream &to_json(std::ostream &os) const override {
             // TODO: do json escaping of strings.
             // TODO: serialize other attributes too.
@@ -101,6 +105,10 @@ namespace {
                 , exit_(exit)
         { }
 
+        const char *name() const override {
+            return "process_stop";
+        }
+
         std::ostream &to_json(std::ostream &os) const override {
             // TODO: serialize other attributes too.
 
@@ -120,7 +128,7 @@ namespace {
         pear::Result<int> send(const pear::EventPtr &event) noexcept override;
 
     private:
-        pear::Result<std::shared_ptr<std::ostream>> create_stream() const;
+        pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string &) const;
 
         std::string const target_;
     };
@@ -131,15 +139,15 @@ namespace {
     { }
 
     pear::Result<int> ReporterImpl::send(const pear::EventPtr &event) noexcept {
-        return create_stream()
+        return create_stream(event->name())
                 .map<int>([&event](auto stream) {
                     event->to_json(*stream);
                     return 0;
                 });
     }
 
-    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream() const {
-        const std::string prefix = target_ + std::string("/execution.");
+    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string &prefix) const {
+        const std::string path = target_ + "/" + prefix + ".";
         return pear::temp_file(prefix.c_str(), ".json");
     }
 }
