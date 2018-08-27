@@ -61,7 +61,9 @@ namespace {
     }
 
     void trace_function_call(const char *message) {
-        if ((session_ptr) && (session_ptr->context.verbose))
+        if (session_ptr == nullptr)
+            fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", message);
+        else if (session_ptr->context.verbose)
             fprintf(stderr, "libexec.so: %s\n", message);
     }
 
@@ -180,8 +182,9 @@ int execl(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1];
-    va_copy_n(ap, argv, argc);
+    char *argv[argc + 2];
+    argv[0] = const_cast<char *>(path);
+    va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
     auto envp = const_cast<char *const *>(::ear::environment::current());
@@ -200,8 +203,9 @@ int execlp(const char *file, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1];
-    va_copy_n(ap, argv, argc);
+    char *argv[argc + 2];
+    argv[0] = const_cast<char *>(file);
+    va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
     auto envp = const_cast<char *const *>(::ear::environment::current());
@@ -221,8 +225,9 @@ int execle(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 1];
-    va_copy_n(ap, argv, argc);
+    char *argv[argc + 2];
+    argv[0] = const_cast<char *>(path);
+    va_copy_n(ap, &argv[1], argc);
     char **envp = va_arg(ap, char **);
     va_end(ap);
 

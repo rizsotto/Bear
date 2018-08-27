@@ -340,10 +340,11 @@ def build_command(args, tmp_dir):
     # type: (argparse.Namespace, str) -> List[str]
     session = [ '--session-library', args.libexec ]
     command = [ '--exec-file', args.build[0], '--exec-command' ] + args.build
+    verbose = [ '--verbose' ] if args.verbose else []
     return [
                args.interceptor,
                '--report-destination', tmp_dir
-           ] + session + command
+           ] + session + verbose + command
 
 # def setup_environment(args, destination):
 #     # type: (argparse.Namespace, str) -> Dict[str, str]

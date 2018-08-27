@@ -29,6 +29,8 @@
 
 namespace {
 
+    constexpr char MESSAGE_PREFIX[] = "intercept: ";
+
     pear::Result<pid_t> spawnp(const ::pear::Execution &config,
                                const ::pear::EnvironmentPtr &environment) noexcept {
         if ((config.search_path != nullptr) && (config.file != nullptr)) {
@@ -47,7 +49,7 @@ namespace {
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
-                    std::cerr << message.what() << std::endl;
+                    std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
                 })
                 .get_or_else(0);
     }
@@ -59,7 +61,7 @@ namespace {
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
-                    std::cerr << message.what() << std::endl;
+                    std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
                 })
                 .get_or_else(0);
     }
@@ -70,10 +72,29 @@ namespace {
         return builder.build();
     }
 
+    std::ostream &operator<<(std::ostream &os, char *const *values) {
+        os << '[';
+        for (char *const *it = values; *it != nullptr; ++it) {
+            if (it != values) {
+                os << ", ";
+            }
+            os << '"' << *it << '"';
+        }
+        os << ']';
+
+        return os;
+    }
+
 }
 
 int main(int argc, char *argv[], char *envp[]) {
     return ::pear::parse(argc, argv)
+            .map<pear::SessionPtr>([&argv](auto arguments) {
+                if (arguments->context_.verbose) {
+                    std::cerr << MESSAGE_PREFIX << argv << std::endl;
+                }
+                return arguments;
+            })
             .bind<int>([&envp](auto arguments) {
                 auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
 
@@ -96,7 +117,7 @@ int main(int argc, char *argv[], char *envp[]) {
                         });
             })
             .handle_with([](auto message) {
-                std::cerr << message.what() << std::endl;
+                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
             })
             .get_or_else(EXIT_FAILURE);
 }
