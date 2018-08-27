@@ -17,11 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <unistd.h>
-
-#include <cstdlib>
-#include <cstdio>
-#include <cstring>
+#include <iostream>
 
 #include "intercept_a/Interface.h"
 #include "intercept_a/Session.h"
@@ -51,7 +47,7 @@ namespace {
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
-                    fprintf(stderr, "%s\n", message.what());
+                    std::cerr << message.what() << std::endl;
                 })
                 .get_or_else(0);
     }
@@ -63,7 +59,7 @@ namespace {
                     return rptr->send(eptr);
                 })
                 .handle_with([](auto message) {
-                    fprintf(stderr, "%s\n", message.what());
+                    std::cerr << message.what() << std::endl;
                 })
                 .get_or_else(0);
     }
@@ -100,7 +96,7 @@ int main(int argc, char *argv[], char *envp[]) {
                         });
             })
             .handle_with([](auto message) {
-                fprintf(stderr, "%s\n", message.what());
+                std::cerr << message.what() << std::endl;
             })
             .get_or_else(EXIT_FAILURE);
 }
