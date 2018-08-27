@@ -129,6 +129,7 @@ namespace pear {
 
     Environment::Builder &
     Environment::Builder::add_library(const char *library) noexcept {
+        environ_.emplace(pear::env::library_key, library);
 #ifdef APPLE
         const std::string key = osx_preload_key;
 #else

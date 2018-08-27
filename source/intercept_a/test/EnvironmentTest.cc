@@ -75,7 +75,8 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[1]);
     }
 
     TEST(environment, library_already_there) {
@@ -89,7 +90,8 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[1]);
     }
 
     TEST(environment, library_already_with_another) {
@@ -103,7 +105,8 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[1]);
     }
 
     TEST(environment, another_libray_is_there) {
@@ -117,7 +120,8 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[1]);
     }
 #endif
 
