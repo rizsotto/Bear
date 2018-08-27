@@ -36,7 +36,7 @@ namespace {
         } else if (config.file != nullptr) {
             return pear::spawnp(config.file, config.command, environment->data());
         } else {
-            return pear::spawn(config.command, environment->data());
+            return pear::spawn(config.path, config.command, environment->data());
         }
     }
 

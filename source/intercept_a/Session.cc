@@ -127,7 +127,7 @@ namespace {
             auto const [ reporter, __ ] = parameters.find(program_key)->second;
             return ::pear::Ok<::pear::Context>({ *reporter, *destination, verbose });
         } else {
-            return ::pear::Err(std::runtime_error("Missing destination.\n"));
+            return ::pear::Err(std::runtime_error("Missing destination."));
         }
     }
 
@@ -144,11 +144,16 @@ namespace {
         auto const nowhere = parameters.end();
         if (auto command_it = parameters.find(::pear::flag::command); command_it != nowhere) {
             auto [ command, _ ] = command_it->second;
+            auto path = get_optional(::pear::flag::path);
             auto file = get_optional(::pear::flag::file);
             auto search_path = get_optional(::pear::flag::search_path);
-            return ::pear::Ok<::pear::Execution>({ command, file, search_path });
+            if ((path != nullptr && file == nullptr) ||(path == nullptr && file != nullptr)) {
+                return ::pear::Ok<::pear::Execution>({command, path, file, search_path});
+            } else {
+                return ::pear::Err(std::runtime_error("Either 'path' or 'file' needs to be specified."));
+            }
         } else {
-            return ::pear::Err(std::runtime_error("Missing command.\n"));
+            return ::pear::Err(std::runtime_error("Missing command."));
         }
     }
 
@@ -184,6 +189,7 @@ namespace pear {
             { ::pear::flag::library,     1, "path to the intercept library" },
             { ::pear::flag::wrapper_cc,  2, "path to the C compiler and the wrapper" },
             { ::pear::flag::wrapper_cxx, 2, "path to the C++ compiler and the wrapper", },
+            { ::pear::flag::path,        1, "the path parameter for the command" },
             { ::pear::flag::file,        1, "the file name for the command" },
             { ::pear::flag::search_path, 1, "the search path for the command" },
             { ::pear::flag::command,    -1, "the executed command" }

@@ -28,13 +28,18 @@
 namespace {
 
     size_t length(const ::pear::Execution &execution) noexcept {
-        return ((execution.file != nullptr) ? 2 : 0) +
+        return ((execution.path != nullptr) ? 2 : 0) +
+               ((execution.file != nullptr) ? 2 : 0) +
                ((execution.search_path != nullptr) ? 2 : 0) +
                ::ear::array::length(execution.command) +
                2;
     }
 
     const char **copy(const ::pear::Execution &execution, const char **it, const char **it_end) noexcept {
+        if (execution.path != nullptr) {
+            *it++ = ::pear::flag::path;
+            *it++ = execution.path;
+        }
         if (execution.file != nullptr) {
             *it++ = ::pear::flag::file;
             *it++ = execution.file;
@@ -63,7 +68,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -84,7 +89,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -105,7 +110,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::pear::Execution execution = { const_cast<const char **>(argv), file, search_path };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -130,7 +135,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -155,7 +160,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::pear::Execution execution = { const_cast<const char **>(argv), file, nullptr };
+            const ::pear::Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];

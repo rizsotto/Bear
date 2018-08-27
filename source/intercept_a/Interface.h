@@ -28,6 +28,7 @@ namespace pear {
         constexpr char library[]        = "--session-library";
         constexpr char wrapper_cc[]     = "--session-cc-wrapper";
         constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
+        constexpr char path[]           = "--exec-path";
         constexpr char file[]           = "--exec-file";
         constexpr char search_path[]    = "--exec-search_path";
         constexpr char command[]        = "--exec-command";
@@ -47,6 +48,7 @@ namespace pear {
 
     struct Execution {
         const char **command;
+        const char *path;
         const char *file;
         const char *search_path;
     };

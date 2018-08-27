@@ -29,6 +29,7 @@ namespace {
                                ::pear::flag::library, "/install/path/libexec.so",
                                ::pear::flag::destination, "/tmp/destination",
                                ::pear::flag::verbose,
+                               ::pear::flag::path, "/bin/ls",
                                ::pear::flag::command, "ls", "-l", "-a",
                                nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
@@ -42,9 +43,10 @@ namespace {
         ASSERT_STREQ(argv[4], session_result->context_.destination);
         ASSERT_EQ(true, session_result->context_.verbose);
 
-        ASSERT_EQ(argv + 7, session_result->execution_.command);
-        ASSERT_EQ(nullptr, session_result->execution_.search_path);
+        ASSERT_EQ(argv + 9, session_result->execution_.command);
+        ASSERT_EQ(argv[7], session_result->execution_.path);
         ASSERT_EQ(nullptr, session_result->execution_.file);
+        ASSERT_EQ(nullptr, session_result->execution_.search_path);
 
         ASSERT_EQ(argv[2], session_result->library);
     }
@@ -54,7 +56,7 @@ namespace {
                                ::pear::flag::wrapper_cc, "cc", "/install/path/wrapper-cc",
                                ::pear::flag::wrapper_cxx, "c++", "/install/path/wrapper-c++",
                                ::pear::flag::destination, "/tmp/destination",
-                               ::pear::flag::file, "/bin/ls",
+                               ::pear::flag::file, "ls",
                                ::pear::flag::command, "ls", "-l", "-a",
                                nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
@@ -69,8 +71,9 @@ namespace {
         ASSERT_EQ(false, session_result->context_.verbose);
 
         ASSERT_EQ(argv + 12, session_result->execution_.command);
-        ASSERT_EQ(nullptr, session_result->execution_.search_path);
+        ASSERT_EQ(nullptr, session_result->execution_.path);
         ASSERT_STREQ(argv[10], session_result->execution_.file);
+        ASSERT_EQ(nullptr, session_result->execution_.search_path);
 
         ASSERT_STREQ(argv[2], session_result->cc);
         ASSERT_STREQ(argv[3], session_result->cc_wrapper);
@@ -81,6 +84,7 @@ namespace {
     TEST(session, parse_simple_success) {
         const char *argv[] = { "program",
                                ::pear::flag::destination, "/tmp/destination",
+                               ::pear::flag::file, "ls",
                                ::pear::flag::search_path, "/bin:/usr/bin",
                                ::pear::flag::command, "ls", "-l", "-a",
                                nullptr };
@@ -95,8 +99,9 @@ namespace {
         ASSERT_STREQ(argv[2], session_result->context_.destination);
         ASSERT_EQ(false, session_result->context_.verbose);
 
-        ASSERT_EQ(argv + 6, session_result->execution_.command);
-        ASSERT_STREQ(argv[4], session_result->execution_.search_path);
-        ASSERT_EQ(nullptr, session_result->execution_.file);
+        ASSERT_EQ(argv + 8, session_result->execution_.command);
+        ASSERT_EQ(nullptr, session_result->execution_.path);
+        ASSERT_STREQ(argv[4], session_result->execution_.file);
+        ASSERT_STREQ(argv[6], session_result->execution_.search_path);
     }
 }

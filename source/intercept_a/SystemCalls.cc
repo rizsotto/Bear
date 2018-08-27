@@ -39,9 +39,9 @@ namespace pear {
 #endif
     }
 
-    Result<int> spawn(const char **argv, const char **envp) noexcept {
+    Result<int> spawn(const char *path, const char **argv, const char **envp) noexcept {
         pid_t child;
-        if (0 != posix_spawn(&child, argv[0], nullptr, nullptr,
+        if (0 != posix_spawn(&child, path, nullptr, nullptr,
                               const_cast<char **>(argv),
                               const_cast<char **>(envp))) {
             return Err<pid_t>("posix_spawn");
