@@ -566,7 +566,7 @@ class Compilation:
         :param command:     the command to classify
         :param category:    helper object to detect compiler
         :return: None if the command is not a compilation, or a tuple
-                (compiler_language, rest of the command) otherwise """
+                (compiler, language, rest of the command) otherwise """
 
         if command:  # not empty list will allow to index '0' and '1:'
             executable = os.path.basename(command[0])  # type: str
@@ -577,7 +577,7 @@ class Compilation:
             if category.is_wrapper(executable):
                 result = cls._split_compiler(parameters, category)
                 # Compiler wrapper without compiler is a 'C' compiler.
-                return ('c', parameters) if result is None else result
+                return result if result else (command[0], C_LANG, parameters)
             # MPI compiler wrappers add extra parameters
             elif category.is_mpi_wrapper(executable):
                 # Pass the executable with full path to avoid pick different
