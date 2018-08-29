@@ -18,6 +18,7 @@
  */
 
 #include <unistd.h>
+#include <cstdio>
 
 #include "libexec_a/Interface.h"
 #include "libexec_a/Environment.h"
@@ -43,17 +44,20 @@ namespace {
 
 
 int main(int argc, char *argv[], char *envp[]) {
-    ::ear::WrapperSession session {};
-    ::ear::WrapperSession const *const session_ptr =
-            ::ear::environment::capture(session, const_cast<const char **>(envp));
-    if (session_ptr == nullptr)
+    if (argc <= 0) {
+        fprintf(stderr, "intercept-wrapper: not enough arguments.");
         return -1;
+    }
+
+    const auto session = ::ear::environment::wrapper_session(const_cast<const char **>(envp));
+    if (! session.is_valid()) {
+        fprintf(stderr, "intercept-wrapper: not initialized.");
+        return -1;
+    }
 
     // Replace the compiler wrapper to the real compiler.
-    if (argc <= 0)
-        return -1;
     argv[0] = const_cast<char *>((is_cxx(argv[0])) ? session.cxx : session.cc);
 
-    const Executor executor(&session);
+    const Executor executor(session);
     return executor.execve(argv[0], argv, envp);
 }

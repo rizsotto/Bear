@@ -26,11 +26,24 @@ namespace ear {
     struct LibrarySession {
         ::pear::Context context;
         char const *library;
+
+        bool is_valid() const noexcept {
+            return (context.reporter != nullptr &&
+                    context.destination != nullptr &&
+                    library != nullptr);
+        }
     };
 
     struct WrapperSession {
         ::pear::Context context;
         char const *cc;
         char const *cxx;
+
+        bool is_valid() const noexcept {
+            return (context.reporter != nullptr &&
+                    context.destination != nullptr &&
+                    cc != nullptr &&
+                    cxx != nullptr);
+        }
     };
 }

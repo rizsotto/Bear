@@ -174,28 +174,28 @@ namespace ear {
         }
 
     public:
-        explicit Executor(const ::ear::LibrarySession *session) noexcept
-                : session_ {
-                        (session != nullptr) ? session->context.reporter : nullptr,
-                        (session != nullptr) ? ::pear::flag::destination : nullptr,
-                        (session != nullptr) ? session->context.destination : nullptr,
-                        (session != nullptr) ? ::pear::flag::library : nullptr,
-                        (session != nullptr) ? session->library : nullptr,
-                        (session != nullptr && session->context.verbose) ? ::pear::flag::verbose : nullptr,
+        explicit Executor(const ::ear::LibrarySession &session) noexcept
+                : initialized_(session.is_valid())
+                , session_ {
+                        (initialized_) ? session.context.reporter : nullptr,
+                        (initialized_) ? ::pear::flag::destination : nullptr,
+                        (initialized_) ? session.context.destination : nullptr,
+                        (initialized_) ? ::pear::flag::library : nullptr,
+                        (initialized_) ? session.library : nullptr,
+                        (initialized_ && session.context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
-                , initialized_(session != nullptr)
         { }
 
-        explicit Executor(const ::ear::WrapperSession *session) noexcept
-                : session_ {
-                        (session != nullptr) ? session->context.reporter : nullptr,
-                        (session != nullptr) ? ::pear::flag::destination : nullptr,
-                        (session != nullptr) ? session->context.destination : nullptr,
-                        (session != nullptr && session->context.verbose) ? ::pear::flag::verbose : nullptr,
+        explicit Executor(const ::ear::WrapperSession &session) noexcept
+                : initialized_(session.is_valid())
+                , session_ {
+                        (initialized_) ? session.context.reporter : nullptr,
+                        (initialized_) ? ::pear::flag::destination : nullptr,
+                        (initialized_) ? session.context.destination : nullptr,
+                        (initialized_ && session.context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
-                , initialized_(session != nullptr)
         { }
 
         Executor() noexcept = delete;
@@ -226,9 +226,9 @@ namespace ear {
     private:
         static constexpr size_t SESSION_SIZE = 8;
 
+        bool initialized_;
         const char *session_[SESSION_SIZE];
         const size_t session_size_;
-        bool initialized_;
     };
 
 }

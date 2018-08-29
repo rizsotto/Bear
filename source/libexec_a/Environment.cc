@@ -62,38 +62,35 @@ namespace ear {
 #endif
         }
 
-        LibrarySession *
-        capture(LibrarySession &session, const char **environment) noexcept {
+        LibrarySession
+        libray_session(const char **environment) noexcept {
             if (nullptr == environment)
-                return nullptr;
-
-            session.context.reporter    = get_env(environment, ::pear::env::reporter_key);
-            session.context.destination = get_env(environment, ::pear::env::destination_key);
-            session.context.verbose     = get_env(environment, ::pear::env::verbose_key) != nullptr;
-            session.library             = get_env(environment, ::pear::env::library_key);
-
-            return (session.context.reporter == nullptr ||
-                    session.context.destination == nullptr ||
-                    session.library == nullptr)
-                ? nullptr : &session;
+                return LibrarySession { {nullptr, nullptr, false}, nullptr };
+            else
+                return LibrarySession {
+                        {
+                                get_env(environment, ::pear::env::reporter_key),
+                                get_env(environment, ::pear::env::destination_key),
+                                get_env(environment, ::pear::env::verbose_key) != nullptr
+                        },
+                        get_env(environment, ::pear::env::library_key)
+                };
         }
 
-        WrapperSession *
-        capture(WrapperSession &session, const char **environment) noexcept {
+        WrapperSession
+        wrapper_session(const char **environment) noexcept {
             if (nullptr == environment)
-                return nullptr;
-
-            session.context.reporter    = get_env(environment, ::pear::env::reporter_key);
-            session.context.destination = get_env(environment, ::pear::env::destination_key);
-            session.context.verbose     = get_env(environment, ::pear::env::verbose_key) != nullptr;
-            session.cc                  = get_env(environment, ::pear::env::cc_key);
-            session.cxx                 = get_env(environment, ::pear::env::cxx_key);
-
-            return (session.context.reporter == nullptr ||
-                    session.context.destination == nullptr ||
-                    session.cc == nullptr ||
-                    session.cxx == nullptr)
-                   ? nullptr : &session;
+                return WrapperSession { {nullptr, nullptr, false}, nullptr, nullptr };
+            else
+                return WrapperSession {
+                        {
+                                get_env(environment, ::pear::env::reporter_key),
+                                get_env(environment, ::pear::env::destination_key),
+                                get_env(environment, ::pear::env::verbose_key) != nullptr
+                        },
+                        get_env(environment, ::pear::env::cc_key),
+                        get_env(environment, ::pear::env::cxx_key)
+                };
         }
 
     }

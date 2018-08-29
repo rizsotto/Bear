@@ -6,37 +6,27 @@
 
 namespace {
 
-    struct Environment : public ::testing::Test {
-        ::ear::LibrarySession librarySession;
-        ::ear::WrapperSession wrapperSession;
-
-        Environment() noexcept
-                : librarySession()
-                , wrapperSession()
-        { }
-    };
-
-    TEST_F(Environment, dont_crash_on_nullptr_4_library) {
-        EXPECT_EQ(nullptr, ::ear::environment::capture(librarySession, nullptr));
+    TEST(Environment, dont_crash_on_nullptr_4_library) {
+        EXPECT_FALSE(::ear::environment::libray_session(nullptr).is_valid());
     }
 
-    TEST_F(Environment, dont_crash_on_nullptr_4_wrapper) {
-        EXPECT_EQ(nullptr, ::ear::environment::capture(wrapperSession, nullptr));
+    TEST(Environment, dont_crash_on_nullptr_4_wrapper) {
+        EXPECT_FALSE(::ear::environment::wrapper_session(nullptr).is_valid());
     }
 
-    TEST_F(Environment, returns_nullptr_when_missing_4_library) {
+    TEST(Environment, returns_nullptr_when_missing_4_library) {
         const char *envp[] = { "this=is", "these=are", nullptr };
 
-        EXPECT_EQ(nullptr, ::ear::environment::capture(librarySession, envp));
+        EXPECT_FALSE(::ear::environment::libray_session(envp).is_valid());
     }
 
-    TEST_F(Environment, returns_nullptr_when_missing_4_wrapper) {
+    TEST(Environment, returns_nullptr_when_missing_4_wrapper) {
         const char *envp[] = { "this=is", "these=are", nullptr };
 
-        EXPECT_EQ(nullptr, ::ear::environment::capture(wrapperSession, envp));
+        EXPECT_FALSE(::ear::environment::wrapper_session(envp).is_valid());
     }
 
-    TEST_F(Environment, capture_4_libray) {
+    TEST(Environment, capture_4_libray) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so",
@@ -44,15 +34,15 @@ namespace {
                 nullptr
         };
 
-        EXPECT_EQ(&librarySession, ::ear::environment::capture(librarySession, envp));
+        const auto result = ::ear::environment::libray_session(envp);
 
-        EXPECT_STREQ("/tmp/intercept.random", librarySession.context.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", librarySession.library);
-        EXPECT_STREQ("/usr/bin/intercept", librarySession.context.reporter);
-        EXPECT_EQ(false, librarySession.context.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", result.context.destination);
+        EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
+        EXPECT_STREQ("/usr/bin/intercept", result.context.reporter);
+        EXPECT_EQ(false, result.context.verbose);
     }
 
-    TEST_F(Environment, capture_4_wrapper) {
+    TEST(Environment, capture_4_wrapper) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_REPORT_COMMAND=/usr/bin/intercept",
@@ -61,16 +51,16 @@ namespace {
                 nullptr
         };
 
-        EXPECT_EQ(&wrapperSession, ::ear::environment::capture(wrapperSession, envp));
+        const auto result = ::ear::environment::wrapper_session(envp);
 
-        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.context.destination);
-        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.context.reporter);
-        EXPECT_EQ(false, wrapperSession.context.verbose);
-        EXPECT_STREQ("/usr/bin/cc", wrapperSession.cc);
-        EXPECT_STREQ("/usr/bin/c++", wrapperSession.cxx);
+        EXPECT_STREQ("/tmp/intercept.random", result.context.destination);
+        EXPECT_STREQ("/usr/bin/intercept", result.context.reporter);
+        EXPECT_EQ(false, result.context.verbose);
+        EXPECT_STREQ("/usr/bin/cc", result.cc);
+        EXPECT_STREQ("/usr/bin/c++", result.cxx);
     }
 
-    TEST_F(Environment, capture_verbose_4_library) {
+    TEST(Environment, capture_verbose_4_library) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so",
@@ -79,15 +69,15 @@ namespace {
                 nullptr
         };
 
-        EXPECT_EQ(&librarySession, ::ear::environment::capture(librarySession, envp));
+        const auto result = ::ear::environment::libray_session(envp);
 
-        EXPECT_STREQ("/tmp/intercept.random", librarySession.context.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", librarySession.library);
-        EXPECT_STREQ("/usr/bin/intercept", librarySession.context.reporter);
-        EXPECT_EQ(true, librarySession.context.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", result.context.destination);
+        EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
+        EXPECT_STREQ("/usr/bin/intercept", result.context.reporter);
+        EXPECT_EQ(true, result.context.verbose);
     }
 
-    TEST_F(Environment, capture_verbose_4_wrapper) {
+    TEST(Environment, capture_verbose_4_wrapper) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_REPORT_COMMAND=/usr/bin/intercept",
@@ -97,13 +87,13 @@ namespace {
                 nullptr
         };
 
-        EXPECT_EQ(&wrapperSession, ::ear::environment::capture(wrapperSession, envp));
+        const auto result = ::ear::environment::wrapper_session(envp);
 
-        EXPECT_STREQ("/tmp/intercept.random", wrapperSession.context.destination);
-        EXPECT_STREQ("/usr/bin/intercept", wrapperSession.context.reporter);
-        EXPECT_EQ(true, wrapperSession.context.verbose);
-        EXPECT_STREQ("/usr/bin/cc", wrapperSession.cc);
-        EXPECT_STREQ("/usr/bin/c++", wrapperSession.cxx);
+        EXPECT_STREQ("/tmp/intercept.random", result.context.destination);
+        EXPECT_STREQ("/usr/bin/intercept", result.context.reporter);
+        EXPECT_EQ(true, result.context.verbose);
+        EXPECT_STREQ("/usr/bin/cc", result.cc);
+        EXPECT_STREQ("/usr/bin/c++", result.cxx);
     }
 
 }

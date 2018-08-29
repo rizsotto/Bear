@@ -78,16 +78,16 @@ namespace {
 
     TEST_F(ExecutorTest, execve_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession *session_ptr = nullptr;
+        const ::ear::LibrarySession session {};
 
-        auto result = Sut(session_ptr).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(session).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
     TEST_F(ExecutorTest, execve_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -113,7 +113,7 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -140,7 +140,7 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&VERBOSE_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(VERBOSE_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -164,7 +164,7 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&SILENT_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -189,22 +189,22 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&VERBOSE_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(VERBOSE_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, execvpe_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession *session_ptr = nullptr;
+        const ::ear::LibrarySession session {};
 
-        auto result = Sut(session_ptr).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = Sut(session).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
     TEST_F(ExecutorTest, execvpe_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -230,22 +230,22 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, execvp2_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession *session_ptr = nullptr;
+        const ::ear::LibrarySession session {};
 
-        auto result = Sut(session_ptr).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(session).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
     TEST_F(ExecutorTest, execvp2_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -273,16 +273,16 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(&SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, spawn_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession *session_ptr = nullptr;
+        const ::ear::LibrarySession session {};
 
         pid_t pid;
-        auto result = Sut(session_ptr).posix_spawn(
+        auto result = Sut(session).posix_spawn(
                 &pid,
                 LS_PATH,
                 nullptr,
@@ -297,7 +297,7 @@ namespace {
 
 
         pid_t pid;
-        auto result = Sut(&SILENT_LIBRARY_SESSION).posix_spawn(
+        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawn(
                 &pid,
                 LS_PATH,
                 nullptr,
@@ -335,7 +335,7 @@ namespace {
         using Sut = ::ear::Executor < Validator>;
 
         pid_t pid;
-        auto result = Sut(&SILENT_LIBRARY_SESSION).posix_spawn(
+        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawn(
                 &pid,
                 LS_PATH,
                 nullptr,
@@ -347,10 +347,10 @@ namespace {
 
     TEST_F(ExecutorTest, spawnp_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession *session_ptr = nullptr;
+        const ::ear::LibrarySession session {};
 
         pid_t pid;
-        auto result = Sut(session_ptr).posix_spawnp(
+        auto result = Sut(session).posix_spawnp(
                 &pid,
                 LS_FILE,
                 nullptr,
@@ -365,7 +365,7 @@ namespace {
 
 
         pid_t pid;
-        auto result = Sut(&SILENT_LIBRARY_SESSION).posix_spawnp(
+        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawnp(
                 &pid,
                 LS_FILE,
                 nullptr,
@@ -403,7 +403,7 @@ namespace {
         using Sut = ::ear::Executor < Validator>;
 
         pid_t pid;
-        auto result = Sut(&SILENT_LIBRARY_SESSION).posix_spawnp(
+        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawnp(
                 &pid,
                 LS_FILE,
                 nullptr,
