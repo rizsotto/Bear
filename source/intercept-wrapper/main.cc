@@ -22,7 +22,6 @@
 #include "libexec_a/Interface.h"
 #include "libexec_a/Environment.h"
 #include "libexec_a/Executor.h"
-#include "libexec_a/String.h"
 
 namespace {
 
@@ -37,7 +36,7 @@ namespace {
 
     /// It's a C++ compiler if the name ends with "++".
     bool is_cxx(const char * name) noexcept {
-        const size_t length = ::ear::string::length(name);
+        const size_t length = ::ear::array::length(name);
         return (length > 2) && (name[length - 1] == '+') && (name[length - 2] == '+');
     }
 }

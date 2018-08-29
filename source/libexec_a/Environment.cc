@@ -20,7 +20,7 @@
 #include "config.h"
 
 #include "libexec_a/Environment.h"
-#include "libexec_a/String.h"
+#include "libexec_a/Array.h"
 #include "libexec_a/Interface.h"
 
 #if defined HAVE_NSGETENVIRON
@@ -32,12 +32,12 @@ extern "C" char **environ;
 namespace {
 
     const char *get_env(const char **envp, const char *key) noexcept {
-        const size_t key_size = ::ear::string::length(key);
+        const size_t key_size = ::ear::array::length(key);
 
         for (const char **it = envp; *it != nullptr; ++it) {
             const char *const current = *it;
             // Is the key a prefix of the pointed string?
-            if (not ::ear::string::equal(key, current, key_size))
+            if (not ::ear::array::equal_n(key, current, key_size))
                 continue;
             // Is the next character is the equal sign in the pointed string?
             if (current[key_size] != '=')

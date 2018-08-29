@@ -3,7 +3,6 @@ add_executable(libexec_unit_test
         EnvironmentTest.cc
         ExecutorTest.cc
         StorageTest.cc
-        StringTest.cc
 )
 
 target_link_libraries(libexec_unit_test libgtest)

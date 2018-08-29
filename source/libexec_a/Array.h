@@ -75,5 +75,23 @@ namespace ear {
             return (src_it == src_end) ? dst_it : nullptr;
         }
 
+        /**
+         * Check if two nullptr terminated array is equal till the limit.
+         *
+         * @tparam T
+         * @param lhs
+         * @param rhs
+         * @param length
+         * @return true if the two array is equal till the limit.
+         */
+        template<typename T>
+        constexpr bool equal_n(T *const lhs, T *const rhs, size_t length) {
+            for (int idx = 0; idx < length; ++idx) {
+                if (lhs[idx] != rhs[idx])
+                    return false;
+            }
+            return true;
+        }
+
     }
 }

@@ -14,7 +14,6 @@ add_library(exec_a STATIC
         Environment.cc
         Storage.h
         Storage.cc
-        String.h
 )
 
 set_property(TARGET exec_a PROPERTY POSITION_INDEPENDENT_CODE 1)
