@@ -1,7 +1,6 @@
 #pragma once
 
 #cmakedefine HAVE_NSGETENVIRON
-#cmakedefine HAVE_XLOCALE_HEADER
 #cmakedefine HAVE_SPAWN_HEADER
 
 #cmakedefine APPLE
