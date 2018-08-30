@@ -45,13 +45,13 @@ namespace {
 
 int main(int argc, char *argv[], char *envp[]) {
     if (argc <= 0) {
-        fprintf(stderr, "intercept-wrapper: not enough arguments.");
+        fprintf(stderr, "intercept-wrapper: not enough arguments.\n");
         return -1;
     }
 
     const auto session = ::ear::environment::wrapper_session(const_cast<const char **>(envp));
     if (! session.is_valid()) {
-        fprintf(stderr, "intercept-wrapper: not initialized.");
+        fprintf(stderr, "intercept-wrapper: not initialized.\n");
         return -1;
     }
 
