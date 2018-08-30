@@ -199,7 +199,7 @@ namespace {
     }
 
     pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string &prefix) const {
-        return pear::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
+        return pear::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }
 }
 
@@ -207,9 +207,9 @@ namespace {
 namespace pear {
 
     Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
-        const Result<pid_t> current_pid = get_pid();
-        const Result<pid_t> parent_pid = get_ppid();
-        const Result<std::string> working_dir = get_cwd();
+        const Result<pid_t> current_pid = SystemCalls::get_pid();
+        const Result<pid_t> parent_pid = SystemCalls::get_ppid();
+        const Result<std::string> working_dir = SystemCalls::get_cwd();
         return merge(current_pid, parent_pid, working_dir)
                 .map<EventPtr>([&pid, &cmd](auto tuple) {
                     const auto& [ current, parent, cwd ] = tuple;
@@ -218,7 +218,7 @@ namespace pear {
     };
 
     Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept {
-        return get_pid()
+        return SystemCalls::get_pid()
                 .map<EventPtr>([&pid, &exit](auto current) {
                     return EventPtr(new ProcessStopEvent(pid, current, exit));
                 });

@@ -26,20 +26,31 @@
 
 namespace pear {
 
-    Result<pid_t> fork_with_execvp(const char *file, const char *search_path, const char **argv, const char **envp) noexcept;
+    struct SystemCalls {
 
-    Result<pid_t> spawn(const char *path, const char **argv, const char **envp) noexcept;
+        static Result<pid_t>
+        fork_with_execvp(const char *file, const char *search_path, const char **argv, const char **envp) noexcept;
 
-    Result<pid_t> spawnp(const char *file, const char **argv, const char **envp) noexcept;
+        static Result<pid_t>
+        spawn(const char *path, const char **argv, const char **envp) noexcept;
 
-    Result<int> wait_pid(pid_t pid) noexcept;
+        static Result<pid_t>
+        spawnp(const char *file, const char **argv, const char **envp) noexcept;
 
-    Result<pid_t> get_pid() noexcept;
+        static Result<int>
+        wait_pid(pid_t pid) noexcept;
 
-    Result<pid_t> get_ppid() noexcept;
+        static Result<pid_t>
+        get_pid() noexcept;
 
-    Result<std::string> get_cwd() noexcept;
+        static Result<pid_t>
+        get_ppid() noexcept;
 
-    Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept;
+        static Result<std::string>
+        get_cwd() noexcept;
+
+        static Result<std::shared_ptr<std::ostream>>
+        temp_file(const char *dir, const char *suffix) noexcept;
+    };
 
 }

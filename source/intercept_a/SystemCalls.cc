@@ -30,8 +30,11 @@
 
 namespace pear {
 
-    Result<pid_t>
-    fork_with_execvp(const char *file, const char *search_path, const char **argv, const char **envp) noexcept {
+    Result<pid_t> SystemCalls::fork_with_execvp(
+            const char *file,
+            const char *search_path,
+            const char **argv,
+            const char **envp) noexcept {
 #ifdef HAVE_EXECVP2
         // TODO: implement it
 #else
@@ -39,7 +42,7 @@ namespace pear {
 #endif
     }
 
-    Result<int> spawn(const char *path, const char **argv, const char **envp) noexcept {
+    Result<int> SystemCalls::spawn(const char *path, const char **argv, const char **envp) noexcept {
         pid_t child;
         if (0 != posix_spawn(&child, path, nullptr, nullptr,
                               const_cast<char **>(argv),
@@ -50,7 +53,7 @@ namespace pear {
         }
     }
 
-    Result<int> spawnp(const char *file, const char **argv, const char **envp) noexcept {
+    Result<int> SystemCalls::spawnp(const char *file, const char **argv, const char **envp) noexcept {
         pid_t child;
         if (0 != posix_spawnp(&child, file, nullptr, nullptr,
                               const_cast<char **>(argv),
@@ -61,7 +64,7 @@ namespace pear {
         }
     }
 
-    Result<int> wait_pid(pid_t pid) noexcept {
+    Result<int> SystemCalls::wait_pid(pid_t pid) noexcept {
         int status;
         if (-1 == waitpid(pid, &status, 0)) {
             return Err<int>("waitpid");
@@ -71,15 +74,15 @@ namespace pear {
         }
     }
 
-    Result<pid_t> get_pid() noexcept {
+    Result<pid_t> SystemCalls::get_pid() noexcept {
         return Ok(getpid());
     }
 
-    Result<pid_t> get_ppid() noexcept {
+    Result<pid_t> SystemCalls::get_ppid() noexcept {
         return Ok(getppid());
     }
 
-    Result<std::string> get_cwd() noexcept {
+    Result<std::string> SystemCalls::get_cwd() noexcept {
         constexpr static const size_t buffer_size = 8192;
 
         char buffer[buffer_size];
@@ -90,7 +93,7 @@ namespace pear {
         }
     }
 
-    Result<std::shared_ptr<std::ostream>> temp_file(const char *dir, const char *suffix) noexcept {
+    Result<std::shared_ptr<std::ostream>> SystemCalls::temp_file(const char *dir, const char *suffix) noexcept {
         auto path = std::filesystem::path(dir) / (std::string("XXXXXX") + suffix);
         // create char buffer with this filename.
         const auto path_str = path.string();

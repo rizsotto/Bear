@@ -34,11 +34,11 @@ namespace {
     pear::Result<pid_t> spawnp(const ::pear::Execution &config,
                                const ::pear::EnvironmentPtr &environment) noexcept {
         if ((config.search_path != nullptr) && (config.file != nullptr)) {
-            return pear::fork_with_execvp(config.file, config.search_path, config.command, environment->data());
+            return pear::SystemCalls::fork_with_execvp(config.file, config.search_path, config.command, environment->data());
         } else if (config.file != nullptr) {
-            return pear::spawnp(config.file, config.command, environment->data());
+            return pear::SystemCalls::spawnp(config.file, config.command, environment->data());
         } else {
-            return pear::spawn(config.path, config.command, environment->data());
+            return pear::SystemCalls::spawn(config.path, config.command, environment->data());
         }
     }
 
@@ -105,7 +105,7 @@ int main(int argc, char *argv[], char *envp[]) {
                             return pid;
                         })
                         .template bind<std::tuple<pid_t, int>>([](auto pid) {
-                            return pear::wait_pid(pid)
+                            return pear::SystemCalls::wait_pid(pid)
                                     .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                                         return std::make_tuple(pid, exit);
                                     });
