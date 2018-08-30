@@ -1,3 +1,9 @@
+## 2.3.13 (2018.08.30)
+
+Bugfixes:
+  - Fix bug introduced in 2.3.12 to fix #211 (#221, @markuspohjoismaki)
+
+
 ## 2.3.12 (2018.08.06)
 
 Bugfixes:

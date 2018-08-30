@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(bear C)
-set(BEAR_VERSION "2.3.12")
+set(BEAR_VERSION "2.3.13")
 
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
