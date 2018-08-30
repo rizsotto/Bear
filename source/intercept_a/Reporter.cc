@@ -128,7 +128,7 @@ namespace {
             return "process_start";
         }
 
-        std::ostream &to_json(std::ostream &os) const override {
+        void to_json(std::ostream &os) const override {
             os << '{';
             json_attribute(os, "pid", child_);
             os << ',';
@@ -140,8 +140,6 @@ namespace {
             os << ',';
             json_attribute(os, "cmd", cmd_);
             os << '}';
-
-            return os;
         }
     };
 
@@ -163,7 +161,7 @@ namespace {
             return "process_stop";
         }
 
-        std::ostream &to_json(std::ostream &os) const override {
+        void to_json(std::ostream &os) const override {
             os << '{';
             json_attribute(os, "pid", child_);
             os << ',';
@@ -171,8 +169,6 @@ namespace {
             os << ',';
             json_attribute(os, "exit", exit_);
             os << '}';
-
-            return os;
         }
     };
 

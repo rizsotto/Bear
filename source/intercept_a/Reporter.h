@@ -21,7 +21,7 @@
 
 #include <unistd.h>
 
-#include <ostream>
+#include <iosfwd>
 #include <utility>
 #include <memory>
 
@@ -39,7 +39,7 @@ namespace pear {
 
         virtual const char *name() const = 0;
 
-        virtual std::ostream &to_json(std::ostream &) const = 0;
+        virtual void to_json(std::ostream &) const = 0;
 
     public:
         static Result<EventPtr> start(pid_t pid, const char **cmd) noexcept;
