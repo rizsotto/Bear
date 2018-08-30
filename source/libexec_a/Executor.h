@@ -61,9 +61,6 @@ namespace ear {
     class Executor {
     public:
         int execve(const char *path, char *const argv[], char *const envp[]) const noexcept {
-            if (! initialized_)
-                return -1;
-
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -82,9 +79,6 @@ namespace ear {
         }
 
         int execvpe(const char *file, char *const argv[], char *const envp[]) const noexcept {
-            if (! initialized_)
-                return -1;
-
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -103,9 +97,6 @@ namespace ear {
         }
 
         int execvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) const noexcept {
-            if (! initialized_)
-                return -1;
-
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -128,9 +119,6 @@ namespace ear {
                         const posix_spawnattr_t *attrp,
                         char *const argv[],
                         char *const envp[]) const noexcept {
-            if (! initialized_)
-                return -1;
-
             auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
@@ -153,9 +141,6 @@ namespace ear {
                          const posix_spawnattr_t *attrp,
                          char *const argv[],
                          char *const envp[]) const noexcept {
-            if (! initialized_)
-                return -1;
-
             auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
@@ -175,25 +160,23 @@ namespace ear {
 
     public:
         explicit Executor(const ::ear::LibrarySession &session) noexcept
-                : initialized_(session.is_valid())
-                , session_ {
-                        (initialized_) ? session.context.reporter : nullptr,
-                        (initialized_) ? ::pear::flag::destination : nullptr,
-                        (initialized_) ? session.context.destination : nullptr,
-                        (initialized_) ? ::pear::flag::library : nullptr,
-                        (initialized_) ? session.library : nullptr,
-                        (initialized_ && session.context.verbose) ? ::pear::flag::verbose : nullptr,
+                : session_ {
+                        session.context.reporter,
+                        ::pear::flag::destination,
+                        session.context.destination,
+                        ::pear::flag::library,
+                        session.library,
+                        (session.context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
         { }
 
         explicit Executor(const ::ear::WrapperSession &session) noexcept
-                : initialized_(session.is_valid())
-                , session_ {
-                        (initialized_) ? session.context.reporter : nullptr,
-                        (initialized_) ? ::pear::flag::destination : nullptr,
-                        (initialized_) ? session.context.destination : nullptr,
-                        (initialized_ && session.context.verbose) ? ::pear::flag::verbose : nullptr,
+                : session_ {
+                        session.context.reporter,
+                        ::pear::flag::destination,
+                        session.context.destination,
+                        (session.context.verbose) ? ::pear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
         { }
@@ -226,7 +209,6 @@ namespace ear {
     private:
         static constexpr size_t SESSION_SIZE = 8;
 
-        bool initialized_;
         const char *session_[SESSION_SIZE];
         const size_t session_size_;
     };
