@@ -587,7 +587,7 @@ class Compilation:
         args = iter(compiler_and_arguments[1])
         for arg in args:
             # quit when compilation pass is not involved
-            if arg in {'-E', '-cc1', '-cc1as', '-M', '-MM', '-###'}:
+            if arg in {'-E', '-cc1as', '-M', '-MM', '-###'}:
                 return None
             elif arg in {'-S', '-c'}:
                 result.phase.append(arg)
