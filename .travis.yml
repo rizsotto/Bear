@@ -5,14 +5,6 @@ matrix:
     - os: linux
       sudo: false
       dist: trusty
-      python: "pypy"
-    - os: linux
-      sudo: required
-      dist: trusty
-      python: 2.7
-    - os: linux
-      sudo: false
-      dist: trusty
       python: 3.5
     - os: linux
       sudo: false
@@ -28,16 +20,17 @@ matrix:
 addons:
   apt:
     packages:
-      - clang-5.0
-      - libclang-5.0-dev
+      - clang-6.0
+      - libclang-6.0-dev
+      - llvm-6.0-tools
       - python-pip
       - cmake
       - libc6-dev
       - scons
       - qt4-qmake
     sources:
-      - sourceline: 'deb http://apt.llvm.org/trusty/ llvm-toolchain-trusty-5.0 main'
-        key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+      - llvm-toolchain-trusty-6.0
+      - ubuntu-toolchain-r-test
 
 before_script:
   - mkdir -p "$HOME/install" "$HOME/build"
@@ -58,7 +51,8 @@ install:
 
 script:
   - cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-5.0 -DCPACK_GENERATOR="TGZ;DEB"
+  - cmake --version
+  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-6.0 -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
@@ -71,5 +65,4 @@ script:
 
 branches:
   except:
-    - 3.x
     - experimental
