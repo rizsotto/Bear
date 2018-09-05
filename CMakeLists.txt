@@ -17,10 +17,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 enable_testing()
+include(AddGoogleTest)
+
 set(CMAKE_CTEST_COMMAND ctest -V)
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
