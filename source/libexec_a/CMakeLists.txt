@@ -1,8 +1,3 @@
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
-set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
-
 add_library(exec_a STATIC
         ../intercept_a/Interface.h
         Array.h
@@ -16,8 +11,10 @@ add_library(exec_a STATIC
         Storage.cc
 )
 
-set_property(TARGET exec_a PROPERTY POSITION_INDEPENDENT_CODE 1)
-target_link_libraries(exec_a ${CMAKE_DL_LIBS})
-set_target_properties(exec_a PROPERTIES LINKER_LANGUAGE C)
+target_compile_features(exec_a PUBLIC cxx_std_14)
+target_compile_options(exec_a PUBLIC -fno-exceptions -fno-rtti)
+set_target_properties(exec_a PROPERTIES
+        LINKER_LANGUAGE "C"
+        POSITION_INDEPENDENT_CODE 1)
 
 add_subdirectory(test)

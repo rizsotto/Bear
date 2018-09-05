@@ -1,8 +1,3 @@
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
-set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
-
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 set(CMAKE_EXE_LINKER_FLAGS "-static")
 
@@ -12,6 +7,9 @@ add_executable(intercept
 
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept stdc++fs)
+target_compile_features(intercept PUBLIC cxx_std_17)
+target_compile_options(intercept PUBLIC -fno-exceptions -fno-rtti)
+set_target_properties(intercept PROPERTIES LINKER_LANGUAGE "C")
 
 include(GNUInstallDirs)
 install(TARGETS intercept

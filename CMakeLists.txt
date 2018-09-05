@@ -1,11 +1,22 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.9)
 
-project(bear C CXX)
-set(BEAR_VERSION "3.0.0")
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+else()
+    cmake_policy(VERSION 3.12)
+endif()
 
-if (NOT CMAKE_BUILD_TYPE)
+
+project(bear
+    VERSION 3.0.0
+    DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
+    LANGUAGES C CXX)
+
+
+if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
+
 
 enable_testing()
 set(CMAKE_CTEST_COMMAND ctest -V)
