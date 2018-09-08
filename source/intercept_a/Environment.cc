@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <numeric>
 #include <cstring>
+#include <functional>
 
 #include "intercept_a/Environment.h"
 #include "intercept_a/Interface.h"
@@ -35,8 +36,10 @@ namespace {
     constexpr char cc_key[] = "CC";
     constexpr char cxx_key[] = "CXX";
 
+    using env_t = std::map<std::string, std::string>;
+    using mapper_t = std::function<std::string (const std::string&, const std::string&)>;
 
-    char **to_c_array(const std::map<std::string, std::string> &input) {
+    char **to_c_array(const env_t &input) {
         const size_t result_size = input.size() + 1;
         const auto result = new char *[result_size];
         auto result_it = result;
@@ -55,8 +58,8 @@ namespace {
         return result;
     }
 
-    std::map<std::string, std::string> to_map(const char **const input) noexcept {
-        std::map<std::string, std::string> result;
+    env_t to_map(const char **const input) noexcept {
+        env_t result;
         if (input == nullptr)
             return result;
 
@@ -81,6 +84,36 @@ namespace {
         } while (previous != std::string::npos);
 
         return result;
+    }
+
+    std::string merge_into_paths(const std::string &current, const std::string &value) noexcept {
+        auto paths = split(current, ':');
+        if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
+            paths.emplace_front(value);
+            return std::accumulate(paths.begin(), paths.end(),
+                                   std::string(),
+                                   [](std::string acc, std::string item) {
+                                       return (acc.empty()) ? item : acc + ':' + item;
+                                   });
+        } else {
+            return current;
+        }
+    }
+
+    void insert_or_assign(env_t &target, const char *key, const char *value) noexcept {
+        if (auto it = target.find(key); it != target.end()) {
+            it->second = std::string(value);
+        } else {
+            target.emplace(key, std::string(value));
+        }
+    }
+
+    void insert_or_merge(env_t &target, const char *key, const char *value, const mapper_t &merger) noexcept {
+        if (auto it = target.find(key); it != target.end()) {
+            it->second = merger(it->second, std::string(value));
+        } else {
+            target.emplace(key, std::string(value));
+        }
     }
 
 }
@@ -109,65 +142,48 @@ namespace pear {
 
     Environment::Builder &
     Environment::Builder::add_reporter(const char *reporter) noexcept {
-        environ_.insert_or_assign(::pear::env::reporter_key, reporter);
+        insert_or_assign(environ_, ::pear::env::reporter_key, reporter);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_destination(const char *destination) noexcept {
-        environ_.insert_or_assign(::pear::env::destination_key, destination);
+        insert_or_assign(environ_, ::pear::env::destination_key, destination);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_verbose(bool verbose) noexcept {
         if (verbose) {
-            environ_.insert_or_assign(::pear::env::verbose_key, "1");
+            insert_or_assign(environ_, ::pear::env::verbose_key, "1");
         }
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_library(const char *library) noexcept {
-        environ_.emplace(pear::env::library_key, library);
+        insert_or_assign(environ_, pear::env::library_key, library);
 #ifdef APPLE
-        const std::string key = osx_preload_key;
+        insert_or_assign(environ_, osx_namespace_key, "1");
+        const char *key = osx_preload_key;
 #else
-        const std::string key = glibc_preload_key;
+        const char *key = glibc_preload_key;
 #endif
-        const std::string value = library;
-        if (auto preloads = environ_.find(key); preloads != environ_.end()) {
-            auto paths = split(preloads->second, ':');
-            if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
-                paths.emplace_front(value);
-                const std::string updated =
-                        std::accumulate(paths.begin(), paths.end(),
-                                        std::string(),
-                                        [](std::string acc, std::string item) {
-                                            return (acc.empty()) ? item : acc + ':' + item;
-                                        });
-                preloads->second = updated;
-            }
-        } else {
-            environ_.emplace(key, value);
-        }
-#ifdef APPLE
-        environ_.insert_or_assign(osx_namespace_key, "1");
-#endif
+        insert_or_merge(environ_, key, library, merge_into_paths);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_cc_compiler(const char *compiler, const char *wrapper) noexcept {
-        environ_.insert_or_assign(cc_key, wrapper);
-        environ_.insert_or_assign(::pear::env::cc_key, compiler);
+        insert_or_assign(environ_, cc_key, wrapper);
+        insert_or_assign(environ_, ::pear::env::cc_key, compiler);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_cxx_compiler(const char *compiler, const char *wrapper) noexcept {
-        environ_.insert_or_assign(cxx_key, wrapper);
-        environ_.insert_or_assign(::pear::env::cxx_key, compiler);
+        insert_or_assign(environ_, cxx_key, wrapper);
+        insert_or_assign(environ_, ::pear::env::cxx_key, compiler);
         return *this;
     }
 
