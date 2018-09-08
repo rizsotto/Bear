@@ -22,6 +22,7 @@
 #include <list>
 #include <algorithm>
 #include <numeric>
+#include <string>
 #include <cstring>
 #include <functional>
 

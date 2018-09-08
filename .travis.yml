@@ -43,6 +43,7 @@ addons:
     packages:
       - python-pip
       - libc6-dev
+      - cmake
       - scons
       - qt4-qmake
 
@@ -55,13 +56,14 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
+      brew upgrade cmake;
       brew install scons qt;
     fi
 
 install:
   - pip --version
   - pip install --upgrade pip
-  - pip install lit pycodestyle cmake
+  - pip install lit pycodestyle
 
 script:
   - cd "$HOME/build"
