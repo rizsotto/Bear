@@ -10,4 +10,4 @@ set_target_properties(intercept-c++ PROPERTIES
 
 include(GNUInstallDirs)
 install(TARGETS intercept-c++
-        RUNTIME DESTINATION CMAKE_INSTALL_LIBEXECDIR)
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
