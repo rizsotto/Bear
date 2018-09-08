@@ -63,7 +63,7 @@ before_install:
 install:
   - pip --version
   - pip install --upgrade pip
-  - pip install lit pycodestyle
+  - pip install lit pex pycodestyle
 
 script:
   - cd "$HOME/build"
