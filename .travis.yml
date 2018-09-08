@@ -5,11 +5,32 @@ matrix:
     - os: linux
       sudo: false
       dist: trusty
-      python: 3.5
+      python: 3.6
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - CC=gcc-7
+        - CXX=g++-7
     - os: linux
       sudo: false
       dist: trusty
       python: 3.6
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-6.0
+          packages:
+            - clang-6.0
+            - libclang-6.0-dev
+            - llvm-6.0-tools
+      env:
+        - CC=clang-6.0
+        - CXX=clang++-6.0
     - os: osx
       osx_image: xcode7.3
       language: generic
@@ -20,24 +41,17 @@ matrix:
 addons:
   apt:
     packages:
-      - clang-6.0
-      - libclang-6.0-dev
-      - llvm-6.0-tools
       - python-pip
-      - cmake
       - libc6-dev
       - scons
       - qt4-qmake
-    sources:
-      - llvm-toolchain-trusty-6.0
-      - ubuntu-toolchain-r-test
 
 before_script:
   - mkdir -p "$HOME/install" "$HOME/build"
-  - env
+  - uname
+  - env | sort
 
 before_install:
-  - uname
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
@@ -47,12 +61,12 @@ before_install:
 install:
   - pip --version
   - pip install --upgrade pip
-  - pip install lit pycodestyle
+  - pip install lit pycodestyle cmake
 
 script:
   - cd "$HOME/build"
   - cmake --version
-  - cmake "$TRAVIS_BUILD_DIR" -DCMAKE_CXX_COMPILER=clang++-6.0 -DCPACK_GENERATOR="TGZ;DEB"
+  - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
   - VERBOSE=1 make check
   - VERBOSE=1 make package
