@@ -22,7 +22,6 @@
 #include "intercept_a/SystemCalls.h"
 
 #include <chrono>
-#include <filesystem>
 #include <iostream>
 
 namespace {
@@ -182,7 +181,7 @@ namespace {
     private:
         pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string &) const;
 
-        std::filesystem::path const target_;
+        std::string const target_;
     };
 
     ReporterImpl::ReporterImpl(const char *target) noexcept
@@ -225,12 +224,15 @@ namespace pear {
     }
 
     Result<ReporterPtr> Reporter::tempfile(char const *dir_name) noexcept {
-        if (std::filesystem::is_directory(dir_name)) {
             ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
             return Ok(std::move(result));
-        } else {
-            const std::string message = std::string("Directory does not exists: ") + dir_name;
-            return Err(std::runtime_error(message));
-        }
+
+//        if (std::filesystem::is_directory(dir_name)) {
+//            ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
+//            return Ok(std::move(result));
+//        } else {
+//            const std::string message = std::string("Directory does not exists: ") + dir_name;
+//            return Err(std::runtime_error(message));
+//        }
     }
 }

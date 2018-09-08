@@ -26,7 +26,10 @@
 #include <memory>
 #include <algorithm>
 #include <fstream>
-#include <filesystem>
+
+namespace {
+    constexpr char os_path_sep = '/';
+}
 
 namespace pear {
 
@@ -94,17 +97,17 @@ namespace pear {
     }
 
     Result<std::shared_ptr<std::ostream>> SystemCalls::temp_file(const char *dir, const char *suffix) noexcept {
-        auto path = std::filesystem::path(dir) / (std::string("XXXXXX") + suffix);
+        // TODO: validate input?
+        const auto &path = std::string(dir) + os_path_sep + "XXXXXX" + suffix;
         // create char buffer with this filename.
-        const auto path_str = path.string();
-        const size_t buffer_size = path_str.length() + 1;
+        const size_t buffer_size = path.length() + 1;
         char buffer[buffer_size];
-        std::copy(path_str.c_str(), path_str.c_str() + path_str.length() + 1, (char *)buffer);
+        std::copy(path.c_str(), path.c_str() + path.length() + 1, (char *)buffer);
         // create the temporary file.
         if (-1 == mkstemps(buffer, strlen(suffix))) {
             return Err<std::shared_ptr<std::ostream>>("mkstemp");
         } else {
-            auto result = std::make_shared<std::ofstream>(std::filesystem::path(buffer));
+            auto result = std::make_shared<std::ofstream>(std::string(buffer));
             return Ok(std::dynamic_pointer_cast<std::ostream>(result));
         }
     }
