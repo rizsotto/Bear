@@ -70,7 +70,7 @@ script:
   - cmake --version
   - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
-  - VERBOSE=1 make check
+  - VERBOSE=1 make test
   - VERBOSE=1 make package
   - VERBOSE=1 DESTDIR="$HOME/install" make install
   - if [ "$TRAVIS_SUDO" == "true" ]; then

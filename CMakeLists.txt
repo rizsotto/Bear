@@ -6,32 +6,34 @@ else()
     cmake_policy(VERSION 3.12)
 endif()
 
+set(default_build_type "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 
 project(bear
     VERSION 3.0.0
     DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
     LANGUAGES C CXX)
 
-
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-endif()
+enable_testing()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-
-enable_testing()
 include(AddGoogleTest)
-
-set(CMAKE_CTEST_COMMAND ctest -V)
-
-include(GNUInstallDirs)
-install(FILES COPYING README.md ChangeLog.md
-        DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 add_subdirectory(source)
 add_subdirectory(test)
 add_subdirectory(man)
 
+include(GNUInstallDirs)
+install(FILES COPYING README.md ChangeLog.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 set(CPACK_PACKAGE_NAME "source/bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")

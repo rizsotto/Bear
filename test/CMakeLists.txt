@@ -1,5 +1,3 @@
-add_dependencies(check exec)
-
 message(STATUS "Looking for lit")
 find_program(LIT_EXECUTABLE
   NAMES lit
