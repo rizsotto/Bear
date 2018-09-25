@@ -128,5 +128,5 @@ SELinux on Fedora, CentOS, RHEL.
 
 # COPYRIGHT
 
-Copyright (C) 2012-2017 by László Nagy
+Copyright (C) 2012-2018 by László Nagy
 <https://github.com/rizsotto/Bear>
