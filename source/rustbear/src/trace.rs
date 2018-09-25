@@ -20,8 +20,7 @@
 use std::env;
 use std::io;
 use std::fs::{OpenOptions, File};
-use std::path::Path;
-use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use libc;
 use serde_json;
 
@@ -30,28 +29,28 @@ use Result;
 #[derive(Serialize, Deserialize)]
 pub struct Trace {
     pid: libc::pid_t,
-    cwd: OsString,
-    cmd: Vec<OsString>
+    cwd: PathBuf,
+    cmd: Vec<String>
 }
 
 impl Trace {
     /// Create an Trace report object from the given arguments.
     /// Capture the current process id and working directory.
-    pub fn create(args: &Vec<OsString>) -> Result<Trace> {
+    pub fn create(args: &Vec<String>) -> Result<Trace> {
         let pid: libc::pid_t = unsafe { libc::getpid() };
         let cwd = env::current_dir()?;
-        Ok(Trace { pid: pid, cwd: cwd.into_os_string(), cmd: args.clone() })
+        Ok(Trace { pid: pid, cwd: cwd, cmd: args.clone() })
     }
 
     pub fn get_pid(&self) -> &libc::pid_t {
         &self.pid
     }
 
-    pub fn get_cwd(&self) -> &OsString {
+    pub fn get_cwd(&self) -> &Path {
         &self.cwd
     }
 
-    pub fn get_cmd(&self) -> &[OsString] {
+    pub fn get_cmd(&self) -> &[String] {
         &self.cmd
     }
 
