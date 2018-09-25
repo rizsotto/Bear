@@ -18,71 +18,83 @@
  */
 
 use std::io;
-use std::ffi;
 use serde_json;
 
 use Result;
+use std::path::{Path, PathBuf};
 
-#[derive(Serialize, Deserialize)]
 pub struct Entry {
-    directory: ffi::OsString,
-    file: ffi::OsString,
-    output: Option<ffi::OsString>,
-    #[serde(skip_serializing)]
-    command: Option<ffi::OsString>,
-    arguments: Vec<ffi::OsString>
+    directory: PathBuf,
+    file: PathBuf,
+    command: Vec<String>,
+    output: Option<PathBuf>
 }
 
 type Entries = Vec<Entry>;
 
 
 impl Entry {
-    pub fn new(directory: ffi::OsString,
-               file: ffi::OsString,
-               output: Option<ffi::OsString>,
-               arguments: Vec<ffi::OsString>) -> Entry {
+    pub fn new(directory: PathBuf,
+               file: PathBuf,
+               output: Option<PathBuf>,
+               arguments: Vec<String>) -> Entry {
         Entry {
             directory: directory,
             file: file,
-            output: output,
-            command: None,
-            arguments: arguments
+            command: arguments,
+            output: output
         }
     }
 
-    pub fn get_directory(&self) -> &ffi::OsString {
+    pub fn get_directory(&self) -> &Path {
         &self.directory
     }
 
-    pub fn get_file(&self) -> &ffi::OsString {
+    pub fn get_file(&self) -> &Path {
         &self.file
     }
 
-    pub fn get_output(&self) -> &Option<ffi::OsString> {
-        &self.output
-    }
-
-    pub fn get_arguments(&self) -> &[ffi::OsString] {
-        &self.arguments
-    }
-
-    fn get_command(&self) -> &Option<ffi::OsString> {
+    pub fn get_command(&self) -> &[String] {
         &self.command
+    }
+
+//    pub fn get_output(&self) -> &Option<Path> {
+//        &self.output
+//    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct IoEntry {
+    directory: PathBuf,
+    file: PathBuf,
+    command: Vec<String>,
+    output: Option<PathBuf>
+}
+
+type IoEntries = Vec<IoEntry>;
+
+
+impl From<Entry> for IoEntry {
+    fn from(_: Entry) -> Self {
+        unimplemented!()
     }
 }
 
+impl Into<Entry> for IoEntry {
+    fn into(self) -> Entry {
+        unimplemented!()
+    }
+}
 
 pub fn read(source: &mut io::Read) -> Result<Entries> {
-    let result: Entries = serde_json::from_reader(source)?;
-    // todo: transform the entries into one which has arguments.
+    let io_result: IoEntries = serde_json::from_reader(source)?;
+    let result: Entries = io_result.into_iter().map(IoEntry::into).collect();
     Ok(result)
 }
 
 pub fn write(target: &mut io::Write, value: &Entries) -> Result<()> {
-    let result = serde_json::to_writer(target, value)?;
-    Ok(result)
-}
-
-fn parse(command: ffi::OsString) -> Result<Vec<ffi::OsString>> {
+//    let io_value: IoEntries = value.into_iter().map(IoEntry::from).collect();
+//    let result = serde_json::to_writer(target, &io_value)?;
+//    Ok(result)
     unimplemented!()
 }
