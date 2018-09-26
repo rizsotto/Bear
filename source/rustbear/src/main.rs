@@ -22,18 +22,12 @@ extern crate serde_json;
 #[macro_use] extern crate clap;
 #[macro_use] extern crate log;
 extern crate env_logger;
-
 extern crate intercept;
-use intercept::parameters;
 
-use std::env;
 use std::process;
 use clap::{App, Arg};
 
 fn main() {
-    let default_cc_compiler = env::var("CC").unwrap_or("cc".to_string());
-    let default_cxx_compiler = env::var("CXX").unwrap_or("c++".to_string());
-
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
@@ -49,45 +43,16 @@ fn main() {
             .value_name("file")
             .default_value("compile_commands.json")
             .help("The compilation database file"))
-        .arg(Arg::with_name("cc_compiler")
-            .long("use-cc")
-            .takes_value(true)
-            .value_name("compiler")
-            .default_value(default_cc_compiler.as_str())
-            .help("The C compiler which will be used in compiler wrappers"))
-        .arg(Arg::with_name("cxx_compiler")
-            .long("use-c++")
-            .takes_value(true)
-            .value_name("compiler")
-            .default_value(default_cxx_compiler.as_str())
-            .help("The C++ compiler which will be used in compiler wrappers"))
-        .arg(Arg::with_name("relative")
-            .long("relative")
-            .takes_value(true)
-            .value_name("directory")
-            .help("Makes the database entries relative to this directory"))
         .arg(Arg::with_name("build")
-            .value_name("command")
-            .takes_value(true)
             .multiple(true)
+            .allow_hyphen_values(true)
             .required(true)
             .help("The build command to intercept"))
         .get_matches();
 
-    let config = parameters::Parameters::new(
-        matches.value_of("cc_compiler").unwrap(),
-        matches.value_of("cxx_compiler").unwrap(),
-        "/tmp"  // todo: generate temporary directory
-    );
-
-    let (config_key, config_val) = parameters::to_env(&config).unwrap();
     let build: Vec<_> = matches.values_of("build").unwrap().collect();
-
     let mut command = process::Command::new(build[0]);
     command.args(&build[1..]);
-    command.env(config_key, config_val);
-    command.env("CC", "bear-cc");
-    command.env("CXX", "bear-cxx");
 
     match command.spawn() {
         Ok(mut child) => match child.wait() {
