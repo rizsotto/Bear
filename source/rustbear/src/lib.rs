@@ -21,7 +21,7 @@ extern crate libc;
 extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
-#[macro_use] extern crate log;
+//#[macro_use] extern crate log;
 extern crate tempdir;
 
 
@@ -38,6 +38,7 @@ pub enum Error {
     Io(std::io::Error),
     Env(std::env::VarError),
     Json(serde_json::Error),
+    RuntimeError(String),
 }
 
 impl From<std::io::Error> for Error {
