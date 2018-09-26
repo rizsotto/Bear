@@ -82,3 +82,4 @@ script:
 branches:
   except:
     - experimental
+    - 3.x
