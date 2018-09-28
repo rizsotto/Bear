@@ -1,4 +1,4 @@
-Build EAR
+Build BEAR
 =========
 
 Bear is a tool that generates a compilation database for clang tooling.
