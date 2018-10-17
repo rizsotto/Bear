@@ -51,7 +51,7 @@ impl Trace {
         &self.cmd
     }
 
-    /// Create an Trace report object from the given arguments.
+    /// Create a Trace report object from the given arguments.
     /// Capture the current process id and working directory.
     pub fn create(args: &Vec<String>) -> Result<Trace> {
         let pid: libc::pid_t = unsafe { libc::getpid() };
@@ -79,6 +79,8 @@ pub struct TraceDirectory {
 }
 
 impl TraceDirectory {
+
+    /// Create a TraceDirectory object from the directory path.
     pub fn new(path: &path::Path) -> Result<TraceDirectory> {
         if path.is_dir() {
             let input = fs::read_dir(path)?;
@@ -88,25 +90,15 @@ impl TraceDirectory {
         }
     }
 
-//    fn create_writer(path: &path::Path) -> Result<fs::File> {
-//        let file_name = path.join("random");  // todo: generate random filename
-//        let file = fs::OpenOptions::new().write(true).open(file_name)?;
-//        Ok(file)
-//    }
+    fn is_execution_trace(path: &path::Path) -> bool {
+        const EXTENSION: &'static str = ".process_start.json";
 
-    fn create_reader(path: &path::Path) -> Result<fs::File> {
-        let file = fs::OpenOptions::new().read(true).open(path)?;
-        Ok(file)
-    }
-
-    fn read_content(path: &path::Path) -> Result<Trace> {
-        let mut file = TraceDirectory::create_reader(&path)?;
-        Trace::read(&mut file)
+        path.to_str().map_or(false, |str| { str.ends_with(EXTENSION) })
     }
 }
 
 impl Iterator for TraceDirectory {
-    type Item = Result<Trace>;
+    type Item = path::PathBuf;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         match self.input.next() {
@@ -114,13 +106,27 @@ impl Iterator for TraceDirectory {
                 let path = entry.path();
                 if path.is_dir() {
                     self.next()
+                } else if TraceDirectory::is_execution_trace(&path) {
+                    Some(path.to_path_buf())
                 } else {
-                    let result = TraceDirectory::read_content(&path);
-                    Some(result)
+                    self.next()
                 }
             },
             Some(Err(_)) => self.next(),
             _ => None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_execution_trace() {
+        let valid = path::Path::new("/tmp/5432.process_start.json");
+        assert!(TraceDirectory::is_execution_trace(valid));
+        let invalid = path::Path::new("/tmp/something.json");
+        assert!(!TraceDirectory::is_execution_trace(invalid));
     }
 }
