@@ -18,25 +18,25 @@
  */
 
 use std::io;
+use std::path;
 use serde_json;
 
 use Result;
-use std::path::{Path, PathBuf};
 
 pub struct Entry {
-    directory: PathBuf,
-    file: PathBuf,
+    directory: path::PathBuf,
+    file: path::PathBuf,
     command: Vec<String>,
-    output: Option<PathBuf>
+    output: Option<path::PathBuf>
 }
 
 type Entries = Vec<Entry>;
 
 
 impl Entry {
-    pub fn new(directory: PathBuf,
-               file: PathBuf,
-               output: Option<PathBuf>,
+    pub fn new(directory: path::PathBuf,
+               file: path::PathBuf,
+               output: Option<path::PathBuf>,
                arguments: Vec<String>) -> Entry {
         Entry {
             directory: directory,
@@ -46,11 +46,11 @@ impl Entry {
         }
     }
 
-    pub fn get_directory(&self) -> &Path {
+    pub fn get_directory(&self) -> &path::Path {
         &self.directory
     }
 
-    pub fn get_file(&self) -> &Path {
+    pub fn get_file(&self) -> &path::Path {
         &self.file
     }
 
@@ -65,10 +65,10 @@ impl Entry {
 
 #[derive(Serialize, Deserialize)]
 pub struct IoEntry {
-    directory: PathBuf,
-    file: PathBuf,
+    directory: path::PathBuf,
+    file: path::PathBuf,
     command: Vec<String>,
-    output: Option<PathBuf>
+    output: Option<path::PathBuf>
 }
 
 type IoEntries = Vec<IoEntry>;

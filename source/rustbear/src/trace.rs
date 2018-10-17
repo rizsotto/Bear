@@ -35,12 +35,8 @@ pub struct Trace {
 }
 
 impl Trace {
-    /// Create an Trace report object from the given arguments.
-    /// Capture the current process id and working directory.
-    pub fn create(args: &Vec<String>) -> Result<Trace> {
-        let pid: libc::pid_t = unsafe { libc::getpid() };
-        let cwd = env::current_dir()?;
-        Ok(Trace { pid: pid, cwd: cwd, cmd: args.clone() })
+    pub fn new(pid: libc::pid_t, cwd: path::PathBuf, cmd: Vec<String>) -> Trace {
+        Trace { pid: pid, cwd: cwd, cmd: cmd }
     }
 
     pub fn get_pid(&self) -> &libc::pid_t {
@@ -53,6 +49,15 @@ impl Trace {
 
     pub fn get_cmd(&self) -> &[String] {
         &self.cmd
+    }
+
+    /// Create an Trace report object from the given arguments.
+    /// Capture the current process id and working directory.
+    pub fn create(args: &Vec<String>) -> Result<Trace> {
+        let pid: libc::pid_t = unsafe { libc::getpid() };
+        let cwd = env::current_dir()?;
+
+        Ok(Trace::new(pid, cwd, args.clone()))
     }
 
     /// Write a single trace entry into the given target.
