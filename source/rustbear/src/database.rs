@@ -17,19 +17,19 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::io;
 use std::path;
-
+use serde_json;
 use Result;
 
+
+#[derive(Serialize, Deserialize)]
 pub struct Entry {
     directory: path::PathBuf,
     file: path::PathBuf,
     command: Vec<String>,
     output: Option<path::PathBuf>
 }
-
-type Entries = Vec<Entry>;
-
 
 impl Entry {
     pub fn new(directory: path::PathBuf,
@@ -61,45 +61,15 @@ impl Entry {
     }
 }
 
-mod internal {
+type Entries = Vec<Entry>;
 
-    use super::*;
-    use std::io;
-    use serde_json;
-
-    #[derive(Serialize, Deserialize)]
-    pub struct IoEntry {
-        directory: path::PathBuf,
-        file: path::PathBuf,
-        command: Vec<String>,
-        output: Option<path::PathBuf>
-    }
-
-    type IoEntries = Vec<IoEntry>;
-
-
-    impl From<Entry> for IoEntry {
-        fn from(_: Entry) -> Self {
-            unimplemented!()
-        }
-    }
-
-    impl Into<Entry> for IoEntry {
-        fn into(self) -> Entry {
-            unimplemented!()
-        }
-    }
-
-    pub fn read(source: &mut io::Read) -> Result<Entries> {
-        let io_result: IoEntries = serde_json::from_reader(source)?;
-        let result: Entries = io_result.into_iter().map(IoEntry::into).collect();
-        Ok(result)
-    }
-
-    pub fn write(_target: &mut io::Write, _value: &Entries) -> Result<()> {
-//    let io_value: IoEntries = value.into_iter().map(IoEntry::from).collect();
-//    let result = serde_json::to_writer(target, &io_value)?;
-//    Ok(result)
-        unimplemented!()
-    }
+pub fn read(source: &mut io::Read) -> Result<Entries> {
+    let result: Entries = serde_json::from_reader(source)?;
+    Ok(result)
 }
+
+pub fn write(target: &mut io::Write, values: &Entries) -> Result<()> {
+    let result = serde_json::to_writer(target, &values)?;
+    Ok(result)
+}
+

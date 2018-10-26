@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn read_works_on_verbose() {
+    fn read_works_on_unkown_fields() {
         let mut data = r#"{
                     "pid": 12,
                     "ppid": 11,
