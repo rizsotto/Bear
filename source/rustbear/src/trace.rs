@@ -39,8 +39,8 @@ impl Trace {
         Trace { pid: pid, cwd: cwd, cmd: cmd }
     }
 
-    pub fn get_pid(&self) -> &libc::pid_t {
-        &self.pid
+    pub fn get_pid(&self) -> libc::pid_t {
+        self.pid
     }
 
     pub fn get_cwd(&self) -> &path::Path {
@@ -128,5 +128,26 @@ mod tests {
         assert!(TraceDirectory::is_execution_trace(valid));
         let invalid = path::Path::new("/tmp/something.json");
         assert!(!TraceDirectory::is_execution_trace(invalid));
+    }
+
+    #[test]
+    fn read_works_on_verbose() {
+        let mut data = r#"{
+                    "pid": 12,
+                    "ppid": 11,
+                    "pppid": 10,
+                    "cwd": "/usr/home/user",
+                    "cmd": [
+                      "program",
+                      "arg1",
+                      "arg2"
+                    ]
+                  }"#.as_bytes();
+
+        let result = Trace::read(&mut data).unwrap();
+
+        assert_eq!(12i32, result.get_pid());
+        assert_eq!(path::Path::new("/usr/home/user"), result.get_cwd());
+        assert_eq!(["program", "arg1", "arg2"], result.get_cmd());
     }
 }
