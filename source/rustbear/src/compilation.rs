@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::ffi;
+use std::path;
 
-use trace::Trace;
-use database::Entry;
 use Result;
+use trace;
+use database;
 
 pub enum CompilerPass {
     Preprocessor,
@@ -31,32 +31,20 @@ pub enum CompilerPass {
 }
 
 pub struct Compilation {
-    compiler: ffi::OsString,
+    compiler: path::PathBuf,
     phase: CompilerPass,
-    flags: Vec<ffi::OsString>,
-    source: ffi::OsString,
-    output: Option<ffi::OsString>,
-    cwd: ffi::OsString,
+    flags: Vec<String>,
+    source: path::PathBuf,
+    output: Option<path::PathBuf>,
+    cwd: path::PathBuf,
 }
 
 impl Compilation {
-    pub fn from_trace(trace: Trace) -> Result<Compilation> {
+    pub fn from_trace(_trace: trace::Trace) -> Result<Compilation> {
         unimplemented!()
     }
 
-    pub fn from_db_entry(entry: Entry) -> Result<Compilation> {
-        unimplemented!()
-    }
-
-    pub fn to_db_entry(&self) -> Result<Entry> {
-        unimplemented!()
-    }
-
-    pub fn to_relative(&self, to: ffi::OsString) -> Result<Compilation> {
-        unimplemented!()
-    }
-
-    pub fn to_absolute(&self, to: ffi::OsString) -> Result<Compilation> {
+    pub fn to_db_entry(&self) -> Result<database::Entry> {
         unimplemented!()
     }
 }

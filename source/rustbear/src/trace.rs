@@ -150,4 +150,26 @@ mod tests {
         assert_eq!(path::Path::new("/usr/home/user"), result.get_cwd());
         assert_eq!(["program", "arg1", "arg2"], result.get_cmd());
     }
+
+    #[test]
+    fn write_and_read_works() {
+        let expected = Trace::new(12i32,
+                                  path::PathBuf::from("/home/user"),
+                                  vec!["program".to_string(), "arg".to_string()]);
+
+        let mut data: [u8; 100] = [0; 100];
+        {
+            let mut buffer = &mut data[..];
+            let _result = Trace::write(&mut buffer, &expected).unwrap();
+        }
+        {
+            let end = data.iter().position(|&c| c == 0).unwrap();
+            let mut buffer = &data[..end];
+            let result = Trace::read(&mut buffer).unwrap();
+
+            assert_eq!(expected.get_pid(), result.get_pid());
+            assert_eq!(expected.get_cwd(), result.get_cwd());
+            assert_eq!(expected.get_cmd(), result.get_cmd());
+        }
+    }
 }

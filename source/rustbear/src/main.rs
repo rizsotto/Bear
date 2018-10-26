@@ -17,10 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#[macro_use] extern crate serde_derive;
+extern crate serde_derive;
 extern crate serde_json;
 #[macro_use] extern crate clap;
-#[macro_use] extern crate log;
 extern crate env_logger;
 extern crate intercept;
 
