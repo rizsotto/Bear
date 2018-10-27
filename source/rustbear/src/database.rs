@@ -17,13 +17,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::collections;
 use std::io;
+use std::iter::FromIterator;
 use std::path;
 use serde_json;
 use Result;
 
 
-#[derive(Serialize, Deserialize)]
+#[derive(Hash, Serialize, Deserialize)]
 pub struct Entry {
     directory: path::PathBuf,
     file: path::PathBuf,
@@ -61,15 +63,44 @@ impl Entry {
     }
 }
 
-type Entries = Vec<Entry>;
-
-pub fn read(source: &mut io::Read) -> Result<Entries> {
-    let result: Entries = serde_json::from_reader(source)?;
-    Ok(result)
+impl PartialEq for Entry {
+    fn eq(&self, other: &Entry) -> bool {
+        self.directory == other.directory &&
+        self.file == other.file &&
+        self.command == other.command
+    }
 }
 
-pub fn write(target: &mut io::Write, values: &Entries) -> Result<()> {
-    let result = serde_json::to_writer(target, &values)?;
-    Ok(result)
+impl Eq for Entry {}
+
+
+pub struct Database {
+    entries: collections::HashSet<Entry>
 }
 
+impl Database {
+    pub fn new() -> Database {
+        Database { entries: collections::HashSet::new() }
+    }
+
+    pub fn load(&mut self, source: &mut io::Read) -> Result<()> {
+        let entries: Vec<Entry> = serde_json::from_reader(source)?;
+        let result = self.add_entries(entries);
+        Ok(result)
+    }
+
+    pub fn save(&self, target: &mut io::Write) -> Result<()> {
+        let values = Vec::from_iter(self.entries.iter());
+        let result = serde_json::to_writer(target, &values)?;
+        Ok(result)
+    }
+
+    pub fn add_entry(&mut self, entry: Entry) -> () {
+        self.entries.insert(entry);
+    }
+
+    pub fn add_entries(&mut self, entries: Vec<Entry>) -> () {
+        let fresh: collections::HashSet<Entry> = collections::HashSet::from_iter(entries);
+        self.entries.union(&fresh);
+    }
+}
