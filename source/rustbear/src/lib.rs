@@ -26,7 +26,6 @@ extern crate tempdir;
 
 
 pub mod trace;
-pub mod parameters;
 pub mod database;
 pub mod compilation;
 
@@ -38,7 +37,8 @@ pub enum Error {
     Io(std::io::Error),
     Env(std::env::VarError),
     Json(serde_json::Error),
-    RuntimeError(String),
+    String(std::str::Utf8Error),
+    RuntimeError(&'static str),
 }
 
 impl From<std::io::Error> for Error {
@@ -56,6 +56,12 @@ impl From<serde_json::Error> for Error {
 impl From<std::env::VarError> for Error {
     fn from(err: std::env::VarError) -> Error {
         Error::Env(err)
+    }
+}
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(err: std::str::Utf8Error) -> Error {
+        Error::String(err)
     }
 }
 

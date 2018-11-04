@@ -70,7 +70,7 @@ impl TraceDirectory {
             let input = fs::read_dir(path)?;
             Ok(TraceDirectory { input: input })
         } else {
-            Err(Error::RuntimeError("TraceSource should be directory".to_string()))
+            Err(Error::RuntimeError("TraceSource should be directory"))
         }
     }
 

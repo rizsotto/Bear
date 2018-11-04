@@ -18,10 +18,12 @@
  */
 
 use std::path;
+use std::process;
+use std::str;
 
-use Result;
 use trace;
-use database;
+use Result;
+use Error;
 
 pub enum CompilerPass {
     Preprocessor,
@@ -30,21 +32,63 @@ pub enum CompilerPass {
     Linking
 }
 
-pub struct Compilation {
+pub struct CompilerExecution {
     compiler: path::PathBuf,
     phase: CompilerPass,
     flags: Vec<String>,
-    source: path::PathBuf,
-    output: Option<path::PathBuf>,
-    cwd: path::PathBuf,
+    inputs: Vec<path::PathBuf>,
+    output: Option<path::PathBuf>
 }
 
-impl Compilation {
-    pub fn from_trace(_trace: trace::Trace) -> Result<Compilation> {
+impl CompilerExecution {
+
+    pub fn from(_trace: &trace::Trace) -> Option<CompilerExecution> {
         unimplemented!()
     }
 
-    pub fn to_db_entry(&self) -> Result<database::Entry> {
-        unimplemented!()
+}
+
+/// Takes a command string and returns as a list.
+fn shell_split(string: &str) -> Result<Vec<String>> {
+    unimplemented!()
+//    def unescape(arg):
+//    # type: (str) -> str
+//    """ Gets rid of the escaping characters. """
+//
+//    if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
+//    return re.sub(r'\\(["\\])', r'\1', arg[1:-1])
+//        return re.sub(r'\\([\\ $%&\(\)\[\]\{\}\*|<>@?!])', r'\1', arg)
+//
+//    return [unescape(token) for token in shlex.split(string)]
+}
+
+/// Provide information on how the underlying compiler would have been
+/// invoked without the MPI compiler wrapper.
+fn get_mpi_call(wrapper: &String) -> Result<Vec<String>> {
+    fn run_mpi_wrapper(wrapper: &String, flag: &str) -> Result<Vec<String>> {
+        let child = process::Command::new(wrapper)
+            .arg(flag)
+            .stdout(process::Stdio::piped())
+            .spawn()?;
+        let output = child.wait_with_output()?;
+        // Take the stdout if the process was successful.
+        if output.status.success() {
+            let string = str::from_utf8(output.stdout.as_slice())?;
+            // Take only the first line.
+            let lines: Vec<&str> = string.lines().collect();
+            // And treat as it would be a shell command.
+            match lines.first() {
+                Some(first_line) => shell_split(first_line),
+                _ => Err(Error::RuntimeError("Empty output of wrapper"))
+            }
+        } else {
+            Err(Error::RuntimeError("Process failed."))
+        }
     }
+
+    // Try both flags with the wrapper and return the first successful result.
+    ["--show", "--showme"].iter()
+        .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
+        .find(Result::is_ok)
+        .unwrap_or(Err(Error::RuntimeError("Could not determinate MPI flags.")))
 }
