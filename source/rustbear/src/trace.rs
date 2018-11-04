@@ -29,35 +29,19 @@ use Error;
 
 #[derive(Serialize, Deserialize)]
 pub struct Trace {
-    pid: libc::pid_t,
-    cwd: path::PathBuf,
-    cmd: Vec<String>
+    pub pid: libc::pid_t,
+    pub cwd: path::PathBuf,
+    pub cmd: Vec<String>
 }
 
 impl Trace {
-    pub fn new(pid: libc::pid_t, cwd: path::PathBuf, cmd: Vec<String>) -> Trace {
-        Trace { pid: pid, cwd: cwd, cmd: cmd }
-    }
-
-    pub fn get_pid(&self) -> libc::pid_t {
-        self.pid
-    }
-
-    pub fn get_cwd(&self) -> &path::Path {
-        &self.cwd
-    }
-
-    pub fn get_cmd(&self) -> &[String] {
-        &self.cmd
-    }
-
     /// Create a Trace report object from the given arguments.
     /// Capture the current process id and working directory.
     pub fn create(args: &Vec<String>) -> Result<Trace> {
         let pid: libc::pid_t = unsafe { libc::getpid() };
         let cwd = env::current_dir()?;
 
-        Ok(Trace::new(pid, cwd, args.clone()))
+        Ok(Trace{ pid: pid, cwd: cwd, cmd: args.clone() })
     }
 
     /// Write a single trace entry into the given target.
@@ -139,23 +123,24 @@ mod tests {
                     "cwd": "/usr/home/user",
                     "cmd": [
                       "program",
-                      "arg1",
-                      "arg2"
+                      "arg"
                     ]
                   }"#.as_bytes();
 
         let result = Trace::read(&mut data).unwrap();
 
-        assert_eq!(12i32, result.get_pid());
-        assert_eq!(path::Path::new("/usr/home/user"), result.get_cwd());
-        assert_eq!(["program", "arg1", "arg2"], result.get_cmd());
+        assert_eq!(12i32, result.pid);
+        assert_eq!(path::Path::new("/usr/home/user"), result.cwd);
+        assert_eq!(vec!["program".to_string(), "arg".to_string()], result.cmd);
     }
 
     #[test]
     fn write_and_read_works() {
-        let expected = Trace::new(12i32,
-                                  path::PathBuf::from("/home/user"),
-                                  vec!["program".to_string(), "arg".to_string()]);
+        let expected = Trace {
+            pid: 12i32,
+            cwd: path::PathBuf::from("/home/user"),
+            cmd: vec!["program".to_string(), "arg".to_string()]
+        };
 
         let mut data: [u8; 100] = [0; 100];
         {
@@ -167,9 +152,9 @@ mod tests {
             let mut buffer = &data[..end];
             let result = Trace::read(&mut buffer).unwrap();
 
-            assert_eq!(expected.get_pid(), result.get_pid());
-            assert_eq!(expected.get_cwd(), result.get_cwd());
-            assert_eq!(expected.get_cmd(), result.get_cmd());
+            assert_eq!(expected.pid, result.pid);
+            assert_eq!(expected.cwd, result.cwd);
+            assert_eq!(expected.cmd, result.cmd);
         }
     }
 }

@@ -27,40 +27,10 @@ use Result;
 
 #[derive(Hash, Serialize, Deserialize)]
 pub struct Entry {
-    directory: path::PathBuf,
-    file: path::PathBuf,
-    command: Vec<String>,
-    output: Option<path::PathBuf>
-}
-
-impl Entry {
-    pub fn new(directory: path::PathBuf,
-               file: path::PathBuf,
-               output: Option<path::PathBuf>,
-               arguments: Vec<String>) -> Entry {
-        Entry {
-            directory: directory,
-            file: file,
-            command: arguments,
-            output: output
-        }
-    }
-
-    pub fn get_directory(&self) -> &path::Path {
-        &self.directory
-    }
-
-    pub fn get_file(&self) -> &path::Path {
-        &self.file
-    }
-
-    pub fn get_command(&self) -> &[String] {
-        &self.command
-    }
-
-    pub fn get_output(&self) -> &Option<path::PathBuf> {
-        &self.output
-    }
+    pub directory: path::PathBuf,
+    pub file: path::PathBuf,
+    pub command: Vec<String>,
+    pub output: Option<path::PathBuf>
 }
 
 impl PartialEq for Entry {
