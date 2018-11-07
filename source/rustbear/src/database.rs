@@ -17,40 +17,40 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use serde_json;
 use std::collections;
 use std::io;
 use std::iter::FromIterator;
 use std::path;
-use serde_json;
 use Result;
-
 
 #[derive(Hash, Serialize, Deserialize)]
 pub struct Entry {
     pub directory: path::PathBuf,
     pub file: path::PathBuf,
     pub command: Vec<String>,
-    pub output: Option<path::PathBuf>
+    pub output: Option<path::PathBuf>,
 }
 
 impl PartialEq for Entry {
     fn eq(&self, other: &Entry) -> bool {
-        self.directory == other.directory &&
-        self.file == other.file &&
-        self.command == other.command
+        self.directory == other.directory
+            && self.file == other.file
+            && self.command == other.command
     }
 }
 
 impl Eq for Entry {}
 
-
 pub struct Database {
-    entries: collections::HashSet<Entry>
+    entries: collections::HashSet<Entry>,
 }
 
 impl Database {
     pub fn new() -> Database {
-        Database { entries: collections::HashSet::new() }
+        Database {
+            entries: collections::HashSet::new(),
+        }
     }
 
     pub fn load(&mut self, source: &mut io::Read) -> Result<()> {

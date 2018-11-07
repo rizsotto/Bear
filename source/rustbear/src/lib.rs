@@ -20,18 +20,18 @@
 extern crate libc;
 extern crate serde;
 extern crate serde_json;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 //#[macro_use] extern crate log;
-extern crate tempdir;
 extern crate shellwords;
-#[macro_use] extern crate lazy_static;
+extern crate tempdir;
+#[macro_use]
+extern crate lazy_static;
 extern crate regex;
 
-
-pub mod trace;
-pub mod database;
 pub mod compilation;
-
+pub mod database;
+pub mod trace;
 
 use std::result;
 

@@ -17,22 +17,22 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use regex;
+use shellwords;
+use std::collections;
 use std::path;
 use std::process;
 use std::str;
-use std::collections;
-use regex;
-use shellwords;
 
 use trace;
-use Result;
 use Error;
+use Result;
 
 pub enum CompilerPass {
     Preprocessor,
     Compilation,
     Assembly,
-    Linking
+    Linking,
 }
 
 pub struct CompilerExecution {
@@ -40,15 +40,13 @@ pub struct CompilerExecution {
     phase: CompilerPass,
     flags: Vec<String>,
     inputs: Vec<path::PathBuf>,
-    output: Option<path::PathBuf>
+    output: Option<path::PathBuf>,
 }
 
 impl CompilerExecution {
-
     pub fn from(_trace: &trace::Trace) -> Option<CompilerExecution> {
         unimplemented!()
     }
-
 }
 
 lazy_static! {
@@ -124,7 +122,7 @@ lazy_static! {
 struct Category {
     ignore: bool,
     c_compilers: Vec<String>,
-    cxx_compilers: Vec<String>
+    cxx_compilers: Vec<String>,
 }
 
 impl Category {
@@ -133,19 +131,23 @@ impl Category {
             let path = path::PathBuf::from(file);
             match path.file_name().map(|path| path.to_str()) {
                 Some(Some(str)) => Ok(str.to_string()),
-                _ => Err(Error::RuntimeError("Can't get basename."))
+                _ => Err(Error::RuntimeError("Can't get basename.")),
             }
         }
 
-        let c_compiler_names: Result<Vec<_>> =
-            c_compilers.into_iter().map(|path| basename(&path)).collect();
-        let cxx_compiler_names: Result<Vec<_>> =
-            cxx_compilers.into_iter().map(|path| basename(&path)).collect();
+        let c_compiler_names: Result<Vec<_>> = c_compilers
+            .into_iter()
+            .map(|path| basename(&path))
+            .collect();
+        let cxx_compiler_names: Result<Vec<_>> = cxx_compilers
+            .into_iter()
+            .map(|path| basename(&path))
+            .collect();
 
         Ok(Category {
             ignore: only_use,
             c_compilers: c_compiler_names?,
-            cxx_compilers: cxx_compiler_names?
+            cxx_compilers: cxx_compiler_names?,
         })
     }
 
@@ -176,17 +178,15 @@ impl Category {
     }
 
     fn _is_pattern_match(candidate: &String, patterns: &Vec<regex::Regex>) -> bool {
-        patterns.iter()
-            .any(|pattern| pattern.is_match(candidate))
+        patterns.iter().any(|pattern| pattern.is_match(candidate))
     }
 }
-
 
 /// Takes a command string and returns as a list.
 fn shell_split(string: &str) -> Result<Vec<String>> {
     match shellwords::split(string) {
         Ok(value) => Ok(value),
-        _ => Err(Error::RuntimeError("Can't parse shell command"))
+        _ => Err(Error::RuntimeError("Can't parse shell command")),
     }
 }
 
@@ -201,13 +201,11 @@ fn get_mpi_call(wrapper: &String) -> Result<Vec<String>> {
         let output = child.wait_with_output()?;
         // Take the stdout if the process was successful.
         if output.status.success() {
-            let string = str::from_utf8(output.stdout.as_slice())?;
-            // Take only the first line.
-            let lines: Vec<&str> = string.lines().collect();
-            // And treat as it would be a shell command.
-            match lines.first() {
+            // Take only the first line and treat as it would be a shell command.
+            let output_string = str::from_utf8(output.stdout.as_slice())?;
+            match output_string.lines().next() {
                 Some(first_line) => shell_split(first_line),
-                _ => Err(Error::RuntimeError("Empty output of wrapper"))
+                _ => Err(Error::RuntimeError("Empty output of wrapper")),
             }
         } else {
             Err(Error::RuntimeError("Process failed."))
@@ -215,7 +213,8 @@ fn get_mpi_call(wrapper: &String) -> Result<Vec<String>> {
     }
 
     // Try both flags with the wrapper and return the first successful result.
-    ["--show", "--showme"].iter()
+    ["--show", "--showme"]
+        .iter()
         .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
         .find(Result::is_ok)
         .unwrap_or(Err(Error::RuntimeError("Could not determinate MPI flags.")))

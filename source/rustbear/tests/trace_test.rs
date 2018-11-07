@@ -1,8 +1,8 @@
 extern crate intercept;
 
-use std::path;
-use std::fs;
 use intercept::trace::Trace;
+use std::fs;
+use std::path;
 
 const TEST_FILE_NAME: &'static str = "execution.test.read_write_works.json";
 
@@ -11,7 +11,7 @@ fn read_write_works() {
     let expected = Trace {
         pid: 1234,
         cwd: path::PathBuf::from("/tmp"),
-        cmd: vec!["a".to_string(), "b".to_string()]
+        cmd: vec!["a".to_string(), "b".to_string()],
     };
     {
         let mut file = fs::File::create(TEST_FILE_NAME).unwrap();

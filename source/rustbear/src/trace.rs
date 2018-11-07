@@ -17,21 +17,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::env;
-use std::io;
-use std::fs;
-use std::path;
 use libc;
 use serde_json;
+use std::env;
+use std::fs;
+use std::io;
+use std::path;
 
-use Result;
 use Error;
+use Result;
 
 #[derive(Serialize, Deserialize)]
 pub struct Trace {
     pub pid: libc::pid_t,
     pub cwd: path::PathBuf,
-    pub cmd: Vec<String>
+    pub cmd: Vec<String>,
 }
 
 impl Trace {
@@ -41,7 +41,11 @@ impl Trace {
         let pid: libc::pid_t = unsafe { libc::getpid() };
         let cwd = env::current_dir()?;
 
-        Ok(Trace{ pid: pid, cwd: cwd, cmd: args.clone() })
+        Ok(Trace {
+            pid: pid,
+            cwd: cwd,
+            cmd: args.clone(),
+        })
     }
 
     /// Write a single trace entry into the given target.
@@ -57,13 +61,11 @@ impl Trace {
     }
 }
 
-
 pub struct TraceDirectory {
-    input: fs::ReadDir
+    input: fs::ReadDir,
 }
 
 impl TraceDirectory {
-
     /// Create a TraceDirectory object from the directory path.
     pub fn new(path: &path::Path) -> Result<TraceDirectory> {
         if path.is_dir() {
@@ -77,7 +79,7 @@ impl TraceDirectory {
     fn is_execution_trace(path: &path::Path) -> bool {
         const EXTENSION: &'static str = ".process_start.json";
 
-        path.to_str().map_or(false, |str| { str.ends_with(EXTENSION) })
+        path.to_str().map_or(false, |str| str.ends_with(EXTENSION))
     }
 }
 
@@ -95,9 +97,9 @@ impl Iterator for TraceDirectory {
                 } else {
                     self.next()
                 }
-            },
+            }
             Some(Err(_)) => self.next(),
-            _ => None
+            _ => None,
         }
     }
 }
@@ -139,7 +141,7 @@ mod tests {
         let expected = Trace {
             pid: 12i32,
             cwd: path::PathBuf::from("/home/user"),
-            cmd: vec!["program".to_string(), "arg".to_string()]
+            cmd: vec!["program".to_string(), "arg".to_string()],
         };
 
         let mut data: [u8; 100] = [0; 100];

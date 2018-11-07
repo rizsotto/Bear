@@ -19,35 +19,39 @@
 
 extern crate serde_derive;
 extern crate serde_json;
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate clap;
 extern crate env_logger;
 extern crate intercept;
 
-use std::process;
 use clap::{App, Arg};
+use std::process;
 
 fn main() {
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
-        .arg(Arg::with_name("verbose")
-            .long("verbose")
-            .short("v")
-            .multiple(true)
-            .help("Sets the level of verbosity"))
-        .arg(Arg::with_name("output")
-            .long("output")
-            .short("o")
-            .takes_value(true)
-            .value_name("file")
-            .default_value("compile_commands.json")
-            .help("The compilation database file"))
-        .arg(Arg::with_name("build")
-            .multiple(true)
-            .allow_hyphen_values(true)
-            .required(true)
-            .help("The build command to intercept"))
-        .get_matches();
+        .arg(
+            Arg::with_name("verbose")
+                .long("verbose")
+                .short("v")
+                .multiple(true)
+                .help("Sets the level of verbosity"),
+        ).arg(
+            Arg::with_name("output")
+                .long("output")
+                .short("o")
+                .takes_value(true)
+                .value_name("file")
+                .default_value("compile_commands.json")
+                .help("The compilation database file"),
+        ).arg(
+            Arg::with_name("build")
+                .multiple(true)
+                .allow_hyphen_values(true)
+                .required(true)
+                .help("The build command to intercept"),
+        ).get_matches();
 
     let build: Vec<_> = matches.values_of("build").unwrap().collect();
     let mut command = process::Command::new(build[0]);
@@ -56,7 +60,7 @@ fn main() {
     match command.spawn() {
         Ok(mut child) => match child.wait() {
             Ok(status_code) => process::exit(status_code.code().unwrap_or(130)), // 128 + signal
-            Err(_) => process::exit(64), // not used yet
+            Err(_) => process::exit(64),                                         // not used yet
         },
         Err(_) => process::exit(127), // command not found
     }
