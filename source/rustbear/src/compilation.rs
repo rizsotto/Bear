@@ -20,6 +20,7 @@
 use std::path;
 use std::process;
 use std::str;
+use shellwords;
 
 use trace;
 use Result;
@@ -50,16 +51,10 @@ impl CompilerExecution {
 
 /// Takes a command string and returns as a list.
 fn shell_split(string: &str) -> Result<Vec<String>> {
-    unimplemented!()
-//    def unescape(arg):
-//    # type: (str) -> str
-//    """ Gets rid of the escaping characters. """
-//
-//    if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] == '"':
-//    return re.sub(r'\\(["\\])', r'\1', arg[1:-1])
-//        return re.sub(r'\\([\\ $%&\(\)\[\]\{\}\*|<>@?!])', r'\1', arg)
-//
-//    return [unescape(token) for token in shlex.split(string)]
+    match shellwords::split(string) {
+        Ok(value) => Ok(value),
+        _ => Err(Error::RuntimeError("Can't parse shell command"))
+    }
 }
 
 /// Provide information on how the underlying compiler would have been
