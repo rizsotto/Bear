@@ -24,6 +24,7 @@ extern crate serde_json;
 //#[macro_use] extern crate log;
 extern crate tempdir;
 extern crate shellwords;
+#[macro_use] extern crate lazy_static;
 
 
 pub mod trace;
