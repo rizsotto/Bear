@@ -21,6 +21,7 @@ use std::path;
 use std::process;
 use std::str;
 use std::collections;
+use regex;
 use shellwords;
 
 use trace;
@@ -92,7 +93,94 @@ lazy_static! {
         m.insert("-EHa",        0u8);
         m
     };
+
+    /// Known C/C++ compiler wrapper name patterns.
+    static ref COMPILER_PATTERN_WRAPPER: regex::Regex =
+        regex::Regex::new(r"^(distcc|ccache)$").unwrap();
+
+    /// Known MPI compiler wrapper name patterns.
+    static ref COMPILER_PATTERNS_MPI_WRAPPER: regex::Regex =
+        regex::Regex::new(r"^mpi(cc|cxx|CC|c\+\+)$").unwrap();
+
+    /// Known C compiler executable name patterns.
+    static ref COMPILER_PATTERNS_CC: Vec<regex::Regex> = vec![
+        regex::Regex::new(r"^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*clang(-\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^(|i)cc$").unwrap(),
+        regex::Regex::new(r"^(g|)xlc$").unwrap(),
+    ];
+
+    /// Known C++ compiler executable name patterns.
+    static ref COMPILER_PATTERNS_CXX: Vec<regex::Regex> = vec![
+        regex::Regex::new(r"^(c\+\+|cxx|CC)$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^icpc$").unwrap(),
+        regex::Regex::new(r"^(g|)xl(C|c\+\+)$").unwrap(),
+    ];
+
 }
+
+struct Category {
+    ignore: bool,
+    c_compilers: Vec<String>,
+    cxx_compilers: Vec<String>
+}
+
+impl Category {
+    fn new(only_use: bool, c_compilers: &[String], cxx_compilers: &[String]) -> Result<Category> {
+        fn basename(file: &String) -> Result<String> {
+            let path = path::PathBuf::from(file);
+            match path.file_name().map(|path| path.to_str()) {
+                Some(Some(str)) => Ok(str.to_string()),
+                _ => Err(Error::RuntimeError("Can't get basename."))
+            }
+        }
+
+        let c_compiler_names: Result<Vec<_>> =
+            c_compilers.into_iter().map(|path| basename(&path)).collect();
+        let cxx_compiler_names: Result<Vec<_>> =
+            cxx_compilers.into_iter().map(|path| basename(&path)).collect();
+
+        Ok(Category {
+            ignore: only_use,
+            c_compilers: c_compiler_names?,
+            cxx_compilers: cxx_compiler_names?
+        })
+    }
+
+    fn is_wrapper(&self, cmd: &String) -> bool {
+        COMPILER_PATTERN_WRAPPER.is_match(cmd)
+    }
+
+    fn is_mpi_wrapper(&self, cmd: &String) -> bool {
+        COMPILER_PATTERNS_MPI_WRAPPER.is_match(cmd)
+    }
+
+    fn is_c_compiler(&self, cmd: &String) -> bool {
+        let use_match = self.c_compilers.contains(cmd);
+        if self.ignore {
+            use_match
+        } else {
+            use_match || Category::_is_pattern_match(cmd, &COMPILER_PATTERNS_CC)
+        }
+    }
+
+    fn is_cxx_compiler(&self, cmd: &String) -> bool {
+        let use_match = self.cxx_compilers.contains(cmd);
+        if self.ignore {
+            use_match
+        } else {
+            use_match || Category::_is_pattern_match(cmd, &COMPILER_PATTERNS_CXX)
+        }
+    }
+
+    fn _is_pattern_match(candidate: &String, patterns: &Vec<regex::Regex>) -> bool {
+        patterns.iter()
+            .any(|pattern| pattern.is_match(candidate))
+    }
+}
+
 
 /// Takes a command string and returns as a list.
 fn shell_split(string: &str) -> Result<Vec<String>> {

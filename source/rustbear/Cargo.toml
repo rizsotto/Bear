@@ -29,6 +29,7 @@ env_logger = "0.5.13"
 tempdir = "0.3.7"
 shellwords = "1.0"
 lazy_static = "1.2"
+regex = "1"
 
 [dependencies.clap]
 version = "~2.32.0"
