@@ -47,6 +47,47 @@ impl CompilerExecution {
     pub fn from(_trace: &trace::Trace) -> Option<CompilerExecution> {
         unimplemented!()
     }
+
+    /// A predicate to decide whether the command is a compiler call.
+    ///
+    /// # Arguments
+    /// `command` - the command to classify
+    /// `category` - helper object to detect compiler
+    ///
+    /// # Returns
+    /// None if the command is not a compilation, or a tuple (compiler, arguments) otherwise.
+    fn split_compiler(command: &[String], category: &Category) -> Option<(String, Vec<String>)> {
+        match command.split_first() {
+            Some((executable, parameters)) => {
+                // 'wrapper' 'parameters' and
+                // 'wrapper' 'compiler' 'parameters' are valid.
+                // Additionally, a wrapper can wrap another wrapper.
+                if category.is_wrapper(&executable) {
+                    let result = CompilerExecution::split_compiler(parameters, category);
+                    // Compiler wrapper without compiler is a 'C' compiler.
+                    if result.is_some() { result } else { Some((executable.clone(), parameters.to_vec())) }
+                // MPI compiler wrappers add extra parameters
+                } else if category.is_mpi_wrapper(executable) {
+                    match get_mpi_call(executable) {
+                        Ok(mut mpi_call) => {
+                            mpi_call.extend_from_slice(parameters);
+                            CompilerExecution::split_compiler(mpi_call.as_ref(), category)
+                        },
+                        _ => None,
+                    }
+                // and 'compiler' 'parameters' is valid.
+                } else if category.is_c_compiler(&executable) {
+                    Some((executable.clone(), parameters.to_vec()))
+                } else if category.is_cxx_compiler(&executable) {
+                    Some((executable.clone(), parameters.to_vec()))
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        }
+    }
+
 }
 
 lazy_static! {
@@ -127,58 +168,63 @@ struct Category {
 
 impl Category {
     fn new(only_use: bool, c_compilers: &[String], cxx_compilers: &[String]) -> Result<Category> {
-        fn basename(file: &String) -> Result<String> {
-            let path = path::PathBuf::from(file);
-            match path.file_name().map(|path| path.to_str()) {
-                Some(Some(str)) => Ok(str.to_string()),
-                _ => Err(Error::RuntimeError("Can't get basename.")),
-            }
-        }
-
-        let c_compiler_names: Result<Vec<_>> = c_compilers
+        let c_compiler_names: Vec<_> = c_compilers
             .into_iter()
-            .map(|path| basename(&path))
+            .map(|path| Category::_basename(&path))
             .collect();
-        let cxx_compiler_names: Result<Vec<_>> = cxx_compilers
+        let cxx_compiler_names: Vec<_> = cxx_compilers
             .into_iter()
-            .map(|path| basename(&path))
+            .map(|path| Category::_basename(&path))
             .collect();
 
         Ok(Category {
             ignore: only_use,
-            c_compilers: c_compiler_names?,
-            cxx_compilers: cxx_compiler_names?,
+            c_compilers: c_compiler_names,
+            cxx_compilers: cxx_compiler_names,
         })
     }
 
-    fn is_wrapper(&self, cmd: &String) -> bool {
-        COMPILER_PATTERN_WRAPPER.is_match(cmd)
+    fn is_wrapper(&self, executable: &String) -> bool {
+        let program = Category::_basename(executable);
+        COMPILER_PATTERN_WRAPPER.is_match(&program)
     }
 
-    fn is_mpi_wrapper(&self, cmd: &String) -> bool {
-        COMPILER_PATTERNS_MPI_WRAPPER.is_match(cmd)
+    fn is_mpi_wrapper(&self, executable: &String) -> bool {
+        let program = Category::_basename(executable);
+        COMPILER_PATTERNS_MPI_WRAPPER.is_match(&program)
     }
 
-    fn is_c_compiler(&self, cmd: &String) -> bool {
-        let use_match = self.c_compilers.contains(cmd);
+    fn is_c_compiler(&self, executable: &String) -> bool {
+        let program = Category::_basename(executable);
+        let use_match = self.c_compilers.contains(&program);
         if self.ignore {
             use_match
         } else {
-            use_match || Category::_is_pattern_match(cmd, &COMPILER_PATTERNS_CC)
+            use_match || Category::_is_pattern_match(&program, &COMPILER_PATTERNS_CC)
         }
     }
 
-    fn is_cxx_compiler(&self, cmd: &String) -> bool {
-        let use_match = self.cxx_compilers.contains(cmd);
+    fn is_cxx_compiler(&self, executable: &String) -> bool {
+        let program = Category::_basename(executable);
+        let use_match = self.cxx_compilers.contains(&program);
         if self.ignore {
             use_match
         } else {
-            use_match || Category::_is_pattern_match(cmd, &COMPILER_PATTERNS_CXX)
+            use_match || Category::_is_pattern_match(&program, &COMPILER_PATTERNS_CXX)
         }
     }
 
     fn _is_pattern_match(candidate: &String, patterns: &Vec<regex::Regex>) -> bool {
         patterns.iter().any(|pattern| pattern.is_match(candidate))
+    }
+
+    /// Returns the filename of the given path (rendered as String).
+    fn _basename(file: &String) -> String {
+        let path = path::PathBuf::from(file);
+        match path.file_name().map(|path| path.to_str()) {
+            Some(Some(str)) => str.to_string(),
+            _ => file.clone(),
+        }
     }
 }
 
