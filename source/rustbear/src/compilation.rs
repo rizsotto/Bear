@@ -20,6 +20,7 @@
 use regex;
 use shellwords;
 use std::collections;
+use std::mem;
 use std::path;
 use std::process;
 use std::str;
@@ -28,13 +29,42 @@ use trace;
 use Error;
 use Result;
 
+#[derive(Debug,PartialEq)]
 pub enum CompilerPass {
     Preprocessor,
     Compilation,
-    Assembly,
     Linking,
+    Internal,
 }
 
+impl CompilerPass {
+    fn is_compiling(&self) -> bool {
+        self == &CompilerPass::Compilation || self == &CompilerPass::Linking
+    }
+
+    fn update(&mut self, new_state: &CompilerPass) {
+        match self {
+            CompilerPass::Linking => match new_state {
+                CompilerPass::Internal => { mem::replace(self, CompilerPass::Internal); },
+                CompilerPass::Compilation => { mem::replace(self, CompilerPass::Compilation); },
+                CompilerPass::Preprocessor => { mem::replace(self, CompilerPass::Preprocessor); },
+                _ => (),
+            },
+            CompilerPass::Compilation => match new_state {
+                CompilerPass::Internal => { mem::replace(self, CompilerPass::Internal); },
+                CompilerPass::Preprocessor => { mem::replace(self, CompilerPass::Preprocessor); },
+                _ => (),
+            },
+            CompilerPass::Preprocessor => match new_state {
+                CompilerPass::Internal => { mem::replace(self, CompilerPass::Internal); },
+                _ => (),
+            },
+            _ => (),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct CompilerExecution {
     compiler: path::PathBuf,
     phase: CompilerPass,
@@ -65,7 +95,11 @@ impl CompilerExecution {
                 if category.is_wrapper(&executable) {
                     let result = CompilerExecution::split_compiler(parameters, category);
                     // Compiler wrapper without compiler is a 'C' compiler.
-                    if result.is_some() { result } else { Some((executable.clone(), parameters.to_vec())) }
+                    if result.is_some() {
+                        result
+                    } else {
+                        Some((executable.clone(), parameters.to_vec()))
+                    }
                 // MPI compiler wrappers add extra parameters
                 } else if category.is_mpi_wrapper(executable) {
                     match get_mpi_call(executable) {
@@ -87,6 +121,71 @@ impl CompilerExecution {
             _ => None,
         }
     }
+
+    /// Returns a value when the command is a compilation, None otherwise.
+    ///
+    /// # Arguments
+    /// `command` - the command to classify
+    /// `category` - helper object to detect compiler
+    ///
+    /// Returns a CompilationCommand objects optionally.
+    fn parse_command(command: &[String], category: &Category) -> Option<CompilerExecution> {
+        debug!("input was: {:?}", command);
+        match CompilerExecution::split_compiler(command, category) {
+            Some(compiler_and_parameters) => {
+                let mut result = CompilerExecution {
+                    compiler: path::PathBuf::from(compiler_and_parameters.0),
+                    phase: CompilerPass::Linking,
+                    flags: vec![],
+                    inputs: vec![],
+                    output: None,
+                };
+                for arg in compiler_and_parameters.1.iter() {
+                    // if it's a phase modifier flag, update it and move on.
+                    if let Some(phase) = PHASE_FLAGS.get(arg.as_str()) {
+                        result.phase.update(phase);
+                        continue
+                    }
+                    // check shall we ignore this flag.
+                    let _count_opt = IGNORED_FLAGS.get(arg.as_str());
+                }
+                if result.phase.is_compiling() {
+                    debug!("output is {:?}", result);
+                    Some(result)
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        }
+    }
+
+//    def _split_command(cls, command, category):
+//        # iterate on the compile options
+//        args = iter(compiler_and_arguments[2])
+//        for arg in args:
+//            # ignore some flags
+//            elif arg in IGNORED_FLAGS:
+//                count = IGNORED_FLAGS[arg]
+//                for _ in range(count):
+//                    next(args)
+//            elif re.match(r'^-(l|L|Wl,).+', arg):
+//                pass
+//            # some parameters look like a filename, take those explicitly
+//            elif arg in {'-D', '-I'}:
+//                result.flags.extend([arg, next(args)])
+//            # get the output file separately
+//            elif arg == '-o':
+//                result.output.append(next(args))
+//            # parameter which looks source file is taken...
+//            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+//                result.files.append(arg)
+//            # and consider everything else as compile option.
+//            else:
+//                result.flags.append(arg)
+//        logging.debug('output is: %s', result)
+//        # do extra check on number of source files
+//        return result if result.files else None
 
 }
 
@@ -130,6 +229,20 @@ lazy_static! {
         m.insert("-nologo",     0u8);
         m.insert("-EHsc",       0u8);
         m.insert("-EHa",        0u8);
+        m
+    };
+
+    static ref PHASE_FLAGS: collections::BTreeMap<&'static str, CompilerPass> = {
+        let mut m = collections::BTreeMap::new();
+        m.insert("-v",      CompilerPass::Internal);
+        m.insert("-###",    CompilerPass::Internal);
+        m.insert("-cc1",    CompilerPass::Internal);
+        m.insert("-cc1as",  CompilerPass::Internal);
+        m.insert("-E",      CompilerPass::Preprocessor);
+        m.insert("-M",      CompilerPass::Preprocessor);
+        m.insert("-MM",     CompilerPass::Preprocessor);
+        m.insert("-c",      CompilerPass::Compilation);
+        m.insert("-S",      CompilerPass::Compilation);
         m
     };
 

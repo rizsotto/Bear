@@ -28,6 +28,8 @@ extern crate tempdir;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
+#[macro_use]
+extern crate log;
 
 pub mod compilation;
 pub mod database;
