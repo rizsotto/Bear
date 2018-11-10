@@ -19,9 +19,8 @@
 
 use std::path;
 
-use trace;
 use database;
-
+use trace;
 
 pub fn compilations(_trace: &trace::Trace) -> Option<Vec<database::Entry>> {
     unimplemented!()
@@ -61,22 +60,22 @@ fn parse_command(command: &[String], category: &compiler::Classifier) -> Option<
                     result.phase.update(pass);
                     continue;
                 }
-//    def _split_command(cls, command, category):
-//        # iterate on the compile options
-//        args = iter(compiler_and_arguments[2])
-//        for arg in args:
-//            # some parameters look like a filename, take those explicitly
-//            elif arg in {'-D', '-I'}:
-//                result.flags.extend([arg, next(args)])
-//            # get the output file separately
-//            elif arg == '-o':
-//                result.output.append(next(args))
-//            # parameter which looks source file is taken...
-//            elif re.match(r'^[^-].+', arg) and classify_source(arg):
-//                result.files.append(arg)
-//            # and consider everything else as compile option.
-//            else:
-//                result.flags.append(arg)
+                //    def _split_command(cls, command, category):
+                //        # iterate on the compile options
+                //        args = iter(compiler_and_arguments[2])
+                //        for arg in args:
+                //            # some parameters look like a filename, take those explicitly
+                //            elif arg in {'-D', '-I'}:
+                //                result.flags.extend([arg, next(args)])
+                //            # get the output file separately
+                //            elif arg == '-o':
+                //                result.output.append(next(args))
+                //            # parameter which looks source file is taken...
+                //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+                //                result.files.append(arg)
+                //            # and consider everything else as compile option.
+                //            else:
+                //                result.flags.append(arg)
             }
             if result.phase.is_compiling() && !result.inputs.is_empty() {
                 debug!("output is {:?}", result);
@@ -88,7 +87,6 @@ fn parse_command(command: &[String], category: &compiler::Classifier) -> Option<
         _ => None,
     }
 }
-
 
 mod pass {
     use std::collections;
@@ -132,34 +130,25 @@ mod pass {
         }
 
         pub fn update(&mut self, new_state: &CompilerPass) {
-            match self {
-                CompilerPass::Linking => match new_state {
-                    CompilerPass::Internal => {
-                        mem::replace(self, CompilerPass::Internal);
-                    }
-                    CompilerPass::Compilation => {
-                        mem::replace(self, CompilerPass::Compilation);
-                    }
-                    CompilerPass::Preprocessor => {
-                        mem::replace(self, CompilerPass::Preprocessor);
-                    }
-                    _ => (),
-                },
-                CompilerPass::Compilation => match new_state {
-                    CompilerPass::Internal => {
-                        mem::replace(self, CompilerPass::Internal);
-                    }
-                    CompilerPass::Preprocessor => {
-                        mem::replace(self, CompilerPass::Preprocessor);
-                    }
-                    _ => (),
-                },
-                CompilerPass::Preprocessor => match new_state {
-                    CompilerPass::Internal => {
-                        mem::replace(self, CompilerPass::Internal);
-                    }
-                    _ => (),
-                },
+            match (&self, new_state) {
+                (CompilerPass::Linking, CompilerPass::Internal) => {
+                    mem::replace(self, CompilerPass::Internal);
+                }
+                (CompilerPass::Linking, CompilerPass::Compilation) => {
+                    mem::replace(self, CompilerPass::Compilation);
+                }
+                (CompilerPass::Linking, CompilerPass::Preprocessor) => {
+                    mem::replace(self, CompilerPass::Preprocessor);
+                }
+                (CompilerPass::Compilation, CompilerPass::Internal) => {
+                    mem::replace(self, CompilerPass::Internal);
+                }
+                (CompilerPass::Compilation, CompilerPass::Preprocessor) => {
+                    mem::replace(self, CompilerPass::Preprocessor);
+                }
+                (CompilerPass::Preprocessor, CompilerPass::Internal) => {
+                    mem::replace(self, CompilerPass::Internal);
+                }
                 _ => (),
             }
         }
@@ -231,13 +220,13 @@ mod flags {
         type Item = String;
 
         fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-//            # ignore some flags
-//            elif arg in IGNORED_FLAGS:
-//                count = IGNORED_FLAGS[arg]
-//                for _ in range(count):
-//                    next(args)
-//            elif re.match(r'^-(l|L|Wl,).+', arg):
-//                pass
+            //            # ignore some flags
+            //            elif arg in IGNORED_FLAGS:
+            //                count = IGNORED_FLAGS[arg]
+            //                for _ in range(count):
+            //                    next(args)
+            //            elif re.match(r'^-(l|L|Wl,).+', arg):
+            //                pass
             self.inner.next()
         }
     }
@@ -331,7 +320,7 @@ mod compiler {
                         } else {
                             Some((executable.clone(), parameters.to_vec()))
                         }
-                        // MPI compiler wrappers add extra parameters
+                    // MPI compiler wrappers add extra parameters
                     } else if self.is_mpi_wrapper(executable) {
                         match get_mpi_call(executable) {
                             Ok(mut mpi_call) => {
@@ -340,7 +329,7 @@ mod compiler {
                             }
                             _ => None,
                         }
-                        // and 'compiler' 'parameters' is valid.
+                    // and 'compiler' 'parameters' is valid.
                     } else if self.is_c_compiler(&executable) {
                         Some((executable.clone(), parameters.to_vec()))
                     } else if self.is_cxx_compiler(&executable) {
