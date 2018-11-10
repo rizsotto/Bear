@@ -17,15 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use shellwords;
 use std::path;
-use std::process;
-use std::str;
 
 use trace;
 use database;
-use Error;
-use Result;
 
 
 pub fn compilations(_trace: &trace::Trace) -> Option<Vec<database::Entry>> {
@@ -41,50 +36,6 @@ struct CompilerExecution {
     output: Option<path::PathBuf>,
 }
 
-/// A predicate to decide whether the command is a compiler call.
-///
-/// # Arguments
-/// `command` - the command to classify
-/// `category` - helper object to detect compiler
-///
-/// # Returns
-/// None if the command is not a compilation, or a tuple (compiler, arguments) otherwise.
-fn split_compiler(command: &[String], category: &category::Category) -> Option<(String, Vec<String>)> {
-    match command.split_first() {
-        Some((executable, parameters)) => {
-            // 'wrapper' 'parameters' and
-            // 'wrapper' 'compiler' 'parameters' are valid.
-            // Additionally, a wrapper can wrap another wrapper.
-            if category.is_wrapper(&executable) {
-                let result = split_compiler(parameters, category);
-                // Compiler wrapper without compiler is a 'C' compiler.
-                if result.is_some() {
-                    result
-                } else {
-                    Some((executable.clone(), parameters.to_vec()))
-                }
-            // MPI compiler wrappers add extra parameters
-            } else if category.is_mpi_wrapper(executable) {
-                match get_mpi_call(executable) {
-                    Ok(mut mpi_call) => {
-                        mpi_call.extend_from_slice(parameters);
-                        split_compiler(mpi_call.as_ref(), category)
-                    }
-                    _ => None,
-                }
-            // and 'compiler' 'parameters' is valid.
-            } else if category.is_c_compiler(&executable) {
-                Some((executable.clone(), parameters.to_vec()))
-            } else if category.is_cxx_compiler(&executable) {
-                Some((executable.clone(), parameters.to_vec()))
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
 /// Returns a value when the command is a compilation, None otherwise.
 ///
 /// # Arguments
@@ -92,9 +43,9 @@ fn split_compiler(command: &[String], category: &category::Category) -> Option<(
 /// `category` - helper object to detect compiler
 ///
 /// Returns a CompilationCommand objects optionally.
-fn parse_command(command: &[String], category: &category::Category) -> Option<CompilerExecution> {
+fn parse_command(command: &[String], category: &compiler::Classifier) -> Option<CompilerExecution> {
     debug!("input was: {:?}", command);
-    match split_compiler(command, category) {
+    match category.split(command) {
         Some(compiler_and_parameters) => {
             let mut result = CompilerExecution {
                 compiler: path::PathBuf::from(compiler_and_parameters.0),
@@ -110,29 +61,10 @@ fn parse_command(command: &[String], category: &category::Category) -> Option<Co
                     result.phase.update(pass);
                     continue;
                 }
-            }
-            if result.phase.is_compiling() {
-                debug!("output is {:?}", result);
-                Some(result)
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
 //    def _split_command(cls, command, category):
 //        # iterate on the compile options
 //        args = iter(compiler_and_arguments[2])
 //        for arg in args:
-//            # ignore some flags
-//            elif arg in IGNORED_FLAGS:
-//                count = IGNORED_FLAGS[arg]
-//                for _ in range(count):
-//                    next(args)
-//            elif re.match(r'^-(l|L|Wl,).+', arg):
-//                pass
 //            # some parameters look like a filename, take those explicitly
 //            elif arg in {'-D', '-I'}:
 //                result.flags.extend([arg, next(args)])
@@ -145,48 +77,18 @@ fn parse_command(command: &[String], category: &category::Category) -> Option<Co
 //            # and consider everything else as compile option.
 //            else:
 //                result.flags.append(arg)
-//        logging.debug('output is: %s', result)
-//        # do extra check on number of source files
-//        return result if result.files else None
-
-
-/// Takes a command string and returns as a list.
-fn shell_split(string: &str) -> Result<Vec<String>> {
-    match shellwords::split(string) {
-        Ok(value) => Ok(value),
-        _ => Err(Error::RuntimeError("Can't parse shell command")),
-    }
-}
-
-/// Provide information on how the underlying compiler would have been
-/// invoked without the MPI compiler wrapper.
-fn get_mpi_call(wrapper: &String) -> Result<Vec<String>> {
-    fn run_mpi_wrapper(wrapper: &String, flag: &str) -> Result<Vec<String>> {
-        let child = process::Command::new(wrapper)
-            .arg(flag)
-            .stdout(process::Stdio::piped())
-            .spawn()?;
-        let output = child.wait_with_output()?;
-        // Take the stdout if the process was successful.
-        if output.status.success() {
-            // Take only the first line and treat as it would be a shell command.
-            let output_string = str::from_utf8(output.stdout.as_slice())?;
-            match output_string.lines().next() {
-                Some(first_line) => shell_split(first_line),
-                _ => Err(Error::RuntimeError("Empty output of wrapper")),
             }
-        } else {
-            Err(Error::RuntimeError("Process failed."))
+            if result.phase.is_compiling() && !result.inputs.is_empty() {
+                debug!("output is {:?}", result);
+                Some(result)
+            } else {
+                None
+            }
         }
+        _ => None,
     }
-
-    // Try both flags with the wrapper and return the first successful result.
-    ["--show", "--showme"]
-        .iter()
-        .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
-        .find(Result::is_ok)
-        .unwrap_or(Err(Error::RuntimeError("Could not determinate MPI flags.")))
 }
+
 
 mod pass {
     use std::collections;
@@ -329,14 +231,27 @@ mod flags {
         type Item = String;
 
         fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+//            # ignore some flags
+//            elif arg in IGNORED_FLAGS:
+//                count = IGNORED_FLAGS[arg]
+//                for _ in range(count):
+//                    next(args)
+//            elif re.match(r'^-(l|L|Wl,).+', arg):
+//                pass
             self.inner.next()
         }
     }
 }
 
-mod category {
+mod compiler {
     use regex;
+    use shellwords;
     use std::path;
+    use std::process;
+    use std::str;
+
+    use Error;
+    use Result;
 
     lazy_static! {
         /// Known C/C++ compiler wrapper name patterns.
@@ -365,13 +280,19 @@ mod category {
         ];
     }
 
-    pub struct Category {
+    pub struct Classifier {
         ignore: bool,
         c_compilers: Vec<String>,
         cxx_compilers: Vec<String>,
     }
 
-    impl Category {
+    impl Classifier {
+        /// Create a new Category object.
+        ///
+        /// # Arguments
+        /// `only_use` - use only the given compiler names for classification,
+        /// `c_compilers` - list of C compiler names,
+        /// `cxx_compilers` - list of C++ compiler names.
         pub fn new(only_use: bool, c_compilers: &[String], cxx_compilers: &[String]) -> Self {
             let c_compiler_names: Vec<_> = c_compilers
                 .into_iter()
@@ -389,17 +310,63 @@ mod category {
             }
         }
 
-        pub fn is_wrapper(&self, executable: &String) -> bool {
+        /// A predicate to decide whether the command is a compiler call.
+        ///
+        /// # Arguments
+        /// `command` - the command to classify
+        ///
+        /// # Returns
+        /// None if the command is not a compilation, or a tuple (compiler, arguments) otherwise.
+        pub fn split(&self, command: &[String]) -> Option<(String, Vec<String>)> {
+            match command.split_first() {
+                Some((executable, parameters)) => {
+                    // 'wrapper' 'parameters' and
+                    // 'wrapper' 'compiler' 'parameters' are valid.
+                    // Additionally, a wrapper can wrap another wrapper.
+                    if self.is_wrapper(&executable) {
+                        let result = self.split(parameters);
+                        // Compiler wrapper without compiler is a 'C' compiler.
+                        if result.is_some() {
+                            result
+                        } else {
+                            Some((executable.clone(), parameters.to_vec()))
+                        }
+                        // MPI compiler wrappers add extra parameters
+                    } else if self.is_mpi_wrapper(executable) {
+                        match get_mpi_call(executable) {
+                            Ok(mut mpi_call) => {
+                                mpi_call.extend_from_slice(parameters);
+                                self.split(mpi_call.as_ref())
+                            }
+                            _ => None,
+                        }
+                        // and 'compiler' 'parameters' is valid.
+                    } else if self.is_c_compiler(&executable) {
+                        Some((executable.clone(), parameters.to_vec()))
+                    } else if self.is_cxx_compiler(&executable) {
+                        Some((executable.clone(), parameters.to_vec()))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        }
+
+        /// Match against known compiler wrappers.
+        fn is_wrapper(&self, executable: &str) -> bool {
             let program = basename(executable);
             COMPILER_PATTERN_WRAPPER.is_match(&program)
         }
 
-        pub fn is_mpi_wrapper(&self, executable: &String) -> bool {
+        /// Match against known MPI compiler wrappers.
+        fn is_mpi_wrapper(&self, executable: &str) -> bool {
             let program = basename(executable);
             COMPILER_PATTERNS_MPI_WRAPPER.is_match(&program)
         }
 
-        pub fn is_c_compiler(&self, executable: &String) -> bool {
+        /// Match against known C compiler names.
+        fn is_c_compiler(&self, executable: &str) -> bool {
             let program = basename(executable);
             let use_match = self.c_compilers.contains(&program);
             if self.ignore {
@@ -409,7 +376,8 @@ mod category {
             }
         }
 
-        pub fn is_cxx_compiler(&self, executable: &String) -> bool {
+        /// Match against known C++ compiler names.
+        fn is_cxx_compiler(&self, executable: &str) -> bool {
             let program = basename(executable);
             let use_match = self.cxx_compilers.contains(&program);
             if self.ignore {
@@ -420,16 +388,55 @@ mod category {
         }
     }
 
-    fn is_pattern_match(candidate: &String, patterns: &Vec<regex::Regex>) -> bool {
+    /// Takes a command string and returns as a list.
+    fn shell_split(string: &str) -> Result<Vec<String>> {
+        match shellwords::split(string) {
+            Ok(value) => Ok(value),
+            _ => Err(Error::RuntimeError("Can't parse shell command")),
+        }
+    }
+
+    /// Provide information on how the underlying compiler would have been
+    /// invoked without the MPI compiler wrapper.
+    fn get_mpi_call(wrapper: &str) -> Result<Vec<String>> {
+        fn run_mpi_wrapper(wrapper: &str, flag: &str) -> Result<Vec<String>> {
+            let child = process::Command::new(wrapper)
+                .arg(flag)
+                .stdout(process::Stdio::piped())
+                .spawn()?;
+            let output = child.wait_with_output()?;
+            // Take the stdout if the process was successful.
+            if output.status.success() {
+                // Take only the first line and treat as it would be a shell command.
+                let output_string = str::from_utf8(output.stdout.as_slice())?;
+                match output_string.lines().next() {
+                    Some(first_line) => shell_split(first_line),
+                    _ => Err(Error::RuntimeError("Empty output of wrapper")),
+                }
+            } else {
+                Err(Error::RuntimeError("Process failed."))
+            }
+        }
+
+        // Try both flags with the wrapper and return the first successful result.
+        ["--show", "--showme"]
+            .iter()
+            .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
+            .find(Result::is_ok)
+            .unwrap_or(Err(Error::RuntimeError("Could not determinate MPI flags.")))
+    }
+
+    /// Match against a list of regex and return true if any of those were match.
+    fn is_pattern_match(candidate: &str, patterns: &[regex::Regex]) -> bool {
         patterns.iter().any(|pattern| pattern.is_match(candidate))
     }
 
     /// Returns the filename of the given path (rendered as String).
-    fn basename(file: &String) -> String {
+    fn basename(file: &str) -> String {
         let path = path::PathBuf::from(file);
         match path.file_name().map(|path| path.to_str()) {
             Some(Some(str)) => str.to_string(),
-            _ => file.clone(),
+            _ => file.to_string(),
         }
     }
 }
