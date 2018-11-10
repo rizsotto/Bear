@@ -17,74 +17,86 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path;
-
 use database;
 use trace;
 
-pub fn compilations(_trace: &trace::Trace) -> Option<Vec<database::Entry>> {
+pub fn compilations(
+    _classifier: &compiler::Classifier,
+    _trace: &trace::Trace,
+) -> Option<Vec<database::Entry>> {
     unimplemented!()
 }
 
-#[derive(Debug)]
-struct CompilerExecution {
-    compiler: path::PathBuf,
-    phase: pass::CompilerPass,
-    flags: Vec<String>,
-    inputs: Vec<path::PathBuf>,
-    output: Option<path::PathBuf>,
-}
+mod execution {
+    use std::path;
 
-/// Returns a value when the command is a compilation, None otherwise.
-///
-/// # Arguments
-/// `command` - the command to classify
-/// `category` - helper object to detect compiler
-///
-/// Returns a CompilationCommand objects optionally.
-fn parse_command(command: &[String], category: &compiler::Classifier) -> Option<CompilerExecution> {
-    debug!("input was: {:?}", command);
-    match category.split(command) {
-        Some(compiler_and_parameters) => {
-            let mut result = CompilerExecution {
-                compiler: path::PathBuf::from(compiler_and_parameters.0),
-                phase: pass::default(),
-                flags: vec![],
-                inputs: vec![],
-                output: None,
-            };
-            let parameters = compiler_and_parameters.1;
-            for arg in flags::FlagIterator::from(parameters) {
-                // if it's a pass modifier flag, update it and move on.
-                if let Some(pass) = pass::is_pass_flag(arg.as_str()) {
-                    result.phase.update(pass);
-                    continue;
+    use compilation::compiler;
+    use compilation::flags;
+    use compilation::pass;
+
+    #[derive(Debug)]
+    struct CompilerExecution {
+        compiler: path::PathBuf,
+        phase: pass::CompilerPass,
+        flags: Vec<String>,
+        inputs: Vec<path::PathBuf>,
+        output: Option<path::PathBuf>,
+    }
+
+    /// Returns a value when the command is a compilation, None otherwise.
+    ///
+    /// # Arguments
+    /// `classifier` - helper object to detect compiler
+    /// `command` - the command to classify
+    ///
+    /// Returns a CompilationCommand objects optionally.
+    fn parse_command(
+        classifier: &compiler::Classifier,
+        command: &[String],
+    ) -> Option<CompilerExecution> {
+        debug!("input was: {:?}", command);
+        match classifier.split(command) {
+            Some(compiler_and_parameters) => {
+                let mut result = CompilerExecution {
+                    compiler: path::PathBuf::from(compiler_and_parameters.0),
+                    phase: pass::default(),
+                    flags: vec![],
+                    inputs: vec![],
+                    output: None,
+                };
+                let parameters = compiler_and_parameters.1;
+                for arg in flags::FlagIterator::from(parameters) {
+                    // if it's a pass modifier flag, update it and move on.
+                    if let Some(pass) = pass::is_pass_flag(arg.as_str()) {
+                        result.phase.update(pass);
+                        continue;
+                    }
+                    //    def _split_command(cls, command, classifier):
+                    //        # iterate on the compile options
+                    //        args = iter(compiler_and_arguments[2])
+                    //        for arg in args:
+                    //            # some parameters look like a filename, take those explicitly
+                    //            elif arg in {'-D', '-I'}:
+                    //                result.flags.extend([arg, next(args)])
+                    //            # get the output file separately
+                    //            elif arg == '-o':
+                    //                result.output.append(next(args))
+                    //            # parameter which looks source file is taken...
+                    //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+                    //                result.files.append(arg)
+                    //            # and consider everything else as compile option.
+                    //            else:
+                    //                result.flags.append(arg)
                 }
-                //    def _split_command(cls, command, category):
-                //        # iterate on the compile options
-                //        args = iter(compiler_and_arguments[2])
-                //        for arg in args:
-                //            # some parameters look like a filename, take those explicitly
-                //            elif arg in {'-D', '-I'}:
-                //                result.flags.extend([arg, next(args)])
-                //            # get the output file separately
-                //            elif arg == '-o':
-                //                result.output.append(next(args))
-                //            # parameter which looks source file is taken...
-                //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
-                //                result.files.append(arg)
-                //            # and consider everything else as compile option.
-                //            else:
-                //                result.flags.append(arg)
+                if result.phase.is_compiling() && !result.inputs.is_empty() {
+                    debug!("output is {:?}", result);
+                    Some(result)
+                } else {
+                    None
+                }
             }
-            if result.phase.is_compiling() && !result.inputs.is_empty() {
-                debug!("output is {:?}", result);
-                Some(result)
-            } else {
-                None
-            }
+            _ => None,
         }
-        _ => None,
     }
 }
 
