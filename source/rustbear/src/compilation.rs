@@ -212,17 +212,19 @@ mod flags {
             m.insert("-EHa",        0u8);
             m
         };
+
+        /// Typical linker flags also not really needed for a compilation.
+        static ref LINKER_FLAG: regex::Regex =
+            regex::Regex::new(r"^-(l|L|Wl,).+").unwrap();
     }
 
     pub struct FlagIterator {
-        skip: u8,
         inner: Box<Iterator<Item = String>>,
     }
 
     impl FlagIterator {
         pub fn from(collection: Vec<String>) -> Self {
             Self {
-                skip: 0u8,
                 inner: Box::new(collection.into_iter()),
             }
         }
@@ -232,14 +234,66 @@ mod flags {
         type Item = String;
 
         fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-            //            # ignore some flags
-            //            elif arg in IGNORED_FLAGS:
-            //                count = IGNORED_FLAGS[arg]
-            //                for _ in range(count):
-            //                    next(args)
-            //            elif re.match(r'^-(l|L|Wl,).+', arg):
-            //                pass
-            self.inner.next()
+            while let Some(flag) = self.inner.next() {
+                // Skip flags which matches from the given map.
+                if let Some(skip) = IGNORED_FLAGS.get(flag.as_str()) {
+                    for _ in 0..*skip {
+                        self.inner.next();
+                    }
+                    return self.next();
+                // Skip linker flags too.
+                } else if LINKER_FLAG.is_match(flag.as_str()) {
+                    return self.next();
+                } else {
+                    return Some(flag);
+                }
+            }
+            None
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn assert_ignored_eq(expected: &[&str], input: &[&str]) {
+            let input_vec: Vec<String> = input.iter().map(|str| str.to_string()).collect();
+            let expected_vec: Vec<String> = expected.iter().map(|str| str.to_string()).collect();
+
+            let mut sut = FlagIterator::from(input_vec);
+            let result: Vec<_> = sut.collect();
+            assert_eq!(expected_vec, result);
+        }
+
+        #[test]
+        fn test_empty() {
+            assert_ignored_eq(&[], &[]);
+        }
+
+        #[test]
+        fn test_not_skip() {
+            assert_ignored_eq(&["a", "b", "c"], &["a", "b", "c"]);
+            assert_ignored_eq(&["-a", "-b", "-c"], &["-a", "-b", "-c"]);
+            assert_ignored_eq(&["/a", "/b", "/c"], &["/a", "/b", "/c"]);
+        }
+
+        #[test]
+        fn test_skip_given_flags() {
+            assert_ignored_eq(&["a", "b"], &["a", "-MD", "b"]);
+            assert_ignored_eq(&["a", "b"], &["a", "-MMD", "b"]);
+            assert_ignored_eq(&["a", "b"], &["a", "-MF", "file", "b"]);
+
+            assert_ignored_eq(&["a", "b"], &["a", "-MG", "-MT", "skip", "b"]);
+            assert_ignored_eq(&["a", "b", "c"], &["a", "-MG", "b", "-MT", "skip", "c"]);
+        }
+
+        #[test]
+        fn test_skip_linker_flags() {
+            assert_ignored_eq(&["a", "b"], &["a", "-live", "b"]);
+            assert_ignored_eq(&["a", "b"], &["a", "-L/path", "b"]);
+            assert_ignored_eq(&["a", "b"], &["a", "-Wl,option", "b"]);
+
+            assert_ignored_eq(&["a", "b"], &["a", "-live", "-L/path", "b"]);
         }
     }
 }
