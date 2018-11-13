@@ -34,7 +34,7 @@ mod execution {
     use compilation::flags;
     use compilation::pass;
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     struct CompilerExecution {
         compiler: path::PathBuf,
         phase: pass::CompilerPass,
@@ -57,13 +57,8 @@ mod execution {
         debug!("input was: {:?}", command);
         match classifier.split(command) {
             Some(compiler_and_parameters) => {
-                let mut result = CompilerExecution {
-                    compiler: path::PathBuf::from(compiler_and_parameters.0),
-                    phase: pass::default(),
-                    flags: vec![],
-                    inputs: vec![],
-                    output: None,
-                };
+                let mut result: CompilerExecution = Default::default();
+                result.compiler = path::PathBuf::from(compiler_and_parameters.0);
                 let parameters = compiler_and_parameters.1;
                 for arg in flags::FlagIterator::from(parameters) {
                     // if it's a pass modifier flag, update it and move on.
@@ -128,8 +123,10 @@ mod pass {
         };
     }
 
-    pub fn default() -> CompilerPass {
-        CompilerPass::Linking
+    impl Default for CompilerPass {
+        fn default() -> CompilerPass {
+            CompilerPass::Linking
+        }
     }
 
     pub fn is_pass_flag(string: &str) -> Option<&CompilerPass> {
