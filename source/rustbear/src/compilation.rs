@@ -162,6 +162,65 @@ mod pass {
             }
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_default_stays_linker() {
+            let mut sut: CompilerPass = Default::default();
+            assert_eq!(CompilerPass::Linking, sut);
+
+            sut.update(&CompilerPass::Linking);
+            assert_eq!(CompilerPass::Linking, sut);
+        }
+
+        #[test]
+        fn test_compilation_updates_linker() {
+            let mut sut: CompilerPass = Default::default();
+            assert_eq!(CompilerPass::Linking, sut);
+
+            sut.update(&CompilerPass::Compilation);
+            assert_eq!(CompilerPass::Compilation, sut);
+        }
+
+        #[test]
+        fn test_prepocessor_updates_linker() {
+            let mut sut: CompilerPass = Default::default();
+            assert_eq!(CompilerPass::Linking, sut);
+
+            sut.update(&CompilerPass::Preprocessor);
+            assert_eq!(CompilerPass::Preprocessor, sut);
+        }
+
+        #[test]
+        fn test_internal_updates_linker() {
+            let mut sut: CompilerPass = Default::default();
+            assert_eq!(CompilerPass::Linking, sut);
+
+            sut.update(&CompilerPass::Internal);
+            assert_eq!(CompilerPass::Internal, sut);
+        }
+
+        #[test]
+        fn test_is_compiling() {
+            assert_eq!(true, CompilerPass::Compilation.is_compiling());
+            assert_eq!(true, CompilerPass::Linking.is_compiling());
+
+            assert_eq!(false, CompilerPass::Preprocessor.is_compiling());
+            assert_eq!(false, CompilerPass::Internal.is_compiling());
+        }
+
+        #[test]
+        fn test_is_pass_flag() {
+            assert_eq!(Some(&CompilerPass::Compilation), is_pass_flag("-c"));
+            assert_eq!(Some(&CompilerPass::Preprocessor), is_pass_flag("-E"));
+            assert_eq!(Some(&CompilerPass::Internal), is_pass_flag("-cc1"));
+            assert_eq!(Some(&CompilerPass::Internal), is_pass_flag("-###"));
+        }
+
+    }
 }
 
 mod flags {
