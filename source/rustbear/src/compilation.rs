@@ -17,30 +17,97 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use database;
-use trace;
-
-pub fn compilations(
-    _classifier: &compiler::Classifier,
-    _trace: &trace::Trace,
-) -> Option<Vec<database::Entry>> {
-    unimplemented!()
-}
-
 mod execution {
     use std::path;
+
+    use database;
+    use Error;
+    use Result;
 
     use compilation::compiler;
     use compilation::flags;
     use compilation::pass;
 
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     struct CompilerExecution {
+        directory: path::PathBuf,
         compiler: path::PathBuf,
-        phase: pass::CompilerPass,
+        pass: pass::CompilerPass,
         flags: Vec<String>,
         inputs: Vec<path::PathBuf>,
         output: Option<path::PathBuf>,
+    }
+
+    impl CompilerExecution {
+        fn new(working_dir: &str, compiler: &str) -> Self {
+            let mut result: Self = Default::default();
+            result.directory = path::PathBuf::from(working_dir);
+            result.compiler = path::PathBuf::from(compiler);
+            result
+        }
+
+        fn pass(&mut self, flag: &str) -> bool {
+            self.pass.take(flag)
+        }
+
+        fn output(&mut self, flag: &str, it: &mut flags::FlagIterator) -> bool {
+            if "-o" == flag {
+                if let Some(output) = it.next() {
+                    self.output = Some(path::PathBuf::from(output));
+                }
+                return true;
+            }
+            false
+        }
+
+        fn flags(&mut self, flag: &str, it: &mut flags::FlagIterator) -> bool {
+            //            # some parameters look like a filename, take those explicitly
+            //            elif arg in {'-D', '-I'}:
+            //                result.flags.extend([arg, next(args)])
+            //            # and consider everything else as compile option.
+            //            else:
+            //                result.flags.append(arg)
+            unimplemented!()
+        }
+
+        fn source(&mut self, file: &str) -> bool {
+            //            # parameter which looks source file is taken...
+            //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+            //                result.files.append(arg)
+            unimplemented!()
+        }
+
+        fn build(&self) -> Result<Vec<database::Entry>> {
+            if !self.pass.is_compiling() {
+                Err(Error::RuntimeError("Compiler is not doing compilation."))
+            } else if self.inputs.is_empty() {
+                Err(Error::RuntimeError("Have not found source files."))
+            } else {
+                let entries: Vec<_> = self
+                    .inputs
+                    .iter()
+                    .map(|input| {
+                        let mut command: Vec<String> = Vec::new();
+                        command.push(
+                            self.compiler
+                                .clone()
+                                .into_os_string()
+                                .into_string()
+                                .unwrap(),
+                        );
+                        command.push("-c".to_string());
+                        command.extend_from_slice(self.flags.as_ref());
+                        command.push(input.clone().into_os_string().into_string().unwrap());
+                        database::Entry {
+                            directory: self.directory.clone(),
+                            file: input.clone(),
+                            command: command,
+                            output: self.output.clone(),
+                        }
+                    }).collect();
+                Ok(entries)
+            }
+        }
     }
 
     /// Returns a value when the command is a compilation, None otherwise.
@@ -48,49 +115,38 @@ mod execution {
     /// # Arguments
     /// `classifier` - helper object to detect compiler
     /// `command` - the command to classify
-    ///
-    /// Returns a CompilationCommand objects optionally.
     fn parse_command(
         classifier: &compiler::Classifier,
+        working_dir: &str,
         command: &[String],
-    ) -> Option<CompilerExecution> {
+    ) -> Result<Vec<database::Entry>> {
         debug!("input was: {:?}", command);
         match classifier.split(command) {
             Some(compiler_and_parameters) => {
-                let mut result: CompilerExecution = Default::default();
-                result.compiler = path::PathBuf::from(compiler_and_parameters.0);
-                let parameters = compiler_and_parameters.1;
-                for arg in flags::FlagIterator::from(parameters) {
+                let mut result =
+                    CompilerExecution::new(working_dir, compiler_and_parameters.0.as_str());
+                let mut it = flags::FlagIterator::from(compiler_and_parameters.1);
+                while let Some(arg) = it.next() {
                     // if it's a pass modifier flag, update it and move on.
-                    if let Some(pass) = pass::is_pass_flag(arg.as_str()) {
-                        result.phase.update(pass);
+                    if result.pass(arg.as_str()) {
                         continue;
                     }
-                    //    def _split_command(cls, command, classifier):
-                    //        # iterate on the compile options
-                    //        args = iter(compiler_and_arguments[2])
-                    //        for arg in args:
-                    //            # some parameters look like a filename, take those explicitly
-                    //            elif arg in {'-D', '-I'}:
-                    //                result.flags.extend([arg, next(args)])
-                    //            # get the output file separately
-                    //            elif arg == '-o':
-                    //                result.output.append(next(args))
-                    //            # parameter which looks source file is taken...
-                    //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
-                    //                result.files.append(arg)
-                    //            # and consider everything else as compile option.
-                    //            else:
-                    //                result.flags.append(arg)
+                    // take the output flag
+                    if result.output(arg.as_str(), &mut it) {
+                        continue;
+                    }
+                    // take flags
+                    if result.flags(arg.as_str(), &mut it) {
+                        continue;
+                    }
+                    // take the rest as source file
+                    if result.source(arg.as_str()) {
+                        continue;
+                    }
                 }
-                if result.phase.is_compiling() && !result.inputs.is_empty() {
-                    debug!("output is {:?}", result);
-                    Some(result)
-                } else {
-                    None
-                }
+                result.build()
             }
-            _ => None,
+            _ => Err(Error::RuntimeError("Compiler not recognized.")),
         }
     }
 }
@@ -129,16 +185,21 @@ mod pass {
         }
     }
 
-    pub fn is_pass_flag(string: &str) -> Option<&CompilerPass> {
-        PHASE_FLAGS.get(string)
-    }
-
     impl CompilerPass {
+        pub fn take(&mut self, string: &str) -> bool {
+            if let Some(pass) = PHASE_FLAGS.get(string) {
+                self.update(pass);
+                true
+            } else {
+                false
+            }
+        }
+
         pub fn is_compiling(&self) -> bool {
             self == &CompilerPass::Compilation || self == &CompilerPass::Linking
         }
 
-        pub fn update(&mut self, new_state: &CompilerPass) {
+        fn update(&mut self, new_state: &CompilerPass) {
             match (&self, new_state) {
                 (CompilerPass::Linking, CompilerPass::Internal) => {
                     mem::replace(self, CompilerPass::Internal);
@@ -172,7 +233,7 @@ mod pass {
             let mut sut: CompilerPass = Default::default();
             assert_eq!(CompilerPass::Linking, sut);
 
-            sut.update(&CompilerPass::Linking);
+            assert_eq!(false, sut.take("--not_this"));
             assert_eq!(CompilerPass::Linking, sut);
         }
 
@@ -181,7 +242,8 @@ mod pass {
             let mut sut: CompilerPass = Default::default();
             assert_eq!(CompilerPass::Linking, sut);
 
-            sut.update(&CompilerPass::Compilation);
+            assert_eq!(true, sut.take("-c"));
+            assert_eq!(false, sut.take("--not_this"));
             assert_eq!(CompilerPass::Compilation, sut);
         }
 
@@ -190,7 +252,8 @@ mod pass {
             let mut sut: CompilerPass = Default::default();
             assert_eq!(CompilerPass::Linking, sut);
 
-            sut.update(&CompilerPass::Preprocessor);
+            assert_eq!(true, sut.take("-E"));
+            assert_eq!(false, sut.take("--not_this"));
             assert_eq!(CompilerPass::Preprocessor, sut);
         }
 
@@ -199,7 +262,8 @@ mod pass {
             let mut sut: CompilerPass = Default::default();
             assert_eq!(CompilerPass::Linking, sut);
 
-            sut.update(&CompilerPass::Internal);
+            assert_eq!(true, sut.take("-###"));
+            assert_eq!(false, sut.take("--not_this"));
             assert_eq!(CompilerPass::Internal, sut);
         }
 
@@ -211,15 +275,6 @@ mod pass {
             assert_eq!(false, CompilerPass::Preprocessor.is_compiling());
             assert_eq!(false, CompilerPass::Internal.is_compiling());
         }
-
-        #[test]
-        fn test_is_pass_flag() {
-            assert_eq!(Some(&CompilerPass::Compilation), is_pass_flag("-c"));
-            assert_eq!(Some(&CompilerPass::Preprocessor), is_pass_flag("-E"));
-            assert_eq!(Some(&CompilerPass::Internal), is_pass_flag("-cc1"));
-            assert_eq!(Some(&CompilerPass::Internal), is_pass_flag("-###"));
-        }
-
     }
 }
 
