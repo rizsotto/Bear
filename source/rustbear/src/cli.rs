@@ -23,7 +23,6 @@ use std::path;
 use ErrorKind;
 use Result;
 
-const VERBOSE_FLAG: &str = "verbose";
 const CONFIG_FLAG: &str = "config";
 const OUTPUT_FLAG: &str = "output";
 const BUILD_FLAG: &str = "build";
@@ -32,25 +31,18 @@ const CONFIG_FLAG_DEFAULT: &str = "~/.config/bear.conf";
 const OUTPUT_FLAG_DEFAULT: &str = "compile_commands.json";
 
 #[derive(Debug)]
-pub struct Config {
-    pub verbose: usize,
+pub struct Arguments {
     pub config: path::PathBuf,
     pub output: path::PathBuf,
     pub build: Vec<String>,
 }
 
-impl Config {
-    pub fn parse(args: &[String]) -> Result<Config> {
+impl Arguments {
+    pub fn parse(args: &[String]) -> Self {
         let matches = clap::App::new(crate_name!())
             .version(crate_version!())
             .about(crate_description!())
             .arg(
-                clap::Arg::with_name(VERBOSE_FLAG)
-                    .long(VERBOSE_FLAG)
-                    .short("v")
-                    .multiple(true)
-                    .help("Sets the level of verbosity"),
-            ).arg(
                 clap::Arg::with_name(CONFIG_FLAG)
                     .long(CONFIG_FLAG)
                     .short("c")
@@ -74,24 +66,18 @@ impl Config {
                     .help("The build command to intercept"),
             ).get_matches_from(args);
 
-        let result = Config {
-            verbose: matches.values_of(VERBOSE_FLAG).iter().count(),
-            config: path::PathBuf::from(
-                matches.value_of(CONFIG_FLAG).unwrap_or(CONFIG_FLAG_DEFAULT),
-            ),
-            output: path::PathBuf::from(
-                matches.value_of(OUTPUT_FLAG).unwrap_or(OUTPUT_FLAG_DEFAULT),
-            ),
+        Self {
+            config: path::PathBuf::from(matches.value_of(CONFIG_FLAG).unwrap()),
+            output: path::PathBuf::from(matches.value_of(OUTPUT_FLAG).unwrap()),
             build: matches
                 .values_of(BUILD_FLAG)
                 .unwrap()
                 .map(|s| s.to_string())
                 .collect(),
-        };
-        Config::validate(result)
+        }
     }
 
-    fn validate(self) -> Result<Self> {
+    pub fn validate(&self) -> Result<&Self> {
         if !self.config.is_file() {
             let message = self.config.to_str().map(|utf| utf.to_string()).unwrap();
             Err(ErrorKind::ConfigFileNotFound(message).into())

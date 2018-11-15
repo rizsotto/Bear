@@ -33,13 +33,16 @@ fn main() {
     drop(env_logger::init());
     debug!("invocation: {:?}", &args);
 
-    match cli::Config::parse(&args) {
-        Ok(cli) => do_things(cli),
+    let cli = cli::Arguments::parse(&args);
+    debug!("parsed command line: {:?}", cli);
+
+    match cli.validate() {
+        Ok(_) => do_things(cli),
         Err(error) => eprintln!("{}", error),
     }
 }
 
-fn do_things(cli: cli::Config) {
+fn do_things(cli: cli::Arguments) {
     let build = cli.build;
     let mut command = process::Command::new(&build[0]);
     command.args(&build[1..]);
