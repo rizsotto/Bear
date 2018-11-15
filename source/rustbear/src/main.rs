@@ -17,40 +17,31 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#[macro_use]
-extern crate clap;
+extern crate env_logger;
 extern crate intercept;
+#[macro_use]
+extern crate log;
 
+use intercept::cli;
+use intercept::config;
+use std::env;
 use std::process;
 
 fn main() {
-    let matches = clap::App::new(crate_name!())
-        .version(crate_version!())
-        .about(crate_description!())
-        .arg(
-            clap::Arg::with_name("verbose")
-                .long("verbose")
-                .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
-        ).arg(
-            clap::Arg::with_name("output")
-                .long("output")
-                .short("o")
-                .takes_value(true)
-                .value_name("file")
-                .default_value("compile_commands.json")
-                .help("The compilation database file"),
-        ).arg(
-            clap::Arg::with_name("build")
-                .multiple(true)
-                .allow_hyphen_values(true)
-                .required(true)
-                .help("The build command to intercept"),
-        ).get_matches();
+    let args: Vec<String> = env::args().collect();
 
-    let build: Vec<_> = matches.values_of("build").unwrap().collect();
-    let mut command = process::Command::new(build[0]);
+    drop(env_logger::init());
+    debug!("Invocation: {:?}", &args);
+
+    match cli::Config::parse(&args) {
+        Ok(cli) => do_things(cli),
+        Err(error) => eprintln!("{:?}", error),
+    }
+}
+
+fn do_things(cli: cli::Config) {
+    let build = cli.build;
+    let mut command = process::Command::new(&build[0]);
     command.args(&build[1..]);
 
     match command.spawn() {

@@ -17,6 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#[macro_use]
+extern crate clap;
 extern crate libc;
 extern crate serde;
 extern crate serde_json;
@@ -35,7 +37,9 @@ extern crate mockers;
 #[cfg(test)]
 extern crate mockers_derive;
 
+pub mod cli;
 pub mod compilation;
+pub mod config;
 pub mod database;
 pub mod trace;
 
@@ -43,6 +47,7 @@ use std::result;
 
 #[derive(Debug)]
 pub enum Error {
+    Config(String),
     Io(std::io::Error),
     Env(std::env::VarError),
     Json(serde_json::Error),

@@ -19,11 +19,12 @@ name = "intercept"
 crate-type = ["rlib"]
 path = "src/lib.rs"
 
-[dependencies]                                                                                            
+[dependencies]
 libc = "0.2"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+serde_yaml = "0.8"
 log = "0.4"
 env_logger = "0.5.13"
 tempdir = "0.3.7"
