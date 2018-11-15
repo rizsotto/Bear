@@ -31,11 +31,11 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     drop(env_logger::init());
-    debug!("Invocation: {:?}", &args);
+    debug!("invocation: {:?}", &args);
 
     match cli::Config::parse(&args) {
         Ok(cli) => do_things(cli),
-        Err(error) => eprintln!("{:?}", error),
+        Err(error) => eprintln!("{}", error),
     }
 }
 

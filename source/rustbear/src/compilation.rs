@@ -21,7 +21,7 @@ mod execution {
     use std::path;
 
     use database;
-    use Error;
+    use ErrorKind;
     use Result;
 
     use compilation::compiler;
@@ -79,9 +79,9 @@ mod execution {
 
         fn build(&self) -> Result<Vec<database::Entry>> {
             if !self.pass.is_compiling() {
-                Err(Error::RuntimeError("Compiler is not doing compilation."))
+                Err(ErrorKind::CompilationError("Compiler is not doing compilation.").into())
             } else if self.inputs.is_empty() {
-                Err(Error::RuntimeError("Have not found source files."))
+                Err(ErrorKind::CompilationError("Have not found source files.").into())
             } else {
                 let entries: Vec<_> = self
                     .inputs
@@ -146,7 +146,7 @@ mod execution {
                 }
                 result.build()
             }
-            _ => Err(Error::RuntimeError("Compiler not recognized.")),
+            _ => Err(ErrorKind::CompilationError("Compiler not recognized.").into()),
         }
     }
 }
@@ -416,7 +416,7 @@ mod compiler {
     use std::process;
     use std::str;
 
-    use Error;
+    use ErrorKind;
     use Result;
 
     lazy_static! {
@@ -558,7 +558,7 @@ mod compiler {
     fn shell_split(string: &str) -> Result<Vec<String>> {
         match shellwords::split(string) {
             Ok(value) => Ok(value),
-            _ => Err(Error::RuntimeError("Can't parse shell command")),
+            _ => Err(ErrorKind::RuntimeError("Can't parse shell command").into()),
         }
     }
 
@@ -577,10 +577,10 @@ mod compiler {
                 let output_string = str::from_utf8(output.stdout.as_slice())?;
                 match output_string.lines().next() {
                     Some(first_line) => shell_split(first_line),
-                    _ => Err(Error::RuntimeError("Empty output of wrapper")),
+                    _ => Err(ErrorKind::RuntimeError("Empty output of wrapper").into()),
                 }
             } else {
-                Err(Error::RuntimeError("Process failed."))
+                Err(ErrorKind::RuntimeError("Process failed.").into())
             }
         }
 
@@ -589,7 +589,9 @@ mod compiler {
             .iter()
             .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
             .find(Result::is_ok)
-            .unwrap_or(Err(Error::RuntimeError("Could not determinate MPI flags.")))
+            .unwrap_or(Err(ErrorKind::CompilationError(
+                "Could not determinate MPI flags.",
+            ).into()))
     }
 
     /// Match against a list of regex and return true if any of those were match.

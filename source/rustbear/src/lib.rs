@@ -18,6 +18,8 @@
  */
 
 #[macro_use]
+extern crate error_chain;
+#[macro_use]
 extern crate clap;
 extern crate libc;
 extern crate serde;
@@ -43,40 +45,32 @@ pub mod config;
 pub mod database;
 pub mod trace;
 
-use std::result;
+mod error {
+    error_chain! {
+        foreign_links {
+            Io(::std::io::Error);
+            Env(::std::env::VarError);
+            String(::std::str::Utf8Error);
+            Json(::serde_json::Error);
+        }
 
-#[derive(Debug)]
-pub enum Error {
-    Config(String),
-    Io(std::io::Error),
-    Env(std::env::VarError),
-    Json(serde_json::Error),
-    String(std::str::Utf8Error),
-    RuntimeError(&'static str),
-}
+        errors {
+            ConfigFileNotFound(msg: String) {
+                description("configuration file not found"),
+                display("configuration file not found: '{}'", msg),
+            }
 
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
-        Error::Io(err)
+            CompilationError(msg: &'static str) {
+                description("compilation error"),
+                display("compilation error: '{}'", msg),
+            }
+
+            RuntimeError(msg: &'static str) {
+                description("runtime error"),
+                display("runtime error: '{}'", msg),
+            }
+        }
     }
 }
 
-impl From<serde_json::Error> for Error {
-    fn from(err: serde_json::Error) -> Error {
-        Error::Json(err)
-    }
-}
-
-impl From<std::env::VarError> for Error {
-    fn from(err: std::env::VarError) -> Error {
-        Error::Env(err)
-    }
-}
-
-impl From<std::str::Utf8Error> for Error {
-    fn from(err: std::str::Utf8Error) -> Error {
-        Error::String(err)
-    }
-}
-
-type Result<T> = result::Result<T, Error>;
+pub use error::{Error, ErrorKind, Result};

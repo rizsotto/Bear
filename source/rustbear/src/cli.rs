@@ -20,7 +20,7 @@
 use clap;
 use std::path;
 
-use Error;
+use ErrorKind;
 use Result;
 
 const VERBOSE_FLAG: &str = "verbose";
@@ -93,14 +93,10 @@ impl Config {
 
     fn validate(self) -> Result<Self> {
         if !self.config.is_file() {
-            Err(Error::Config(config_file_not_found(self.config.as_path())))
+            let message = self.config.to_str().map(|utf| utf.to_string()).unwrap();
+            Err(ErrorKind::ConfigFileNotFound(message).into())
         } else {
             Ok(self)
         }
     }
-}
-
-fn config_file_not_found(file: &path::Path) -> String {
-    let message = "Config file not found: ".to_string();
-    message + file.to_str().unwrap()
 }

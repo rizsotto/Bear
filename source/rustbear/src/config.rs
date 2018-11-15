@@ -21,9 +21,6 @@ use serde;
 use std::collections;
 use std::path;
 
-use Error;
-use Result;
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub intercept: Intercept,

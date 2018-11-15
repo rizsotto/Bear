@@ -24,7 +24,7 @@ use std::fs;
 use std::io;
 use std::path;
 
-use Error;
+use ErrorKind;
 use Result;
 
 #[derive(Serialize, Deserialize)]
@@ -72,7 +72,7 @@ impl TraceDirectory {
             let input = fs::read_dir(path)?;
             Ok(TraceDirectory { input: input })
         } else {
-            Err(Error::RuntimeError("TraceSource should be directory"))
+            Err(ErrorKind::RuntimeError("TraceSource should be directory").into())
         }
     }
 
