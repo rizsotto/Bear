@@ -22,7 +22,6 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-//#[macro_use] extern crate log;
 extern crate shellwords;
 extern crate tempdir;
 #[macro_use]

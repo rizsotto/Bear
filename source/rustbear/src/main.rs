@@ -17,28 +17,24 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
 extern crate clap;
-extern crate env_logger;
 extern crate intercept;
 
-use clap::{App, Arg};
 use std::process;
 
 fn main() {
-    let matches = App::new(crate_name!())
+    let matches = clap::App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
         .arg(
-            Arg::with_name("verbose")
+            clap::Arg::with_name("verbose")
                 .long("verbose")
                 .short("v")
                 .multiple(true)
                 .help("Sets the level of verbosity"),
         ).arg(
-            Arg::with_name("output")
+            clap::Arg::with_name("output")
                 .long("output")
                 .short("o")
                 .takes_value(true)
@@ -46,7 +42,7 @@ fn main() {
                 .default_value("compile_commands.json")
                 .help("The compilation database file"),
         ).arg(
-            Arg::with_name("build")
+            clap::Arg::with_name("build")
                 .multiple(true)
                 .allow_hyphen_values(true)
                 .required(true)
