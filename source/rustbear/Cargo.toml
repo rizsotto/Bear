@@ -30,6 +30,10 @@ tempdir = "0.3.7"
 shellwords = "1.0"
 lazy_static = "1.2"
 regex = "1"
+mockers_derive = "0.12.2"
+
+[dev-dependencies]
+mockers = "0.12.2"
 
 [dependencies.clap]
 version = "~2.32.0"

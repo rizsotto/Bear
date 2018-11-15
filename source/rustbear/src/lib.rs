@@ -30,6 +30,11 @@ extern crate regex;
 #[macro_use]
 extern crate log;
 
+#[cfg(test)]
+extern crate mockers;
+#[cfg(test)]
+extern crate mockers_derive;
+
 pub mod compilation;
 pub mod database;
 pub mod trace;
