@@ -29,15 +29,22 @@ pub struct Config {
     pub compilers: Compilers,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Intercept {
-    pub mode: InterceptMode,
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Intercept {
+    Preload {
+        library: path::PathBuf,
+        process: path::PathBuf,
+    },
+    Wrapper {
+        cc_wrapper: CompilerWrapper,
+        cxx_wrapper: CompilerWrapper,
+    },
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum InterceptMode {
-    Preload,
-    Wrapper,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CompilerWrapper {
+    pub wrapper: path::PathBuf,
+    pub compiler: path::PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,8 +71,6 @@ pub struct Sources {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Compilers {
     pub languages: CompilersLanguages,
-    pub passes: Vec<CompilerPass>,
-    pub flags_to_ignore: collections::HashMap<String, u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -74,10 +79,4 @@ pub struct CompilersLanguages {
     pub cxx_compilers: Vec<String>,
     pub mpi_compilers: Vec<String>,
     pub compiler_wrappers: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-pub enum CompilerPass {
-    Compilation,
-    Link,
 }
