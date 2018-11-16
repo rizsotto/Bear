@@ -24,6 +24,7 @@ extern crate clap;
 extern crate libc;
 extern crate serde;
 extern crate serde_json;
+extern crate serde_yaml;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellwords;
@@ -39,7 +40,6 @@ extern crate mockers;
 #[cfg(test)]
 extern crate mockers_derive;
 
-pub mod cli;
 pub mod compilation;
 pub mod config;
 pub mod database;
@@ -52,6 +52,7 @@ mod error {
             Env(::std::env::VarError);
             String(::std::str::Utf8Error);
             Json(::serde_json::Error);
+            Yaml(::serde_yaml::Error);
         }
 
         errors {

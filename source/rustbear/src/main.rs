@@ -22,7 +22,6 @@ extern crate intercept;
 #[macro_use]
 extern crate log;
 
-use intercept::cli;
 use intercept::config;
 use std::env;
 use std::process;
@@ -33,16 +32,16 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let cli = cli::Arguments::parse(&args);
+    let cli = config::Arguments::parse(&args);
     debug!("parsed command line: {:?}", cli);
 
-    match cli.validate() {
-        Ok(_) => do_things(cli),
+    match cli.read_config() {
+        Ok(config) => do_things(cli, config),
         Err(error) => eprintln!("{}", error),
     }
 }
 
-fn do_things(cli: cli::Arguments) {
+fn do_things(cli: config::Arguments, cfg: config::Config) {
     let build = cli.build;
     let mut command = process::Command::new(&build[0]);
     command.args(&build[1..]);
