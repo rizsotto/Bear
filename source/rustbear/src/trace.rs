@@ -68,12 +68,8 @@ pub struct TraceDirectory {
 impl TraceDirectory {
     /// Create a TraceDirectory object from the directory path.
     pub fn new(path: &path::Path) -> Result<TraceDirectory> {
-        if path.is_dir() {
-            let input = fs::read_dir(path)?;
-            Ok(TraceDirectory { input: input })
-        } else {
-            Err(ErrorKind::RuntimeError("TraceSource should be directory").into())
-        }
+        let input = fs::read_dir(path)?;
+        Ok(TraceDirectory { input: input })
     }
 
     fn is_execution_trace(path: &path::Path) -> bool {
@@ -90,9 +86,7 @@ impl Iterator for TraceDirectory {
         match self.input.next() {
             Some(Ok(entry)) => {
                 let path = entry.path();
-                if path.is_dir() {
-                    self.next()
-                } else if TraceDirectory::is_execution_trace(&path) {
+                if !path.is_dir() && TraceDirectory::is_execution_trace(&path) {
                     Some(path.to_path_buf())
                 } else {
                     self.next()
