@@ -86,10 +86,12 @@ pub struct CompilersLanguages {
 impl Config {
     pub fn read(config_string: &str) -> Result<Self> {
         if config_string == "-" {
+            debug!("reading stdin for config");
             let reader = io::stdin();
             let result = serde_yaml::from_reader(reader.lock())?;
             Ok(result)
         } else {
+            debug!("reading file for config '{}'", config_string);
             let filename = path::PathBuf::from(&config_string);
             if filename.is_file() {
                 let reader = fs::File::open(filename.as_path())?;
