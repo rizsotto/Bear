@@ -19,8 +19,6 @@
 
 #[macro_use]
 extern crate error_chain;
-#[macro_use]
-extern crate clap;
 extern crate libc;
 extern crate serde;
 extern crate serde_json;

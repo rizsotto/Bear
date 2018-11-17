@@ -24,7 +24,6 @@ use std::fs;
 use std::io;
 use std::path;
 
-use ErrorKind;
 use Result;
 
 #[derive(Serialize, Deserialize)]

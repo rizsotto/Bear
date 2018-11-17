@@ -20,6 +20,7 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+dirs = "1.0"
 error-chain = "0.12"
 libc = "0.2"
 serde = "1.0"
