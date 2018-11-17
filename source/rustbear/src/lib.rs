@@ -28,17 +28,17 @@ extern crate serde_yaml;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellwords;
-extern crate tempdir;
+extern crate tempfile;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
 #[macro_use]
 extern crate log;
 
-#[cfg(test)]
-extern crate mockers;
-#[cfg(test)]
-extern crate mockers_derive;
+//#[cfg(test)]
+//extern crate mockers;
+//#[cfg(test)]
+//extern crate mockers_derive;
 
 pub mod compilation;
 pub mod config;
