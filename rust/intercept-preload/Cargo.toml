@@ -5,22 +5,20 @@ authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
 description = "InterceptWrappers is a set of developer tool wrappers."
 homepage = "https://github.com/rizsotto/Bear"
+build = "build.rs"
+links = "cexec"
 include = [
     "**/*.rs",
     "Cargo.toml",
 ]
 
 [lib]
-name = "libintercept"
-crate-type = ["rlib"]
+name = "exec"
 path = "src/lib.rs"
+crate-type = ["dylib"]
 
-[dependencies]
-error-chain = "0.12"
-libc = "0.2"
-log = "0.4"
-env_logger = "0.5.13"
-lazy_static = "1.2"
+[build-dependencies]
+cc = "1.0.25"
 
 [dependencies.clap]
 version = "~2.32.0"

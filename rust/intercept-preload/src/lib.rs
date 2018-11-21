@@ -17,27 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#[macro_use]
-extern crate error_chain;
+//#![no_std]
 
-mod error {
-    error_chain! {
-        foreign_links {
-            Io(::std::io::Error);
-        }
+const CONST: u8 = 2u8;
 
-        errors {
-            CompilationError(msg: &'static str) {
-                description("compilation error"),
-                display("compilation error: '{}'", msg),
-            }
-
-            RuntimeError(msg: &'static str) {
-                description("runtime error"),
-                display("runtime error: '{}'", msg),
-            }
-        }
-    }
+#[no_mangle]
+pub extern fn hello_rust() -> *const u8 {
+    &CONST
 }
-
-pub use error::{Error, ErrorKind, Result};
