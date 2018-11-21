@@ -1,9 +1,9 @@
 [package]
-name = "intercept"
+name = "InterceptWrappers"
 version = "3.1.0"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
-description = "BuildEAR is a tool that generates a compilation database for clang tooling."
+description = "InterceptWrappers is a set of developer tool wrappers."
 homepage = "https://github.com/rizsotto/Bear"
 include = [
     "**/*.rs",
@@ -11,34 +11,26 @@ include = [
 ]
 
 [[bin]]
-name = "intercept"
-path = "src/main.rs"
+name = "cc"
+path = "src/bin/cc.rs"
+
+[[bin]]
+name = "cxx"
+path = "src/bin/cxx.rs"
 
 [lib]
-name = "intercept"
+name = "wrapper"
 crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
 InterceptIpcLibrary = { path = "../intercept-ipc" }
 
-dirs = "1.0"
 error-chain = "0.12"
 libc = "0.2"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-serde_yaml = "0.8"
 log = "0.4"
 env_logger = "0.5.13"
-tempfile = "3.0"
-shellwords = "1.0"
 lazy_static = "1.2"
-regex = "1"
-#mockers_derive = "0.12.2"
-
-#[dev-dependencies]
-#mockers = "0.12.2"
 
 [dependencies.clap]
 version = "~2.32.0"

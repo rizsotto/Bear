@@ -1,5 +1,5 @@
 [package]
-name = "InterceptWrappers"
+name = "InterceptLibrary"
 version = "3.1.0"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
@@ -10,16 +10,8 @@ include = [
     "Cargo.toml",
 ]
 
-[[bin]]
-name = "cc"
-path = "src/bin/cc.rs"
-
-[[bin]]
-name = "cxx"
-path = "src/bin/cxx.rs"
-
 [lib]
-name = "wrapper"
+name = "libintercept"
 crate-type = ["rlib"]
 path = "src/lib.rs"
 

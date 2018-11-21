@@ -1,0 +1,27 @@
+[package]
+name = "InterceptIpcLibrary"
+version = "3.1.0"
+authors = ["László Nagy <rizsotto at gmail dot com>"]
+license = "GPL-3.0-only"
+description = "InterceptIpcLibrary is part of BuildEAR. (Contains IPC related code)"
+homepage = "https://github.com/rizsotto/Bear"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
+
+[lib]
+name = "intercept_ipc"
+crate-type = ["rlib"]
+path = "src/lib.rs"
+
+[dependencies]
+error-chain = "0.12"
+libc = "0.2"
+log = "0.4"
+env_logger = "0.5.13"
+lazy_static = "1.2"
+
+[dependencies.clap]
+version = "~2.32.0"
+default-features = false

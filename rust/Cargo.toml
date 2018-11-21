@@ -1,5 +1,7 @@
 [workspace]
 members = [
+    "intercept-ipc",
     "intercept",
-    "wrappers"
+    "intercept-preload",
+    "intercept-wrappers"
 ]
