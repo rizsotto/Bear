@@ -24,13 +24,13 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-#InterceptIpcLibrary = { path = "../intercept-ipc" }
+intercept = { path = "../intercept" }
 
+env_logger = "0.5.13"
 error-chain = "0.12"
+lazy_static = "1.2"
 libc = "0.2"
 log = "0.4"
-env_logger = "0.5.13"
-lazy_static = "1.2"
 
 [dependencies.clap]
 version = "~2.32.0"
