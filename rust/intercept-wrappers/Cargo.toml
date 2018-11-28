@@ -24,7 +24,7 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-InterceptIpcLibrary = { path = "../intercept-ipc" }
+#InterceptIpcLibrary = { path = "../intercept-ipc" }
 
 error-chain = "0.12"
 libc = "0.2"
