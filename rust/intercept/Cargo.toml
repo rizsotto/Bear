@@ -16,6 +16,7 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
+chrono = { version = "0.4", features = ["serde"] }
 env_logger = "0.5.13"
 error-chain = "0.12"
 lazy_static = "1.2"

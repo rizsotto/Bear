@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+extern crate chrono;
 #[macro_use]
 extern crate error_chain;
 extern crate libc;
@@ -39,6 +40,7 @@ extern crate log;
 
 pub mod compilation;
 pub mod database;
+pub mod event;
 pub mod trace;
 
 mod error {
@@ -51,11 +53,6 @@ mod error {
         }
 
         errors {
-            ConfigFileNotFound(msg: String) {
-                description("configuration file not found"),
-                display("configuration file not found: '{}'", msg),
-            }
-
             CompilationError(msg: &'static str) {
                 description("compilation error"),
                 display("compilation error: '{}'", msg),
