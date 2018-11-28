@@ -98,10 +98,14 @@ fn intercept_build(build: &[String]) -> Result<()> {
                 if 0 == status_code.code().unwrap_or(130) {
                     Ok(())
                 } else {
-                    bail!(intercept::ErrorKind::RuntimeError("build exited with non zero status"));
+                    bail!(intercept::ErrorKind::RuntimeError(
+                        "build exited with non zero status"
+                    ));
                 }
             }
-            Err(_) => bail!(intercept::ErrorKind::RuntimeError("build exited with signal")),
+            Err(_) => bail!(intercept::ErrorKind::RuntimeError(
+                "build exited with signal"
+            )),
         },
         Err(_) => bail!(intercept::ErrorKind::RuntimeError("command not found")),
     }

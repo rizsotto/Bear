@@ -22,6 +22,6 @@
 const CONST: u8 = 2u8;
 
 #[no_mangle]
-pub extern fn hello_rust() -> *const u8 {
+pub extern "C" fn hello_rust() -> *const u8 {
     &CONST
 }
