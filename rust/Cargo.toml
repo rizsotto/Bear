@@ -19,7 +19,6 @@ intercept = { path = "./intercept" }
 intercept-wrappers = { path = "./intercept-wrappers" }
 intercept-preload = { path = "./intercept-preload" }
 
-dirs = "1.0"
 env_logger = "0.5.13"
 error-chain = "0.12"
 lazy_static = "1.2"

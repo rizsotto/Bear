@@ -26,8 +26,7 @@ extern crate intercept;
 #[macro_use]
 extern crate log;
 
-use intercept::config::Config;
-use intercept::{Error, Result};
+use intercept::Result;
 use std::env;
 use std::path;
 use std::process;
@@ -50,7 +49,6 @@ fn main() {
 }
 
 fn run() -> intercept::Result<()> {
-    const CONFIG_FLAG: &str = "config";
     const OUTPUT_FLAG: &str = "output";
     const BUILD_FLAG: &str = "build";
 
@@ -60,20 +58,10 @@ fn run() -> intercept::Result<()> {
     let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let default_config_path = default_config_path();
-
     let matches = clap::App::new(crate_name!())
         .version(crate_version!())
         .about(crate_description!())
         .arg(
-            clap::Arg::with_name(CONFIG_FLAG)
-                .long(CONFIG_FLAG)
-                .short("c")
-                .takes_value(true)
-                .value_name("file")
-                .default_value(default_config_path.as_ref())
-                .help("The configuration file"),
-        ).arg(
             clap::Arg::with_name(OUTPUT_FLAG)
                 .long(OUTPUT_FLAG)
                 .short("o")
@@ -99,20 +87,7 @@ fn run() -> intercept::Result<()> {
         .collect();
     debug!("command to run: {:?}", build);
 
-    let config_string = matches.value_of(CONFIG_FLAG).unwrap().to_string();
-    let config = Config::read(config_string.as_ref())
-        .map_err(|e| Error::with_chain(e, "could not read config"))?;
-    debug!("config: {:?}", config);
-
     intercept_build(build.as_ref())
-}
-
-fn default_config_path() -> String {
-    let default_config_path = match dirs::config_dir() {
-        Some(dir) => dir.join("bear.conf"),
-        None => path::PathBuf::from("bear.conf"),
-    };
-    default_config_path.into_os_string().into_string().unwrap()
 }
 
 fn intercept_build(build: &[String]) -> Result<()> {

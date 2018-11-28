@@ -16,7 +16,6 @@ crate-type = ["rlib"]
 path = "src/lib.rs"
 
 [dependencies]
-dirs = "1.0"
 env_logger = "0.5.13"
 error-chain = "0.12"
 lazy_static = "1.2"
@@ -26,7 +25,6 @@ regex = "1"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
-serde_yaml = "0.8"
 shellwords = "1.0"
 tempfile = "3.0"
 #mockers_derive = "0.12.2"
