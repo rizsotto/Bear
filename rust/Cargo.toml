@@ -3,7 +3,7 @@ name = "BuildEAR"
 version = "3.1.0"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
-description = "InterceptWrappers is a set of developer tool wrappers."
+description = "BuildEAR is a tool that generates a compilation database for clang tooling."
 homepage = "https://github.com/rizsotto/Bear"
 include = [
     "**/*.rs",
@@ -16,6 +16,8 @@ path = "src/main.rs"
 
 [dependencies]
 intercept = { path = "./intercept" }
+intercept-wrappers = { path = "./intercept-wrappers" }
+intercept-preload = { path = "./intercept-preload" }
 
 dirs = "1.0"
 env_logger = "0.5.13"
