@@ -74,3 +74,67 @@ impl Database {
         self.entries.union(&fresh);
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StringEntry {
+    directory: String,
+    file: String,
+    command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ArrayEntry {
+    directory: String,
+    file: String,
+    arguments: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+enum EntryX {
+    StringEntry(StringEntry),
+    ArrayEntry(ArrayEntry),
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn test_load_arguments() {
+        let input =
+            r#"{
+                "directory": "/build/dir/path",
+                "file": "/path/to/source/file.c",
+                "arguments": ["cc", "-c", "/path/to/source/file.c"]
+            }"#;
+
+        let entry: EntryX = serde_json::from_str(input).unwrap();
+        println!("{:?}", entry);
+    }
+
+    #[test]
+    fn test_save_arguments() {
+        let entry_one = EntryX::ArrayEntry(ArrayEntry {
+            directory: "/build/dir/path".to_string(),
+            file: "/path/to/source.c".to_string(),
+            arguments: vec!["cc".to_string(), "-c".to_string()],
+            output: None
+        });
+        let entry_two = EntryX::StringEntry(StringEntry {
+            directory: "/build/dir/path".to_string(),
+            file: "/path/to/source.c".to_string(),
+            command: "cc -c /path/to/source.c -o /build/dir/path/source.o".to_string(),
+            output: Some("/build/dir/path/source.o".to_string())
+        });
+        let inputs = vec![entry_one, entry_two];
+
+        let output = serde_json::to_string(&inputs).unwrap();
+        println!("{}", output);
+    }
+}
