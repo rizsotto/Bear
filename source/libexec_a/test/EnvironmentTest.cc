@@ -1,6 +1,5 @@
 #include "gtest/gtest.h"
 
-#include "../Storage.h"
 #include "../Interface.h"
 #include "../Environment.h"
 

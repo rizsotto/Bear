@@ -31,13 +31,14 @@ namespace {
         char buffer[64];
         ::ear::Storage sut(buffer, buffer + 64);
 
-        const char *literal = "Hi there people";
+        const char *literal0 = "Hi there people";
+        const char *literal1 = "Hallo Leute";
 
-        const char *result0 = sut.store(literal);
-        const char *result1 = sut.store(literal);
+        const char *result0 = sut.store(literal0);
+        const char *result1 = sut.store(literal1);
 
-        EXPECT_STREQ(literal, result0);
-        EXPECT_STREQ(literal, result1);
+        EXPECT_STREQ(literal0, result0);
+        EXPECT_STREQ(literal1, result1);
     }
 
     TEST(Storage, handles_size_issue) {
