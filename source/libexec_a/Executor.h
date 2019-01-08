@@ -159,24 +159,14 @@ namespace ear {
         }
 
     public:
-        explicit Executor(const ::ear::LibrarySession &session) noexcept
+        explicit Executor(const ::ear::Session &session) noexcept
                 : session_ {
-                        session.context.reporter,
+                        session.reporter,
                         ::ear::flag::destination,
-                        session.context.destination,
+                        session.destination,
                         ::ear::flag::library,
                         session.library,
-                        (session.context.verbose) ? ::ear::flag::verbose : nullptr,
-                        nullptr }
-                , session_size_(::ear::array::length(session_))
-        { }
-
-        explicit Executor(const ::ear::WrapperSession &session) noexcept
-                : session_ {
-                        session.context.reporter,
-                        ::ear::flag::destination,
-                        session.context.destination,
-                        (session.context.verbose) ? ::ear::flag::verbose : nullptr,
+                        (session.verbose) ? ::ear::flag::verbose : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
         { }

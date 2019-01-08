@@ -40,45 +40,25 @@ namespace {
 
     class ExecutorTest : public ::testing::Test {
     public:
-        static const ::ear::Context SILENT_SESSION;
-        static const ::ear::Context VERBOSE_SESSION;
-        static const ::ear::LibrarySession SILENT_LIBRARY_SESSION;
-        static const ::ear::LibrarySession VERBOSE_LIBRARY_SESSION;
-        static const ::ear::WrapperSession SILENT_WRAPPER_SESSION;
-        static const ::ear::WrapperSession VERBOSE_WRAPPER_SESSION;
+        static const ::ear::Session SILENT_SESSION;
+        static const ::ear::Session VERBOSE_SESSION;
     };
-    const ::ear::Context ExecutorTest::SILENT_SESSION = {
+    const ::ear::Session ExecutorTest::SILENT_SESSION = {
             "/usr/bin/intercept",
             "/tmp/intercept.random",
-            false
+            false,
+            "/usr/libexec/libexec.so"
     };
-    const ::ear::Context ExecutorTest::VERBOSE_SESSION = {
+    const ::ear::Session ExecutorTest::VERBOSE_SESSION = {
             "/usr/bin/intercept",
             "/tmp/intercept.random",
-            true
-    };
-    const ::ear::LibrarySession ExecutorTest::SILENT_LIBRARY_SESSION = {
-            SILENT_SESSION,
+            true,
             "/usr/libexec/libexec.so"
-    };
-    const ::ear::LibrarySession ExecutorTest::VERBOSE_LIBRARY_SESSION = {
-            VERBOSE_SESSION,
-            "/usr/libexec/libexec.so"
-    };
-    const ::ear::WrapperSession ExecutorTest::SILENT_WRAPPER_SESSION = {
-            SILENT_SESSION,
-            "cc",
-            "c++"
-    };
-    const ::ear::WrapperSession ExecutorTest::VERBOSE_WRAPPER_SESSION = {
-            VERBOSE_SESSION,
-            "cc",
-            "c++"
     };
 
     TEST_F(ExecutorTest, execve_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession session {};
+        const ::ear::Session session {};
 
         auto result = Sut(session).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
@@ -87,7 +67,7 @@ namespace {
     TEST_F(ExecutorTest, execve_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -100,7 +80,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(SILENT_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::path, argv[5]);
                     EXPECT_STREQ(LS_PATH, argv[6]);
                     EXPECT_STREQ(::ear::flag::command, argv[7]);
@@ -113,7 +93,7 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -126,7 +106,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(VERBOSE_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(VERBOSE_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(VERBOSE_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::verbose, argv[5]);
                     EXPECT_STREQ(::ear::flag::path, argv[6]);
                     EXPECT_STREQ(LS_PATH, argv[7]);
@@ -140,62 +120,13 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(VERBOSE_LIBRARY_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
-    }
-
-    TEST_F(ExecutorTest, execve_silent_wrapper) {
-        struct Validator {
-            static auto resolve_execve() {
-                return [](const char* path, char* const argv[], char* const envp[]) -> int {
-                    EXPECT_STREQ(SILENT_SESSION.reporter, path);
-                    EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
-                    EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::ear::flag::path, argv[3]);
-                    EXPECT_STREQ(LS_PATH, argv[4]);
-                    EXPECT_STREQ(::ear::flag::command, argv[5]);
-                    EXPECT_STREQ(LS_ARGV[0], argv[6]);
-                    EXPECT_STREQ(LS_ARGV[1], argv[7]);
-                    EXPECT_EQ(LS_ENVP, envp);
-                    return SUCCESS;
-                };
-            }
-        };
-        using Sut = ::ear::Executor<Validator>;
-
-        auto result = Sut(SILENT_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
-    }
-
-    TEST_F(ExecutorTest, execve_verbose_wrapper) {
-        struct Validator {
-            static auto resolve_execve() {
-                return [](const char* path, char* const argv[], char* const envp[]) -> int {
-                    EXPECT_STREQ(VERBOSE_SESSION.reporter, path);
-                    EXPECT_STREQ(VERBOSE_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
-                    EXPECT_STREQ(VERBOSE_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::ear::flag::verbose, argv[3]);
-                    EXPECT_STREQ(::ear::flag::path, argv[4]);
-                    EXPECT_STREQ(LS_PATH, argv[5]);
-                    EXPECT_STREQ(::ear::flag::command, argv[6]);
-                    EXPECT_STREQ(LS_ARGV[0], argv[7]);
-                    EXPECT_STREQ(LS_ARGV[1], argv[8]);
-                    EXPECT_EQ(LS_ENVP, envp);
-                    return SUCCESS;
-                };
-            }
-        };
-        using Sut = ::ear::Executor<Validator>;
-
-        auto result = Sut(VERBOSE_WRAPPER_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(VERBOSE_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, execvpe_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession session {};
+        const ::ear::Session session {};
 
         auto result = Sut(session).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
@@ -204,7 +135,7 @@ namespace {
     TEST_F(ExecutorTest, execvpe_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -217,7 +148,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(SILENT_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
                     EXPECT_STREQ(::ear::flag::command, argv[7]);
@@ -230,13 +161,13 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, execvp2_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession session {};
+        const ::ear::Session session {};
 
         auto result = Sut(session).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
@@ -245,7 +176,7 @@ namespace {
     TEST_F(ExecutorTest, execvp2_fails_without_resolver) {
         using Sut = ::ear::Executor<BrokenResolver>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -258,7 +189,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(SILENT_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
                     EXPECT_STREQ(::ear::flag::search_path, argv[7]);
@@ -273,13 +204,13 @@ namespace {
         };
         using Sut = ::ear::Executor<Validator>;
 
-        auto result = Sut(SILENT_LIBRARY_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = Sut(SILENT_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
     TEST_F(ExecutorTest, spawn_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession session {};
+        const ::ear::Session session {};
 
         pid_t pid;
         auto result = Sut(session).posix_spawn(
@@ -297,7 +228,7 @@ namespace {
 
 
         pid_t pid;
-        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawn(
+        auto result = Sut(SILENT_SESSION).posix_spawn(
                 &pid,
                 LS_PATH,
                 nullptr,
@@ -321,7 +252,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(SILENT_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::path, argv[5]);
                     EXPECT_STREQ(LS_PATH, argv[6]);
                     EXPECT_STREQ(::ear::flag::command, argv[7]);
@@ -335,7 +266,7 @@ namespace {
         using Sut = ::ear::Executor < Validator>;
 
         pid_t pid;
-        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawn(
+        auto result = Sut(SILENT_SESSION).posix_spawn(
                 &pid,
                 LS_PATH,
                 nullptr,
@@ -347,7 +278,7 @@ namespace {
 
     TEST_F(ExecutorTest, spawnp_fails_without_env) {
         using Sut = ::ear::Executor<BrokenResolver>;
-        const ::ear::LibrarySession session {};
+        const ::ear::Session session {};
 
         pid_t pid;
         auto result = Sut(session).posix_spawnp(
@@ -365,7 +296,7 @@ namespace {
 
 
         pid_t pid;
-        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawnp(
+        auto result = Sut(SILENT_SESSION).posix_spawnp(
                 &pid,
                 LS_FILE,
                 nullptr,
@@ -389,7 +320,7 @@ namespace {
                     EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
                     EXPECT_STREQ(::ear::flag::library, argv[3]);
-                    EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
+                    EXPECT_STREQ(SILENT_SESSION.library, argv[4]);
                     EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
                     EXPECT_STREQ(::ear::flag::command, argv[7]);
@@ -403,7 +334,7 @@ namespace {
         using Sut = ::ear::Executor < Validator>;
 
         pid_t pid;
-        auto result = Sut(SILENT_LIBRARY_SESSION).posix_spawnp(
+        auto result = Sut(SILENT_SESSION).posix_spawnp(
                 &pid,
                 LS_FILE,
                 nullptr,

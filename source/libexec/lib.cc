@@ -39,21 +39,19 @@ namespace {
     constexpr size_t BUFFER_SIZE = 16 * 1024;
     char BUFFER[BUFFER_SIZE];
 
-    ::ear::LibrarySession SESSION;
+    ::ear::Session SESSION;
 
 
-    ::ear::LibrarySession store_session_attributes(const ::ear::LibrarySession &input) noexcept {
+    ::ear::Session store_session_attributes(const ::ear::Session &input) noexcept {
         if (! input.is_valid())
             return input;
 
         ::ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
 
-        return ::ear::LibrarySession {
-                {
-                        storage.store(input.context.reporter),
-                        storage.store(input.context.destination),
-                        input.context.verbose
-                },
+        return ::ear::Session {
+                storage.store(input.reporter),
+                storage.store(input.destination),
+                input.verbose,
                 storage.store(input.library)
         };
     }
@@ -61,7 +59,7 @@ namespace {
     void trace_function_call(const char *message) {
         if (! SESSION.is_valid())
             fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", message);
-        else if (SESSION.context.verbose)
+        else if (SESSION.verbose)
             fprintf(stderr, "libexec.so: %s\n", message);
     }
 
@@ -81,7 +79,7 @@ extern "C" void on_load() {
         return;
 
     const auto environment = ::ear::environment::current();
-    const auto session = ::ear::environment::libray_session(environment);
+    const auto session = ::ear::environment::capture_session(environment);
     SESSION = store_session_attributes(session);
 
     trace_function_call("on_load");

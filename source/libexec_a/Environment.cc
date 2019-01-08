@@ -62,34 +62,15 @@ namespace ear {
 #endif
         }
 
-        LibrarySession
-        libray_session(const char **environment) noexcept {
+        Session capture_session(const char **environment) noexcept {
             if (nullptr == environment)
-                return LibrarySession { {nullptr, nullptr, false}, nullptr };
+                return Session { nullptr, nullptr, false, nullptr };
             else
-                return LibrarySession {
-                        {
-                                get_env(environment, ::ear::env::reporter_key),
-                                get_env(environment, ::ear::env::destination_key),
-                                get_env(environment, ::ear::env::verbose_key) != nullptr
-                        },
+                return Session {
+                        get_env(environment, ::ear::env::reporter_key),
+                        get_env(environment, ::ear::env::destination_key),
+                        get_env(environment, ::ear::env::verbose_key) != nullptr,
                         get_env(environment, ::ear::env::library_key)
-                };
-        }
-
-        WrapperSession
-        wrapper_session(const char **environment) noexcept {
-            if (nullptr == environment)
-                return WrapperSession { {nullptr, nullptr, false}, nullptr, nullptr };
-            else
-                return WrapperSession {
-                        {
-                                get_env(environment, ::ear::env::reporter_key),
-                                get_env(environment, ::ear::env::destination_key),
-                                get_env(environment, ::ear::env::verbose_key) != nullptr
-                        },
-                        get_env(environment, ::ear::env::cc_key),
-                        get_env(environment, ::ear::env::cxx_key)
                 };
         }
 

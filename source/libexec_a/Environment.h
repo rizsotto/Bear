@@ -28,11 +28,7 @@ namespace ear {
 
         const char **current() noexcept;
 
-        LibrarySession
-        libray_session(const char **environment) noexcept;
-
-        WrapperSession
-        wrapper_session(const char **environment) noexcept;
+        Session capture_session(const char **environment) noexcept;
 
     }
 }

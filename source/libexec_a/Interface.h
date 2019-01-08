@@ -22,12 +22,9 @@
 namespace ear {
     namespace flag {
 
-        constexpr char help[]           = "--help";
         constexpr char verbose[]        = "--verbose";
         constexpr char destination[]    = "--report-destination";
         constexpr char library[]        = "--session-library";
-        constexpr char wrapper_cc[]     = "--session-cc-wrapper";
-        constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
         constexpr char path[]           = "--exec-path";
         constexpr char file[]           = "--exec-file";
         constexpr char search_path[]    = "--exec-search_path";
@@ -41,8 +38,6 @@ namespace ear {
         constexpr char destination_key[] = "INTERCEPT_REPORT_DESTINATION";
         constexpr char verbose_key[]     = "INTERCEPT_VERBOSE";
         constexpr char library_key[]     = "INTERCEPT_SESSION_LIBRARY";
-        constexpr char cc_key[]          = "INTERCEPT_SESSION_CC";
-        constexpr char cxx_key[]         = "INTERCEPT_SESSION_CXX";
 
     }
 
@@ -53,33 +48,16 @@ namespace ear {
         const char *search_path;
     };
 
-    struct Context {
+    struct Session {
         char const *reporter;
         char const *destination;
         bool verbose;
-    };
-
-    struct LibrarySession {
-        Context context;
         char const *library;
 
         bool is_valid() const noexcept {
-            return (context.reporter != nullptr &&
-                    context.destination != nullptr &&
+            return (reporter != nullptr &&
+                    destination != nullptr &&
                     library != nullptr);
-        }
-    };
-
-    struct WrapperSession {
-        Context context;
-        char const *cc;
-        char const *cxx;
-
-        bool is_valid() const noexcept {
-            return (context.reporter != nullptr &&
-                    context.destination != nullptr &&
-                    cc != nullptr &&
-                    cxx != nullptr);
         }
     };
 }
