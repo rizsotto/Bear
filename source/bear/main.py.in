@@ -486,18 +486,6 @@ def create_intercept_parser():
         default="@INTERCEPT_EXE@",
         action='store',
         help="""specify the intercept binary location.""")
-    advanced.add_argument(
-        '--intercept-wrapper',
-        dest='intercept_wrapper_cc',
-        default="@INTERCEPT_CC_EXE@",
-        action='store',
-        help="""specify the C compiler wrapper location.""")
-    advanced.add_argument(
-        '--intercept-wrapper++',
-        dest='intercept_wrapper_cxx',
-        default="@INTERCEPT_CXX_EXE@",
-        action='store',
-        help="""specify the C++ compiler wrapper location.""")
 
     parser.add_argument(
         dest='build', nargs=argparse.REMAINDER, help="""Command to run.""")
