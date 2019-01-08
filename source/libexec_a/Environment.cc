@@ -69,11 +69,11 @@ namespace ear {
             else
                 return LibrarySession {
                         {
-                                get_env(environment, ::pear::env::reporter_key),
-                                get_env(environment, ::pear::env::destination_key),
-                                get_env(environment, ::pear::env::verbose_key) != nullptr
+                                get_env(environment, ::ear::env::reporter_key),
+                                get_env(environment, ::ear::env::destination_key),
+                                get_env(environment, ::ear::env::verbose_key) != nullptr
                         },
-                        get_env(environment, ::pear::env::library_key)
+                        get_env(environment, ::ear::env::library_key)
                 };
         }
 
@@ -84,12 +84,12 @@ namespace ear {
             else
                 return WrapperSession {
                         {
-                                get_env(environment, ::pear::env::reporter_key),
-                                get_env(environment, ::pear::env::destination_key),
-                                get_env(environment, ::pear::env::verbose_key) != nullptr
+                                get_env(environment, ::ear::env::reporter_key),
+                                get_env(environment, ::ear::env::destination_key),
+                                get_env(environment, ::ear::env::verbose_key) != nullptr
                         },
-                        get_env(environment, ::pear::env::cc_key),
-                        get_env(environment, ::pear::env::cxx_key)
+                        get_env(environment, ::ear::env::cc_key),
+                        get_env(environment, ::ear::env::cxx_key)
                 };
         }
 

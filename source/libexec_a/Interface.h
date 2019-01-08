@@ -19,12 +19,48 @@
 
 #pragma once
 
-#include "intercept_a/Interface.h"
-
 namespace ear {
+    namespace flag {
+
+        constexpr char help[]           = "--help";
+        constexpr char verbose[]        = "--verbose";
+        constexpr char destination[]    = "--report-destination";
+        constexpr char library[]        = "--session-library";
+        constexpr char wrapper_cc[]     = "--session-cc-wrapper";
+        constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
+        constexpr char path[]           = "--exec-path";
+        constexpr char file[]           = "--exec-file";
+        constexpr char search_path[]    = "--exec-search_path";
+        constexpr char command[]        = "--exec-command";
+
+    }
+
+    namespace env {
+
+        constexpr char reporter_key[]    = "INTERCEPT_REPORT_COMMAND";
+        constexpr char destination_key[] = "INTERCEPT_REPORT_DESTINATION";
+        constexpr char verbose_key[]     = "INTERCEPT_VERBOSE";
+        constexpr char library_key[]     = "INTERCEPT_SESSION_LIBRARY";
+        constexpr char cc_key[]          = "INTERCEPT_SESSION_CC";
+        constexpr char cxx_key[]         = "INTERCEPT_SESSION_CXX";
+
+    }
+
+    struct Execution {
+        const char **command;
+        const char *path;
+        const char *file;
+        const char *search_path;
+    };
+
+    struct Context {
+        char const *reporter;
+        char const *destination;
+        bool verbose;
+    };
 
     struct LibrarySession {
-        ::pear::Context context;
+        Context context;
         char const *library;
 
         bool is_valid() const noexcept {
@@ -35,7 +71,7 @@ namespace ear {
     };
 
     struct WrapperSession {
-        ::pear::Context context;
+        Context context;
         char const *cc;
         char const *cxx;
 

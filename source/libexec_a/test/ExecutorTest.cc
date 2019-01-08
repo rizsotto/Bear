@@ -40,19 +40,19 @@ namespace {
 
     class ExecutorTest : public ::testing::Test {
     public:
-        static const ::pear::Context SILENT_SESSION;
-        static const ::pear::Context VERBOSE_SESSION;
+        static const ::ear::Context SILENT_SESSION;
+        static const ::ear::Context VERBOSE_SESSION;
         static const ::ear::LibrarySession SILENT_LIBRARY_SESSION;
         static const ::ear::LibrarySession VERBOSE_LIBRARY_SESSION;
         static const ::ear::WrapperSession SILENT_WRAPPER_SESSION;
         static const ::ear::WrapperSession VERBOSE_WRAPPER_SESSION;
     };
-    const ::pear::Context ExecutorTest::SILENT_SESSION = {
+    const ::ear::Context ExecutorTest::SILENT_SESSION = {
             "/usr/bin/intercept",
             "/tmp/intercept.random",
             false
     };
-    const ::pear::Context ExecutorTest::VERBOSE_SESSION = {
+    const ::ear::Context ExecutorTest::VERBOSE_SESSION = {
             "/usr/bin/intercept",
             "/tmp/intercept.random",
             true
@@ -97,13 +97,13 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::path, argv[5]);
+                    EXPECT_STREQ(::ear::flag::path, argv[5]);
                     EXPECT_STREQ(LS_PATH, argv[6]);
-                    EXPECT_STREQ(::pear::flag::command, argv[7]);
+                    EXPECT_STREQ(::ear::flag::command, argv[7]);
                     EXPECT_STREQ(LS_ARGV[0], argv[8]);
                     EXPECT_STREQ(LS_ARGV[1], argv[9]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -123,14 +123,14 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(VERBOSE_SESSION.reporter, path);
                     EXPECT_STREQ(VERBOSE_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(VERBOSE_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(VERBOSE_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::verbose, argv[5]);
-                    EXPECT_STREQ(::pear::flag::path, argv[6]);
+                    EXPECT_STREQ(::ear::flag::verbose, argv[5]);
+                    EXPECT_STREQ(::ear::flag::path, argv[6]);
                     EXPECT_STREQ(LS_PATH, argv[7]);
-                    EXPECT_STREQ(::pear::flag::command, argv[8]);
+                    EXPECT_STREQ(::ear::flag::command, argv[8]);
                     EXPECT_STREQ(LS_ARGV[0], argv[9]);
                     EXPECT_STREQ(LS_ARGV[1], argv[10]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -150,11 +150,11 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::path, argv[3]);
+                    EXPECT_STREQ(::ear::flag::path, argv[3]);
                     EXPECT_STREQ(LS_PATH, argv[4]);
-                    EXPECT_STREQ(::pear::flag::command, argv[5]);
+                    EXPECT_STREQ(::ear::flag::command, argv[5]);
                     EXPECT_STREQ(LS_ARGV[0], argv[6]);
                     EXPECT_STREQ(LS_ARGV[1], argv[7]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -174,12 +174,12 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(VERBOSE_SESSION.reporter, path);
                     EXPECT_STREQ(VERBOSE_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(VERBOSE_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::verbose, argv[3]);
-                    EXPECT_STREQ(::pear::flag::path, argv[4]);
+                    EXPECT_STREQ(::ear::flag::verbose, argv[3]);
+                    EXPECT_STREQ(::ear::flag::path, argv[4]);
                     EXPECT_STREQ(LS_PATH, argv[5]);
-                    EXPECT_STREQ(::pear::flag::command, argv[6]);
+                    EXPECT_STREQ(::ear::flag::command, argv[6]);
                     EXPECT_STREQ(LS_ARGV[0], argv[7]);
                     EXPECT_STREQ(LS_ARGV[1], argv[8]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -214,13 +214,13 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::file, argv[5]);
+                    EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
-                    EXPECT_STREQ(::pear::flag::command, argv[7]);
+                    EXPECT_STREQ(::ear::flag::command, argv[7]);
                     EXPECT_STREQ(LS_ARGV[0], argv[8]);
                     EXPECT_STREQ(LS_ARGV[1], argv[9]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -255,15 +255,15 @@ namespace {
                 return [](const char* path, char* const argv[], char* const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::file, argv[5]);
+                    EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
-                    EXPECT_STREQ(::pear::flag::search_path, argv[7]);
+                    EXPECT_STREQ(::ear::flag::search_path, argv[7]);
                     EXPECT_STREQ(SEARCH_PATH, argv[8]);
-                    EXPECT_STREQ(::pear::flag::command, argv[9]);
+                    EXPECT_STREQ(::ear::flag::command, argv[9]);
                     EXPECT_STREQ(LS_ARGV[0], argv[10]);
                     EXPECT_STREQ(LS_ARGV[1], argv[11]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -318,13 +318,13 @@ namespace {
                           char *const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::path, argv[5]);
+                    EXPECT_STREQ(::ear::flag::path, argv[5]);
                     EXPECT_STREQ(LS_PATH, argv[6]);
-                    EXPECT_STREQ(::pear::flag::command, argv[7]);
+                    EXPECT_STREQ(::ear::flag::command, argv[7]);
                     EXPECT_STREQ(LS_ARGV[0], argv[8]);
                     EXPECT_STREQ(LS_ARGV[1], argv[9]);
                     EXPECT_EQ(LS_ENVP, envp);
@@ -386,13 +386,13 @@ namespace {
                           char *const envp[]) -> int {
                     EXPECT_STREQ(SILENT_SESSION.reporter, path);
                     EXPECT_STREQ(SILENT_SESSION.reporter, argv[0]);
-                    EXPECT_STREQ(::pear::flag::destination, argv[1]);
+                    EXPECT_STREQ(::ear::flag::destination, argv[1]);
                     EXPECT_STREQ(SILENT_SESSION.destination, argv[2]);
-                    EXPECT_STREQ(::pear::flag::library, argv[3]);
+                    EXPECT_STREQ(::ear::flag::library, argv[3]);
                     EXPECT_STREQ(SILENT_LIBRARY_SESSION.library, argv[4]);
-                    EXPECT_STREQ(::pear::flag::file, argv[5]);
+                    EXPECT_STREQ(::ear::flag::file, argv[5]);
                     EXPECT_STREQ(LS_FILE, argv[6]);
-                    EXPECT_STREQ(::pear::flag::command, argv[7]);
+                    EXPECT_STREQ(::ear::flag::command, argv[7]);
                     EXPECT_STREQ(LS_ARGV[0], argv[8]);
                     EXPECT_STREQ(LS_ARGV[1], argv[9]);
                     EXPECT_EQ(LS_ENVP, envp);

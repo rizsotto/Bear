@@ -1,5 +1,4 @@
 add_library(exec_a STATIC
-        ../intercept_a/Interface.h
         Array.h
         DynamicLinker.h
         DynamicLinker.cc
