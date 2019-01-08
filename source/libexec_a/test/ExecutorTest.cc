@@ -44,16 +44,16 @@ namespace {
         static const ::ear::Session VERBOSE_SESSION;
     };
     const ::ear::Session ExecutorTest::SILENT_SESSION = {
+            "/usr/libexec/libexec.so",
             "/usr/bin/intercept",
             "/tmp/intercept.random",
-            false,
-            "/usr/libexec/libexec.so"
+            false
     };
     const ::ear::Session ExecutorTest::VERBOSE_SESSION = {
+            "/usr/libexec/libexec.so",
             "/usr/bin/intercept",
             "/tmp/intercept.random",
-            true,
-            "/usr/libexec/libexec.so"
+            true
     };
 
     TEST_F(ExecutorTest, execve_fails_without_env) {

@@ -64,13 +64,13 @@ namespace ear {
 
         Session capture_session(const char **environment) noexcept {
             if (nullptr == environment)
-                return Session { nullptr, nullptr, false, nullptr };
+                return Session {nullptr, nullptr, nullptr, false };
             else
                 return Session {
+                        get_env(environment, ::ear::env::library_key),
                         get_env(environment, ::ear::env::reporter_key),
                         get_env(environment, ::ear::env::destination_key),
-                        get_env(environment, ::ear::env::verbose_key) != nullptr,
-                        get_env(environment, ::ear::env::library_key)
+                        get_env(environment, ::ear::env::verbose_key) != nullptr
                 };
         }
 

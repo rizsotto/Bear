@@ -49,15 +49,9 @@ namespace ear {
     };
 
     struct Session {
+        char const *library;
         char const *reporter;
         char const *destination;
         bool verbose;
-        char const *library;
-
-        bool is_valid() const noexcept {
-            return (reporter != nullptr &&
-                    destination != nullptr &&
-                    library != nullptr);
-        }
     };
 }

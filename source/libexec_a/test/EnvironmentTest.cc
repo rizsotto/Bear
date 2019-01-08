@@ -6,17 +6,22 @@
 
 namespace {
 
-    TEST(Environment, dont_crash_on_nullptr_4_library) {
-        EXPECT_FALSE(::ear::environment::capture_session(nullptr).is_valid());
+    TEST(Environment, dont_crash_on_nullptr) {
+        const auto result = ::ear::environment::capture_session(nullptr);
     }
 
-    TEST(Environment, returns_nullptr_when_missing_4_library) {
+    TEST(Environment, capture_on_empty) {
         const char *envp[] = { "this=is", "these=are", nullptr };
 
-        EXPECT_FALSE(::ear::environment::capture_session(envp).is_valid());
+        const auto result = ::ear::environment::capture_session(envp);
+
+        EXPECT_EQ(nullptr, result.destination);
+        EXPECT_EQ(nullptr, result.library);
+        EXPECT_EQ(nullptr, result.reporter);
+        EXPECT_EQ(false, result.verbose);
     }
 
-    TEST(Environment, capture_4_libray) {
+    TEST(Environment, capture_silent) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so",
@@ -32,7 +37,7 @@ namespace {
         EXPECT_EQ(false, result.verbose);
     }
 
-    TEST(Environment, capture_verbose_4_library) {
+    TEST(Environment, capture_verbose) {
         const char *envp[] = {
                 "INTERCEPT_REPORT_DESTINATION=/tmp/intercept.random",
                 "INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so",
