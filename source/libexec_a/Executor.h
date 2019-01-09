@@ -25,9 +25,27 @@
 #include "libexec_a/Environment.h"
 #include "libexec_a/Interface.h"
 
+namespace ear {
+
+    constexpr char FLAG_VERBOSE[] = "--verbose";
+    constexpr char FLAG_DESTINATION[] = "--report-destination";
+    constexpr char FLAG_LIBRARY[] = "--session-library";
+    constexpr char FLAG_PATH[] = "--exec-path";
+    constexpr char FLAG_FILE[] = "--exec-file";
+    constexpr char FLAG_SEARCH_PATH[] = "--exec-search_path";
+    constexpr char FLAG_COMMAND[] = "--exec-command";
+}
+
 namespace {
 
-    size_t length(const ::ear::Execution &execution) noexcept {
+    struct Execution {
+        const char **command;
+        const char *path;
+        const char *file;
+        const char *search_path;
+    };
+
+    size_t length(const Execution &execution) noexcept {
         return ((execution.path != nullptr) ? 2 : 0) +
                ((execution.file != nullptr) ? 2 : 0) +
                ((execution.search_path != nullptr) ? 2 : 0) +
@@ -35,20 +53,20 @@ namespace {
                2;
     }
 
-    const char **copy(const ::ear::Execution &execution, const char **it, const char **it_end) noexcept {
+    const char **copy(const Execution &execution, const char **it, const char **it_end) noexcept {
         if (execution.path != nullptr) {
-            *it++ = ::ear::flag::path;
+            *it++ = ::ear::FLAG_PATH;
             *it++ = execution.path;
         }
         if (execution.file != nullptr) {
-            *it++ = ::ear::flag::file;
+            *it++ = ::ear::FLAG_FILE;
             *it++ = execution.file;
         }
         if (execution.search_path != nullptr) {
-            *it++ = ::ear::flag::search_path;
+            *it++ = ::ear::FLAG_SEARCH_PATH;
             *it++ = execution.search_path;
         }
-        *it++ = ::ear::flag::command;
+        *it++ = ::ear::FLAG_COMMAND;
         const size_t command_size = ::ear::array::length(execution.command);
         const char **const command_end = execution.command + (command_size + 1);
         return ::ear::array::copy(execution.command, command_end, it, it_end);
@@ -65,7 +83,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::ear::Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
+            const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -83,7 +101,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::ear::Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
+            const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -101,7 +119,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::ear::Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
+            const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -123,7 +141,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::ear::Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
+            const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -145,7 +163,7 @@ namespace ear {
             if (fp == nullptr)
                 return -1;
 
-            const ::ear::Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
+            const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
             const size_t dst_length = length(execution) + session_size_;
             const char *dst[dst_length];
@@ -162,11 +180,11 @@ namespace ear {
         explicit Executor(const ::ear::Session &session) noexcept
                 : session_ {
                         session.reporter,
-                        ::ear::flag::destination,
+                        ::ear::FLAG_DESTINATION,
                         session.destination,
-                        ::ear::flag::library,
+                        ::ear::FLAG_LIBRARY,
                         session.library,
-                        (session.verbose) ? ::ear::flag::verbose : nullptr,
+                        (session.verbose) ? ::ear::FLAG_VERBOSE : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
         { }

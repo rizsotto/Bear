@@ -20,24 +20,6 @@
 #pragma once
 
 namespace ear {
-    namespace flag {
-
-        constexpr char verbose[]        = "--verbose";
-        constexpr char destination[]    = "--report-destination";
-        constexpr char library[]        = "--session-library";
-        constexpr char path[]           = "--exec-path";
-        constexpr char file[]           = "--exec-file";
-        constexpr char search_path[]    = "--exec-search_path";
-        constexpr char command[]        = "--exec-command";
-
-    }
-
-    struct Execution {
-        const char **command;
-        const char *path;
-        const char *file;
-        const char *search_path;
-    };
 
     struct Session {
         char const *library;
