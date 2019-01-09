@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "../Interface.h"
+#include "../Session.h"
 #include "../Environment.h"
 #include "../Executor.h"
 
