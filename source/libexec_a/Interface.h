@@ -32,15 +32,6 @@ namespace ear {
 
     }
 
-    namespace env {
-
-        constexpr char reporter_key[]    = "INTERCEPT_REPORT_COMMAND";
-        constexpr char destination_key[] = "INTERCEPT_REPORT_DESTINATION";
-        constexpr char verbose_key[]     = "INTERCEPT_VERBOSE";
-        constexpr char library_key[]     = "INTERCEPT_SESSION_LIBRARY";
-
-    }
-
     struct Execution {
         const char **command;
         const char *path;

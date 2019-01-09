@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include "config.h"
-
 #include "libexec_a/Interface.h"
 
 namespace ear {

@@ -21,7 +21,6 @@
 
 #include "libexec_a/Environment.h"
 #include "libexec_a/Array.h"
-#include "libexec_a/Interface.h"
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
@@ -30,6 +29,11 @@ extern "C" char **environ;
 #endif
 
 namespace {
+
+    constexpr char KEY_LIBRARY[]     = "INTERCEPT_SESSION_LIBRARY";
+    constexpr char KEY_REPORTER[]    = "INTERCEPT_REPORT_COMMAND";
+    constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
+    constexpr char KEY_VERBOSE[]     = "INTERCEPT_VERBOSE";
 
     const char *get_env(const char **envp, const char *key) noexcept {
         const size_t key_size = ::ear::array::length(key);
@@ -67,10 +71,10 @@ namespace ear {
                 return Session {nullptr, nullptr, nullptr, false };
             else
                 return Session {
-                        get_env(environment, ::ear::env::library_key),
-                        get_env(environment, ::ear::env::reporter_key),
-                        get_env(environment, ::ear::env::destination_key),
-                        get_env(environment, ::ear::env::verbose_key) != nullptr
+                        get_env(environment, KEY_LIBRARY),
+                        get_env(environment, KEY_REPORTER),
+                        get_env(environment, KEY_DESTINATION),
+                        get_env(environment, KEY_VERBOSE) != nullptr
                 };
         }
 
