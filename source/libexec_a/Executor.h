@@ -79,6 +79,9 @@ namespace ear {
     class Executor {
     public:
         int execve(const char *path, char *const argv[], char *const envp[]) const noexcept {
+            if (not_valid_)
+                return -1;
+
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -97,6 +100,9 @@ namespace ear {
         }
 
         int execvpe(const char *file, char *const argv[], char *const envp[]) const noexcept {
+            if (not_valid_)
+                return -1;
+
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -115,6 +121,9 @@ namespace ear {
         }
 
         int execvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) const noexcept {
+            if (not_valid_)
+                return -1;
+
             auto fp = Resolver::resolve_execve();
             if (fp == nullptr)
                 return -1;
@@ -137,6 +146,9 @@ namespace ear {
                         const posix_spawnattr_t *attrp,
                         char *const argv[],
                         char *const envp[]) const noexcept {
+            if (not_valid_)
+                return -1;
+
             auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
@@ -159,6 +171,9 @@ namespace ear {
                          const posix_spawnattr_t *attrp,
                          char *const argv[],
                          char *const envp[]) const noexcept {
+            if (not_valid_)
+                return -1;
+
             auto fp = Resolver::resolve_spawn();
             if (fp == nullptr)
                 return -1;
@@ -178,7 +193,8 @@ namespace ear {
 
     public:
         explicit Executor(const ::ear::Session &session) noexcept
-                : session_ {
+                : not_valid_(session.is_not_valid())
+                , session_ {
                         session.reporter,
                         ::ear::FLAG_DESTINATION,
                         session.destination,
@@ -217,6 +233,7 @@ namespace ear {
     private:
         static constexpr size_t SESSION_SIZE = 8;
 
+        const bool not_valid_;
         const char *session_[SESSION_SIZE];
         const size_t session_size_;
     };

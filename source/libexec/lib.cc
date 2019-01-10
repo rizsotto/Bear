@@ -102,9 +102,7 @@ extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("execve");
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
 
 
@@ -113,9 +111,7 @@ int execv(const char *path, char *const argv[]) {
     trace_function_call("execv");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
 
 
@@ -123,9 +119,7 @@ extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
     trace_function_call("execvpe");
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
 
 
@@ -134,9 +128,7 @@ int execvp(const char *file, char *const argv[]) {
     trace_function_call("execvp");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
 
 
@@ -145,9 +137,7 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
     trace_function_call("execvP");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execvP(file, search_path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execvP(file, search_path, argv, envp);
 }
 
 
@@ -155,9 +145,7 @@ extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("exect");
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
 
 
@@ -178,9 +166,7 @@ int execl(const char *path, const char *arg, ...) {
     va_end(ap);
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
 
 
@@ -201,9 +187,7 @@ int execlp(const char *file, const char *arg, ...) {
     va_end(ap);
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
 
 
@@ -225,9 +209,7 @@ int execle(const char *path, const char *arg, ...) {
     char **envp = va_arg(ap, char **);
     va_end(ap);
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
 
 
@@ -238,9 +220,7 @@ int posix_spawn(pid_t *pid, const char *path,
                 char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawn");
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    return DynamicLinkerExecutor(SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
 
@@ -251,9 +231,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawnp");
 
-    return SESSION.is_not_valid()
-            ? -1
-            : DynamicLinkerExecutor(SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    return DynamicLinkerExecutor(SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 
 //extern "C"
