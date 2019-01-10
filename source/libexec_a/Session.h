@@ -19,9 +19,24 @@
 
 #pragma once
 
+#include "libexec_a/Storage.h"
+
 namespace ear {
 
     struct Session {
+        bool is_not_valid() const noexcept {
+            return (library == nullptr || reporter == nullptr || destination == nullptr);
+        }
+
+        void persist(Storage &storage) noexcept {
+            if (is_not_valid())
+                return;
+
+            library = storage.store(library);
+            reporter = storage.store(reporter);
+            destination = storage.store(destination);
+        }
+
         char const *library;
         char const *reporter;
         char const *destination;

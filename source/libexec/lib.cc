@@ -34,43 +34,33 @@
 
 namespace {
 
+    using DynamicLinkerExecutor = ear::Executor<ear::DynamicLinker>;
+
     std::atomic<bool> LOADED(false);
+    ear::Session SESSION;
 
     constexpr size_t BUFFER_SIZE = 16 * 1024;
     char BUFFER[BUFFER_SIZE];
 
-    ::ear::Session SESSION;
 
+    size_t va_length(va_list &args) {
+        size_t arg_count = 0;
+        while (va_arg(args, const char *) != nullptr)
+            ++arg_count;
+        return arg_count;
+    };
 
-    bool is_not_valid(const ::ear::Session &input) noexcept {
-        return (input.library == nullptr ||
-                input.reporter == nullptr ||
-                input.destination == nullptr);
-    }
-
-    ::ear::Session store_session_attributes(const ::ear::Session &input) noexcept {
-        if (is_not_valid(input))
-            return input;
-
-        ::ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
-
-        return ::ear::Session {
-                storage.store(input.library),
-                storage.store(input.reporter),
-                storage.store(input.destination),
-                input.verbose
-        };
-    }
+    void va_copy_n(va_list &args, char *argv[], size_t const argc) {
+        for (size_t idx = 0; idx <= argc; ++idx)
+            argv[idx] = va_arg(args, char *);
+    };
 
     void trace_function_call(const char *message) {
-        if (is_not_valid(SESSION))
+        if (SESSION.is_not_valid())
             fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", message);
         else if (SESSION.verbose)
             fprintf(stderr, "libexec.so: %s\n", message);
     }
-
-
-    using DynamicLinkerExecutor = ::ear::Executor<::ear::DynamicLinker>;
 }
 
 /**
@@ -84,9 +74,11 @@ extern "C" void on_load() {
     if (LOADED.exchange(true))
         return;
 
-    const auto environment = ::ear::environment::current();
-    const auto session = ::ear::environment::capture_session(environment);
-    SESSION = store_session_attributes(session);
+    const auto environment = ear::environment::current();
+    SESSION = ear::environment::capture_session(environment);
+
+    ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
+    SESSION.persist(storage);
 
     trace_function_call("on_load");
 }
@@ -110,7 +102,7 @@ extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("execve");
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
@@ -120,8 +112,8 @@ extern "C"
 int execv(const char *path, char *const argv[]) {
     trace_function_call("execv");
 
-    auto envp = const_cast<char *const *>(::ear::environment::current());
-    return is_not_valid(SESSION)
+    auto envp = const_cast<char *const *>(ear::environment::current());
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
@@ -131,7 +123,7 @@ extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
     trace_function_call("execvpe");
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
@@ -141,8 +133,8 @@ extern "C"
 int execvp(const char *file, char *const argv[]) {
     trace_function_call("execvp");
 
-    auto envp = const_cast<char *const *>(::ear::environment::current());
-    return is_not_valid(SESSION)
+    auto envp = const_cast<char *const *>(ear::environment::current());
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
@@ -152,8 +144,8 @@ extern "C"
 int execvP(const char *file, const char *search_path, char *const argv[]) {
     trace_function_call("execvP");
 
-    auto envp = const_cast<char *const *>(::ear::environment::current());
-    return is_not_valid(SESSION)
+    auto envp = const_cast<char *const *>(ear::environment::current());
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execvP(file, search_path, argv, envp);
 }
@@ -163,24 +155,9 @@ extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("exect");
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
-}
-
-
-namespace {
-    size_t va_length(va_list &args) {
-        size_t arg_count = 0;
-        while (va_arg(args, const char *) != nullptr)
-            ++arg_count;
-        return arg_count;
-    };
-
-    void va_copy_n(va_list &args, char *argv[], size_t const argc) {
-        for (size_t idx = 0; idx <= argc; ++idx)
-            argv[idx] = va_arg(args, char *);
-    };
 }
 
 
@@ -200,8 +177,8 @@ int execl(const char *path, const char *arg, ...) {
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char *const *>(::ear::environment::current());
-    return is_not_valid(SESSION)
+    auto envp = const_cast<char *const *>(ear::environment::current());
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
@@ -223,8 +200,8 @@ int execlp(const char *file, const char *arg, ...) {
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char *const *>(::ear::environment::current());
-    return is_not_valid(SESSION)
+    auto envp = const_cast<char *const *>(ear::environment::current());
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
 }
@@ -248,7 +225,7 @@ int execle(const char *path, const char *arg, ...) {
     char **envp = va_arg(ap, char **);
     va_end(ap);
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
 }
@@ -261,7 +238,7 @@ int posix_spawn(pid_t *pid, const char *path,
                 char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawn");
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
@@ -274,7 +251,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawnp");
 
-    return is_not_valid(SESSION)
+    return SESSION.is_not_valid()
             ? -1
             : DynamicLinkerExecutor(SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }

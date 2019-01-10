@@ -7,17 +7,14 @@ namespace {
 
     TEST(Environment, dont_crash_on_nullptr) {
         const auto result = ::ear::environment::capture_session(nullptr);
+        ASSERT_TRUE(result.is_not_valid());
     }
 
     TEST(Environment, capture_on_empty) {
         const char *envp[] = { "this=is", "these=are", nullptr };
 
         const auto result = ::ear::environment::capture_session(envp);
-
-        EXPECT_EQ(nullptr, result.destination);
-        EXPECT_EQ(nullptr, result.library);
-        EXPECT_EQ(nullptr, result.reporter);
-        EXPECT_EQ(false, result.verbose);
+        ASSERT_TRUE(result.is_not_valid());
     }
 
     TEST(Environment, capture_silent) {
@@ -29,6 +26,7 @@ namespace {
         };
 
         const auto result = ::ear::environment::capture_session(envp);
+        ASSERT_FALSE(result.is_not_valid());
 
         EXPECT_STREQ("/tmp/intercept.random", result.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
@@ -46,6 +44,7 @@ namespace {
         };
 
         const auto result = ::ear::environment::capture_session(envp);
+        ASSERT_FALSE(result.is_not_valid());
 
         EXPECT_STREQ("/tmp/intercept.random", result.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
