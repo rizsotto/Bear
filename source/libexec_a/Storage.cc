@@ -25,12 +25,6 @@
 
 namespace ear {
 
-    Storage::Storage(char *const begin, char *const end) noexcept
-            : begin_(begin)
-            , end_(end)
-            , top_(begin)
-    { }
-
     char const *Storage::store(char const *const input) noexcept {
         if (input == nullptr)
             return nullptr;

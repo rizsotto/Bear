@@ -43,4 +43,12 @@ namespace ear {
         char *const end_;
         char *top_;
     };
+
+    inline
+    Storage::Storage(char *const begin, char *const end) noexcept
+            : begin_(begin)
+            , end_(end)
+            , top_(begin)
+    { }
+
 }

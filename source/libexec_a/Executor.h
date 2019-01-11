@@ -78,132 +78,7 @@ namespace ear {
     template<typename Resolver>
     class Executor {
     public:
-        int execve(const char *path, char *const argv[], char *const envp[]) const noexcept {
-            if (not_valid_)
-                return -1;
-
-            auto fp = Resolver::resolve_execve();
-            if (fp == nullptr)
-                return -1;
-
-            const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-            const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length];
-            const char **const dst_end = dst + dst_length;
-
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            if (copy(execution, it, dst_end) == nullptr)
-                return -1;
-
-            return fp(reporter(), const_cast<char *const *>(dst), envp);
-        }
-
-        int execvpe(const char *file, char *const argv[], char *const envp[]) const noexcept {
-            if (not_valid_)
-                return -1;
-
-            auto fp = Resolver::resolve_execve();
-            if (fp == nullptr)
-                return -1;
-
-            const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-            const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length];
-            const char **const dst_end = dst + dst_length;
-
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            if (copy(execution, it, dst_end) == nullptr)
-                return -1;
-
-            return fp(reporter(), const_cast<char *const *>(dst), envp);
-        }
-
-        int execvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) const noexcept {
-            if (not_valid_)
-                return -1;
-
-            auto fp = Resolver::resolve_execve();
-            if (fp == nullptr)
-                return -1;
-
-            const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
-
-            const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length];
-            const char **const dst_end = dst + dst_length;
-
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            if (copy(execution, it, dst_end) == nullptr)
-                return -1;
-
-            return fp(reporter(), const_cast<char *const *>(dst), envp);
-        }
-
-        int posix_spawn(pid_t *pid, const char *path,
-                        const posix_spawn_file_actions_t *file_actions,
-                        const posix_spawnattr_t *attrp,
-                        char *const argv[],
-                        char *const envp[]) const noexcept {
-            if (not_valid_)
-                return -1;
-
-            auto fp = Resolver::resolve_spawn();
-            if (fp == nullptr)
-                return -1;
-
-            const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-            const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length];
-            const char **const dst_end = dst + dst_length;
-
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            if (copy(execution, it, dst_end) == nullptr)
-                return -1;
-
-            return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
-        }
-
-        int posix_spawnp(pid_t *pid, const char *file,
-                         const posix_spawn_file_actions_t *file_actions,
-                         const posix_spawnattr_t *attrp,
-                         char *const argv[],
-                         char *const envp[]) const noexcept {
-            if (not_valid_)
-                return -1;
-
-            auto fp = Resolver::resolve_spawn();
-            if (fp == nullptr)
-                return -1;
-
-            const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-            const size_t dst_length = length(execution) + session_size_;
-            const char *dst[dst_length];
-            const char **const dst_end = dst + dst_length;
-
-            const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-            if (copy(execution, it, dst_end) == nullptr)
-                return -1;
-
-            return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
-        }
-
-    public:
-        explicit Executor(const ::ear::Session &session) noexcept
-                : not_valid_(session.is_not_valid())
-                , session_ {
-                        session.get_reporter(),
-                        ::ear::FLAG_DESTINATION,
-                        session.get_destination(),
-                        ::ear::FLAG_LIBRARY,
-                        session.get_library(),
-                        (session.is_verbose()) ? ::ear::FLAG_VERBOSE : nullptr,
-                        nullptr }
-                , session_size_(::ear::array::length(session_))
-        { }
+        explicit Executor(const ::ear::Session &session) noexcept;
 
         Executor() noexcept = delete;
 
@@ -217,18 +92,31 @@ namespace ear {
 
         Executor &operator=(Executor &&) noexcept = delete;
 
+    public:
+        int execve(const char *path, char *const argv[], char *const envp[]) const noexcept;
+
+        int execvpe(const char *file, char *const argv[], char *const envp[]) const noexcept;
+
+        int execvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) const noexcept;
+
+        int posix_spawn(pid_t *pid, const char *path,
+                        const posix_spawn_file_actions_t *file_actions,
+                        const posix_spawnattr_t *attrp,
+                        char *const argv[],
+                        char *const envp[]) const noexcept;
+
+        int posix_spawnp(pid_t *pid, const char *file,
+                         const posix_spawn_file_actions_t *file_actions,
+                         const posix_spawnattr_t *attrp,
+                         char *const argv[],
+                         char *const envp[]) const noexcept;
+
     private:
-        const char *reporter() const noexcept {
-            return session_[0];
-        }
+        const char *reporter() const noexcept;
 
-        const char **session_begin() const noexcept {
-            return const_cast<const char **>(session_);
-        }
+        const char **session_begin() const noexcept;
 
-        const char **session_end() const noexcept {
-            return session_begin() + session_size_;
-        }
+        const char **session_end() const noexcept;
 
     private:
         static constexpr size_t SESSION_SIZE = 8;
@@ -237,5 +125,149 @@ namespace ear {
         const char *session_[SESSION_SIZE];
         const size_t session_size_;
     };
+
+    template<typename Resolver>
+    Executor<Resolver>::Executor(const ::ear::Session &session) noexcept
+            : not_valid_(session.is_not_valid())
+            , session_ {
+                    session.get_reporter(),
+                    ::ear::FLAG_DESTINATION,
+                    session.get_destination(),
+                    ::ear::FLAG_LIBRARY,
+                    session.get_library(),
+                    (session.is_verbose()) ? ::ear::FLAG_VERBOSE : nullptr,
+                    nullptr }
+            , session_size_(::ear::array::length(session_))
+    { }
+
+    template<typename Resolver>
+    const char *Executor<Resolver>::reporter() const noexcept {
+        return session_[0];
+    }
+
+    template<typename Resolver>
+    const char **Executor<Resolver>::session_begin() const noexcept {
+        return const_cast<const char **>(session_);
+    }
+
+    template<typename Resolver>
+    const char **Executor<Resolver>::session_end() const noexcept {
+        return session_begin() + session_size_;
+    }
+
+    template<typename Resolver>
+    int Executor<Resolver>::execve(const char *path, char *const *argv, char *const *envp) const noexcept {
+        if (not_valid_)
+            return -1;
+
+        auto fp = Resolver::resolve_execve();
+        if (fp == nullptr)
+            return -1;
+
+        const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
+
+        const size_t dst_length = length(execution) + session_size_;
+        const char *dst[dst_length];
+        const char **const dst_end = dst + dst_length;
+
+        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        if (copy(execution, it, dst_end) == nullptr)
+            return -1;
+
+        return fp(reporter(), const_cast<char *const *>(dst), envp);
+    }
+
+    template<typename Resolver>
+    int Executor<Resolver>::execvpe(const char *file, char *const *argv, char *const *envp) const noexcept {
+        if (not_valid_)
+            return -1;
+
+        auto fp = Resolver::resolve_execve();
+        if (fp == nullptr)
+            return -1;
+
+        const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
+
+        const size_t dst_length = length(execution) + session_size_;
+        const char *dst[dst_length];
+        const char **const dst_end = dst + dst_length;
+
+        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        if (copy(execution, it, dst_end) == nullptr)
+            return -1;
+
+        return fp(reporter(), const_cast<char *const *>(dst), envp);
+    }
+
+    template<typename Resolver>
+    int Executor<Resolver>::execvP(const char *file, const char *search_path, char *const *argv,
+                                   char *const *envp) const noexcept {
+        if (not_valid_)
+            return -1;
+
+        auto fp = Resolver::resolve_execve();
+        if (fp == nullptr)
+            return -1;
+
+        const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
+
+        const size_t dst_length = length(execution) + session_size_;
+        const char *dst[dst_length];
+        const char **const dst_end = dst + dst_length;
+
+        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        if (copy(execution, it, dst_end) == nullptr)
+            return -1;
+
+        return fp(reporter(), const_cast<char *const *>(dst), envp);
+    }
+
+    template<typename Resolver>
+    int Executor<Resolver>::posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions,
+                                        const posix_spawnattr_t *attrp, char *const *argv,
+                                        char *const *envp) const noexcept {
+        if (not_valid_)
+            return -1;
+
+        auto fp = Resolver::resolve_spawn();
+        if (fp == nullptr)
+            return -1;
+
+        const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
+
+        const size_t dst_length = length(execution) + session_size_;
+        const char *dst[dst_length];
+        const char **const dst_end = dst + dst_length;
+
+        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        if (copy(execution, it, dst_end) == nullptr)
+            return -1;
+
+        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+    }
+
+    template<typename Resolver>
+    int Executor<Resolver>::posix_spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t *file_actions,
+                                         const posix_spawnattr_t *attrp, char *const *argv,
+                                         char *const *envp) const noexcept {
+        if (not_valid_)
+            return -1;
+
+        auto fp = Resolver::resolve_spawn();
+        if (fp == nullptr)
+            return -1;
+
+        const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
+
+        const size_t dst_length = length(execution) + session_size_;
+        const char *dst[dst_length];
+        const char **const dst_end = dst + dst_length;
+
+        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        if (copy(execution, it, dst_end) == nullptr)
+            return -1;
+
+        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+    }
 
 }

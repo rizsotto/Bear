@@ -33,17 +33,6 @@ namespace {
 
 namespace ear {
 
-    Session::Session(
-            char const *library,
-            char const *reporter,
-            char const *destination,
-            bool verbose) noexcept
-            : library(library)
-            , reporter(reporter)
-            , destination(destination)
-            , verbose(verbose)
-    { }
-
     Session Session::from(const char **environment) noexcept {
         if (nullptr == environment)
             return {};
@@ -56,32 +45,12 @@ namespace ear {
             };
     }
 
-    const char *Session::get_library() const {
-        return library;
-    }
-
-    const char *Session::get_reporter() const {
-        return reporter;
-    }
-
-    const char *Session::get_destination() const {
-        return destination;
-    }
-
-    bool Session::is_verbose() const {
-        return verbose;
-    }
-
-    bool Session::is_not_valid() const noexcept {
-        return (library == nullptr || reporter == nullptr || destination == nullptr);
-    }
-
     void Session::persist(Storage &storage) noexcept {
         if (is_not_valid())
             return;
 
-        library = storage.store(library);
-        reporter = storage.store(reporter);
-        destination = storage.store(destination);
+        library_ = storage.store(library_);
+        reporter_ = storage.store(reporter_);
+        destination_ = storage.store(destination_);
     }
 }
