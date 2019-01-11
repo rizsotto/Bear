@@ -58,7 +58,7 @@ namespace {
     void trace_function_call(const char *message) {
         if (SESSION.is_not_valid())
             fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", message);
-        else if (SESSION.verbose)
+        else if (SESSION.is_verbose())
             fprintf(stderr, "libexec.so: %s\n", message);
     }
 }
@@ -75,7 +75,7 @@ extern "C" void on_load() {
         return;
 
     const auto environment = ear::environment::current();
-    SESSION = ear::environment::capture_session(environment);
+    SESSION = ear::Session::from(environment);
 
     ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
     SESSION.persist(storage);

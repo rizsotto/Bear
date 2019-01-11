@@ -1,6 +1,6 @@
 add_executable(libexec_unit_test
         ArrayTest.cc
-        EnvironmentTest.cc
+        SessionTest.cc
         ExecutorTest.cc
         StorageTest.cc
 )

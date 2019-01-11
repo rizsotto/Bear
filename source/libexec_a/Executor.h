@@ -195,12 +195,12 @@ namespace ear {
         explicit Executor(const ::ear::Session &session) noexcept
                 : not_valid_(session.is_not_valid())
                 , session_ {
-                        session.reporter,
+                        session.get_reporter(),
                         ::ear::FLAG_DESTINATION,
-                        session.destination,
+                        session.get_destination(),
                         ::ear::FLAG_LIBRARY,
-                        session.library,
-                        (session.verbose) ? ::ear::FLAG_VERBOSE : nullptr,
+                        session.get_library(),
+                        (session.is_verbose()) ? ::ear::FLAG_VERBOSE : nullptr,
                         nullptr }
                 , session_size_(::ear::array::length(session_))
         { }

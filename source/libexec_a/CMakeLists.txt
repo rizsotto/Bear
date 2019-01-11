@@ -4,6 +4,7 @@ add_library(exec_a STATIC
         DynamicLinker.cc
         Executor.h
         Session.h
+        Session.cc
         Environment.h
         Environment.cc
         Storage.h

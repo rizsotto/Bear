@@ -19,14 +19,11 @@
 
 #pragma once
 
-#include "libexec_a/Session.h"
-
 namespace ear {
     namespace environment {
 
         const char **current() noexcept;
 
-        Session capture_session(const char **environment) noexcept;
-
+        const char *get_env_value(const char **envp, const char *key) noexcept;
     }
 }

@@ -6,14 +6,14 @@
 namespace {
 
     TEST(Environment, dont_crash_on_nullptr) {
-        const auto result = ::ear::environment::capture_session(nullptr);
+        const auto result = ear::Session::from(nullptr);
         ASSERT_TRUE(result.is_not_valid());
     }
 
     TEST(Environment, capture_on_empty) {
         const char *envp[] = { "this=is", "these=are", nullptr };
 
-        const auto result = ::ear::environment::capture_session(envp);
+        const auto result = ear::Session::from(envp);
         ASSERT_TRUE(result.is_not_valid());
     }
 
@@ -25,13 +25,13 @@ namespace {
                 nullptr
         };
 
-        const auto result = ::ear::environment::capture_session(envp);
+        const auto result = ear::Session::from(envp);
         ASSERT_FALSE(result.is_not_valid());
 
-        EXPECT_STREQ("/tmp/intercept.random", result.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
-        EXPECT_STREQ("/usr/bin/intercept", result.reporter);
-        EXPECT_EQ(false, result.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", result.get_destination());
+        EXPECT_STREQ("/usr/libexec/libexec.so", result.get_library());
+        EXPECT_STREQ("/usr/bin/intercept", result.get_reporter());
+        EXPECT_EQ(false, result.is_verbose());
     }
 
     TEST(Environment, capture_verbose) {
@@ -43,13 +43,13 @@ namespace {
                 nullptr
         };
 
-        const auto result = ::ear::environment::capture_session(envp);
+        const auto result = ear::Session::from(envp);
         ASSERT_FALSE(result.is_not_valid());
 
-        EXPECT_STREQ("/tmp/intercept.random", result.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", result.library);
-        EXPECT_STREQ("/usr/bin/intercept", result.reporter);
-        EXPECT_EQ(true, result.verbose);
+        EXPECT_STREQ("/tmp/intercept.random", result.get_destination());
+        EXPECT_STREQ("/usr/libexec/libexec.so", result.get_library());
+        EXPECT_STREQ("/usr/bin/intercept", result.get_reporter());
+        EXPECT_EQ(true, result.is_verbose());
     }
 
 }
