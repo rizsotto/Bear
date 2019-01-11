@@ -2,11 +2,13 @@ add_library(exec_a STATIC
         Array.h
         DynamicLinker.h
         DynamicLinker.cc
-        Executor.h
-        Session.h
-        Session.cc
         Environment.h
         Environment.cc
+        Executor.h
+        Executor.cc
+        Resolver.h
+        Session.h
+        Session.cc
         Storage.h
         Storage.cc
 )

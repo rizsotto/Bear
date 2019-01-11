@@ -19,15 +19,29 @@
 
 #pragma once
 
-#include "libexec_a/Resolver.h"
+#include "config.h"
 
 namespace ear {
 
-    struct DynamicLinker : public Resolver {
+    struct Resolver {
 
-        execve_t execve() const noexcept override;
+        using execve_t =
+                int (*)(const char *path,
+                        char *const argv[],
+                        char *const envp[]);
 
-        posix_spawn_t posix_spawn() const noexcept override;
+        using posix_spawn_t =
+                int (*)(pid_t *pid,
+                        const char *path,
+                        const posix_spawn_file_actions_t *file_actions,
+                        const posix_spawnattr_t *attrp,
+                        char *const argv[],
+                        char *const envp[]);
+
+        virtual ~Resolver() noexcept = default;
+
+        virtual execve_t execve() const noexcept = 0;
+        virtual posix_spawn_t posix_spawn() const noexcept = 0;
     };
 
 }

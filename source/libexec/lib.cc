@@ -34,14 +34,13 @@
 
 namespace {
 
-    using DynamicLinkerExecutor = ear::Executor<ear::DynamicLinker>;
-
     std::atomic<bool> LOADED(false);
     ear::Session SESSION;
 
     constexpr size_t BUFFER_SIZE = 16 * 1024;
     char BUFFER[BUFFER_SIZE];
 
+    ear::DynamicLinker RESOLVER;
 
     size_t va_length(va_list &args) {
         size_t arg_count = 0;
@@ -102,7 +101,7 @@ extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("execve");
 
-    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
 
@@ -111,7 +110,7 @@ int execv(const char *path, char *const argv[]) {
     trace_function_call("execv");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
 
@@ -119,7 +118,7 @@ extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
     trace_function_call("execvpe");
 
-    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
 
@@ -128,7 +127,7 @@ int execvp(const char *file, char *const argv[]) {
     trace_function_call("execvp");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
 
@@ -137,7 +136,7 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
     trace_function_call("execvP");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return DynamicLinkerExecutor(SESSION).execvP(file, search_path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execvP(file, search_path, argv, envp);
 }
 
 
@@ -145,7 +144,7 @@ extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
     trace_function_call("exect");
 
-    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
 
@@ -166,7 +165,7 @@ int execl(const char *path, const char *arg, ...) {
     va_end(ap);
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
 
@@ -187,7 +186,7 @@ int execlp(const char *file, const char *arg, ...) {
     va_end(ap);
 
     auto envp = const_cast<char *const *>(ear::environment::current());
-    return DynamicLinkerExecutor(SESSION).execvpe(file, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
 
@@ -209,7 +208,7 @@ int execle(const char *path, const char *arg, ...) {
     char **envp = va_arg(ap, char **);
     va_end(ap);
 
-    return DynamicLinkerExecutor(SESSION).execve(path, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
 
@@ -220,7 +219,7 @@ int posix_spawn(pid_t *pid, const char *path,
                 char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawn");
 
-    return DynamicLinkerExecutor(SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
 
@@ -231,7 +230,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  char *const argv[], char *const envp[]) {
     trace_function_call("posix_spawnp");
 
-    return DynamicLinkerExecutor(SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    return ear::Executor(SESSION, RESOLVER).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 
 //extern "C"

@@ -21,10 +21,6 @@
 
 #include "config.h"
 
-#include "libexec_a/Array.h"
-#include "libexec_a/Environment.h"
-#include "libexec_a/Session.h"
-
 namespace ear {
 
     constexpr char FLAG_VERBOSE[] = "--verbose";
@@ -34,51 +30,13 @@ namespace ear {
     constexpr char FLAG_FILE[] = "--exec-file";
     constexpr char FLAG_SEARCH_PATH[] = "--exec-search_path";
     constexpr char FLAG_COMMAND[] = "--exec-command";
-}
 
-namespace {
+    class Resolver;
+    class Session;
 
-    struct Execution {
-        const char **command;
-        const char *path;
-        const char *file;
-        const char *search_path;
-    };
-
-    size_t length(const Execution &execution) noexcept {
-        return ((execution.path != nullptr) ? 2 : 0) +
-               ((execution.file != nullptr) ? 2 : 0) +
-               ((execution.search_path != nullptr) ? 2 : 0) +
-               ::ear::array::length(execution.command) +
-               2;
-    }
-
-    const char **copy(const Execution &execution, const char **it, const char **it_end) noexcept {
-        if (execution.path != nullptr) {
-            *it++ = ::ear::FLAG_PATH;
-            *it++ = execution.path;
-        }
-        if (execution.file != nullptr) {
-            *it++ = ::ear::FLAG_FILE;
-            *it++ = execution.file;
-        }
-        if (execution.search_path != nullptr) {
-            *it++ = ::ear::FLAG_SEARCH_PATH;
-            *it++ = execution.search_path;
-        }
-        *it++ = ::ear::FLAG_COMMAND;
-        const size_t command_size = ::ear::array::length(execution.command);
-        const char **const command_end = execution.command + (command_size + 1);
-        return ::ear::array::copy(execution.command, command_end, it, it_end);
-    }
-}
-
-namespace ear {
-
-    template<typename Resolver>
     class Executor {
     public:
-        explicit Executor(const ::ear::Session &session) noexcept;
+        Executor(ear::Session const &session, ear::Resolver const &resolver) noexcept;
 
         Executor() noexcept = delete;
 
@@ -124,150 +82,23 @@ namespace ear {
         const bool not_valid_;
         const char *session_[SESSION_SIZE];
         const size_t session_size_;
+
+        const ear::Resolver &resolver_;
     };
 
-    template<typename Resolver>
-    Executor<Resolver>::Executor(const ::ear::Session &session) noexcept
-            : not_valid_(session.is_not_valid())
-            , session_ {
-                    session.get_reporter(),
-                    ::ear::FLAG_DESTINATION,
-                    session.get_destination(),
-                    ::ear::FLAG_LIBRARY,
-                    session.get_library(),
-                    (session.is_verbose()) ? ::ear::FLAG_VERBOSE : nullptr,
-                    nullptr }
-            , session_size_(::ear::array::length(session_))
-    { }
-
-    template<typename Resolver>
-    const char *Executor<Resolver>::reporter() const noexcept {
+    inline
+    const char *Executor::reporter() const noexcept {
         return session_[0];
     }
 
-    template<typename Resolver>
-    const char **Executor<Resolver>::session_begin() const noexcept {
+    inline
+    const char **Executor::session_begin() const noexcept {
         return const_cast<const char **>(session_);
     }
 
-    template<typename Resolver>
-    const char **Executor<Resolver>::session_end() const noexcept {
+    inline
+    const char **Executor::session_end() const noexcept {
         return session_begin() + session_size_;
-    }
-
-    template<typename Resolver>
-    int Executor<Resolver>::execve(const char *path, char *const *argv, char *const *envp) const noexcept {
-        if (not_valid_)
-            return -1;
-
-        auto fp = Resolver::resolve_execve();
-        if (fp == nullptr)
-            return -1;
-
-        const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-        const size_t dst_length = length(execution) + session_size_;
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
-
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
-    }
-
-    template<typename Resolver>
-    int Executor<Resolver>::execvpe(const char *file, char *const *argv, char *const *envp) const noexcept {
-        if (not_valid_)
-            return -1;
-
-        auto fp = Resolver::resolve_execve();
-        if (fp == nullptr)
-            return -1;
-
-        const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-        const size_t dst_length = length(execution) + session_size_;
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
-
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
-    }
-
-    template<typename Resolver>
-    int Executor<Resolver>::execvP(const char *file, const char *search_path, char *const *argv,
-                                   char *const *envp) const noexcept {
-        if (not_valid_)
-            return -1;
-
-        auto fp = Resolver::resolve_execve();
-        if (fp == nullptr)
-            return -1;
-
-        const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
-
-        const size_t dst_length = length(execution) + session_size_;
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
-
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
-    }
-
-    template<typename Resolver>
-    int Executor<Resolver>::posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions,
-                                        const posix_spawnattr_t *attrp, char *const *argv,
-                                        char *const *envp) const noexcept {
-        if (not_valid_)
-            return -1;
-
-        auto fp = Resolver::resolve_spawn();
-        if (fp == nullptr)
-            return -1;
-
-        const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-        const size_t dst_length = length(execution) + session_size_;
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
-
-        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
-    }
-
-    template<typename Resolver>
-    int Executor<Resolver>::posix_spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t *file_actions,
-                                         const posix_spawnattr_t *attrp, char *const *argv,
-                                         char *const *envp) const noexcept {
-        if (not_valid_)
-            return -1;
-
-        auto fp = Resolver::resolve_spawn();
-        if (fp == nullptr)
-            return -1;
-
-        const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-        const size_t dst_length = length(execution) + session_size_;
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = ::ear::array::copy(session_begin(), session_end(), dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
-
-        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
     }
 
 }
