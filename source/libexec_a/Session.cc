@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdio>
 #include "libexec_a/Session.h"
 
 #include "libexec_a/Environment.h"
@@ -52,5 +53,12 @@ namespace ear {
         library_ = storage.store(library_);
         reporter_ = storage.store(reporter_);
         destination_ = storage.store(destination_);
+    }
+
+    void Session::report_call(const char *function_name) const noexcept {
+        if (is_not_valid())
+            fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", function_name);
+        else if (is_verbose())
+            fprintf(stderr, "libexec.so: %s\n", function_name);
     }
 }

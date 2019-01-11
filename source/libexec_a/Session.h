@@ -55,6 +55,8 @@ namespace ear {
 
         void persist(Storage &storage) noexcept;
 
+        void report_call(const char *function_name) const noexcept;
+
     private:
         char const *library_;
         char const *reporter_;
