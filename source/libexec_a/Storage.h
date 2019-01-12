@@ -21,12 +21,30 @@
 
 namespace ear {
 
+    /**
+     * Represents a character storage.
+     *
+     * Define helper methods to persist character sequences. The covered
+     * functionality is not more than a `memcpy` to a static char array.
+     */
     class Storage {
     public:
+        /**
+         * Takes the memory addresses of the buffer.
+         *
+         * @param begin of the buffer.
+         * @param end of the buffer.
+         */
         Storage(char *begin, char *end) noexcept;
 
         ~Storage() noexcept = default;
 
+        /**
+         * Copy the input to the buffer.
+         *
+         * @param input to persist.
+         * @return the address of the persisted input.
+         */
         char const *store(char const *input) noexcept;
 
     public:

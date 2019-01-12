@@ -23,6 +23,9 @@ namespace ear {
 
     class Storage;
 
+    /**
+     * Represents an intercept session parameter set.
+     */
     class Session {
     public:
         Session() noexcept = default;
@@ -39,6 +42,12 @@ namespace ear {
 
         Session &operator=(Session &&) noexcept = default;
 
+        /**
+         * Creates a Session object from the given environment.
+         *
+         * @param environment to initialize from.
+         * @return a Session object which might or might not be initialized.
+         */
         static Session from(const char **environment) noexcept;
 
     public:
@@ -51,10 +60,30 @@ namespace ear {
         bool is_verbose() const;
 
     public:
+        /**
+         * @return true if the session is initialized and can be used to
+         * intercept execution calls.
+         */
         bool is_not_valid() const noexcept;
 
+        /**
+         * It persist the parameters to a buffer.
+         *
+         * If the values were created from the environment array. Those
+         * pointers can be freed before they get used. (The process calls
+         * a `setenv` method.)
+         *
+         * @param storage uses a buffer to persist the values.
+         */
         void persist(Storage &storage) noexcept;
 
+        /**
+         * Report a function call to stderr.
+         *
+         * It's for debugging purposes. It leaves traces of the interface invocations.
+         *
+         * @param function_name to print.
+         */
         void report_call(const char *function_name) const noexcept;
 
     private:

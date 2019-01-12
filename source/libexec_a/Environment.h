@@ -22,8 +22,27 @@
 namespace ear {
     namespace environment {
 
+        /**
+         * Abstraction to get the current environment.
+         *
+         * When the dynamic linker loads the library the `environ` variable
+         * might not be available. (This is the case for OSX.) This method
+         * makes it uniform to access the current environment on all platform.
+         *
+         * @return the current environment.
+         */
         const char **current() noexcept;
 
+        /**
+         * Returns the value for the given environment name, from the given
+         * environment array.
+         *
+         * It's a re-implementation of the standard library function..
+         *
+         * @param envp the environment array.
+         * @param key the name of the environment.
+         * @return the value of the environment.
+         */
         const char *get_env_value(const char **envp, const char *key) noexcept;
     }
 }
