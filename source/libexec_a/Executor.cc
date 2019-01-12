@@ -73,6 +73,30 @@ namespace {
             *it++ = ear::FLAG_VERBOSE;
         return it;
     }
+
+#define CHECK_SESSION(SESSION_) \
+    do { \
+        if (SESSION_.is_not_valid()) { \
+            SESSION_.write_message("not initialized."); \
+            return -1; \
+        } \
+    } while (false)
+
+#define CHECK_FP(SESSION_, FP_) \
+    do { \
+        if (FP_ == nullptr) { \
+            SESSION_.write_message("could not resolve symbol."); \
+            return -1; \
+        } \
+    } while (false)
+
+#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_) \
+    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_); \
+    const char *VAR_[VAR_##_length]; \
+    const char **const VAR_##_end = VAR_ + VAR_##_length; \
+    const char **VAR_##it = copy(SESSION_, VAR_, VAR_##_end); \
+    copy(EXECUTION_, VAR_##it, VAR_##_end);
+
 }
 
 namespace ear {
@@ -83,65 +107,38 @@ namespace ear {
     { }
 
     int Executor::execve(const char *path, char *const *argv, char *const *envp) const noexcept {
-        if (session_.is_not_valid())
-            return -1;
+        CHECK_SESSION(session_);
 
         auto fp = resolver_.execve();
-        if (fp == nullptr)
-            return -1;
+        CHECK_FP(session_, fp);
 
         const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-        const size_t dst_length = length(execution) + length(session_);
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = copy(session_, dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
+        CREATE_BUFFER(dst, session_, execution);
 
         return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
 
     int Executor::execvpe(const char *file, char *const *argv, char *const *envp) const noexcept {
-        if (session_.is_not_valid())
-            return -1;
+        CHECK_SESSION(session_);
 
         auto fp = resolver_.execve();
-        if (fp == nullptr)
-            return -1;
+        CHECK_FP(session_, fp);
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-        const size_t dst_length = length(execution) + length(session_);
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = copy(session_, dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
+        CREATE_BUFFER(dst, session_, execution);
 
         return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
 
     int Executor::execvP(const char *file, const char *search_path, char *const *argv,
                          char *const *envp) const noexcept {
-        if (session_.is_not_valid())
-            return -1;
+        CHECK_SESSION(session_);
 
         auto fp = resolver_.execve();
-        if (fp == nullptr)
-            return -1;
+        CHECK_FP(session_, fp);
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
-
-        const size_t dst_length = length(execution) + length(session_);
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = copy(session_, dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
+        CREATE_BUFFER(dst, session_, execution);
 
         return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
@@ -149,22 +146,13 @@ namespace ear {
     int Executor::posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions,
                               const posix_spawnattr_t *attrp, char *const *argv,
                               char *const *envp) const noexcept {
-        if (session_.is_not_valid())
-            return -1;
+        CHECK_SESSION(session_);
 
         auto fp = resolver_.posix_spawn();
-        if (fp == nullptr)
-            return -1;
+        CHECK_FP(session_, fp);
 
         const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
-
-        const size_t dst_length = length(execution) + length(session_);
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = copy(session_, dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
+        CREATE_BUFFER(dst, session_, execution);
 
         return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
     }
@@ -172,22 +160,13 @@ namespace ear {
     int Executor::posix_spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t *file_actions,
                                const posix_spawnattr_t *attrp, char *const *argv,
                                char *const *envp) const noexcept {
-        if (session_.is_not_valid())
-            return -1;
+        CHECK_SESSION(session_);
 
         auto fp = resolver_.posix_spawn();
-        if (fp == nullptr)
-            return -1;
+        CHECK_FP(session_, fp);
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
-
-        const size_t dst_length = length(execution) + length(session_);
-        const char *dst[dst_length];
-        const char **const dst_end = dst + dst_length;
-
-        const char **it = copy(session_, dst, dst_end);
-        if (copy(execution, it, dst_end) == nullptr)
-            return -1;
+        CREATE_BUFFER(dst, session_, execution);
 
         return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
     }

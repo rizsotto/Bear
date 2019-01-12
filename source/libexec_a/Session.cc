@@ -55,10 +55,8 @@ namespace ear {
         destination_ = storage.store(destination_);
     }
 
-    void Session::report_call(const char *function_name) const noexcept {
-        if (is_not_valid())
-            fprintf(stderr, "libexec.so: not initialized. Failed to execute: %s\n", function_name);
-        else if (is_verbose())
-            fprintf(stderr, "libexec.so: %s\n", function_name);
+    void Session::write_message(const char *message) const noexcept {
+        if (is_verbose())
+            fprintf(stderr, "libexec.so: %s\n", message);
     }
 }

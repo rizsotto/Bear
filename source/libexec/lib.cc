@@ -111,7 +111,7 @@ extern "C" void on_load() {
     ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
     SESSION.persist(storage);
 
-    SESSION.report_call("on_load");
+    SESSION.write_message("on_load");
 }
 
 /**
@@ -125,13 +125,13 @@ extern "C" void on_unload() {
     if (not LOADED.exchange(false))
         return;
 
-    SESSION.report_call("on_unload");
+    SESSION.write_message("on_unload");
 }
 
 
 extern "C"
 int execve(const char *path, char *const argv[], char *const envp[]) {
-    SESSION.report_call("execve");
+    SESSION.write_message("execve");
 
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
@@ -139,7 +139,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 
 extern "C"
 int execv(const char *path, char *const argv[]) {
-    SESSION.report_call("execv");
+    SESSION.write_message("execv");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
@@ -148,7 +148,7 @@ int execv(const char *path, char *const argv[]) {
 
 extern "C"
 int execvpe(const char *file, char *const argv[], char *const envp[]) {
-    SESSION.report_call("execvpe");
+    SESSION.write_message("execvpe");
 
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
@@ -156,7 +156,7 @@ int execvpe(const char *file, char *const argv[], char *const envp[]) {
 
 extern "C"
 int execvp(const char *file, char *const argv[]) {
-    SESSION.report_call("execvp");
+    SESSION.write_message("execvp");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
@@ -165,7 +165,7 @@ int execvp(const char *file, char *const argv[]) {
 
 extern "C"
 int execvP(const char *file, const char *search_path, char *const argv[]) {
-    SESSION.report_call("execvP");
+    SESSION.write_message("execvP");
 
     auto envp = const_cast<char *const *>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execvP(file, search_path, argv, envp);
@@ -174,7 +174,7 @@ int execvP(const char *file, const char *search_path, char *const argv[]) {
 
 extern "C"
 int exect(const char *path, char *const argv[], char *const envp[]) {
-    SESSION.report_call("exect");
+    SESSION.write_message("exect");
 
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
@@ -182,7 +182,7 @@ int exect(const char *path, char *const argv[], char *const envp[]) {
 
 extern "C"
 int execl(const char *path, const char *arg, ...) {
-    SESSION.report_call("execl");
+    SESSION.write_message("execl");
 
     // Count the number of arguments.
     va_list ap;
@@ -203,7 +203,7 @@ int execl(const char *path, const char *arg, ...) {
 
 extern "C"
 int execlp(const char *file, const char *arg, ...) {
-    SESSION.report_call("execlp");
+    SESSION.write_message("execlp");
 
     // Count the number of arguments.
     va_list ap;
@@ -225,7 +225,7 @@ int execlp(const char *file, const char *arg, ...) {
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 extern "C"
 int execle(const char *path, const char *arg, ...) {
-    SESSION.report_call("execle");
+    SESSION.write_message("execle");
 
     // Count the number of arguments.
     va_list ap;
@@ -249,7 +249,7 @@ int posix_spawn(pid_t *pid, const char *path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *attrp,
                 char *const argv[], char *const envp[]) {
-    SESSION.report_call("posix_spawn");
+    SESSION.write_message("posix_spawn");
 
     return ear::Executor(SESSION, RESOLVER).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
@@ -260,7 +260,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  const posix_spawn_file_actions_t *file_actions,
                  const posix_spawnattr_t *attrp,
                  char *const argv[], char *const envp[]) {
-    SESSION.report_call("posix_spawnp");
+    SESSION.write_message("posix_spawnp");
 
     return ear::Executor(SESSION, RESOLVER).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }

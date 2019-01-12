@@ -82,9 +82,9 @@ namespace ear {
          *
          * It's for debugging purposes. It leaves traces of the interface invocations.
          *
-         * @param function_name to print.
+         * @param message to print.
          */
-        void report_call(const char *function_name) const noexcept;
+        void write_message(const char *message) const noexcept;
 
     private:
         char const *library_;
