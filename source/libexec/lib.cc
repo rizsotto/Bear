@@ -24,8 +24,10 @@
 #include <cstdarg>
 #include <atomic>
 
+#include <dlfcn.h>
+
 #include "libexec_a/Array.h"
-#include "libexec_a/DynamicLinker.h"
+#include "libexec_a/Resolver.h"
 #include "libexec_a/Session.h"
 #include "libexec_a/Environment.h"
 #include "libexec_a/Storage.h"
@@ -33,14 +35,6 @@
 
 
 namespace {
-
-    std::atomic<bool> LOADED(false);
-    ear::Session SESSION;
-
-    constexpr size_t BUFFER_SIZE = 16 * 1024;
-    char BUFFER[BUFFER_SIZE];
-
-    ear::DynamicLinker RESOLVER;
 
     size_t va_length(va_list &args) {
         size_t arg_count = 0;
@@ -53,7 +47,29 @@ namespace {
         for (size_t idx = 0; idx <= argc; ++idx)
             argv[idx] = va_arg(args, char *);
     };
+
+    void *dynamic_linker(char const *const name) {
+        return dlsym(RTLD_NEXT, name);
+    }
 }
+
+
+/**
+ * Library static data
+ *
+ * Will be initialized, when the library loaded into memory.
+ */
+namespace {
+
+    std::atomic<bool> LOADED(false);
+    ear::Session SESSION;
+
+    constexpr size_t BUFFER_SIZE = 16 * 1024;
+    char BUFFER[BUFFER_SIZE];
+
+    ear::Resolver RESOLVER(&dynamic_linker);
+}
+
 
 /**
  * Library entry point.

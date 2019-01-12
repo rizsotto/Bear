@@ -23,20 +23,6 @@
 
 #include <spawn.h>
 
-//#include "config.h"
-//
-//#include <cstdio>
-//#include <cstdlib>
-//#include <cstdarg>
-//#include <atomic>
-//
-//#include "libexec_a/Array.h"
-//#include "libexec_a/DynamicLinker.h"
-//#include "libexec_a/Interface.h"
-//#include "libexec_a/Environment.h"
-//#include "libexec_a/Storage.h"
-//#include "libexec_a/Executor.h"
-
 
 static size_t va_length(va_list *args) {
     size_t arg_count = 0;

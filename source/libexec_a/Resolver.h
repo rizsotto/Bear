@@ -23,7 +23,10 @@
 
 namespace ear {
 
-    struct Resolver {
+    class Resolver {
+    public:
+        using resolver_t =
+                void *(*)(char const *const name);
 
         using execve_t =
                 int (*)(const char *path,
@@ -38,10 +41,30 @@ namespace ear {
                         char *const argv[],
                         char *const envp[]);
 
-        virtual ~Resolver() noexcept = default;
+    public:
+        explicit Resolver(resolver_t) noexcept;
 
-        virtual execve_t execve() const noexcept = 0;
-        virtual posix_spawn_t posix_spawn() const noexcept = 0;
+        execve_t execve() const noexcept;
+
+        posix_spawn_t posix_spawn() const noexcept;
+
+    private:
+        resolver_t resolver_;
     };
+
+    inline
+    Resolver::Resolver(Resolver::resolver_t resolver) noexcept
+            : resolver_(resolver)
+    { }
+
+    inline
+    Resolver::execve_t Resolver::execve() const noexcept {
+        return reinterpret_cast<execve_t >(resolver_("execve"));
+    }
+
+    inline
+    Resolver::posix_spawn_t Resolver::posix_spawn() const noexcept {
+        return reinterpret_cast<posix_spawn_t >(resolver_("posix_spawn"));
+    }
 
 }

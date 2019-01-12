@@ -1,7 +1,5 @@
 add_library(exec_a STATIC
         Array.h
-        DynamicLinker.h
-        DynamicLinker.cc
         Environment.h
         Environment.cc
         Executor.h
