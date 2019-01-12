@@ -23,6 +23,21 @@
 
 namespace ear {
 
+    /**
+     * It is an abstraction of the symbol resolver.
+     *
+     * It uses the provided symbol resolver method and cast the result
+     * to a specific type.
+     *
+     * Design decisions:
+     *
+     * - Could have been just a function pointer, but a class might be
+     * better choice for this language. It also allows multiple
+     * implementation, which might be stateful.
+     *
+     * - Could have been using inheritance. But virtual functions needs
+     * symbols from the `libstdc++` library, which I wanted to avoid.
+     */
     class Resolver {
     public:
         using resolver_t =
@@ -42,7 +57,13 @@ namespace ear {
                         char *const envp[]);
 
     public:
-        explicit Resolver(resolver_t) noexcept;
+        /**
+         * Constructor.
+         *
+         * @param resolver function pointer to the OS's dynamic linker
+         * symbol resolver method.
+         */
+        explicit Resolver(resolver_t resolver) noexcept;
 
         execve_t execve() const noexcept;
 
