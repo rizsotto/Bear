@@ -70,35 +70,8 @@ namespace ear {
                          char *const envp[]) const noexcept;
 
     private:
-        const char *reporter() const noexcept;
-
-        const char **session_begin() const noexcept;
-
-        const char **session_end() const noexcept;
-
-    private:
-        static constexpr size_t SESSION_SIZE = 8;
-
-        const bool not_valid_;
-        const char *session_[SESSION_SIZE];
-        const size_t session_size_;
-
-        const ear::Resolver &resolver_;
+        ear::Session const &session_;
+        ear::Resolver const &resolver_;
     };
-
-    inline
-    const char *Executor::reporter() const noexcept {
-        return session_[0];
-    }
-
-    inline
-    const char **Executor::session_begin() const noexcept {
-        return const_cast<const char **>(session_);
-    }
-
-    inline
-    const char **Executor::session_end() const noexcept {
-        return session_begin() + session_size_;
-    }
 
 }

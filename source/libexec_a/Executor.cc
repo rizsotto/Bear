@@ -32,7 +32,7 @@ namespace {
         const char *search_path;
     };
 
-    size_t length(const Execution &execution) noexcept {
+    size_t length(Execution const &execution) noexcept {
         return ((execution.path != nullptr) ? 2 : 0) +
                ((execution.file != nullptr) ? 2 : 0) +
                ((execution.search_path != nullptr) ? 2 : 0) +
@@ -40,7 +40,7 @@ namespace {
                2;
     }
 
-    const char **copy(const Execution &execution, const char **it, const char **it_end) noexcept {
+    const char **copy(Execution const &execution, const char **it, const char **it_end) noexcept {
         if (execution.path != nullptr) {
             *it++ = ear::FLAG_PATH;
             *it++ = execution.path;
@@ -58,26 +58,32 @@ namespace {
         const char **const command_end = execution.command + (command_size + 1);
         return ear::array::copy(execution.command, command_end, it, it_end);
     }
+
+    size_t length(ear::Session const &session) noexcept {
+        return session.is_not_valid() ? 5 : 6;
+    }
+
+    const char **copy(ear::Session const &session, const char **it, const char **it_end) noexcept {
+        *it++ = session.get_reporter();
+        *it++ = ear::FLAG_DESTINATION;
+        *it++ = session.get_destination();
+        *it++ = ear::FLAG_LIBRARY;
+        *it++ = session.get_library();
+        if (session.is_verbose())
+            *it++ = ear::FLAG_VERBOSE;
+        return it;
+    }
 }
 
 namespace ear {
 
     Executor::Executor(ear::Session const &session, ear::Resolver const &resolver) noexcept
-            : not_valid_(session.is_not_valid())
-            , session_ {
-                    session.get_reporter(),
-                    ear::FLAG_DESTINATION,
-                    session.get_destination(),
-                    ear::FLAG_LIBRARY,
-                    session.get_library(),
-                    (session.is_verbose()) ? ear::FLAG_VERBOSE : nullptr,
-                    nullptr }
-            , session_size_(ear::array::length(session_))
+            : session_(session)
             , resolver_(resolver)
     { }
 
     int Executor::execve(const char *path, char *const *argv, char *const *envp) const noexcept {
-        if (not_valid_)
+        if (session_.is_not_valid())
             return -1;
 
         auto fp = resolver_.execve();
@@ -86,19 +92,19 @@ namespace ear {
 
         const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
-        const size_t dst_length = length(execution) + session_size_;
+        const size_t dst_length = length(execution) + length(session_);
         const char *dst[dst_length];
         const char **const dst_end = dst + dst_length;
 
-        const char **it = ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        const char **it = copy(session_, dst, dst_end);
         if (copy(execution, it, dst_end) == nullptr)
             return -1;
 
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
+        return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
 
     int Executor::execvpe(const char *file, char *const *argv, char *const *envp) const noexcept {
-        if (not_valid_)
+        if (session_.is_not_valid())
             return -1;
 
         auto fp = resolver_.execve();
@@ -107,20 +113,20 @@ namespace ear {
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
-        const size_t dst_length = length(execution) + session_size_;
+        const size_t dst_length = length(execution) + length(session_);
         const char *dst[dst_length];
         const char **const dst_end = dst + dst_length;
 
-        const char **it = ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        const char **it = copy(session_, dst, dst_end);
         if (copy(execution, it, dst_end) == nullptr)
             return -1;
 
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
+        return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
 
     int Executor::execvP(const char *file, const char *search_path, char *const *argv,
                          char *const *envp) const noexcept {
-        if (not_valid_)
+        if (session_.is_not_valid())
             return -1;
 
         auto fp = resolver_.execve();
@@ -129,21 +135,21 @@ namespace ear {
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, search_path };
 
-        const size_t dst_length = length(execution) + session_size_;
+        const size_t dst_length = length(execution) + length(session_);
         const char *dst[dst_length];
         const char **const dst_end = dst + dst_length;
 
-        const char **it = ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        const char **it = copy(session_, dst, dst_end);
         if (copy(execution, it, dst_end) == nullptr)
             return -1;
 
-        return fp(reporter(), const_cast<char *const *>(dst), envp);
+        return fp(session_.get_reporter(), const_cast<char *const *>(dst), envp);
     }
 
     int Executor::posix_spawn(pid_t *pid, const char *path, const posix_spawn_file_actions_t *file_actions,
                               const posix_spawnattr_t *attrp, char *const *argv,
                               char *const *envp) const noexcept {
-        if (not_valid_)
+        if (session_.is_not_valid())
             return -1;
 
         auto fp = resolver_.posix_spawn();
@@ -152,21 +158,21 @@ namespace ear {
 
         const Execution execution = { const_cast<const char **>(argv), path, nullptr, nullptr };
 
-        const size_t dst_length = length(execution) + session_size_;
+        const size_t dst_length = length(execution) + length(session_);
         const char *dst[dst_length];
         const char **const dst_end = dst + dst_length;
 
-        const char **it = ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        const char **it = copy(session_, dst, dst_end);
         if (copy(execution, it, dst_end) == nullptr)
             return -1;
 
-        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+        return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
     }
 
     int Executor::posix_spawnp(pid_t *pid, const char *file, const posix_spawn_file_actions_t *file_actions,
                                const posix_spawnattr_t *attrp, char *const *argv,
                                char *const *envp) const noexcept {
-        if (not_valid_)
+        if (session_.is_not_valid())
             return -1;
 
         auto fp = resolver_.posix_spawn();
@@ -175,15 +181,14 @@ namespace ear {
 
         const Execution execution = { const_cast<const char **>(argv), nullptr, file, nullptr };
 
-        const size_t dst_length = length(execution) + session_size_;
+        const size_t dst_length = length(execution) + length(session_);
         const char *dst[dst_length];
         const char **const dst_end = dst + dst_length;
 
-        const char **it = ear::array::copy(session_begin(), session_end(), dst, dst_end);
+        const char **it = copy(session_, dst, dst_end);
         if (copy(execution, it, dst_end) == nullptr)
             return -1;
 
-        return fp(pid, reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
+        return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char *const *>(dst), envp);
     }
-
 }
