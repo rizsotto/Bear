@@ -92,7 +92,7 @@ IGNORED_FLAGS = {
 }  # type: Dict[str, int]
 
 # Known C/C++ compiler wrapper name patterns.
-COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
+COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache|xt-xcc|xt-xc\+\+)$')
 
 # Known MPI compiler wrapper name patterns.
 COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
