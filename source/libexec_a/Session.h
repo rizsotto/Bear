@@ -80,7 +80,7 @@ namespace ear {
         /**
          * Report a function call to stderr.
          *
-         * It's for debugging purposes. It leaves traces of the interface invocations.
+         * It's for debugging purposes.
          *
          * @param message to print.
          */

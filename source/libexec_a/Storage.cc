@@ -29,8 +29,8 @@ namespace ear {
         if (input == nullptr)
             return nullptr;
 
-        auto input_end = ::ear::array::end(input) + 1;  // include the zero element
-        auto top = ::ear::array::copy(input, input_end, top_, end_);
+        auto input_end = ear::array::end(input) + 1;  // include the zero element
+        auto top = ear::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);
         return top;

@@ -41,17 +41,17 @@ namespace ear {
         }
 
         const char *get_env_value(const char **envp, const char *key) noexcept {
-            const size_t key_size = ::ear::array::length(key);
+            const size_t key_size = ear::array::length(key);
 
             for (const char **it = envp; *it != nullptr; ++it) {
                 const char *const current = *it;
                 // Is the key a prefix of the pointed string?
-                if (not ::ear::array::equal_n(key, current, key_size))
+                if (!ear::array::equal_n(key, current, key_size))
                     continue;
-                // Is the next character is the equal sign in the pointed string?
+                // Is the next character is the equal sign?
                 if (current[key_size] != '=')
                     continue;
-                // It must be the one! Calculate the address of the value string.
+                // It must be the one! Calculate the address of the value.
                 return current + key_size + 1;
             }
             return nullptr;

@@ -93,9 +93,11 @@ namespace {
 #define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_) \
     const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_); \
     const char *VAR_[VAR_##_length]; \
-    const char **const VAR_##_end = VAR_ + VAR_##_length; \
-    const char **VAR_##it = copy(SESSION_, VAR_, VAR_##_end); \
-    copy(EXECUTION_, VAR_##it, VAR_##_end);
+    { \
+        const char **const VAR_##_end = VAR_ + VAR_##_length; \
+        const char **VAR_##it = copy(SESSION_, VAR_, VAR_##_end); \
+        copy(EXECUTION_, VAR_##it, VAR_##_end); \
+    }
 
 }
 

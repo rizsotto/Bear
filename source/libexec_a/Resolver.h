@@ -87,5 +87,4 @@ namespace ear {
     Resolver::posix_spawn_t Resolver::posix_spawn() const noexcept {
         return reinterpret_cast<posix_spawn_t >(resolver_("posix_spawn"));
     }
-
 }

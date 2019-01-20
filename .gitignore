@@ -1,5 +1,5 @@
 .idea/
-cmake-build-debug/
+cmake-build*/
 Output/
 Cargo.lock
 target/

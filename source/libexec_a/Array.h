@@ -63,10 +63,8 @@ namespace ear {
          * @return output iterator to the last copied element.
          */
         template<typename I, typename O>
-        constexpr O *copy(I *const src_begin,
-                          I *const src_end,
-                          O *const dst_begin,
-                          O *const dst_end) noexcept {
+        constexpr O *copy(I *const src_begin, I *const src_end,
+                          O *const dst_begin, O *const dst_end) noexcept {
             auto src_it = src_begin;
             auto dst_it = dst_begin;
             for (; src_it != src_end && dst_it != dst_end;)
@@ -85,13 +83,12 @@ namespace ear {
          * @return true if the two array is equal till the limit.
          */
         template<typename T>
-        constexpr bool equal_n(T *const lhs, T *const rhs, size_t length) {
+        constexpr bool equal_n(T *const lhs, T *const rhs, const size_t length) noexcept {
             for (int idx = 0; idx < length; ++idx) {
                 if (lhs[idx] != rhs[idx])
                     return false;
             }
             return true;
         }
-
     }
 }

@@ -68,5 +68,4 @@ namespace ear {
             , end_(end)
             , top_(begin)
     { }
-
 }
