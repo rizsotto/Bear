@@ -17,7 +17,6 @@ path = "src/main.rs"
 [dependencies]
 intercept = { path = "./intercept" }
 intercept-wrappers = { path = "./intercept-wrappers" }
-intercept-preload = { path = "./intercept-preload" }
 
 env_logger = "0.5.13"
 error-chain = "0.12"
@@ -30,6 +29,5 @@ default-features = false
 [workspace]
 members = [
     "intercept",
-    "intercept-preload",
     "intercept-wrappers"
 ]
