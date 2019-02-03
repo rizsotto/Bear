@@ -22,14 +22,14 @@ extern crate clap;
 extern crate env_logger;
 #[macro_use]
 extern crate error_chain;
+extern crate intercept;
 #[macro_use]
 extern crate log;
-extern crate wrapper;
 
+use intercept::{Error, Result};
 use std::env;
 use std::path;
 use std::process;
-use wrapper::{Error, Result};
 
 fn main() {
     if let Err(ref e) = run() {

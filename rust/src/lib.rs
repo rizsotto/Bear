@@ -38,10 +38,10 @@ extern crate log;
 //#[cfg(test)]
 //extern crate mockers_derive;
 
-pub mod compilation;
-pub mod database;
-pub mod event;
 pub mod trace;
+pub mod event;
+pub mod database;
+pub mod compilation;
 
 mod error {
     error_chain! {
