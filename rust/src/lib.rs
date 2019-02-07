@@ -26,7 +26,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate shellwords;
-extern crate tempfile;
 #[macro_use]
 extern crate lazy_static;
 extern crate regex;
