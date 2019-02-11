@@ -20,16 +20,17 @@
 #[macro_use]
 extern crate clap;
 extern crate env_logger;
-#[macro_use]
 extern crate error_chain;
 extern crate intercept;
 #[macro_use]
 extern crate log;
 
-use intercept::{Error, Result};
 use std::env;
-use std::path;
-use std::process;
+
+use intercept::Result;
+use intercept::event::*;
+use intercept::supervisor::Supervisor;
+use intercept::protocol::Protocol;
 
 fn main() {
     if let Err(ref e) = run() {
@@ -49,15 +50,31 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    const CONFIG_FLAG: &str = "config";
-    const OUTPUT_FLAG: &str = "output";
-    const BUILD_FLAG: &str = "build";
-
     drop(env_logger::init());
     info!("{} {}", crate_name!(), crate_version!());
 
     let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    Ok(())
+    let mut protocol = Protocol::new()?;
+    let mut child = Supervisor::new(&args[1..], get_parent_pid())?;
+
+    child.wait(&mut |event: Event| protocol.send(event))
+}
+
+#[cfg(unix)]
+fn get_parent_pid() -> ProcessId {
+    let ppid: libc::pid_t = unsafe { libc::getppid() };
+    ppid as ProcessId
+}
+
+#[cfg(not(unix))]
+fn get_parent_pid() -> ProcessId {
+    match env::var("INTERCEPT_PPID") {
+        Ok(value) => {
+            let ppid: ProcessId = value.parse().unwrap();
+            ppid
+        },
+        _ => 0,
+    }
 }

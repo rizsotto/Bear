@@ -17,159 +17,101 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use chrono;
-
 use std::env;
 use std::path;
 use std::process;
-use std::sync::mpsc;
 
-use ErrorKind;
-use Result;
+use chrono;
 
+use {ErrorKind, Result, ResultExt};
 use event::*;
 
-#[cfg(unix)]
-fn get_parent_pid() -> Result<ProcessId> {
-    let ppid: libc::pid_t = unsafe { libc::getppid() };
-    Ok(ppid as ProcessId)
+pub struct Supervisor {
+    child: process::Child,
+    parent: ProcessId,
+    cmd: Vec<String>,
+    cwd: path::PathBuf,
+    running: bool,
 }
 
-#[cfg(not(unix))]
-fn get_parent_pid() -> Result<ProcessId> {
-    Ok(process::id())
-}
+impl Supervisor {
+    pub fn new(cmd: &[String], parent: ProcessId) -> Result<Supervisor> {
+        let cwd = env::current_dir()
+            .chain_err(|| "unable to get current working directory")?;
+        let child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
+            .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
 
-pub struct EventSender {
-    sender: mpsc::Sender<Event>,
-}
-
-impl EventSender {
-    pub fn report_started(&self, cmd: &[String], pid: ProcessId) {
-        fn started_event(cmd: &[String], pid: ProcessId) -> Result<Event> {
-            let detail = ProcessStarted {
-                pid,
-                ppid: get_parent_pid()?,
-                cwd: env::current_dir()?,
-                cmd: cmd.to_vec(),
-            };
-
-            Ok(Event::Started(detail, chrono::Utc::now()))
-        }
-
-        // TODO: write log message about the failure
-        started_event(cmd, pid)
-            .and_then(|event| {
-                self.send_report(event);
-                Ok(())
-            });
+        debug!("process was started: {:?}", child.id());
+        Ok(Supervisor { child, parent, cmd: cmd.to_vec(), cwd, running: true })
     }
 
-    pub fn report_failed(&self, cmd: &[String], error: String) {
-        fn failed_event(cmd: &[String], error: String) -> Result<Event> {
-            let detail = ProcessStartFailed {
-                cwd: env::current_dir()?,
-                cmd: cmd.to_vec(),
-                error,
-            };
+    pub fn wait<F>(&mut self, listener: &mut F) -> Result<()>
+        where F: FnMut(Event) -> Result<()> {
 
-            Ok(Event::Failed(detail, chrono::Utc::now()))
-        }
-
-        // TODO: write log message about the failure
-        failed_event(cmd, error)
-            .and_then(|event| {
-                self.send_report(event);
-                Ok(())
-            });
-    }
-
-    #[cfg(unix)]
-    pub fn report_status(&self, pid: ProcessId, status: &process::ExitStatus) {
-        use ::std::os::unix::process::ExitStatusExt;
-
-        match status.signal() {
-            Some(number) => self.report_signaled(pid, number),
-            None => self.report_stopped(pid, status),
-        }
-    }
-
-    #[cfg(not(unix))]
-    pub fn report_status(&self, pid: ProcessId, status: &process::ExitStatus) {
-        self.report_stopped(pid, status)
-    }
-
-    fn report_stopped(&self, pid: ProcessId, status: &process::ExitStatus) {
-        let exit_code = match status.code() {
-            // Report the received status code.
-            Some(number) => number,
-            // Report something, otherwise it's considered as a running one.
-            None =>  -1,
-        };
-
-        let detail = ProcessStopped { pid, exit_code };
-        let event = Event::Stopped(detail, chrono::Utc::now());
-
-        self.send_report(event)
-    }
-
-    fn report_signaled(&self, pid: ProcessId, signal: SignalId) {
-        let detail = ProcessSignaled { pid, signal };
-        let event = Event::Signaled(detail, chrono::Utc::now());
-
-        self.send_report(event)
-    }
-
-    fn send_report(&self, event: Event) {
-        // TODO: write log message about the failure
-        match self.sender.send(event) {
-            Ok(_) => (),
-            Err(_) => (),
-        }
-    }
-}
-
-pub fn run(cmd: &[String], sender: &EventSender) -> Result<()> {
-    let mut command = process::Command::new(&cmd[0]);
-    match command.args(&cmd[1..]).spawn() {
-        Ok(mut child) => {
-            let pid: ProcessId = child.id();
-
-            sender.report_started(cmd, pid);
-            match child.try_wait() {
-                Ok(Some(status)) => {
-                    sender.report_status(pid, &status);
-                    if status.success() {
-                        Ok(())
-                    } else {
-                        bail!(ErrorKind::RuntimeError("process exited with non zero status"));
-                    }
-                },
-                Ok(None) => {
-                    match child.wait() {
-                        Ok(status) => {
-                            sender.report_status(pid, &status);
-                            if status.success() {
-                                Ok(())
-                            } else {
-                                bail!(ErrorKind::RuntimeError("process exited with non zero status"));
-                            }
-                        },
-                        Err(_) => {
-                            // TODO: report something
-                            bail!(ErrorKind::RuntimeError("command status retrival failed"))
-                        },
-                    }
-                },
-                Err(error) => {
-                    // TODO: report something
-                    bail!(ErrorKind::RuntimeError("command execution failed"))
-                },
+        self.report(self.created(), listener);
+        match self.child.wait() {
+            Ok(status) => {
+                debug!("process was stopped: {:?}", self.child.id());
+                self.report(self.terminated(status), listener);
+                self.running = false;
             }
-        },
-        Err(err) => {
-            sender.report_failed(&cmd, format!("{}", err));
-            bail!(ErrorKind::RuntimeError("command not found"))
-        },
+            Err(_) => {
+                warn!("process was not running: {:?}", self.child.id());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn stop(&mut self) {
+        if self.running {
+            match self.child.kill() {
+                Ok(()) => {
+                    debug!("Process kill successful: {:?}", self.child.id());
+                }
+                Err(_) => {
+                    debug!("Process kill failed: {:?}", self.child.id());
+                }
+            }
+        } else {
+            debug!("Process kill not needed: {:?}", self.child.id());
+        }
+    }
+
+    fn created(&self) -> Event {
+        let message = ProcessCreated {
+            pid: self.child.id(),
+            ppid: self.parent,
+            cwd: self.cwd.clone(),
+            cmd: self.cmd.clone(),
+        };
+        Event::Created(message, chrono::Utc::now())
+    }
+
+    fn terminated(&self, status: process::ExitStatus) -> Event {
+        let pid = self.child.id();
+        match status.code() {
+            Some(code) => {
+                let message = ProcessTerminatedNormally { pid, code };
+                Event::TerminatedNormally(message, chrono::Utc::now())
+            }
+            None => {
+                let message = ProcessTerminatedAbnormally { pid, signal: -1 };
+                Event::TerminatedAbnormally(message, chrono::Utc::now())
+            }
+        }
+    }
+
+    fn report<F>(&self, event: Event, listener: &mut F)
+        where F: FnMut(Event) -> Result<()> {
+        match listener(event) {
+            Ok(_) => debug!("Event sent."),
+            Err(error) => debug!("Event sending failed. {:?}", error),
+        }
+    }
+}
+
+impl Drop for Supervisor {
+    fn drop(&mut self) {
+        self.stop()
     }
 }

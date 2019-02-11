@@ -32,13 +32,12 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate shellwords;
 
-pub use error::{Error, ErrorKind, Result};
-
 pub mod event;
 pub mod supervisor;
 pub mod trace;
 pub mod database;
 pub mod compilation;
+pub mod protocol;
 
 mod error {
     error_chain! {
@@ -63,3 +62,4 @@ mod error {
     }
 }
 
+pub use error::{Error, ErrorKind, Result, ResultExt};
