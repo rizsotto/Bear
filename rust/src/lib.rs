@@ -20,25 +20,23 @@
 extern crate chrono;
 #[macro_use]
 extern crate error_chain;
-extern crate libc;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-extern crate shellwords;
 #[macro_use]
 extern crate lazy_static;
-extern crate regex;
+extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate regex;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
+extern crate shellwords;
 
-//#[cfg(test)]
-//extern crate mockers;
-//#[cfg(test)]
-//extern crate mockers_derive;
+pub use error::{Error, ErrorKind, Result};
 
-pub mod trace;
 pub mod event;
+pub mod supervisor;
+pub mod trace;
 pub mod database;
 pub mod compilation;
 
@@ -65,4 +63,3 @@ mod error {
     }
 }
 
-pub use error::{Error, ErrorKind, Result};
