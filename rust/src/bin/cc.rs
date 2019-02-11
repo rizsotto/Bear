@@ -59,22 +59,5 @@ fn run() -> Result<()> {
     let mut protocol = Protocol::new()?;
     let mut supervisor = Supervisor::new(|event: Event| protocol.send(event));
 
-    supervisor.run(&args[1..], get_parent_pid())
-}
-
-#[cfg(unix)]
-fn get_parent_pid() -> ProcessId {
-    let ppid: libc::pid_t = unsafe { libc::getppid() };
-    ppid as ProcessId
-}
-
-#[cfg(not(unix))]
-fn get_parent_pid() -> ProcessId {
-    match env::var("INTERCEPT_PPID") {
-        Ok(value) => {
-            let ppid: ProcessId = value.parse().unwrap();
-            ppid
-        },
-        _ => 0,
-    }
+    supervisor.run(&args[1..])
 }

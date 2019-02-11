@@ -23,8 +23,8 @@ use std::process;
 
 use chrono;
 
-use {ErrorKind, Result, ResultExt};
-use event::*;
+use crate::{ErrorKind, Result, ResultExt};
+use crate::event::*;
 
 pub struct Supervisor<'a> {
     sink: Box<FnMut(Event) -> Result<()> + 'a>,
@@ -36,7 +36,7 @@ impl<'a> Supervisor<'a> {
         Supervisor { sink: Box::new(sink) }
     }
 
-    pub fn run(&mut self, cmd: &[String], parent: ProcessId) -> Result<()> {
+    pub fn run(&mut self, cmd: &[String]) -> Result<()> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
         let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
@@ -46,7 +46,7 @@ impl<'a> Supervisor<'a> {
         let event = Event::Created(
             ProcessCreated {
                 pid: child.id(),
-                ppid: parent,
+                ppid: get_parent_pid(),
                 cwd: cwd.clone(),
                 cmd: cmd.to_vec(), },
             chrono::Utc::now());
@@ -79,5 +79,17 @@ impl<'a> Supervisor<'a> {
             Ok(_) => debug!("Event sent."),
             Err(error) => debug!("Event sending failed. {:?}", error),
         }
+    }
+}
+
+fn get_parent_pid() -> ProcessId {
+    match env::var("INTERCEPT_PPID") {
+        Ok(value) => {
+            match value.parse() {
+                Ok(ppid) => ppid,
+                _ => 0,
+            }
+        },
+        _ => 0,
     }
 }
