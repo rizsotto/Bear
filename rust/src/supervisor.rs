@@ -26,92 +26,58 @@ use chrono;
 use {ErrorKind, Result, ResultExt};
 use event::*;
 
-pub struct Supervisor {
-    child: process::Child,
-    parent: ProcessId,
-    cmd: Vec<String>,
-    cwd: path::PathBuf,
-    running: bool,
+pub struct Supervisor<'a> {
+    sink: Box<FnMut(Event) -> Result<()> + 'a>,
 }
 
-impl Supervisor {
-    pub fn new(cmd: &[String], parent: ProcessId) -> Result<Supervisor> {
+impl<'a> Supervisor<'a> {
+    pub fn new<F: 'a>(sink: F) -> Supervisor<'a>
+        where F: FnMut(Event) -> Result<()> {
+        Supervisor { sink: Box::new(sink) }
+    }
+
+    pub fn run(&mut self, cmd: &[String], parent: ProcessId) -> Result<()> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
-        let child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
+        let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
             .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
 
         debug!("process was started: {:?}", child.id());
-        Ok(Supervisor { child, parent, cmd: cmd.to_vec(), cwd, running: true })
-    }
+        let event = Event::Created(
+            ProcessCreated {
+                pid: child.id(),
+                ppid: parent,
+                cwd: cwd.clone(),
+                cmd: cmd.to_vec(), },
+            chrono::Utc::now());
+        self.report(event);
 
-    pub fn wait<F>(&mut self, listener: &mut F) -> Result<()>
-        where F: FnMut(Event) -> Result<()> {
-
-        self.report(self.created(), listener);
-        match self.child.wait() {
+        match child.wait() {
             Ok(status) => {
-                debug!("process was stopped: {:?}", self.child.id());
-                self.report(self.terminated(status), listener);
-                self.running = false;
+                debug!("process was stopped: {:?}", child.id());
+                let event = match status.code() {
+                    Some(code) => {
+                        let message = ProcessTerminatedNormally { pid: child.id(), code };
+                        Event::TerminatedNormally(message, chrono::Utc::now())
+                    }
+                    None => {
+                        let message = ProcessTerminatedAbnormally { pid: child.id(), signal: -1 };
+                        Event::TerminatedAbnormally(message, chrono::Utc::now())
+                    }
+                };
+                self.report(event);
             }
             Err(_) => {
-                warn!("process was not running: {:?}", self.child.id());
+                warn!("process was not running: {:?}", child.id());
             }
         }
         Ok(())
     }
 
-    pub fn stop(&mut self) {
-        if self.running {
-            match self.child.kill() {
-                Ok(()) => {
-                    debug!("Process kill successful: {:?}", self.child.id());
-                }
-                Err(_) => {
-                    debug!("Process kill failed: {:?}", self.child.id());
-                }
-            }
-        } else {
-            debug!("Process kill not needed: {:?}", self.child.id());
-        }
-    }
-
-    fn created(&self) -> Event {
-        let message = ProcessCreated {
-            pid: self.child.id(),
-            ppid: self.parent,
-            cwd: self.cwd.clone(),
-            cmd: self.cmd.clone(),
-        };
-        Event::Created(message, chrono::Utc::now())
-    }
-
-    fn terminated(&self, status: process::ExitStatus) -> Event {
-        let pid = self.child.id();
-        match status.code() {
-            Some(code) => {
-                let message = ProcessTerminatedNormally { pid, code };
-                Event::TerminatedNormally(message, chrono::Utc::now())
-            }
-            None => {
-                let message = ProcessTerminatedAbnormally { pid, signal: -1 };
-                Event::TerminatedAbnormally(message, chrono::Utc::now())
-            }
-        }
-    }
-
-    fn report<F>(&self, event: Event, listener: &mut F)
-        where F: FnMut(Event) -> Result<()> {
-        match listener(event) {
+    fn report(&mut self, event: Event) {
+        match (self.sink)(event) {
             Ok(_) => debug!("Event sent."),
             Err(error) => debug!("Event sending failed. {:?}", error),
         }
-    }
-}
-
-impl Drop for Supervisor {
-    fn drop(&mut self) {
-        self.stop()
     }
 }

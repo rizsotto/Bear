@@ -57,9 +57,9 @@ fn run() -> Result<()> {
     debug!("invocation: {:?}", &args);
 
     let mut protocol = Protocol::new()?;
-    let mut child = Supervisor::new(&args[1..], get_parent_pid())?;
+    let mut supervisor = Supervisor::new(|event: Event| protocol.send(event));
 
-    child.wait(&mut |event: Event| protocol.send(event))
+    supervisor.run(&args[1..], get_parent_pid())
 }
 
 #[cfg(unix)]
