@@ -25,6 +25,7 @@ use chrono;
 
 use crate::{ErrorKind, Result, ResultExt};
 use crate::event::*;
+use super::fake::get_parent_pid;
 
 pub struct Supervisor<'a> {
     sink: Box<FnMut(Event) -> Result<()> + 'a>,
@@ -79,17 +80,5 @@ impl<'a> Supervisor<'a> {
             Ok(_) => debug!("Event sent."),
             Err(error) => debug!("Event sending failed. {:?}", error),
         }
-    }
-}
-
-fn get_parent_pid() -> ProcessId {
-    match env::var("INTERCEPT_PPID") {
-        Ok(value) => {
-            match value.parse() {
-                Ok(ppid) => ppid,
-                _ => 0,
-            }
-        },
-        _ => 0,
     }
 }

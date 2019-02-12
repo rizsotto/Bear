@@ -32,6 +32,15 @@ pub struct Classifier {
     cxx_compilers: Vec<String>,
 }
 
+impl Default for Classifier {
+    /// Default value constructor.
+    ///
+    /// Only the pre-set compilers will classify as compiler.
+    fn default() -> Self {
+        Classifier { ignore: false, c_compilers: vec![], cxx_compilers: vec![] }
+    }
+}
+
 impl Classifier {
     /// Create a new Category object.
     ///

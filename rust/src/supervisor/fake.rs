@@ -25,6 +25,8 @@ use chrono;
 
 use crate::{ErrorKind, Result, ResultExt};
 use crate::event::*;
+use crate::compilation::compiler::*;
+use crate::compilation::execution::*;
 
 pub struct Supervisor<'a> {
     sink: Box<FnMut(Event) -> Result<()> + 'a>,
@@ -39,38 +41,29 @@ impl<'a> Supervisor<'a> {
     pub fn run(&mut self, cmd: &[String]) -> Result<()> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
-//        let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
-//            .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
-//
-//        debug!("process was started: {:?}", child.id());
-//        let event = Event::Created(
-//            ProcessCreated {
-//                pid: child.id(),
-//                ppid: get_parent_pid(),
-//                cwd: cwd.clone(),
-//                cmd: cmd.to_vec(), },
-//            chrono::Utc::now());
-//        self.report(event);
-//
-//        match child.wait() {
-//            Ok(status) => {
-//                debug!("process was stopped: {:?}", child.id());
-//                let event = match status.code() {
-//                    Some(code) => {
-//                        let message = ProcessTerminatedNormally { pid: child.id(), code };
-//                        Event::TerminatedNormally(message, chrono::Utc::now())
-//                    }
-//                    None => {
-//                        let message = ProcessTerminatedAbnormally { pid: child.id(), signal: -1 };
-//                        Event::TerminatedAbnormally(message, chrono::Utc::now())
-//                    }
-//                };
-//                self.report(event);
-//            }
-//            Err(_) => {
-//                warn!("process was not running: {:?}", child.id());
-//            }
-//        }
+        let pid = process::id();
+
+        let event = Event::Created(
+            ProcessCreated {
+                pid,
+                ppid: get_parent_pid(),
+                cwd: cwd.clone(),
+                cmd: cmd.to_vec(), },
+            chrono::Utc::now());
+        self.report(event);
+
+        let event = match create_output_file() {
+            Ok(_) => {
+                let message = ProcessTerminatedNormally { pid, code: 0 };
+                Event::TerminatedNormally(message, chrono::Utc::now())
+            }
+            Err(_) => {
+                let message = ProcessTerminatedAbnormally { pid, signal: -1 };
+                Event::TerminatedAbnormally(message, chrono::Utc::now())
+            }
+        };
+        self.report(event);
+
         Ok(())
     }
 
@@ -82,7 +75,8 @@ impl<'a> Supervisor<'a> {
     }
 }
 
-fn get_parent_pid() -> ProcessId {
+#[cfg(not(unix))]
+pub fn get_parent_pid() -> ProcessId {
     match env::var("INTERCEPT_PPID") {
         Ok(value) => {
             match value.parse() {
@@ -92,4 +86,13 @@ fn get_parent_pid() -> ProcessId {
         },
         _ => 0,
     }
+}
+
+#[cfg(unix)]
+pub fn get_parent_pid() -> ProcessId {
+    std::os::unix::process::parent_id() as ProcessId
+}
+
+fn create_output_file() -> Result<()> {
+    unimplemented!()
 }

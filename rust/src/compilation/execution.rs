@@ -35,7 +35,7 @@ struct CompilerExecution {
 }
 
 impl CompilerExecution {
-    fn new(working_dir: &str, compiler: &str) -> Self {
+    fn new(working_dir: &path::Path, compiler: &str) -> Self {
         let mut result: Self = Default::default();
         result.directory = path::PathBuf::from(working_dir);
         result.compiler = path::PathBuf::from(compiler);
@@ -111,9 +111,9 @@ impl CompilerExecution {
 /// # Arguments
 /// `classifier` - helper object to detect compiler
 /// `command` - the command to classify
-fn parse_command(
+pub fn parse_command(
     classifier: &compiler::Classifier,
-    working_dir: &str,
+    working_dir: &path::Path,
     command: &[String],
 ) -> Result<Vec<database::Entry>> {
     debug!("input was: {:?}", command);
