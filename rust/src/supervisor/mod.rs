@@ -17,7 +17,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod generic;
+mod fake;
+#[cfg(not(unix))]
+mod generic;
+#[cfg(unix)]
+mod unix;
 
+pub use self::fake::Supervisor as FakeSupervisor;
+
+#[cfg(not(unix))]
 pub use self::generic::Supervisor;
-
+#[cfg(unix)]
+pub use self::unix::Supervisor;
