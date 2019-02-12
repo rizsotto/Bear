@@ -58,11 +58,11 @@ impl<'a> Supervisor<'a> {
                 debug!("process was stopped: {:?}", child.id());
                 let event = match status.code() {
                     Some(code) => {
-                        let message = ProcessTerminatedNormally { pid: child.id(), code };
+                        let message = ProcessTerminated { pid: child.id(), code };
                         Event::TerminatedNormally(message, chrono::Utc::now())
                     }
                     None => {
-                        let message = ProcessTerminatedAbnormally { pid: child.id(), signal: -1 };
+                        let message = ProcessSignaled { pid: child.id(), signal: -1 };
                         Event::TerminatedAbnormally(message, chrono::Utc::now())
                     }
                 };

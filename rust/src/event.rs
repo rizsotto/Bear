@@ -35,25 +35,13 @@ pub struct ProcessCreated {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessTerminatedNormally {
+pub struct ProcessTerminated {
     pub pid: ProcessId,
     pub code: ExitCode,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessTerminatedAbnormally {
-    pub pid: ProcessId,
-    pub signal: SignalId,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessStopped {
-    pub pid: ProcessId,
-    pub signal: SignalId,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessResumed {
+pub struct ProcessSignaled {
     pub pid: ProcessId,
     pub signal: SignalId,
 }
@@ -61,8 +49,8 @@ pub struct ProcessResumed {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
     Created(ProcessCreated, DateTime),
-    TerminatedNormally(ProcessTerminatedNormally, DateTime),
-    TerminatedAbnormally(ProcessTerminatedAbnormally, DateTime),
-    Stopped(ProcessStopped, DateTime),
-    Resumed(ProcessResumed, DateTime),
+    TerminatedNormally(ProcessTerminated, DateTime),
+    TerminatedAbnormally(ProcessSignaled, DateTime),
+    Stopped(ProcessSignaled, DateTime),
+    Resumed(ProcessSignaled, DateTime),
 }

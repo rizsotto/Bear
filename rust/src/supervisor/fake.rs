@@ -54,12 +54,12 @@ impl<'a> Supervisor<'a> {
 
         let event = match create_output_file() {
             Ok(_) => {
-                let message = ProcessTerminatedNormally { pid, code: 0 };
+                let message = ProcessTerminated { pid, code: 0 };
                 Event::TerminatedNormally(message, chrono::Utc::now())
             }
             Err(_) => {
-                let message = ProcessTerminatedAbnormally { pid, signal: -1 };
-                Event::TerminatedAbnormally(message, chrono::Utc::now())
+                let message = ProcessTerminated { pid, code: -1 };
+                Event::TerminatedNormally(message, chrono::Utc::now())
             }
         };
         self.report(event);
