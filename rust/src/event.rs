@@ -24,7 +24,7 @@ use std::path;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub type ProcessId = u32;
 pub type ExitCode = i32;
-pub type SignalId = i32;
+pub type SignalId = String;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessCreated {

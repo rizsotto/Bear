@@ -25,6 +25,9 @@ extern crate intercept;
 #[macro_use]
 extern crate log;
 
+#[cfg(unix)]
+extern crate nix;
+
 use std::env;
 
 use intercept::Result;
@@ -33,23 +36,28 @@ use intercept::supervisor::Supervisor;
 use intercept::protocol::Protocol;
 
 fn main() {
-    if let Err(ref e) = run() {
-        eprintln!("error: {}", e);
-
-        for e in e.iter().skip(1) {
-            eprintln!("caused by: {}", e);
+    match run() {
+        Ok(code) => {
+            ::std::process::exit(code);
         }
+        Err(ref e) => {
+            eprintln!("error: {}", e);
 
-        // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
-        if let Some(backtrace) = e.backtrace() {
-            eprintln!("backtrace: {:?}", backtrace);
+            for e in e.iter().skip(1) {
+                eprintln!("caused by: {}", e);
+            }
+
+            // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
+            if let Some(backtrace) = e.backtrace() {
+                eprintln!("backtrace: {:?}", backtrace);
+            }
+
+            ::std::process::exit(1);
         }
-
-        ::std::process::exit(1);
     }
 }
 
-fn run() -> Result<()> {
+fn run() -> Result<ExitCode> {
     drop(env_logger::init());
     info!("{} {}", crate_name!(), crate_version!());
 

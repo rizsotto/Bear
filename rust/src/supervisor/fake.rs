@@ -38,7 +38,7 @@ impl<'a> Supervisor<'a> {
         Supervisor { sink: Box::new(sink) }
     }
 
-    pub fn run(&mut self, cmd: &[String]) -> Result<()> {
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
         let pid = process::id();
@@ -64,7 +64,7 @@ impl<'a> Supervisor<'a> {
         };
         self.report(event);
 
-        Ok(())
+        Ok(0)
     }
 
     fn report(&mut self, event: Event) {

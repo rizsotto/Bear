@@ -37,7 +37,7 @@ impl<'a> Supervisor<'a> {
         Supervisor { sink: Box::new(sink) }
     }
 
-    pub fn run(&mut self, cmd: &[String]) -> Result<()> {
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
         let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
@@ -62,7 +62,7 @@ impl<'a> Supervisor<'a> {
                         Event::TerminatedNormally(message, chrono::Utc::now())
                     }
                     None => {
-                        let message = ProcessSignaled { pid: child.id(), signal: -1 };
+                        let message = ProcessSignaled { pid: child.id(), signal: "unknown".to_string() };
                         Event::TerminatedAbnormally(message, chrono::Utc::now())
                     }
                 };
@@ -72,7 +72,7 @@ impl<'a> Supervisor<'a> {
                 warn!("process was not running: {:?}", child.id());
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     fn report(&mut self, event: Event) {

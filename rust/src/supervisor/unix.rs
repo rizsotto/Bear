@@ -18,14 +18,17 @@
  */
 
 use std::env;
+use std::ffi;
 use std::path;
-use std::process;
 
 use chrono;
+use nix::unistd::{fork, execvp, pipe, close, write, read, ForkResult, Pid};
+use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 
 use crate::{ErrorKind, Result, ResultExt};
 use crate::event::*;
 use super::fake::get_parent_pid;
+
 
 pub struct Supervisor<'a> {
     sink: Box<FnMut(Event) -> Result<()> + 'a>,
@@ -37,42 +40,110 @@ impl<'a> Supervisor<'a> {
         Supervisor { sink: Box::new(sink) }
     }
 
-    pub fn run(&mut self, cmd: &[String]) -> Result<()> {
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
-        let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
-            .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
+        let (read_fd, write_fd) = pipe()?;
 
-        debug!("process was started: {:?}", child.id());
-        let event = Event::Created(
-            ProcessCreated {
-                pid: child.id(),
-                ppid: get_parent_pid(),
-                cwd: cwd.clone(),
-                cmd: cmd.to_vec(), },
-            chrono::Utc::now());
-        self.report(event);
+        match fork() {
+            Ok(ForkResult::Parent { child, .. }) => {
+                debug!("Parent process: waiting for pid: {}", child);
+                close(write_fd);
 
-        match child.wait() {
-            Ok(status) => {
-                debug!("process was stopped: {:?}", child.id());
-                let event = match status.code() {
-                    Some(code) => {
-                        let message = ProcessTerminated { pid: child.id(), code };
-                        Event::TerminatedNormally(message, chrono::Utc::now())
-                    }
-                    None => {
-                        let message = ProcessSignaled { pid: child.id(), signal: -1 };
-                        Event::TerminatedAbnormally(message, chrono::Utc::now())
-                    }
-                };
-                self.report(event);
+                let mut buffer = vec![0u8, 10];
+                match read(read_fd, buffer.as_mut()) {
+                    // In case of successful start the child closed the pipe,
+                    // so we can't read anything from it.
+                    Ok(0) => {
+                        let event = Event::Created(
+                            ProcessCreated {
+                                pid: child.as_raw() as ProcessId,
+                                ppid: Pid::parent().as_raw() as ProcessId,
+                                cwd: cwd.clone(),
+                                cmd: cmd.to_vec(),
+                            },
+                            chrono::Utc::now());
+                        self.report(event);
+                        self.wait_for_pid(child)
+                    },
+                    // If the child failed to exec the given process, it
+                    // sends us a message through the pipe.
+                    Ok(length) => {
+                        bail!("Could not execute process. {:?}", cmd[0])
+                    },
+                    // Not sure if this will happen, when we can't read.
+                    Err(_) => {
+                        bail!("Read failed.")
+                    },
+                }
             }
+            Ok(ForkResult::Child) => {
+                debug!("Child process: will call exec soon.");
+                close(read_fd);
+
+                let args = to_c_string(cmd);
+                execvp(&args[0], &args)
+                    .map(|_| /* Not going to execute this. */ 0)
+                    .chain_err(|| {
+                        write(write_fd, b"error");
+                        format!("exec failed: {:?}", cmd)
+                    })
+            },
             Err(_) => {
-                warn!("process was not running: {:?}", child.id());
-            }
+                bail!("Could not fork process")
+            },
         }
-        Ok(())
+    }
+
+    fn wait_for_pid(&mut self, child: Pid) -> Result<ExitCode> {
+        waitpid(child, None)
+            .map_err(|err| ErrorKind::RuntimeError("waitpid failed").into())
+            .and_then(|status|
+                match status {
+                    WaitStatus::Exited(pid, code) => {
+                        debug!("exited");
+                        let event = Event::TerminatedNormally(
+                            ProcessTerminated { pid: pid.as_raw() as ProcessId, code },
+                            chrono::Utc::now());
+                        self.report(event);
+                        Ok(code)
+                    },
+                    WaitStatus::Signaled(pid, signal, bool) => {
+                        debug!("signaled");
+                        let event = Event::TerminatedAbnormally(
+                            ProcessSignaled {
+                                pid: pid.as_raw() as ProcessId,
+                                signal: format!("{}", signal)
+                            },
+                            chrono::Utc::now());
+                        self.report(event);
+                        Ok(-1) // TODO: check
+                    },
+                    WaitStatus::Stopped(pid, signal) => {
+                        debug!("stopped");
+                        // TODO: send event
+                        self.wait_for_pid(child)
+                    },
+                    WaitStatus::PtraceEvent(pid, signal, c_int) => {
+                        debug!("ptrace-event");
+                        self.wait_for_pid(child)
+                    },
+                    WaitStatus::PtraceSyscall(pid) => {
+                        debug!("ptrace-systrace");
+                        self.wait_for_pid(child)
+                    },
+                    WaitStatus::Continued(pid) => {
+                        debug!("continued");
+                        // TODO: send event
+                        self.wait_for_pid(child)
+                    },
+                    WaitStatus::StillAlive => {
+                        debug!("still alive");
+                        self.wait_for_pid(child)
+                    },
+                }
+            )
+            .chain_err(|| "Process creation failed.")
     }
 
     fn report(&mut self, event: Event) {
@@ -81,4 +152,11 @@ impl<'a> Supervisor<'a> {
             Err(error) => debug!("Event sending failed. {:?}", error),
         }
     }
+}
+
+fn to_c_string(cmd: &[String]) -> Vec<ffi::CString> {
+    let result: Vec<_> = cmd.iter()
+        .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
+        .collect();
+    result
 }

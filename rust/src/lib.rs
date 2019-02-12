@@ -31,6 +31,9 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate shellwords;
 
+#[cfg(unix)]
+extern crate nix;
+
 pub mod event;
 pub mod supervisor;
 pub mod compilation;
@@ -44,6 +47,7 @@ mod error {
             Env(::std::env::VarError);
             String(::std::str::Utf8Error);
             Json(::serde_json::Error);
+            System(::nix::Error);
         }
 
         errors {
