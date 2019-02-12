@@ -17,18 +17,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use libc;
 use serde_json;
 use std::env;
 use std::fs;
 use std::io;
 use std::path;
+use std::process;
 
 use Result;
 
 #[derive(Serialize, Deserialize)]
 pub struct Trace {
-    pub pid: libc::pid_t,
+    pub pid: u32,
     pub cwd: path::PathBuf,
     pub cmd: Vec<String>,
 }
@@ -37,7 +37,7 @@ impl Trace {
     /// Create a Trace report object from the given arguments.
     /// Capture the current process id and working directory.
     pub fn create(args: &Vec<String>) -> Result<Trace> {
-        let pid: libc::pid_t = unsafe { libc::getpid() };
+        let pid = process::id();
         let cwd = env::current_dir()?;
 
         Ok(Trace {
@@ -124,7 +124,7 @@ mod tests {
 
         let result = Trace::read(&mut data).unwrap();
 
-        assert_eq!(12i32, result.pid);
+        assert_eq!(12u32, result.pid);
         assert_eq!(path::Path::new("/usr/home/user"), result.cwd);
         assert_eq!(vec!["program".to_string(), "arg".to_string()], result.cmd);
     }
@@ -132,7 +132,7 @@ mod tests {
     #[test]
     fn write_and_read_works() {
         let expected = Trace {
-            pid: 12i32,
+            pid: 12u32,
             cwd: path::PathBuf::from("/home/user"),
             cmd: vec!["program".to_string(), "arg".to_string()],
         };

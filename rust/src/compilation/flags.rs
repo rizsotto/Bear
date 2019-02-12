@@ -114,7 +114,7 @@ mod tests {
         let input_vec: Vec<String> = input.iter().map(|str| str.to_string()).collect();
         let expected_vec: Vec<String> = expected.iter().map(|str| str.to_string()).collect();
 
-        let mut sut = FlagIterator::from(input_vec);
+        let sut = FlagIterator::from(input_vec);
         let result: Vec<_> = sut.collect();
         assert_eq!(expected_vec, result);
     }
