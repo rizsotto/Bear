@@ -26,33 +26,6 @@ use std::str;
 use ErrorKind;
 use Result;
 
-lazy_static! {
-    /// Known C/C++ compiler wrapper name patterns.
-    static ref COMPILER_PATTERN_WRAPPER: regex::Regex =
-        regex::Regex::new(r"^(distcc|ccache)$").unwrap();
-
-    /// Known MPI compiler wrapper name patterns.
-    static ref COMPILER_PATTERNS_MPI_WRAPPER: regex::Regex =
-        regex::Regex::new(r"^mpi(cc|cxx|CC|c\+\+)$").unwrap();
-
-    /// Known C compiler executable name patterns.
-    static ref COMPILER_PATTERNS_CC: Vec<regex::Regex> = vec![
-        regex::Regex::new(r"^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$").unwrap(),
-        regex::Regex::new(r"^([^-]*-)*clang(-\d+(\.\d+){0,2})?$").unwrap(),
-        regex::Regex::new(r"^(|i)cc$").unwrap(),
-        regex::Regex::new(r"^(g|)xlc$").unwrap(),
-    ];
-
-    /// Known C++ compiler executable name patterns.
-    static ref COMPILER_PATTERNS_CXX: Vec<regex::Regex> = vec![
-        regex::Regex::new(r"^(c\+\+|cxx|CC)$").unwrap(),
-        regex::Regex::new(r"^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$").unwrap(),
-        regex::Regex::new(r"^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$").unwrap(),
-        regex::Regex::new(r"^icpc$").unwrap(),
-        regex::Regex::new(r"^(g|)xl(C|c\+\+)$").unwrap(),
-    ];
-}
-
 pub struct Classifier {
     ignore: bool,
     c_compilers: Vec<String>,
@@ -213,4 +186,31 @@ fn basename(file: &str) -> String {
         Some(Some(str)) => str.to_string(),
         _ => file.to_string(),
     }
+}
+
+lazy_static! {
+    /// Known C/C++ compiler wrapper name patterns.
+    static ref COMPILER_PATTERN_WRAPPER: regex::Regex =
+        regex::Regex::new(r"^(distcc|ccache)$").unwrap();
+
+    /// Known MPI compiler wrapper name patterns.
+    static ref COMPILER_PATTERNS_MPI_WRAPPER: regex::Regex =
+        regex::Regex::new(r"^mpi(cc|cxx|CC|c\+\+)$").unwrap();
+
+    /// Known C compiler executable name patterns.
+    static ref COMPILER_PATTERNS_CC: Vec<regex::Regex> = vec![
+        regex::Regex::new(r"^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*clang(-\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^(|i)cc$").unwrap(),
+        regex::Regex::new(r"^(g|)xlc$").unwrap(),
+    ];
+
+    /// Known C++ compiler executable name patterns.
+    static ref COMPILER_PATTERNS_CXX: Vec<regex::Regex> = vec![
+        regex::Regex::new(r"^(c\+\+|cxx|CC)$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$").unwrap(),
+        regex::Regex::new(r"^icpc$").unwrap(),
+        regex::Regex::new(r"^(g|)xl(C|c\+\+)$").unwrap(),
+    ];
 }

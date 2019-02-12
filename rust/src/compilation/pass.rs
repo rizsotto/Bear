@@ -28,22 +28,6 @@ pub enum CompilerPass {
     Internal,
 }
 
-lazy_static! {
-        static ref PHASE_FLAGS: collections::BTreeMap<&'static str, CompilerPass> = {
-            let mut m = collections::BTreeMap::new();
-            m.insert("-v", CompilerPass::Internal);
-            m.insert("-###", CompilerPass::Internal);
-            m.insert("-cc1", CompilerPass::Internal);
-            m.insert("-cc1as", CompilerPass::Internal);
-            m.insert("-E", CompilerPass::Preprocessor);
-            m.insert("-M", CompilerPass::Preprocessor);
-            m.insert("-MM", CompilerPass::Preprocessor);
-            m.insert("-c", CompilerPass::Compilation);
-            m.insert("-S", CompilerPass::Compilation);
-            m
-        };
-    }
-
 impl Default for CompilerPass {
     fn default() -> CompilerPass {
         CompilerPass::Linking
@@ -51,6 +35,15 @@ impl Default for CompilerPass {
 }
 
 impl CompilerPass {
+
+    /// Consume a single argument and update the compiler pass if the argument
+    /// is one which influence it.
+    ///
+    /// # Arguments
+    /// `string` the argument to evaluate.
+    ///
+    /// # Returns
+    /// true if the argument change the compiler pass.
     pub fn take(&mut self, string: &str) -> bool {
         if let Some(pass) = PHASE_FLAGS.get(string) {
             self.update(pass);
@@ -60,6 +53,10 @@ impl CompilerPass {
         }
     }
 
+    /// Query method to get if the compilation pass was running or not.
+    ///
+    /// # Returns
+    /// true if the compiler pass was running.
     pub fn is_compiling(&self) -> bool {
         self == &CompilerPass::Compilation || self == &CompilerPass::Linking
     }
@@ -87,6 +84,22 @@ impl CompilerPass {
             _ => (),
         }
     }
+}
+
+lazy_static! {
+    static ref PHASE_FLAGS: collections::BTreeMap<&'static str, CompilerPass> = {
+        let mut m = collections::BTreeMap::new();
+        m.insert("-v", CompilerPass::Internal);
+        m.insert("-###", CompilerPass::Internal);
+        m.insert("-cc1", CompilerPass::Internal);
+        m.insert("-cc1as", CompilerPass::Internal);
+        m.insert("-E", CompilerPass::Preprocessor);
+        m.insert("-M", CompilerPass::Preprocessor);
+        m.insert("-MM", CompilerPass::Preprocessor);
+        m.insert("-c", CompilerPass::Compilation);
+        m.insert("-S", CompilerPass::Compilation);
+        m
+    };
 }
 
 #[cfg(test)]
