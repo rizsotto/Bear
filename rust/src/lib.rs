@@ -34,9 +34,8 @@ extern crate shellwords;
 
 pub mod event;
 pub mod supervisor;
-pub mod trace;
-pub mod database;
 pub mod compilation;
+pub mod trace;
 pub mod protocol;
 
 mod error {
