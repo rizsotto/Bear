@@ -47,7 +47,7 @@ mod error {
             Env(::std::env::VarError);
             String(::std::str::Utf8Error);
             Json(::serde_json::Error);
-            System(::nix::Error);
+            Nix(::nix::Error) #[cfg(unix)];
         }
 
         errors {
