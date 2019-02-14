@@ -25,7 +25,7 @@ use chrono;
 use nix::unistd::{fork, execvp, pipe, close, write, read, ForkResult, Pid};
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 
-use crate::{ErrorKind, Result, ResultExt};
+use crate::{Error, ErrorKind, Result, ResultExt};
 use crate::event::*;
 use super::fake::get_parent_pid;
 
@@ -44,8 +44,8 @@ impl<'a> Supervisor<'a> {
         let cwd = env::current_dir()
             .chain_err(|| "unable to get current working directory")?;
 
-        match spawn(cmd) {
-            Ok(pid) => {
+        spawn(cmd)
+            .and_then(|pid| {
                 let event = Event::Created(
                     ProcessCreated {
                         pid: pid.as_raw() as ProcessId,
@@ -56,16 +56,12 @@ impl<'a> Supervisor<'a> {
                     chrono::Utc::now());
                 self.report(event);
                 self.wait_for_pid(pid)
-            },
-            Err(_) => {
-                bail!("Could not execute process")
-            },
-        }
+            })
     }
 
     fn wait_for_pid(&mut self, child: Pid) -> Result<ExitCode> {
         waitpid(child, None)
-            .map_err(|err| ErrorKind::RuntimeError("waitpid failed").into())
+            .map_err(|err| err.into())
             .and_then(|status|
                 match status {
                     WaitStatus::Exited(pid, code) => {
@@ -125,41 +121,44 @@ impl<'a> Supervisor<'a> {
 fn spawn(cmd: &[String]) -> Result<Pid> {
     let (read_fd, write_fd) = pipe()?;
 
-    match fork() {
-        Ok(ForkResult::Parent { child, .. }) => {
-            debug!("Parent process: waiting for pid: {}", child);
-            close(write_fd);
+    fork()
+        .map_err(|err| err.into())
+        .and_then(|fork_result| {
+            match fork_result {
+                ForkResult::Parent { child, .. } => {
+                    debug!("Parent process: waiting for pid: {}", child);
+                    close(write_fd);
 
-            let mut buffer = vec![0u8, 10];
-            match read(read_fd, buffer.as_mut()) {
-                // In case of successful start the child closed the pipe,
-                // so we can't read anything from it.
-                Ok(0) =>
-                    Ok(child),
-                // If the child failed to exec the given process, it
-                // sends us a message through the pipe.
-                Ok(length) =>
-                    bail!("Could not execute process. {:?}", cmd[0]),
-                // Not sure if this will happen, when we can't read.
-                Err(_) =>
-                    bail!("Read failed."),
+                    let mut buffer = vec![0u8, 10];
+                    read(read_fd, buffer.as_mut())
+                        .map_err(|err| Error::with_chain(err, "Read from pipe failed."))
+                        .and_then(|length| {
+                            if length == 0 {
+                                // In case of successful start the child closed the pipe,
+                                // so we can't read anything from it.
+                                Ok(child)
+                            } else {
+                                // If the child failed to exec the given process, it
+                                // sends us a message through the pipe.
+                                bail!("Could not execute process: {}", cmd[0])
+                            }
+                        })
+                }
+                ForkResult::Child => {
+                    debug!("Child process: will call exec soon.");
+                    close(read_fd);
+
+                    let args : Vec<_> = cmd.iter()
+                        .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
+                        .collect();
+                    execvp(&args[0], args.as_ref())
+                        .map_err(|_| {
+                            // TODO: send the error message through
+                            write(write_fd, b"error");
+                            close(write_fd);
+                        });
+                    ::std::process::exit(1);
+                },
             }
-        }
-        Ok(ForkResult::Child) => {
-            debug!("Child process: will call exec soon.");
-            close(read_fd);
-
-            let args : Vec<_> = cmd.iter()
-                .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
-                .collect();
-            execvp(&args[0], args.as_ref())
-                .map(|_| /* Not going to execute this. */ 0)
-                .map_err(|_| {
-                    write(write_fd, b"error");
-                });
-            bail!("exec failed: {:?}", cmd)
-        },
-        Err(_) =>
-            bail!("Could not fork process"),
-    }
+        })
 }
