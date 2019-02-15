@@ -29,6 +29,7 @@ extern crate log;
 extern crate nix;
 
 use std::env;
+use std::process;
 
 use intercept::Result;
 use intercept::event::*;
@@ -38,8 +39,8 @@ use intercept::protocol::Protocol;
 fn main() {
     match run() {
         Ok(code) => {
-            ::std::process::exit(code);
-        }
+            process::exit(code);
+        },
         Err(ref e) => {
             eprintln!("error: {}", e);
 
@@ -51,9 +52,8 @@ fn main() {
             if let Some(backtrace) = e.backtrace() {
                 eprintln!("backtrace: {:?}", backtrace);
             }
-
-            ::std::process::exit(1);
-        }
+            process::exit(1);
+        },
     }
 }
 
