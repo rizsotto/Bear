@@ -25,16 +25,20 @@ use chrono;
 
 use crate::{ErrorKind, Result, ResultExt};
 use crate::event::*;
+
 use super::fake::get_parent_pid;
 
-pub struct Supervisor<'a> {
-    sink: Box<FnMut(Event) -> Result<()> + 'a>,
+pub struct Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    sink: F,
 }
 
-impl<'a> Supervisor<'a> {
-    pub fn new<F: 'a>(sink: F) -> Supervisor<'a>
-        where F: FnMut(Event) -> Result<()> {
-        Supervisor { sink: Box::new(sink) }
+impl<F> Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    pub fn new(sink: F) -> Supervisor<F> {
+        Supervisor { sink }
     }
 
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
@@ -49,7 +53,8 @@ impl<'a> Supervisor<'a> {
                 pid: child.id(),
                 ppid: get_parent_pid(),
                 cwd: cwd.clone(),
-                cmd: cmd.to_vec(), },
+                cmd: cmd.to_vec(),
+            },
             chrono::Utc::now());
         self.report(event);
 

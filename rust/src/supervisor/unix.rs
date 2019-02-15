@@ -22,22 +22,25 @@ use std::ffi;
 use std::path;
 
 use chrono;
-use nix::unistd::{fork, execvp, pipe, close, write, read, ForkResult, Pid};
 use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+use nix::unistd::{close, execvp, fork, ForkResult, Pid, pipe, read, write};
 
 use crate::{Error, ErrorKind, Result, ResultExt};
 use crate::event::*;
+
 use super::fake::get_parent_pid;
 
-
-pub struct Supervisor<'a> {
-    sink: Box<FnMut(Event) -> Result<()> + 'a>,
+pub struct Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    sink: F,
 }
 
-impl<'a> Supervisor<'a> {
-    pub fn new<F: 'a>(sink: F) -> Supervisor<'a>
-        where F: FnMut(Event) -> Result<()> {
-        Supervisor { sink: Box::new(sink) }
+impl<F> Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    pub fn new(sink: F) -> Supervisor<F> {
+        Supervisor { sink }
     }
 
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {

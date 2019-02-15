@@ -24,18 +24,21 @@ use std::process;
 use chrono;
 
 use crate::{ErrorKind, Result, ResultExt};
-use crate::event::*;
 use crate::compilation::compiler::*;
 use crate::compilation::execution::*;
+use crate::event::*;
 
-pub struct Supervisor<'a> {
-    sink: Box<FnMut(Event) -> Result<()> + 'a>,
+pub struct Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    sink: F,
 }
 
-impl<'a> Supervisor<'a> {
-    pub fn new<F: 'a>(sink: F) -> Supervisor<'a>
-        where F: FnMut(Event) -> Result<()> {
-        Supervisor { sink: Box::new(sink) }
+impl<F> Supervisor<F>
+    where F: FnMut(Event) -> Result<()>
+{
+    pub fn new(sink: F) -> Supervisor<F> {
+        Supervisor { sink }
     }
 
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
