@@ -29,13 +29,13 @@ use crate::compilation::execution::*;
 use crate::event::*;
 
 pub struct Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     sink: F,
 }
 
 impl<F> Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     pub fn new(sink: F) -> Supervisor<F> {
         Supervisor { sink }
@@ -46,7 +46,7 @@ impl<F> Supervisor<F>
             .chain_err(|| "unable to get current working directory")?;
         let pid = process::id();
 
-        self.report(
+        (self.sink)(
             Event::Created {
                 pid,
                 ppid: get_parent_pid(),
@@ -71,16 +71,9 @@ impl<F> Supervisor<F>
                 }
             }
         };
-        self.report(event);
+        (self.sink)(event);
 
         Ok(0)
-    }
-
-    fn report(&mut self, event: Event) {
-        match (self.sink)(event) {
-            Ok(_) => debug!("Event sent."),
-            Err(error) => debug!("Event sending failed. {:?}", error),
-        }
     }
 }
 

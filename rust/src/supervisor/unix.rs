@@ -31,13 +31,13 @@ use crate::event::*;
 use super::fake::get_parent_pid;
 
 pub struct Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     sink: F,
 }
 
 impl<F> Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     pub fn new(sink: F) -> Supervisor<F> {
         Supervisor { sink }
@@ -49,7 +49,7 @@ impl<F> Supervisor<F>
 
         spawn(cmd)
             .and_then(|pid| {
-                self.report(
+                (self.sink)(
                     Event::Created {
                         pid: pid.as_raw() as ProcessId,
                         ppid: Pid::parent().as_raw() as ProcessId,
@@ -68,7 +68,7 @@ impl<F> Supervisor<F>
                 match status {
                     WaitStatus::Exited(pid, code) => {
                         debug!("exited");
-                        self.report(
+                        (self.sink)(
                             Event::TerminatedNormally {
                                 pid: pid.as_raw() as ProcessId,
                                 code,
@@ -78,7 +78,7 @@ impl<F> Supervisor<F>
                     },
                     WaitStatus::Signaled(pid, signal, bool) => {
                         debug!("signaled");
-                        self.report(
+                        (self.sink)(
                             Event::TerminatedAbnormally {
                                 pid: pid.as_raw() as ProcessId,
                                 signal: format!("{}", signal),
@@ -89,7 +89,7 @@ impl<F> Supervisor<F>
                     },
                     WaitStatus::Stopped(pid, signal) => {
                         debug!("stopped");
-                        self.report(
+                        (self.sink)(
                             Event::Stopped {
                                 pid: pid.as_raw() as ProcessId,
                                 signal: format!("{}", signal),
@@ -99,7 +99,7 @@ impl<F> Supervisor<F>
                     },
                     WaitStatus::Continued(pid) => {
                         debug!("continued");
-                        self.report(
+                        (self.sink)(
                             Event::Continued {
                                 pid: pid.as_raw() as ProcessId,
                                 when: chrono::Utc::now(),
@@ -113,13 +113,6 @@ impl<F> Supervisor<F>
                 }
             )
             .chain_err(|| "Process creation failed.")
-    }
-
-    fn report(&mut self, event: Event) {
-        match (self.sink)(event) {
-            Ok(_) => debug!("Event sent."),
-            Err(error) => debug!("Event sending failed. {:?}", error),
-        }
     }
 }
 

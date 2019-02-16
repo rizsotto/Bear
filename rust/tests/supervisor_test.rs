@@ -39,7 +39,7 @@ mod unix {
 
         #[test]
         fn success() {
-            let mut sut = Supervisor::new(|_: Event| Ok(()));
+            let mut sut = Supervisor::new(|_: Event| ());
 
             let result = sut.run(slice_of_strings!("/usr/bin/true"));
             assert_eq!(true, result.is_ok());
@@ -48,7 +48,7 @@ mod unix {
 
         #[test]
         fn fail() {
-            let mut sut = Supervisor::new(|_: Event| Ok(()));
+            let mut sut = Supervisor::new(|_: Event| ());
 
             let result = sut.run(slice_of_strings!("/usr/bin/false"));
             assert_eq!(true, result.is_ok());
@@ -57,7 +57,7 @@ mod unix {
 
         #[test]
         fn exec_failure() {
-            let mut sut = Supervisor::new(|_: Event| Ok(()));
+            let mut sut = Supervisor::new(|_: Event| ());
 
             let result = sut.run(slice_of_strings!("./path/to/not/exists"));
             assert_eq!(false, result.is_ok());
@@ -74,7 +74,6 @@ mod unix {
             {
                 let mut sut = Supervisor::new(|event: Event| {
                     (&mut events).push(event);
-                    Ok(())
                 });
                 let _ = sut.run(args);
             }

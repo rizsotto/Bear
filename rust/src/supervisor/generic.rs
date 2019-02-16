@@ -29,13 +29,13 @@ use crate::event::*;
 use super::fake::get_parent_pid;
 
 pub struct Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     sink: F,
 }
 
 impl<F> Supervisor<F>
-    where F: FnMut(Event) -> Result<()>
+    where F: FnMut(Event) -> ()
 {
     pub fn new(sink: F) -> Supervisor<F> {
         Supervisor { sink }
@@ -48,7 +48,7 @@ impl<F> Supervisor<F>
             .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
 
         debug!("process was started: {:?}", child.id());
-        self.report(
+        (self.sink)(
             Event::Created {
                 pid: child.id(),
                 ppid: get_parent_pid(),
@@ -77,19 +77,12 @@ impl<F> Supervisor<F>
                         }
                     }
                 };
-                self.report(event);
+                (self.sink)(event);
             }
             Err(_) => {
                 warn!("process was not running: {:?}", child.id());
             }
         }
         Ok(0)
-    }
-
-    fn report(&mut self, event: Event) {
-        match (self.sink)(event) {
-            Ok(_) => debug!("Event sent."),
-            Err(error) => debug!("Event sending failed. {:?}", error),
-        }
     }
 }
