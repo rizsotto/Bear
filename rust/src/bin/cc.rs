@@ -65,7 +65,7 @@ fn run() -> Result<ExitCode> {
     debug!("invocation: {:?}", &args);
 
     let mut protocol = Protocol::new()?;
-    let mut supervisor = Supervisor::new(|event: Event| protocol.send(event));
+    let mut supervisor = Supervisor::new(|event: &Event| protocol.send(event));
 
     supervisor.run(&args[1..])
 }

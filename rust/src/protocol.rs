@@ -30,7 +30,7 @@ impl Protocol {
         Ok(Protocol {})
     }
 
-    pub fn send(&mut self, event: Event) -> () {
+    pub fn send(&mut self, event: &Event) -> () {
         println!("event: {:?}", event);
     }
 }
