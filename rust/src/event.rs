@@ -18,7 +18,6 @@
  */
 
 use chrono;
-use serde_json;
 use std::path;
 
 pub type DateTime = chrono::DateTime<chrono::Utc>;

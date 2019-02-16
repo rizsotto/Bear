@@ -18,9 +18,15 @@
  */
 
 use std::env;
-use std::ffi;
 use std::process;
 use std::str;
+
+#[cfg(unix)]
+use std::ffi;
+#[cfg(unix)]
+use nix::unistd;
+#[cfg(unix)]
+use nix::sys::wait;
 
 use chrono;
 
@@ -40,6 +46,87 @@ impl<F> Supervisor<F>
         Supervisor { sink }
     }
 
+    pub fn fake(&mut self, cmd: &[String]) -> Result<ExitCode> {
+        let cwd = env::current_dir()
+            .chain_err(|| "unable to get current working directory")?;
+        let pid = process::id();
+
+        (self.sink)(
+            Event::Created {
+                pid,
+                ppid: get_parent_pid(),
+                cwd: cwd.clone(),
+                cmd: cmd.to_vec(),
+                when: chrono::Utc::now(),
+            });
+
+        let event = match create_output_file() {
+            Ok(_) => {
+                Event::TerminatedNormally {
+                    pid,
+                    code: 0,
+                    when:  chrono::Utc::now(),
+                }
+            }
+            Err(_) => {
+                Event::TerminatedNormally {
+                    pid,
+                    code: 1,
+                    when:  chrono::Utc::now(),
+                }
+            }
+        };
+        (self.sink)(event);
+
+        Ok(0)
+    }
+
+    #[cfg(not(unix))]
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
+        let cwd = env::current_dir()
+            .chain_err(|| "Unable to get current working directory")?;
+        let mut child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
+            .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
+
+        debug!("Child process started: {:?}", child.id());
+        (self.sink)(
+            Event::Created {
+                pid: child.id(),
+                ppid: get_parent_pid(),
+                cwd: cwd.clone(),
+                cmd: cmd.to_vec(),
+                when: chrono::Utc::now(),
+            });
+
+        match child.wait() {
+            Ok(status) => {
+                debug!("Child process stopped: {:?}", child.id());
+                let event = match status.code() {
+                    Some(code) => {
+                        Event::TerminatedNormally {
+                            pid: child.id(),
+                            code,
+                            when: chrono::Utc::now(),
+                        }
+                    }
+                    None => {
+                        Event::TerminatedAbnormally {
+                            pid: child.id(),
+                            signal: "unknown".to_string(),
+                            when: chrono::Utc::now(),
+                        }
+                    }
+                };
+                (self.sink)(event);
+            }
+            Err(_) => {
+                warn!("Child process was not running: {:?}", child.id());
+            }
+        }
+        Ok(0)
+    }
+
+    #[cfg(unix)]
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
         let cwd = env::current_dir()
             .chain_err(|| "Unable to get current working directory")?;
@@ -59,9 +146,10 @@ impl<F> Supervisor<F>
             })
     }
 
+    #[cfg(unix)]
     fn wait_for_pid(&mut self, child: nix::unistd::Pid) -> Result<ExitCode> {
-        match nix::sys::wait::waitpid(child, None) {
-            Ok(nix::sys::wait::WaitStatus::Exited(pid, code)) => {
+        match wait::waitpid(child, None) {
+            Ok(wait::WaitStatus::Exited(pid, code)) => {
                 (self.sink)(
                     Event::TerminatedNormally {
                         pid: pid.as_raw() as ProcessId,
@@ -70,7 +158,7 @@ impl<F> Supervisor<F>
                     });
                 Ok(code)
             },
-            Ok(nix::sys::wait::WaitStatus::Signaled(pid, signal, _dump)) => {
+            Ok(wait::WaitStatus::Signaled(pid, signal, _dump)) => {
                 (self.sink)(
                     Event::TerminatedAbnormally {
                         pid: pid.as_raw() as ProcessId,
@@ -80,7 +168,7 @@ impl<F> Supervisor<F>
                 // TODO: fake the signal in return value.
                 Ok(1)
             },
-            Ok(nix::sys::wait::WaitStatus::Stopped(pid, signal)) => {
+            Ok(wait::WaitStatus::Stopped(pid, signal)) => {
                 (self.sink)(
                     Event::Stopped {
                         pid: pid.as_raw() as ProcessId,
@@ -89,7 +177,7 @@ impl<F> Supervisor<F>
                     });
                 self.wait_for_pid(child)
             },
-            Ok(nix::sys::wait::WaitStatus::Continued(pid)) => {
+            Ok(wait::WaitStatus::Continued(pid)) => {
                 (self.sink)(
                     Event::Continued {
                         pid: pid.as_raw() as ProcessId,
@@ -107,30 +195,31 @@ impl<F> Supervisor<F>
     }
 }
 
-fn spawn(cmd: &[String]) -> Result<nix::unistd::Pid> {
+#[cfg(unix)]
+fn spawn(cmd: &[String]) -> Result<unistd::Pid> {
     // Create communication channel between the child and parent processes.
     // Parent want to be notified if process execution went well or failed.
-    let (read_fd, write_fd) = nix::unistd::pipe()
+    let (read_fd, write_fd) = unistd::pipe()
         .chain_err(|| "Unable to create pipe.")?;
 
-    match nix::unistd::fork() {
-        Ok(nix::unistd::ForkResult::Parent { child, .. }) => {
+    match unistd::fork() {
+        Ok(unistd::ForkResult::Parent { child, .. }) => {
             debug!("Parent process: waiting for pid: {}", child);
-            let _ = nix::unistd::close(write_fd);
+            let _ = unistd::close(write_fd);
             defer! {{
-                    let _ = nix::unistd::close(read_fd);
+                    let _ = unistd::close(read_fd);
             }}
 
             let mut buffer = vec![0u8; 1024];
-            match nix::unistd::read(read_fd, buffer.as_mut()) {
+            match unistd::read(read_fd, buffer.as_mut()) {
                 Ok(0) =>
-                    // In case of successful start the child closed the pipe,
-                    // so we can't read anything from it.
+                // In case of successful start the child closed the pipe,
+                // so we can't read anything from it.
                     Ok(child),
                 Ok(_) =>
-                    // If the child failed to exec the given process,
-                    // it sends us a message through the pipe.
-                    // Take that read value and use as error message.
+                // If the child failed to exec the given process,
+                // it sends us a message through the pipe.
+                // Take that read value and use as error message.
                     Err(
                         str::from_utf8(buffer.as_ref())
                             .unwrap_or("Unknown reason.")
@@ -139,24 +228,46 @@ fn spawn(cmd: &[String]) -> Result<nix::unistd::Pid> {
                     Err(Error::with_chain(error, "Read from pipe failed.")),
             }
         }
-        Ok(nix::unistd::ForkResult::Child) => {
+        Ok(unistd::ForkResult::Child) => {
             debug!("Child process: calling exec.");
-            let _ = nix::unistd::close(read_fd);
+            let _ = unistd::close(read_fd);
             defer! {{
-                    let _ = nix::unistd::close(write_fd);
+                    let _ = unistd::close(write_fd);
             }}
 
             let args: Vec<_> = cmd.iter()
                 .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
                 .collect();
-            nix::unistd::execvp(&args[0], args.as_ref())
+            unistd::execvp(&args[0], args.as_ref())
                 .map_err(|error| {
                     let message = error.to_string().into_bytes();
-                    let _ = nix::unistd::write(write_fd, message.as_ref());
+                    let _ = unistd::write(write_fd, message.as_ref());
                 });
             process::exit(1);
         },
         Err(error) =>
             Err(Error::with_chain(error, "Fork process failed.")),
     }
+}
+
+#[cfg(not(unix))]
+pub fn get_parent_pid() -> ProcessId {
+    match env::var("INTERCEPT_PPID") {
+        Ok(value) => {
+            match value.parse() {
+                Ok(ppid) => ppid,
+                _ => 0,
+            }
+        },
+        _ => 0,
+    }
+}
+
+#[cfg(unix)]
+pub fn get_parent_pid() -> ProcessId {
+    unistd::Pid::parent().as_raw() as ProcessId
+}
+
+fn create_output_file() -> Result<()> {
+    unimplemented!()
 }
