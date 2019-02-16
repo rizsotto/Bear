@@ -25,6 +25,8 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate regex;
+#[macro_use]
+extern crate scopeguard;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

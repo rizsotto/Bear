@@ -19,13 +19,12 @@
 
 use std::env;
 use std::ffi;
-use std::path;
 use std::process;
 use std::str;
 
 use chrono;
 
-use crate::{Error, ErrorKind, Result, ResultExt};
+use crate::{Error, Result, ResultExt};
 use crate::event::{Event, ExitCode, ProcessId};
 
 pub struct Supervisor<F>
@@ -71,7 +70,7 @@ impl<F> Supervisor<F>
                     });
                 Ok(code)
             },
-            Ok(nix::sys::wait::WaitStatus::Signaled(pid, signal, bool)) => {
+            Ok(nix::sys::wait::WaitStatus::Signaled(pid, signal, _dump)) => {
                 (self.sink)(
                     Event::TerminatedAbnormally {
                         pid: pid.as_raw() as ProcessId,
@@ -118,43 +117,42 @@ fn spawn(cmd: &[String]) -> Result<nix::unistd::Pid> {
         Ok(nix::unistd::ForkResult::Parent { child, .. }) => {
             debug!("Parent process: waiting for pid: {}", child);
             let _ = nix::unistd::close(write_fd);
+            defer! {{
+                    let _ = nix::unistd::close(read_fd);
+            }}
 
             let mut buffer = vec![0u8; 1024];
             match nix::unistd::read(read_fd, buffer.as_mut()) {
-                Ok(0) => {
+                Ok(0) =>
                     // In case of successful start the child closed the pipe,
                     // so we can't read anything from it.
-                    let _ = nix::unistd::close(read_fd);
-                    Ok(child)
-                },
-                Ok(length) => {
+                    Ok(child),
+                Ok(_) =>
                     // If the child failed to exec the given process,
                     // it sends us a message through the pipe.
-                    let _ = nix::unistd::close(read_fd);
                     // Take that read value and use as error message.
                     Err(
                         str::from_utf8(buffer.as_ref())
                             .unwrap_or("Unknown reason.")
-                            .into())
-                },
-                Err(error) => {
-                    let _ = nix::unistd::close(read_fd);
-                    Err(Error::with_chain(error, "Read from pipe failed."))
-                },
+                            .into()),
+                Err(error) =>
+                    Err(Error::with_chain(error, "Read from pipe failed.")),
             }
         }
         Ok(nix::unistd::ForkResult::Child) => {
             debug!("Child process: calling exec.");
             let _ = nix::unistd::close(read_fd);
+            defer! {{
+                    let _ = nix::unistd::close(write_fd);
+            }}
 
-            let args : Vec<_> = cmd.iter()
+            let args: Vec<_> = cmd.iter()
                 .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
                 .collect();
             nix::unistd::execvp(&args[0], args.as_ref())
                 .map_err(|error| {
                     let message = error.to_string().into_bytes();
                     let _ = nix::unistd::write(write_fd, message.as_ref());
-                    let _ = nix::unistd::close(write_fd);
                 });
             process::exit(1);
         },
