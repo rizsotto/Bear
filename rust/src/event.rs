@@ -27,30 +27,31 @@ pub type ExitCode = i32;
 pub type SignalId = String;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessCreated {
-    pub pid: ProcessId,
-    pub ppid: ProcessId,
-    pub cwd: path::PathBuf,
-    pub cmd: Vec<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessTerminated {
-    pub pid: ProcessId,
-    pub code: ExitCode,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ProcessSignaled {
-    pub pid: ProcessId,
-    pub signal: SignalId,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
-    Created(ProcessCreated, DateTime),
-    TerminatedNormally(ProcessTerminated, DateTime),
-    TerminatedAbnormally(ProcessSignaled, DateTime),
-    Stopped(ProcessSignaled, DateTime),
-    Resumed(ProcessSignaled, DateTime),
+    Created {
+        when: DateTime,
+        pid: ProcessId,
+        ppid: ProcessId,
+        cwd: path::PathBuf,
+        cmd: Vec<String>,
+    },
+    TerminatedNormally {
+        when: DateTime,
+        pid: ProcessId,
+        code: ExitCode,
+    },
+    TerminatedAbnormally {
+        when: DateTime,
+        pid: ProcessId,
+        signal: SignalId,
+    },
+    Stopped {
+        when: DateTime,
+        pid: ProcessId,
+        signal: SignalId,
+    },
+    Continued {
+        when: DateTime,
+        pid: ProcessId,
+    },
 }

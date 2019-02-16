@@ -49,15 +49,14 @@ impl<F> Supervisor<F>
 
         spawn(cmd)
             .and_then(|pid| {
-                let event = Event::Created(
-                    ProcessCreated {
+                self.report(
+                    Event::Created {
                         pid: pid.as_raw() as ProcessId,
                         ppid: Pid::parent().as_raw() as ProcessId,
                         cwd: cwd.clone(),
                         cmd: cmd.to_vec(),
-                    },
-                    chrono::Utc::now());
-                self.report(event);
+                        when: chrono::Utc::now(),
+                    });
                 self.wait_for_pid(pid)
             })
     }
@@ -69,43 +68,46 @@ impl<F> Supervisor<F>
                 match status {
                     WaitStatus::Exited(pid, code) => {
                         debug!("exited");
-                        let event = Event::TerminatedNormally(
-                            ProcessTerminated { pid: pid.as_raw() as ProcessId, code },
-                            chrono::Utc::now());
-                        self.report(event);
+                        self.report(
+                            Event::TerminatedNormally {
+                                pid: pid.as_raw() as ProcessId,
+                                code,
+                                when: chrono::Utc::now(),
+                            });
                         Ok(code)
                     },
                     WaitStatus::Signaled(pid, signal, bool) => {
                         debug!("signaled");
-                        let event = Event::TerminatedAbnormally(
-                            ProcessSignaled {
+                        self.report(
+                            Event::TerminatedAbnormally {
                                 pid: pid.as_raw() as ProcessId,
-                                signal: format!("{}", signal)
-                            },
-                            chrono::Utc::now());
-                        self.report(event);
-                        Ok(-1) // TODO: check
+                                signal: format!("{}", signal),
+                                when: chrono::Utc::now(),
+                            });
+                        // TODO: fake the signal in return value.
+                        Ok(1)
                     },
                     WaitStatus::Stopped(pid, signal) => {
                         debug!("stopped");
-                        // TODO: send event
-                        self.wait_for_pid(child)
-                    },
-                    WaitStatus::PtraceEvent(pid, signal, c_int) => {
-                        debug!("ptrace-event");
-                        self.wait_for_pid(child)
-                    },
-                    WaitStatus::PtraceSyscall(pid) => {
-                        debug!("ptrace-systrace");
+                        self.report(
+                            Event::Stopped {
+                                pid: pid.as_raw() as ProcessId,
+                                signal: format!("{}", signal),
+                                when: chrono::Utc::now(),
+                            });
                         self.wait_for_pid(child)
                     },
                     WaitStatus::Continued(pid) => {
                         debug!("continued");
-                        // TODO: send event
+                        self.report(
+                            Event::Continued {
+                                pid: pid.as_raw() as ProcessId,
+                                when: chrono::Utc::now(),
+                            });
                         self.wait_for_pid(child)
                     },
-                    WaitStatus::StillAlive => {
-                        debug!("still alive");
+                    _ => {
+                        info!("Wait status is ignored, continue to wait.");
                         self.wait_for_pid(child)
                     },
                 }

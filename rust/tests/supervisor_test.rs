@@ -19,7 +19,7 @@
 
 extern crate intercept;
 
-use intercept::event::{Event, ProcessCreated };
+use intercept::event::Event;
 use intercept::supervisor::Supervisor;
 
 macro_rules! vec_of_strings {
@@ -68,7 +68,6 @@ mod unix {
         use super::*;
         use std::env;
         use std::process;
-        use intercept::event::ProcessTerminated;
 
         fn run_supervisor(args: &[String]) -> Vec<Event> {
             let mut events: Vec<Event> = vec![];
@@ -89,7 +88,7 @@ mod unix {
 
             assert_eq!(2usize, (&events).len());
             match events[0] {
-                Event::Created(ProcessCreated { pid, ppid, ref cwd, ref cmd, .. }, _) => {
+                Event::Created { pid, ppid, ref cwd, ref cmd, .. } => {
                     assert_ne!(0, pid);
                     assert_ne!(process::id(), pid);
                     assert_ne!(std::os::unix::process::parent_id(), pid);
@@ -100,7 +99,7 @@ mod unix {
                 _ => assert_eq!(true, false),
             }
             match events[1] {
-                Event::TerminatedNormally(ProcessTerminated { pid, code, .. }, _) => {
+                Event::TerminatedNormally { pid, code, .. } => {
                     // TODO: check if it is the same as the create one
                     assert_ne!(0, pid);
                     assert_ne!(process::id(), pid);

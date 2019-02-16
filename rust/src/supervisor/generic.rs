@@ -48,27 +48,33 @@ impl<F> Supervisor<F>
             .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
 
         debug!("process was started: {:?}", child.id());
-        let event = Event::Created(
-            ProcessCreated {
+        self.report(
+            Event::Created {
                 pid: child.id(),
                 ppid: get_parent_pid(),
                 cwd: cwd.clone(),
                 cmd: cmd.to_vec(),
-            },
-            chrono::Utc::now());
-        self.report(event);
+                when: chrono::Utc::now(),
+            });
 
         match child.wait() {
             Ok(status) => {
                 debug!("process was stopped: {:?}", child.id());
                 let event = match status.code() {
                     Some(code) => {
-                        let message = ProcessTerminated { pid: child.id(), code };
-                        Event::TerminatedNormally(message, chrono::Utc::now())
+                        Event::TerminatedNormally {
+                            pid: child.id(),
+                            code,
+                            when:  chrono::Utc::now(),
+                        }
                     }
                     None => {
-                        let message = ProcessSignaled { pid: child.id(), signal: "unknown".to_string() };
-                        Event::TerminatedAbnormally(message, chrono::Utc::now())
+                        let message = ProcessSignaled {  };
+                        Event::TerminatedAbnormally {
+                            pid: child.id(),
+                            signal: "unknown".to_string(),
+                            when:  chrono::Utc::now(),
+                        }
                     }
                 };
                 self.report(event);

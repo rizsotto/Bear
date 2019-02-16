@@ -46,23 +46,29 @@ impl<F> Supervisor<F>
             .chain_err(|| "unable to get current working directory")?;
         let pid = process::id();
 
-        let event = Event::Created(
-            ProcessCreated {
+        self.report(
+            Event::Created {
                 pid,
                 ppid: get_parent_pid(),
                 cwd: cwd.clone(),
-                cmd: cmd.to_vec(), },
-            chrono::Utc::now());
-        self.report(event);
+                cmd: cmd.to_vec(),
+                when: chrono::Utc::now(),
+            });
 
         let event = match create_output_file() {
             Ok(_) => {
-                let message = ProcessTerminated { pid, code: 0 };
-                Event::TerminatedNormally(message, chrono::Utc::now())
+                Event::TerminatedNormally {
+                    pid,
+                    code: 0,
+                    when:  chrono::Utc::now(),
+                }
             }
             Err(_) => {
-                let message = ProcessTerminated { pid, code: -1 };
-                Event::TerminatedNormally(message, chrono::Utc::now())
+                Event::TerminatedNormally {
+                    pid,
+                    code: 1,
+                    when:  chrono::Utc::now(),
+                }
             }
         };
         self.report(event);
