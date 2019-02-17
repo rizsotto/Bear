@@ -54,3 +54,25 @@ pub enum Event {
         pid: ProcessId,
     },
 }
+
+impl Event {
+    pub fn pid(&self) -> ProcessId {
+        match self {
+            Event::Created { pid, .. } => *pid,
+            Event::TerminatedNormally { pid, .. } => *pid,
+            Event::TerminatedAbnormally { pid, .. } => *pid,
+            Event::Stopped { pid, .. } => *pid,
+            Event::Continued { pid, .. } => *pid,
+        }
+    }
+
+    pub fn when(&self) -> DateTime {
+        match self {
+            Event::Created { when, .. } => *when,
+            Event::TerminatedNormally { when, .. } => *when,
+            Event::TerminatedAbnormally { when, .. } => *when,
+            Event::Stopped { when, .. } => *when,
+            Event::Continued { when, .. } => *when,
+        }
+    }
+}

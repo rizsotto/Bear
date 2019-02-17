@@ -22,10 +22,6 @@ extern crate intercept;
 use intercept::event::Event;
 use intercept::supervisor::Supervisor;
 
-macro_rules! vec_of_strings {
-    ($($x:expr),*) => (vec![$($x.to_string()),*]);
-}
-
 macro_rules! slice_of_strings {
     ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
 }
@@ -80,32 +76,40 @@ mod unix {
             events
         }
 
-        #[test]
-        fn success() {
-            let command = vec_of_strings!("/usr/bin/true");
-            let events = run_supervisor(command.as_ref());
+        fn assert_start_stop_events(args: &[String], expected_exit_code: i32) {
+            let events = run_supervisor(args);
 
             assert_eq!(2usize, (&events).len());
+            // assert that the pid is not any of us.
+            assert_ne!(0, events[0].pid());
+            assert_ne!(process::id(), events[0].pid());
+            assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
+            // assert that the all event's pid are the same.
+            assert_eq!(events[0].pid(), events[1].pid());
             match events[0] {
-                Event::Created { pid, ppid, ref cwd, ref cmd, .. } => {
-                    assert_ne!(0, pid);
-                    assert_ne!(process::id(), pid);
-                    assert_ne!(std::os::unix::process::parent_id(), pid);
+                Event::Created { ppid, ref cwd, ref cmd, .. } => {
                     assert_eq!(std::os::unix::process::parent_id(), ppid);
                     assert_eq!(env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
-                    assert_eq!(&command, cmd);
+                    assert_eq!(args.to_vec(), *cmd);
                 },
                 _ => assert_eq!(true, false),
             }
             match events[1] {
-                Event::TerminatedNormally { pid, code, .. } => {
-                    // TODO: check if it is the same as the create one
-                    assert_ne!(0, pid);
-                    assert_ne!(process::id(), pid);
-                    assert_eq!(0i32, code);
+                Event::TerminatedNormally { code, .. } => {
+                    assert_eq!(expected_exit_code, code);
                 },
                 _ => assert_eq!(true, false),
             }
+        }
+
+        #[test]
+        fn success() {
+            assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
+        }
+
+        #[test]
+        fn fail() {
+            assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
         }
 
         #[test]

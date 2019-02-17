@@ -151,12 +151,14 @@ mod unix {
                     Ok(0) => {
                         // In case of successful start the child closed the pipe,
                         // so we can't read anything from it.
+                        debug!("Parent process: looks the child was done well.");
                         Ok(child)
                     },
                     Ok(_) => {
                         // If the child failed to exec the given process,
                         // it sends us a message through the pipe.
                         // Take that read value and use as error message.
+                        debug!("Parent process: looks the child failed exec.");
                         Err(
                             str::from_utf8(buffer.as_ref())
                                 .unwrap_or("Unknown reason.")
@@ -179,6 +181,7 @@ mod unix {
                         let message = error.to_string().into_bytes();
                         let _ = unistd::write(write_fd, message.as_ref());
                     });
+                debug!("Child process: exec failed, calling exit.");
                 process::exit(1);
             },
             Err(error) =>
