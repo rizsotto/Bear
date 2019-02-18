@@ -44,6 +44,7 @@ trait Executor {
 
         let mut child = Self::spawn(sink, cmd, cwd)
             .chain_err(|| format!("Unable to execute: {}", &cmd[0]))?;
+
         Self::wait(sink, &mut child)
     }
 }
@@ -91,6 +92,8 @@ pub fn get_parent_pid() -> ProcessId {
 #[cfg(unix)]
 mod unix {
     use std::ffi;
+    use std::os::unix::io;
+    use nix::fcntl;
     use nix::unistd;
     use nix::sys::wait;
 
@@ -208,7 +211,7 @@ mod unix {
             Ok(unistd::ForkResult::Child) => {
                 debug!("Child process: calling exec.");
                 let _ = unistd::close(read_fd);
-                defer! {{ let _ = unistd::close(write_fd); }}
+                set_close_on_exec(write_fd);
 
                 let args: Vec<_> = cmd.iter()
                     .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
@@ -224,6 +227,32 @@ mod unix {
             Err(error) =>
                 Err(Error::with_chain(error, "Fork process failed.")),
         }
+    }
+
+    fn wait_flags() -> wait::WaitPidFlag {
+        let mut wait_flags = wait::WaitPidFlag::empty();
+//        wait_flags.insert(wait::WaitPidFlag::WNOWAIT);
+//        wait_flags.insert(wait::WaitPidFlag::WNOHANG);
+//        wait_flags.insert(wait::WaitPidFlag::WEXITED);
+        wait_flags.insert(wait::WaitPidFlag::WCONTINUED);
+        wait_flags.insert(wait::WaitPidFlag::WSTOPPED);
+        wait_flags.insert(wait::WaitPidFlag::WUNTRACED);
+        wait_flags.insert(wait::WaitPidFlag::__WALL);
+        wait_flags
+    }
+
+    fn set_close_on_exec(fd: io::RawFd) {
+        fcntl::fcntl(fd, fcntl::F_GETFD)
+            .and_then(|current_bits| {
+                let flags: fcntl::FdFlag = fcntl::FdFlag::from_bits(current_bits)
+                    .map(|mut flag| {
+                        flag.insert(fcntl::FdFlag::FD_CLOEXEC);
+                        flag
+                    })
+                    .unwrap_or(fcntl::FdFlag::FD_CLOEXEC);
+                fcntl::fcntl(fd, fcntl::F_SETFD(flags))
+            })
+            .expect("set close-on-exec failed.");
     }
 }
 

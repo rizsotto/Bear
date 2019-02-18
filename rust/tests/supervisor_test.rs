@@ -18,6 +18,7 @@
  */
 
 extern crate intercept;
+extern crate nix;
 
 use intercept::event::Event;
 use intercept::supervisor::Supervisor;
@@ -64,6 +65,8 @@ mod unix {
         use super::*;
         use std::env;
         use std::process;
+        use nix::sys::signal;
+        use nix::unistd::Pid;
 
         fn run_supervisor(args: &[String]) -> Vec<Event> {
             let mut events: Vec<Event> = vec![];
@@ -118,5 +121,31 @@ mod unix {
             assert_eq!(0usize, (&events).len());
         }
 
+        #[test]
+        fn signal() {
+
+            let mut events: Vec<Event> = vec![];
+            {
+                let mut sut = Supervisor::new(|event: Event| {
+                    match event {
+                        Event::Created { pid, .. } => {
+                            signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
+                                .expect("kill failed");
+                        },
+                        _ => (&mut events).push(event),
+                    }
+                });
+                sut.run(slice_of_strings!("/usr/bin/sleep", "5"))
+                    .expect("execute sleep failed");
+            }
+
+            assert_eq!(1usize, (&events).len());
+            match events[0] {
+                Event::TerminatedAbnormally { ref signal, .. } => {
+                    assert_eq!("SIGKILL".to_string(), *signal);
+                },
+                _ => assert_eq!(true, false),
+            }
+        }
     }
 }
