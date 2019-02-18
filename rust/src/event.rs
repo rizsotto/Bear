@@ -25,7 +25,7 @@ pub type ProcessId = u32;
 pub type ExitCode = i32;
 pub type SignalId = String;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Event {
     Created {
         when: DateTime,

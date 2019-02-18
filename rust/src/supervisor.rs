@@ -27,56 +27,49 @@ use chrono;
 use crate::{Result, ResultExt};
 use crate::event::{Event, ExitCode, ProcessId};
 
-type Events = Box<Vec<Event>>;
-
 trait Executor {
     type Handle;
 
-    fn spawn(cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>;
-    fn wait(handle: &mut Self::Handle) -> Result<Events>;
+    fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
+        where F: FnMut(Event) -> ();
+
+    fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
+        where F: FnMut(Event) -> ();
+
+    fn run<F>(sink: &mut F, cmd: &[String]) -> Result<ExitCode>
+        where F: FnMut(Event) -> ()
+    {
+        let cwd = env::current_dir()
+            .chain_err(|| "Unable to get current working directory")?;
+
+        let mut child = Self::spawn(sink, cmd, cwd)
+            .chain_err(|| format!("Unable to execute: {}", &cmd[0]))?;
+        Self::wait(sink, &mut child)
+    }
 }
 
 pub struct Supervisor<F>
-    where F: FnMut(&Event) -> ()
+    where F: FnMut(Event) -> ()
 {
     sink: F,
 }
 
 impl<F> Supervisor<F>
-    where F: FnMut(&Event) -> ()
+    where F: FnMut(Event) -> ()
 {
-    pub fn new(sink: F) -> Supervisor<F> {
+    pub fn new(sink: F) -> Supervisor<F>
+    {
         Supervisor { sink }
     }
 
-    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode> {
-        let cwd = env::current_dir()
-            .chain_err(|| "Unable to get current working directory")?;
-
-        let events = if cfg!(unix) {
-            let mut child = unix::ProcessHandle::spawn(cmd, cwd)
-                .chain_err(|| format!("Unable to execute: {}", &cmd[0]))?;
-            *unix::ProcessHandle::wait(&mut child)?
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
+    {
+        if cfg!(unix) {
+            unix::ProcessHandle::run(&mut self.sink, cmd)
         } else {
-            let mut child = generic::ProcessHandle::spawn(cmd, cwd)
-                .chain_err(|| format!("Unable to execute: {}", &cmd[0]))?;
-            *generic::ProcessHandle::wait(&mut child)?
-        };
-        for event in &events {
-            (self.sink)(&event);
-        }
-        Ok(exit_code(&events))
-    }
-}
-
-fn exit_code(events: &[Event]) -> ExitCode {
-    for event in events {
-        match event {
-            Event::TerminatedNormally { code, .. } => return *code,
-            _ => continue,
+            generic::ProcessHandle::run(&mut self.sink, cmd)
         }
     }
-    return 1;
 }
 
 pub fn get_parent_pid() -> ProcessId {
@@ -107,30 +100,74 @@ mod unix {
 
     pub struct ProcessHandle {
         pid: nix::unistd::Pid,
-        cmd: Vec<String>,
-        cwd: path::PathBuf,
     }
 
     impl Executor for ProcessHandle {
         type Handle = ProcessHandle;
 
-        fn spawn(cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle> {
+        fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
+            where F: FnMut(Event) -> ()
+        {
             spawn(cmd)
                 .and_then(|pid| {
-                    Ok(ProcessHandle { pid, cmd: cmd.to_vec(), cwd })
+                    sink(
+                        Event::Created {
+                            pid: pid.as_raw() as ProcessId,
+                            ppid: nix::unistd::Pid::parent().as_raw() as ProcessId,
+                            cwd: cwd.clone(),
+                            cmd: cmd.to_vec(),
+                            when: chrono::Utc::now(),
+                        });
+                    Ok(ProcessHandle { pid })
                 })
         }
 
-        fn wait(handle: &mut Self::Handle) -> Result<Events> {
-            let event = Event::Created {
-                pid: handle.pid.as_raw() as ProcessId,
-                ppid: nix::unistd::Pid::parent().as_raw() as ProcessId,
-                cwd: handle.cwd.clone(),
-                cmd: handle.cmd.clone(),
-                when: chrono::Utc::now(),
-            };
-            let results = Box::new(vec!(event));
-            wait_and_collect(handle.pid, results)
+        fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
+            where F: FnMut(Event) -> ()
+        {
+            match wait::waitpid(handle.pid, None) {
+                Ok(wait::WaitStatus::Exited(pid, code)) => {
+                    sink(
+                        Event::TerminatedNormally {
+                            pid: pid.as_raw() as ProcessId,
+                            code,
+                            when: chrono::Utc::now(),
+                        });
+                    Ok(code)
+                },
+                Ok(wait::WaitStatus::Signaled(pid, signal, _dump)) => {
+                    sink(
+                        Event::TerminatedAbnormally {
+                            pid: pid.as_raw() as ProcessId,
+                            signal: format!("{}", signal),
+                            when: chrono::Utc::now(),
+                        });
+                    Ok(127)
+                },
+                Ok(wait::WaitStatus::Stopped(pid, signal)) => {
+                    sink(
+                        Event::Stopped {
+                            pid: pid.as_raw() as ProcessId,
+                            signal: format!("{}", signal),
+                            when: chrono::Utc::now(),
+                        });
+                    Self::wait(sink, handle)
+                },
+                Ok(wait::WaitStatus::Continued(pid)) => {
+                    sink(
+                        Event::Continued {
+                            pid: pid.as_raw() as ProcessId,
+                            when: chrono::Utc::now(),
+                        });
+                    Self::wait(sink, handle)
+                },
+                Ok(_) => {
+                    info!("Wait status is ignored, continue to wait.");
+                    Self::wait(sink, handle)
+                },
+                Err(error) =>
+                    Err(Error::with_chain(error, "Process creation failed.")),
+            }
         }
     }
 
@@ -188,56 +225,6 @@ mod unix {
                 Err(Error::with_chain(error, "Fork process failed.")),
         }
     }
-
-    fn wait_and_collect(handle: nix::unistd::Pid, results: Events) -> Result<Events> {
-        match wait::waitpid(handle, None) {
-            Ok(wait::WaitStatus::Exited(pid, code)) => {
-                let mut events = *results;
-                events.push(
-                    Event::TerminatedNormally {
-                        pid: pid.as_raw() as ProcessId,
-                        code,
-                        when: chrono::Utc::now(),
-                    });
-                Ok(Box::new(events))
-            },
-            Ok(wait::WaitStatus::Signaled(pid, signal, _dump)) => {
-                let mut events = *results;
-                events.push(
-                    Event::TerminatedAbnormally {
-                        pid: pid.as_raw() as ProcessId,
-                        signal: format!("{}", signal),
-                        when: chrono::Utc::now(),
-                    });
-                Ok(Box::new(events))
-            },
-            Ok(wait::WaitStatus::Stopped(pid, signal)) => {
-                let mut events = *results;
-                events.push(
-                    Event::Stopped {
-                        pid: pid.as_raw() as ProcessId,
-                        signal: format!("{}", signal),
-                        when: chrono::Utc::now(),
-                    });
-                wait_and_collect(handle, Box::new(events))
-            },
-            Ok(wait::WaitStatus::Continued(pid)) => {
-                let mut events = *results;
-                events.push(
-                    Event::Continued {
-                        pid: pid.as_raw() as ProcessId,
-                        when: chrono::Utc::now(),
-                    });
-                wait_and_collect(handle, Box::new(events))
-            },
-            Ok(_) => {
-                info!("Wait status is ignored, continue to wait.");
-                wait_and_collect(handle, results)
-            },
-            Err(error) =>
-                Err(Error::with_chain(error, "Process creation failed.")),
-        }
-    }
 }
 
 mod generic {
@@ -247,46 +234,52 @@ mod generic {
 
     pub struct ProcessHandle {
         child: process::Child,
-        cmd: Vec<String>,
-        cwd: path::PathBuf,
     }
 
     impl Executor for ProcessHandle {
         type Handle = ProcessHandle;
 
-        fn spawn(cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle> {
+        fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
+            where F: FnMut(Event) -> ()
+        {
             let child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
                 .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
 
-            Ok(ProcessHandle { child, cmd: cmd.to_vec(), cwd })
+            sink(
+                Event::Created {
+                    pid: child.id() as ProcessId,
+                    ppid: get_parent_pid(),
+                    cwd: cwd.clone(),
+                    cmd: cmd.to_vec(),
+                    when: chrono::Utc::now(),
+                });
+
+            Ok(ProcessHandle { child })
         }
 
-        fn wait(handle: &mut Self::Handle) -> Result<Events> {
-            let start = Event::Created {
-                pid: handle.child.id() as ProcessId,
-                ppid: get_parent_pid(),
-                cwd: handle.cwd.clone(),
-                cmd: handle.cmd.clone(),
-                when: chrono::Utc::now(),
-            };
+        fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
+            where F: FnMut(Event) -> ()
+        {
             match handle.child.wait() {
                 Ok(status) => {
                     match status.code() {
                         Some(code) => {
-                            let end = Event::TerminatedNormally {
-                                pid: handle.child.id(),
-                                code,
-                                when: chrono::Utc::now(),
-                            };
-                            Ok(Box::new(vec!(start, end)))
+                            sink(
+                                Event::TerminatedNormally {
+                                    pid: handle.child.id(),
+                                    code,
+                                    when: chrono::Utc::now(),
+                                });
+                            Ok(code)
                         }
                         None => {
-                            let end = Event::TerminatedAbnormally {
-                                pid: handle.child.id(),
-                                signal: "unknown".to_string(),
-                                when: chrono::Utc::now(),
-                            };
-                            Ok(Box::new(vec!(start, end)))
+                            sink(
+                                Event::TerminatedAbnormally {
+                                    pid: handle.child.id(),
+                                    signal: "unknown".to_string(),
+                                    when: chrono::Utc::now(),
+                                });
+                            Ok(127)
                         }
                     }
                 }
@@ -301,37 +294,51 @@ mod generic {
 
 mod fake {
     use super::*;
-    use crate::{Result, ResultExt};
+    use crate::Result;
     use crate::event::{Event, ProcessId};
 
-    pub struct ProcessHandle {
-        cmd: Vec<String>,
-        cwd: path::PathBuf,
-    }
+    pub struct ProcessHandle { }
 
     impl Executor for ProcessHandle {
         type Handle = ProcessHandle;
 
-        fn spawn(cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle> {
-            fake_execution()?;
-
-            Ok(ProcessHandle { cmd: cmd.to_vec(), cwd })
-        }
-
-        fn wait(handle: &mut Self::Handle) -> Result<Events> {
-            let start = Event::Created {
+        fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
+            where F: FnMut(Event) -> ()
+        {
+            sink(Event::Created {
                 pid: process::id() as ProcessId,
                 ppid: get_parent_pid(),
-                cwd: handle.cwd.clone(),
-                cmd: handle.cmd.clone(),
+                cwd: cwd.clone(),
+                cmd: cmd.to_vec(),
                 when: chrono::Utc::now(),
-            };
-            let end = Event::TerminatedNormally {
-                pid: process::id() as ProcessId,
-                code: 0,
-                when:  chrono::Utc::now(),
-            };
-            Ok(Box::new(vec!(start, end)))
+            });
+
+            Ok(ProcessHandle { })
+        }
+
+        fn wait<F>(sink: &mut F, _: &mut Self::Handle) -> Result<ExitCode>
+            where F: FnMut(Event) -> ()
+        {
+            match fake_execution() {
+                Ok(_) => {
+                    sink(
+                        Event::TerminatedNormally {
+                            pid: process::id() as ProcessId,
+                            code: 0,
+                            when:  chrono::Utc::now(),
+                        });
+                    Ok(0)
+                },
+                Err(_) => {
+                    sink(
+                        Event::TerminatedNormally {
+                            pid: process::id() as ProcessId,
+                            code: 1,
+                            when:  chrono::Utc::now(),
+                        });
+                    Ok(1)
+                }
+            }
         }
     }
 
