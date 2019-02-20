@@ -122,7 +122,7 @@ mod unix {
         }
 
         #[test]
-        fn signal() {
+        fn kill_signal() {
 
             let mut events: Vec<Event> = vec![];
             {
@@ -141,10 +141,58 @@ mod unix {
 
             assert_eq!(1usize, (&events).len());
             match events[0] {
-                Event::TerminatedAbnormally { ref signal, .. } => {
-                    assert_eq!("SIGKILL".to_string(), *signal);
-                },
-                _ => assert_eq!(true, false),
+                Event::TerminatedAbnormally { ref signal, .. } =>
+                    assert_eq!("SIGKILL".to_string(), *signal),
+                _ =>
+                    assert_eq!(true, false),
+            }
+        }
+
+        #[test]
+        fn stop_signal() {
+
+            let mut events: Vec<Event> = vec![];
+            {
+                let mut sut = Supervisor::new(|event: Event| {
+                    match event {
+                        Event::Created { pid, .. } => {
+                            signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP)
+                                .expect("kill failed");
+                        },
+                        Event::Stopped { pid, .. } => {
+                            signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT)
+                                .expect("kill failed");
+                        },
+                        Event::Continued { pid, .. } => {
+                            signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
+                                .expect("kill failed");
+                        }
+                        _ => (),
+                    }
+                    (&mut events).push(event);
+                });
+                sut.run(slice_of_strings!("/usr/bin/sleep", "5"))
+                    .expect("execute sleep failed");
+            }
+
+            assert_eq!(4usize, (&events).len());
+            match events[1] {
+                Event::Stopped { ref signal, .. } =>
+                    assert_eq!("SIGSTOP".to_string(), *signal),
+                _ =>
+                    assert_eq!(true, false),
+            }
+            match events[2] {
+                Event::Continued { .. } =>
+                    assert_eq!(true, true),
+                _ =>
+                    assert_eq!(true, false),
+            }
+            match events[3] {
+                Event::TerminatedAbnormally { ref signal, .. } =>
+                    assert_eq!("SIGKILL".to_string(), *signal),
+                _ =>
+                    assert_eq!(true, false),
             }
         }
     }

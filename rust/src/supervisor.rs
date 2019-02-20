@@ -128,7 +128,7 @@ mod unix {
         fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
             where F: FnMut(Event) -> ()
         {
-            match wait::waitpid(handle.pid, None) {
+            match wait::waitpid(handle.pid, wait_flags()) {
                 Ok(wait::WaitStatus::Exited(pid, code)) => {
                     sink(
                         Event::TerminatedNormally {
@@ -229,16 +229,13 @@ mod unix {
         }
     }
 
-    fn wait_flags() -> wait::WaitPidFlag {
+    fn wait_flags() -> Option<wait::WaitPidFlag> {
         let mut wait_flags = wait::WaitPidFlag::empty();
-//        wait_flags.insert(wait::WaitPidFlag::WNOWAIT);
-//        wait_flags.insert(wait::WaitPidFlag::WNOHANG);
-//        wait_flags.insert(wait::WaitPidFlag::WEXITED);
         wait_flags.insert(wait::WaitPidFlag::WCONTINUED);
         wait_flags.insert(wait::WaitPidFlag::WSTOPPED);
         wait_flags.insert(wait::WaitPidFlag::WUNTRACED);
         wait_flags.insert(wait::WaitPidFlag::__WALL);
-        wait_flags
+        Some(wait_flags)
     }
 
     fn set_close_on_exec(fd: io::RawFd) {
