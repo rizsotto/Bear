@@ -251,6 +251,180 @@ mod unix {
             })
             .expect("set close-on-exec failed.");
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        macro_rules! slice_of_strings {
+            ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
+        }
+
+        mod test_exit_code {
+            use super::*;
+
+            #[test]
+            fn success() {
+                let mut sink = |_: Event| ();
+
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/true"));
+                assert_eq!(true, result.is_ok());
+                assert_eq!(0i32, result.unwrap());
+            }
+
+            #[test]
+            fn fail() {
+                let mut sink = |_: Event| ();
+
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/false"));
+                assert_eq!(true, result.is_ok());
+                assert_eq!(1i32, result.unwrap());
+            }
+
+            #[test]
+            fn exec_failure() {
+                let mut sink = |_: Event| ();
+
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("./path/to/not/exists"));
+                assert_eq!(false, result.is_ok());
+            }
+        }
+
+        mod test_events {
+            use super::*;
+            use std::env;
+            use std::process;
+            use nix::sys::signal;
+            use nix::unistd::Pid;
+
+            fn run_supervisor(args: &[String]) -> Vec<Event> {
+                let mut events: Vec<Event> = vec![];
+                {
+                    let _ = super::ProcessHandle::run(&mut |event: Event| {
+                        (&mut events).push(event);
+                    }, args);
+                }
+                events
+            }
+
+            fn assert_start_stop_events(args: &[String], expected_exit_code: i32) {
+                let events = run_supervisor(args);
+
+                assert_eq!(2usize, (&events).len());
+                // assert that the pid is not any of us.
+                assert_ne!(0, events[0].pid());
+                assert_ne!(process::id(), events[0].pid());
+                assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
+                // assert that the all event's pid are the same.
+                assert_eq!(events[0].pid(), events[1].pid());
+                match events[0] {
+                    Event::Created { ppid, ref cwd, ref cmd, .. } => {
+                        assert_eq!(std::os::unix::process::parent_id(), ppid);
+                        assert_eq!(env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
+                        assert_eq!(args.to_vec(), *cmd);
+                    },
+                    _ => assert_eq!(true, false),
+                }
+                match events[1] {
+                    Event::TerminatedNormally { code, .. } => {
+                        assert_eq!(expected_exit_code, code);
+                    },
+                    _ => assert_eq!(true, false),
+                }
+            }
+
+            #[test]
+            fn success() {
+                assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
+            }
+
+            #[test]
+            fn fail() {
+                assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
+            }
+
+            #[test]
+            fn exec_failure() {
+                let events = run_supervisor(slice_of_strings!("./path/to/not/exists"));
+                assert_eq!(0usize, (&events).len());
+            }
+
+            #[test]
+            fn kill_signal() {
+
+                let mut events: Vec<Event> = vec![];
+                {
+                    let mut sink = |event: Event| {
+                        match event {
+                            Event::Created { pid, .. } => {
+                                signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
+                                    .expect("kill failed");
+                            },
+                            _ => (&mut events).push(event),
+                        }
+                    };
+                    super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/sleep", "5"))
+                        .expect("execute sleep failed");
+                }
+
+                assert_eq!(1usize, (&events).len());
+                match events[0] {
+                    Event::TerminatedAbnormally { ref signal, .. } =>
+                        assert_eq!("SIGKILL".to_string(), *signal),
+                    _ =>
+                        assert_eq!(true, false),
+                }
+            }
+
+            #[test]
+            fn stop_signal() {
+
+                let mut events: Vec<Event> = vec![];
+                {
+                    let mut sink = |event: Event| {
+                        match event {
+                            Event::Created { pid, .. } => {
+                                signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP)
+                                    .expect("kill failed");
+                            },
+                            Event::Stopped { pid, .. } => {
+                                signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT)
+                                    .expect("kill failed");
+                            },
+                            Event::Continued { pid, .. } => {
+                                signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
+                                    .expect("kill failed");
+                            }
+                            _ => (),
+                        }
+                        (&mut events).push(event);
+                    };
+                    super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/sleep", "5"))
+                        .expect("execute sleep failed");
+                }
+
+                assert_eq!(4usize, (&events).len());
+                match events[1] {
+                    Event::Stopped { ref signal, .. } =>
+                        assert_eq!("SIGSTOP".to_string(), *signal),
+                    _ =>
+                        assert_eq!(true, false),
+                }
+                match events[2] {
+                    Event::Continued { .. } =>
+                        assert_eq!(true, true),
+                    _ =>
+                        assert_eq!(true, false),
+                }
+                match events[3] {
+                    Event::TerminatedAbnormally { ref signal, .. } =>
+                        assert_eq!("SIGKILL".to_string(), *signal),
+                    _ =>
+                        assert_eq!(true, false),
+                }
+            }
+        }
+    }
 }
 
 mod generic {
