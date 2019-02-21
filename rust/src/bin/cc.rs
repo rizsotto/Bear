@@ -29,12 +29,13 @@ extern crate log;
 extern crate nix;
 
 use std::env;
+use std::path;
 use std::process;
 
 use intercept::Result;
 use intercept::event::*;
 use intercept::supervisor::Supervisor;
-use intercept::protocol::Protocol;
+use intercept::protocol::sender::Protocol;
 
 fn main() {
     match run() {
@@ -64,7 +65,7 @@ fn run() -> Result<ExitCode> {
     let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let mut protocol = Protocol::new()?;
+    let mut protocol = Protocol::new(path::Path::new("/tmp"))?;
     let mut supervisor = Supervisor::new(|event: Event| protocol.send(event));
 
     supervisor.run(&args[1..])

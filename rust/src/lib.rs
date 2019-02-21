@@ -32,6 +32,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate shellwords;
+extern crate tempfile;
 
 #[cfg(unix)]
 extern crate nix;
@@ -39,7 +40,6 @@ extern crate nix;
 pub mod event;
 pub mod supervisor;
 pub mod compilation;
-pub mod trace;
 pub mod protocol;
 
 mod error {
