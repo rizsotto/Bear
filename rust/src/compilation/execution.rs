@@ -56,7 +56,7 @@ impl CompilerExecution {
         false
     }
 
-    fn flags(&mut self, flag: &str, it: &mut flags::FlagIterator) -> bool {
+    fn flags(&mut self, _flag: &str, _it: &mut flags::FlagIterator) -> bool {
         //            # some parameters look like a filename, take those explicitly
         //            elif arg in {'-D', '-I'}:
         //                result.flags.extend([arg, next(args)])
@@ -66,7 +66,7 @@ impl CompilerExecution {
         unimplemented!()
     }
 
-    fn source(&mut self, file: &str) -> bool {
+    fn source(&mut self, _file: &str) -> bool {
         //            # parameter which looks source file is taken...
         //            elif re.match(r'^[^-].+', arg) and classify_source(arg):
         //                result.files.append(arg)

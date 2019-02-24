@@ -187,7 +187,6 @@ mod unix {
         }
     }
 
-    #[allow(unused_must_use)]
     fn spawn(cmd: &[String]) -> Result<nix::unistd::Pid> {
         // Create communication channel between the child and parent processes.
         // Parent want to be notified if process execution went well or failed.
@@ -230,13 +229,15 @@ mod unix {
                 let args: Vec<_> = cmd.iter()
                     .map(|arg| ffi::CString::new(arg.as_bytes()).unwrap())
                     .collect();
-                unistd::execvp(&args[0], args.as_ref())
-                    .map_err(|error| {
+                match unistd::execvp(&args[0], args.as_ref()) {
+                    Ok(_) => Err("Never gonna happen".into()),
+                    Err(error) => {
                         let message = error.to_string().into_bytes();
                         let _ = unistd::write(write_fd, message.as_ref());
-                    });
-                debug!("Child process: exec failed, calling exit.");
-                process::exit(1);
+                        debug!("Child process: exec failed, calling exit.");
+                        process::exit(1);
+                    },
+                }
             },
             Err(error) =>
                 Err(Error::with_chain(error, "Fork process failed.")),

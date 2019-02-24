@@ -178,9 +178,7 @@ fn get_mpi_call(wrapper: &str) -> Result<Vec<String>> {
         .iter()
         .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
         .find(Result::is_ok)
-        .unwrap_or(bail!(ErrorKind::CompilationError(
-            "Could not determinate MPI flags.",
-        )))
+        .unwrap_or(Err(ErrorKind::CompilationError("Could not determinate MPI flags.").into()))
 }
 
 /// Match against a list of regex and return true if any of those were match.
