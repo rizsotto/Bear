@@ -17,14 +17,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use serde_json;
 use std::collections;
-use std::io;
-use std::iter::FromIterator;
 use std::path;
+
 use Result;
 
-#[derive(Hash, Serialize, Deserialize)]
+
+/// Represents a generic entry of the compilation database.
+#[derive(Hash)]
 pub struct Entry {
     pub directory: path::PathBuf,
     pub file: path::PathBuf,
@@ -40,101 +40,166 @@ impl PartialEq for Entry {
     }
 }
 
-impl Eq for Entry {}
-
-pub struct Database {
-    entries: collections::HashSet<Entry>,
+impl Eq for Entry {
 }
 
-impl Database {
-    pub fn new() -> Database {
-        Database {
-            entries: collections::HashSet::new(),
+type Entries = collections::HashSet<Entry>;
+
+
+/// Represents the expected format of the JSON compilation database.
+pub struct DatabaseFormat {
+    command_as_array: bool,
+
+    // Other attributes might be:
+    // - output present or not
+    // - paths are relative or absolute
+}
+
+impl DatabaseFormat {
+    pub fn new() -> Self {
+        DatabaseFormat {
+            command_as_array: true,
         }
     }
 
-    pub fn load(&mut self, source: &mut io::Read) -> Result<()> {
-        let entries: Vec<Entry> = serde_json::from_reader(source)?;
-        let result = self.add_entries(entries);
-        Ok(result)
-    }
-
-    pub fn save(&self, target: &mut io::Write) -> Result<()> {
-        let values = Vec::from_iter(self.entries.iter());
-        let result = serde_json::to_writer(target, &values)?;
-        Ok(result)
-    }
-
-    pub fn add_entry(&mut self, entry: Entry) -> () {
-        self.entries.insert(entry);
-    }
-
-    pub fn add_entries(&mut self, entries: Vec<Entry>) -> () {
-        let fresh: collections::HashSet<Entry> = collections::HashSet::from_iter(entries);
-        self.entries.union(&fresh);
+    pub fn command_as_array(&mut self, value: bool) -> &mut Self {
+        self.command_as_array = value;
+        self
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct StringEntry {
-    directory: String,
-    file: String,
-    command: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    output: Option<String>,
+/// Represents a JSON compilation database.
+pub struct Database {
+    path: path::PathBuf,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct ArrayEntry {
-    directory: String,
-    file: String,
-    arguments: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    output: Option<String>,
+impl Database {
+    pub fn new(path: &path::Path) -> Self {
+        Database { path: path.to_path_buf(), }
+    }
+
+    pub fn load() -> Result<Entries> {
+        unimplemented!()
+    }
+
+    pub fn save(_entries: &Entries, _format: DatabaseFormat) -> Result<()> {
+        unimplemented!()
+    }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-enum EntryX {
-    StringEntry(StringEntry),
-    ArrayEntry(ArrayEntry),
-}
 
-#[cfg(test)]
-mod test {
-
+mod inner {
     use super::*;
+    use serde_json;
 
-    #[test]
-    fn test_load_arguments() {
-        let input =
-            r#"{
+    #[derive(Debug, Serialize, Deserialize)]
+    struct StringEntry {
+        directory: String,
+        file: String,
+        command: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct ArrayEntry {
+        directory: String,
+        file: String,
+        arguments: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output: Option<String>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(untagged)]
+    enum GenericEntry {
+        StringEntry(StringEntry),
+        ArrayEntry(ArrayEntry),
+    }
+
+    type GenericEntries = Vec<GenericEntry>;
+
+
+    fn load(_path: &path::Path) -> Result<GenericEntries> {
+        unimplemented!()
+    }
+
+    fn save(_path: &path::Path, _entries: &GenericEntries) -> Result<()> {
+        unimplemented!()
+    }
+
+    fn from(_entry: Entry, _format: DatabaseFormat) -> GenericEntry {
+        unimplemented!()
+    }
+
+    fn into(_entry: GenericEntry) -> Entry {
+        unimplemented!()
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[test]
+        fn test_load_arguments() {
+            let input =
+                r#"{
                 "directory": "/build/dir/path",
                 "file": "/path/to/source/file.c",
                 "arguments": ["cc", "-c", "/path/to/source/file.c"]
             }"#;
 
-        let entry: EntryX = serde_json::from_str(input).unwrap();
-        println!("{:?}", entry);
-    }
+            let entry: GenericEntry = serde_json::from_str(input).unwrap();
+            println!("{:?}", entry);
+        }
 
-    #[test]
-    fn test_save_arguments() {
-        let entry_one = EntryX::ArrayEntry(ArrayEntry {
-            directory: "/build/dir/path".to_string(),
-            file: "/path/to/source.c".to_string(),
-            arguments: vec!["cc".to_string(), "-c".to_string()],
-            output: None
-        });
-        let entry_two = EntryX::StringEntry(StringEntry {
-            directory: "/build/dir/path".to_string(),
-            file: "/path/to/source.c".to_string(),
-            command: "cc -c /path/to/source.c -o /build/dir/path/source.o".to_string(),
-            output: Some("/build/dir/path/source.o".to_string())
-        });
-        let inputs = vec![entry_one, entry_two];
+        #[test]
+        fn test_save_arguments() {
+            let entry_one = GenericEntry::ArrayEntry(ArrayEntry {
+                directory: "/build/dir/path".to_string(),
+                file: "/path/to/source.c".to_string(),
+                arguments: vec!["cc".to_string(), "-c".to_string()],
+                output: None
+            });
+            let entry_two = GenericEntry::StringEntry(StringEntry {
+                directory: "/build/dir/path".to_string(),
+                file: "/path/to/source.c".to_string(),
+                command: "cc -c /path/to/source.c -o /build/dir/path/source.o".to_string(),
+                output: Some("/build/dir/path/source.o".to_string())
+            });
+            let inputs = vec![entry_one, entry_two];
 
-        let output = serde_json::to_string(&inputs).unwrap();
-        println!("{}", output);
+            let output = serde_json::to_string(&inputs).unwrap();
+            println!("{}", output);
+        }
     }
 }
+
+//impl Database {
+//    pub fn new() -> Database {
+//        Database {
+//            entries: collections::HashSet::new(),
+//        }
+//    }
+//
+//    pub fn load(&mut self, source: &mut io::Read) -> Result<()> {
+//        let entries: Vec<Entry> = serde_json::from_reader(source)?;
+//        let result = self.add_entries(entries);
+//        Ok(result)
+//    }
+//
+//    pub fn save(&self, target: &mut io::Write) -> Result<()> {
+//        let values = Vec::from_iter(self.entries.iter());
+//        let result = serde_json::to_writer(target, &values)?;
+//        Ok(result)
+//    }
+//
+//    pub fn add_entry(&mut self, entry: Entry) -> () {
+//        self.entries.insert(entry);
+//    }
+//
+//    pub fn add_entries(&mut self, entries: Vec<Entry>) -> () {
+//        let fresh: collections::HashSet<Entry> = collections::HashSet::from_iter(entries);
+//        self.entries.union(&fresh);
+//    }
+//}
