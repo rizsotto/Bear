@@ -141,6 +141,7 @@ mod tests {
     use event::ProcessId;
     use std::io::Write;
 
+    #[allow(unused_assignments)]
     fn assert_in_temporary_directory<F>(op: F)
         where F: Fn(&mut collector::Protocol) -> Result<()>
     {

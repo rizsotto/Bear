@@ -20,44 +20,64 @@
 #[macro_use]
 extern crate clap;
 extern crate env_logger;
-#[macro_use]
 extern crate error_chain;
 extern crate intercept;
 #[macro_use]
 extern crate log;
 
-use intercept::{Error, Result};
+#[cfg(unix)]
+extern crate nix;
+
 use std::env;
 use std::path;
 use std::process;
 
+use intercept::Result;
+use intercept::environment::{KEY_CXX, KEY_DESTINATION};
+use intercept::event::ExitCode;
+use intercept::supervisor::Supervisor;
+use intercept::protocol::sender::Protocol;
+
 fn main() {
-    if let Err(ref e) = run() {
-        eprintln!("error: {}", e);
+    match run() {
+        Ok(code) => {
+            process::exit(code);
+        },
+        Err(ref e) => {
+            eprintln!("error: {}", e);
 
-        for e in e.iter().skip(1) {
-            eprintln!("caused by: {}", e);
-        }
+            for e in e.iter().skip(1) {
+                eprintln!("caused by: {}", e);
+            }
 
-        // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
-        if let Some(backtrace) = e.backtrace() {
-            eprintln!("backtrace: {:?}", backtrace);
-        }
-
-        ::std::process::exit(1);
+            // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
+            if let Some(backtrace) = e.backtrace() {
+                eprintln!("backtrace: {:?}", backtrace);
+            }
+            process::exit(1);
+        },
     }
 }
 
-fn run() -> Result<()> {
-    const CONFIG_FLAG: &str = "config";
-    const OUTPUT_FLAG: &str = "output";
-    const BUILD_FLAG: &str = "build";
-
+fn run() -> Result<ExitCode> {
     drop(env_logger::init());
     info!("{} {}", crate_name!(), crate_version!());
 
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    Ok(())
+    let target = env::var(KEY_DESTINATION)?;
+    let mut protocol = Protocol::new(path::Path::new(target.as_str()))?;
+
+    let mut supervisor = Supervisor::new(|event| protocol.send(event));
+
+    match env::var(KEY_CXX) {
+        Ok(wrapper) => {
+            args[0] = wrapper;
+            supervisor.run(&args[..])
+        },
+        Err(_) => {
+            supervisor.fake(&args[..])
+        },
+    }
 }

@@ -33,7 +33,8 @@ use std::path;
 use std::process;
 
 use intercept::Result;
-use intercept::event::*;
+use intercept::environment::{KEY_CC, KEY_DESTINATION};
+use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
 use intercept::protocol::sender::Protocol;
 
@@ -62,11 +63,21 @@ fn run() -> Result<ExitCode> {
     drop(env_logger::init());
     info!("{} {}", crate_name!(), crate_version!());
 
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let mut protocol = Protocol::new(path::Path::new("/tmp"))?;
-    let mut supervisor = Supervisor::new(|event: Event| protocol.send(event));
+    let target = env::var(KEY_DESTINATION)?;
+    let mut protocol = Protocol::new(path::Path::new(target.as_str()))?;
 
-    supervisor.run(&args[1..])
+    let mut supervisor = Supervisor::new(|event| protocol.send(event));
+
+    match env::var(KEY_CC) {
+        Ok(wrapper) => {
+            args[0] = wrapper;
+            supervisor.run(&args[..])
+        },
+        Err(_) => {
+            supervisor.fake(&args[..])
+        },
+    }
 }

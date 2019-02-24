@@ -24,8 +24,9 @@ use std::str;
 
 use chrono;
 
-use crate::{Result, ResultExt};
-use crate::event::{Event, ExitCode, ProcessId};
+use {Result, ResultExt};
+use event::{Event, ExitCode, ProcessId};
+use environment;
 
 trait Executor {
     type Handle;
@@ -66,10 +67,17 @@ impl<F> Supervisor<F>
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
     {
         if cfg!(unix) {
+            debug!("Running: unix supervisor");
             unix::ProcessHandle::run(&mut self.sink, cmd)
         } else {
+            debug!("Running: generic supervisor");
             generic::ProcessHandle::run(&mut self.sink, cmd)
         }
+    }
+
+    pub fn fake(&mut self, cmd: &[String]) -> Result<ExitCode> {
+        debug!("Running: fake supervisor");
+        fake::ProcessHandle::run(&mut self.sink, cmd)
     }
 }
 
@@ -77,7 +85,7 @@ pub fn get_parent_pid() -> ProcessId {
     if cfg!(unix) {
         std::os::unix::process::parent_id()
     } else {
-        match env::var("INTERCEPT_PPID") {
+        match env::var(environment::KEY_PARENT) {
             Ok(value) => {
                 match value.parse() {
                     Ok(ppid) => ppid,
@@ -179,6 +187,7 @@ mod unix {
         }
     }
 
+    #[allow(unused_must_use)]
     fn spawn(cmd: &[String]) -> Result<nix::unistd::Pid> {
         // Create communication channel between the child and parent processes.
         // Parent want to be notified if process execution went well or failed.
@@ -530,8 +539,6 @@ mod generic {
             use super::*;
             use std::env;
             use std::process;
-            use nix::sys::signal;
-            use nix::unistd::Pid;
 
             fn run_supervisor(args: &[String]) -> Vec<Event> {
                 let mut events: Vec<Event> = vec![];
@@ -553,7 +560,7 @@ mod generic {
                 // assert that the all event's pid are the same.
                 assert_eq!(events[0].pid(), events[1].pid());
                 match events[0] {
-                    Event::Created { ppid, ref cwd, ref cmd, .. } => {
+                    Event::Created { ref cwd, ref cmd, .. } => {
                         assert_eq!(env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
                         assert_eq!(args.to_vec(), *cmd);
                     },

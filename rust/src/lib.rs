@@ -37,6 +37,7 @@ extern crate tempfile;
 #[cfg(unix)]
 extern crate nix;
 
+pub mod environment;
 pub mod event;
 pub mod supervisor;
 pub mod compilation;
