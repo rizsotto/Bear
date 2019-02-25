@@ -61,7 +61,7 @@ fn main() {
 
 fn run() -> Result<ExitCode> {
     drop(env_logger::init());
-    info!("{} {}", crate_name!(), crate_version!());
+    info!("cc - {} {}", crate_name!(), crate_version!());
 
     let mut args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);

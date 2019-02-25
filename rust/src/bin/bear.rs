@@ -20,40 +20,50 @@
 #[macro_use]
 extern crate clap;
 extern crate env_logger;
-#[macro_use]
 extern crate error_chain;
 extern crate intercept;
 #[macro_use]
 extern crate log;
 
-use intercept::Result;
 use std::env;
 use std::path;
 use std::process;
 
+use intercept::Result;
+use intercept::environment::KEY_DESTINATION;
+use intercept::event::ExitCode;
+use intercept::supervisor::Supervisor;
+use intercept::protocol;
+
+
 fn main() {
-    if let Err(ref e) = run() {
-        eprintln!("error: {}", e);
+    match run() {
+        Ok(code) => {
+            process::exit(code);
+        },
+        Err(ref e) => {
+            eprintln!("error: {}", e);
 
-        for e in e.iter().skip(1) {
-            eprintln!("caused by: {}", e);
-        }
+            for e in e.iter().skip(1) {
+                eprintln!("caused by: {}", e);
+            }
 
-        // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
-        if let Some(backtrace) = e.backtrace() {
-            eprintln!("backtrace: {:?}", backtrace);
-        }
+            // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
+            if let Some(backtrace) = e.backtrace() {
+                eprintln!("backtrace: {:?}", backtrace);
+            }
 
-        ::std::process::exit(1);
+            ::std::process::exit(1);
+        },
     }
 }
 
-fn run() -> intercept::Result<()> {
-    const OUTPUT_FLAG: &str = "output";
-    const BUILD_FLAG: &str = "build";
+const OUTPUT_FLAG: &str = "output";
+const BUILD_FLAG: &str = "build";
 
+fn run() -> Result<ExitCode> {
     drop(env_logger::init());
-    info!("{} {}", crate_name!(), crate_version!());
+    info!("bear - {} {}", crate_name!(), crate_version!());
 
     let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
@@ -90,23 +100,19 @@ fn run() -> intercept::Result<()> {
     intercept_build(build.as_ref())
 }
 
-fn intercept_build(build: &[String]) -> Result<()> {
-    let mut command = process::Command::new(&build[0]);
-    match command.args(&build[1..]).spawn() {
-        Ok(mut child) => match child.wait() {
-            Ok(status_code) => {
-                if 0 == status_code.code().unwrap_or(130) {
-                    Ok(())
-                } else {
-                    bail!(intercept::ErrorKind::RuntimeError(
-                        "build exited with non zero status"
-                    ));
-                }
-            }
-            Err(_) => bail!(intercept::ErrorKind::RuntimeError(
-                "build exited with signal"
-            )),
-        },
-        Err(_) => bail!(intercept::ErrorKind::RuntimeError("command not found")),
+fn intercept_build(command: &[String]) -> Result<ExitCode> {
+    let collector = protocol::collector::Protocol::new()?;
+    env::set_var(KEY_DESTINATION, collector.path());
+
+    let mut sender = protocol::sender::Protocol::new(collector.path())?;
+    let mut build = Supervisor::new(|event| sender.send(event));
+    let exit = build.run(command)?;
+    info!("Build finished with status code: {}", exit);
+
+    for event in collector.events() {
+        info!("Intercepted event: {:?}", event);
+        // TODO: convert event to compilation database entries and write the db.
     }
+
+    Ok(exit)
 }
