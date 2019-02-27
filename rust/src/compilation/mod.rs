@@ -22,3 +22,25 @@ pub mod flags;
 pub mod database;
 pub mod execution;
 pub mod compiler;
+
+pub struct CompilerCall {
+    work_dir: std::path::PathBuf,
+    compiler: CompilerExecutable,
+    flags: Vec<CompilerFlag>,
+}
+
+pub enum CompilerExecutable {
+    CompilerC { path: std::path::PathBuf },
+    CompilerCxx { path: std::path::PathBuf },
+    Wrapper { compiler: std::boxed::Box<CompilerExecutable> },
+}
+
+pub enum CompilerFlag {
+    Pass { pass: pass::CompilerPass },
+    Preprocessor { },
+    Linker { },
+    Output { },
+    Source { },
+    Other { },
+    Ignored { },
+}
