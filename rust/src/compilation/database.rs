@@ -21,7 +21,8 @@ use std::collections;
 use std::fs;
 use std::path;
 
-use Result;
+use crate::Result;
+use crate::compilation::CompilerCall;
 
 
 /// Represents a generic entry of the compilation database.
@@ -31,6 +32,54 @@ pub struct Entry {
     pub file: path::PathBuf,
     pub command: Vec<String>,
     pub output: Option<path::PathBuf>,
+}
+
+impl Entry {
+    pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
+        let make_output= |source: &path::PathBuf| {
+            match compilation.output() {
+                None =>
+                    source.with_extension(
+                        source.extension()
+                            .map(|e| {
+                                let mut result = e.to_os_string();
+                                result.push(".o");
+                                result
+                            })
+                            .unwrap_or(std::ffi::OsString::from("o"))),
+                Some(o) =>
+                    o.to_path_buf(),
+            }
+        };
+
+        let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
+            let mut result = compilation.compiler().to_strings();
+            result.push(compilation.pass().to_string());
+            result.append(&mut compilation.flags());
+            result.push(source.to_string_lossy().into_owned());
+            result.push("-o".to_string());
+            result.push(output.to_string_lossy().into_owned());
+            result
+        };
+
+        if compilation.pass().is_compiling() {
+            compilation.sources()
+                .iter()
+                .map(|source| {
+                    let output = make_output(source);
+                    let command = make_command(source, &output);
+                    Entry {
+                        directory: compilation.work_dir.clone(),
+                        file: source.to_path_buf(),
+                        output: Some(output),
+                        command,
+                    }
+                })
+                .collect::<Vec<Entry>>()
+        } else {
+            vec!()
+        }
+    }
 }
 
 impl PartialEq for Entry {

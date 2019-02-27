@@ -607,7 +607,7 @@ mod fake {
         fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
             where F: FnMut(Event) -> ()
         {
-            match fake_execution(cwd.as_path(), cmd.as_ref()) {
+            match fake_execution(cmd.as_ref(), cwd.as_path()) {
                 Ok(_) => {
                     sink(
                         Event::Created {
@@ -645,16 +645,18 @@ mod fake {
     /// For a compiler, linker call the expected side effect by the build system
     /// is to create the output files. That will make sure that the build tool
     /// will continue the build process.
-    fn fake_execution(cwd: &path::Path, cmd: &[String]) -> Result<()> {
-        let compilation = CompilerCall::from(cwd, cmd)?;
-        for output in compilation.outputs() {
+    fn fake_execution(cmd: &[String], cwd: &path::Path) -> Result<()> {
+        let compilation = CompilerCall::from(cmd, cwd)?;
+        match compilation.output() {
             // When the file is not yet exists, create one.
-            if !output.exists() {
+            Some(ref output) if !output.exists() =>
                 std::fs::OpenOptions::new()
                     .create(true)
-                    .open(output)?;
-            }
+                    .open(output)
+                    .map(|_| ())
+                    .map_err(|error| error.into()),
+            _ =>
+                Ok(()),
         }
-        Ok(())
     }
 }

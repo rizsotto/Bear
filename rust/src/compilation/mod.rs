@@ -32,11 +32,66 @@ pub struct CompilerCall {
     pub flags: Vec<CompilerFlag>,
 }
 
+impl CompilerCall {
+
+    pub fn from(_cmd: &[String], _cwd: &std::path::Path) -> Result<CompilerCall> {
+        unimplemented!()
+    }
+
+    pub fn compiler(&self) -> &CompilerExecutable {
+        &self.compiler
+    }
+
+    pub fn pass(&self) -> pass::CompilerPass {
+        unimplemented!()
+    }
+
+    pub fn flags(&self) -> Vec<String> {
+        unimplemented!()
+    }
+
+    pub fn sources(&self) -> Vec<std::path::PathBuf> {
+        unimplemented!()
+    }
+
+    pub fn output(&self) -> Option<std::path::PathBuf> {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug)]
 pub enum CompilerExecutable {
     CompilerC { path: std::path::PathBuf },
     CompilerCxx { path: std::path::PathBuf },
-    Wrapper { compiler: std::boxed::Box<CompilerExecutable> },
+    Wrapper { path: std::path::PathBuf, compiler: Option<Box<CompilerExecutable>> },
+}
+
+impl CompilerExecutable {
+
+    pub fn as_vec(&self, drop_wrapper: bool) -> Vec<std::path::PathBuf> {
+        match self {
+            CompilerExecutable::CompilerC { path, .. } => vec!(path.to_path_buf()),
+            CompilerExecutable::CompilerCxx { path, .. } => vec!(path.to_path_buf()),
+            CompilerExecutable::Wrapper { path, compiler, .. } => {
+                match compiler {
+                    Some(c) if !drop_wrapper => {
+                        let mut result = vec!(path.to_path_buf());
+                        result.extend(c.as_ref().as_vec(drop_wrapper));
+                        result
+                    },
+                    Some(c) => c.as_ref().as_vec(drop_wrapper),
+                    None => vec!(path.to_path_buf()),
+                }
+            },
+        }
+    }
+
+    pub fn to_strings(&self) -> Vec<String> {
+        self.as_vec(false)
+            .iter()
+            .map(|path: &std::path::PathBuf| path.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+    }
 }
 
 #[derive(Debug)]
@@ -48,19 +103,4 @@ pub enum CompilerFlag {
     Source { },
     Other { },
     Ignored { },
-}
-
-impl CompilerCall {
-
-    pub fn from(_cwd: &std::path::Path, _cmd: &[String]) -> Result<CompilerCall> {
-        unimplemented!()
-    }
-
-    pub fn into_db_entry(&self) -> Vec<database::Entry> {
-        unimplemented!()
-    }
-
-    pub fn outputs(&self) -> Vec<std::path::PathBuf> {
-        unimplemented!()
-    }
 }

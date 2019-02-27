@@ -66,9 +66,9 @@ impl Event {
         }
     }
 
-    pub fn to_execution(self) -> Option<(path::PathBuf, Vec<String>)> {
+    pub fn to_execution(&self) -> Option<(Vec<String>, path::PathBuf)> {
         match self {
-            Event::Created { cwd, cmd, .. } => Some((cwd, cmd)),
+            Event::Created { cmd, cwd, .. } => Some((cmd.to_vec(), cwd.to_path_buf())),
             _ => None,
         }
     }

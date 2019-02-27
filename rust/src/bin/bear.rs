@@ -31,7 +31,7 @@ use std::process;
 
 use intercept::Result;
 use intercept::compilation::CompilerCall;
-use intercept::compilation::database::{Database, DatabaseFormat, Entries};
+use intercept::compilation::database::{Database, DatabaseFormat, Entry, Entries};
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
@@ -117,12 +117,12 @@ fn intercept_build(command: &[String]) -> Result<ExitCode> {
             event.to_execution()
         })
         .filter_map(|execution| {
-            debug!("Intercepted execution: {:?} @ {:?}", execution.1, execution.0);
+            debug!("Intercepted execution: {:?} @ {:?}", execution.0, execution.1);
             CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
         })
         .flat_map(|call| {
             debug!("Intercepted compiler call: {:?}", call);
-            call.into_db_entry()
+            Entry::from(&call)
         })
         .collect();
 

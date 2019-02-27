@@ -36,6 +36,19 @@ impl Default for CompilerPass {
 
 impl CompilerPass {
 
+    /// Query method to get if the compilation pass was running or not.
+    ///
+    /// # Returns
+    /// true if the compiler pass was running.
+    pub fn is_compiling(&self) -> bool {
+        self == &CompilerPass::Compilation || self == &CompilerPass::Linking
+    }
+
+    pub fn to_string(&self) -> String {
+        // TODO!!!
+        "-c".to_string()
+    }
+
     /// Consume a single argument and update the compiler pass if the argument
     /// is one which influence it.
     ///
@@ -51,14 +64,6 @@ impl CompilerPass {
         } else {
             false
         }
-    }
-
-    /// Query method to get if the compilation pass was running or not.
-    ///
-    /// # Returns
-    /// true if the compiler pass was running.
-    pub fn is_compiling(&self) -> bool {
-        self == &CompilerPass::Compilation || self == &CompilerPass::Linking
     }
 
     fn update(&mut self, new_state: &CompilerPass) {
