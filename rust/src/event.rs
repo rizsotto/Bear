@@ -66,13 +66,10 @@ impl Event {
         }
     }
 
-    pub fn when(&self) -> DateTime {
+    pub fn to_execution(self) -> Option<(path::PathBuf, Vec<String>)> {
         match self {
-            Event::Created { when, .. } => *when,
-            Event::TerminatedNormally { when, .. } => *when,
-            Event::TerminatedAbnormally { when, .. } => *when,
-            Event::Stopped { when, .. } => *when,
-            Event::Continued { when, .. } => *when,
+            Event::Created { cwd, cmd, .. } => Some((cwd, cmd)),
+            _ => None,
         }
     }
 }

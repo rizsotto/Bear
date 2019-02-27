@@ -44,7 +44,7 @@ impl PartialEq for Entry {
 impl Eq for Entry {
 }
 
-type Entries = collections::HashSet<Entry>;
+pub type Entries = collections::HashSet<Entry>;
 
 
 /// Represents the expected format of the JSON compilation database.
@@ -84,8 +84,10 @@ impl Database {
         }
     }
 
-    pub fn save(&self, entries: &Entries, format: &DatabaseFormat) -> Result<()> {
-        let generic_entries = entries.iter()
+    pub fn save<'a, I>(&self, entries: I, format: &DatabaseFormat) -> Result<()>
+        where I: Iterator<Item = &'a Entry>
+    {
+        let generic_entries = entries
             .map(|entry| inner::from(entry, format))
             .collect::<Result<Vec<_>>>()?;
         inner::save(&self.path, &generic_entries)
@@ -225,7 +227,7 @@ mod test {
         let formatter = DatabaseFormat { command_as_array: false };
 
         let expected = expected_values();
-        sut.save(&expected, &formatter)?;
+        sut.save(expected.iter(), &formatter)?;
 
         let entries = sut.load()?;
 
@@ -246,7 +248,7 @@ mod test {
         let formatter = DatabaseFormat { command_as_array: true };
 
         let expected = expected_values();
-        sut.save(&expected, &formatter)?;
+        sut.save(expected.iter(), &formatter)?;
 
         let entries = sut.load()?;
 

@@ -30,6 +30,8 @@ use std::path;
 use std::process;
 
 use intercept::Result;
+use intercept::compilation::CompilerCall;
+use intercept::compilation::database::{Database, DatabaseFormat, Entries};
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
@@ -109,9 +111,28 @@ fn intercept_build(command: &[String]) -> Result<ExitCode> {
     let exit = build.run(command)?;
     info!("Build finished with status code: {}", exit);
 
-    for event in collector.events() {
-        info!("Intercepted event: {:?}", event);
-        // TODO: convert event to compilation database entries and write the db.
+    let current: Entries = collector.events()
+        .filter_map(|event| {
+            debug!("Intercepted event: {:?}", event);
+            event.to_execution()
+        })
+        .filter_map(|execution| {
+            debug!("Intercepted execution: {:?} @ {:?}", execution.1, execution.0);
+            CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
+        })
+        .flat_map(|call| {
+            debug!("Intercepted compiler call: {:?}", call);
+            call.into_db_entry()
+        })
+        .collect();
+
+    let db = Database::new(path::Path::new("./compile_commands.json"));
+    let db_formatter = DatabaseFormat { command_as_array: true };
+    if false {
+        let previous = db.load()?;
+        db.save(previous.union(&current), &db_formatter)?;
+    } else {
+        db.save(current.iter(), &db_formatter)?;
     }
 
     Ok(exit)

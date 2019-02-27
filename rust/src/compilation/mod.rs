@@ -23,18 +23,23 @@ pub mod database;
 pub mod execution;
 pub mod compiler;
 
+use crate::Result;
+
+#[derive(Debug)]
 pub struct CompilerCall {
     work_dir: std::path::PathBuf,
     compiler: CompilerExecutable,
     flags: Vec<CompilerFlag>,
 }
 
+#[derive(Debug)]
 pub enum CompilerExecutable {
     CompilerC { path: std::path::PathBuf },
     CompilerCxx { path: std::path::PathBuf },
     Wrapper { compiler: std::boxed::Box<CompilerExecutable> },
 }
 
+#[derive(Debug)]
 pub enum CompilerFlag {
     Pass { pass: pass::CompilerPass },
     Preprocessor { },
@@ -43,4 +48,15 @@ pub enum CompilerFlag {
     Source { },
     Other { },
     Ignored { },
+}
+
+impl CompilerCall {
+
+    pub fn from(_cwd: &std::path::Path, _cmd: &[String]) -> Result<CompilerCall> {
+        unimplemented!()
+    }
+
+    pub fn into_db_entry(&self) -> Vec<database::Entry> {
+        unimplemented!()
+    }
 }
