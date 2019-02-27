@@ -27,9 +27,9 @@ use crate::Result;
 
 #[derive(Debug)]
 pub struct CompilerCall {
-    work_dir: std::path::PathBuf,
-    compiler: CompilerExecutable,
-    flags: Vec<CompilerFlag>,
+    pub work_dir: std::path::PathBuf,
+    pub compiler: CompilerExecutable,
+    pub flags: Vec<CompilerFlag>,
 }
 
 #[derive(Debug)]
@@ -57,6 +57,10 @@ impl CompilerCall {
     }
 
     pub fn into_db_entry(&self) -> Vec<database::Entry> {
+        unimplemented!()
+    }
+
+    pub fn outputs(&self) -> Vec<std::path::PathBuf> {
         unimplemented!()
     }
 }

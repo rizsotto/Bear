@@ -24,7 +24,7 @@ use std::str;
 
 use chrono;
 
-use {Result, ResultExt};
+use {Error, Result, ResultExt};
 use event::{Event, ExitCode, ProcessId};
 use environment;
 
@@ -111,7 +111,6 @@ mod unix {
     use nix::sys::wait;
 
     use super::*;
-    use crate::{Error, Result, ResultExt};
     use crate::event::{Event, ProcessId};
 
     pub struct ProcessHandle {
@@ -440,7 +439,6 @@ mod unix {
 
 mod generic {
     use super::*;
-    use crate::{Error, Result, ResultExt};
     use crate::event::{Event, ProcessId};
 
     pub struct ProcessHandle {
@@ -596,10 +594,12 @@ mod generic {
 
 mod fake {
     use super::*;
-    use crate::Result;
     use crate::event::{Event, ProcessId};
+    use crate::compilation::CompilerCall;
 
-    pub struct ProcessHandle { }
+    pub struct ProcessHandle {
+        code: ExitCode,
+    }
 
     impl Executor for ProcessHandle {
         type Handle = ProcessHandle;
@@ -607,40 +607,35 @@ mod fake {
         fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
             where F: FnMut(Event) -> ()
         {
-            sink(Event::Created {
-                pid: process::id() as ProcessId,
-                ppid: get_parent_pid(),
-                cwd: cwd.clone(),
-                cmd: cmd.to_vec(),
-                when: chrono::Utc::now(),
-            });
-
-            Ok(ProcessHandle { })
-        }
-
-        fn wait<F>(sink: &mut F, _: &mut Self::Handle) -> Result<ExitCode>
-            where F: FnMut(Event) -> ()
-        {
-            match fake_execution() {
+            match fake_execution(cwd.as_path(), cmd.as_ref()) {
                 Ok(_) => {
+                    sink(
+                        Event::Created {
+                            pid: process::id() as ProcessId,
+                            ppid: get_parent_pid(),
+                            cwd: cwd.clone(),
+                            cmd: cmd.to_vec(),
+                            when: chrono::Utc::now(),
+                        }
+                    );
                     sink(
                         Event::TerminatedNormally {
                             pid: process::id() as ProcessId,
                             code: 0,
                             when:  chrono::Utc::now(),
-                        });
-                    Ok(0)
+                        }
+                    );
+                    Ok(ProcessHandle { code: 0 })
                 },
-                Err(_) => {
-                    sink(
-                        Event::TerminatedNormally {
-                            pid: process::id() as ProcessId,
-                            code: 1,
-                            when:  chrono::Utc::now(),
-                        });
-                    Ok(1)
-                }
+                Err(error) =>
+                    Err(Error::with_chain(error, "Faking process execution failed.")),
             }
+        }
+
+        fn wait<F>(_sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
+            where F: FnMut(Event) -> ()
+        {
+            Ok(handle.code)
         }
     }
 
@@ -650,7 +645,16 @@ mod fake {
     /// For a compiler, linker call the expected side effect by the build system
     /// is to create the output files. That will make sure that the build tool
     /// will continue the build process.
-    fn fake_execution() -> Result<()> {
-        unimplemented!()
+    fn fake_execution(cwd: &path::Path, cmd: &[String]) -> Result<()> {
+        let compilation = CompilerCall::from(cwd, cmd)?;
+        for output in compilation.outputs() {
+            // When the file is not yet exists, create one.
+            if !output.exists() {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .open(output)?;
+            }
+        }
+        Ok(())
     }
 }
