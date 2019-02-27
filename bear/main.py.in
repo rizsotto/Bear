@@ -635,6 +635,10 @@ class Compilation:
                 result.output.append(next(args))
             # parameter which looks source file is taken...
             elif re.match(r'^[^-].+', arg) and classify_source(arg):
+                if len(result.flags):
+                    if result.flags[-1] == u'-include':
+                        result.flags.append(arg)
+                        continue
                 result.files.append(arg)
             # and consider everything else as compile option.
             else:
