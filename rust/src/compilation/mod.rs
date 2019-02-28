@@ -67,26 +67,25 @@ pub enum CompilerExecutable {
 
 impl CompilerExecutable {
 
-    pub fn as_vec(&self, drop_wrapper: bool) -> Vec<std::path::PathBuf> {
+    pub fn as_vec(&self) -> Vec<std::path::PathBuf> {
         match self {
             CompilerExecutable::CompilerC { path, .. } => vec!(path.to_path_buf()),
             CompilerExecutable::CompilerCxx { path, .. } => vec!(path.to_path_buf()),
             CompilerExecutable::Wrapper { path, compiler, .. } => {
                 match compiler {
-                    Some(c) if !drop_wrapper => {
+                    Some(c) => {
                         let mut result = vec!(path.to_path_buf());
-                        result.extend(c.as_ref().as_vec(drop_wrapper));
+                        result.extend(c.as_ref().as_vec());
                         result
                     },
-                    Some(c) => c.as_ref().as_vec(drop_wrapper),
                     None => vec!(path.to_path_buf()),
                 }
             },
         }
     }
 
-    pub fn to_strings(&self, drop_wrapper: bool) -> Vec<String> {
-        self.as_vec(drop_wrapper)
+    pub fn to_strings(&self) -> Vec<String> {
+        self.as_vec()
             .iter()
             .map(|path: &std::path::PathBuf| path.to_string_lossy().into_owned())
             .collect::<Vec<_>>()

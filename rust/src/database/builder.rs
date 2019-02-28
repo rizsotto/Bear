@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::collections;
 use std::path;
 
 use crate::{Result, ResultExt};
@@ -25,15 +24,14 @@ use crate::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::compiler::CompilerFilter;
 use crate::compilation::flags::FlagFilter;
+use crate::compilation::pass::CompilerPass;
 use crate::compilation::source::SourceFilter;
-use crate::database::file;
-use compilation::pass::CompilerPass;
+use crate::database::{CompilationDatabase, Entry, Entries};
 
 
 /// Represents a compilation database building strategy.
+#[derive(Debug)]
 pub struct Builder {
-    pub file: path::PathBuf,
-    pub format: Format,
     pub append_to_existing: bool,
     pub include_headers: bool,      // TODO
     pub include_linking: bool,
@@ -44,12 +42,11 @@ pub struct Builder {
 
 impl Builder {
 
-    pub fn build<I>(&self, events: I) -> Result<()>
+    pub fn build<I>(&self, events: I, db: &CompilationDatabase) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.append_to_existing {
-            debug!("Reading from: {:?}", self.file);
-            file::load(self.file.as_path())
+        let previous = if self.append_to_existing && db.exists() {
+            db.load()
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
             Entries::new()
@@ -71,21 +68,23 @@ impl Builder {
             })
             .flat_map(|call| {
                 debug!("Compiler call: {:?}", call);
-                Entry::from(&call, &self.format)
+                Entry::from(&call)
             })
             .inspect(|entry| {
                 debug!("The output entry: {:?}", entry)
             })
             .collect();
 
-        debug!("Writing into: {:?}", self.file);
-        file::save(self.file.as_path(), previous.union(&current), &self.format)
+        let mut result = Entries::new();
+        result.extend(previous);
+        result.extend(current);
+        result.dedup();
+        db.save(result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
-    pub fn transform(&self) -> Result<()> {
-        debug!("Reading from: {:?}", self.file);
-        let previous = file::load(self.file.as_path())
+    pub fn transform(&self, db: &CompilationDatabase) -> Result<()> {
+        let previous = db.load()
             .chain_err(|| "Failed to load compilation database.")?;
 
         let current: Entries = previous.iter()
@@ -100,15 +99,14 @@ impl Builder {
             })
             .flat_map(|call| {
                 debug!("Compiler call: {:?}", call);
-                Entry::from(&call, &self.format)
+                Entry::from(&call)
             })
             .inspect(|entry| {
                 debug!("The output entry: {:?}", entry)
             })
             .collect();
 
-        debug!("Writing into: {:?}", self.file);
-        file::save(self.file.as_path(), current.iter(), &self.format)
+        db.save(current)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
@@ -116,8 +114,6 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Builder {
-            file: path::PathBuf::from("./compile_commands.json"),
-            format: Format::default(),
             append_to_existing: false,
             include_headers: false,
             include_linking: false,
@@ -129,6 +125,7 @@ impl Default for Builder {
 }
 
 /// Represents the expected format of the JSON compilation database.
+#[derive(Debug)]
 pub struct Format {
     pub relative_to: Option<path::PathBuf>, // TODO
     pub command_as_array: bool,
@@ -148,38 +145,16 @@ impl Default for Format {
 }
 
 
-/// Represents a generic entry of the compilation database.
-#[derive(Hash, Debug)]
-pub struct Entry {
-    pub directory: path::PathBuf,
-    pub file: path::PathBuf,
-    pub command: Vec<String>,
-    pub output: Option<path::PathBuf>,
-}
-
 impl Entry {
-    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
-        entry::from(compilation, format)
+    pub fn from(compilation: &CompilerCall) -> Entries {
+        entry::from(compilation)
     }
 }
-
-impl PartialEq for Entry {
-    fn eq(&self, other: &Entry) -> bool {
-        self.directory == other.directory
-            && self.file == other.file
-            && self.command == other.command
-    }
-}
-
-impl Eq for Entry {
-}
-
-pub type Entries = collections::HashSet<Entry>;
 
 mod entry {
     use super::*;
 
-    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
+    pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
         let make_output= |source: &path::PathBuf| {
             let is_linking = compilation.pass() == CompilerPass::Linking;
             match (is_linking, compilation.output()) {
@@ -189,7 +164,7 @@ mod entry {
         };
 
         let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
-            let mut result = compilation.compiler().to_strings(format.drop_wrapper);
+            let mut result = compilation.compiler().to_strings();
             result.push(compilation.pass().to_string());
             result.append(&mut compilation.flags());
             result.push(source.to_string_lossy().into_owned());

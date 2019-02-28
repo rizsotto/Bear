@@ -26,6 +26,7 @@ use std::str;
 use ErrorKind;
 use Result;
 
+#[derive(Debug)]
 pub struct CompilerFilter {
 //    c_compilers: Vec<String>,
 //    cxx_compilers: Vec<String>,

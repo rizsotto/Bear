@@ -30,11 +30,12 @@ use std::path;
 use std::process;
 
 use intercept::{Result, ResultExt};
-use intercept::database::builder::Builder;
+use intercept::database::builder::{Builder, Format};
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
 use intercept::protocol;
+use intercept::database::file::JsonCompilationDatabase;
 
 
 fn main() {
@@ -109,7 +110,11 @@ fn intercept_build(command: &[String]) -> Result<ExitCode> {
         .chain_err(|| "Failed to run the build.")?;
 
     let builder = Builder::default();
-    builder.build(collector.events())
+    let db = JsonCompilationDatabase::new(
+        path::Path::new(""),
+        Format::default()
+    );
+    builder.build(collector.events(), &db)
         .chain_err(|| "Failed to write output.")?;
 
     Ok(exit)

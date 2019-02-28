@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#[derive(Debug)]
 pub struct SourceFilter {
     pub extensions_to_exclude: Vec<String>,
     pub extensions_to_include: Vec<String>,
