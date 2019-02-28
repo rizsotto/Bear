@@ -26,7 +26,7 @@ use crate::compilation::compiler::CompilerFilter;
 use crate::compilation::flags::FlagFilter;
 use crate::compilation::source::SourceFilter;
 use crate::protocol::collector::Protocol;
-use crate::database::file::{load, save};
+use crate::database::file;
 
 
 /// Represents a compilation database building strategy.
@@ -45,29 +45,47 @@ impl Builder {
     pub fn build(&self, collector: &Protocol, path: &path::Path) -> Result<()> {
         let current: Entries = collector.events()
             .filter_map(|event| {
-                debug!("Intercepted event: {:?}", event);
+                debug!("Event from protocol: {:?}", event);
                 event.to_execution()
             })
             .filter_map(|execution| {
-                debug!("Intercepted execution: {:?} @ {:?}", execution.0, execution.1);
+                debug!("Execution: {:?} @ {:?}", execution.0, execution.1);
                 CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
             })
             .flat_map(|call| {
-                debug!("Intercepted compiler call: {:?}", call);
+                debug!("Compiler call: {:?}", call);
                 Entry::from(&call, &self.format)
+            })
+            .inspect(|entry| {
+                debug!("The output entry: {:?}", entry)
             })
             .collect();
 
         if self.append_to_existing {
-            let previous = load(path)?;
-            save(path, previous.union(&current), &self.format)
+            let previous = file::load(path)?;
+            file::save(path, previous.union(&current), &self.format)
         } else {
-            save(path, current.iter(), &self.format)
+            file::save(path, current.iter(), &self.format)
         }
     }
 
-    pub fn transform(&self, _path: &path::Path) -> Result<()> {
-        unimplemented!()
+    pub fn transform(&self, path: &path::Path) -> Result<()> {
+        let previous = file::load(path)?;
+        let current: Entries = previous.iter()
+            .filter_map(|entry| {
+                debug!("Entry from file {:?}", entry);
+                CompilerCall::from(entry.command.as_ref(), entry.directory.as_path()).ok()
+            })
+            .flat_map(|call| {
+                debug!("Compiler call: {:?}", call);
+                Entry::from(&call, &self.format)
+            })
+            .inspect(|entry| {
+                debug!("The output entry: {:?}", entry)
+            })
+            .collect();
+
+        file::save(path, current.iter(), &self.format)
     }
 }
 
