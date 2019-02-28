@@ -26,7 +26,7 @@ use crate::compilation::compiler::CompilerFilter;
 use crate::compilation::flags::FlagFilter;
 use crate::compilation::source::SourceFilter;
 use crate::protocol::collector::Protocol;
-use crate::database::file::Database;
+use crate::database::file::{load, save};
 
 
 /// Represents a compilation database building strategy.
@@ -58,12 +58,11 @@ impl Builder {
             })
             .collect();
 
-        let db = Database::new(path);
         if self.append_to_existing {
-            let previous = db.load()?;
-            db.save(previous.union(&current), &self.format)
+            let previous = load(path)?;
+            save(path, previous.union(&current), &self.format)
         } else {
-            db.save(current.iter(), &self.format)
+            save(path, current.iter(), &self.format)
         }
     }
 

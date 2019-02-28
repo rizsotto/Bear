@@ -23,25 +23,14 @@ use crate::Result;
 use crate::database::builder::{Entry, Entries, Format};
 
 
-/// Represents a JSON compilation database.
-pub struct Database {
-    path: path::PathBuf,
+pub fn load(path: &path::Path) -> Result<Entries> {
+    db::load(path)
 }
 
-impl Database {
-    pub fn new(path: &path::Path) -> Self {
-        Database { path: path.to_path_buf(), }
-    }
-
-    pub fn load(&self) -> Result<Entries> {
-        db::load(self)
-    }
-
-    pub fn save<'a, I>(&self, entries: I, format: &Format) -> Result<()>
-        where I: Iterator<Item = &'a Entry>
-    {
-        db::save(self, entries, format)
-    }
+pub fn save<'a, I>(path: &path::Path, entries: I, format: &Format) -> Result<()>
+    where I: Iterator<Item = &'a Entry>
+{
+    db::save(path, entries, format)
 }
 
 
@@ -59,8 +48,7 @@ mod test {
     #[test]
     #[should_panic]
     fn test_load_not_existing_file_fails() {
-        let sut = Database::new(path::Path::new("/not/exists/file.json"));
-        let _ = sut.load().unwrap();
+        let _ = load(path::Path::new("/not/exists/file.json")).unwrap();
     }
 
     #[test]
@@ -71,8 +59,7 @@ mod test {
         comp_db_file.write(br#"this is not json"#)
             .expect("test file content write failed");
 
-        let sut = Database::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = load(comp_db_file.path()).unwrap();
     }
 
     #[test]
@@ -83,8 +70,7 @@ mod test {
         comp_db_file.write(br#"{ "file": "string" }"#)
             .expect("test file content write failed");
 
-        let sut = Database::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = load(comp_db_file.path()).unwrap();
     }
 
     #[test]
@@ -92,8 +78,7 @@ mod test {
         let comp_db_file = TestFile::new()?;
         comp_db_file.write(br#"[]"#)?;
 
-        let sut = Database::new(comp_db_file.path());
-        let entries = sut.load()?;
+        let entries = load(comp_db_file.path())?;
 
         let expected = Entries::new();
         assert_eq!(expected, entries);
@@ -119,8 +104,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = Database::new(comp_db_file.path());
-        let entries = sut.load()?;
+        let entries = load(comp_db_file.path())?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -146,8 +130,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = Database::new(comp_db_file.path());
-        let entries = sut.load()?;
+        let entries = load(comp_db_file.path())?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -168,21 +151,19 @@ mod test {
             ]"#)
             .expect("test file content write failed");
 
-        let sut = Database::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = load(comp_db_file.path()).unwrap();
     }
 
     #[test]
     fn test_save_string_command() -> Result<()> {
         let comp_db_file = TestFile::new()?;
 
-        let sut = Database::new(comp_db_file.path());
         let formatter = Format { command_as_array: false, ..Format::default() };
 
-        let expected = expected_values();
-        sut.save(expected.iter(), &formatter)?;
+        let input = expected_values();
+        save(comp_db_file.path(), input.iter(), &formatter)?;
 
-        let entries = sut.load()?;
+        let entries = load(comp_db_file.path())?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -197,13 +178,12 @@ mod test {
     fn test_save_array_command() -> Result<()> {
         let comp_db_file = TestFile::new()?;
 
-        let sut = Database::new(comp_db_file.path());
         let formatter = Format { command_as_array: true, ..Format::default() };
 
-        let expected = expected_values();
-        sut.save(expected.iter(), &formatter)?;
+        let input = expected_values();
+        save(comp_db_file.path(), input.iter(), &formatter)?;
 
-        let entries = sut.load()?;
+        let entries = load(comp_db_file.path())?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -289,8 +269,8 @@ mod db {
     use serde_json;
     use shellwords;
 
-    pub fn load(db: &Database) -> Result<Entries> {
-        let generic_entries = read(&db.path)?;
+    pub fn load(path: &path::Path) -> Result<Entries> {
+        let generic_entries = read(path)?;
         let entries = generic_entries.iter()
             .map(|entry| into(entry))
             .collect::<Result<Entries>>();
@@ -308,13 +288,13 @@ mod db {
         }
     }
 
-    pub fn save<'a, I>(db: &Database, entries: I, format: &Format) -> Result<()>
+    pub fn save<'a, I>(path: &path::Path, entries: I, format: &Format) -> Result<()>
         where I: Iterator<Item = &'a Entry>
     {
         let generic_entries = entries
             .map(|entry| from(entry, format))
             .collect::<Result<Vec<_>>>()?;
-        write(&db.path, &generic_entries)
+        write(path, &generic_entries)
     }
 
     #[derive(Debug, Serialize, Deserialize)]
