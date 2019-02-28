@@ -26,6 +26,17 @@ use std::str;
 use ErrorKind;
 use Result;
 
+pub struct CompilerFilter {
+//    c_compilers: Vec<String>,
+//    cxx_compilers: Vec<String>,
+}
+
+impl Default for CompilerFilter {
+    fn default() -> Self {
+        unimplemented!()
+    }
+}
+
 pub struct Classifier {
     ignore: bool,
     c_compilers: Vec<String>,

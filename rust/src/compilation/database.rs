@@ -22,6 +22,79 @@ use std::path;
 
 use crate::Result;
 use crate::compilation::CompilerCall;
+use crate::compilation::compiler::CompilerFilter;
+use crate::compilation::flags::FlagFilter;
+use crate::compilation::source::SourceFilter;
+use crate::protocol::collector::Protocol;
+
+
+/// Represents a compilation database building strategy.
+pub struct BuildStrategy {
+    pub format: Format,
+    pub append_to_existing: bool,
+    pub include_headers: bool,
+    pub include_linking: bool,
+    pub compilers: CompilerFilter,
+    pub sources: SourceFilter,
+    pub flags: FlagFilter,
+}
+
+impl BuildStrategy {
+
+    pub fn build(&self, collector: &Protocol, path: &path::Path) -> Result<()> {
+        let current: Entries = collector.events()
+            .filter_map(|event| {
+                debug!("Intercepted event: {:?}", event);
+                event.to_execution()
+            })
+            .filter_map(|execution| {
+                debug!("Intercepted execution: {:?} @ {:?}", execution.0, execution.1);
+                CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
+            })
+            .flat_map(|call| {
+                debug!("Intercepted compiler call: {:?}", call);
+                Entry::from(&call, &self.format)
+            })
+            .collect();
+
+        let db = Database::new(path);
+        if self.append_to_existing {
+            let previous = db.load()?;
+            db.save(previous.union(&current), &self.format)
+        } else {
+            db.save(current.iter(), &self.format)
+        }
+    }
+
+    pub fn transform(&self, _path: &path::Path) -> Result<()> {
+        unimplemented!()
+    }
+}
+
+impl Default for BuildStrategy {
+    fn default() -> Self {
+        unimplemented!()
+    }
+}
+
+/// Represents the expected format of the JSON compilation database.
+pub struct Format {
+    pub relative_to: Option<path::PathBuf>,
+    pub command_as_array: bool,
+    pub drop_output_field: bool,
+    pub drop_wrapper: bool,
+}
+
+impl Default for Format {
+    fn default() -> Self {
+        Format {
+            relative_to: None,
+            command_as_array: true,
+            drop_output_field: false,
+            drop_wrapper: true,
+        }
+    }
+}
 
 
 /// Represents a generic entry of the compilation database.
@@ -34,8 +107,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
-        entry::from(compilation)
+    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
+        entry::from(compilation, format)
     }
 }
 
@@ -53,14 +126,6 @@ impl Eq for Entry {
 pub type Entries = collections::HashSet<Entry>;
 
 
-/// Represents the expected format of the JSON compilation database.
-pub struct DatabaseFormat {
-    pub command_as_array: bool,
-
-    // Other attributes might be:
-    // - output field dropped or preserved.
-}
-
 /// Represents a JSON compilation database.
 pub struct Database {
     path: path::PathBuf,
@@ -75,7 +140,7 @@ impl Database {
         db::load(self)
     }
 
-    pub fn save<'a, I>(&self, entries: I, format: &DatabaseFormat) -> Result<()>
+    pub fn save<'a, I>(&self, entries: I, format: &Format) -> Result<()>
         where I: Iterator<Item = &'a Entry>
     {
         db::save(self, entries, format)
@@ -214,7 +279,7 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let sut = Database::new(comp_db_file.path());
-        let formatter = DatabaseFormat { command_as_array: false };
+        let formatter = Format { command_as_array: false, ..Format::default() };
 
         let expected = expected_values();
         sut.save(expected.iter(), &formatter)?;
@@ -235,7 +300,7 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let sut = Database::new(comp_db_file.path());
-        let formatter = DatabaseFormat { command_as_array: true };
+        let formatter = Format { command_as_array: true, ..Format::default() };
 
         let expected = expected_values();
         sut.save(expected.iter(), &formatter)?;
@@ -345,7 +410,7 @@ mod db {
         }
     }
 
-    pub fn save<'a, I>(db: &Database, entries: I, format: &DatabaseFormat) -> Result<()>
+    pub fn save<'a, I>(db: &Database, entries: I, format: &Format) -> Result<()>
         where I: Iterator<Item = &'a Entry>
     {
         let generic_entries = entries
@@ -393,7 +458,7 @@ mod db {
             .map_err(|error| error.into())
     }
 
-    fn from(entry: &Entry, format: &DatabaseFormat) -> Result<GenericEntry> {
+    fn from(entry: &Entry, format: &Format) -> Result<GenericEntry> {
         fn path_to_string(path: &path::Path) -> Result<String> {
             match path.to_str() {
                 Some(str) => Ok(str.to_string()),
@@ -466,7 +531,7 @@ mod db {
 mod entry {
     use super::*;
 
-    pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
+    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
         let make_output= |source: &path::PathBuf| {
             match compilation.output() {
                 None =>
@@ -484,7 +549,7 @@ mod entry {
         };
 
         let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
-            let mut result = compilation.compiler().to_strings();
+            let mut result = compilation.compiler().to_strings(format.drop_wrapper);
             result.push(compilation.pass().to_string());
             result.append(&mut compilation.flags());
             result.push(source.to_string_lossy().into_owned());

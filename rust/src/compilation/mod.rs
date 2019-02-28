@@ -22,6 +22,7 @@ pub mod flags;
 pub mod database;
 pub mod execution;
 pub mod compiler;
+pub mod source;
 
 use crate::Result;
 
@@ -86,8 +87,8 @@ impl CompilerExecutable {
         }
     }
 
-    pub fn to_strings(&self) -> Vec<String> {
-        self.as_vec(false)
+    pub fn to_strings(&self, drop_wrapper: bool) -> Vec<String> {
+        self.as_vec(drop_wrapper)
             .iter()
             .map(|path: &std::path::PathBuf| path.to_string_lossy().into_owned())
             .collect::<Vec<_>>()

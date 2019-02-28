@@ -30,8 +30,7 @@ use std::path;
 use std::process;
 
 use intercept::Result;
-use intercept::compilation::CompilerCall;
-use intercept::compilation::database::{Database, DatabaseFormat, Entry, Entries};
+use intercept::compilation::database::BuildStrategy;
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
@@ -104,36 +103,21 @@ fn run() -> Result<ExitCode> {
 
 fn intercept_build(command: &[String]) -> Result<ExitCode> {
     let collector = protocol::collector::Protocol::new()?;
-    env::set_var(KEY_DESTINATION, collector.path());
 
-    let mut sender = protocol::sender::Protocol::new(collector.path())?;
+    let exit = run_build(command, collector.path());
+
+    let db = BuildStrategy::default();
+    db.build(&collector, path::Path::new("./compile_commands.json"))?;
+
+    exit
+}
+
+fn run_build(command: &[String], destination: &path::Path) -> Result<ExitCode> {
+    env::set_var(KEY_DESTINATION, destination);
+
+    let mut sender = protocol::sender::Protocol::new(destination)?;
     let mut build = Supervisor::new(|event| sender.send(event));
     let exit = build.run(command)?;
     info!("Build finished with status code: {}", exit);
-
-    let current: Entries = collector.events()
-        .filter_map(|event| {
-            debug!("Intercepted event: {:?}", event);
-            event.to_execution()
-        })
-        .filter_map(|execution| {
-            debug!("Intercepted execution: {:?} @ {:?}", execution.0, execution.1);
-            CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
-        })
-        .flat_map(|call| {
-            debug!("Intercepted compiler call: {:?}", call);
-            Entry::from(&call)
-        })
-        .collect();
-
-    let db = Database::new(path::Path::new("./compile_commands.json"));
-    let db_formatter = DatabaseFormat { command_as_array: true };
-    if false {
-        let previous = db.load()?;
-        db.save(previous.union(&current), &db_formatter)?;
-    } else {
-        db.save(current.iter(), &db_formatter)?;
-    }
-
     Ok(exit)
 }

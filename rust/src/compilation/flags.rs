@@ -19,6 +19,11 @@
 
 use std::collections;
 
+
+pub struct FlagFilter {
+
+}
+
 /// Represents an iterator over the given compiler arguments.
 ///
 /// Its main responsibility is to filter out not relevant arguments.
