@@ -19,8 +19,6 @@
 
 pub mod pass;
 pub mod flags;
-pub mod database;
-pub mod execution;
 pub mod compiler;
 pub mod source;
 

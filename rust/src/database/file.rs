@@ -17,113 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::collections;
 use std::path;
 
 use crate::Result;
-use crate::compilation::CompilerCall;
-use crate::compilation::compiler::CompilerFilter;
-use crate::compilation::flags::FlagFilter;
-use crate::compilation::source::SourceFilter;
-use crate::protocol::collector::Protocol;
-
-
-/// Represents a compilation database building strategy.
-pub struct BuildStrategy {
-    pub format: Format,
-    pub append_to_existing: bool,
-    pub include_headers: bool,
-    pub include_linking: bool,
-    pub compilers: CompilerFilter,
-    pub sources: SourceFilter,
-    pub flags: FlagFilter,
-}
-
-impl BuildStrategy {
-
-    pub fn build(&self, collector: &Protocol, path: &path::Path) -> Result<()> {
-        let current: Entries = collector.events()
-            .filter_map(|event| {
-                debug!("Intercepted event: {:?}", event);
-                event.to_execution()
-            })
-            .filter_map(|execution| {
-                debug!("Intercepted execution: {:?} @ {:?}", execution.0, execution.1);
-                CompilerCall::from(&execution.0, execution.1.as_ref()).ok()
-            })
-            .flat_map(|call| {
-                debug!("Intercepted compiler call: {:?}", call);
-                Entry::from(&call, &self.format)
-            })
-            .collect();
-
-        let db = Database::new(path);
-        if self.append_to_existing {
-            let previous = db.load()?;
-            db.save(previous.union(&current), &self.format)
-        } else {
-            db.save(current.iter(), &self.format)
-        }
-    }
-
-    pub fn transform(&self, _path: &path::Path) -> Result<()> {
-        unimplemented!()
-    }
-}
-
-impl Default for BuildStrategy {
-    fn default() -> Self {
-        unimplemented!()
-    }
-}
-
-/// Represents the expected format of the JSON compilation database.
-pub struct Format {
-    pub relative_to: Option<path::PathBuf>,
-    pub command_as_array: bool,
-    pub drop_output_field: bool,
-    pub drop_wrapper: bool,
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format {
-            relative_to: None,
-            command_as_array: true,
-            drop_output_field: false,
-            drop_wrapper: true,
-        }
-    }
-}
-
-
-/// Represents a generic entry of the compilation database.
-#[derive(Hash, Debug)]
-pub struct Entry {
-    pub directory: path::PathBuf,
-    pub file: path::PathBuf,
-    pub command: Vec<String>,
-    pub output: Option<path::PathBuf>,
-}
-
-impl Entry {
-    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
-        entry::from(compilation, format)
-    }
-}
-
-impl PartialEq for Entry {
-    fn eq(&self, other: &Entry) -> bool {
-        self.directory == other.directory
-            && self.file == other.file
-            && self.command == other.command
-    }
-}
-
-impl Eq for Entry {
-}
-
-pub type Entries = collections::HashSet<Entry>;
+use crate::database::builder::{Entry, Entries, Format};
 
 
 /// Represents a JSON compilation database.
@@ -151,6 +48,7 @@ impl Database {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections;
     use std::fs;
     use std::io::{Read, Write};
 
@@ -524,56 +422,6 @@ mod db {
                         Err(format!("Quotes are mismatch in {:?}", command).into()),
                 }
             }
-        }
-    }
-}
-
-mod entry {
-    use super::*;
-
-    pub fn from(compilation: &CompilerCall, format: &Format) -> Vec<Entry> {
-        let make_output= |source: &path::PathBuf| {
-            match compilation.output() {
-                None =>
-                    source.with_extension(
-                        source.extension()
-                            .map(|e| {
-                                let mut result = e.to_os_string();
-                                result.push(".o");
-                                result
-                            })
-                            .unwrap_or(std::ffi::OsString::from("o"))),
-                Some(o) =>
-                    o.to_path_buf(),
-            }
-        };
-
-        let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
-            let mut result = compilation.compiler().to_strings(format.drop_wrapper);
-            result.push(compilation.pass().to_string());
-            result.append(&mut compilation.flags());
-            result.push(source.to_string_lossy().into_owned());
-            result.push("-o".to_string());
-            result.push(output.to_string_lossy().into_owned());
-            result
-        };
-
-        if compilation.pass().is_compiling() {
-            compilation.sources()
-                .iter()
-                .map(|source| {
-                    let output = make_output(source);
-                    let command = make_command(source, &output);
-                    Entry {
-                        directory: compilation.work_dir.clone(),
-                        file: source.to_path_buf(),
-                        output: Some(output),
-                        command,
-                    }
-                })
-                .collect::<Vec<Entry>>()
-        } else {
-            vec!()
         }
     }
 }

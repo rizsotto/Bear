@@ -41,6 +41,7 @@ pub mod environment;
 pub mod event;
 pub mod supervisor;
 pub mod compilation;
+pub mod database;
 pub mod protocol;
 
 mod error {

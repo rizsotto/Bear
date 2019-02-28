@@ -30,7 +30,7 @@ use std::path;
 use std::process;
 
 use intercept::Result;
-use intercept::compilation::database::BuildStrategy;
+use intercept::database::builder::Builder;
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
@@ -106,7 +106,7 @@ fn intercept_build(command: &[String]) -> Result<ExitCode> {
 
     let exit = run_build(command, collector.path());
 
-    let db = BuildStrategy::default();
+    let db = Builder::default();
     db.build(&collector, path::Path::new("./compile_commands.json"))?;
 
     exit
