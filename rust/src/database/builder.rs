@@ -43,7 +43,7 @@ pub struct Builder {
 
 impl Builder {
 
-    pub fn create(&self, path: &path::Path, collector: &Protocol) -> Result<()> {
+    pub fn build(&self, path: &path::Path, collector: &Protocol) -> Result<()> {
         let previous = if self.append_to_existing {
             debug!("Reading from: {:?}", path);
             file::load(path)
