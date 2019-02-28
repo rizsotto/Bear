@@ -18,7 +18,6 @@
  */
 
 use std::collections;
-use std::fs;
 use std::path;
 
 use crate::Result;
@@ -36,49 +35,7 @@ pub struct Entry {
 
 impl Entry {
     pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
-        let make_output= |source: &path::PathBuf| {
-            match compilation.output() {
-                None =>
-                    source.with_extension(
-                        source.extension()
-                            .map(|e| {
-                                let mut result = e.to_os_string();
-                                result.push(".o");
-                                result
-                            })
-                            .unwrap_or(std::ffi::OsString::from("o"))),
-                Some(o) =>
-                    o.to_path_buf(),
-            }
-        };
-
-        let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
-            let mut result = compilation.compiler().to_strings();
-            result.push(compilation.pass().to_string());
-            result.append(&mut compilation.flags());
-            result.push(source.to_string_lossy().into_owned());
-            result.push("-o".to_string());
-            result.push(output.to_string_lossy().into_owned());
-            result
-        };
-
-        if compilation.pass().is_compiling() {
-            compilation.sources()
-                .iter()
-                .map(|source| {
-                    let output = make_output(source);
-                    let command = make_command(source, &output);
-                    Entry {
-                        directory: compilation.work_dir.clone(),
-                        file: source.to_path_buf(),
-                        output: Some(output),
-                        command,
-                    }
-                })
-                .collect::<Vec<Entry>>()
-        } else {
-            vec!()
-        }
+        entry::from(compilation)
     }
 }
 
@@ -115,37 +72,21 @@ impl Database {
     }
 
     pub fn load(&self) -> Result<Entries> {
-        let generic_entries = inner::load(&self.path)?;
-        let entries = generic_entries.iter()
-            .map(|entry| inner::into(entry))
-            .collect::<Result<Entries>>();
-        // In case of error, let's be verbose which entries were problematic.
-        if let Err(_) = entries {
-            let errors = generic_entries.iter()
-                .map(|entry| inner::into(entry))
-                .filter_map(Result::err)
-                .map(|error| error.to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            Err(errors.into())
-        } else {
-            entries
-        }
+        db::load(self)
     }
 
     pub fn save<'a, I>(&self, entries: I, format: &DatabaseFormat) -> Result<()>
         where I: Iterator<Item = &'a Entry>
     {
-        let generic_entries = entries
-            .map(|entry| inner::from(entry, format))
-            .collect::<Result<Vec<_>>>()?;
-        inner::save(&self.path, &generic_entries)
+        db::save(self, entries, format)
     }
 }
+
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs;
     use std::io::{Read, Write};
 
     macro_rules! vec_of_strings {
@@ -379,14 +320,43 @@ mod test {
 }
 
 
-mod inner {
+mod db {
     use super::*;
+    use std::fs;
     use serde_json;
     use shellwords;
 
+    pub fn load(db: &Database) -> Result<Entries> {
+        let generic_entries = read(&db.path)?;
+        let entries = generic_entries.iter()
+            .map(|entry| into(entry))
+            .collect::<Result<Entries>>();
+        // In case of error, let's be verbose which entries were problematic.
+        if let Err(_) = entries {
+            let errors = generic_entries.iter()
+                .map(|entry| into(entry))
+                .filter_map(Result::err)
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(errors.into())
+        } else {
+            entries
+        }
+    }
+
+    pub fn save<'a, I>(db: &Database, entries: I, format: &DatabaseFormat) -> Result<()>
+        where I: Iterator<Item = &'a Entry>
+    {
+        let generic_entries = entries
+            .map(|entry| from(entry, format))
+            .collect::<Result<Vec<_>>>()?;
+        write(&db.path, &generic_entries)
+    }
+
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(untagged)]
-    pub enum GenericEntry {
+    enum GenericEntry {
         StringEntry {
             directory: String,
             file: String,
@@ -405,8 +375,7 @@ mod inner {
 
     type GenericEntries = Vec<GenericEntry>;
 
-
-    pub fn load(path: &path::Path) -> Result<GenericEntries> {
+    fn read(path: &path::Path) -> Result<GenericEntries> {
         let file = fs::OpenOptions::new()
             .read(true)
             .open(path)?;
@@ -414,7 +383,7 @@ mod inner {
         Ok(entries)
     }
 
-    pub fn save(path: &path::Path, entries: &GenericEntries) -> Result<()> {
+    fn write(path: &path::Path, entries: &GenericEntries) -> Result<()> {
         let file = fs::OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -424,7 +393,7 @@ mod inner {
             .map_err(|error| error.into())
     }
 
-    pub fn from(entry: &Entry, format: &DatabaseFormat) -> Result<GenericEntry> {
+    fn from(entry: &Entry, format: &DatabaseFormat) -> Result<GenericEntry> {
         fn path_to_string(path: &path::Path) -> Result<String> {
             match path.to_str() {
                 Some(str) => Ok(str.to_string()),
@@ -460,9 +429,9 @@ mod inner {
         }
     }
 
-    pub fn into(entry: &GenericEntry) -> Result<Entry> {
+    fn into(entry: &GenericEntry) -> Result<Entry> {
         match entry {
-            GenericEntry::ArrayEntry { directory, file, arguments, output} => {
+            GenericEntry::ArrayEntry { directory, file, arguments, output } => {
                 let directory_path = path::PathBuf::from(directory);
                 let file_path = path::PathBuf::from(file);
                 let output_path = output.clone().map(|string| path::PathBuf::from(string));
@@ -475,7 +444,7 @@ mod inner {
             },
             GenericEntry::StringEntry { directory, file, command, output } => {
                 match shellwords::split(command) {
-                    Ok(arguments ) => {
+                    Ok(arguments) => {
                         let directory_path = path::PathBuf::from(directory);
                         let file_path = path::PathBuf::from(file);
                         let output_path = output.clone().map(|string| path::PathBuf::from(string));
@@ -490,6 +459,56 @@ mod inner {
                         Err(format!("Quotes are mismatch in {:?}", command).into()),
                 }
             }
+        }
+    }
+}
+
+mod entry {
+    use super::*;
+
+    pub fn from(compilation: &CompilerCall) -> Vec<Entry> {
+        let make_output= |source: &path::PathBuf| {
+            match compilation.output() {
+                None =>
+                    source.with_extension(
+                        source.extension()
+                            .map(|e| {
+                                let mut result = e.to_os_string();
+                                result.push(".o");
+                                result
+                            })
+                            .unwrap_or(std::ffi::OsString::from("o"))),
+                Some(o) =>
+                    o.to_path_buf(),
+            }
+        };
+
+        let make_command = |source: &path::PathBuf, output: &path::PathBuf| {
+            let mut result = compilation.compiler().to_strings();
+            result.push(compilation.pass().to_string());
+            result.append(&mut compilation.flags());
+            result.push(source.to_string_lossy().into_owned());
+            result.push("-o".to_string());
+            result.push(output.to_string_lossy().into_owned());
+            result
+        };
+
+        if compilation.pass().is_compiling() {
+            compilation.sources()
+                .iter()
+                .map(|source| {
+                    let output = make_output(source);
+                    let command = make_command(source, &output);
+                    Entry {
+                        directory: compilation.work_dir.clone(),
+                        file: source.to_path_buf(),
+                        output: Some(output),
+                        command,
+                    }
+                })
+                .collect::<Vec<Entry>>()
+        } else {
+            vec!()
         }
     }
 }
