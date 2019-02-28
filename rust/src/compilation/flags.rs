@@ -24,6 +24,12 @@ pub struct FlagFilter {
 
 }
 
+impl Default for FlagFilter {
+    fn default() -> Self {
+        unimplemented!()
+    }
+}
+
 /// Represents an iterator over the given compiler arguments.
 ///
 /// Its main responsibility is to filter out not relevant arguments.

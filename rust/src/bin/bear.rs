@@ -107,7 +107,7 @@ fn intercept_build(command: &[String]) -> Result<ExitCode> {
     let exit = run_build(command, collector.path());
 
     let db = Builder::default();
-    db.build(&collector, path::Path::new("./compile_commands.json"))?;
+    db.create(path::Path::new("./compile_commands.json"), &collector)?;
 
     exit
 }

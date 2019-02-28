@@ -23,3 +23,9 @@ pub struct SourceFilter {
     pub path_to_exclude: Vec<std::path::PathBuf>,
     pub path_to_include: Vec<std::path::PathBuf>,
 }
+
+impl Default for SourceFilter {
+    fn default() -> Self {
+        unimplemented!()
+    }
+}
