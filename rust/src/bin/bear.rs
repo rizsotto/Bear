@@ -29,7 +29,7 @@ use std::env;
 use std::path;
 use std::process;
 
-use intercept::Result;
+use intercept::{Result, ResultExt};
 use intercept::database::builder::Builder;
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
@@ -91,25 +91,28 @@ fn run() -> Result<ExitCode> {
     let output = path::PathBuf::from(matches.value_of(OUTPUT_FLAG).unwrap());
     debug!("output file: {:?}", output);
 
-    let build: Vec<_> = matches
+    let command: Vec<_> = matches
         .values_of(BUILD_FLAG)
         .unwrap()
         .map(|s| s.to_string())
         .collect();
-    debug!("command to run: {:?}", build);
+    debug!("command to run: {:?}", command);
 
-    intercept_build(build.as_ref())
+    intercept_build(command.as_ref())
 }
 
 fn intercept_build(command: &[String]) -> Result<ExitCode> {
-    let collector = protocol::collector::Protocol::new()?;
+    let collector = protocol::collector::Protocol::new()
+        .chain_err(|| "Failed to set up event collection.")?;
 
-    let exit = run_build(command, collector.path());
+    let exit = run_build(command, collector.path())
+        .chain_err(|| "Failed to run the build.")?;
 
-    let db = Builder::default();
-    db.build(path::Path::new("./compile_commands.json"), &collector)?;
+    let builder = Builder::default();
+    builder.build(collector.events())
+        .chain_err(|| "Failed to write output.")?;
 
-    exit
+    Ok(exit)
 }
 
 fn run_build(command: &[String], destination: &path::Path) -> Result<ExitCode> {

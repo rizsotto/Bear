@@ -21,17 +21,18 @@ use std::collections;
 use std::path;
 
 use crate::{Result, ResultExt};
+use crate::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::compiler::CompilerFilter;
 use crate::compilation::flags::FlagFilter;
 use crate::compilation::source::SourceFilter;
-use crate::protocol::collector::Protocol;
 use crate::database::file;
 use compilation::pass::CompilerPass;
 
 
 /// Represents a compilation database building strategy.
 pub struct Builder {
+    pub file: path::PathBuf,
     pub format: Format,
     pub append_to_existing: bool,
     pub include_headers: bool,      // TODO
@@ -43,16 +44,18 @@ pub struct Builder {
 
 impl Builder {
 
-    pub fn build(&self, path: &path::Path, collector: &Protocol) -> Result<()> {
+    pub fn build<I>(&self, events: I) -> Result<()>
+        where I: Iterator<Item = Event>
+    {
         let previous = if self.append_to_existing {
-            debug!("Reading from: {:?}", path);
-            file::load(path)
+            debug!("Reading from: {:?}", self.file);
+            file::load(self.file.as_path())
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
             Entries::new()
         };
 
-        let current: Entries = collector.events()
+        let current: Entries = events
             .filter_map(|event| {
                 debug!("Event from protocol: {:?}", event);
                 event.to_execution()
@@ -75,14 +78,14 @@ impl Builder {
             })
             .collect();
 
-        debug!("Writing into: {:?}", path);
-        file::save(path, previous.union(&current), &self.format)
+        debug!("Writing into: {:?}", self.file);
+        file::save(self.file.as_path(), previous.union(&current), &self.format)
             .chain_err(|| "Failed to save compilation database.")
     }
 
-    pub fn transform(&self, path: &path::Path) -> Result<()> {
-        debug!("Reading from: {:?}", path);
-        let previous = file::load(path)
+    pub fn transform(&self) -> Result<()> {
+        debug!("Reading from: {:?}", self.file);
+        let previous = file::load(self.file.as_path())
             .chain_err(|| "Failed to load compilation database.")?;
 
         let current: Entries = previous.iter()
@@ -104,8 +107,8 @@ impl Builder {
             })
             .collect();
 
-        debug!("Writing into: {:?}", path);
-        file::save(path, current.iter(), &self.format)
+        debug!("Writing into: {:?}", self.file);
+        file::save(self.file.as_path(), current.iter(), &self.format)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
@@ -113,6 +116,7 @@ impl Builder {
 impl Default for Builder {
     fn default() -> Self {
         Builder {
+            file: path::PathBuf::from("./compile_commands.json"),
             format: Format::default(),
             append_to_existing: false,
             include_headers: false,
