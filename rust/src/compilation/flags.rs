@@ -20,7 +20,6 @@
 use std::collections;
 
 
-#[derive(Debug)]
 pub struct FlagFilter {
 
 }
