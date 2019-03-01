@@ -30,13 +30,14 @@ use std::path;
 use std::process;
 
 use intercept::{Result, ResultExt};
-use intercept::database::builder::Config;
+use intercept::database::CompilationDatabase;
+use intercept::database::file::JsonCompilationDatabase;
+use intercept::database::builder::Builder;
+use intercept::database::config::Config;
 use intercept::environment::KEY_DESTINATION;
 use intercept::event::ExitCode;
 use intercept::supervisor::Supervisor;
 use intercept::protocol;
-use intercept::database::file::JsonCompilationDatabase;
-use intercept::database::CompilationDatabase;
 
 
 fn main() {
@@ -108,13 +109,14 @@ fn run() -> Result<ExitCode> {
     intercept_build(&db, &builder, command.as_ref())
 }
 
-fn intercept_build(db: &CompilationDatabase, builder: &Config, command: &[String]) -> Result<ExitCode> {
+fn intercept_build(db: &CompilationDatabase, config: &Config, command: &[String]) -> Result<ExitCode> {
     let collector = protocol::collector::Protocol::new()
         .chain_err(|| "Failed to set up event collection.")?;
 
     let exit = run_build(command, collector.path())
         .chain_err(|| "Failed to run the build.")?;
 
+    let builder = Builder::new(config);
     builder.build(db, collector.events())
         .chain_err(|| "Failed to write output.")?;
 

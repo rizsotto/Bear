@@ -21,7 +21,7 @@ use std::path;
 
 use crate::Result;
 use crate::database::{CompilationDatabase, Entry, Entries};
-use crate::database::builder::Format;
+use crate::database::config::Format;
 
 
 /// Represents a JSON compilation database file.

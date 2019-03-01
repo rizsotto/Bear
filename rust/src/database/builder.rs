@@ -23,27 +23,24 @@ use crate::{Result, ResultExt};
 use crate::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::pass::CompilerPass;
+use crate::database::config::Config;
 use crate::database::{CompilationDatabase, Entry, Entries};
 
 
-/// Represents a compilation database building strategy.
-pub struct Config {
-    pub format: Format,
-    pub append_to_existing: bool,
-    pub include_headers: bool,      // TODO
-    pub include_linking: bool,
-    pub relative_to: Option<path::PathBuf>, // TODO
-    pub compilers: CompilerFilter,  // TODO
-    pub sources: SourceFilter,      // TODO
-    pub flags: FlagFilter,          // TODO
+pub struct Builder<'a> {
+    config: &'a Config,
 }
 
-impl Config {
+impl<'a> Builder<'a> {
+
+    pub fn new(config: &'a Config) -> Self {
+        Builder { config }
+    }
 
     pub fn build<I>(&self, db: &CompilationDatabase, events: I) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.append_to_existing && db.exists() {
+        let previous = if self.config.append_to_existing && db.exists() {
             db.load()
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
@@ -62,7 +59,7 @@ impl Config {
             .filter(|call| {
                 let pass = call.pass();
                 debug!("Compiler runs this pass: {:?}", pass);
-                (self.include_linking && pass.is_compiling()) || (pass == CompilerPass::Compilation)
+                (self.config.include_linking && pass.is_compiling()) || (pass == CompilerPass::Compilation)
             })
             .flat_map(|call| {
                 debug!("Compiler call: {:?}", call);
@@ -77,7 +74,7 @@ impl Config {
         result.extend(previous);
         result.extend(current);
         result.dedup();
-        db.save(&self.format, result)
+        db.save(&self.config.format, result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
@@ -93,7 +90,7 @@ impl Config {
             .filter(|call| {
                 let pass = call.pass();
                 debug!("Compiler runs this pass: {:?}", pass);
-                (self.include_linking && pass.is_compiling()) || (pass == CompilerPass::Compilation)
+                (self.config.include_linking && pass.is_compiling()) || (pass == CompilerPass::Compilation)
             })
             .flat_map(|call| {
                 debug!("Compiler call: {:?}", call);
@@ -104,75 +101,8 @@ impl Config {
             })
             .collect();
 
-        to_db.save(&self.format, current)
+        to_db.save(&self.config.format, current)
             .chain_err(|| "Failed to save compilation database.")
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            format: Format::default(),
-            append_to_existing: false,
-            include_headers: false,
-            include_linking: false,
-            relative_to: None,
-            compilers: CompilerFilter::default(),
-            sources: SourceFilter::default(),
-            flags: FlagFilter::default(),
-        }
-    }
-}
-
-/// Represents the expected format of the JSON compilation database.
-pub struct Format {
-    pub command_as_array: bool,
-    pub drop_output_field: bool,            // TODO
-}
-
-impl Default for Format {
-    fn default() -> Self {
-        Format {
-            command_as_array: true,
-            drop_output_field: false,
-        }
-    }
-}
-
-pub struct CompilerFilter {
-    pub drop_wrapper: bool,                 // TODO
-//    c_compilers: Vec<String>,
-//    cxx_compilers: Vec<String>,
-}
-
-impl Default for CompilerFilter {
-    fn default() -> Self {
-        CompilerFilter {
-            drop_wrapper: true,
-        }
-    }
-}
-
-pub struct FlagFilter {
-
-}
-
-impl Default for FlagFilter {
-    fn default() -> Self {
-        unimplemented!()
-    }
-}
-
-pub struct SourceFilter {
-    pub extensions_to_exclude: Vec<String>,
-    pub extensions_to_include: Vec<String>,
-    pub path_to_exclude: Vec<std::path::PathBuf>,
-    pub path_to_include: Vec<std::path::PathBuf>,
-}
-
-impl Default for SourceFilter {
-    fn default() -> Self {
-        unimplemented!()
     }
 }
 
