@@ -30,7 +30,6 @@ use std::path;
 use std::process;
 
 use intercept::{Result, ResultExt};
-use intercept::database::CompilationDatabase;
 use intercept::database::file::JsonCompilationDatabase;
 use intercept::database::builder::Builder;
 use intercept::database::config::Config;
@@ -101,23 +100,23 @@ fn run() -> Result<ExitCode> {
         .collect();
     debug!("command to run: {:?}", command);
 
-    let builder = Config::default();
-    let db =
+    let config = Config::default();
+    let target =
         JsonCompilationDatabase::new(
             path::Path::new("./compile_commands.json"));
+    let builder = Builder::new(&config, &target);
 
-    intercept_build(&db, &builder, command.as_ref())
+    intercept_build(&builder, command.as_ref())
 }
 
-fn intercept_build(db: &CompilationDatabase, config: &Config, command: &[String]) -> Result<ExitCode> {
+fn intercept_build(builder: &Builder, command: &[String]) -> Result<ExitCode> {
     let collector = protocol::collector::Protocol::new()
         .chain_err(|| "Failed to set up event collection.")?;
 
     let exit = run_build(command, collector.path())
         .chain_err(|| "Failed to run the build.")?;
 
-    let builder = Builder::new(config);
-    builder.build(db, collector.events())
+    builder.build(collector.events())
         .chain_err(|| "Failed to write output.")?;
 
     Ok(exit)

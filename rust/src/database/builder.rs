@@ -29,19 +29,20 @@ use crate::database::{CompilationDatabase, Entry, Entries};
 
 pub struct Builder<'a> {
     config: &'a Config,
+    target: &'a CompilationDatabase,
 }
 
 impl<'a> Builder<'a> {
 
-    pub fn new(config: &'a Config) -> Self {
-        Builder { config }
+    pub fn new(config: &'a Config, target: &'a CompilationDatabase) -> Self {
+        Builder { config, target }
     }
 
-    pub fn build<I>(&self, db: &CompilationDatabase, events: I) -> Result<()>
+    pub fn build<I>(&self, events: I) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.config.append_to_existing && db.exists() {
-            db.load()
+        let previous = if self.config.append_to_existing && self.target.exists() {
+            self.target.load()
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
             Entries::new()
@@ -74,11 +75,11 @@ impl<'a> Builder<'a> {
         result.extend(previous);
         result.extend(current);
         result.dedup();
-        db.save(&self.config.format, result)
+        self.target.save(&self.config.format, result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
-    pub fn transform(&self, from_db: &CompilationDatabase, to_db: &CompilationDatabase) -> Result<()> {
+    pub fn transform(&self, from_db: &CompilationDatabase) -> Result<()> {
         let previous = from_db.load()
             .chain_err(|| "Failed to load compilation database.")?;
 
@@ -101,7 +102,7 @@ impl<'a> Builder<'a> {
             })
             .collect();
 
-        to_db.save(&self.config.format, current)
+        self.target.save(&self.config.format, current)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
