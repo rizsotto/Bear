@@ -16,16 +16,3 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-pub struct SourceFilter {
-    pub extensions_to_exclude: Vec<String>,
-    pub extensions_to_include: Vec<String>,
-    pub path_to_exclude: Vec<std::path::PathBuf>,
-    pub path_to_include: Vec<std::path::PathBuf>,
-}
-
-impl Default for SourceFilter {
-    fn default() -> Self {
-        unimplemented!()
-    }
-}
