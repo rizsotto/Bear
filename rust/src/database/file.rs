@@ -29,13 +29,12 @@ use crate::database::builder::Format;
 /// https://clang.llvm.org/docs/JSONCompilationDatabase.html
 pub struct JsonCompilationDatabase {
     file: path::PathBuf,
-    format: Format,
 }
 
 impl JsonCompilationDatabase {
 
-    pub fn new(path: &path::Path, format: Format) -> Self {
-        JsonCompilationDatabase { file: path.to_path_buf(), format }
+    pub fn new(path: &path::Path) -> Self {
+        JsonCompilationDatabase { file: path.to_path_buf(), }
     }
 }
 
@@ -50,9 +49,9 @@ impl CompilationDatabase for JsonCompilationDatabase {
         db::load(self.file.as_path())
     }
 
-    fn save(&self, entries: Entries) -> Result<()> {
+    fn save(&self, format: &Format, entries: Entries) -> Result<()> {
         debug!("Writing to: {:?}", self.file);
-        db::save(self.file.as_path(), entries, &self.format)
+        db::save(self.file.as_path(), entries, format)
     }
 }
 
@@ -69,8 +68,10 @@ mod test {
     #[test]
     #[should_panic]
     fn test_load_not_existing_file_fails() {
-        let not_existing_file = path::Path::new("/not/exists/file.json");
-        let sut = JsonCompilationDatabase::new(not_existing_file, Format::default());
+        let sut =
+            JsonCompilationDatabase::new(
+                path::Path::new("/not/exists/file.json"));
+
         let _ = sut.load().unwrap();
     }
 
@@ -82,7 +83,7 @@ mod test {
         comp_db_file.write(br#"this is not json"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let _ = sut.load().unwrap();
     }
 
@@ -94,7 +95,7 @@ mod test {
         comp_db_file.write(br#"{ "file": "string" }"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let _ = sut.load().unwrap();
     }
 
@@ -103,7 +104,7 @@ mod test {
         let comp_db_file = TestFile::new()?;
         comp_db_file.write(br#"[]"#)?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let entries = sut.load().unwrap();
 
         let expected = Entries::new();
@@ -130,7 +131,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let entries = sut.load().unwrap();
 
         let expected = expected_values();
@@ -157,7 +158,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let entries = sut.load().unwrap();
 
         let expected = expected_values();
@@ -179,7 +180,7 @@ mod test {
             ]"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
         let _ = sut.load().unwrap();
     }
 
@@ -188,10 +189,10 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let formatter = Format { command_as_array: false, ..Format::default() };
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), formatter);
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
 
         let input = expected_values();
-        sut.save(input)?;
+        sut.save(&formatter, input)?;
 
         let entries = sut.load()?;
 
@@ -209,10 +210,10 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let formatter = Format { command_as_array: true, ..Format::default() };
-        let sut = JsonCompilationDatabase::new(comp_db_file.path(), formatter);
+        let sut = JsonCompilationDatabase::new(comp_db_file.path());
 
         let input = expected_values();
-        sut.save(input)?;
+        sut.save(&formatter, input)?;
 
         let entries = sut.load()?;
 

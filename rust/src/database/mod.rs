@@ -21,6 +21,7 @@ pub mod builder;
 pub mod file;
 
 use crate::Result;
+use database::builder::Format;
 
 /// Represents a compilation database.
 pub trait CompilationDatabase {
@@ -29,7 +30,7 @@ pub trait CompilationDatabase {
 
     fn load(&self) -> Result<Entries>;
 
-    fn save(&self, entries: Entries) -> Result<()>;
+    fn save(&self, format: &Format, entries: Entries) -> Result<()>;
 }
 
 /// Represents an entry of the compilation database.

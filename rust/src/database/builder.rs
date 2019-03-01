@@ -24,12 +24,11 @@ use crate::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::pass::CompilerPass;
 use crate::database::{CompilationDatabase, Entry, Entries};
-use database::file::JsonCompilationDatabase;
 
 
 /// Represents a compilation database building strategy.
-pub struct Builder {
-    pub database: Box<CompilationDatabase>,
+pub struct Config {
+    pub format: Format,
     pub append_to_existing: bool,
     pub include_headers: bool,      // TODO
     pub include_linking: bool,
@@ -39,13 +38,13 @@ pub struct Builder {
     pub flags: FlagFilter,          // TODO
 }
 
-impl Builder {
+impl Config {
 
-    pub fn build<I>(&self, events: I) -> Result<()>
+    pub fn build<I>(&self, db: &CompilationDatabase, events: I) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.append_to_existing && self.database.exists() {
-            self.database.load()
+        let previous = if self.append_to_existing && db.exists() {
+            db.load()
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
             Entries::new()
@@ -78,12 +77,12 @@ impl Builder {
         result.extend(previous);
         result.extend(current);
         result.dedup();
-        self.database.save(result)
+        db.save(&self.format, result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
-    pub fn transform(&self) -> Result<()> {
-        let previous = self.database.load()
+    pub fn transform(&self, from_db: &CompilationDatabase, to_db: &CompilationDatabase) -> Result<()> {
+        let previous = from_db.load()
             .chain_err(|| "Failed to load compilation database.")?;
 
         let current: Entries = previous.iter()
@@ -105,19 +104,15 @@ impl Builder {
             })
             .collect();
 
-        self.database.save(current)
+        to_db.save(&self.format, current)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
 
-impl Default for Builder {
+impl Default for Config {
     fn default() -> Self {
-        Builder {
-            database: Box::new(
-                JsonCompilationDatabase::new(
-                    path::Path::new("./compile_commands.json"),
-                    Format::default()
-            )),
+        Config {
+            format: Format::default(),
             append_to_existing: false,
             include_headers: false,
             include_linking: false,
