@@ -27,9 +27,7 @@ use crate::database::config::Format;
 /// Represents a compilation database.
 pub trait CompilationDatabase {
 
-    fn exists(&self) -> bool;
-
-    fn load(&self) -> Result<Entries>;
+    fn load(&self, empty_if_not_exists: bool) -> Result<Entries>;
 
     fn save(&self, format: &Format, entries: Entries) -> Result<()>;
 }

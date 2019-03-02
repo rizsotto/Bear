@@ -40,13 +40,14 @@ impl JsonCompilationDatabase {
 
 impl CompilationDatabase for JsonCompilationDatabase {
 
-    fn exists(&self) -> bool {
-        self.file.exists()
-    }
-
-    fn load(&self) -> Result<Entries> {
-        debug!("Reading from: {:?}", self.file);
-        db::load(self.file.as_path())
+    fn load(&self, empty_if_not_exists: bool) -> Result<Entries> {
+        if empty_if_not_exists && !self.file.exists() {
+            debug!("File does not exists: {:?}", self.file);
+            Ok(Entries::new())
+        } else {
+            debug!("Reading from: {:?}", self.file);
+            db::load(self.file.as_path())
+        }
     }
 
     fn save(&self, format: &Format, entries: Entries) -> Result<()> {
@@ -72,7 +73,18 @@ mod test {
             JsonCompilationDatabase::new(
                 path::Path::new("/not/exists/file.json"));
 
-        let _ = sut.load().unwrap();
+        let _ = sut.load(false).unwrap();
+    }
+
+    #[test]
+    fn test_load_not_existing_file_returns_empty() -> Result<()> {
+        let sut =
+            JsonCompilationDatabase::new(
+                path::Path::new("/not/exists/file.json"));
+
+        let entries = sut.load(true)?;
+        assert_eq!(Entries::new(), entries);
+        Ok(())
     }
 
     #[test]
@@ -84,7 +96,7 @@ mod test {
             .expect("test file content write failed");
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = sut.load(false).unwrap();
     }
 
     #[test]
@@ -96,7 +108,7 @@ mod test {
             .expect("test file content write failed");
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = sut.load(false).unwrap();
     }
 
     #[test]
@@ -105,7 +117,7 @@ mod test {
         comp_db_file.write(br#"[]"#)?;
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let entries = sut.load().unwrap();
+        let entries = sut.load(false)?;
 
         let expected = Entries::new();
         assert_eq!(expected, entries);
@@ -132,7 +144,7 @@ mod test {
         )?;
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let entries = sut.load().unwrap();
+        let entries = sut.load(false)?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -159,7 +171,7 @@ mod test {
         )?;
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let entries = sut.load().unwrap();
+        let entries = sut.load(false)?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -181,7 +193,7 @@ mod test {
             .expect("test file content write failed");
 
         let sut = JsonCompilationDatabase::new(comp_db_file.path());
-        let _ = sut.load().unwrap();
+        let _ = sut.load(false).unwrap();
     }
 
     #[test]
@@ -194,7 +206,7 @@ mod test {
         let input = expected_values();
         sut.save(&formatter, input)?;
 
-        let entries = sut.load()?;
+        let entries = sut.load(false)?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);
@@ -215,7 +227,7 @@ mod test {
         let input = expected_values();
         sut.save(&formatter, input)?;
 
-        let entries = sut.load()?;
+        let entries = sut.load(false)?;
 
         let expected = expected_values();
         assert_eq!(expected, entries);

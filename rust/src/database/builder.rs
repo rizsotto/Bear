@@ -41,8 +41,8 @@ impl<'a> Builder<'a> {
     pub fn build<I>(&self, events: I) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.config.append_to_existing && self.target.exists() {
-            self.target.load()
+        let previous = if self.config.append_to_existing {
+            self.target.load(true)
                 .chain_err(|| "Failed to load compilation database.")?
         } else {
             Entries::new()
@@ -80,7 +80,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn transform(&self, from_db: &CompilationDatabase) -> Result<()> {
-        let previous = from_db.load()
+        let previous = from_db.load(false)
             .chain_err(|| "Failed to load compilation database.")?;
 
         let current: Entries = previous.iter()
