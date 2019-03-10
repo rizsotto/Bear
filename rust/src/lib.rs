@@ -19,6 +19,8 @@
 
 extern crate chrono;
 #[macro_use]
+extern crate clap;
+#[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
@@ -47,6 +49,7 @@ pub mod protocol;
 mod error {
     error_chain! {
         foreign_links {
+            Clap(::clap::Error);  // TODO: remove this!
             Io(::std::io::Error);
             Env(::std::env::VarError);
             String(::std::str::Utf8Error);
