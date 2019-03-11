@@ -30,6 +30,7 @@ path = "src/bin/cxx.rs"
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "2", default-features = false }
+directories = "1.0"
 env_logger = "0.6"
 error-chain = "0.12"
 lazy_static = "1.2"

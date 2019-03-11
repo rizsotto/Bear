@@ -20,6 +20,7 @@
 use std::path;
 
 /// Represents a compilation database building strategy.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Config {
     pub format: Format,
     pub append_to_existing: bool,
@@ -47,6 +48,7 @@ impl Default for Config {
 }
 
 /// Represents the expected format of the JSON compilation database.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Format {
     pub command_as_array: bool,
     pub drop_output_field: bool,            // TODO
@@ -61,6 +63,7 @@ impl Default for Format {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct CompilerFilter {
     pub drop_wrapper: bool,                 // TODO
 //    c_compilers: Vec<String>,
@@ -75,6 +78,7 @@ impl Default for CompilerFilter {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct FlagFilter {
 
 }
@@ -85,6 +89,7 @@ impl Default for FlagFilter {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct SourceFilter {
     pub extensions_to_exclude: Vec<String>,
     pub extensions_to_include: Vec<String>,

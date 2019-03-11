@@ -19,7 +19,9 @@
 
 #[macro_use]
 extern crate clap;
+extern crate directories;
 extern crate env_logger;
+#[macro_use]
 extern crate error_chain;
 extern crate intercept;
 #[macro_use]
@@ -29,12 +31,21 @@ use std::env;
 use std::path;
 use std::process;
 
-use intercept::{Result, ResultExt};
-use intercept::database;
 use intercept::event::ExitCode;
+use intercept::iterator_pairs::Pairs;
 use clap::ArgMatches;
-use ::Command::Supervise;
 
+
+mod error {
+    error_chain! {
+        foreign_links {
+            Clap(::clap::Error);
+            Intercept(intercept::Error);
+        }
+    }
+}
+
+pub use error::{Error, ErrorKind, Result, ResultExt};
 
 fn main() {
     match run() {
@@ -70,17 +81,20 @@ fn run() -> Result<ExitCode> {
 }
 
 fn parse_arguments(args: &[String]) -> Result<Command> {
+    let default_config = default_config_file();
     let matches = clap::App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
+        .subcommand(parse_supervise())
+        .subcommand(parse_configure())
+        .subcommand(parse_build(default_config.as_str()))
+        .subcommand(parse_intercept())
         .settings(&[
+            clap::AppSettings::GlobalVersion,
             clap::AppSettings::SubcommandRequired,
-            clap::AppSettings::GlobalVersion
+            clap::AppSettings::DisableHelpSubcommand,
         ])
-        .subcommand(supervise_command())
-        .subcommand(clap::SubCommand::with_name("intercept"))
-        .subcommand(clap::SubCommand::with_name("transform"))
         .get_matches_from_safe(args)?;
 
     build_command(matches)
@@ -91,14 +105,15 @@ fn build_command(matches: ArgMatches) -> Result<Command> {
     debug!("{:?}", matches);
     match matches.subcommand() {
         ("supervise", Some(sub_matches)) =>
-            build_supervise_command(sub_matches),
-        ("intercept", Some(_sub_matches)) => {
-            unimplemented!()
-        },
-        ("transform", Some(_sub_matches)) => {
-            unimplemented!()
-        },
-        _ => unimplemented!()
+            build_command_supervise(sub_matches),
+        ("configure", Some(sub_matches)) =>
+            build_command_configure(sub_matches),
+        ("build", Some(sub_matches)) =>
+            build_command_build(sub_matches),
+        ("intercept", Some(sub_matches)) =>
+            build_command_intercept(sub_matches),
+        _ =>
+            unimplemented!(),
     }
 }
 
@@ -108,14 +123,21 @@ enum Command {
         session: Session,
         execution: Execution,
     },
-    CompilationDatabaseBuild {
-//        config: database::config::Config,
-//        target: Box<database::CompilationDatabase>,
+    InjectWrappers {
         command: Vec<String>,
+        modes: Vec<InterceptMode>,
     },
-    CompilationDatabaseTransform,
-    OntologyBuild,
-    OntologyEnrich,
+    OntologyBuild {
+        output: path::PathBuf,
+        command: Vec<String>,
+        modes: Vec<InterceptMode>,
+    },
+    CompilationDatabaseBuild {
+        output: path::PathBuf,
+        command: Vec<String>,
+        modes: Vec<InterceptMode>,
+        config: path::PathBuf,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -138,6 +160,12 @@ enum ExecutionTarget {
     WithSearchPath(String, Vec<path::PathBuf>),
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum InterceptMode {
+    Library(path::PathBuf),
+    Wrapper(String, path::PathBuf),
+}
+
 impl Command {
 
 //    pub fn parse(matches: ArgMatches) -> Result<Command> {
@@ -155,8 +183,6 @@ impl Command {
 //        intercept_build(&builder, command.as_ref())
         unimplemented!()
     }
-}
-
 
 //fn intercept_build(builder: &Builder, command: &[String]) -> Result<ExitCode> {
 //    let collector = protocol::collector::Protocol::new()
@@ -180,35 +206,32 @@ impl Command {
 //    info!("Build finished with status code: {}", exit);
 //    Ok(exit)
 //}
+}
 
-fn supervise_command<'a, 'b>() -> clap::App<'a, 'b> {
+
+fn parse_supervise<'a, 'b>() -> clap::App<'a, 'b> {
     clap::SubCommand::with_name("supervise")
-        // TODO: make verbose a top level param
         .arg(clap::Arg::with_name("verbose")
             .long("session-verbose")
             .takes_value(false))
         .arg(clap::Arg::with_name("destination")
             .long("session-destination")
-            .takes_value(true)
+            .value_name("URL")
             .required(true))
         .arg(clap::Arg::with_name("library")
             .long("session-library")
-            .takes_value(true)
+            .value_name("PATH")
             .required(true))
         .arg(clap::Arg::with_name("path")
             .long("execution-path")
-            .takes_value(true))
+            .value_name("FILE"))
         .arg(clap::Arg::with_name("file")
             .long("execution-file")
-            .takes_value(true))
+            .value_name("FILE"))
         .arg(clap::Arg::with_name("search-path")
             .long("execution-search-path")
-            .takes_value(true))
-        .arg(clap::Arg::with_name("command")
-            .multiple(true)
-            .allow_hyphen_values(true)
-            .required(true)
-            .last(true))
+            .value_name("PATH"))
+        .arg(arg_command())
         .group(clap::ArgGroup::with_name("session")
             .multiple(true)
             .args(&["verbose", "destination", "library"]))
@@ -225,20 +248,32 @@ fn supervise_command<'a, 'b>() -> clap::App<'a, 'b> {
         ])
 }
 
-fn build_supervise_command(matches: &ArgMatches) -> Result<Command> {
-    let destination = matches.value_of("destination").unwrap();
-    let library = matches.value_of("library").unwrap();
-    let verbose = matches.is_present("verbose");
+fn arg_command<'a, 'b>() -> clap::Arg<'a, 'b> {
+    clap::Arg::with_name("command")
+        .multiple(true)
+        .allow_hyphen_values(true)
+        .required(true)
+        .last(true)
+}
+
+fn build_command_supervise(matches: &ArgMatches) -> Result<Command> {
     let session = Session {
-        destination: path::PathBuf::from(destination),
-        library: path::PathBuf::from(library),
-        verbose,
+        destination: value_t!(matches, "destination", path::PathBuf).unwrap(),
+        library: value_t!(matches, "library", path::PathBuf).unwrap(),
+        verbose: matches.is_present("verbose"),
+    };
+    let execution = Execution {
+        program: build_execution_target(matches)?,
+        arguments: values_t!(matches, "command", String)?,
     };
 
-    let program: Result<ExecutionTarget> =
-        match (matches.value_of("search-path"),
-               matches.value_of("file"),
-               matches.value_of("path")) {
+    Ok(Command::Supervise { session, execution, })
+}
+
+fn build_execution_target(matches: &ArgMatches) -> Result<ExecutionTarget> {
+    match (matches.value_of("search-path"),
+           matches.value_of("file"),
+           matches.value_of("path")) {
         (Some(sp), _, Some(path)) => {
             let paths = sp.split(":").map(|p| path::PathBuf::from(p)).collect::<Vec<_>>();
             Ok(ExecutionTarget::WithSearchPath(path.to_string(), paths))
@@ -249,15 +284,116 @@ fn build_supervise_command(matches: &ArgMatches) -> Result<Command> {
             Ok(ExecutionTarget::File(path::PathBuf::from(file))),
         _ =>
             Err(matches.usage().into())
-    };
-    let command = matches.values_of("command").unwrap();
-    let execution = Execution {
-        program: program?,
-        arguments: command.map(|str| str.to_string()).collect::<Vec<_>>(),
-    };
-
-    Ok(Supervise { session, execution, })
+    }
 }
+
+fn parse_configure<'a, 'b>() -> clap::App<'a, 'b> {
+    clap::SubCommand::with_name("configure")
+        .args(args_intercept_modes().as_ref())
+        .arg(arg_command())
+        .settings(&[
+            clap::AppSettings::TrailingVarArg,
+        ])
+}
+
+fn args_intercept_modes<'a, 'b>() -> Vec<clap::Arg<'a, 'b>> {
+    vec!(
+        clap::Arg::with_name("library")
+            .long("library")
+            .value_name("PATH")
+            .display_order(50),
+        clap::Arg::with_name("wrapper")
+            .long("wrapper")
+            .value_names(&["NAME", "PATH"])
+            .multiple(true)
+            .display_order(50),
+    )
+}
+
+fn build_command_configure(matches: &ArgMatches) -> Result<Command> {
+    let modes = build_intercept_modes(matches)?;
+    let command = values_t!(matches, "command", String)?;
+    Ok(Command::InjectWrappers { modes, command })
+}
+
+fn build_intercept_modes(matches: &ArgMatches) -> Result<Vec<InterceptMode>> {
+    let mut modes: Vec<InterceptMode> = vec!();
+    if let Ok(library) = value_t!(matches, "library", path::PathBuf) {
+        modes.push(InterceptMode::Library(library));
+    }
+    if let Ok(wrappers) = values_t!(matches, "wrapper", String) {
+        Pairs::new(wrappers.iter())
+            .for_each(|pair|
+                modes.push(InterceptMode::Wrapper(
+                    pair.0.to_string(),
+                    path::PathBuf::from(pair.1))))
+    }
+    Ok(modes)
+}
+
+fn parse_build<'a, 'b>(default_config: &'a str) -> clap::App<'a, 'b> {
+    clap::SubCommand::with_name("build")
+        .arg(clap::Arg::with_name("config")
+            .short("c")
+            .long("config")
+            .value_name("FILE")
+            .default_value(default_config)
+            .display_order(10))
+        .arg(clap::Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .value_name("FILE")
+            .default_value("compile_commands.json")
+            .display_order(10))
+        .args(args_intercept_modes().as_ref())
+        .arg(arg_command())
+        .settings(&[
+            clap::AppSettings::TrailingVarArg,
+        ])
+}
+
+fn default_config_file() -> String {
+    if let Some(proj_dirs) =
+    directories::ProjectDirs::from("org.github", "rizsotto",  "bear") {
+        let config_dir = proj_dirs.config_dir().to_path_buf();
+        let config_file = config_dir.join("bear.conf");
+        if let Some(str) = config_file.to_str() {
+            return str.to_string()
+        }
+    }
+    "./bear.conf".to_string()
+}
+
+fn build_command_build(matches: &ArgMatches) -> Result<Command> {
+    let modes = build_intercept_modes(matches)?;
+    let command = values_t!(matches, "command", String)?;
+    let output = value_t!(matches, "output", path::PathBuf)?;
+    let config = value_t!(matches, "config", path::PathBuf)?;
+    Ok(Command::CompilationDatabaseBuild { output, modes, command, config })
+}
+
+fn parse_intercept<'a, 'b>() -> clap::App<'a, 'b> {
+    clap::SubCommand::with_name("intercept")
+        .arg(clap::Arg::with_name("output")
+            .short("o")
+            .long("output")
+            .value_name("FILE")
+            .default_value("commands.n3")
+            .display_order(10))
+        .args(args_intercept_modes().as_ref())
+        .arg(arg_command())
+        .settings(&[
+            clap::AppSettings::TrailingVarArg,
+        ])
+}
+
+fn build_command_intercept(matches: &ArgMatches) -> Result<Command> {
+    let modes = build_intercept_modes(matches)?;
+    let command = values_t!(matches, "command", String)?;
+    let output = value_t!(matches, "output", path::PathBuf)?;
+    Ok(Command::OntologyBuild { output, modes, command })
+}
+
 
 #[cfg(test)]
 mod test {
@@ -345,7 +481,7 @@ mod test {
                 "--", "cc", "-c", "source.c");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
-            let expected_command = Supervise {
+            let expected_command = Command::Supervise {
                 session: Session {
                     destination: path::PathBuf::from("/tmp/bear"),
                     library: path::PathBuf::from("/usr/local/lib/libear.so"),
@@ -370,7 +506,7 @@ mod test {
                 "--", "cc", "-c", "source.c");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
-            let expected_command = Supervise {
+            let expected_command = Command::Supervise {
                 session: Session {
                     destination: path::PathBuf::from("/tmp/bear"),
                     library: path::PathBuf::from("/usr/local/lib/libear.so"),
@@ -380,6 +516,221 @@ mod test {
                     program: ExecutionTarget::File(path::PathBuf::from("/usr/bin/cc")),
                     arguments: vec_of_strings!("cc", "-c", "source.c"),
                 }
+            };
+            assert_eq!(expected_command, command);
+        }
+    }
+
+    mod configure_command {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn missing_command() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "configure",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc");
+            let _ = parse_arguments(arguments.as_slice()).unwrap();
+        }
+
+        #[test]
+        fn parsed_with_modes() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "configure",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc",
+                "--wrapper", "cxx", "/usr/bin/c++",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::InjectWrappers {
+                modes: vec!(
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
+                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
+                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                ),
+                command: vec_of_strings!("make")
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_without_modes() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "configure",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::InjectWrappers {
+                modes: vec!(),
+                command: vec_of_strings!("make")
+            };
+            assert_eq!(expected_command, command);
+        }
+    }
+
+    mod build_command {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn missing_command() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc");
+            let _ = parse_arguments(arguments.as_slice()).unwrap();
+        }
+
+        #[test]
+        fn parsed_simple() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::CompilationDatabaseBuild {
+                modes: vec!(),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("compile_commands.json"),
+                config: path::PathBuf::from(default_config_file().as_str()),
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_with_modes() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc",
+                "--wrapper", "cxx", "/usr/bin/c++",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::CompilationDatabaseBuild {
+                modes: vec!(
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
+                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
+                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                ),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("compile_commands.json"),
+                config: path::PathBuf::from(default_config_file().as_str()),
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_with_output() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "-o", "commands.json",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::CompilationDatabaseBuild {
+                modes: vec!(),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("commands.json"),
+                config: path::PathBuf::from(default_config_file().as_str()),
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_with_config() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "-c", "/path/to/bear.conf",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::CompilationDatabaseBuild {
+                modes: vec!(),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("compile_commands.json"),
+                config: path::PathBuf::from("/path/to/bear.conf"),
+            };
+            assert_eq!(expected_command, command);
+        }
+    }
+
+    mod intercept_command {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn missing_command() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "build",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc");
+            let _ = parse_arguments(arguments.as_slice()).unwrap();
+        }
+
+        #[test]
+        fn parsed_simple() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "intercept",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::OntologyBuild {
+                modes: vec!(),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("commands.n3"),
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_with_modes() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "intercept",
+                "--library", "/usr/local/lib/libear.so",
+                "--wrapper", "cc", "/usr/bin/cc",
+                "--wrapper", "cxx", "/usr/bin/c++",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::OntologyBuild {
+                modes: vec!(
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
+                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
+                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                ),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("commands.n3"),
+            };
+            assert_eq!(expected_command, command);
+        }
+
+        #[test]
+        fn parsed_with_output() {
+            let arguments = vec_of_strings!(
+                "bear",
+                "intercept",
+                "-o", "commands.json",
+                "--", "make");
+            let command = parse_arguments(arguments.as_slice()).unwrap();
+
+            let expected_command = Command::OntologyBuild {
+                modes: vec!(),
+                command: vec_of_strings!("make"),
+                output: path::PathBuf::from("commands.json"),
             };
             assert_eq!(expected_command, command);
         }
