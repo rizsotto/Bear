@@ -23,9 +23,7 @@ project(intercept-libexec
     LANGUAGES C CXX)
 
 enable_testing()
-
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-include(AddGoogleTest)
+find_package(GTest REQUIRED)
 
 add_subdirectory(src)
 
