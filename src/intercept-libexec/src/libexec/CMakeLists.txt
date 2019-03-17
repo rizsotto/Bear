@@ -16,3 +16,5 @@ if(APPLE)
 else()
     set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 endif()
+
+install(TARGETS exec DESTINATION .)

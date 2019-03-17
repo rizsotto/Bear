@@ -5,6 +5,7 @@ authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
 description = "BuildEAR is a tool that generates a compilation database for clang tooling."
 homepage = "https://github.com/rizsotto/Bear"
+build="build.rs"
 include = [
     "**/*.rs",
     "Cargo.toml",
@@ -45,3 +46,6 @@ tempfile = "3.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.13"
+
+[build-dependencies]
+cmake = "0.1"

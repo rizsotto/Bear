@@ -17,9 +17,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 
-project(intercept-library
+project(intercept-libexec
     VERSION 3.1.0
-    DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
+    DESCRIPTION "Program execution library using execution wrappers."
     LANGUAGES C CXX)
 
 enable_testing()
