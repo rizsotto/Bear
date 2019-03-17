@@ -31,21 +31,12 @@ use std::env;
 use std::path;
 use std::process;
 
+use intercept::command::{Command, Session, Execution, ExecutionTarget, InterceptMode};
 use intercept::event::ExitCode;
-use intercept::iterator_pairs::Pairs;
 use clap::ArgMatches;
 
-
-mod error {
-    error_chain! {
-        foreign_links {
-            Clap(::clap::Error);
-            Intercept(intercept::Error);
-        }
-    }
-}
-
-pub use error::{Error, ErrorKind, Result, ResultExt};
+use error::{Result, ResultExt};
+use iterator::Pairs;
 
 fn main() {
     match run() {
@@ -77,7 +68,7 @@ fn run() -> Result<ExitCode> {
     debug!("invocation: {:?}", &args);
 
     parse_arguments(args.as_slice())
-        .and_then(|command| command.run())
+        .and_then(|command| command.run().map_err(|err| err.into()))
 }
 
 fn parse_arguments(args: &[String]) -> Result<Command> {
@@ -115,97 +106,6 @@ fn build_command(matches: ArgMatches) -> Result<Command> {
         _ =>
             unimplemented!(),
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Command {
-    Supervise {
-        session: Session,
-        execution: Execution,
-    },
-    InjectWrappers {
-        command: Vec<String>,
-        modes: Vec<InterceptMode>,
-    },
-    OntologyBuild {
-        output: path::PathBuf,
-        command: Vec<String>,
-        modes: Vec<InterceptMode>,
-    },
-    CompilationDatabaseBuild {
-        output: path::PathBuf,
-        command: Vec<String>,
-        modes: Vec<InterceptMode>,
-        config: path::PathBuf,
-    },
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Session {
-    destination: path::PathBuf,
-    library: path::PathBuf,
-    verbose: bool,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct Execution {
-    program: ExecutionTarget,
-    arguments: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ExecutionTarget {
-    File(path::PathBuf),
-    Path(String),
-    WithSearchPath(String, Vec<path::PathBuf>),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum InterceptMode {
-    Library(path::PathBuf),
-    Wrapper(String, path::PathBuf),
-}
-
-impl Command {
-
-//    pub fn parse(matches: ArgMatches) -> Result<Command> {
-//        unimplemented!()
-//    }
-
-    pub fn run(self) -> Result<ExitCode> {
-
-//        let config = Config::default();
-//        let target =
-//            JsonCompilationDatabase::new(
-//                path::Path::new("./compile_commands.json"));
-//        let builder = Builder::new(&config, &target);
-//
-//        intercept_build(&builder, command.as_ref())
-        unimplemented!()
-    }
-
-//fn intercept_build(builder: &Builder, command: &[String]) -> Result<ExitCode> {
-//    let collector = protocol::collector::Protocol::new()
-//        .chain_err(|| "Failed to set up event collection.")?;
-//
-//    let exit = run_build(command, collector.path())
-//        .chain_err(|| "Failed to run the build.")?;
-//
-//    builder.build(collector.events())
-//        .chain_err(|| "Failed to write output.")?;
-//
-//    Ok(exit)
-//}
-//
-//fn run_build(command: &[String], destination: &path::Path) -> Result<ExitCode> {
-//    env::set_var(KEY_DESTINATION, destination);
-//
-//    let mut sender = protocol::sender::Protocol::new(destination)?;
-//    let mut build = Supervisor::new(|event| sender.send(event));
-//    let exit = build.run(command)?;
-//    info!("Build finished with status code: {}", exit);
-//    Ok(exit)
-//}
 }
 
 
@@ -394,6 +294,37 @@ fn build_command_intercept(matches: &ArgMatches) -> Result<Command> {
     Ok(Command::OntologyBuild { output, modes, command })
 }
 
+mod error {
+    error_chain! {
+        foreign_links {
+            Clap(::clap::Error);
+            Intercept(::intercept::Error);
+        }
+    }
+}
+
+mod iterator {
+    pub struct Pairs<I> {
+        inner: I,
+    }
+
+    impl<I> Pairs<I> where I: Iterator {
+        pub fn new(inner: I) -> Pairs<I> {
+            Pairs { inner }
+        }
+    }
+
+    impl<I> Iterator for Pairs<I> where I: Iterator {
+        type Item = (<I as Iterator>::Item, <I as Iterator>::Item);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match (self.inner.next(), self.inner.next()) {
+                (Some(first), Some(second)) => Some((first, second)),
+                _ => None,
+            }
+        }
+    }
+}
 
 #[cfg(test)]
 mod test {

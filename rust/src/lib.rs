@@ -43,7 +43,7 @@ pub mod supervisor;
 pub mod compilation;
 pub mod database;
 pub mod protocol;
-pub mod iterator_pairs;
+pub mod command;
 
 mod error {
     error_chain! {
