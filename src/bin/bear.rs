@@ -123,13 +123,13 @@ fn parse_supervise<'a, 'b>() -> clap::App<'a, 'b> {
             .value_name("PATH")
             .required(true))
         .arg(clap::Arg::with_name("path")
-            .long("execution-path")
+            .long("exec-path")
             .value_name("FILE"))
         .arg(clap::Arg::with_name("file")
-            .long("execution-file")
+            .long("exec-file")
             .value_name("FILE"))
         .arg(clap::Arg::with_name("search-path")
-            .long("execution-search-path")
+            .long("exec-searchpath")
             .value_name("PATH"))
         .arg(arg_command())
         .group(clap::ArgGroup::with_name("session")
@@ -344,7 +344,7 @@ mod test {
                 "bear",
                 "supervise",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-path", "cc",
+                "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
@@ -356,7 +356,7 @@ mod test {
                 "bear",
                 "supervise",
                 "--session-destination", "/tmp/bear",
-                "--execution-path", "cc",
+                "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
@@ -369,7 +369,7 @@ mod test {
                 "supervise",
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-path", "cc");
+                "--exec-path", "cc");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
 
@@ -381,8 +381,8 @@ mod test {
                 "supervise",
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-file", "/usr/bin/cc",
-                "--execution-path", "cc",
+                "--exec-file", "/usr/bin/cc",
+                "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
@@ -395,8 +395,8 @@ mod test {
                 "supervise",
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-file", "/usr/bin/cc",
-                "--execution-search-path", "/usr/bin:/usr/local/bin",
+                "--exec-file", "/usr/bin/cc",
+                "--exec-search-path", "/usr/bin:/usr/local/bin",
                 "--", "cc", "-c", "source.c");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
@@ -408,7 +408,7 @@ mod test {
                 "supervise",
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-path", "cc",
+                "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
@@ -433,7 +433,7 @@ mod test {
                 "supervise",
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
-                "--execution-file", "/usr/bin/cc",
+                "--exec-file", "/usr/bin/cc",
                 "--", "cc", "-c", "source.c");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 

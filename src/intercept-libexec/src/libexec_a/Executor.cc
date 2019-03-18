@@ -60,11 +60,12 @@ namespace {
     }
 
     size_t length(ear::Session const &session) noexcept {
-        return session.is_not_valid() ? 5 : 6;
+        return session.is_not_valid() ? 6 : 7;
     }
 
     const char **copy(ear::Session const &session, const char **it, const char **it_end) noexcept {
         *it++ = session.get_reporter();
+        *it++ = ear::SUPERVISE_COMMAND;
         *it++ = ear::FLAG_DESTINATION;
         *it++ = session.get_destination();
         *it++ = ear::FLAG_LIBRARY;

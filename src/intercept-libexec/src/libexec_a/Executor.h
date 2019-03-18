@@ -23,13 +23,15 @@
 
 namespace ear {
 
-    constexpr char FLAG_VERBOSE[]     = "--verbose";
-    constexpr char FLAG_DESTINATION[] = "--report-destination";
+    constexpr char SUPERVISE_COMMAND[] = "supervise";
+
+    constexpr char FLAG_VERBOSE[]     = "--session-verbose";
+    constexpr char FLAG_DESTINATION[] = "--session-destination";
     constexpr char FLAG_LIBRARY[]     = "--session-library";
     constexpr char FLAG_PATH[]        = "--exec-path";
     constexpr char FLAG_FILE[]        = "--exec-file";
-    constexpr char FLAG_SEARCH_PATH[] = "--exec-search_path";
-    constexpr char FLAG_COMMAND[]     = "--exec-command";
+    constexpr char FLAG_SEARCH_PATH[] = "--exec-searchpath";
+    constexpr char FLAG_COMMAND[]     = "--";
 
     class Resolver;
     class Session;

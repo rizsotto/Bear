@@ -42,29 +42,11 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_PATH, argv[5]);
-                EXPECT_STREQ(LS_PATH, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
-                EXPECT_STREQ(LS_ARGV[0], argv[8]);
-                EXPECT_STREQ(LS_ARGV[1], argv[9]);
-                EXPECT_EQ(LS_ENVP, envp);
-                return SUCCESS;
-            };
-        }
-
-        static ear::Resolver::execve_t mock_verbose_session_execve() noexcept {
-            return [](const char* path, char* const argv[], char* const envp[]) -> int {
-                EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), path);
-                EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(VERBOSE_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(VERBOSE_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_VERBOSE, argv[5]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[5]);
                 EXPECT_STREQ(ear::FLAG_PATH, argv[6]);
                 EXPECT_STREQ(LS_PATH, argv[7]);
                 EXPECT_STREQ(ear::FLAG_COMMAND, argv[8]);
@@ -75,19 +57,40 @@ namespace {
             };
         }
 
+        static ear::Resolver::execve_t mock_verbose_session_execve() noexcept {
+            return [](const char* path, char* const argv[], char* const envp[]) -> int {
+                EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), path);
+                EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), argv[0]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(VERBOSE_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(VERBOSE_SESSION.get_library(), argv[5]);
+                EXPECT_STREQ(ear::FLAG_VERBOSE, argv[6]);
+                EXPECT_STREQ(ear::FLAG_PATH, argv[7]);
+                EXPECT_STREQ(LS_PATH, argv[8]);
+                EXPECT_STREQ(ear::FLAG_COMMAND, argv[9]);
+                EXPECT_STREQ(LS_ARGV[0], argv[10]);
+                EXPECT_STREQ(LS_ARGV[1], argv[11]);
+                EXPECT_EQ(LS_ENVP, envp);
+                return SUCCESS;
+            };
+        }
+
         static ear::Resolver::execve_t mock_silent_session_execvpe() noexcept {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
-                EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
-                EXPECT_STREQ(LS_ARGV[0], argv[8]);
-                EXPECT_STREQ(LS_ARGV[1], argv[9]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[5]);
+                EXPECT_STREQ(ear::FLAG_FILE, argv[6]);
+                EXPECT_STREQ(LS_FILE, argv[7]);
+                EXPECT_STREQ(ear::FLAG_COMMAND, argv[8]);
+                EXPECT_STREQ(LS_ARGV[0], argv[9]);
+                EXPECT_STREQ(LS_ARGV[1], argv[10]);
                 EXPECT_EQ(LS_ENVP, envp);
                 return SUCCESS;
             };
@@ -97,17 +100,18 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
-                EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_SEARCH_PATH, argv[7]);
-                EXPECT_STREQ(SEARCH_PATH, argv[8]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[9]);
-                EXPECT_STREQ(LS_ARGV[0], argv[10]);
-                EXPECT_STREQ(LS_ARGV[1], argv[11]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[5]);
+                EXPECT_STREQ(ear::FLAG_FILE, argv[6]);
+                EXPECT_STREQ(LS_FILE, argv[7]);
+                EXPECT_STREQ(ear::FLAG_SEARCH_PATH, argv[8]);
+                EXPECT_STREQ(SEARCH_PATH, argv[9]);
+                EXPECT_STREQ(ear::FLAG_COMMAND, argv[10]);
+                EXPECT_STREQ(LS_ARGV[0], argv[11]);
+                EXPECT_STREQ(LS_ARGV[1], argv[12]);
                 EXPECT_EQ(LS_ENVP, envp);
                 return SUCCESS;
             };
@@ -122,15 +126,16 @@ namespace {
                       char *const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_PATH, argv[5]);
-                EXPECT_STREQ(LS_PATH, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
-                EXPECT_STREQ(LS_ARGV[0], argv[8]);
-                EXPECT_STREQ(LS_ARGV[1], argv[9]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[5]);
+                EXPECT_STREQ(ear::FLAG_PATH, argv[6]);
+                EXPECT_STREQ(LS_PATH, argv[7]);
+                EXPECT_STREQ(ear::FLAG_COMMAND, argv[8]);
+                EXPECT_STREQ(LS_ARGV[0], argv[9]);
+                EXPECT_STREQ(LS_ARGV[1], argv[10]);
                 EXPECT_EQ(LS_ENVP, envp);
                 return SUCCESS;
             };
@@ -145,15 +150,16 @@ namespace {
                       char *const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
-                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
-                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
-                EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
-                EXPECT_STREQ(LS_ARGV[0], argv[8]);
-                EXPECT_STREQ(LS_ARGV[1], argv[9]);
+                EXPECT_STREQ(ear::SUPERVISE_COMMAND, argv[1]);
+                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[2]);
+                EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[3]);
+                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[4]);
+                EXPECT_STREQ(SILENT_SESSION.get_library(), argv[5]);
+                EXPECT_STREQ(ear::FLAG_FILE, argv[6]);
+                EXPECT_STREQ(LS_FILE, argv[7]);
+                EXPECT_STREQ(ear::FLAG_COMMAND, argv[8]);
+                EXPECT_STREQ(LS_ARGV[0], argv[9]);
+                EXPECT_STREQ(LS_ARGV[1], argv[10]);
                 EXPECT_EQ(LS_ENVP, envp);
                 return SUCCESS;
             };
