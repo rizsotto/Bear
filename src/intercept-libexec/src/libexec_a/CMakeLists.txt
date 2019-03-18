@@ -17,4 +17,6 @@ set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"
         POSITION_INDEPENDENT_CODE 1)
 
-add_subdirectory(test)
+if(ENABLE_TESTING)
+    add_subdirectory(test)
+endif()

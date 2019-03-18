@@ -9,9 +9,30 @@ matrix:
     - os: linux
       sudo: false
       dist: trusty
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - CC=gcc-7
+        - CXX=g++-7
     - os: linux
       sudo: false
-      dist: precise
+      dist: trusty
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-6.0
+          packages:
+            - clang-6.0
+            - libclang-6.0-dev
+            - llvm-6.0-tools
+      env:
+        - CC=clang-6.0
+        - CXX=clang++-6.0
     - os: osx
       osx_image: xcode6.4
     - os: osx
@@ -25,8 +46,6 @@ matrix:
 addons:
   apt:
     packages:
-      - libc6-dev
-      - libgtest-dev
       - cmake
 
 before_script:
@@ -37,6 +56,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
+      brew upgrade cmake;
     fi
 
 script:

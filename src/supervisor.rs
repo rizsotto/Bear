@@ -20,13 +20,11 @@
 use std::env;
 use std::path;
 use std::process;
-use std::str;
 
 use chrono;
 
 use {Error, Result, ResultExt};
 use event::{Event, ExitCode, ProcessId};
-use environment;
 
 trait Executor {
     type Handle;
@@ -64,15 +62,18 @@ impl<F> Supervisor<F>
         Supervisor { sink }
     }
 
+    #[cfg(unix)]
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
     {
-        if cfg!(unix) {
-            debug!("Running: unix supervisor");
-            unix::ProcessHandle::run(&mut self.sink, cmd)
-        } else {
-            debug!("Running: generic supervisor");
-            generic::ProcessHandle::run(&mut self.sink, cmd)
-        }
+        debug!("Running: unix supervisor");
+        unix::ProcessHandle::run(&mut self.sink, cmd)
+    }
+
+    #[cfg(not(unix))]
+    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
+    {
+        debug!("Running: generic supervisor");
+        generic::ProcessHandle::run(&mut self.sink, cmd)
     }
 
     pub fn fake(&mut self, cmd: &[String]) -> Result<ExitCode> {
@@ -81,19 +82,23 @@ impl<F> Supervisor<F>
     }
 }
 
+#[cfg(unix)]
 pub fn get_parent_pid() -> ProcessId {
-    if cfg!(unix) {
-        std::os::unix::process::parent_id()
-    } else {
-        match env::var(environment::KEY_PARENT) {
-            Ok(value) => {
-                match value.parse() {
-                    Ok(ppid) => ppid,
-                    _ => 0,
-                }
-            },
-            _ => 0,
-        }
+    std::os::unix::process::parent_id()
+}
+
+#[cfg(not(unix))]
+pub fn get_parent_pid() -> ProcessId {
+    use environment;
+
+    match env::var(environment::KEY_PARENT) {
+        Ok(value) => {
+            match value.parse() {
+                Ok(ppid) => ppid,
+                _ => 0,
+            }
+        },
+        _ => 0,
     }
 }
 
@@ -104,6 +109,7 @@ macro_rules! slice_of_strings {
 
 #[cfg(unix)]
 mod unix {
+    use std::str;
     use std::ffi;
     use std::os::unix::io;
     use nix::fcntl;
@@ -248,7 +254,6 @@ mod unix {
         wait_flags.insert(wait::WaitPidFlag::WCONTINUED);
         wait_flags.insert(wait::WaitPidFlag::WSTOPPED);
         wait_flags.insert(wait::WaitPidFlag::WUNTRACED);
-        wait_flags.insert(wait::WaitPidFlag::__WALL);
         Some(wait_flags)
     }
 
@@ -277,7 +282,7 @@ mod unix {
             fn success() {
                 let mut sink = |_: Event| ();
 
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/true"));
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("true"));
                 assert_eq!(true, result.is_ok());
                 assert_eq!(0i32, result.unwrap());
             }
@@ -286,7 +291,7 @@ mod unix {
             fn fail() {
                 let mut sink = |_: Event| ();
 
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/false"));
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("false"));
                 assert_eq!(true, result.is_ok());
                 assert_eq!(1i32, result.unwrap());
             }
@@ -345,12 +350,12 @@ mod unix {
 
             #[test]
             fn success() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
+                assert_start_stop_events(slice_of_strings!("true"), 0i32);
             }
 
             #[test]
             fn fail() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
+                assert_start_stop_events(slice_of_strings!("false"), 1i32);
             }
 
             #[test]
@@ -373,7 +378,7 @@ mod unix {
                             _ => (&mut events).push(event),
                         }
                     };
-                    super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/sleep", "5"))
+                    super::ProcessHandle::run(&mut sink, slice_of_strings!("sleep", "5"))
                         .expect("execute sleep failed");
                 }
 
@@ -409,7 +414,7 @@ mod unix {
                         }
                         (&mut events).push(event);
                     };
-                    super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/sleep", "5"))
+                    super::ProcessHandle::run(&mut sink, slice_of_strings!("sleep", "5"))
                         .expect("execute sleep failed");
                 }
 
@@ -511,7 +516,7 @@ mod generic {
             fn success() {
                 let mut sink = |_: Event| ();
 
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/true"));
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("true"));
                 assert_eq!(true, result.is_ok());
                 assert_eq!(0i32, result.unwrap());
             }
@@ -520,7 +525,7 @@ mod generic {
             fn fail() {
                 let mut sink = |_: Event| ();
 
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("/usr/bin/false"));
+                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("false"));
                 assert_eq!(true, result.is_ok());
                 assert_eq!(1i32, result.unwrap());
             }
@@ -575,12 +580,12 @@ mod generic {
 
             #[test]
             fn success() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
+                assert_start_stop_events(slice_of_strings!("true"), 0i32);
             }
 
             #[test]
             fn fail() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
+                assert_start_stop_events(slice_of_strings!("false"), 1i32);
             }
 
             #[test]

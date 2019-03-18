@@ -22,8 +22,10 @@ project(intercept-libexec
     DESCRIPTION "Program execution library using execution wrappers."
     LANGUAGES C CXX)
 
-enable_testing()
-find_package(GTest REQUIRED)
+if(ENABLE_TESTING)
+    enable_testing()
+    find_package(GTest REQUIRED)
+endif()
 
 add_subdirectory(src)
 
