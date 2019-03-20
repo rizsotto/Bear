@@ -252,6 +252,7 @@ mod unix {
     fn wait_flags() -> Option<wait::WaitPidFlag> {
         let mut wait_flags = wait::WaitPidFlag::empty();
         wait_flags.insert(wait::WaitPidFlag::WCONTINUED);
+       #[cfg(not(target_os = "macos"))]
         wait_flags.insert(wait::WaitPidFlag::WSTOPPED);
         wait_flags.insert(wait::WaitPidFlag::WUNTRACED);
         Some(wait_flags)
