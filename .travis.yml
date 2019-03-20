@@ -6,6 +6,11 @@ matrix:
     - os: linux
       sudo: false
       dist: xenial
+      rust: stable
+    - os: linux
+      sudo: false
+      dist: xenial
+      rust: beta
     - os: linux
       sudo: false
       dist: trusty
@@ -34,13 +39,9 @@ matrix:
         - CC=clang-6.0
         - CXX=clang++-6.0
     - os: osx
-      osx_image: xcode6.4
+      osx_image: xcode9.4
     - os: osx
-      osx_image: xcode7.3
-    - os: osx
-      osx_image: xcode9.0
-    - os: osx
-      osx_image: xcode10.0
+      osx_image: xcode10.1
     - os: windows
 
 addons:
