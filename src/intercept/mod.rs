@@ -21,6 +21,74 @@ pub mod event;
 pub mod protocol;
 pub mod supervisor;
 
+use crate::Result;
+
+pub type Environment = std::collections::HashMap<String, String>;
+
+pub struct EnvironmentBuilder {}
+
+impl EnvironmentBuilder {
+
+    fn new() -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn from(_environment: &Environment) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn build(&self) -> Environment {
+        unimplemented!()
+    }
+
+    fn with_mode(&mut self, _mode: &InterceptMode) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn with_modes(&mut self, _modes: &[InterceptMode]) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn with_verbose(&mut self, _verbose: bool) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn with_destination(&mut self, _destination: &std::path::Path) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+}
+
+pub struct Executor {}
+
+impl Executor {
+
+    fn new(_sink: std::sync::mpsc::Sender<event::Event>) -> Executor {
+        unimplemented!()
+    }
+
+    fn intercept(_execution: &Execution, _environment: &Environment) -> Result<ExitCode>
+    {
+        // set environment
+        // execute command
+        // collect and send events
+        unimplemented!()
+    }
+
+    fn supervise(_execution: &Execution, _environment: &Environment) -> Result<ExitCode>
+    {
+        // set environment
+        // execute command
+        // send events
+        unimplemented!()
+    }
+
+    fn fake(_execution: &Execution) -> Result<ExitCode>
+    {
+        // send events
+        unimplemented!()
+    }
+}
+
 pub type ExitCode = i32;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,14 +98,6 @@ pub enum InterceptMode {
 }
 
 pub type InterceptModes = Vec<InterceptMode>;
-
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Session {
-    pub destination: std::path::PathBuf,
-    pub library: std::path::PathBuf,
-    pub verbose: bool,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Execution {
@@ -50,4 +110,11 @@ pub enum ExecutionTarget {
     ByFilename(std::path::PathBuf),
     WithPath(String),
     WithSearchPath(String, Vec<std::path::PathBuf>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Session {
+    pub destination: std::path::PathBuf,
+    pub library: std::path::PathBuf,
+    pub verbose: bool,
 }
