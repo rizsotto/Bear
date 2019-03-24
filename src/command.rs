@@ -20,8 +20,7 @@
 use std::path;
 
 use Result;
-use intercept::InterceptModes;
-use intercept::event::ExitCode;
+use intercept::{Execution, ExitCode, InterceptModes, Session};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -46,31 +45,7 @@ pub enum Command {
     },
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Session {
-    pub destination: path::PathBuf,
-    pub library: path::PathBuf,
-    pub verbose: bool,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Execution {
-    pub program: ExecutionTarget,
-    pub arguments: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExecutionTarget {
-    File(path::PathBuf),
-    Path(String),
-    WithSearchPath(String, Vec<path::PathBuf>),
-}
-
 impl Command {
-
-//    pub fn parse(matches: ArgMatches) -> Result<Command> {
-//        unimplemented!()
-//    }
 
     pub fn run(self) -> Result<ExitCode> {
 

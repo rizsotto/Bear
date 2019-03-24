@@ -17,12 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use chrono;
-use std::path;
+use super::ExitCode;
 
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub type ProcessId = u32;
-pub type ExitCode = i32;
 pub type SignalId = String;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -31,7 +29,7 @@ pub enum Event {
         when: DateTime,
         pid: ProcessId,
         ppid: ProcessId,
-        cwd: path::PathBuf,
+        cwd: std::path::PathBuf,
         cmd: Vec<String>,
     },
     TerminatedNormally {
@@ -66,7 +64,7 @@ impl Event {
         }
     }
 
-    pub fn to_execution(&self) -> Option<(Vec<String>, path::PathBuf)> {
+    pub fn to_execution(&self) -> Option<(Vec<String>, std::path::PathBuf)> {
         match self {
             Event::Created { cmd, cwd, .. } => Some((cmd.to_vec(), cwd.to_path_buf())),
             _ => None,

@@ -31,9 +31,9 @@ use std::env;
 use std::path;
 use std::process;
 
-use ear::command::{Command, Session, Execution, ExecutionTarget};
-use ear::intercept::{InterceptMode, InterceptModes};
-use ear::intercept::event::ExitCode;
+use ear::command::Command;
+use ear::intercept::{Execution, ExecutionTarget, InterceptMode, InterceptModes, Session};
+use ear::intercept::ExitCode;
 use clap::ArgMatches;
 
 use error::{Result, ResultExt};
@@ -180,9 +180,9 @@ fn build_execution_target(matches: &ArgMatches) -> Result<ExecutionTarget> {
             Ok(ExecutionTarget::WithSearchPath(path.to_string(), paths))
         },
         (None, None, Some(path)) =>
-            Ok(ExecutionTarget::Path(path.to_string())),
+            Ok(ExecutionTarget::WithPath(path.to_string())),
         (None, Some(file), None) =>
-            Ok(ExecutionTarget::File(path::PathBuf::from(file))),
+            Ok(ExecutionTarget::ByFilename(path::PathBuf::from(file))),
         _ =>
             Err(matches.usage().into())
     }
@@ -420,7 +420,7 @@ mod test {
                     verbose: false,
                 },
                 execution: Execution {
-                    program: ExecutionTarget::Path("cc".to_string()),
+                    program: ExecutionTarget::WithPath("cc".to_string()),
                     arguments: vec_of_strings!("cc", "-c", "source.c"),
                 }
             };
@@ -445,7 +445,7 @@ mod test {
                     verbose: false,
                 },
                 execution: Execution {
-                    program: ExecutionTarget::File(path::PathBuf::from("/usr/bin/cc")),
+                    program: ExecutionTarget::ByFilename(path::PathBuf::from("/usr/bin/cc")),
                     arguments: vec_of_strings!("cc", "-c", "source.c"),
                 }
             };

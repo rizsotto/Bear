@@ -21,6 +21,8 @@ pub mod event;
 pub mod protocol;
 pub mod supervisor;
 
+pub type ExitCode = i32;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterceptMode {
     Library(std::path::PathBuf),
@@ -28,3 +30,24 @@ pub enum InterceptMode {
 }
 
 pub type InterceptModes = Vec<InterceptMode>;
+
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Session {
+    pub destination: std::path::PathBuf,
+    pub library: std::path::PathBuf,
+    pub verbose: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct Execution {
+    pub program: ExecutionTarget,
+    pub arguments: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ExecutionTarget {
+    ByFilename(std::path::PathBuf),
+    WithPath(String),
+    WithSearchPath(String, Vec<std::path::PathBuf>),
+}

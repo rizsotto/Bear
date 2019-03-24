@@ -24,7 +24,8 @@ use std::process;
 use chrono;
 
 use crate::{Error, Result, ResultExt};
-use crate::intercept::event::{Event, ExitCode, ProcessId};
+use crate::intercept::ExitCode;
+use crate::intercept::event::{Event, ProcessId};
 
 trait Executor {
     type Handle;

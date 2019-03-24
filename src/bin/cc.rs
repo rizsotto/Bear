@@ -34,7 +34,7 @@ use std::process;
 
 use ear::Result;
 use ear::environment::{KEY_CC, KEY_DESTINATION};
-use ear::intercept::event::ExitCode;
+use ear::intercept::ExitCode;
 use ear::intercept::supervisor::Supervisor;
 use ear::intercept::protocol::sender::Protocol;
 
