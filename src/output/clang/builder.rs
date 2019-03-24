@@ -158,6 +158,6 @@ mod entry {
                     result.push(".o");
                     result
                 })
-                .unwrap_or(std::ffi::OsString::from("o")))
+                .unwrap_or_else(|| std::ffi::OsString::from("o")))
     }
 }

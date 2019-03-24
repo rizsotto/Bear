@@ -41,21 +41,22 @@ impl Iterator for FlagIterator {
     type Item = String;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
-        while let Some(flag) = self.inner.next() {
+        if let Some(flag) = self.inner.next() {
             // Skip flags which matches from the given map.
             if let Some(skip) = IGNORED_FLAGS.get(flag.as_str()) {
                 for _ in 0..*skip {
                     self.inner.next();
                 }
-                return self.next();
+                self.next()
                 // Skip linker flags too.
             } else if LINKER_FLAG.is_match(flag.as_str()) {
-                return self.next();
+                self.next()
             } else {
-                return Some(flag);
+                Some(flag)
             }
+        } else {
+            None
         }
-        None
     }
 }
 

@@ -611,7 +611,7 @@ mod fake {
         fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
             where F: FnMut(Event) -> ()
         {
-            match fake_execution(cmd.as_ref(), cwd.as_path()) {
+            match fake_execution(cmd, cwd.as_path()) {
                 Ok(_) => {
                     sink(
                         Event::Created {

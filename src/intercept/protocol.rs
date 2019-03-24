@@ -110,8 +110,8 @@ pub mod collector {
 }
 
 
-const PREFIX: &'static str = "report-";
-const SUFFIX: &'static str = ".json";
+const PREFIX: &str = "report-";
+const SUFFIX: &str = ".json";
 
 /// Read a single event file content from given source.
 fn load(path: &path::Path) -> Result<Event> {

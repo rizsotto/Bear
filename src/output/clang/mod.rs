@@ -33,7 +33,7 @@ pub trait CompilationDatabase {
 }
 
 /// Represents an entry of the compilation database.
-#[derive(Hash, Debug)]
+#[derive(Debug)]
 pub struct Entry {
     pub directory: std::path::PathBuf,
     pub file: std::path::PathBuf,

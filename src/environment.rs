@@ -17,12 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub const KEY_CC: &'static str = "INTERCEPT_CC";
-pub const KEY_CXX: &'static str = "INTERCEPT_CXX";
+pub const KEY_CC: &str = "INTERCEPT_CC";
+pub const KEY_CXX: &str = "INTERCEPT_CXX";
 
-pub const KEY_PARENT: &'static str = "INTERCEPT_PARENT_PID";
+pub const KEY_PARENT: &str = "INTERCEPT_PARENT_PID";
 
-pub const KEY_LIBRARY: &'static str = "INTERCEPT_SESSION_LIBRARY";
-pub const KEY_REPORTER: &'static str = "INTERCEPT_REPORT_COMMAND";
-pub const KEY_DESTINATION: &'static str = "INTERCEPT_REPORT_DESTINATION";
-pub const KEY_VERBOSE: &'static str = "INTERCEPT_VERBOSE";
+pub const KEY_LIBRARY: &str = "INTERCEPT_SESSION_LIBRARY";
+pub const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
+pub const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
+pub const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";

@@ -62,7 +62,7 @@ fn main() {
 }
 
 fn run() -> Result<ExitCode> {
-    drop(env_logger::init());
+    env_logger::init();
     info!("bear - {} {}", crate_name!(), crate_version!());
 
     let args = env::args().collect::<Vec<_>>();
@@ -176,7 +176,7 @@ fn build_execution_target(matches: &ArgMatches) -> Result<ExecutionTarget> {
            matches.value_of("file"),
            matches.value_of("path")) {
         (Some(sp), _, Some(path)) => {
-            let paths = sp.split(":").map(|p| path::PathBuf::from(p)).collect::<Vec<_>>();
+            let paths = sp.split(':').map(path::PathBuf::from).collect::<Vec<_>>();
             Ok(ExecutionTarget::WithSearchPath(path.to_string(), paths))
         },
         (None, None, Some(path)) =>

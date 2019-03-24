@@ -50,11 +50,11 @@ impl Classifier {
     /// `cxx_compilers` - list of C++ compiler names.
     pub fn new(only_use: bool, c_compilers: &[String], cxx_compilers: &[String]) -> Self {
         let c_compiler_names: Vec<_> = c_compilers
-            .into_iter()
+            .iter()
             .map(|path| basename(&path))
             .collect();
         let cxx_compiler_names: Vec<_> = cxx_compilers
-            .into_iter()
+            .iter()
             .map(|path| basename(&path))
             .collect();
 
@@ -96,9 +96,7 @@ impl Classifier {
                         _ => None,
                     }
                 // and 'compiler' 'parameters' is valid.
-                } else if self.is_c_compiler(&executable) {
-                    Some((executable.clone(), parameters.to_vec()))
-                } else if self.is_cxx_compiler(&executable) {
+                } else if self.is_c_compiler(&executable) || self.is_cxx_compiler(&executable) {
                     Some((executable.clone(), parameters.to_vec()))
                 } else {
                     None
@@ -178,7 +176,7 @@ fn get_mpi_call(wrapper: &str) -> Result<Vec<String>> {
         .iter()
         .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
         .find(Result::is_ok)
-        .unwrap_or(Err(ErrorKind::CompilationError("Could not determinate MPI flags.").into()))
+        .unwrap_or_else(|| Err(ErrorKind::CompilationError("Could not determinate MPI flags.").into()))
 }
 
 /// Match against a list of regex and return true if any of those were match.

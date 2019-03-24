@@ -319,7 +319,7 @@ mod db {
             .map(|entry| into(entry))
             .collect::<Result<Entries>>();
         // In case of error, let's be verbose which entries were problematic.
-        if let Err(_) = entries {
+        if entries.is_err() {
             let errors = generic_entries.iter()
                 .map(|entry| into(entry))
                 .filter_map(Result::err)
@@ -369,7 +369,7 @@ mod db {
         Ok(entries)
     }
 
-    fn write(path: &path::Path, entries: &GenericEntries) -> Result<()> {
+    fn write(path: &path::Path, entries: &[GenericEntry]) -> Result<()> {
         let file = fs::OpenOptions::new()
             .write(true)
             .truncate(true)
@@ -420,7 +420,7 @@ mod db {
             GenericEntry::ArrayEntry { directory, file, arguments, output } => {
                 let directory_path = path::PathBuf::from(directory);
                 let file_path = path::PathBuf::from(file);
-                let output_path = output.clone().map(|string| path::PathBuf::from(string));
+                let output_path = output.clone().map(path::PathBuf::from);
                 Ok(Entry {
                     directory: directory_path,
                     file: file_path,
@@ -433,7 +433,7 @@ mod db {
                     Ok(arguments) => {
                         let directory_path = path::PathBuf::from(directory);
                         let file_path = path::PathBuf::from(file);
-                        let output_path = output.clone().map(|string| path::PathBuf::from(string));
+                        let output_path = output.clone().map(path::PathBuf::from);
                         Ok(Entry {
                             directory: directory_path,
                             file: file_path,
