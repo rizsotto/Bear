@@ -20,8 +20,8 @@
 use std::path;
 
 use crate::Result;
-use crate::database::{CompilationDatabase, Entry, Entries};
-use crate::database::config::Format;
+use crate::output::clang::{CompilationDatabase, Entry, Entries};
+use crate::output::clang::config::Format;
 
 
 /// Represents a JSON compilation database file.

@@ -22,7 +22,7 @@ pub mod builder;
 pub mod file;
 
 use crate::Result;
-use crate::database::config::Format;
+use crate::output::clang::config::Format;
 
 /// Represents a compilation database.
 pub trait CompilationDatabase {

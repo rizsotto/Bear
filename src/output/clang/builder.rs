@@ -23,8 +23,8 @@ use crate::{Result, ResultExt};
 use crate::intercept::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::pass::CompilerPass;
-use crate::database::config::Config;
-use crate::database::{CompilationDatabase, Entry, Entries};
+use crate::output::clang::config::Config;
+use crate::output::clang::{CompilationDatabase, Entry, Entries};
 
 
 pub struct Builder<'a> {

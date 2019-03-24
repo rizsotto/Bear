@@ -40,7 +40,7 @@ extern crate nix;
 pub mod environment;
 pub mod intercept;
 pub mod compilation;
-pub mod database;
+pub mod output;
 pub mod command;
 
 mod error {
