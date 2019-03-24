@@ -598,7 +598,7 @@ mod generic {
 
 mod fake {
     use super::*;
-    use crate::compilation::CompilerCall;
+    use crate::semantic::c_compiler::CompilerCall;
 
     pub struct ProcessHandle {
         code: ExitCode,

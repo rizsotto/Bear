@@ -21,8 +21,8 @@ use std::path;
 
 use crate::{Result, ResultExt};
 use crate::intercept::event::Event;
-use crate::compilation::CompilerCall;
-use crate::compilation::pass::CompilerPass;
+use crate::semantic::c_compiler::CompilerCall;
+use crate::semantic::c_compiler::pass::CompilerPass;
 use crate::output::clang::config::Config;
 use crate::output::clang::{CompilationDatabase, Entry, Entries};
 

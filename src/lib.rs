@@ -39,7 +39,7 @@ extern crate nix;
 
 pub mod environment;
 pub mod intercept;
-pub mod compilation;
+pub mod semantic;
 pub mod output;
 pub mod command;
 
