@@ -21,7 +21,7 @@
 extern crate clap;
 extern crate env_logger;
 extern crate error_chain;
-extern crate intercept;
+extern crate ear;
 #[macro_use]
 extern crate log;
 
@@ -32,11 +32,11 @@ use std::env;
 use std::path;
 use std::process;
 
-use intercept::Result;
-use intercept::environment::{KEY_CC, KEY_DESTINATION};
-use intercept::event::ExitCode;
-use intercept::supervisor::Supervisor;
-use intercept::protocol::sender::Protocol;
+use ear::Result;
+use ear::environment::{KEY_CC, KEY_DESTINATION};
+use ear::event::ExitCode;
+use ear::supervisor::Supervisor;
+use ear::protocol::sender::Protocol;
 
 fn main() {
     match run() {

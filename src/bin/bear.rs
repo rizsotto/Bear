@@ -23,7 +23,7 @@ extern crate directories;
 extern crate env_logger;
 #[macro_use]
 extern crate error_chain;
-extern crate intercept;
+extern crate ear;
 #[macro_use]
 extern crate log;
 
@@ -31,8 +31,8 @@ use std::env;
 use std::path;
 use std::process;
 
-use intercept::command::{Command, Session, Execution, ExecutionTarget, InterceptMode};
-use intercept::event::ExitCode;
+use ear::command::{Command, Session, Execution, ExecutionTarget, InterceptMode};
+use ear::event::ExitCode;
 use clap::ArgMatches;
 
 use error::{Result, ResultExt};
@@ -298,7 +298,7 @@ mod error {
     error_chain! {
         foreign_links {
             Clap(::clap::Error);
-            Intercept(::intercept::Error);
+            Intercept(::ear::Error);
         }
     }
 }

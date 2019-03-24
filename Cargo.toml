@@ -12,7 +12,7 @@ include = [
 ]
 
 [lib]
-name = "intercept"
+name = "ear"
 crate-type = ["rlib"]
 path = "src/lib.rs"
 
