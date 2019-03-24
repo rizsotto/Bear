@@ -20,3 +20,11 @@
 pub mod event;
 pub mod protocol;
 pub mod supervisor;
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum InterceptMode {
+    Library(std::path::PathBuf),
+    Wrapper(String, std::path::PathBuf),
+}
+
+pub type InterceptModes = Vec<InterceptMode>;

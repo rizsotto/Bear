@@ -31,7 +31,8 @@ use std::env;
 use std::path;
 use std::process;
 
-use ear::command::{Command, Session, Execution, ExecutionTarget, InterceptMode};
+use ear::command::{Command, Session, Execution, ExecutionTarget};
+use ear::intercept::{InterceptMode, InterceptModes};
 use ear::intercept::event::ExitCode;
 use clap::ArgMatches;
 
@@ -216,8 +217,8 @@ fn build_command_configure(matches: &ArgMatches) -> Result<Command> {
     Ok(Command::InjectWrappers { modes, command })
 }
 
-fn build_intercept_modes(matches: &ArgMatches) -> Result<Vec<InterceptMode>> {
-    let mut modes: Vec<InterceptMode> = vec!();
+fn build_intercept_modes(matches: &ArgMatches) -> Result<InterceptModes> {
+    let mut modes: InterceptModes = vec!();
     if let Ok(library) = value_t!(matches, "library", path::PathBuf) {
         modes.push(InterceptMode::Library(library));
     }

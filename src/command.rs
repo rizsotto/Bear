@@ -20,6 +20,7 @@
 use std::path;
 
 use Result;
+use intercept::InterceptModes;
 use intercept::event::ExitCode;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -30,17 +31,17 @@ pub enum Command {
     },
     InjectWrappers {
         command: Vec<String>,
-        modes: Vec<InterceptMode>,
+        modes: InterceptModes,
     },
     OntologyBuild {
         output: path::PathBuf,
         command: Vec<String>,
-        modes: Vec<InterceptMode>,
+        modes: InterceptModes,
     },
     CompilationDatabaseBuild {
         output: path::PathBuf,
         command: Vec<String>,
-        modes: Vec<InterceptMode>,
+        modes: InterceptModes,
         config: path::PathBuf,
     },
 }
@@ -63,12 +64,6 @@ pub enum ExecutionTarget {
     File(path::PathBuf),
     Path(String),
     WithSearchPath(String, Vec<path::PathBuf>),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum InterceptMode {
-    Library(path::PathBuf),
-    Wrapper(String, path::PathBuf),
 }
 
 impl Command {
