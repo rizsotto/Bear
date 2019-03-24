@@ -38,11 +38,9 @@ extern crate tempfile;
 extern crate nix;
 
 pub mod environment;
-pub mod event;
-pub mod supervisor;
+pub mod intercept;
 pub mod compilation;
 pub mod database;
-pub mod protocol;
 pub mod command;
 
 mod error {

@@ -21,8 +21,8 @@ use std::fs;
 use std::path;
 use tempfile;
 
-use event::Event;
-use Result;
+use crate::intercept::event::Event;
+use crate::Result;
 
 
 pub mod sender {
@@ -138,7 +138,7 @@ fn save(target: &path::Path, event: &Event) -> Result<path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use event::ProcessId;
+    use crate::intercept::event::ProcessId;
     use std::io::Write;
 
     #[allow(unused_assignments)]

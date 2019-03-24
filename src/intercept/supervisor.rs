@@ -23,8 +23,8 @@ use std::process;
 
 use chrono;
 
-use {Error, Result, ResultExt};
-use event::{Event, ExitCode, ProcessId};
+use crate::{Error, Result, ResultExt};
+use crate::intercept::event::{Event, ExitCode, ProcessId};
 
 trait Executor {
     type Handle;
@@ -117,7 +117,6 @@ mod unix {
     use nix::sys::wait;
 
     use super::*;
-    use crate::event::{Event, ProcessId};
 
     pub struct ProcessHandle {
         pid: nix::unistd::Pid,
@@ -445,7 +444,6 @@ mod unix {
 
 mod generic {
     use super::*;
-    use crate::event::{Event, ProcessId};
 
     pub struct ProcessHandle {
         child: process::Child,
@@ -600,7 +598,6 @@ mod generic {
 
 mod fake {
     use super::*;
-    use crate::event::{Event, ProcessId};
     use crate::compilation::CompilerCall;
 
     pub struct ProcessHandle {

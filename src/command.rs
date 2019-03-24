@@ -20,7 +20,7 @@
 use std::path;
 
 use Result;
-use event::ExitCode;
+use intercept::event::ExitCode;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {

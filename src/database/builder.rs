@@ -20,7 +20,7 @@
 use std::path;
 
 use crate::{Result, ResultExt};
-use crate::event::Event;
+use crate::intercept::event::Event;
 use crate::compilation::CompilerCall;
 use crate::compilation::pass::CompilerPass;
 use crate::database::config::Config;

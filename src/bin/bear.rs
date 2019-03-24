@@ -32,7 +32,7 @@ use std::path;
 use std::process;
 
 use ear::command::{Command, Session, Execution, ExecutionTarget, InterceptMode};
-use ear::event::ExitCode;
+use ear::intercept::event::ExitCode;
 use clap::ArgMatches;
 
 use error::{Result, ResultExt};

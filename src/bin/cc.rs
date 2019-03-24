@@ -34,9 +34,9 @@ use std::process;
 
 use ear::Result;
 use ear::environment::{KEY_CC, KEY_DESTINATION};
-use ear::event::ExitCode;
-use ear::supervisor::Supervisor;
-use ear::protocol::sender::Protocol;
+use ear::intercept::event::ExitCode;
+use ear::intercept::supervisor::Supervisor;
+use ear::intercept::protocol::sender::Protocol;
 
 fn main() {
     match run() {
