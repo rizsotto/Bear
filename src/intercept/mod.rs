@@ -41,19 +41,22 @@ impl EnvironmentBuilder {
         unimplemented!()
     }
 
-    fn with_mode(&mut self, _mode: &InterceptMode) -> EnvironmentBuilder {
+    fn with_mode(&mut self, _mode: &InterceptMode) -> &mut EnvironmentBuilder {
         unimplemented!()
     }
 
-    fn with_modes(&mut self, _modes: &[InterceptMode]) -> EnvironmentBuilder {
+    fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
+        for mode in modes {
+            self.with_mode(mode);
+        }
+        self
+    }
+
+    fn with_verbose(&mut self, _verbose: bool) -> &mut EnvironmentBuilder {
         unimplemented!()
     }
 
-    fn with_verbose(&mut self, _verbose: bool) -> EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn with_destination(&mut self, _destination: &std::path::Path) -> EnvironmentBuilder {
+    fn with_destination(&mut self, _destination: &std::path::Path) -> &mut EnvironmentBuilder {
         unimplemented!()
     }
 }

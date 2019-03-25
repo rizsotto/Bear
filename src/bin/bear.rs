@@ -105,7 +105,7 @@ fn build_command(matches: ArgMatches) -> Result<Command> {
         ("intercept", Some(sub_matches)) =>
             build_command_intercept(sub_matches),
         _ =>
-            unimplemented!(),
+            Err(matches.usage().into()),
     }
 }
 

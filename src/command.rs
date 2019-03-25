@@ -20,7 +20,7 @@
 use std::path;
 
 use Result;
-use intercept::{Execution, ExitCode, InterceptModes, Session};
+use intercept::{Execution, ExitCode, InterceptModes, Session, InterceptMode};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
@@ -46,9 +46,41 @@ pub enum Command {
 }
 
 impl Command {
-
     pub fn run(self) -> Result<ExitCode> {
+        match self {
+            Command::Supervise { session, execution } =>
+                run_supervise(&session, &execution),
+            Command::InjectWrappers { command, modes } =>
+                run_inject_wrappers(&command, &modes),
+            Command::OntologyBuild { output, command, modes } =>
+                run_ontology_build(&output, &command, &modes),
+            Command::CompilationDatabaseBuild { output, command, modes, config  } =>
+                run_clang_build(&output, &command, &modes, &config),
+        }
+    }
+}
 
+fn run_supervise(_session: &Session, _execution: &Execution)
+    -> Result<ExitCode>
+{
+    unimplemented!()
+}
+
+fn run_inject_wrappers(_command: &[String], _modes: &[InterceptMode])
+    -> Result<ExitCode>
+{
+    unimplemented!()
+}
+
+fn run_ontology_build(_output: &std::path::Path, _command: &[String], _modes: &[InterceptMode])
+    -> Result<ExitCode>
+{
+    unimplemented!()
+}
+
+fn run_clang_build(_output: &std::path::Path, _command: &[String], _modes: &[InterceptMode], _cfg: &std::path::Path)
+    -> Result<ExitCode>
+{
 //        let config = Config::default();
 //        let target =
 //            JsonCompilationDatabase::new(
@@ -56,8 +88,10 @@ impl Command {
 //        let builder = Builder::new(&config, &target);
 //
 //        intercept_build(&builder, command.as_ref())
-        unimplemented!()
-    }
+
+    unimplemented!()
+}
+
 
 //fn intercept_build(builder: &Builder, command: &[String]) -> Result<ExitCode> {
 //    let collector = protocol::collector::Protocol::new()
@@ -81,4 +115,3 @@ impl Command {
 //    info!("Build finished with status code: {}", exit);
 //    Ok(exit)
 //}
-}
