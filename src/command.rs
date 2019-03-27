@@ -20,13 +20,13 @@
 use std::path;
 
 use Result;
-use intercept::{Execution, ExitCode, InterceptModes, Session, InterceptMode};
+use intercept::{ExecutionRequest, ExitCode, InterceptModes, Session, InterceptMode};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
     Supervise {
         session: Session,
-        execution: Execution,
+        execution: ExecutionRequest,
     },
     InjectWrappers {
         command: Vec<String>,
@@ -60,7 +60,7 @@ impl Command {
     }
 }
 
-fn run_supervise(_session: &Session, _execution: &Execution)
+fn run_supervise(_session: &Session, _execution: &ExecutionRequest)
     -> Result<ExitCode>
 {
     unimplemented!()

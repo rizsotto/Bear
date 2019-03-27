@@ -32,7 +32,7 @@ use std::path;
 use std::process;
 
 use ear::command::Command;
-use ear::intercept::{Execution, ExecutionTarget, InterceptMode, InterceptModes, Session};
+use ear::intercept::{ExecutionRequest, Executable, InterceptMode, InterceptModes, Session};
 use ear::intercept::ExitCode;
 use clap::ArgMatches;
 
@@ -160,29 +160,29 @@ fn arg_command<'a, 'b>() -> clap::Arg<'a, 'b> {
 fn build_command_supervise(matches: &ArgMatches) -> Result<Command> {
     let session = Session {
         destination: value_t!(matches, "destination", path::PathBuf).unwrap(),
-        library: value_t!(matches, "library", path::PathBuf).unwrap(),
         verbose: matches.is_present("verbose"),
+        modes: vec!(InterceptMode::Library(value_t!(matches, "library", path::PathBuf).unwrap())),
     };
-    let execution = Execution {
-        program: build_execution_target(matches)?,
+    let execution = ExecutionRequest {
+        executable: build_execution_target(matches)?,
         arguments: values_t!(matches, "command", String)?,
     };
 
     Ok(Command::Supervise { session, execution, })
 }
 
-fn build_execution_target(matches: &ArgMatches) -> Result<ExecutionTarget> {
+fn build_execution_target(matches: &ArgMatches) -> Result<Executable> {
     match (matches.value_of("search-path"),
            matches.value_of("file"),
            matches.value_of("path")) {
         (Some(sp), _, Some(path)) => {
             let paths = sp.split(':').map(path::PathBuf::from).collect::<Vec<_>>();
-            Ok(ExecutionTarget::WithSearchPath(path.to_string(), paths))
+            Ok(Executable::WithSearchPath(path.to_string(), paths))
         },
         (None, None, Some(path)) =>
-            Ok(ExecutionTarget::WithPath(path.to_string())),
+            Ok(Executable::WithPath(path.to_string())),
         (None, Some(file), None) =>
-            Ok(ExecutionTarget::ByFilename(path::PathBuf::from(file))),
+            Ok(Executable::WithFilename(path::PathBuf::from(file))),
         _ =>
             Err(matches.usage().into())
     }
@@ -416,11 +416,11 @@ mod test {
             let expected_command = Command::Supervise {
                 session: Session {
                     destination: path::PathBuf::from("/tmp/bear"),
-                    library: path::PathBuf::from("/usr/local/lib/libear.so"),
                     verbose: false,
+                    modes: vec!(InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so"))),
                 },
-                execution: Execution {
-                    program: ExecutionTarget::WithPath("cc".to_string()),
+                execution: ExecutionRequest {
+                    executable: Executable::WithPath("cc".to_string()),
                     arguments: vec_of_strings!("cc", "-c", "source.c"),
                 }
             };
@@ -441,11 +441,11 @@ mod test {
             let expected_command = Command::Supervise {
                 session: Session {
                     destination: path::PathBuf::from("/tmp/bear"),
-                    library: path::PathBuf::from("/usr/local/lib/libear.so"),
                     verbose: false,
+                    modes: vec!(InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so"))),
                 },
-                execution: Execution {
-                    program: ExecutionTarget::ByFilename(path::PathBuf::from("/usr/bin/cc")),
+                execution: ExecutionRequest {
+                    executable: Executable::WithFilename(path::PathBuf::from("/usr/bin/cc")),
                     arguments: vec_of_strings!("cc", "-c", "source.c"),
                 }
             };

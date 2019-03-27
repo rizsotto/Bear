@@ -24,75 +24,6 @@ pub mod supervisor;
 
 use crate::Result;
 
-pub type Environment = std::collections::HashMap<String, String>;
-
-pub struct EnvironmentBuilder {}
-
-impl EnvironmentBuilder {
-
-    fn new() -> EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn from(_environment: &Environment) -> EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn build(&self) -> Environment {
-        unimplemented!()
-    }
-
-    fn with_mode(&mut self, _mode: &InterceptMode) -> &mut EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
-        for mode in modes {
-            self.with_mode(mode);
-        }
-        self
-    }
-
-    fn with_verbose(&mut self, _verbose: bool) -> &mut EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn with_destination(&mut self, _destination: &std::path::Path) -> &mut EnvironmentBuilder {
-        unimplemented!()
-    }
-}
-
-pub struct Executor {}
-
-impl Executor {
-
-    fn new(_sink: std::sync::mpsc::Sender<event::Event>) -> Executor {
-        unimplemented!()
-    }
-
-    fn intercept(_execution: &Execution, _environment: &Environment) -> Result<ExitCode>
-    {
-        // set environment
-        // execute command
-        // collect and send events
-        unimplemented!()
-    }
-
-    fn supervise(_execution: &Execution, _environment: &Environment) -> Result<ExitCode>
-    {
-        // set environment
-        // execute command
-        // send events
-        unimplemented!()
-    }
-
-    fn fake(_execution: &Execution) -> Result<ExitCode>
-    {
-        // send events
-        unimplemented!()
-    }
-}
-
 pub type ExitCode = i32;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -104,21 +35,81 @@ pub enum InterceptMode {
 pub type InterceptModes = Vec<InterceptMode>;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Execution {
-    pub program: ExecutionTarget,
+pub struct ExecutionRequest {
+    pub executable: Executable,
     pub arguments: Vec<String>,
 }
 
+impl ExecutionRequest {
+
+    fn from_arguments(arguments: &[String]) -> Result<ExecutionRequest> {
+        unimplemented!()
+    }
+
+    fn from_spec(executable: &Executable, arguments: &[String]) -> Result<ExecutionRequest> {
+        unimplemented!()
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
-pub enum ExecutionTarget {
-    ByFilename(std::path::PathBuf),
+pub enum Executable {
+    WithFilename(std::path::PathBuf),
     WithPath(String),
     WithSearchPath(String, Vec<std::path::PathBuf>),
+}
+
+impl Executable {
+
+    fn to_absolute_path(&self) -> Result<std::path::PathBuf> {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Session {
     pub destination: std::path::PathBuf,
-    pub library: std::path::PathBuf,
     pub verbose: bool,
+    pub modes: InterceptModes,
+}
+
+impl Session {
+
+    fn to_environment(&self) -> Result<environment::Environment> {
+        unimplemented!()
+    }
+}
+
+
+mod inner {
+    use super::*;
+
+    pub struct Executor {}
+
+    impl Executor {
+        fn new(_sink: std::sync::mpsc::Sender<event::Event>) -> Executor {
+            unimplemented!()
+        }
+
+        fn intercept(_execution: &ExecutionRequest, _environment: &environment::Environment) -> Result<ExitCode>
+        {
+            // set environment
+            // execute command
+            // collect and send events
+            unimplemented!()
+        }
+
+        fn supervise(_execution: &ExecutionRequest, _environment: &environment::Environment) -> Result<ExitCode>
+        {
+            // set environment
+            // execute command
+            // send events
+            unimplemented!()
+        }
+
+        fn fake(_execution: &ExecutionRequest) -> Result<ExitCode>
+        {
+            // send events
+            unimplemented!()
+        }
+    }
 }

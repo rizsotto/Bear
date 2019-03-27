@@ -17,6 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use super::InterceptMode;
+
 pub const KEY_CC: &str = "INTERCEPT_CC";
 pub const KEY_CXX: &str = "INTERCEPT_CXX";
 
@@ -26,3 +28,42 @@ pub const KEY_LIBRARY: &str = "INTERCEPT_SESSION_LIBRARY";
 pub const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
 pub const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
 pub const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";
+
+
+pub type Environment = std::collections::HashMap<String, String>;
+
+pub struct EnvironmentBuilder {}
+
+impl EnvironmentBuilder {
+
+    fn new() -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn from(_environment: &Environment) -> EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn build(&self) -> Environment {
+        unimplemented!()
+    }
+
+    fn with_mode(&mut self, _mode: &InterceptMode) -> &mut EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
+        for mode in modes {
+            self.with_mode(mode);
+        }
+        self
+    }
+
+    fn with_verbose(&mut self, _verbose: bool) -> &mut EnvironmentBuilder {
+        unimplemented!()
+    }
+
+    fn with_destination(&mut self, _destination: &std::path::Path) -> &mut EnvironmentBuilder {
+        unimplemented!()
+    }
+}
