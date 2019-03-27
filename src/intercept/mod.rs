@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+pub mod environment;
 pub mod event;
 pub mod protocol;
 pub mod supervisor;

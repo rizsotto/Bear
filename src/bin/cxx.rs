@@ -33,7 +33,7 @@ use std::path;
 use std::process;
 
 use ear::Result;
-use ear::environment::{KEY_CXX, KEY_DESTINATION};
+use ear::intercept::environment::{KEY_CXX, KEY_DESTINATION};
 use ear::intercept::ExitCode;
 use ear::intercept::supervisor::Supervisor;
 use ear::intercept::protocol::sender::Protocol;
