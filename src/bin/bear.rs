@@ -37,7 +37,6 @@ use ear::intercept::ExitCode;
 use clap::ArgMatches;
 
 use error::{Result, ResultExt};
-use iterator::Pairs;
 
 fn main() {
     match run() {
@@ -203,10 +202,13 @@ fn args_intercept_modes<'a, 'b>() -> Vec<clap::Arg<'a, 'b>> {
             .long("library")
             .value_name("PATH")
             .display_order(50),
-        clap::Arg::with_name("wrapper")
-            .long("wrapper")
-            .value_names(&["NAME", "PATH"])
-            .multiple(true)
+        clap::Arg::with_name("wrapper_cc")
+            .long("cc-wrapper")
+            .value_names(&["COMPILER", "WRAPPER"])
+            .display_order(50),
+        clap::Arg::with_name("wrapper_cxx")
+            .long("cxx-wrapper")
+            .value_names(&["COMPILER", "WRAPPER"])
             .display_order(50),
     )
 }
@@ -222,12 +224,15 @@ fn build_intercept_modes(matches: &ArgMatches) -> Result<InterceptModes> {
     if let Ok(library) = value_t!(matches, "library", path::PathBuf) {
         modes.push(InterceptMode::Library(library));
     }
-    if let Ok(wrappers) = values_t!(matches, "wrapper", String) {
-        Pairs::new(wrappers.iter())
-            .for_each(|pair|
-                modes.push(InterceptMode::Wrapper(
-                    pair.0.to_string(),
-                    path::PathBuf::from(pair.1))))
+    if let Ok(wrapper) = values_t!(matches, "wrapper_cc", String) {
+        modes.push(InterceptMode::WrapperCC {
+            compiler: path::PathBuf::from(&wrapper[0]),
+            wrapper: path::PathBuf::from(&wrapper[1]) })
+    }
+    if let Ok(wrapper) = values_t!(matches, "wrapper_cxx", String) {
+        modes.push(InterceptMode::WrapperCXX {
+            compiler: path::PathBuf::from(&wrapper[0]),
+            wrapper: path::PathBuf::from(&wrapper[1]) })
     }
     Ok(modes)
 }
@@ -300,29 +305,6 @@ mod error {
         foreign_links {
             Clap(::clap::Error);
             Intercept(::ear::Error);
-        }
-    }
-}
-
-mod iterator {
-    pub struct Pairs<I> {
-        inner: I,
-    }
-
-    impl<I> Pairs<I> where I: Iterator {
-        pub fn new(inner: I) -> Pairs<I> {
-            Pairs { inner }
-        }
-    }
-
-    impl<I> Iterator for Pairs<I> where I: Iterator {
-        type Item = (<I as Iterator>::Item, <I as Iterator>::Item);
-
-        fn next(&mut self) -> Option<Self::Item> {
-            match (self.inner.next(), self.inner.next()) {
-                (Some(first), Some(second)) => Some((first, second)),
-                _ => None,
-            }
         }
     }
 }
@@ -472,17 +454,21 @@ mod test {
             let arguments = vec_of_strings!(
                 "bear",
                 "configure",
-                "--library", "/usr/local/lib/libear.so",
-                "--wrapper", "cc", "/usr/bin/cc",
-                "--wrapper", "cxx", "/usr/bin/c++",
+                "--library", "/usr/local/share/bear/libear.so",
+                "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
+                "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
             let expected_command = Command::InjectWrappers {
                 modes: vec!(
-                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
-                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
-                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/share/bear/libear.so")),
+                    InterceptMode::WrapperCC {
+                        compiler: path::PathBuf::from("/usr/bin/cc"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/cc") },
+                    InterceptMode::WrapperCXX {
+                        compiler: path::PathBuf::from("/usr/bin/c++"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/c++") },
                 ),
                 command: vec_of_strings!("make")
             };
@@ -514,8 +500,8 @@ mod test {
             let arguments = vec_of_strings!(
                 "bear",
                 "build",
-                "--library", "/usr/local/lib/libear.so",
-                "--wrapper", "cc", "/usr/bin/cc");
+                "--library", "/usr/local/share/bear/libear.so",
+                "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc");
             let _ = parse_arguments(arguments.as_slice()).unwrap();
         }
 
@@ -541,17 +527,21 @@ mod test {
             let arguments = vec_of_strings!(
                 "bear",
                 "build",
-                "--library", "/usr/local/lib/libear.so",
-                "--wrapper", "cc", "/usr/bin/cc",
-                "--wrapper", "cxx", "/usr/bin/c++",
+                "--library", "/usr/local/share/bear/libear.so",
+                "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
+                "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
             let expected_command = Command::CompilationDatabaseBuild {
                 modes: vec!(
-                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
-                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
-                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/share/bear/libear.so")),
+                    InterceptMode::WrapperCC {
+                        compiler: path::PathBuf::from("/usr/bin/cc"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/cc") },
+                    InterceptMode::WrapperCXX {
+                        compiler: path::PathBuf::from("/usr/bin/c++"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/c++") },
                 ),
                 command: vec_of_strings!("make"),
                 output: path::PathBuf::from("compile_commands.json"),
@@ -632,17 +622,21 @@ mod test {
             let arguments = vec_of_strings!(
                 "bear",
                 "intercept",
-                "--library", "/usr/local/lib/libear.so",
-                "--wrapper", "cc", "/usr/bin/cc",
-                "--wrapper", "cxx", "/usr/bin/c++",
+                "--library", "/usr/local/share/bear/libear.so",
+                "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
+                "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
             let command = parse_arguments(arguments.as_slice()).unwrap();
 
             let expected_command = Command::OntologyBuild {
                 modes: vec!(
-                    InterceptMode::Library(path::PathBuf::from("/usr/local/lib/libear.so")),
-                    InterceptMode::Wrapper("cc".to_string(), path::PathBuf::from("/usr/bin/cc")),
-                    InterceptMode::Wrapper("cxx".to_string(), path::PathBuf::from("/usr/bin/c++")),
+                    InterceptMode::Library(path::PathBuf::from("/usr/local/share/bear/libear.so")),
+                    InterceptMode::WrapperCC {
+                        compiler: path::PathBuf::from("/usr/bin/cc"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/cc") },
+                    InterceptMode::WrapperCXX {
+                        compiler: path::PathBuf::from("/usr/bin/c++"),
+                        wrapper: path::PathBuf::from("/usr/local/share/bear/c++") },
                 ),
                 command: vec_of_strings!("make"),
                 output: path::PathBuf::from("commands.n3"),

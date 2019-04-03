@@ -29,7 +29,8 @@ pub type ExitCode = i32;
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterceptMode {
     Library(std::path::PathBuf),
-    Wrapper(String, std::path::PathBuf),
+    WrapperCC { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
+    WrapperCXX { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
 }
 
 pub type InterceptModes = Vec<InterceptMode>;
