@@ -19,20 +19,28 @@
 
 use super::InterceptMode;
 
-pub const KEY_CC: &str = "INTERCEPT_CC";
-pub const KEY_CXX: &str = "INTERCEPT_CXX";
+pub const KEY_CC: &str = "CC";
+pub const KEY_CXX: &str = "CXX";
+
+pub const KEY_INTERCEPT_CC: &str = "INTERCEPT_CC";
+pub const KEY_INTERCEPT_CXX: &str = "INTERCEPT_CXX";
 
 pub const KEY_PARENT: &str = "INTERCEPT_PARENT_PID";
 
-pub const KEY_LIBRARY: &str = "INTERCEPT_SESSION_LIBRARY";
+pub const KEY_LIBRARY: &str = "INTERCEPT_LIBRARY";
 pub const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
 pub const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
 pub const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";
 
+pub const KEY_OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
+pub const KEY_OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
+pub const KEY_GLIBC_PRELOAD: &str = "LD_PRELOAD";
 
 pub type Environment = std::collections::HashMap<String, String>;
 
-pub struct EnvironmentBuilder {}
+pub struct EnvironmentBuilder {
+    state: Box<Environment>,
+}
 
 impl EnvironmentBuilder {
 
@@ -44,26 +52,92 @@ impl EnvironmentBuilder {
         unimplemented!()
     }
 
-    fn build(&self) -> Environment {
+    pub fn build(&self) -> Environment {
         unimplemented!()
     }
 
-    fn with_mode(&mut self, _mode: &InterceptMode) -> &mut EnvironmentBuilder {
-        unimplemented!()
-    }
-
-    fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
-        for mode in modes {
-            self.with_mode(mode);
+    pub fn with_verbose(&mut self, verbose: bool) -> &mut EnvironmentBuilder {
+        if verbose {
+            self.insert_str(KEY_VERBOSE, "1");
         }
         self
     }
 
-    fn with_verbose(&mut self, _verbose: bool) -> &mut EnvironmentBuilder {
-        unimplemented!()
+    pub fn with_destination(&mut self, destination: &std::path::Path) -> &mut EnvironmentBuilder {
+        self.insert_path(KEY_DESTINATION, destination);
+        self
     }
 
-    fn with_destination(&mut self, _destination: &std::path::Path) -> &mut EnvironmentBuilder {
-        unimplemented!()
+    pub fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
+        for mode in modes {
+            match mode {
+                InterceptMode::Library(path) => {
+                    self.insert_path(KEY_LIBRARY, path);
+                    self.insert_library(path)
+                },
+                InterceptMode::WrapperCC { compiler, wrapper, .. } => {
+                    self.insert_path(KEY_INTERCEPT_CC, compiler);
+                    self.insert_path(KEY_CC, wrapper);
+                },
+                InterceptMode::WrapperCXX { compiler, wrapper, .. } => {
+                    self.insert_path(KEY_INTERCEPT_CXX, compiler);
+                    self.insert_path(KEY_CXX, wrapper);
+                },
+            }
+        }
+        self
     }
+
+    #[cfg(any(target_os = "android",
+              target_os = "freebsd",
+              target_os = "linux"))]
+    fn insert_library(&mut self, library: &std::path::Path) {
+        self.insert_preload(KEY_GLIBC_PRELOAD, library);
+    }
+
+    #[cfg(target_os = "macos")]
+    fn insert_library(&mut self, library: &std::path::Path) {
+        self.insert_str(KEY_OSX_NAMESPACE, "1");
+        self.insert_preload(KEY_OSX_PRELOAD, library);
+    }
+
+    #[cfg(not(unix))]
+    fn insert_library(&mut self, library: &std::path::Path) {
+        info!("preload library ignored");
+    }
+
+    fn insert_preload(&mut self, key: &str, library: &std::path::Path) {
+        self.state.entry(key.to_string())
+            .and_modify(|current| {
+                *current = insert_into_paths(current, library);
+            })
+            .or_insert(library.to_string_lossy().to_string());
+    }
+
+    fn insert_path(&mut self, key: &str, value: &std::path::Path) {
+        self.insert_str(key, &value.to_string_lossy());
+    }
+
+    fn insert_str(&mut self, key: &str, value: &str) {
+        self.state.insert(key.to_string(), value.to_string());
+    }
+}
+
+fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
+    // Split up the string into paths.
+    let mut paths = std::env::split_paths(path_str)
+        .into_iter()
+        .collect::<Vec<_>>();
+    // Make sure the library is the first one in the paths.
+    if paths.len() < 1 || paths[0] != library {
+        paths.insert(0, library.to_path_buf());
+        paths.dedup();
+    }
+    // Join the paths into a string again.
+    std::env::join_paths(paths)
+        .map(|os| os.to_string_lossy().to_string())
+        .unwrap_or_else(|err| {
+            warn!("Failed to insert library into path: {}", err);
+            path_str.to_string()
+        })
 }

@@ -33,7 +33,7 @@ use std::path;
 use std::process;
 
 use ear::Result;
-use ear::intercept::environment::{KEY_CXX, KEY_DESTINATION};
+use ear::intercept::environment::{KEY_INTERCEPT_CXX, KEY_DESTINATION};
 use ear::intercept::ExitCode;
 use ear::intercept::supervisor::Supervisor;
 use ear::intercept::protocol::sender::Protocol;
@@ -71,7 +71,7 @@ fn run() -> Result<ExitCode> {
 
     let mut supervisor = Supervisor::new(|event| protocol.send(event));
 
-    match env::var(KEY_CXX) {
+    match env::var(KEY_INTERCEPT_CXX) {
         Ok(wrapper) => {
             args[0] = wrapper;
             supervisor.run(&args[..])
