@@ -18,23 +18,41 @@
  */
 
 use super::InterceptMode;
+use super::Result;
 
-pub const KEY_CC: &str = "CC";
-pub const KEY_CXX: &str = "CXX";
+const KEY_CC: &str = "CC";
+const KEY_CXX: &str = "CXX";
 
-pub const KEY_INTERCEPT_CC: &str = "INTERCEPT_CC";
-pub const KEY_INTERCEPT_CXX: &str = "INTERCEPT_CXX";
+const KEY_INTERCEPT_CC: &str = "INTERCEPT_CC";
+const KEY_INTERCEPT_CXX: &str = "INTERCEPT_CXX";
 
-pub const KEY_PARENT: &str = "INTERCEPT_PARENT_PID";
+const KEY_PARENT: &str = "INTERCEPT_PARENT_PID";
 
-pub const KEY_LIBRARY: &str = "INTERCEPT_LIBRARY";
-pub const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
-pub const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
-pub const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";
+const KEY_LIBRARY: &str = "INTERCEPT_LIBRARY";
+const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
+const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
+const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";
 
-pub const KEY_OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
-pub const KEY_OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
-pub const KEY_GLIBC_PRELOAD: &str = "LD_PRELOAD";
+const KEY_OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
+const KEY_OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
+const KEY_GLIBC_PRELOAD: &str = "LD_PRELOAD";
+
+
+pub fn target_directory() -> Result<std::path::PathBuf> {
+    std::env::var(KEY_DESTINATION)
+        .map(std::path::PathBuf::from)
+        .map_err(|e| e.into())
+}
+
+pub fn c_compiler_path() -> Result<String> {
+    std::env::var(KEY_INTERCEPT_CC)
+        .map_err(|e| e.into())
+}
+
+pub fn cxx_compiler_path() -> Result<String> {
+    std::env::var(KEY_INTERCEPT_CXX)
+        .map_err(|e| e.into())
+}
 
 pub type Environment = std::collections::HashMap<String, String>;
 

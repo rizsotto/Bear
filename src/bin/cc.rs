@@ -29,11 +29,10 @@ extern crate log;
 extern crate nix;
 
 use std::env;
-use std::path;
 use std::process;
 
 use ear::Result;
-use ear::intercept::environment::{KEY_INTERCEPT_CC, KEY_DESTINATION};
+use ear::intercept::environment;
 use ear::intercept::ExitCode;
 use ear::intercept::supervisor::Supervisor;
 use ear::intercept::protocol::sender::Protocol;
@@ -66,12 +65,12 @@ fn run() -> Result<ExitCode> {
     let mut args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let target = env::var(KEY_DESTINATION)?;
-    let mut protocol = Protocol::new(path::Path::new(target.as_str()))?;
+    let target = environment::target_directory()?;
+    let mut protocol = Protocol::new(target.as_path())?;
 
     let mut supervisor = Supervisor::new(|event| protocol.send(event));
 
-    match env::var(KEY_INTERCEPT_CC) {
+    match environment::c_compiler_path() {
         Ok(wrapper) => {
             args[0] = wrapper;
             supervisor.run(&args[..])
