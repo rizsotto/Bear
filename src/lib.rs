@@ -47,6 +47,7 @@ mod error {
         foreign_links {
             Io(::std::io::Error);
             Env(::std::env::VarError);
+            Num(::std::num::ParseIntError);
             String(::std::str::Utf8Error);
             Json(::serde_json::Error);
             Nix(::nix::Error) #[cfg(unix)];

@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use crate::Result;
 use super::InterceptMode;
-use super::Result;
 
 const KEY_CC: &str = "CC";
 const KEY_CXX: &str = "CXX";
@@ -52,6 +52,12 @@ pub fn c_compiler_path() -> Result<String> {
 pub fn cxx_compiler_path() -> Result<String> {
     std::env::var(KEY_INTERCEPT_CXX)
         .map_err(|e| e.into())
+}
+
+pub fn parent_pid() -> Result<u32> {
+    let env = std::env::var(KEY_PARENT)?;
+    let num = env.parse::<u32>()?;
+    Ok(num)
 }
 
 pub type Environment = std::collections::HashMap<String, String>;

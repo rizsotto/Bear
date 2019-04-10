@@ -90,17 +90,10 @@ pub fn get_parent_pid() -> ProcessId {
 
 #[cfg(not(unix))]
 pub fn get_parent_pid() -> ProcessId {
-    use environment;
+    use super::environment;
 
-    match env::var(environment::KEY_PARENT) {
-        Ok(value) => {
-            match value.parse() {
-                Ok(ppid) => ppid,
-                _ => 0,
-            }
-        },
-        _ => 0,
-    }
+    environment::parent_pid()
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -252,7 +245,7 @@ mod unix {
     fn wait_flags() -> Option<wait::WaitPidFlag> {
         let mut wait_flags = wait::WaitPidFlag::empty();
         wait_flags.insert(wait::WaitPidFlag::WCONTINUED);
-       #[cfg(not(target_os = "macos"))]
+        #[cfg(not(target_os = "macos"))]
         wait_flags.insert(wait::WaitPidFlag::WSTOPPED);
         wait_flags.insert(wait::WaitPidFlag::WUNTRACED);
         Some(wait_flags)
