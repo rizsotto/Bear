@@ -24,8 +24,6 @@ pub mod inner;
 
 pub use self::event::*;
 pub use self::report::*;
-pub use self::inner::*;
-
 
 use std::fmt;
 use std::error;

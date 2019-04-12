@@ -60,7 +60,7 @@ fn run() -> Result<ExitCode> {
     env_logger::init();
     info!("cxx - {} {}", crate_name!(), crate_version!());
 
-    let mut args: Vec<String> = env::args().collect();
+    let args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
     let code = report::c_compiler(args.as_ref())?;
