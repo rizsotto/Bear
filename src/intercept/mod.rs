@@ -20,97 +20,49 @@
 pub mod environment;
 pub mod event;
 pub mod protocol;
+pub mod report;
 pub mod supervisor;
+pub mod inner;
 
-use crate::Result;
+pub use self::event::*;
+pub use self::report::*;
+pub use self::inner::*;
 
-pub type ExitCode = i32;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum InterceptMode {
-    Library(std::path::PathBuf),
-    WrapperCC { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
-    WrapperCXX { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
+use std::fmt;
+use std::error;
+
+#[derive(Debug)]
+pub enum Error {
+    Configuration {
+        key: &'static str,
+    },
+    Execution {
+        program: String,
+        #[cfg(unix)]
+        cause: ::nix::Error,
+    },
 }
 
-pub type InterceptModes = Vec<InterceptMode>;
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct ExecutionRequest {
-    pub executable: Executable,
-    pub arguments: Vec<String>,
-}
-
-impl ExecutionRequest {
-
-    fn from_arguments(arguments: &[String]) -> Result<ExecutionRequest> {
-        unimplemented!()
-    }
-
-    fn from_spec(executable: &Executable, arguments: &[String]) -> Result<ExecutionRequest> {
-        unimplemented!()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Executable {
-    WithFilename(std::path::PathBuf),
-    WithPath(String),
-    WithSearchPath(String, Vec<std::path::PathBuf>),
-}
-
-impl Executable {
-
-    fn to_absolute_path(&self) -> Result<std::path::PathBuf> {
-        unimplemented!()
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Session {
-    pub destination: std::path::PathBuf,
-    pub verbose: bool,
-    pub modes: InterceptModes,
-}
-
-impl Session {
-
-    fn to_environment(&self) -> Result<environment::Environment> {
-        unimplemented!()
-    }
-}
-
-
-mod inner {
-    use super::*;
-
-    pub struct Executor {}
-
-    impl Executor {
-        fn new(_sink: std::sync::mpsc::Sender<event::Event>) -> Executor {
-            unimplemented!()
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Configuration { key} => {
+                write!(f, "Could not find {} in the current environment.", key)
+            },
+            Error::Execution { program, .. } => {
+                write!(f, "Failed to execute: {}", program)
+            }
         }
+    }
+}
 
-        fn intercept(_execution: &ExecutionRequest, _environment: &environment::Environment) -> Result<ExitCode>
-        {
-            // set environment
-            // execute command
-            // collect and send events
-            unimplemented!()
-        }
-
-        fn supervise(_execution: &ExecutionRequest, _environment: &environment::Environment) -> Result<ExitCode>
-        {
-            // set environment
-            // execute command
-            // send events
-            unimplemented!()
-        }
-
-        fn fake(_execution: &ExecutionRequest) -> Result<ExitCode>
-        {
-            // send events
-            unimplemented!()
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            #[cfg(unix)]
+            Error::Execution { cause, .. } => Some(cause),
+            _ => None,
         }
     }
 }

@@ -17,8 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use super::ExitCode;
-
+pub type ExitCode = i32;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub type ProcessId = u32;
 pub type SignalId = String;
@@ -66,8 +65,10 @@ impl Event {
 
     pub fn to_execution(&self) -> Option<(Vec<String>, std::path::PathBuf)> {
         match self {
-            Event::Created { cmd, cwd, .. } => Some((cmd.to_vec(), cwd.to_path_buf())),
-            _ => None,
+            Event::Created { cmd, cwd, .. } =>
+                Some((cmd.to_vec(), cwd.to_path_buf())),
+            _ =>
+                None,
         }
     }
 }

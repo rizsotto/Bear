@@ -33,8 +33,7 @@ use std::process;
 
 use ear::Result;
 use ear::intercept::environment;
-use ear::intercept::ExitCode;
-use ear::intercept::supervisor::Supervisor;
+use ear::intercept::{ExitCode, Supervisor};
 use ear::intercept::protocol::sender::Protocol;
 
 fn main() {

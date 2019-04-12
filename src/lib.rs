@@ -36,6 +36,7 @@ extern crate tempfile;
 
 #[cfg(unix)]
 extern crate nix;
+extern crate core;
 
 pub mod intercept;
 pub mod semantic;
