@@ -17,47 +17,43 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use crate::Result;
-use crate::intercept::InterceptMode;
+use crate::intercept::{Error, InterceptMode};
 
-const KEY_CC: &str = "CC";
-const KEY_CXX: &str = "CXX";
+pub mod get {
+    use super::*;
 
-const KEY_INTERCEPT_CC: &str = "INTERCEPT_CC";
-const KEY_INTERCEPT_CXX: &str = "INTERCEPT_CXX";
+    pub fn target_directory() -> Result<std::path::PathBuf, Error> {
+        match std::env::var(keys::DESTINATION) {
+            Ok(value) => Ok(std::path::PathBuf::from(value)),
+            Err(_) => Err(Error::Configuration { key: keys::DESTINATION }),
+        }
+    }
 
-const KEY_PARENT: &str = "INTERCEPT_PARENT_PID";
+    pub fn c_compiler_path() -> Result<String, Error> {
+        match std::env::var(keys::INTERCEPT_CC) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Error::Configuration { key: keys::INTERCEPT_CC }),
+        }
+    }
 
-const KEY_LIBRARY: &str = "INTERCEPT_LIBRARY";
-const KEY_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
-const KEY_DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
-const KEY_VERBOSE: &str = "INTERCEPT_VERBOSE";
+    pub fn cxx_compiler_path() -> Result<String, Error> {
+        match std::env::var(keys::INTERCEPT_CXX) {
+            Ok(value) => Ok(value),
+            Err(_) => Err(Error::Configuration { key: keys::INTERCEPT_CXX }),
+        }
+    }
 
-const KEY_OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
-const KEY_OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
-const KEY_GLIBC_PRELOAD: &str = "LD_PRELOAD";
-
-
-pub fn target_directory() -> Result<std::path::PathBuf> {
-    std::env::var(KEY_DESTINATION)
-        .map(std::path::PathBuf::from)
-        .map_err(|e| e.into())
-}
-
-pub fn c_compiler_path() -> Result<String> {
-    std::env::var(KEY_INTERCEPT_CC)
-        .map_err(|e| e.into())
-}
-
-pub fn cxx_compiler_path() -> Result<String> {
-    std::env::var(KEY_INTERCEPT_CXX)
-        .map_err(|e| e.into())
-}
-
-pub fn parent_pid() -> Result<u32> {
-    let env = std::env::var(KEY_PARENT)?;
-    let num = env.parse::<u32>()?;
-    Ok(num)
+    pub fn parent_pid() -> Result<u32, Error> {
+        match std::env::var(keys::PARENT_PID) {
+            Ok(value) => {
+                match value.parse::<u32>() {
+                    Ok(num) => Ok(num),
+                    Err(_) => Err(Error::Configuration { key: keys::PARENT_PID }),
+                }
+            },
+            Err(_) => Err(Error::Configuration { key: keys::PARENT_PID }),
+        }
+    }
 }
 
 pub type Environment = std::collections::HashMap<String, String>;
@@ -82,13 +78,13 @@ impl EnvironmentBuilder {
 
     pub fn with_verbose(&mut self, verbose: bool) -> &mut EnvironmentBuilder {
         if verbose {
-            self.insert_str(KEY_VERBOSE, "1");
+            self.insert_str(keys::VERBOSE, "1");
         }
         self
     }
 
     pub fn with_destination(&mut self, destination: &std::path::Path) -> &mut EnvironmentBuilder {
-        self.insert_path(KEY_DESTINATION, destination);
+        self.insert_path(keys::DESTINATION, destination);
         self
     }
 
@@ -96,16 +92,16 @@ impl EnvironmentBuilder {
         for mode in modes {
             match mode {
                 InterceptMode::Library(path) => {
-                    self.insert_path(KEY_LIBRARY, path);
+                    self.insert_path(keys::INTERCEPT_LIBRARY, path);
                     self.insert_library(path)
                 },
                 InterceptMode::WrapperCC { compiler, wrapper, .. } => {
-                    self.insert_path(KEY_INTERCEPT_CC, compiler);
-                    self.insert_path(KEY_CC, wrapper);
+                    self.insert_path(keys::INTERCEPT_CC, compiler);
+                    self.insert_path(keys::CC, wrapper);
                 },
                 InterceptMode::WrapperCXX { compiler, wrapper, .. } => {
-                    self.insert_path(KEY_INTERCEPT_CXX, compiler);
-                    self.insert_path(KEY_CXX, wrapper);
+                    self.insert_path(keys::INTERCEPT_CXX, compiler);
+                    self.insert_path(keys::CXX, wrapper);
                 },
             }
         }
@@ -116,13 +112,13 @@ impl EnvironmentBuilder {
               target_os = "freebsd",
               target_os = "linux"))]
     fn insert_library(&mut self, library: &std::path::Path) {
-        self.insert_preload(KEY_GLIBC_PRELOAD, library);
+        self.insert_preload(keys::GLIBC_PRELOAD, library);
     }
 
     #[cfg(target_os = "macos")]
     fn insert_library(&mut self, library: &std::path::Path) {
-        self.insert_str(KEY_OSX_NAMESPACE, "1");
-        self.insert_preload(KEY_OSX_PRELOAD, library);
+        self.insert_str(keys::OSX_NAMESPACE, "1");
+        self.insert_preload(keys::OSX_PRELOAD, library);
     }
 
     #[cfg(not(unix))]
@@ -164,4 +160,21 @@ fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
             warn!("Failed to insert library into path: {}", err);
             path_str.to_string()
         })
+}
+
+mod keys {
+    pub const OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
+    pub const OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
+    pub const GLIBC_PRELOAD: &str = "LD_PRELOAD";
+
+    pub const CC: &str = "CC";
+    pub const CXX: &str = "CXX";
+
+    pub const INTERCEPT_CC: &str = "INTERCEPT_CC";
+    pub const INTERCEPT_CXX: &str = "INTERCEPT_CXX";
+    pub const INTERCEPT_LIBRARY: &str = "INTERCEPT_LIBRARY";
+    pub const REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
+    pub const DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
+    pub const VERBOSE: &str = "INTERCEPT_VERBOSE";
+    pub const PARENT_PID: &str = "INTERCEPT_PARENT_PID";
 }

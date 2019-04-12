@@ -25,7 +25,7 @@ use chrono;
 
 use crate::{Error, Result, ResultExt};
 use crate::intercept::ExitCode;
-use crate::intercept::event::{Event, ProcessId};
+use crate::intercept::{Event, ProcessId};
 
 trait Executor {
     type Handle;
@@ -92,7 +92,7 @@ pub fn get_parent_pid() -> ProcessId {
 pub fn get_parent_pid() -> ProcessId {
     use super::environment;
 
-    environment::parent_pid()
+    environment::get::parent_pid()
         .unwrap_or(0)
 }
 
