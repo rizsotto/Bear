@@ -91,9 +91,10 @@ impl EnvironmentBuilder {
     pub fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
         for mode in modes {
             match mode {
-                InterceptMode::Library(path) => {
-                    self.insert_path(keys::INTERCEPT_LIBRARY, path);
-                    self.insert_library(path)
+                InterceptMode::WrapperPreload { library, wrapper } => {
+                    self.insert_path(keys::INTERCEPT_LIBRARY, library);
+                    self.insert_path(keys::INTERCEPT_REPORTER, wrapper);
+                    self.insert_library(library)
                 },
                 InterceptMode::WrapperCC { compiler, wrapper, .. } => {
                     self.insert_path(keys::INTERCEPT_CC, compiler);
@@ -163,8 +164,15 @@ fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
 }
 
 mod keys {
+    #[cfg(target_os = "macos")]
     pub const OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
+
+    #[cfg(target_os = "macos")]
     pub const OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
+
+    #[cfg(any(target_os = "android",
+    target_os = "freebsd",
+    target_os = "linux"))]
     pub const GLIBC_PRELOAD: &str = "LD_PRELOAD";
 
     pub const CC: &str = "CC";
@@ -173,7 +181,7 @@ mod keys {
     pub const INTERCEPT_CC: &str = "INTERCEPT_CC";
     pub const INTERCEPT_CXX: &str = "INTERCEPT_CXX";
     pub const INTERCEPT_LIBRARY: &str = "INTERCEPT_LIBRARY";
-    pub const REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
+    pub const INTERCEPT_REPORTER: &str = "INTERCEPT_REPORT_COMMAND";
     pub const DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
     pub const VERBOSE: &str = "INTERCEPT_VERBOSE";
     pub const PARENT_PID: &str = "INTERCEPT_PARENT_PID";

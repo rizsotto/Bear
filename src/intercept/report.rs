@@ -66,7 +66,7 @@ pub fn wrapper(_execution: &ExecutionRequest, _session: &Session) -> Result<Exit
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InterceptMode {
-    Library(std::path::PathBuf),
+    WrapperPreload { wrapper: std::path::PathBuf, library: std::path::PathBuf },
     WrapperCC { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
     WrapperCXX { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
 }
