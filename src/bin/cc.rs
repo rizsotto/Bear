@@ -32,9 +32,8 @@ use std::env;
 use std::process;
 
 use ear::Result;
-use ear::intercept::environment;
-use ear::intercept::{ExitCode, Supervisor};
-use ear::intercept::protocol::sender::Protocol;
+use ear::intercept::report;
+use ear::intercept::ExitCode;
 
 fn main() {
     match run() {
@@ -64,18 +63,6 @@ fn run() -> Result<ExitCode> {
     let mut args: Vec<String> = env::args().collect();
     debug!("invocation: {:?}", &args);
 
-    let target = environment::target_directory()?;
-    let mut protocol = Protocol::new(target.as_path())?;
-
-    let mut supervisor = Supervisor::new(|event| protocol.send(event));
-
-    match environment::c_compiler_path() {
-        Ok(wrapper) => {
-            args[0] = wrapper;
-            supervisor.run(&args[..])
-        },
-        Err(_) => {
-            supervisor.fake(&args[..])
-        },
-    }
+    let code = report::c_compiler(args.as_ref())?;
+    Ok(code)
 }

@@ -18,7 +18,7 @@
  */
 
 use crate::Result;
-use super::InterceptMode;
+use crate::intercept::InterceptMode;
 
 const KEY_CC: &str = "CC";
 const KEY_CXX: &str = "CXX";

@@ -52,6 +52,7 @@ mod error {
             String(::std::str::Utf8Error);
             Json(::serde_json::Error);
             Nix(::nix::Error) #[cfg(unix)];
+            Intercept(crate::intercept::Error);
         }
 
         errors {

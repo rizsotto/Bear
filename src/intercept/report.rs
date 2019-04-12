@@ -20,10 +20,42 @@
 use super::*;
 
 pub fn c_compiler(_args: &[String]) -> Result<ExitCode, Error> {
+
+//    let target = environment::target_directory()?;
+//    let mut protocol = Protocol::new(target.as_path())?;
+//
+//    let mut supervisor = Supervisor::new(|event| protocol.send(event));
+//
+//    match environment::c_compiler_path() {
+//        Ok(wrapper) => {
+//            args[0] = wrapper;
+//            supervisor.run(&args[..])
+//        },
+//        Err(_) => {
+//            supervisor.fake(&args[..])
+//        },
+//    }
+
     unimplemented!()
 }
 
 pub fn cxx_compiler(_args: &[String]) -> Result<ExitCode, Error> {
+
+//    let target = environment::target_directory()?;
+//    let mut protocol = Protocol::new(target.as_path())?;
+//
+//    let mut supervisor = Supervisor::new(|event| protocol.send(event));
+//
+//    match environment::cxx_compiler_path() {
+//        Ok(wrapper) => {
+//            args[0] = wrapper;
+//            supervisor.run(&args[..])
+//        },
+//        Err(_) => {
+//            supervisor.fake(&args[..])
+//        },
+//    }
+
     unimplemented!()
 }
 
