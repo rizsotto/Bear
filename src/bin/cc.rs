@@ -20,7 +20,6 @@
 #[macro_use]
 extern crate clap;
 extern crate env_logger;
-extern crate error_chain;
 extern crate ear;
 #[macro_use]
 extern crate log;
@@ -30,6 +29,7 @@ extern crate nix;
 
 use std::env;
 use std::process;
+use std::error::Error;
 
 use ear::Result;
 use ear::intercept::report;
@@ -40,16 +40,10 @@ fn main() {
         Ok(code) => {
             process::exit(code);
         },
-        Err(ref e) => {
+        Err(e) => {
             eprintln!("error: {}", e);
-
-            for e in e.iter().skip(1) {
-                eprintln!("caused by: {}", e);
-            }
-
-            // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
-            if let Some(backtrace) = e.backtrace() {
-                eprintln!("backtrace: {:?}", backtrace);
+            if let Some(source) = e.source() {
+                eprintln!("caused by: {}", source);
             }
             process::exit(1);
         },
