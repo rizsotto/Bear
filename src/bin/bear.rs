@@ -68,12 +68,12 @@ fn run() -> Result<ExitCode> {
     let args = env::args().collect::<Vec<_>>();
     debug!("invocation: {:?}", &args);
 
-    parse_arguments(args.as_slice())
+    let program = env::current_exe()?;
+    parse_arguments(program.as_path(), args.as_slice())
         .and_then(|command| command.run().map_err(|err| err.into()))
 }
 
-fn parse_arguments(args: &[String]) -> Result<Command> {
-    let program = path::PathBuf::from(&args[0]);
+fn parse_arguments(program: &path::Path, args: &[String]) -> Result<Command> {
     let default_config = default_config_file();
     let matches = clap::App::new(crate_name!())
         .version(crate_version!())
@@ -90,7 +90,7 @@ fn parse_arguments(args: &[String]) -> Result<Command> {
         ])
         .get_matches_from_safe(args)?;
 
-    build_command(matches, program.as_ref())
+    build_command(matches, program)
         .chain_err(|| "")
 }
 
@@ -312,6 +312,7 @@ fn build_command_intercept(matches: &ArgMatches, program: &path::Path) -> Result
 mod error {
     error_chain! {
         foreign_links {
+            IO(::std::io::Error);
             Clap(::clap::Error);
             Intercept(::ear::Error);
         }
@@ -326,83 +327,81 @@ mod test {
         ($($x:expr),*) => (vec![$($x.to_string()),*]);
     }
 
+    const PROGRAM: &str = "bear";
+
     mod supervise_command {
         use super::*;
+
+        const COMMAND: &str = "supervise";
 
         #[test]
         #[should_panic]
         fn missing_destination() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         #[should_panic]
         fn missing_libray() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         #[should_panic]
         fn missing_command() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-path", "cc");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         #[should_panic]
         fn conflict_file_and_path() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-file", "/usr/bin/cc",
                 "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         #[should_panic]
         fn conflict_file_and_search_path() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-file", "/usr/bin/cc",
                 "--exec-search-path", "/usr/bin:/usr/local/bin",
                 "--", "cc", "-c", "source.c");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         fn parsed_with_path() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-path", "cc",
                 "--", "cc", "-c", "source.c");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::Supervise {
                 session: Session {
@@ -411,7 +410,7 @@ mod test {
                     modes: vec!(
                         InterceptMode::WrapperPreload {
                             library: path::PathBuf::from("/usr/local/lib/libear.so"),
-                            wrapper: path::PathBuf::from("bear"),
+                            wrapper: path::PathBuf::from(PROGRAM),
                         }),
                 },
                 execution: ExecutionRequest {
@@ -425,13 +424,12 @@ mod test {
         #[test]
         fn parsed_with_file() {
             let arguments = vec_of_strings!(
-                "bear",
-                "supervise",
+                PROGRAM, COMMAND,
                 "--session-destination", "/tmp/bear",
                 "--session-library", "/usr/local/lib/libear.so",
                 "--exec-file", "/usr/bin/cc",
                 "--", "cc", "-c", "source.c");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::Supervise {
                 session: Session {
@@ -440,7 +438,7 @@ mod test {
                     modes: vec!(
                         InterceptMode::WrapperPreload {
                             library: path::PathBuf::from("/usr/local/lib/libear.so"),
-                            wrapper: path::PathBuf::from("bear"),
+                            wrapper: path::PathBuf::from(PROGRAM),
                         }),
                 },
                 execution: ExecutionRequest {
@@ -455,33 +453,33 @@ mod test {
     mod configure_command {
         use super::*;
 
+        const COMMAND: &str = "configure";
+
         #[test]
         #[should_panic]
         fn missing_command() {
             let arguments = vec_of_strings!(
-                "bear",
-                "configure",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/lib/libear.so",
                 "--wrapper", "cc", "/usr/bin/cc");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         fn parsed_with_modes() {
             let arguments = vec_of_strings!(
-                "bear",
-                "configure",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/share/bear/libear.so",
                 "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
                 "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::InjectWrappers {
                 modes: vec!(
                     InterceptMode::WrapperPreload {
                         library: path::PathBuf::from("/usr/local/share/bear/libear.so"),
-                        wrapper: path::PathBuf::from("bear"),
+                        wrapper: path::PathBuf::from(PROGRAM),
                     },
                     InterceptMode::WrapperCC {
                         compiler: path::PathBuf::from("/usr/bin/cc"),
@@ -500,10 +498,9 @@ mod test {
         #[test]
         fn parsed_without_modes() {
             let arguments = vec_of_strings!(
-                "bear",
-                "configure",
+                PROGRAM, COMMAND,
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::InjectWrappers {
                 modes: vec!(),
@@ -516,24 +513,24 @@ mod test {
     mod build_command {
         use super::*;
 
+        const COMMAND: &str = "build";
+
         #[test]
         #[should_panic]
         fn missing_command() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/share/bear/libear.so",
                 "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         fn parsed_simple() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::CompilationDatabaseBuild {
                 modes: vec!(),
@@ -547,19 +544,18 @@ mod test {
         #[test]
         fn parsed_with_modes() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/share/bear/libear.so",
                 "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
                 "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::CompilationDatabaseBuild {
                 modes: vec!(
                     InterceptMode::WrapperPreload {
                         library: path::PathBuf::from("/usr/local/share/bear/libear.so"),
-                        wrapper: path::PathBuf::from("bear"),
+                        wrapper: path::PathBuf::from(PROGRAM),
                     },
                     InterceptMode::WrapperCC {
                         compiler: path::PathBuf::from("/usr/bin/cc"),
@@ -580,11 +576,10 @@ mod test {
         #[test]
         fn parsed_with_output() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "-o", "commands.json",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::CompilationDatabaseBuild {
                 modes: vec!(),
@@ -598,11 +593,10 @@ mod test {
         #[test]
         fn parsed_with_config() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "-c", "/path/to/bear.conf",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::CompilationDatabaseBuild {
                 modes: vec!(),
@@ -617,24 +611,24 @@ mod test {
     mod intercept_command {
         use super::*;
 
+        const COMMAND: &str = "intercept";
+
         #[test]
         #[should_panic]
         fn missing_command() {
             let arguments = vec_of_strings!(
-                "bear",
-                "build",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/lib/libear.so",
                 "--wrapper", "cc", "/usr/bin/cc");
-            let _ = parse_arguments(arguments.as_slice()).unwrap();
+            let _ = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
         }
 
         #[test]
         fn parsed_simple() {
             let arguments = vec_of_strings!(
-                "bear",
-                "intercept",
+                PROGRAM, COMMAND,
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::OntologyBuild {
                 modes: vec!(),
@@ -647,19 +641,18 @@ mod test {
         #[test]
         fn parsed_with_modes() {
             let arguments = vec_of_strings!(
-                "bear",
-                "intercept",
+                PROGRAM, COMMAND,
                 "--library", "/usr/local/share/bear/libear.so",
                 "--cc-wrapper", "/usr/bin/cc", "/usr/local/share/bear/cc",
                 "--cxx-wrapper", "/usr/bin/c++", "/usr/local/share/bear/c++",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::OntologyBuild {
                 modes: vec!(
                     InterceptMode::WrapperPreload {
                         library: path::PathBuf::from("/usr/local/share/bear/libear.so"),
-                        wrapper: path::PathBuf::from("bear"),
+                        wrapper: path::PathBuf::from(PROGRAM),
                     },
                     InterceptMode::WrapperCC {
                         compiler: path::PathBuf::from("/usr/bin/cc"),
@@ -679,11 +672,10 @@ mod test {
         #[test]
         fn parsed_with_output() {
             let arguments = vec_of_strings!(
-                "bear",
-                "intercept",
+                PROGRAM, COMMAND,
                 "-o", "commands.json",
                 "--", "make");
-            let command = parse_arguments(arguments.as_slice()).unwrap();
+            let command = parse_arguments(path::Path::new(PROGRAM), arguments.as_slice()).unwrap();
 
             let expected_command = Command::OntologyBuild {
                 modes: vec!(),
