@@ -145,7 +145,7 @@ impl Classifier {
 fn shell_split(string: &str) -> Result<Vec<String>> {
     match shellwords::split(string) {
         Ok(value) => Ok(value),
-        _ => bail!(ErrorKind::RuntimeError("Can't parse shell command")),
+        _ => Err("Can't parse shell command".into()),
     }
 }
 
@@ -164,10 +164,10 @@ fn get_mpi_call(wrapper: &str) -> Result<Vec<String>> {
             let output_string = str::from_utf8(output.stdout.as_slice())?;
             match output_string.lines().next() {
                 Some(first_line) => shell_split(first_line),
-                _ => bail!(ErrorKind::RuntimeError("Empty output of wrapper")),
+                _ => Err("Empty output of wrapper".into()),
             }
         } else {
-            bail!(ErrorKind::RuntimeError("Process failed."))
+            Err("Process failed.".into())
         }
     }
 
@@ -176,7 +176,7 @@ fn get_mpi_call(wrapper: &str) -> Result<Vec<String>> {
         .iter()
         .map(|&query_flatg| run_mpi_wrapper(wrapper, &query_flatg))
         .find(Result::is_ok)
-        .unwrap_or_else(|| Err(ErrorKind::CompilationError("Could not determinate MPI flags.").into()))
+        .unwrap_or_else(|| Err("Could not determinate MPI flags.".into()))
 }
 
 /// Match against a list of regex and return true if any of those were match.

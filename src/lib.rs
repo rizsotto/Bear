@@ -54,18 +54,6 @@ mod error {
             Nix(::nix::Error) #[cfg(unix)];
             Intercept(crate::intercept::Error);
         }
-
-        errors {
-            CompilationError(msg: &'static str) {
-                description("compilation error"),
-                display("compilation error: '{}'", msg),
-            }
-
-            RuntimeError(msg: &'static str) {
-                description("runtime error"),
-                display("runtime error: '{}'", msg),
-            }
-        }
     }
 }
 
