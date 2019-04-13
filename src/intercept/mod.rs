@@ -43,7 +43,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Configuration { key} => {
+            Error::Configuration { key, .. } => {
                 write!(f, "Could not find {} in the current environment.", key)
             },
             Error::Execution { program, .. } => {

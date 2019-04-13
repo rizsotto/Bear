@@ -21,8 +21,6 @@
 extern crate clap;
 extern crate directories;
 extern crate env_logger;
-#[macro_use]
-extern crate error_chain;
 extern crate ear;
 #[macro_use]
 extern crate log;
@@ -36,27 +34,20 @@ use ear::intercept::{ExecutionRequest, Executable, InterceptMode, InterceptModes
 use ear::intercept::ExitCode;
 use clap::ArgMatches;
 
-use error::{Result, ResultExt};
-use ear::intercept::report::wrapper;
+use error::Result;
+use std::error::Error;
 
 fn main() {
     match run() {
         Ok(code) => {
             process::exit(code);
         },
-        Err(ref e) => {
-            eprintln!("{}", e);
-
-            for e in e.iter().skip(1) {
-                eprintln!("caused by: {}", e);
+        Err(e) => {
+            eprintln!("bear: {}", e);
+            if let Some(source) = e.source() {
+                eprintln!("caused by: {}", source);
             }
-
-            // The backtrace is not always generated. Try to run this with `RUST_BACKTRACE=1`.
-            if let Some(backtrace) = e.backtrace() {
-                eprintln!("backtrace: {:?}", backtrace);
-            }
-
-            ::std::process::exit(1);
+            process::exit(1);
         },
     }
 }
@@ -69,8 +60,9 @@ fn run() -> Result<ExitCode> {
     debug!("invocation: {:?}", &args);
 
     let program = env::current_exe()?;
-    parse_arguments(program.as_path(), args.as_slice())
-        .and_then(|command| command.run().map_err(|err| err.into()))
+    let command = parse_arguments(program.as_path(), args.as_slice())?;
+    let exit_code = command.run()?;
+    Ok(exit_code)
 }
 
 fn parse_arguments(program: &path::Path, args: &[String]) -> Result<Command> {
@@ -91,7 +83,6 @@ fn parse_arguments(program: &path::Path, args: &[String]) -> Result<Command> {
         .get_matches_from_safe(args)?;
 
     build_command(matches, program)
-        .chain_err(|| "")
 }
 
 fn build_command(matches: ArgMatches, program: &path::Path) -> Result<Command> {
@@ -310,13 +301,73 @@ fn build_command_intercept(matches: &ArgMatches, program: &path::Path) -> Result
 }
 
 mod error {
-    error_chain! {
-        foreign_links {
-            IO(::std::io::Error);
-            Clap(::clap::Error);
-            Intercept(::ear::Error);
+
+    use std::fmt;
+    use std::error;
+
+    #[derive(Debug)]
+    pub enum BearError {
+        Runtime(String),
+        Configuration(::clap::Error),
+        Intercept(::ear::Error),
+        Io(::std::io::Error),
+    }
+
+    impl fmt::Display for BearError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                BearError::Runtime(ref message) => {
+                    write!(f, "{}", message)
+                },
+                BearError::Configuration(_) => {
+                    write!(f, "Invocation problem.")
+                },
+                BearError::Intercept(_) => {
+                    write!(f, "Failed to intercept build.")
+                },
+                BearError::Io(_) => {
+                    write!(f, "Could not get current executable path.")
+                },
+            }
         }
     }
+
+    impl error::Error for BearError {
+        fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+            match self {
+                BearError::Configuration(cause) => Some(cause),
+                BearError::Intercept(cause) => Some(cause),
+                BearError::Io(cause) => Some(cause),
+                _ => None,
+            }
+        }
+    }
+
+    impl From<&str> for BearError {
+        fn from(message: &str) -> Self {
+            BearError::Runtime(message.to_string())
+        }
+    }
+
+    impl From<::clap::Error> for BearError {
+        fn from(err: ::clap::Error) -> Self {
+            BearError::Configuration(err)
+        }
+    }
+
+    impl From<::ear::Error> for BearError {
+        fn from(err: ::ear::Error) -> Self {
+            BearError::Intercept(err)
+        }
+    }
+
+    impl From<::std::io::Error> for BearError {
+        fn from(err: ::std::io::Error) -> Self {
+            BearError::Io(err)
+        }
+    }
+
+    pub type Result<T> = std::result::Result<T, BearError>;
 }
 
 #[cfg(test)]
