@@ -40,13 +40,14 @@ extern crate core;
 
 pub mod intercept;
 pub mod semantic;
-pub mod output;
+pub mod io;
 pub mod command;
 
 mod error {
     error_chain! {
         links {
             Intercept(crate::intercept::Error, crate::intercept::ErrorKind);
+            Io(crate::io::Error, crate::io::ErrorKind);
             Semantic(crate::semantic::Error, crate::semantic::ErrorKind);
         }
     }
