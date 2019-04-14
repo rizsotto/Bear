@@ -89,9 +89,9 @@ pub fn get_parent_pid() -> ProcessId {
 
 #[cfg(not(unix))]
 pub fn get_parent_pid() -> ProcessId {
-    use super::environment;
+    use super::env;
 
-    environment::get::parent_pid()
+    env::get::parent_pid()
         .unwrap_or(0)
 }
 

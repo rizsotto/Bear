@@ -19,39 +19,40 @@
 
 use super::super::InterceptMode;
 
-pub type Environment = std::collections::HashMap<String, String>;
+pub type Vars = std::collections::HashMap<String, String>;
 
-pub struct EnvironmentBuilder {
-    state: Box<Environment>,
+pub struct Builder {
+    state: Box<Vars>,
 }
 
-impl EnvironmentBuilder {
+impl Builder {
 
-    fn new() -> EnvironmentBuilder {
-        unimplemented!()
+    pub fn new() -> Builder {
+        let environment = std::env::vars().collect();
+        Builder::from(environment)
     }
 
-    fn from(_environment: &Environment) -> EnvironmentBuilder {
-        unimplemented!()
+    pub fn from(environment: Vars) -> Builder {
+        Builder { state: Box::new(environment) }
     }
 
-    pub fn build(&self) -> Environment {
-        unimplemented!()
+    pub fn build(self) -> Vars {
+        *self.state
     }
 
-    pub fn with_verbose(&mut self, verbose: bool) -> &mut EnvironmentBuilder {
+    pub fn with_verbose(mut self, verbose: bool) -> Builder {
         if verbose {
             self.insert_str(keys::VERBOSE, "1");
         }
         self
     }
 
-    pub fn with_destination(&mut self, destination: &std::path::Path) -> &mut EnvironmentBuilder {
+    pub fn with_destination(mut self, destination: &std::path::Path) -> Builder {
         self.insert_path(keys::DESTINATION, destination);
         self
     }
 
-    pub fn with_modes(&mut self, modes: &[InterceptMode]) -> &mut EnvironmentBuilder {
+    pub fn with_modes(mut self, modes: &[InterceptMode]) -> Builder {
         for mode in modes {
             match mode {
                 InterceptMode::WrapperPreload { library, wrapper } => {
@@ -111,12 +112,10 @@ fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
     // Split up the string into paths.
     let mut paths = std::env::split_paths(path_str)
         .into_iter()
+        .filter(|candidate| candidate != library)
         .collect::<Vec<_>>();
     // Make sure the library is the first one in the paths.
-    if paths.len() < 1 || paths[0] != library {
-        paths.insert(0, library.to_path_buf());
-        paths.dedup();
-    }
+    paths.insert(0, library.to_path_buf());
     // Join the paths into a string again.
     std::env::join_paths(paths)
         .map(|os| os.to_string_lossy().to_string())
@@ -158,15 +157,9 @@ pub mod get {
 }
 
 mod keys {
-    #[cfg(target_os = "macos")]
     pub const OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
-
-    #[cfg(target_os = "macos")]
     pub const OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
 
-    #[cfg(any(target_os = "android",
-    target_os = "freebsd",
-    target_os = "linux"))]
     pub const GLIBC_PRELOAD: &str = "LD_PRELOAD";
 
     pub const CC: &str = "CC";
@@ -179,4 +172,123 @@ mod keys {
     pub const DESTINATION: &str = "INTERCEPT_REPORT_DESTINATION";
     pub const VERBOSE: &str = "INTERCEPT_VERBOSE";
     pub const PARENT_PID: &str = "INTERCEPT_PARENT_PID";
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    macro_rules! map(
+        {} => { ::std::collections::HashMap::new() };
+        { $($key:expr => $value:expr),+ } => {
+            {
+                let mut m = ::std::collections::HashMap::new();
+                $(
+                    m.insert($key.to_string(), $value.to_string());
+                )+
+                m
+            }
+        };
+    );
+
+    #[test]
+    fn keeps_empty() {
+        let env = Builder::from(map!{})
+            .build();
+
+        assert_eq!(map!{}, env);
+    }
+
+    mod verbose {
+        use super::*;
+
+        #[test]
+        fn sets_true() {
+            let env = Builder::from(map! {})
+                .with_verbose(true)
+                .build();
+
+            let expected = map! { keys::VERBOSE => "1" };
+            assert_eq!(expected, env);
+        }
+
+        #[test]
+        fn sets_false() {
+            let env = Builder::from(map! {})
+                .with_verbose(false)
+                .build();
+
+            assert_eq!(map! {}, env);
+        }
+    }
+
+    mod destination {
+        use super::*;
+
+        #[test]
+        fn sets() {
+            let destination = std::path::Path::new("/path/to/");
+
+            let env = Builder::from(map! {})
+                .with_destination(destination.as_ref())
+                .build();
+
+            let expected = map! { keys::DESTINATION => "/path/to/" };
+            assert_eq!(expected, env);
+        }
+    }
+
+    mod modes {
+        use super::*;
+
+        fn assert_preload_value(expected: &str, current: Option<&str>) {
+            let mode = InterceptMode::WrapperPreload {
+                wrapper: std::path::PathBuf::from("/path/to/bear"),
+                library: std::path::PathBuf::from("/path/to/libear.so"),
+            };
+
+            let seed = if current.is_none() {
+                    map!{}
+                } else {
+                    map!{ keys::GLIBC_PRELOAD => current.unwrap() }
+                };
+            let env = Builder::from(seed)
+                .with_modes(vec!(mode).as_ref())
+                .build();
+
+            let expected_map = map!{
+                keys::GLIBC_PRELOAD => expected,
+                keys::INTERCEPT_LIBRARY => "/path/to/libear.so",
+                keys::INTERCEPT_REPORTER => "/path/to/bear"
+            };
+            assert_eq!(expected_map, env);
+        }
+
+        #[test]
+        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+        fn sets_preload_if_empty() {
+            assert_preload_value("/path/to/libear.so", None);
+        }
+
+        #[test]
+        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+        fn sets_preload_if_already_there() {
+            assert_preload_value("/path/to/libear.so",
+                                 Some("/path/to/libear.so"));
+        }
+
+        #[test]
+        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+        fn sets_preload_beside_other() {
+            assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
+                                 Some("/opt/acme/libexe.so"));
+        }
+
+        #[test]
+        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+        fn sets_preload_first() {
+            assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
+                                 Some("/opt/acme/libexe.so:/path/to/libear.so"));
+        }
+    }
 }
