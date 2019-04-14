@@ -19,9 +19,9 @@
 
 use std::path;
 
-use super::super::Result;
+use super::Result;
 use super::{CompilationDatabase, Entry, Entries};
-use super::config;
+use super::Format;
 
 
 /// Represents a JSON compilation database file.
@@ -29,12 +29,12 @@ use super::config;
 /// https://clang.llvm.org/docs/JSONCompilationDatabase.html
 pub struct JsonCompilationDatabase<'a> {
     file: &'a path::Path,
-    format: &'a config::Format,
+    format: &'a Format,
 }
 
 impl<'a> JsonCompilationDatabase<'a> {
 
-    pub fn new(path: &'a path::Path, format: &'a config::Format) -> Self {
+    pub fn new(path: &'a path::Path, format: &'a Format) -> Self {
         JsonCompilationDatabase { file: path, format, }
     }
 }
@@ -314,7 +314,7 @@ mod db {
         }
     }
 
-    pub fn save(path: &path::Path, entries: Entries, format: &config::Format) -> Result<()> {
+    pub fn save(path: &path::Path, entries: Entries, format: &Format) -> Result<()> {
         let generic_entries = entries
             .iter()
             .map(|entry| from(entry, format))
@@ -361,7 +361,7 @@ mod db {
             .map_err(|error| error.into())
     }
 
-    fn from(entry: &Entry, format: &config::Format) -> Result<GenericEntry> {
+    fn from(entry: &Entry, format: &Format) -> Result<GenericEntry> {
         fn path_to_string(path: &path::Path) -> Result<String> {
             match path.to_str() {
                 Some(str) => Ok(str.to_string()),

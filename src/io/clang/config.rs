@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path;
 
 /// Represents a compilation database building strategy.
 #[derive(Debug, PartialEq, Eq)]
@@ -26,7 +25,7 @@ pub struct Config {
     pub append_to_existing: bool,
     pub include_headers: bool,      // TODO
     pub include_linking: bool,
-    pub relative_to: Option<path::PathBuf>, // TODO
+    pub relative_to: Option<std::path::PathBuf>, // TODO
     pub compilers: CompilerFilter,  // TODO
     pub sources: SourceFilter,      // TODO
     pub flags: FlagFilter,          // TODO

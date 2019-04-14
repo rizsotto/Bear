@@ -19,7 +19,7 @@
 
 use std::path;
 
-use super::super::{Result, ResultExt};
+use super::{Result, ResultExt};
 use super::{CompilationDatabase, Entry, Entries};
 use super::config::Config;
 use super::file::JsonCompilationDatabase;

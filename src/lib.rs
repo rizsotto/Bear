@@ -47,8 +47,8 @@ mod error {
     error_chain! {
         links {
             Intercept(crate::intercept::Error, crate::intercept::ErrorKind);
-            Io(crate::io::Error, crate::io::ErrorKind);
             Semantic(crate::semantic::Error, crate::semantic::ErrorKind);
+            Clang(crate::io::clang::Error, crate::io::clang::ErrorKind);
         }
     }
 }

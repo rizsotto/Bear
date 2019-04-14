@@ -20,7 +20,6 @@
 pub mod event;
 pub mod report;
 pub mod supervisor;
-pub mod inner;
 
 pub use self::event::*;
 pub use self::report::*;
@@ -42,3 +41,5 @@ mod error {
 }
 
 pub use self::error::{Error, ErrorKind, Result, ResultExt};
+
+mod inner;

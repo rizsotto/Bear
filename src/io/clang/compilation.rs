@@ -17,24 +17,31 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod config;
-pub mod builder;
-pub mod compilation;
+use super::Result;
 
-pub use self::config::*;
-pub use self::builder::*;
-pub use self::compilation::*;
+/// Represents a compilation database.
+pub trait CompilationDatabase {
 
-mod error {
-    error_chain! {
-        foreign_links {
-            Io(std::io::Error);
-            Json(serde_json::Error);
-            String(std::str::Utf8Error);
-        }
+    fn load(&self) -> Result<Entries>;
+
+    fn save(&self, entries: Entries) -> Result<()>;
+}
+
+/// Represents an entry of the compilation database.
+#[derive(Debug)]
+pub struct Entry {
+    pub directory: std::path::PathBuf,
+    pub file: std::path::PathBuf,
+    pub command: Vec<String>,
+    pub output: Option<std::path::PathBuf>,
+}
+
+impl PartialEq for Entry {
+    fn eq(&self, other: &Entry) -> bool {
+        self.directory == other.directory
+            && self.file == other.file
+            && self.command == other.command
     }
 }
 
-pub use self::error::{Error, ErrorKind, Result, ResultExt};
-
-mod file;
+pub type Entries = Vec<Entry>;
