@@ -21,8 +21,8 @@ pub mod config;
 pub mod builder;
 pub mod file;
 
-use crate::Result;
-use crate::output::clang::config::Format;
+use super::Result;
+use self::config::Format;
 
 /// Represents a compilation database.
 pub trait CompilationDatabase {

@@ -22,7 +22,7 @@ use std::path;
 use tempfile;
 
 use crate::intercept::event::Event;
-use crate::Result;
+use crate::intercept::Result;
 
 
 pub mod sender {

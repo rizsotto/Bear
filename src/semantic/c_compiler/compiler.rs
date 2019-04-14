@@ -23,8 +23,7 @@ use std::path;
 use std::process;
 use std::str;
 
-use ErrorKind;
-use Result;
+use super::Result;
 
 pub struct Classifier {
     ignore: bool,

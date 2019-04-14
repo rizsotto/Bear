@@ -20,6 +20,6 @@
 use super::*;
 use std::sync::mpsc::Sender;
 
-pub fn supervise(_args: &[String], _reports: Sender<Event>) -> Result<ExitCode, Error> {
+pub fn supervise(_args: &[String], _reports: Sender<Event>) -> Result<ExitCode> {
     unimplemented!()
 }

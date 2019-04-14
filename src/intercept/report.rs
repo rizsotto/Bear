@@ -19,7 +19,7 @@
 
 use super::*;
 
-pub fn c_compiler(_args: &[String]) -> Result<ExitCode, Error> {
+pub fn c_compiler(_args: &[String]) -> Result<ExitCode> {
 
 //    let target = environment::target_directory()?;
 //    let mut protocol = Protocol::new(target.as_path())?;
@@ -39,7 +39,7 @@ pub fn c_compiler(_args: &[String]) -> Result<ExitCode, Error> {
     unimplemented!()
 }
 
-pub fn cxx_compiler(_args: &[String]) -> Result<ExitCode, Error> {
+pub fn cxx_compiler(_args: &[String]) -> Result<ExitCode> {
 
 //    let target = environment::target_directory()?;
 //    let mut protocol = Protocol::new(target.as_path())?;
@@ -59,7 +59,7 @@ pub fn cxx_compiler(_args: &[String]) -> Result<ExitCode, Error> {
     unimplemented!()
 }
 
-pub fn wrapper(_execution: &ExecutionRequest, _session: &Session) -> Result<ExitCode, Error> {
+pub fn wrapper(_execution: &ExecutionRequest, _session: &Session) -> Result<ExitCode> {
     unimplemented!()
 }
 

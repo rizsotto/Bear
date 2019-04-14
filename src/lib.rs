@@ -45,14 +45,9 @@ pub mod command;
 
 mod error {
     error_chain! {
-        foreign_links {
-            Io(::std::io::Error);
-            Env(::std::env::VarError);
-            Num(::std::num::ParseIntError);
-            String(::std::str::Utf8Error);
-            Json(::serde_json::Error);
-            Nix(::nix::Error) #[cfg(unix)];
-            Intercept(crate::intercept::Error);
+        links {
+            Intercept(crate::intercept::Error, crate::intercept::ErrorKind);
+            Semantic(crate::semantic::Error, crate::semantic::ErrorKind);
         }
     }
 }

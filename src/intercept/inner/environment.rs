@@ -17,44 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use crate::intercept::{Error, InterceptMode};
-
-pub mod get {
-    use super::*;
-
-    pub fn target_directory() -> Result<std::path::PathBuf, Error> {
-        match std::env::var(keys::DESTINATION) {
-            Ok(value) => Ok(std::path::PathBuf::from(value)),
-            Err(_) => Err(Error::Configuration { key: keys::DESTINATION }),
-        }
-    }
-
-    pub fn c_compiler_path() -> Result<String, Error> {
-        match std::env::var(keys::INTERCEPT_CC) {
-            Ok(value) => Ok(value),
-            Err(_) => Err(Error::Configuration { key: keys::INTERCEPT_CC }),
-        }
-    }
-
-    pub fn cxx_compiler_path() -> Result<String, Error> {
-        match std::env::var(keys::INTERCEPT_CXX) {
-            Ok(value) => Ok(value),
-            Err(_) => Err(Error::Configuration { key: keys::INTERCEPT_CXX }),
-        }
-    }
-
-    pub fn parent_pid() -> Result<u32, Error> {
-        match std::env::var(keys::PARENT_PID) {
-            Ok(value) => {
-                match value.parse::<u32>() {
-                    Ok(num) => Ok(num),
-                    Err(_) => Err(Error::Configuration { key: keys::PARENT_PID }),
-                }
-            },
-            Err(_) => Err(Error::Configuration { key: keys::PARENT_PID }),
-        }
-    }
-}
+use crate::intercept::InterceptMode;
 
 pub type Environment = std::collections::HashMap<String, String>;
 
@@ -161,6 +124,37 @@ fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
             warn!("Failed to insert library into path: {}", err);
             path_str.to_string()
         })
+}
+
+pub mod get {
+    use super::keys;
+    use crate::intercept::Result;
+
+    pub fn target_directory() -> Result<std::path::PathBuf> {
+        let env = std::env::var(keys::DESTINATION)
+            .map(std::path::PathBuf::from)?;
+//            .chain_err(|| "Can't find target directory.".into())
+        Ok(env)
+    }
+
+    pub fn c_compiler_path() -> Result<String> {
+        let env = std::env::var(keys::INTERCEPT_CC)?;
+//            .chain_err(|| "Can't find cc compiler.".into())
+        Ok(env)
+    }
+
+    pub fn cxx_compiler_path() -> Result<String> {
+        let env = std::env::var(keys::INTERCEPT_CXX)?;
+//            .chain_err(|| "Can't find c++ compiler.".into())
+        Ok(env)
+    }
+
+    pub fn parent_pid() -> Result<u32> {
+        let env = std::env::var(keys::PARENT_PID)?;
+//            .chain_err(|| "Can't find parent process id.".into())?;
+        let num = env.parse::<u32>()?;
+        Ok(num)
+    }
 }
 
 mod keys {

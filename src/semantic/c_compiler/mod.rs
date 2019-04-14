@@ -22,7 +22,7 @@ pub mod flags;
 pub mod compiler;
 pub mod source;
 
-use crate::Result;
+use super::Result;
 
 #[derive(Debug)]
 pub struct CompilerCall {

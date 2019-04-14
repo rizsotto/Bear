@@ -18,3 +18,14 @@
  */
 
 pub mod c_compiler;
+
+mod error {
+    error_chain! {
+        foreign_links {
+            Io(std::io::Error);
+            String(std::str::Utf8Error);
+        }
+    }
+}
+
+pub use self::error::{Error, ErrorKind, Result, ResultExt};

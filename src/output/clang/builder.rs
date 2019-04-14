@@ -19,12 +19,12 @@
 
 use std::path;
 
-use crate::{Result, ResultExt};
+use super::super::{Result, ResultExt};
+use super::{CompilationDatabase, Entry, Entries};
+use super::config::Config;
 use crate::intercept::event::Event;
 use crate::semantic::c_compiler::CompilerCall;
 use crate::semantic::c_compiler::pass::CompilerPass;
-use crate::output::clang::config::Config;
-use crate::output::clang::{CompilationDatabase, Entry, Entries};
 
 
 pub struct Builder<'a> {

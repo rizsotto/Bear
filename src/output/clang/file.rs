@@ -19,9 +19,9 @@
 
 use std::path;
 
-use crate::Result;
-use crate::output::clang::{CompilationDatabase, Entry, Entries};
-use crate::output::clang::config::Format;
+use super::super::Result;
+use super::{CompilationDatabase, Entry, Entries};
+use super::config::Format;
 
 
 /// Represents a JSON compilation database file.

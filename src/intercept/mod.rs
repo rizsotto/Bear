@@ -25,40 +25,19 @@ pub mod inner;
 pub use self::event::*;
 pub use self::report::*;
 
-use std::fmt;
-use std::error;
-
-#[derive(Debug)]
-pub enum Error {
-    Configuration {
-        key: &'static str,
-    },
-    Execution {
-        program: String,
-        #[cfg(unix)]
-        cause: ::nix::Error,
-    },
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Error::Configuration { key, .. } => {
-                write!(f, "Could not find {} in the current environment.", key)
-            },
-            Error::Execution { program, .. } => {
-                write!(f, "Failed to execute: {}", program)
-            }
+mod error {
+    error_chain! {
+        links {
+            Semantic(crate::semantic::Error, crate::semantic::ErrorKind);
+        }
+        foreign_links {
+            Io(::std::io::Error);
+            Env(::std::env::VarError);
+            Num(::std::num::ParseIntError);
+            Nix(::nix::Error) #[cfg(unix)];
+            Json(::serde_json::Error);
         }
     }
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            #[cfg(unix)]
-            Error::Execution { cause, .. } => Some(cause),
-            _ => None,
-        }
-    }
-}
+pub use self::error::{Error, ErrorKind, Result, ResultExt};
