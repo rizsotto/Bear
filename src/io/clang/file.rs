@@ -21,7 +21,7 @@ use std::path;
 
 use super::super::Result;
 use super::{CompilationDatabase, Entry, Entries};
-use super::config::Format;
+use super::config;
 
 
 /// Represents a JSON compilation database file.
@@ -29,12 +29,13 @@ use super::config::Format;
 /// https://clang.llvm.org/docs/JSONCompilationDatabase.html
 pub struct JsonCompilationDatabase {
     file: path::PathBuf,
+    format: config::Format,
 }
 
 impl JsonCompilationDatabase {
 
-    pub fn new(path: &path::Path) -> Self {
-        JsonCompilationDatabase { file: path.to_path_buf(), }
+    pub fn new(path: &path::Path, format: config::Format) -> Self {
+        JsonCompilationDatabase { file: path.to_path_buf(), format, }
     }
 }
 
@@ -50,15 +51,16 @@ impl CompilationDatabase for JsonCompilationDatabase {
         }
     }
 
-    fn save(&self, format: &Format, entries: Entries) -> Result<()> {
+    fn save(&self, entries: Entries) -> Result<()> {
         debug!("Writing to: {:?}", self.file);
-        db::save(self.file.as_path(), entries, format)
+        db::save(self.file.as_path(), entries, &self.format)
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::super::config::Format;
     use std::fs;
     use std::io::{Read, Write};
 
@@ -69,18 +71,14 @@ mod test {
     #[test]
     #[should_panic]
     fn test_load_not_existing_file_fails() {
-        let sut =
-            JsonCompilationDatabase::new(
-                path::Path::new("/not/exists/file.json"));
+        let sut = JsonCompilationDatabase::new(path::Path::new("/not/exists/file.json"), Format::default());
 
         let _ = sut.load(false).unwrap();
     }
 
     #[test]
     fn test_load_not_existing_file_returns_empty() -> Result<()> {
-        let sut =
-            JsonCompilationDatabase::new(
-                path::Path::new("/not/exists/file.json"));
+        let sut = JsonCompilationDatabase::new(path::Path::new("/not/exists/file.json"), Format::default());
 
         let entries = sut.load(true)?;
         assert_eq!(Entries::new(), entries);
@@ -95,7 +93,7 @@ mod test {
         comp_db_file.write(br#"this is not json"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let _ = sut.load(false).unwrap();
     }
 
@@ -107,7 +105,7 @@ mod test {
         comp_db_file.write(br#"{ "file": "string" }"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let _ = sut.load(false).unwrap();
     }
 
@@ -116,7 +114,7 @@ mod test {
         let comp_db_file = TestFile::new()?;
         comp_db_file.write(br#"[]"#)?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let entries = sut.load(false)?;
 
         let expected = Entries::new();
@@ -143,7 +141,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let entries = sut.load(false)?;
 
         let expected = expected_values();
@@ -170,7 +168,7 @@ mod test {
             ]"#
         )?;
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let entries = sut.load(false)?;
 
         let expected = expected_values();
@@ -192,7 +190,7 @@ mod test {
             ]"#)
             .expect("test file content write failed");
 
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
         let _ = sut.load(false).unwrap();
     }
 
@@ -201,10 +199,10 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let formatter = Format { command_as_array: false, ..Format::default() };
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), formatter);
 
         let input = expected_values();
-        sut.save(&formatter, input)?;
+        sut.save(input)?;
 
         let entries = sut.load(false)?;
 
@@ -222,10 +220,10 @@ mod test {
         let comp_db_file = TestFile::new()?;
 
         let formatter = Format { command_as_array: true, ..Format::default() };
-        let sut = JsonCompilationDatabase::new(comp_db_file.path());
+        let sut = JsonCompilationDatabase::new(comp_db_file.path(), Format::default());
 
         let input = expected_values();
-        sut.save(&formatter, input)?;
+        sut.save(input)?;
 
         let entries = sut.load(false)?;
 
@@ -332,7 +330,7 @@ mod db {
         }
     }
 
-    pub fn save(path: &path::Path, entries: Entries, format: &Format) -> Result<()> {
+    pub fn save(path: &path::Path, entries: Entries, format: &config::Format) -> Result<()> {
         let generic_entries = entries
             .iter()
             .map(|entry| from(entry, format))
@@ -379,7 +377,7 @@ mod db {
             .map_err(|error| error.into())
     }
 
-    fn from(entry: &Entry, format: &Format) -> Result<GenericEntry> {
+    fn from(entry: &Entry, format: &config::Format) -> Result<GenericEntry> {
         fn path_to_string(path: &path::Path) -> Result<String> {
             match path.to_str() {
                 Some(str) => Ok(str.to_string()),

@@ -22,14 +22,13 @@ pub mod builder;
 pub mod file;
 
 use super::Result;
-use self::config::Format;
 
 /// Represents a compilation database.
 pub trait CompilationDatabase {
 
     fn load(&self, empty_if_not_exists: bool) -> Result<Entries>;
 
-    fn save(&self, format: &Format, entries: Entries) -> Result<()>;
+    fn save(&self, entries: Entries) -> Result<()>;
 }
 
 /// Represents an entry of the compilation database.

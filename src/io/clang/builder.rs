@@ -75,7 +75,7 @@ impl<'a> Builder<'a> {
         result.extend(previous);
         result.extend(current);
         result.dedup();
-        self.target.save(&self.config.format, result)
+        self.target.save(result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
@@ -102,7 +102,7 @@ impl<'a> Builder<'a> {
             })
             .collect();
 
-        self.target.save(&self.config.format, current)
+        self.target.save(current)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
