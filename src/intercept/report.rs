@@ -63,31 +63,10 @@ pub fn wrapper(_execution: &ExecutionRequest, _session: &Session) -> Result<Exit
     unimplemented!()
 }
 
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum InterceptMode {
-    WrapperPreload { wrapper: std::path::PathBuf, library: std::path::PathBuf },
-    WrapperCC { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
-    WrapperCXX { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
-}
-
-pub type InterceptModes = Vec<InterceptMode>;
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct ExecutionRequest {
     pub executable: Executable,
     pub arguments: Vec<String>,
-}
-
-impl ExecutionRequest {
-
-//    fn from_arguments(arguments: &[String]) -> Result<ExecutionRequest> {
-//        unimplemented!()
-//    }
-//
-//    fn from_spec(executable: &Executable, arguments: &[String]) -> Result<ExecutionRequest> {
-//        unimplemented!()
-//    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -97,23 +76,9 @@ pub enum Executable {
     WithSearchPath(String, Vec<std::path::PathBuf>),
 }
 
-impl Executable {
-
-//    fn to_absolute_path(&self) -> Result<std::path::PathBuf> {
-//        unimplemented!()
-//    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Session {
     pub destination: std::path::PathBuf,
     pub verbose: bool,
     pub modes: InterceptModes,
-}
-
-impl Session {
-
-//    fn to_environment(&self) -> Result<environment::Environment> {
-//        unimplemented!()
-//    }
 }

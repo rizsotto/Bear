@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use crate::intercept::InterceptMode;
+use super::super::InterceptMode;
 
 pub type Environment = std::collections::HashMap<String, String>;
 

@@ -20,6 +20,16 @@
 use super::*;
 use std::sync::mpsc::Sender;
 
-pub fn supervise(_args: &[String], _reports: Sender<Event>) -> Result<ExitCode> {
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum InterceptMode {
+    WrapperPreload { wrapper: std::path::PathBuf, library: std::path::PathBuf },
+    WrapperCC { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
+    WrapperCXX { wrapper: std::path::PathBuf, compiler: std::path::PathBuf },
+}
+
+pub type InterceptModes = Vec<InterceptMode>;
+
+pub fn supervise(_args: &[String], _modes: &[InterceptMode], _reports: Sender<Event>) -> Result<ExitCode> {
     unimplemented!()
 }

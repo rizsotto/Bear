@@ -24,6 +24,7 @@ pub mod inner;
 
 pub use self::event::*;
 pub use self::report::*;
+pub use self::supervisor::*;
 
 mod error {
     error_chain! {

@@ -24,6 +24,8 @@ pub mod source;
 
 use super::Result;
 
+pub use self::pass::CompilerPass;
+
 #[derive(Debug)]
 pub struct CompilerCall {
     pub work_dir: std::path::PathBuf,
@@ -94,7 +96,7 @@ impl CompilerExecutable {
 
 #[derive(Debug)]
 pub enum CompilerFlag {
-    Pass { pass: pass::CompilerPass },
+    Pass { pass: CompilerPass },
     Preprocessor { },
     Linker { },
     Output { },

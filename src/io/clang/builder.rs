@@ -22,9 +22,9 @@ use std::path;
 use super::super::{Result, ResultExt};
 use super::{CompilationDatabase, Entry, Entries};
 use super::config::Config;
-use crate::intercept::event::Event;
+use crate::intercept::Event;
 use crate::semantic::c_compiler::CompilerCall;
-use crate::semantic::c_compiler::pass::CompilerPass;
+use crate::semantic::c_compiler::CompilerPass;
 
 
 pub struct Builder<'a> {
