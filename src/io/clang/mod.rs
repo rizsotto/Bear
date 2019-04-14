@@ -26,7 +26,7 @@ use super::Result;
 /// Represents a compilation database.
 pub trait CompilationDatabase {
 
-    fn load(&self, empty_if_not_exists: bool) -> Result<Entries>;
+    fn load(&self) -> Result<Entries>;
 
     fn save(&self, entries: Entries) -> Result<()>;
 }

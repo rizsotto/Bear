@@ -22,31 +22,36 @@ use std::path;
 use super::super::{Result, ResultExt};
 use super::{CompilationDatabase, Entry, Entries};
 use super::config::Config;
+use super::file::JsonCompilationDatabase;
 use crate::intercept::Event;
-use crate::semantic::c_compiler::CompilerCall;
-use crate::semantic::c_compiler::CompilerPass;
+use crate::semantic::c_compiler::{CompilerCall, CompilerPass};
 
 
 pub struct Builder<'a> {
+    file: &'a path::Path,
     config: &'a Config,
-    target: &'a CompilationDatabase,
 }
 
 impl<'a> Builder<'a> {
 
-    pub fn new(config: &'a Config, target: &'a CompilationDatabase) -> Self {
-        Builder { config, target }
+    pub fn new(file: &'a path::Path, config: &'a Config) -> Self {
+        Builder { file, config }
     }
 
     pub fn build<I>(&self, events: I) -> Result<()>
         where I: Iterator<Item = Event>
     {
-        let previous = if self.config.append_to_existing {
-            self.target.load(true)
-                .chain_err(|| "Failed to load compilation database.")?
-        } else {
-            Entries::new()
-        };
+        let target = JsonCompilationDatabase::new(self.file, &self.config.format);
+        let previous =
+            if self.config.append_to_existing && self.file.exists() {
+                target.load()
+                    .chain_err(|| "Failed to load compilation database.")?
+            } else {
+                if self.config.append_to_existing {
+                    debug!("File does not exists: {:?}", self.file);
+                }
+                Entries::new()
+            };
 
         let current: Entries = events
             .filter_map(|event| {
@@ -75,12 +80,12 @@ impl<'a> Builder<'a> {
         result.extend(previous);
         result.extend(current);
         result.dedup();
-        self.target.save(result)
+        target.save(result)
             .chain_err(|| "Failed to save compilation database.")
     }
 
     pub fn transform(&self, from_db: &CompilationDatabase) -> Result<()> {
-        let previous = from_db.load(false)
+        let previous = from_db.load()
             .chain_err(|| "Failed to load compilation database.")?;
 
         let current: Entries = previous.iter()
@@ -102,7 +107,8 @@ impl<'a> Builder<'a> {
             })
             .collect();
 
-        self.target.save(current)
+        let target = JsonCompilationDatabase::new(self.file, &self.config.format);
+        target.save(current)
             .chain_err(|| "Failed to save compilation database.")
     }
 }
