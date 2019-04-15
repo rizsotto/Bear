@@ -18,8 +18,9 @@
  */
 
 use super::super::InterceptMode;
+use std::ffi::{OsString, OsStr};
 
-pub type Vars = std::collections::HashMap<String, String>;
+pub type Vars = std::collections::HashMap<OsString, OsString>;
 
 pub struct Builder {
     state: Box<Vars>,
@@ -28,7 +29,7 @@ pub struct Builder {
 impl Builder {
 
     pub fn new() -> Builder {
-        let environment = std::env::vars().collect();
+        let environment = std::env::vars_os().collect();
         Builder::from(environment)
     }
 
@@ -92,23 +93,23 @@ impl Builder {
     }
 
     fn insert_preload(&mut self, key: &str, library: &std::path::Path) {
-        self.state.entry(key.to_string())
+        self.state.entry(OsString::from(key))
             .and_modify(|current| {
                 *current = insert_into_paths(current, library);
             })
-            .or_insert(library.to_string_lossy().to_string());
+            .or_insert(library.as_os_str().to_os_string());
     }
 
     fn insert_path(&mut self, key: &str, value: &std::path::Path) {
-        self.insert_str(key, &value.to_string_lossy());
+        self.state.insert(OsString::from(key), value.as_os_str().to_os_string());
     }
 
     fn insert_str(&mut self, key: &str, value: &str) {
-        self.state.insert(key.to_string(), value.to_string());
+        self.state.insert(OsString::from(key), OsString::from(value));
     }
 }
 
-fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
+fn insert_into_paths(path_str: &OsStr, library: &std::path::Path) -> OsString {
     // Split up the string into paths.
     let mut paths = std::env::split_paths(path_str)
         .into_iter()
@@ -118,10 +119,9 @@ fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
     paths.insert(0, library.to_path_buf());
     // Join the paths into a string again.
     std::env::join_paths(paths)
-        .map(|os| os.to_string_lossy().to_string())
         .unwrap_or_else(|err| {
             warn!("Failed to insert library into path: {}", err);
-            path_str.to_string()
+            path_str.to_os_string()
         })
 }
 
@@ -184,7 +184,7 @@ mod test {
             {
                 let mut m = ::std::collections::HashMap::new();
                 $(
-                    m.insert($key.to_string(), $value.to_string());
+                    m.insert(OsString::from($key), OsString::from($value));
                 )+
                 m
             }
@@ -266,27 +266,16 @@ mod test {
 
         #[test]
         #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
-        fn sets_preload_if_empty() {
-            assert_preload_value("/path/to/libear.so", None);
-        }
+        fn sets_preload() {
+            assert_preload_value("/path/to/libear.so",
+                                 None);
 
-        #[test]
-        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
-        fn sets_preload_if_already_there() {
             assert_preload_value("/path/to/libear.so",
                                  Some("/path/to/libear.so"));
-        }
 
-        #[test]
-        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
-        fn sets_preload_beside_other() {
             assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
                                  Some("/opt/acme/libexe.so"));
-        }
 
-        #[test]
-        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
-        fn sets_preload_first() {
             assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
                                  Some("/opt/acme/libexe.so:/path/to/libear.so"));
         }
