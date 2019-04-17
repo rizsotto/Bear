@@ -19,8 +19,8 @@
 
 use std::path;
 
-use Result;
-use intercept::{ExecutionRequest, ExitCode, InterceptModes, Session, InterceptMode};
+use crate::Result;
+use crate::intercept::{ExecutionRequest, ExitCode, InterceptModes, Session, InterceptMode};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {

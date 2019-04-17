@@ -5,6 +5,7 @@ authors = ["László Nagy <rizsotto at gmail dot com>"]
 license = "GPL-3.0-only"
 description = "BuildEAR is a tool that generates a compilation database for clang tooling."
 homepage = "https://github.com/rizsotto/Bear"
+edition = "2018"
 build="build.rs"
 include = [
     "**/*.rs",
