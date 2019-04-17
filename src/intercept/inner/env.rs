@@ -74,9 +74,7 @@ impl Builder {
         self
     }
 
-    #[cfg(any(target_os = "android",
-              target_os = "freebsd",
-              target_os = "linux"))]
+    #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
     fn insert_library(&mut self, library: &std::path::Path) {
         self.insert_preload(keys::GLIBC_PRELOAD, library);
     }
@@ -157,9 +155,11 @@ pub mod get {
 }
 
 mod keys {
+    #[cfg(target_os = "macos")]
     pub const OSX_PRELOAD: &str = "DYLD_INSERT_LIBRARIES";
+    #[cfg(target_os = "macos")]
     pub const OSX_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
-
+    #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
     pub const GLIBC_PRELOAD: &str = "LD_PRELOAD";
 
     pub const CC: &str = "CC";
@@ -241,32 +241,32 @@ mod test {
     mod modes {
         use super::*;
 
-        fn assert_preload_value(expected: &str, current: Option<&str>) {
-            let mode = InterceptMode::WrapperPreload {
-                wrapper: std::path::PathBuf::from("/path/to/bear"),
-                library: std::path::PathBuf::from("/path/to/libear.so"),
-            };
+        #[test]
+        #[cfg(target_os = "macos")]
+        fn sets_preload() {
+            fn assert_preload_value(expected: &str, current: Option<&str>) {
+                let mode = InterceptMode::WrapperPreload {
+                    wrapper: std::path::PathBuf::from("/path/to/bear"),
+                    library: std::path::PathBuf::from("/path/to/libear.so"),
+                };
 
-            let seed = if current.is_none() {
+                let seed = if current.is_none() {
                     map!{}
                 } else {
-                    map!{ keys::GLIBC_PRELOAD => current.unwrap() }
+                    map!{ keys::OSX_PRELOAD => current.unwrap() }
                 };
-            let env = Builder::from(seed)
-                .with_modes(vec!(mode).as_ref())
-                .build();
+                let env = Builder::from(seed)
+                    .with_modes(vec!(mode).as_ref())
+                    .build();
 
-            let expected_map = map!{
-                keys::GLIBC_PRELOAD => expected,
-                keys::INTERCEPT_LIBRARY => "/path/to/libear.so",
-                keys::INTERCEPT_REPORTER => "/path/to/bear"
-            };
-            assert_eq!(expected_map, env);
-        }
-
-        #[test]
-        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
-        fn sets_preload() {
+                let expected_map = map!{
+                    keys::OSX_PRELOAD => expected,
+                    keys::OSX_NAMESPACE => "1",
+                    keys::INTERCEPT_LIBRARY => "/path/to/libear.so",
+                    keys::INTERCEPT_REPORTER => "/path/to/bear"
+                };
+                assert_eq!(expected_map, env);
+            }
             assert_preload_value("/path/to/libear.so",
                                  None);
 
@@ -278,6 +278,70 @@ mod test {
 
             assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
                                  Some("/opt/acme/libexe.so:/path/to/libear.so"));
+        }
+
+        #[test]
+        #[cfg(any(target_os = "android", target_os = "freebsd", target_os = "linux"))]
+        fn sets_preload() {
+            fn assert_preload_value(expected: &str, current: Option<&str>) {
+                let mode = InterceptMode::WrapperPreload {
+                    wrapper: std::path::PathBuf::from("/path/to/bear"),
+                    library: std::path::PathBuf::from("/path/to/libear.so"),
+                };
+
+                let seed = if current.is_none() {
+                    map!{}
+                } else {
+                    map!{ keys::GLIBC_PRELOAD => current.unwrap() }
+                };
+                let env = Builder::from(seed)
+                    .with_modes(vec!(mode).as_ref())
+                    .build();
+
+                let expected_map = map!{
+                    keys::GLIBC_PRELOAD => expected,
+                    keys::INTERCEPT_LIBRARY => "/path/to/libear.so",
+                    keys::INTERCEPT_REPORTER => "/path/to/bear"
+                };
+                assert_eq!(expected_map, env);
+            }
+            assert_preload_value("/path/to/libear.so",
+                                 None);
+
+            assert_preload_value("/path/to/libear.so",
+                                 Some("/path/to/libear.so"));
+
+            assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
+                                 Some("/opt/acme/libexe.so"));
+
+            assert_preload_value("/path/to/libear.so:/opt/acme/libexe.so",
+                                 Some("/opt/acme/libexe.so:/path/to/libear.so"));
+        }
+
+        #[test]
+        fn sets_wrappers() {
+            let modes = vec!(
+                InterceptMode::WrapperCC {
+                    wrapper: std::path::PathBuf::from("/path/to/cc"),
+                    compiler: std::path::PathBuf::from("/usr/bin/cc"),
+                },
+                InterceptMode::WrapperCXX {
+                    wrapper: std::path::PathBuf::from("/path/to/cxx"),
+                    compiler: std::path::PathBuf::from("/usr/bin/c++"),
+                },
+            );
+
+            let env = Builder::from(map! {})
+                .with_modes(modes.as_ref())
+                .build();
+
+            let expected_map = map!{
+                keys::CXX => "/path/to/cxx",
+                keys::CC => "/path/to/cc",
+                keys::INTERCEPT_CXX => "/usr/bin/c++",
+                keys::INTERCEPT_CC => "/usr/bin/cc"
+            };
+            assert_eq!(expected_map, env);
         }
     }
 }
