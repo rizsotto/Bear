@@ -18,9 +18,8 @@
  */
 
 use super::super::InterceptMode;
-use std::ffi::{OsString, OsStr};
 
-pub type Vars = std::collections::HashMap<OsString, OsString>;
+pub type Vars = std::collections::HashMap<String, String>;
 
 pub struct Builder {
     state: Box<Vars>,
@@ -29,7 +28,7 @@ pub struct Builder {
 impl Builder {
 
     pub fn new() -> Builder {
-        let environment = std::env::vars_os().collect();
+        let environment = std::env::vars().collect();
         Builder::from(environment)
     }
 
@@ -91,23 +90,23 @@ impl Builder {
     }
 
     fn insert_preload(&mut self, key: &str, library: &std::path::Path) {
-        self.state.entry(OsString::from(key))
+        self.state.entry(key.to_string())
             .and_modify(|current| {
                 *current = insert_into_paths(current, library);
             })
-            .or_insert(library.as_os_str().to_os_string());
+            .or_insert(library.to_string_lossy().to_string());
     }
 
     fn insert_path(&mut self, key: &str, value: &std::path::Path) {
-        self.state.insert(OsString::from(key), value.as_os_str().to_os_string());
+        self.state.insert(key.to_string(), value.to_string_lossy().to_string());
     }
 
     fn insert_str(&mut self, key: &str, value: &str) {
-        self.state.insert(OsString::from(key), OsString::from(value));
+        self.state.insert(key.to_string(), value.to_string());
     }
 }
 
-fn insert_into_paths(path_str: &OsStr, library: &std::path::Path) -> OsString {
+fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
     // Split up the string into paths.
     let mut paths = std::env::split_paths(path_str)
         .into_iter()
@@ -117,9 +116,10 @@ fn insert_into_paths(path_str: &OsStr, library: &std::path::Path) -> OsString {
     paths.insert(0, library.to_path_buf());
     // Join the paths into a string again.
     std::env::join_paths(paths)
+        .map(|os_str| os_str.to_string_lossy().to_string())
         .unwrap_or_else(|err| {
             warn!("Failed to insert library into path: {}", err);
-            path_str.to_os_string()
+            path_str.to_string()
         })
 }
 
@@ -184,7 +184,7 @@ mod test {
             {
                 let mut m = ::std::collections::HashMap::new();
                 $(
-                    m.insert(OsString::from($key), OsString::from($value));
+                    m.insert($key.to_string(), $value.to_string());
                 )+
                 m
             }

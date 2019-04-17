@@ -29,7 +29,8 @@ pub enum Event {
         pid: ProcessId,
         ppid: ProcessId,
         cwd: std::path::PathBuf,
-        cmd: Vec<String>,
+        program: std::path::PathBuf,
+        args: Vec<String>,
     },
     TerminatedNormally {
         when: DateTime,
@@ -65,8 +66,8 @@ impl Event {
 
     pub fn to_execution(&self) -> Option<(Vec<String>, std::path::PathBuf)> {
         match self {
-            Event::Created { cmd, cwd, .. } =>
-                Some((cmd.to_vec(), cwd.to_path_buf())),
+            Event::Created { args, cwd, .. } =>
+                Some((args.to_vec(), cwd.to_path_buf())),
             _ =>
                 None,
         }
