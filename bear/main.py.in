@@ -454,7 +454,7 @@ def create_intercept_parser():
     parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""The JSON compilation database.""")
+        help="""Only use compilers given to '--use-cc' and '--use-c++'.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
