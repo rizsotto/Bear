@@ -76,6 +76,44 @@ pub enum Executable {
     WithSearchPath(String, Vec<std::path::PathBuf>),
 }
 
+impl Executable {
+    pub fn resolve(&self) -> Result<std::path::PathBuf> {
+        match self {
+            Executable::WithFilename(ref path) if path.is_absolute() => {
+                Ok(path.clone())
+            },
+            Executable::WithFilename(ref path) => {
+                let cwd = std::env::current_dir()?;
+                resolve_executable(path, vec!(cwd).as_ref())
+            },
+            Executable::WithPath(ref string) => {
+                let path = std::env::var("PATH")?;
+                let paths = std::env::split_paths(&path)
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                resolve_executable(string, &paths)
+            }
+            Executable::WithSearchPath(ref string, ref paths) => {
+                resolve_executable(string, &paths)
+            },
+        }
+    }
+}
+
+fn resolve_executable<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
+    for prefix in paths {
+        match prefix.join(&path).canonicalize() {
+            Ok(ref result) if is_executable(&result) => return Ok(result.clone()),
+            _ => continue,
+        }
+    }
+    Err("File is not found nor executable.".into())
+}
+
+fn is_executable(path: &std::path::Path) -> bool {
+    unimplemented!()
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Session {
     pub destination: std::path::PathBuf,
