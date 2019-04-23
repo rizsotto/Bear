@@ -297,11 +297,7 @@ mod unix {
         let c_program = path_to_str(program)
             .and_then(|str| str_to_cstring(str))?;
 
-        if program.is_absolute() {
-            let result = unistd::execve(&c_program, c_args.as_ref(), c_envs.as_ref())?;
-        } else {
-            let result = unistd::execvpe(&c_program, c_args.as_ref(), c_envs.as_ref())?;
-        }
+        let _ = unistd::execve(&c_program, c_args.as_ref(), c_envs.as_ref())?;
 
         Ok(())
     }
@@ -351,14 +347,14 @@ mod unix {
 
             #[test]
             fn success() {
-                let result = run_test("true");
+                let result = run_test("/usr/bin/true");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(0i32, result.unwrap());
             }
 
             #[test]
             fn fail() {
-                let result = run_test("false");
+                let result = run_test("/usr/bin/false");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(1i32, result.unwrap());
             }
@@ -418,12 +414,12 @@ mod unix {
 
             #[test]
             fn success() {
-                assert_start_stop_events(slice_of_strings!("true"), 0i32);
+                assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
             }
 
             #[test]
             fn fail() {
-                assert_start_stop_events(slice_of_strings!("false"), 1i32);
+                assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
             }
 
             #[test]
@@ -451,7 +447,7 @@ mod unix {
                 {
                     let sut = super::UnixExecutor::new(event_tx);
                     let _ = sut.run(
-                        std::path::Path::new("sleep").as_ref(),
+                        std::path::Path::new("/usr/bin/sleep").as_ref(),
                         slice_of_strings!("sleep", "5"),
                         &env::Builder::new().build());
                     drop(sut);
@@ -494,7 +490,7 @@ mod unix {
                 {
                     let sut = super::UnixExecutor::new(event_tx);
                     let _ = sut.run(
-                        std::path::Path::new("sleep").as_ref(),
+                        std::path::Path::new("/usr/bin/sleep").as_ref(),
                         slice_of_strings!("sleep", "5"),
                         &env::Builder::new().build());
                     drop(sut);
