@@ -432,7 +432,7 @@ mod unix {
             fn kill_signal() {
                 let (event_tx, event_rx) = mpsc::channel();
                 let (repeat_tx, repeat_rx) = mpsc::channel();
-                thread::spawn(move || {
+                let forwarder = thread::spawn(move || {
                     for event in event_rx {
                         match event {
                             Event::Created { pid, .. } => {
@@ -452,6 +452,7 @@ mod unix {
                         &env::Builder::new().build());
                     drop(sut);
                 }
+                let _ = forwarder.join();
                 let events = repeat_rx.iter().collect::<Vec<Event>>();
 
                 assert_eq!(2usize, (&events).len());
@@ -467,7 +468,7 @@ mod unix {
             fn stop_signal() {
                 let (event_tx, event_rx) = mpsc::channel();
                 let (repeat_tx, repeat_rx) = mpsc::channel();
-                thread::spawn(move || {
+                let forwarder = thread::spawn(move || {
                     for event in event_rx {
                         match event {
                             Event::Created { pid, .. } => {
@@ -495,6 +496,7 @@ mod unix {
                         &env::Builder::new().build());
                     drop(sut);
                 }
+                let _ = forwarder.join();
                 let events = repeat_rx.iter().collect::<Vec<Event>>();
 
                 assert_eq!(4usize, (&events).len());
