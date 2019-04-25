@@ -84,7 +84,7 @@ impl<'a> Builder<'a> {
             .chain_err(|| "Failed to save compilation database.")
     }
 
-    pub fn transform(&self, from_db: &CompilationDatabase) -> Result<()> {
+    pub fn transform(&self, from_db: &dyn CompilationDatabase) -> Result<()> {
         let previous = from_db.load()
             .chain_err(|| "Failed to load compilation database.")?;
 

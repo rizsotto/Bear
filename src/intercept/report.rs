@@ -110,7 +110,7 @@ fn resolve_executable<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::Pa
     Err("File is not found nor executable.".into())
 }
 
-fn is_executable(path: &std::path::Path) -> bool {
+fn is_executable(_path: &std::path::Path) -> bool {
     unimplemented!()
 }
 

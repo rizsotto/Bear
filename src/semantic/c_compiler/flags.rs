@@ -26,7 +26,7 @@ use std::collections;
 /// Not relevant means the flags which do not influence the compilation
 /// pass. (Certain pre-processor flags, or linker flags are like this.)
 pub struct FlagIterator {
-    inner: Box<Iterator<Item = String>>,
+    inner: Box<dyn Iterator<Item = String>>,
 }
 
 impl FlagIterator {

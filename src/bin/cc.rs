@@ -19,13 +19,10 @@
 
 #[macro_use]
 extern crate clap;
-extern crate env_logger;
-extern crate ear;
 #[macro_use]
 extern crate log;
 
-#[cfg(unix)]
-extern crate nix;
+use env_logger;
 
 use std::env;
 use std::process;

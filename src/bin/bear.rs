@@ -19,11 +19,11 @@
 
 #[macro_use]
 extern crate clap;
-extern crate directories;
-extern crate env_logger;
-extern crate ear;
 #[macro_use]
 extern crate log;
+
+use directories;
+use env_logger;
 
 use std::env;
 use std::path;
@@ -85,7 +85,7 @@ fn parse_arguments(program: &path::Path, args: &[String]) -> Result<Command> {
     build_command(matches, program)
 }
 
-fn build_command(matches: ArgMatches, program: &path::Path) -> Result<Command> {
+fn build_command(matches: ArgMatches<'_>, program: &path::Path) -> Result<Command> {
     debug!("{:?}", matches);
     match matches.subcommand() {
         ("supervise", Some(sub_matches)) =>
@@ -149,7 +149,7 @@ fn arg_command<'a, 'b>() -> clap::Arg<'a, 'b> {
         .last(true)
 }
 
-fn build_command_supervise(matches: &ArgMatches, program: &path::Path) -> Result<Command> {
+fn build_command_supervise(matches: &ArgMatches<'_>, program: &path::Path) -> Result<Command> {
     let mode = InterceptMode::WrapperPreload {
         library: value_t!(matches, "library", path::PathBuf).unwrap(),
         wrapper: program.to_path_buf(),
@@ -167,7 +167,7 @@ fn build_command_supervise(matches: &ArgMatches, program: &path::Path) -> Result
     Ok(Command::Supervise { session, execution, })
 }
 
-fn build_execution_target(matches: &ArgMatches) -> Result<Executable> {
+fn build_execution_target(matches: &ArgMatches<'_>) -> Result<Executable> {
     match (matches.value_of("search-path"),
            matches.value_of("file"),
            matches.value_of("path")) {
@@ -210,13 +210,13 @@ fn args_intercept_modes<'a, 'b>() -> Vec<clap::Arg<'a, 'b>> {
     )
 }
 
-fn build_command_configure(matches: &ArgMatches, program: &path::Path) -> Result<Command> {
+fn build_command_configure(matches: &ArgMatches<'_>, program: &path::Path) -> Result<Command> {
     let modes = build_intercept_modes(matches, program)?;
     let command = values_t!(matches, "command", String)?;
     Ok(Command::InjectWrappers { modes, command })
 }
 
-fn build_intercept_modes(matches: &ArgMatches, program: &path::Path) -> Result<InterceptModes> {
+fn build_intercept_modes(matches: &ArgMatches<'_>, program: &path::Path) -> Result<InterceptModes> {
     let mut modes: InterceptModes = vec!();
     if let Ok(library) = value_t!(matches, "library", path::PathBuf) {
         let wrapper = program.to_path_buf();
@@ -270,7 +270,7 @@ fn default_config_file() -> String {
     "./bear.conf".to_string()
 }
 
-fn build_command_build(matches: &ArgMatches, program: &path::Path) -> Result<Command> {
+fn build_command_build(matches: &ArgMatches<'_>, program: &path::Path) -> Result<Command> {
     let modes = build_intercept_modes(matches, program)?;
     let command = values_t!(matches, "command", String)?;
     let output = value_t!(matches, "output", path::PathBuf)?;
@@ -293,7 +293,7 @@ fn parse_intercept<'a, 'b>() -> clap::App<'a, 'b> {
         ])
 }
 
-fn build_command_intercept(matches: &ArgMatches, program: &path::Path) -> Result<Command> {
+fn build_command_intercept(matches: &ArgMatches<'_>, program: &path::Path) -> Result<Command> {
     let modes = build_intercept_modes(matches, program)?;
     let command = values_t!(matches, "command", String)?;
     let output = value_t!(matches, "output", path::PathBuf)?;
@@ -314,7 +314,7 @@ mod error {
     }
 
     impl fmt::Display for BearError {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
                 BearError::Runtime(ref message) => {
                     write!(f, "{}", message)

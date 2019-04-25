@@ -79,7 +79,7 @@ impl<F> Supervisor<F>
     }
 
     #[cfg(unix)]
-    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
+    pub fn run(&mut self, _cmd: &[String]) -> Result<ExitCode>
     {
         debug!("Running: unix supervisor");
 //        unix::ProcessHandle::run(&mut self.sink, cmd)
@@ -277,7 +277,7 @@ mod unix {
     fn execute(program: &std::path::Path, args: &[String], envs: &Vars) -> Result<()> {
         fn str_to_cstring(str: &str) -> Result<ffi::CString> {
             ffi::CString::new(str)
-                .map_err(|e| "String contains null byte.".into())
+                .map_err(|_e| "String contains null byte.".into())
         }
         fn path_to_str(path: &std::path::Path) -> Result<&str> {
             path.as_os_str()
@@ -336,7 +336,7 @@ mod unix {
             use super::*;
 
             fn run_test(program: &str) -> Result<ExitCode> {
-                let (tx, rx) = mpsc::channel();
+                let (tx, _rx) = mpsc::channel();
                 // run the command and return the exit code.
                 let sut = super::UnixExecutor::new(tx);
                 sut.run(
@@ -537,7 +537,7 @@ mod generic {
     }
 
     impl super::Executor for Executor {
-        fn run(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<ExitCode> {
+        fn run(&self, _program: &std::path::Path, _args: &[String], _envs: &Vars) -> Result<ExitCode> {
             unimplemented!()
         }
     }
@@ -549,7 +549,7 @@ mod generic {
     impl Process for ProcessHandle {
         type Handle = ProcessHandle;
 
-        fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
+        fn spawn<F>(_sink: &mut F, cmd: &[String], _cwd: path::PathBuf) -> Result<Self::Handle>
             where F: FnMut(Event) -> ()
         {
             let child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
@@ -605,7 +605,7 @@ mod generic {
     mod test {
         use super::*;
 
-        mod test_exit_code {
+        mod exit_code {
             use super::*;
 
             #[test]
@@ -635,10 +635,8 @@ mod generic {
             }
         }
 
-        mod test_events {
+        mod events {
             use super::*;
-            use std::env;
-            use std::process;
 
             fn run_supervisor(args: &[String]) -> Vec<Event> {
                 let mut events: Vec<Event> = vec![];

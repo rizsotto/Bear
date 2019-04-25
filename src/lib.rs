@@ -17,26 +17,17 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-extern crate chrono;
+
 #[macro_use]
 extern crate error_chain;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
-extern crate regex;
 #[macro_use]
 extern crate scopeguard;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate shellwords;
-extern crate tempfile;
-
-#[cfg(unix)]
-extern crate nix;
-extern crate core;
 
 pub mod intercept;
 pub mod semantic;
