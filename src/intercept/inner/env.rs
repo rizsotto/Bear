@@ -94,7 +94,7 @@ impl Builder {
             .and_modify(|current| {
                 *current = insert_into_paths(current, library);
             })
-            .or_insert(library.to_string_lossy().to_string());
+            .or_insert_with(|| library.to_string_lossy().to_string());
     }
 
     fn insert_path(&mut self, key: &str, value: &std::path::Path) {
@@ -109,7 +109,6 @@ impl Builder {
 fn insert_into_paths(path_str: &str, library: &std::path::Path) -> String {
     // Split up the string into paths.
     let mut paths = std::env::split_paths(path_str)
-        .into_iter()
         .filter(|candidate| candidate != library)
         .collect::<Vec<_>>();
     // Make sure the library is the first one in the paths.

@@ -358,7 +358,7 @@ mod db {
             .create(true)
             .open(path)?;
         serde_json::ser::to_writer_pretty(file, entries)
-            .map_err(|error| error.into())
+            .map_err(std::convert::Into::into)
     }
 
     fn from(entry: &Entry, format: &Format) -> Result<GenericEntry> {

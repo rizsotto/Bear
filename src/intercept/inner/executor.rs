@@ -282,7 +282,7 @@ mod unix {
         fn path_to_str(path: &std::path::Path) -> Result<&str> {
             path.as_os_str()
                 .to_str()
-                .ok_or::<super::Error>("Path can't converted into string.".into())
+                .ok_or_else(|| "Path can't converted into string.".into())
         }
 
         let c_args = args.iter()
@@ -752,7 +752,7 @@ mod fake {
                     .create(true)
                     .open(output)
                     .map(|_| ())
-                    .map_err(|error| error.into()),
+                    .map_err(std::convert::Into::into),
             _ =>
                 Ok(()),
         }

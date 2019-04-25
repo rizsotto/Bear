@@ -186,7 +186,7 @@ fn is_pattern_match(candidate: &str, patterns: &[regex::Regex]) -> bool {
 /// Returns the filename of the given path (rendered as String).
 fn basename(file: &str) -> String {
     let path = path::PathBuf::from(file);
-    match path.file_name().map(|path| path.to_str()) {
+    match path.file_name().map(std::ffi::OsStr::to_str) {
         Some(Some(str)) => str.to_string(),
         _ => file.to_string(),
     }

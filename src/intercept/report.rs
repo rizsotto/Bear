@@ -89,7 +89,6 @@ impl Executable {
             Executable::WithPath(ref string) => {
                 let path = std::env::var("PATH")?;
                 let paths = std::env::split_paths(&path)
-                    .into_iter()
                     .collect::<Vec<_>>();
                 resolve_executable(string, &paths)
             }
