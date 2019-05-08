@@ -506,18 +506,24 @@ static int write_json_report(int fd, char const *const cmd[], char const *const 
     for (char const *const *it = cmd; (it) && (*it); ++it) {
         char const *const sep = (it != cmd) ? "," : "";
         const size_t buffer_size = (6 * strlen(*it)) + 1;
-        char buffer[buffer_size];
+        char *buffer = malloc(buffer_size);
+        if (0 == buffer)
+            ERROR_AND_EXIT("malloc");
         if (-1 == encode_json_string(*it, buffer, buffer_size))
             return -1;
         if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
             return -1;
+	free(buffer);
     }
     const size_t buffer_size = 6 * strlen(cwd);
-    char buffer[buffer_size];
+    char *buffer = malloc(buffer_size);
+    if (0 == buffer)
+        ERROR_AND_EXIT("malloc");
     if (-1 == encode_json_string(cwd, buffer, buffer_size))
         return -1;
     if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
         return -1;
+    free(buffer);
 
     return 0;
 }
