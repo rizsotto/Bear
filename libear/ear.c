@@ -468,7 +468,9 @@ static void report_call(char const *const argv[]) {
     // Create report file name
     char const * const out_dir = initial_env[0];
     size_t const path_max_length = strlen(out_dir) + 32;
-    char filename[path_max_length];
+    char *filename = malloc(path_max_length);
+    if (0 == filename)
+        ERROR_AND_EXIT("malloc");
     if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
         ERROR_AND_EXIT("snprintf");
     // Create report file
@@ -480,6 +482,7 @@ static void report_call(char const *const argv[]) {
     // Close report file
     if (close(fd))
         ERROR_AND_EXIT("close");
+    free(filename);
 }
 
 static void write_report(int fd, char const *const argv[]) {
@@ -506,18 +509,24 @@ static int write_json_report(int fd, char const *const cmd[], char const *const 
     for (char const *const *it = cmd; (it) && (*it); ++it) {
         char const *const sep = (it != cmd) ? "," : "";
         const size_t buffer_size = (6 * strlen(*it)) + 1;
-        char buffer[buffer_size];
+        char *buffer = malloc(buffer_size);
+        if (0 == buffer)
+            ERROR_AND_EXIT("malloc");
         if (-1 == encode_json_string(*it, buffer, buffer_size))
             return -1;
         if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
             return -1;
+	free(buffer);
     }
     const size_t buffer_size = 6 * strlen(cwd);
-    char buffer[buffer_size];
+    char *buffer = malloc(buffer_size);
+    if (0 == buffer)
+        ERROR_AND_EXIT("malloc");
     if (-1 == encode_json_string(cwd, buffer, buffer_size))
         return -1;
     if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
         return -1;
+    free(buffer);
 
     return 0;
 }
