@@ -468,7 +468,7 @@ static void report_call(char const *const argv[]) {
     // Create report file name
     char const * const out_dir = initial_env[0];
     size_t const path_max_length = strlen(out_dir) + 32;
-    char filename[path_max_length];
+    char *filename = malloc(path_max_length);
     if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
         ERROR_AND_EXIT("snprintf");
     // Create report file
@@ -506,25 +506,33 @@ static int write_json_report(int fd, char const *const cmd[], char const *const 
     for (char const *const *it = cmd; (it) && (*it); ++it) {
         char const *const sep = (it != cmd) ? "," : "";
         const size_t buffer_size = (6 * strlen(*it)) + 1;
-        char buffer[buffer_size];
+        char *buffer = malloc(buffer_size);
+        if (0 == buffer)
+            ERROR_AND_EXIT("malloc");
         if (-1 == encode_json_string(*it, buffer, buffer_size))
             return -1;
         if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
             return -1;
+	free(buffer);
     }
     const size_t buffer_size = 6 * strlen(cwd);
-    char buffer[buffer_size];
+    char *buffer = malloc(buffer_size);
+    if (0 == buffer)
+        ERROR_AND_EXIT("malloc");
     if (-1 == encode_json_string(cwd, buffer, buffer_size))
         return -1;
     if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
         return -1;
+    free(buffer);
 
     return 0;
 }
 
 static int encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
     size_t const wsrc_length = mbstowcs(NULL, src, 0);
-    wchar_t wsrc[wsrc_length + 1];
+    wchar_t *wsrc = malloc(sizeof(wchar_t) * (wsrc_length + 1));
+    if (0 == wsrc)
+        ERROR_AND_EXIT("malloc");
     if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
         PERROR("mbstowcs");
         return -1;
@@ -571,6 +579,7 @@ static int encode_json_string(char const *const src, char *const dst, size_t con
             break;
         }
     }
+    free(wsrc);
     if (dst_it < dst_end) {
         // Insert a terminating 0 value.
         *dst_it = 0;
