@@ -12,6 +12,5 @@
 #cmakedefine HAVE_POSIX_SPAWN
 #cmakedefine HAVE_POSIX_SPAWNP
 #cmakedefine HAVE_NSGETENVIRON
-#cmakedefine HAVE_XLOCALE_HEADER
 
 #cmakedefine APPLE

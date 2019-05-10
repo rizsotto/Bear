@@ -37,6 +37,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <locale.h>
 #include <unistd.h>
@@ -46,10 +47,6 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
-
-#if defined HAVE_XLOCALE_HEADER
-#include <xlocale.h>
-#endif
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -97,13 +94,12 @@ typedef char const * bear_env_t[ENV_SIZE];
 static int capture_env_t(bear_env_t *env);
 static void release_env_t(bear_env_t *env);
 static char const **string_array_partial_update(char *const envp[], bear_env_t *env);
-static char const **string_array_single_update(char const **in, char const *key, char const *value);
+static char const **string_array_single_update(char const *envs[], char const *key, char const *value);
 static void report_call(char const *const argv[]);
-static void write_report(int fd, char const *const argv[]);
-static int write_json_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
-static int encode_json_string(char const *src, char *dst, size_t dst_size);
-static char const **string_array_from_varargs(char const *arg, va_list *ap);
-static char const **string_array_copy(char const **const in);
+static int write_report(int fd, char const *const argv[]);
+static int write_binary_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
+static char const **string_array_from_varargs(char const * arg, va_list *args);
+static char const **string_array_copy(char const **in);
 static size_t string_array_length(char const *const *in);
 static void string_array_release(char const **);
 
@@ -126,7 +122,6 @@ static bear_env_t initial_env =
 
 static int initialized = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-static locale_t utf_locale;
 
 static void on_load(void) __attribute__((constructor));
 static void on_unload(void) __attribute__((destructor));
@@ -175,14 +170,14 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 
 static void on_load(void) {
     pthread_mutex_lock(&mutex);
-    if ((!initialized) && (mt_safe_on_load()))
-        initialized = 1;
+    if (0 == initialized)
+        initialized = mt_safe_on_load();
     pthread_mutex_unlock(&mutex);
 }
 
 static void on_unload(void) {
     pthread_mutex_lock(&mutex);
-    if (initialized)
+    if (0 != initialized)
         mt_safe_on_unload();
     initialized = 0;
     pthread_mutex_unlock(&mutex);
@@ -194,21 +189,11 @@ static int mt_safe_on_load(void) {
     if (0 == environ)
         return 0;
 #endif
-    // Create locale to encode UTF-8 characters
-    utf_locale = newlocale(LC_CTYPE_MASK, "", (locale_t)0);
-    if ((locale_t)0 == utf_locale) {
-        PERROR("newlocale");
-        return 0;
-    }
     // Capture current relevant environment variables
-    if (0 == capture_env_t(&initial_env))
-        return 0;
-    // Well done
-    return 1;
+    return capture_env_t(&initial_env);
 }
 
 static void mt_safe_on_unload(void) {
-    freelocale(utf_locale);
     release_env_t(&initial_env);
 }
 
@@ -476,124 +461,121 @@ static void report_call(char const *const argv[]) {
     if (-1 == fd)
         ERROR_AND_EXIT("mkstemp");
     // Write report file
-    write_report(fd, argv);
+    const int finished = write_report(fd, argv);
     // Close report file
     if (close(fd))
         ERROR_AND_EXIT("close");
+    // Remove the file if it's not done
+    if ((-1 == finished) && (-1 == unlink(filename)))
+        ERROR_AND_EXIT("unlink");
 }
 
-static void write_report(int fd, char const *const argv[]) {
-    const locale_t saved_locale = uselocale(utf_locale);
-    if ((locale_t)0 == saved_locale)
-        ERROR_AND_EXIT("uselocale");
-
-    const char *cwd = getcwd(NULL, 0);
-    if (0 == cwd)
-        ERROR_AND_EXIT("getcwd");
-    if (write_json_report(fd, argv, cwd, getpid()))
-        ERROR_AND_EXIT("writing json problem");
-    free((void *)cwd);
-
-    const locale_t restored_locale = uselocale(saved_locale);
-    if ((locale_t)0 == restored_locale)
-        ERROR_AND_EXIT("uselocale");
-}
-
-static int write_json_report(int fd, char const *const cmd[], char const *const cwd, pid_t pid) {
-    if (0 > dprintf(fd, "{ \"pid\": %d, \"cmd\": [", pid))
+static int write_binary_pid(int fd, const pid_t pid) {
+    // write type
+    if (-1 == write(fd, "pid", 3)) {
+        PERROR("write type");
         return -1;
-
-    for (char const *const *it = cmd; (it) && (*it); ++it) {
-        char const *const sep = (it != cmd) ? "," : "";
-        const size_t buffer_size = (6 * strlen(*it)) + 1;
-        char buffer[buffer_size];
-        if (-1 == encode_json_string(*it, buffer, buffer_size))
-            return -1;
-        if (0 > dprintf(fd, "%s \"%s\"", sep, buffer))
-            return -1;
     }
-    const size_t buffer_size = 6 * strlen(cwd);
-    char buffer[buffer_size];
-    if (-1 == encode_json_string(cwd, buffer, buffer_size))
+    // write length
+    const uint32_t length = sizeof(pid_t);
+    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
+        PERROR("write length");
         return -1;
-    if (0 > dprintf(fd, "], \"cwd\": \"%s\" }", buffer))
+    }
+    // write value
+    if (-1 == write(fd, (void *) &pid, sizeof(pid_t))) {
+        PERROR("write value");
         return -1;
-
+    }
     return 0;
 }
 
-static int encode_json_string(char const *const src, char *const dst, size_t const dst_size) {
-    size_t const wsrc_length = mbstowcs(NULL, src, 0);
-    wchar_t wsrc[wsrc_length + 1];
-    if (mbstowcs((wchar_t *)&wsrc, src, wsrc_length + 1) != wsrc_length) {
-        PERROR("mbstowcs");
+static int write_binary_string(int fd, const char *const string) {
+    // write type
+    if (-1 == write(fd, "str", 3)) {
+        PERROR("write type");
         return -1;
     }
-    wchar_t const *wsrc_it = (wchar_t const *)&wsrc;
-    wchar_t const *const wsrc_end = wsrc_it + wsrc_length;
+    // write length
+    const uint32_t length = strlen(string);
+    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
+        PERROR("write length");
+        return -1;
+    }
+    // write value
+    if (-1 == write(fd, (void *) string, length)) {
+        PERROR("write value");
+        return -1;
+    }
+    return 0;
+}
 
-    char *dst_it = dst;
-    char *const dst_end = dst + dst_size;
-
-    for (; wsrc_it != wsrc_end; ++wsrc_it) {
-        if (dst_it >= dst_end) {
+static int wirte_binary_string_list(int fd, const char *const *const strings) {
+    // write type
+    if (-1 == write(fd, "lst", 3)) {
+        PERROR("write type");
+        return -1;
+    }
+    // write length
+    const uint32_t length = string_array_length(strings);
+    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
+        PERROR("write length");
+        return -1;
+    }
+    // write value
+    for (uint32_t idx = 0; idx < length; ++idx) {
+        const char *string = strings[idx];
+        if (-1 == write_binary_string(fd, string)) {
+            PERROR("write value");
             return -1;
         }
-        // Insert an escape character before control characters.
-        switch (*wsrc_it) {
-        case L'\b':
-            dst_it += snprintf(dst_it, 3, "\\b");
-            break;
-        case L'\f':
-            dst_it += snprintf(dst_it, 3, "\\f");
-            break;
-        case L'\n':
-            dst_it += snprintf(dst_it, 3, "\\n");
-            break;
-        case L'\r':
-            dst_it += snprintf(dst_it, 3, "\\r");
-            break;
-        case L'\t':
-            dst_it += snprintf(dst_it, 3, "\\t");
-            break;
-        case L'"':
-            dst_it += snprintf(dst_it, 3, "\\\"");
-            break;
-        case L'\\':
-            dst_it += snprintf(dst_it, 3, "\\\\");
-            break;
-        default:
-            if ((*wsrc_it < L' ') || (*wsrc_it > 127)) {
-                dst_it += snprintf(dst_it, 7, "\\u%04x", (unsigned int)*wsrc_it);
-            } else {
-                *dst_it++ = (char)*wsrc_it;
-            }
-            break;
+    }
+    return 0;
+}
+
+static int write_report(int fd, char const *const argv[]) {
+    const char *cwd = getcwd(NULL, 0);
+    if (0 == cwd) {
+        PERROR("getcwd");
+        return -1;
+    } else {
+        if (-1 == write_binary_string(fd, cwd)) {
+            PERROR("cwd writing failed");
+            return -1;
         }
     }
-    if (dst_it < dst_end) {
-        // Insert a terminating 0 value.
-        *dst_it = 0;
-        return 0;
+    free((void *)cwd);
+    if (-1 == write_binary_pid(fd, getpid())) {
+        PERROR("pid writing failed");
+        return -1;
     }
-    return -1;
+    if (-1 == wirte_binary_string_list(fd, argv)) {
+        PERROR("cmd writing failed");
+        return -1;
+    }
+    return 0;
 }
 
 /* update environment assure that chilren processes will copy the desired
  * behaviour */
 
 static int capture_env_t(bear_env_t *env) {
-    int status = 1;
     for (size_t it = 0; it < ENV_SIZE; ++it) {
         char const * const env_value = getenv(env_names[it]);
-        char const * const env_copy = (env_value) ? strdup(env_value) : env_value;
-        (*env)[it] = env_copy;
-        status &= (env_copy) ? 1 : 0;
-        // Just report the problem, but don't roll back.
-        if (0 == status)
+        if (0 == env_value) {
+            PERROR("getenv");
+            return 0;
+        }
+
+        char const * const env_copy = strdup(env_value);
+        if (0 == env_copy) {
             PERROR("strdup");
+            return 0;
+        }
+
+        (*env)[it] = env_copy;
     }
-    return status;
+    return 1;
 }
 
 static void release_env_t(bear_env_t *env) {

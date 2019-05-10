@@ -13,7 +13,6 @@ check_function_exists(execle HAVE_EXECLE)
 check_function_exists(posix_spawn HAVE_POSIX_SPAWN)
 check_function_exists(posix_spawnp HAVE_POSIX_SPAWNP)
 check_symbol_exists(_NSGetEnviron crt_externs.h HAVE_NSGETENVIRON)
-check_include_file(xlocale.h HAVE_XLOCALE_HEADER)
 
 find_package(Threads REQUIRED)
 
