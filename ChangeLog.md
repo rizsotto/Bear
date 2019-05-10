@@ -17,7 +17,7 @@ Bugfixes:
 
 Bugfixes:
   - Fix CPack RPM problems on CentOS7 (@antmak, #191, #192)
-  - Change libear.so location to $LIBDIR/bear to avoid direct linking. (@morxa, #189)
+  - Change `libear.so` location to `$LIBDIR/bear` to avoid direct linking. (@morxa, #189)
 
 
 ## 2.3.10 (2017.12.07)
@@ -87,7 +87,7 @@ Bugfixes:
 ## 2.3.0 (2017.04.20)
 
 Features:
-  - Rewrite functional test on lit.
+  - Rewrite functional test on LLVM `lit`.
   - Write intermediate execution report in JSON format.
   - Write compilation database with "arguments" instead of "command".
   - Write compilation database with relative paths.
@@ -165,14 +165,14 @@ Bugfixes:
 
 Bugfixes:
 
-  - Fix crash when make with -j option (@minhyuk, #87)
+  - Fix crash when `make -j` runs parallel (@minhyuk, #87)
 
 
 ## 2.0.3 (2015-04-04)
 
 Bugfixes:
 
-  - Fix passing of arguments to mkdtemp (@kljohann, #75)
+  - Fix passing of arguments to `mkdtemp` (@kljohann, #75)
   - Empty output when compiler used to link. (@QuaziRandom, #80)
   - Bad escape of strings in compilation database. (@jumapico, #81)
 
@@ -242,7 +242,7 @@ Bugfixes:
 
   - fix typo in the README.md (#48, @breser)
   - fix typo in the man page (#49, @sebastinas)
-  - fix cmake file to honor given CFLAGS (#50, @sebastinas)
+  - fix cmake file to honor given `CFLAGS` (#50, @sebastinas)
   - fix execle causes segfault on 32 bit systems (#51, #52, @breser, @sebastinas)
 
 
@@ -259,7 +259,7 @@ Bugfixes:
   - fix non filtered output option renamed from debug (#44, @mikemccracken)
   - fix broken build on OS X (#46, @breser)
   - fix documentation (@mlq)
-  - fix posix_spawn* call not implemented (#43, @agentsim, @apoluektov)
+  - fix `posix_spawn*` call not implemented (#43, @agentsim, @apoluektov)
 
 
 ## 1.2 (2013-10-01)
@@ -297,7 +297,7 @@ Features:
 Bugfixes:
 
   - fix process synchronization problem (#33, @blowback)
-  - fix malloc/realloc usage (#34, @mlq)
+  - fix `malloc`, `realloc` usage (#34, @mlq)
 
 
 ## 0.5 (2013-06-09)
@@ -322,7 +322,7 @@ Features:
 
 Bugfixes:
 
-  - fix json output on whitespaces (#19)
+  - fix JSON output on whitespaces (#19)
   - fix socket reading problem (#20, @brucestephens)
   - improved signal handling (#21)
   - build system checks for available `exec` functions (#22)
@@ -354,7 +354,7 @@ Bugfixes:
   - test added: unit test, end-to-end test and full `exec` family coverage (#4)
   - `scons` does pass empty environment to child processes (#9)
   - fix `execle` overriding bug (#13)
-  - fix json output (#14)
+  - fix JSON output (#14)
 
 
 ## 0.1 (2012-11-17)
