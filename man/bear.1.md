@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% April 20, 2017
+% May 10, 2019
 
 # NAME
 
@@ -128,5 +128,5 @@ SELinux on Fedora, CentOS, RHEL.
 
 # COPYRIGHT
 
-Copyright (C) 2012-2017 by László Nagy
+Copyright (C) 2012-2019 by László Nagy
 <https://github.com/rizsotto/Bear>
