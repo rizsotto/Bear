@@ -4,20 +4,20 @@ matrix:
   include:
     - os: linux
       sudo: false
-      dist: trusty
+      dist: xenial
       python: "pypy"
     - os: linux
       sudo: required
-      dist: trusty
+      dist: xenial
       python: 2.7
     - os: linux
       sudo: false
-      dist: trusty
-      python: 3.5
+      dist: xenial
+      python: 3.6
     - os: linux
       sudo: false
-      dist: trusty
-      python: 3.6
+      dist: xenial
+      python: 3.7
     - os: osx
       osx_image: xcode7.3
       language: generic
@@ -37,7 +37,7 @@ before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
-      brew install scons qt;
+      brew install scons;
     fi
 
 install:
