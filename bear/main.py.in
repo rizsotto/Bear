@@ -118,7 +118,7 @@ TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
 C_LANG, CPLUSPLUS_LANG, OTHER = range(3)
 
-Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
+Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
 
 CompilationCommand = collections.namedtuple(
     'CompilationCommand',
@@ -383,11 +383,6 @@ def parse_exec_trace(filename):
         length_bytes = handler.read(4)
         return byte_to_int(length_bytes)
 
-    def parse_pid(handler):
-        length = parse_length(handler, b'pid')
-        value_bytes = handler.read(length)
-        return byte_to_int(value_bytes)
-
     def parse_string(handler):
         length = parse_length(handler, b'str')
         value_bytes = handler.read(length)
@@ -401,7 +396,6 @@ def parse_exec_trace(filename):
     with open(filename, 'rb', buffering=0) as handler:
         try:
             return Execution(cwd=parse_string(handler),
-                             pid=parse_pid(handler),
                              cmd=parse_string_list(handler))
         except Exception as exception:
             logging.warning('parse exec trace file: %s FAILED: %s',
@@ -556,7 +550,7 @@ class Compilation:
 
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
-        execution = Execution(cmd=command, cwd=entry['directory'], pid=0)
+        execution = Execution(cmd=command, cwd=entry['directory'])
         return cls.iter_from_execution(execution, category)
 
     @classmethod

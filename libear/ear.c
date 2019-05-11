@@ -470,26 +470,6 @@ static void report_call(char const *const argv[]) {
         ERROR_AND_EXIT("unlink");
 }
 
-static int write_binary_pid(int fd, const pid_t pid) {
-    // write type
-    if (-1 == write(fd, "pid", 3)) {
-        PERROR("write type");
-        return -1;
-    }
-    // write length
-    const uint32_t length = sizeof(pid_t);
-    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
-        PERROR("write length");
-        return -1;
-    }
-    // write value
-    if (-1 == write(fd, (void *) &pid, sizeof(pid_t))) {
-        PERROR("write value");
-        return -1;
-    }
-    return 0;
-}
-
 static int write_binary_string(int fd, const char *const string) {
     // write type
     if (-1 == write(fd, "str", 3)) {
@@ -545,10 +525,6 @@ static int write_report(int fd, char const *const argv[]) {
         }
     }
     free((void *)cwd);
-    if (-1 == write_binary_pid(fd, getpid())) {
-        PERROR("pid writing failed");
-        return -1;
-    }
     if (-1 == wirte_binary_string_list(fd, argv)) {
         PERROR("cmd writing failed");
         return -1;
