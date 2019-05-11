@@ -47,6 +47,7 @@ import shlex
 import itertools
 import tempfile
 import shutil
+import struct
 import contextlib
 import logging
 
@@ -374,7 +375,7 @@ def parse_exec_trace(filename):
     :return: an Execution object. """
 
     def byte_to_int(byte):
-        return int.from_bytes(byte, byteorder=sys.byteorder, signed=False)
+        return struct.unpack_from("=I", byte)[0]
 
     def parse_length(handler, type):
         type_bytes = handler.read(3)
