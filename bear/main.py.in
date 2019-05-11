@@ -364,7 +364,7 @@ def setup_environment(args, destination):
 
 
 def parse_exec_trace(filename):
-    # type: (str) -> Execution
+    # type: (str) -> Optional[Execution]
     """ Parse execution report file.
 
     Given filename points to a file which contains the basic report
@@ -373,15 +373,39 @@ def parse_exec_trace(filename):
     :param filename: path to an execution trace file to read from,
     :return: an Execution object. """
 
+    def byte_to_int(byte):
+        return int.from_bytes(byte, byteorder=sys.byteorder, signed=False)
+
+    def parse_length(handler, type):
+        type_bytes = handler.read(3)
+        if type_bytes != type:
+            raise Exception("type not expected")
+        length_bytes = handler.read(4)
+        return byte_to_int(length_bytes)
+
+    def parse_pid(handler):
+        length = parse_length(handler, b'pid')
+        value_bytes = handler.read(length)
+        return byte_to_int(value_bytes)
+
+    def parse_string(handler):
+        length = parse_length(handler, b'str')
+        value_bytes = handler.read(length)
+        return value_bytes.decode("utf-8")
+
+    def parse_string_list(handler):
+        length = parse_length(handler, b'lst')
+        return [parse_string(handler) for _ in range(length)]
+
     logging.debug('parse exec trace file: %s', filename)
-    with open(filename, 'r') as handler:
+    with open(filename, 'rb', buffering=0) as handler:
         try:
-            entry = json.load(handler)
-            return Execution(pid=entry['pid'],
-                             cwd=entry['cwd'],
-                             cmd=entry['cmd'])
-        except ValueError:
-            logging.warning('parse exec trace file: %s FAILED', filename)
+            return Execution(cwd=parse_string(handler),
+                             pid=parse_pid(handler),
+                             cmd=parse_string_list(handler))
+        except Exception as exception:
+            logging.warning('parse exec trace file: %s FAILED: %s',
+                            filename, exception)
             return None
 
 
