@@ -1,3 +1,14 @@
+## 2.4.0 (2019.05.12)
+
+Features:
+  - `libear.so` write binary file instead of JSON.
+
+Bugfixes:
+  - Fix `newlocale` problem (#182, #190, @timblaktu, @3v1n0, @caohaiming, @rbresalier)
+  - Fix long command line problem (#246, @jmodares)
+  - Fix help text for parameter `--use-only` (#245, @koutheir)
+
+
 ## 2.3.13 (2018.08.30)
 
 Bugfixes:
