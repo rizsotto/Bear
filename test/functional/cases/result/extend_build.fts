@@ -4,7 +4,7 @@
 # RUN: bash %s %T/extend_build
 # RUN: cd %T/extend_build; %{intercept-build} --cdb result.json ./run-one.sh
 # RUN: cd %T/extend_build; %{cdb_diff} result.json one.json
-# RUN: cd %T/extend_build; %{intercept-build} --cdb result.json ./run-two.sh
+# RUN: cd %T/extend_build; %{intercept-build} --fifo --show_consumption --cdb result.json ./run-two.sh
 # RUN: cd %T/extend_build; %{cdb_diff} result.json two.json
 # RUN: cd %T/extend_build; %{intercept-build} --cdb result.json --append ./run-one.sh
 # RUN: cd %T/extend_build; %{cdb_diff} result.json sum.json

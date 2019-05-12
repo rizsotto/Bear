@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/extend_build_with_missing
-# RUN: cd %T/extend_build_with_missing; %{intercept-build} --cdb result.json ./run-one.sh
+# RUN: cd %T/extend_build_with_missing; %{intercept-build} --fifo --cdb result.json ./run-one.sh
 # RUN: cd %T/extend_build_with_missing; %{cdb_diff} result.json one.json
 # RUN: cd %T/extend_build_with_missing; rm src/one.c
 # RUN: cd %T/extend_build_with_missing; %{intercept-build} --cdb result.json --append ./run-two.sh

@@ -47,6 +47,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <errno.h>
+#include <limits.h>
 
 #if defined HAVE_POSIX_SPAWN || defined HAVE_POSIX_SPAWNP
 #include <spawn.h>
@@ -91,17 +92,39 @@ extern char **environ;
 
 typedef char const * bear_env_t[ENV_SIZE];
 
+const int fifo_header_size = 32;
+const int max_fifo_payload_size = PIPE_BUF - fifo_header_size;
+
+enum Report_Type {
+    REPORT_FIFO,
+    REPORT_TEMP_FILE
+};
+
+struct Report_buf {
+    enum Report_Type report_type_;
+    char *report_file_name_;
+    int temp_file_fd_;
+    char *report_buf_;
+    int report_capacity_;
+    int current_pos_;
+    int initial_report_size_;
+    int delete_temp_file_when_done_;
+};
+
 static int capture_env_t(bear_env_t *env);
 static void release_env_t(bear_env_t *env);
 static char const **string_array_partial_update(char *const envp[], bear_env_t *env);
 static char const **string_array_single_update(char const *envs[], char const *key, char const *value);
 static void report_call(char const *const argv[]);
-static int write_report(int fd, char const *const argv[]);
+static int write_report(struct Report_buf *report_buf, char const *const argv[]);
 static char const **string_array_from_varargs(char const * arg, va_list *args);
 static char const **string_array_copy(char const **in);
 static size_t string_array_length(char const *const *in);
 static void string_array_release(char const **);
-
+static void report_buf_construct(struct Report_buf *report_buf);
+static void report_buf_destroy(struct Report_buf *report_buf);
+static int report_buf_write(struct Report_buf *report_buf, const void *buf, size_t count);
+static void report_buf_write_fifo(struct Report_buf *report_buf);
 
 static bear_env_t env_names =
     { ENV_OUTPUT
@@ -444,67 +467,217 @@ static int call_posix_spawnp(pid_t *restrict pid, const char *restrict file,
 }
 #endif
 
+static void report_buf_construct(struct Report_buf *report_buf) {
+    report_buf->delete_temp_file_when_done_ = 0;
+    char const *const out_dir = initial_env[0];
+    size_t const path_max_length = strlen(out_dir) + 32;
+    report_buf->report_file_name_ = malloc(path_max_length);
+    if (0 == report_buf->report_file_name_) {
+        ERROR_AND_EXIT("malloc");
+    }
+
+    // First check if fifo file exists, if not will move on to writing to temp file.
+    if (-1 == snprintf(report_buf->report_file_name_, path_max_length, "%s/bearfifo", out_dir)) {
+        ERROR_AND_EXIT("snprintf");
+    }
+
+    struct stat stat_buffer;
+    if (stat(report_buf->report_file_name_, &stat_buffer) == 0) {
+        // Fifo file exists, report into the FIFO
+        report_buf->report_type_ = REPORT_FIFO;
+        report_buf->temp_file_fd_ = -1;
+
+        report_buf->report_capacity_ = max_fifo_payload_size;
+        report_buf->report_buf_ = malloc(report_buf->report_capacity_);
+        if (0 == report_buf) ERROR_AND_EXIT("malloc");
+        report_buf->current_pos_ = 0;
+    } else {
+        // No fifo, Report data into a temp file
+        report_buf->report_type_ = REPORT_TEMP_FILE;
+
+        if (-1 == snprintf(report_buf->report_file_name_, path_max_length, "%s/execution.XXXXXX", out_dir)) {
+            ERROR_AND_EXIT("snprintf");
+        }
+        // Create report file
+        report_buf->temp_file_fd_ = mkstemp(report_buf->report_file_name_);
+        if (-1 == report_buf->temp_file_fd_) {
+            ERROR_AND_EXIT("mkstemp");
+        }
+        report_buf->report_buf_ = NULL;
+    }
+}
+
+static void report_buf_destroy(struct Report_buf *report_buf) {
+    if (report_buf->temp_file_fd_ != -1) {
+        if (close(report_buf->temp_file_fd_)) {
+            ERROR_AND_EXIT("close");
+        }
+        report_buf->temp_file_fd_ = -1;
+    }
+
+    if ((1 == report_buf->delete_temp_file_when_done_) && (-1 == unlink(report_buf->report_file_name_))) {
+        ERROR_AND_EXIT("unlink");
+    }
+
+    if (report_buf->report_buf_ != NULL) {
+        free((void *)(report_buf->report_buf_));
+        report_buf->report_buf_ = NULL;
+    }
+    if (report_buf->report_file_name_ != NULL) {
+        free((void *)(report_buf->report_file_name_));
+        report_buf->report_file_name_ = NULL;
+    }
+}
+
+static int report_buf_write(struct Report_buf *report_buf, const void *buf, size_t count) {
+    if (REPORT_TEMP_FILE == report_buf->report_type_) {
+        int write_ret = write(report_buf->temp_file_fd_, buf, count);
+        if (-1 == write_ret) {
+            // Caller responsible for meaningful error message
+            // Mark delete_temp_file_when_done_ so temp file gets deleted later.
+            report_buf->delete_temp_file_when_done_ = 1;
+        }
+        return write_ret;
+    }
+
+    // Code from here is for FIFO only. REPORT_TEMP_FILE code never reaches here.
+    while (1) {
+        char *ptr_to_write_to = &(report_buf->report_buf_[report_buf->current_pos_]);
+
+        int amt_remaining_in_report = report_buf->report_capacity_ - report_buf->current_pos_;
+        if (count <= amt_remaining_in_report) {
+            memcpy(ptr_to_write_to, buf, count);
+            report_buf->current_pos_ += count;
+            return count;
+        }
+
+        // Not enough space, increase the capacity and then try again.
+        int amt_more_needed = report_buf->current_pos_ + count - report_buf->report_capacity_;
+
+        // ceil (amt_more_needed/report_buf->report_capacity_) to see how much to add
+        int num_max_payloads_to_add = (amt_more_needed + max_fifo_payload_size - 1) / max_fifo_payload_size;
+        report_buf->report_capacity_ = report_buf->report_capacity_ + num_max_payloads_to_add * max_fifo_payload_size;
+        report_buf->report_buf_ = realloc(report_buf->report_buf_, report_buf->report_capacity_);
+        if (0 == report_buf->report_buf_) {
+            ERROR_AND_EXIT("realloc");
+        }
+    }
+}
+
+static void report_buf_write_fifo(struct Report_buf *report_buf) {
+    int fd_fifo = open(report_buf->report_file_name_, O_WRONLY);
+    if (-1 == fd_fifo) {
+        ERROR_AND_EXIT("fifo open");
+    }
+
+    // According to pipe documentation at: http://man7.org/linux/man-pages/man7/pipe.7.html
+    // "POSIX.1 says that write(2)s of less than PIPE_BUF bytes must be atomic"
+    // Since there is a possibility that the report will be larger than PIPE_BUF, we need
+    // to break the report into packets of max size PIPE_BUF each.
+    char *fifo_packet = malloc(PIPE_BUF);
+    if (0 == fifo_packet) {
+        ERROR_AND_EXIT("malloc");
+    }
+
+    pid_t pid = getpid();
+
+    int got_error = 0;
+
+    // Calculate the total # of required parts
+    // ceiling ( report_size / max_fifo_payload_size )
+    int total_parts = (report_buf->current_pos_ + (max_fifo_payload_size - 1)) / max_fifo_payload_size;
+    int part_idx;
+    for (part_idx = 0; part_idx < total_parts; ++part_idx) {
+        int packet_pos_in_report_buf = part_idx * max_fifo_payload_size;
+        int payload_size = max_fifo_payload_size;
+        if (part_idx == (total_parts - 1)) {
+            payload_size = report_buf->current_pos_ - packet_pos_in_report_buf;
+        }
+
+        // Header layout, fit exactly into 32 bytes
+        // 12345678 12345 12345 12345678  1
+        // 01234567890123456789012345678901
+        // pay_size part# totpa pidxxxxx  N
+        // The formatting in snprintf below is designed to exactly fit in 32 bytes
+        // as the FIFO header. Add 1 to make room for null character byte which will
+        // get overwritten with the payload.
+        snprintf(fifo_packet, fifo_header_size + 1, "%8d %5d %5d %8d  \n", payload_size, part_idx, total_parts, pid);
+
+        // Copy the payload of the packet into the FIFO packet buffer after the header.
+        memcpy(&(fifo_packet[fifo_header_size]), &(report_buf->report_buf_[packet_pos_in_report_buf]), payload_size);
+
+        // Write the FIFO packet into the FIFO buffer
+        if (-1 == write(fd_fifo, fifo_packet, fifo_header_size + payload_size)) {
+            PERROR("write fifo");
+            got_error = 1;
+            break;
+        }
+    }
+
+    free((void *)fifo_packet);
+    close(fd_fifo);
+    if (got_error) {
+        ERROR_AND_EXIT("FIFO writing error!");
+    }
+}
+
 /* this method is to write log about the process creation. */
 
 static void report_call(char const *const argv[]) {
     if (!initialized)
         return;
-    // Create report file name
-    char const * const out_dir = initial_env[0];
-    size_t const path_max_length = strlen(out_dir) + 32;
-    char filename[path_max_length];
-    if (-1 == snprintf(filename, path_max_length, "%s/execution.XXXXXX", out_dir))
-        ERROR_AND_EXIT("snprintf");
-    // Create report file
-    int fd = mkstemp((char *)&filename);
-    if (-1 == fd)
-        ERROR_AND_EXIT("mkstemp");
-    // Write report file
-    const int finished = write_report(fd, argv);
-    // Close report file
-    if (close(fd))
-        ERROR_AND_EXIT("close");
-    // Remove the file if it's not done
-    if ((-1 == finished) && (-1 == unlink(filename)))
-        ERROR_AND_EXIT("unlink");
+
+    // Create report buffer
+    struct Report_buf report_buf;
+    report_buf_construct(&report_buf);
+    // Write report to the buffer
+    write_report(&report_buf, argv);
+
+    if (REPORT_FIFO == report_buf.report_type_)
+    {
+      // Write report to the fifo
+      report_buf_write_fifo(&report_buf);
+    }
+    // Destroy report buffer
+    report_buf_destroy(&report_buf);
 }
 
-static int write_binary_string(int fd, const char *const string) {
+static int write_binary_string(struct Report_buf *report_buf, const char *const string) {
     // write type
-    if (-1 == write(fd, "str", 3)) {
+    if (-1 == report_buf_write(report_buf, "str", 3)) {
         PERROR("write type");
         return -1;
     }
     // write length
     const uint32_t length = strlen(string);
-    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
+    if (-1 == report_buf_write(report_buf, (void *) &length, sizeof(uint32_t))) {
         PERROR("write length");
         return -1;
     }
     // write value
-    if (-1 == write(fd, (void *) string, length)) {
+    if (-1 == report_buf_write(report_buf, (void *) string, length)) {
         PERROR("write value");
         return -1;
     }
     return 0;
 }
 
-static int write_binary_string_list(int fd, const char *const *const strings) {
+static int write_binary_string_list(struct Report_buf *report_buf, const char *const *const strings) {
     // write type
-    if (-1 == write(fd, "lst", 3)) {
+    if (-1 == report_buf_write(report_buf, "lst", 3)) {
         PERROR("write type");
         return -1;
     }
     // write length
     const uint32_t length = string_array_length(strings);
-    if (-1 == write(fd, (void *) &length, sizeof(uint32_t))) {
+    if (-1 == report_buf_write(report_buf, (void *) &length, sizeof(uint32_t))) {
         PERROR("write length");
         return -1;
     }
     // write value
     for (uint32_t idx = 0; idx < length; ++idx) {
         const char *string = strings[idx];
-        if (-1 == write_binary_string(fd, string)) {
+        if (-1 == write_binary_string(report_buf, string)) {
             PERROR("write value");
             return -1;
         }
@@ -512,19 +685,19 @@ static int write_binary_string_list(int fd, const char *const *const strings) {
     return 0;
 }
 
-static int write_report(int fd, char const *const argv[]) {
+static int write_report(struct Report_buf *report_buf, char const *const argv[]) {
     const char *cwd = getcwd(NULL, 0);
     if (0 == cwd) {
         PERROR("getcwd");
         return -1;
     } else {
-        if (-1 == write_binary_string(fd, cwd)) {
+        if (-1 == write_binary_string(report_buf, cwd)) {
             PERROR("cwd writing failed");
             return -1;
         }
     }
     free((void *)cwd);
-    if (-1 == write_binary_string_list(fd, argv)) {
+    if (-1 == write_binary_string_list(report_buf, argv)) {
         PERROR("cmd writing failed");
         return -1;
     }

@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/successful_build
-# RUN: cd %T/successful_build; %{intercept-build} --cdb preload.json ./run.sh
+# RUN: cd %T/successful_build; %{intercept-build} --fifo --cdb preload.json ./run.sh
 # RUN: cd %T/successful_build; %{cdb_diff} preload.json expected.json
 
 set -o errexit

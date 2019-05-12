@@ -1,4 +1,4 @@
 # REQUIRES: scons,preload
 # RUN: mkdir -p %T/scons_build
-# RUN: cd %T/scons_build; %{intercept-build} --cdb scons.json scons -Y ../../Input
+# RUN: cd %T/scons_build; %{intercept-build} --fifo --cdb scons.json scons -Y ../../Input
 # RUN: %{python} %S/check_files.py %T/scons_build/scons.json

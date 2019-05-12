@@ -50,6 +50,9 @@ import shutil
 import struct
 import contextlib
 import logging
+import multiprocessing
+import enum
+import io
 
 # Map of ignored compiler option for the creation of a compilation database.
 # This map is used in _split_command method, which classifies the parameters
@@ -191,6 +194,121 @@ def run_build(command, *args, **kwargs):
     logging.debug('build finished with exit code: %d', exit_code)
     return exit_code
 
+class FifoReadStates(enum.IntEnum):
+    eWaitingHeader = 0
+    eWaitingPayload = 1
+
+def executions_receiver(executions_fifo_file, category, bear_args):
+    executions_save = []
+    fifo_header_size = 32
+    current_read_buffer = b""
+    bytes_remaining_to_read = fifo_header_size
+    fifo_read_state = FifoReadStates.eWaitingHeader
+    partial_binary = {}
+    with open(executions_fifo_file, "rb") as fFifoReader:
+        while True:
+            fifo_data_in = fFifoReader.read(bytes_remaining_to_read)
+            if fifo_data_in == b"":
+                # No more writers to the fifo and no more data to read
+                # from the fifo, so we're done with everything and can exit
+                # the read loop.
+                break
+            current_read_buffer += fifo_data_in
+            bytes_remaining_to_read -= len(fifo_data_in)
+            if bytes_remaining_to_read > 0:
+                # Still need to read more to finish getting header or payload
+                continue
+
+            # Being here means we have either the full header or full payload
+
+            if fifo_read_state == FifoReadStates.eWaitingHeader:
+                # Being here means we have the full header
+
+                # Convert bytes to unicode string so we can split/parse it
+                current_read_buffer = current_read_buffer.decode('utf-8')
+
+                header_split = current_read_buffer.split()
+
+                # Header format is:
+                # payload_size part_idx total_parts pid
+
+                bytes_remaining_to_read = int(header_split[0])
+
+                part_idx = int(header_split[1])
+                total_parts = int(header_split[2])
+                pid = int(header_split[3])
+
+                fifo_read_state = FifoReadStates.eWaitingPayload
+                current_read_buffer = b""
+                continue
+
+            # Being here means we have the full payload
+
+            # Update bytes_remaining_to_read/fifo_read_state for next time
+            # Do it now so can issue continue later when desired.
+            bytes_remaining_to_read = fifo_header_size
+            fifo_read_state = FifoReadStates.eWaitingHeader
+
+            # Read the rest of the payload, it will be binary data
+            execution_data_binary = current_read_buffer
+
+            # Reset current_read_buffer for next time when we read the header
+            current_read_buffer = b""
+            if total_parts > 1:
+                if part_idx == 0:
+                    # Save the initial part and continue
+                    partial_binary[pid] = execution_data_binary
+                    continue
+                # Combine the old data with the new
+                execution_data_binary = partial_binary[pid] + execution_data_binary
+                if part_idx != (total_parts - 1):
+                    # Still more parts coming, save what we have and move on
+                    partial_binary[pid] = execution_data_binary
+                    continue
+                # Got all the parts, remove this pid from the dictionary to
+                # free up memory consumption and also to clear it in case pid
+                # gets reused.
+                # Don't execute continue so that we fall into process a full
+                # execution_data_binary
+                partial_binary.pop(pid, None)
+
+            # Got the full data, parse it, and save it only if it is compilation.
+            # Not saving non-compilations allows to conserve memory.
+            exec_call = parse_exec_trace_binary(execution_data_binary)
+            if exec_call is None:
+                # Trace can't be parsed, ignore it
+                continue
+
+            compilations_this_exec = [compilation for compilation in Compilation.iter_from_execution(exec_call, category)]
+
+            if compilations_this_exec:
+                # Being here means this is a compilation, so save it for later.
+                # Will use less memory if we save the binary
+                # It means we will need to repeat binary decoding and Compilation.iter_from_execution again later
+                # for compilation executions, but advantage is less memory required so less swapping.
+                executions_save.append(execution_data_binary)
+
+    if bear_args.show_consumption:
+        # Calculate the memory consumed by executions_save so it can be printed.
+        executions_save_list_size = 0
+        for execution_data_binary in executions_save:
+            executions_save_list_size += sys.getsizeof(execution_data_binary)
+        executions_save_list_enclosure = sys.getsizeof(executions_save)
+        print("BEAR fifo memory consumption: " + sizeof_fmt(executions_save_list_size + executions_save_list_enclosure))
+
+    exec_calls = (parse_exec_trace_binary(execution_data_binary) for execution_data_binary in executions_save)
+    current = compilations(exec_calls, category)
+
+    # Now we have all the current compilations that can be iterated
+    # through using the 'current' generator
+    create_compile_database(bear_args, category, current)
+
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
 
 def run_command(command, cwd=None):
     # type: (List[str], str) -> List[str]
@@ -291,6 +409,12 @@ def intercept_build():
     category = Category(args.use_only, args.use_cc, args.use_cxx)
     exit_code, current = capture(args, category)
 
+    if not args.fifo:
+        create_compile_database(args, category, current)
+
+    return exit_code
+
+def create_compile_database(args, category, current):
     # To support incremental builds, it is desired to read elements from
     # an existing compilation database from a previous run.
     if args.append and os.path.isfile(args.cdb):
@@ -300,9 +424,6 @@ def intercept_build():
     else:
         CompilationDatabase.save(args.cdb, current)
 
-    return exit_code
-
-
 def capture(args, category):
     """ Implementation of compilation database generation.
 
@@ -310,12 +431,49 @@ def capture(args, category):
     :param category:    helper object to detect compiler
     :return:            the exit status of build process. """
 
-    with temporary_directory(prefix='intercept-') as tmp_dir:
+    with temporary_directory(prefix='intercept-', dir=args.tempdir) as tmp_dir:
         # run the build command
         environment = setup_environment(args, tmp_dir)
+
+        if args.fifo:
+            logging.debug('FIFO or FILE: FIFO')
+            executions_fifo_file = os.path.join(tmp_dir, "bearfifo")
+
+            # Create executions_fifo_file
+            # executions_fifo_file will get deleted when 'tmp_dir' goes out of scope
+            os.mkfifo(executions_fifo_file)
+
+            # Create a process object to handle the incoming FIFO messages
+            executions_receiver_process =  multiprocessing.Process(target=executions_receiver, args=(executions_fifo_file, category, args, ))
+
+            # Start the receiver process. Need to do this before opening the FIFO for writing below
+            # so that the open for write below will unblock after the FIFO opened for reading is
+            # created in executions_receiver_process.
+            executions_receiver_process.start()
+
+            # Open a fifo writer so that the executions_receiver will continue to block waiting for
+            # data until we close the executions_fifo_file, which occurs after the build is done.
+            with open(executions_fifo_file, "wb"):
+                exit_code = run_build(args.build, env=environment)
+
+            # Wait for the executions_receiver to finish before moving on.
+            executions_receiver_process.join()
+
+            return exit_code, None
+
+        # Not using the FIFO
+        logging.debug('FIFO or FILE: FILE')
         exit_code = run_build(args.build, env=environment)
+
+        # Print the filesystem consumption of the temporary files if asked to
+        if args.show_consumption:
+            du_process = subprocess.Popen(['du', '-sh', tmp_dir], stdout=subprocess.PIPE)
+            du_output = du_process.communicate()[0].decode('utf-8')
+            du_output_split = du_output.strip().split()
+            print("BEAR temporary files consumption at '" + du_output_split[1] + "' was: " + du_output_split[0])
+
         # read the intercepted exec calls
-        calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
+        calls = (parse_exec_trace_file(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
         current = compilations(safe_calls, category)
 
@@ -350,6 +508,8 @@ def setup_environment(args, destination):
     :param destination: directory path for the execution trace files
     :return: a prepared set of environment variables. """
 
+    logging.debug('INTERCEPT_BUILD_TARGET_DIR: %s', str(destination))
+
     environment = dict(os.environ)
     environment.update({'INTERCEPT_BUILD_TARGET_DIR': destination})
 
@@ -363,15 +523,23 @@ def setup_environment(args, destination):
 
     return environment
 
+def parse_exec_trace_file(filename):
+    logging.debug('parse exec trace file: %s', filename)
+    with open(filename, 'rb', buffering=0) as handler:
+        return parse_exec_trace_handler(handler)
 
-def parse_exec_trace(filename):
-    # type: (str) -> Optional[Execution]
-    """ Parse execution report file.
+def parse_exec_trace_binary(execution_binary):
+    handler = io.BytesIO(execution_binary)
+    return parse_exec_trace_handler(handler)
 
-    Given filename points to a file which contains the basic report
+def parse_exec_trace_handler(handler):
+    # type: (file handle) -> Optional[Execution]
+    """ Parse execution report
+
+    Given file handler contains the basic report
     generated by the interception library or compiler wrapper.
 
-    :param filename: path to an execution trace file to read from,
+    :param handler: file handler to an execution trace stream to read from,
     :return: an Execution object. """
 
     def byte_to_int(byte):
@@ -393,15 +561,13 @@ def parse_exec_trace(filename):
         length = parse_length(handler, b'lst')
         return [parse_string(handler) for _ in range(length)]
 
-    logging.debug('parse exec trace file: %s', filename)
-    with open(filename, 'rb', buffering=0) as handler:
-        try:
-            return Execution(cwd=parse_string(handler),
-                             cmd=parse_string_list(handler))
-        except Exception as exception:
-            logging.warning('parse exec trace file: %s FAILED: %s',
-                            filename, exception)
-            return None
+    try:
+        return Execution(cwd=parse_string(handler),
+                         cmd=parse_string_list(handler))
+    except Exception as exception:
+        logging.warning('parse exec trace binary: FAILED: %s',
+                        exception)
+        return None
 
 
 def exec_trace_files(directory):
@@ -489,6 +655,20 @@ def create_intercept_parser():
         default="@DEFAULT_PRELOAD_FILE@",
         action='store',
         help="""specify libear file location.""")
+    advanced.add_argument(
+        '--fifo', '-f',
+        action='store_true',
+        help="""Use a FIFO instead of temp files.""")
+    advanced.add_argument(
+        '--show_consumption',
+        action='store_true',
+        help="""Show consumption used by execution data (temp files or fifo)""")
+    advanced.add_argument(
+        '--tempdir', '-t',
+        dest='tempdir',
+        default=None,
+        action='store',
+        help="""specify temporary directory.""")
 
     parser.add_argument(
         dest='build', nargs=argparse.REMAINDER, help="""Command to run.""")

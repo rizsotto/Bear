@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/noisy_build
-# RUN: cd %T/noisy_build; %{intercept-build} --cdb preload.json ./run.sh
+# RUN: cd %T/noisy_build; %{intercept-build} --fifo --show_consumption --cdb preload.json ./run.sh
 # RUN: cd %T/noisy_build; %{cdb_diff} preload.json expected.json
 
 set -o errexit
