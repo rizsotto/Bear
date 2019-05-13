@@ -97,7 +97,6 @@ static char const **string_array_partial_update(char *const envp[], bear_env_t *
 static char const **string_array_single_update(char const *envs[], char const *key, char const *value);
 static void report_call(char const *const argv[]);
 static int write_report(int fd, char const *const argv[]);
-static int write_binary_report(int fd, char const *const cmd[], char const *cwd, pid_t pid);
 static char const **string_array_from_varargs(char const * arg, va_list *args);
 static char const **string_array_copy(char const **in);
 static size_t string_array_length(char const *const *in);
@@ -490,7 +489,7 @@ static int write_binary_string(int fd, const char *const string) {
     return 0;
 }
 
-static int wirte_binary_string_list(int fd, const char *const *const strings) {
+static int write_binary_string_list(int fd, const char *const *const strings) {
     // write type
     if (-1 == write(fd, "lst", 3)) {
         PERROR("write type");
@@ -525,7 +524,7 @@ static int write_report(int fd, char const *const argv[]) {
         }
     }
     free((void *)cwd);
-    if (-1 == wirte_binary_string_list(fd, argv)) {
+    if (-1 == write_binary_string_list(fd, argv)) {
         PERROR("cmd writing failed");
         return -1;
     }

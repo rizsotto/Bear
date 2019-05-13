@@ -377,9 +377,9 @@ def parse_exec_trace(filename):
     def byte_to_int(byte):
         return struct.unpack_from("=I", byte)[0]
 
-    def parse_length(handler, type):
+    def parse_length(handler, expected_type):
         type_bytes = handler.read(3)
-        if type_bytes != type:
+        if type_bytes != expected_type:
             raise Exception("type not expected")
         length_bytes = handler.read(4)
         return byte_to_int(length_bytes)
