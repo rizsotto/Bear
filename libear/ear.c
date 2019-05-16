@@ -92,8 +92,8 @@ extern char **environ;
 
 typedef char const * bear_env_t[ENV_SIZE];
 
-const int fifo_header_size = 32;
-const int max_fifo_payload_size = PIPE_BUF - fifo_header_size;
+#define FIFO_HEADER_SIZE 32
+const int max_fifo_payload_size = (PIPE_BUF - FIFO_HEADER_SIZE);
 
 enum Report_Type {
     REPORT_FIFO,
@@ -601,13 +601,13 @@ static void report_buf_write_fifo(struct Report_buf *report_buf) {
         // The formatting in snprintf below is designed to exactly fit in 32 bytes
         // as the FIFO header. Add 1 to make room for null character byte which will
         // get overwritten with the payload.
-        snprintf(fifo_packet, fifo_header_size + 1, "%8d %5d %5d %8d  \n", payload_size, part_idx, total_parts, pid);
+        snprintf(fifo_packet, FIFO_HEADER_SIZE + 1, "%8d %5d %5d %8d  \n", payload_size, part_idx, total_parts, pid);
 
         // Copy the payload of the packet into the FIFO packet buffer after the header.
-        memcpy(&(fifo_packet[fifo_header_size]), &(report_buf->report_buf_[packet_pos_in_report_buf]), payload_size);
+        memcpy(&(fifo_packet[FIFO_HEADER_SIZE]), &(report_buf->report_buf_[packet_pos_in_report_buf]), payload_size);
 
         // Write the FIFO packet into the FIFO buffer
-        if (-1 == write(fd_fifo, fifo_packet, fifo_header_size + payload_size)) {
+        if (-1 == write(fd_fifo, fifo_packet, FIFO_HEADER_SIZE + payload_size)) {
             PERROR("write fifo");
             got_error = 1;
             break;
