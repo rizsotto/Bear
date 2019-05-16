@@ -51,7 +51,6 @@ import struct
 import contextlib
 import logging
 import multiprocessing
-import enum
 import io
 
 # Map of ignored compiler option for the creation of a compilation database.
@@ -195,9 +194,8 @@ def run_build(command, *args, **kwargs):
     return exit_code
 
 
-class FifoReadStates(enum.IntEnum):
-    eWaitingHeader = 0
-    eWaitingPayload = 1
+FifoReadStates_eWaitingHeader = 0
+FifoReadStates_eWaitingPayload = 1
 
 
 def exec_rcv(executions_fifo_file, category, bear_args):
@@ -205,7 +203,7 @@ def exec_rcv(executions_fifo_file, category, bear_args):
     fifo_header_size = 32
     current_read_buffer = b""
     bytes_remaining_to_read = fifo_header_size
-    fifo_read_state = FifoReadStates.eWaitingHeader
+    fifo_read_state = FifoReadStates_eWaitingHeader
     partial_binary = {}
     with open(executions_fifo_file, "rb") as fFifoReader:
         while True:
@@ -223,7 +221,7 @@ def exec_rcv(executions_fifo_file, category, bear_args):
 
             # Being here means we have either the full header or full payload
 
-            if fifo_read_state == FifoReadStates.eWaitingHeader:
+            if fifo_read_state == FifoReadStates_eWaitingHeader:
                 # Being here means we have the full header
 
                 # Convert bytes to unicode string so we can split/parse it
@@ -240,7 +238,7 @@ def exec_rcv(executions_fifo_file, category, bear_args):
                 total_parts = int(header_split[2])
                 pid = int(header_split[3])
 
-                fifo_read_state = FifoReadStates.eWaitingPayload
+                fifo_read_state = FifoReadStates_eWaitingPayload
                 current_read_buffer = b""
                 continue
 
@@ -249,37 +247,35 @@ def exec_rcv(executions_fifo_file, category, bear_args):
             # Update bytes_remaining_to_read/fifo_read_state for next time
             # Do it now so can issue continue later when desired.
             bytes_remaining_to_read = fifo_header_size
-            fifo_read_state = FifoReadStates.eWaitingHeader
+            fifo_read_state = FifoReadStates_eWaitingHeader
 
             # Read the rest of the payload, it will be binary data
-            execution_data_binary = current_read_buffer
+            exec_bin = current_read_buffer
 
             # Reset current_read_buffer for next time when we read the header
             current_read_buffer = b""
             if total_parts > 1:
                 if part_idx == 0:
                     # Save the initial part and continue
-                    partial_binary[pid] = execution_data_binary
+                    partial_binary[pid] = exec_bin
                     continue
                 # Combine the old data with the new
-                execution_data_binary_new = partial_binary[pid]
-                execution_data_binary_new += execution_data_binary
-                execution_data_binary = execution_data_binary_new
+                exec_bin = partial_binary[pid] + exec_bin
                 if part_idx != (total_parts - 1):
                     # Still more parts coming, save what we have and move on
-                    partial_binary[pid] = execution_data_binary
+                    partial_binary[pid] = exec_bin
                     continue
                 # Got all the parts, remove this pid from the dictionary to
                 # free up memory consumption and also to clear it in case pid
                 # gets reused.
                 # Don't execute continue so that we fall into process a full
-                # execution_data_binary
+                # exec_bin
                 partial_binary.pop(pid, None)
 
             # Got the full data, parse it, and save it only if it is
             # compilation. Not saving non-compilations allows to conserve
             # memory.
-            exec_call = parse_exec_trace_binary(execution_data_binary)
+            exec_call = parse_exec_trace_binary(exec_bin)
             if exec_call is None:
                 # Trace can't be parsed, ignore it
                 continue
@@ -295,21 +291,21 @@ def exec_rcv(executions_fifo_file, category, bear_args):
                 # Compilation.iter_from_execution again later
                 # for compilation executions, but advantage is less memory
                 # required so less swapping.
-                executions_save.append(execution_data_binary)
+                executions_save.append(exec_bin)
 
     if bear_args.show_consumption:
         # Calculate the memory consumed by executions_save so it can be
         # printed.
         executions_save_list_size = 0
-        for execution_data_binary in executions_save:
-            executions_save_list_size += sys.getsizeof(execution_data_binary)
-        executions_save_list_enclosure = sys.getsizeof(executions_save)
+        for exec_bin in executions_save:
+            executions_save_list_size += sys.getsizeof(exec_bin, 0)
+        executions_save_list_enclosure = sys.getsizeof(executions_save, 0)
         print("BEAR fifo memory consumption: " +
               sizeof_fmt(executions_save_list_size
                          + executions_save_list_enclosure))
 
-    exec_calls = (parse_exec_trace_binary(execution_data_binary)
-                  for execution_data_binary in executions_save)
+    exec_calls = (parse_exec_trace_binary(exec_bin)
+                  for exec_bin in executions_save)
     current = compilations(exec_calls, category)
 
     # Now we have all the current compilations that can be iterated
