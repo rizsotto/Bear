@@ -92,11 +92,13 @@ IGNORED_FLAGS = {
 
 }  # type: Dict[str, int]
 
+
 # Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
 # Known MPI compiler wrapper name patterns.
-COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
+
+COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$')
 
 # Known C compiler executable name patterns.
 COMPILER_PATTERNS_CC = (
@@ -115,9 +117,18 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^(g|)xl(C|c\+\+)$'),
 )
 
+# Known Fortran compiler executable name patterns
+# Gfortran, Intel Fortran Compilers, PGI compilers
+COMPILER_PATTERNS_F = (
+    re.compile(r'^(f95)$'),
+    re.compile(r'^(gfortran)$'),
+    re.compile(r'^(ifort)$'),
+    re.compile(r'^(pg)(f77|f90|f95|fortran)$')
+    )
+
 TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
-C_LANG, CPLUSPLUS_LANG, OTHER = range(3)
+C_LANG, CPLUSPLUS_LANG, F, OTHER = range(4)
 
 Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
 
@@ -127,11 +138,12 @@ CompilationCommand = collections.namedtuple(
 
 
 class Category:
-
-    def __init__(self, only_use, c_compilers, cxx_compilers):
+     
+    def __init__(self, only_use, c_compilers, cxx_compilers, f_compilers):
         self.ignore = only_use
         self.c_compilers = [os.path.basename(cc) for cc in c_compilers]
         self.cxx_compilers = [os.path.basename(cc) for cc in cxx_compilers]
+        self.f_compilers = [os.path.basename(cc) for cc in f_compilers]
 
     def is_wrapper(self, cmd):
         # type: (Category, str) -> bool
@@ -151,6 +163,12 @@ class Category:
         # type: (Category, str) -> bool
         use_match = Category._is_sting_match(cmd, self.cxx_compilers)
         pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CXX)
+        return use_match if self.ignore else (use_match or pattern_match)
+     
+    def is_f_compiler(self, cmd):
+        # type: (Category, str) -> bool
+        use_match = Category._is_sting_match(cmd, self.f_compilers)
+        pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_F)
         return use_match if self.ignore else (use_match or pattern_match)
 
     @classmethod
@@ -286,11 +304,13 @@ def command_entry_point(function):
 def intercept_build():
     # type: () -> int
     """ Entry point for 'intercept-build' command. """
-
+     
     args = parse_args_for_intercept_build()
-    category = Category(args.use_only, args.use_cc, args.use_cxx)
+    
+    category = Category(args.use_only, args.use_cc, args.use_cxx, args.use_f)
+    
     exit_code, current = capture(args, category)
-
+  
     # To support incremental builds, it is desired to read elements from
     # an existing compilation database from a previous run.
     if args.append and os.path.isfile(args.cdb):
@@ -312,13 +332,16 @@ def capture(args, category):
 
     with temporary_directory(prefix='intercept-') as tmp_dir:
         # run the build command
+       
         environment = setup_environment(args, tmp_dir)
+      
         exit_code = run_build(args.build, env=environment)
-        # read the intercepted exec calls
-        calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
+     
+        calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir)) 
+        
         safe_calls = (x for x in calls if x is not None)
         current = compilations(safe_calls, category)
-
+       
         return exit_code, iter(set(current))
 
 
@@ -470,10 +493,22 @@ def create_intercept_parser():
         default=[os.getenv('CXX', 'c++')],
         help="""Hint '%(prog)s' to classify the given program name as C++
         compiler.""")
+    
+    #add_argument for Fortan
+    parser.add_argument(
+        '--use-f',
+        metavar='<path>',
+        dest='use_f',
+        action='append',
+        #default=[os.getenv('f??','f95')],
+        default=['fXX','f95'],
+        help="""Hint '%(prog)s' to classify the given program name as Fortan
+        compiler.""")
+    
     parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""Only use compilers given to '--use-cc' and '--use-c++'.""")
+        help="""Only use compilers given to '--use-cc' and '--use-c++' and '--use-f'.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
@@ -564,7 +599,8 @@ class Compilation:
         :param category:    helper object to detect compiler
         :return: stream of CompilationDbEntry objects """
 
-        candidate = cls._split_command(execution.cmd, category)
+        candidate = cls._split_command(execution.cmd, category) 
+       
         for source in candidate.files if candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
@@ -589,7 +625,10 @@ class Compilation:
 
         if command:  # not empty list will allow to index '0' and '1:'
             executable = os.path.basename(command[0])  # type: str
-            parameters = command[1:]  # type: List[str]
+            
+            parameters = command[1:]  
+            
+            # type: List[str]
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
             # Additionally, a wrapper can wrap another wrapper.
@@ -608,6 +647,9 @@ class Compilation:
                 return command[0], C_LANG, parameters
             elif category.is_cxx_compiler(executable):
                 return command[0], CPLUSPLUS_LANG, parameters
+            elif category.is_f_compiler(executable):
+                return command[0], F ,parameters
+        
         return None
 
     @classmethod
@@ -722,8 +764,20 @@ def classify_source(filename, c_compiler=True):
         '.s': 'assembly',
         '.S': 'assembly',
         '.sx': 'assembly',
-        '.asm': 'assembly'
-    }
+        '.asm': 'assembly',
+        '.f95':'fortran',
+        '.F95':'fortran',
+        '.f90':'fortran',
+        '.F90':'fortran',
+        '.f':'fortran',
+        '.F':'fortran',
+        '.FOR':'fortran',
+        '.f77': 'fortran',
+        '.fc':'fortran',
+        '.for':'fortran',
+        '.ftn':'fortran',
+        '.fpp':'fortran'
+        }
 
     __, extension = os.path.splitext(os.path.basename(filename))
     return mapping.get(extension)
@@ -749,8 +803,10 @@ def get_mpi_call(wrapper):
 def temporary_directory(**kwargs):
     name = tempfile.mkdtemp(**kwargs)
     try:
+        
         yield name
     finally:
+       
         shutil.rmtree(name)
 
 
