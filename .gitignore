@@ -3,3 +3,4 @@ cmake-build*/
 Output/
 Cargo.lock
 target/
+.DS_Store

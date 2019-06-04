@@ -92,11 +92,13 @@ IGNORED_FLAGS = {
 
 }  # type: Dict[str, int]
 
+
 # Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
 # Known MPI compiler wrapper name patterns.
-COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
+COMPILER_PATTERNS_MPI_WRAPPER = re.compile(
+    r'^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$')
 
 # Known C compiler executable name patterns.
 COMPILER_PATTERNS_CC = (
@@ -115,9 +117,18 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^(g|)xl(C|c\+\+)$'),
 )
 
+# Known Fortran compiler executable name patterns
+# Gfortran, Intel Fortran Compilers, PGI compilers
+COMPILER_PATTERNS_FORTRAN = (
+    re.compile(r'^(f95)$'),
+    re.compile(r'^(gfortran)$'),
+    re.compile(r'^(ifort)$'),
+    re.compile(r'^(pg)(f77|f90|f95|fortran)$')
+)
+
 TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
-C_LANG, CPLUSPLUS_LANG, OTHER = range(3)
+C_LANG, CPLUSPLUS_LANG, FORTRAN_LANG, OTHER = range(4)
 
 Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
 
@@ -127,11 +138,13 @@ CompilationCommand = collections.namedtuple(
 
 
 class Category:
-
-    def __init__(self, only_use, c_compilers, cxx_compilers):
+    def __init__(self, only_use, c_compilers, cxx_compilers,
+                 fortran_compilers):
         self.ignore = only_use
         self.c_compilers = [os.path.basename(cc) for cc in c_compilers]
         self.cxx_compilers = [os.path.basename(cc) for cc in cxx_compilers]
+        self.fortran_compilers = [
+            os.path.basename(cc) for cc in fortran_compilers]
 
     def is_wrapper(self, cmd):
         # type: (Category, str) -> bool
@@ -151,6 +164,13 @@ class Category:
         # type: (Category, str) -> bool
         use_match = Category._is_sting_match(cmd, self.cxx_compilers)
         pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CXX)
+        return use_match if self.ignore else (use_match or pattern_match)
+
+    def is_fortran_compiler(self, cmd):
+        # type: (Category, str) -> bool
+        use_match = Category._is_sting_match(cmd, self.fortran_compilers)
+        pattern_match = Category._is_pattern_match(
+            cmd, COMPILER_PATTERNS_FORTRAN)
         return use_match if self.ignore else (use_match or pattern_match)
 
     @classmethod
@@ -288,7 +308,8 @@ def intercept_build():
     """ Entry point for 'intercept-build' command. """
 
     args = parse_args_for_intercept_build()
-    category = Category(args.use_only, args.use_cc, args.use_cxx)
+    category = Category(args.use_only, args.use_cc,
+                        args.use_cxx, args.use_fortran)
     exit_code, current = capture(args, category)
 
     # To support incremental builds, it is desired to read elements from
@@ -475,9 +496,18 @@ def create_intercept_parser():
         help="""Hint '%(prog)s' to classify the given program name as C++
         compiler.""")
     parser.add_argument(
+        '--use-fortran',
+        metavar='<path>',
+        dest='use_fortran',
+        action='append',
+        default=['f95'],
+        help="""Hint '%(prog)s' to classify the given program name as Fortan
+        compiler.""")
+    parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""Only use compilers given to '--use-cc' and '--use-c++'.""")
+        help="""Only use compilers given to '--use-cc' and
+                '--use-c++' and '--use-fortran'.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
@@ -623,6 +653,8 @@ class Compilation:
                 return command[0], C_LANG, parameters
             elif category.is_cxx_compiler(executable):
                 return command[0], CPLUSPLUS_LANG, parameters
+            elif category.is_fortran_compiler(executable):
+                return command[0], FORTRAN_LANG, parameters
         return None
 
     @classmethod
@@ -737,7 +769,19 @@ def classify_source(filename, c_compiler=True):
         '.s': 'assembly',
         '.S': 'assembly',
         '.sx': 'assembly',
-        '.asm': 'assembly'
+        '.asm': 'assembly',
+        '.f95': 'fortran',
+        '.F95': 'fortran',
+        '.f90': 'fortran',
+        '.F90': 'fortran',
+        '.f': 'fortran',
+        '.F': 'fortran',
+        '.FOR': 'fortran',
+        '.f77': 'fortran',
+        '.fc': 'fortran',
+        '.for': 'fortran',
+        '.ftn': 'fortran',
+        '.fpp': 'fortran'
     }
 
     __, extension = os.path.splitext(os.path.basename(filename))

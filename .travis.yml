@@ -1,4 +1,5 @@
 language: python
+sudo: required
 
 matrix:
   include:
@@ -39,6 +40,9 @@ before_install:
       brew update;
       brew install scons;
     fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+    sudo apt-get install gfortran;
+  fi
 
 install:
   - pip --version
