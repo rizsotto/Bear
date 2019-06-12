@@ -139,7 +139,7 @@ CompilationCommand = collections.namedtuple(
 
 
 class Category:
-    def __init__(self, only_use, c_compilers, cxx_compilers, 
+    def __init__(self, only_use, c_compilers, cxx_compilers,
                  fortran_compilers):
         self.ignore = only_use
         self.c_compilers = [os.path.basename(cc) for cc in c_compilers]
@@ -503,7 +503,7 @@ def create_intercept_parser():
     parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""Only use compilers given to '--use-cc' and 
+        help="""Only use compilers given to '--use-cc' and
                 '--use-c++' and '--use-fortran'.""")
 
     advanced = parser.add_argument_group('advanced options')
