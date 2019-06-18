@@ -124,4 +124,40 @@ mod inner {
     fn is_executable(path: &std::path::Path) -> bool {
         path.exists() && path.is_file()
     }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use tempfile;
+
+        #[test]
+        fn when_absolute_path() -> Result<()> {
+            let dir = tempfile::tempdir()?;
+            let executable = create_executable(dir.path())
+                .map(|candidate| to_absolute_path(dir.path(),candidate.as_path()))?;
+
+            let sut = Executable::WithFilename(executable.clone());
+            let result = sut.resolve()?;
+
+            assert_eq!(executable, result);
+
+            Ok(())
+        }
+
+        fn to_absolute_path(prefix: &std::path::Path, file: &std::path::Path) -> std::path::PathBuf {
+            prefix.to_path_buf().join(file)
+        }
+
+        fn create_executable(path: &std::path::Path) -> Result<std::path::PathBuf> {
+            use std::io::Write;
+
+            let file_name = std::path::PathBuf::from("this_very_unique.exe");
+
+            let abs_file_name = to_absolute_path(path, &file_name.as_path());
+            let mut f = std::fs::File::create(abs_file_name)?;
+            f.write_all(b"content")?;
+
+            Ok(file_name)
+        }
+    }
 }
