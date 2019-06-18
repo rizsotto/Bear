@@ -100,13 +100,11 @@ impl Executable {
 }
 
 fn resolve_executable<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
-    for prefix in paths {
-        match prefix.join(&path).canonicalize() {
-            Ok(ref result) if is_executable(&result) => return Ok(result.clone()),
-            _ => continue,
-        }
-    }
-    Err("File is not found nor executable.".into())
+    paths.iter()
+        .filter_map(|prefix| prefix.join(&path).canonicalize().ok())
+        .filter(|candidate| is_executable(candidate))
+        .next()
+        .ok_or("File is not found nor executable.".into())
 }
 
 fn is_executable(_path: &std::path::Path) -> bool {
