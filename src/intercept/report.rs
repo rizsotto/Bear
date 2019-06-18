@@ -78,37 +78,8 @@ pub enum Executable {
 
 impl Executable {
     pub fn resolve(&self) -> Result<std::path::PathBuf> {
-        match self {
-            Executable::WithFilename(ref path) if path.is_absolute() => {
-                Ok(path.clone())
-            },
-            Executable::WithFilename(ref path) => {
-                let cwd = std::env::current_dir()?;
-                resolve_executable(path, vec!(cwd).as_ref())
-            },
-            Executable::WithPath(ref string) => {
-                let path = std::env::var("PATH")?;
-                let paths = std::env::split_paths(&path)
-                    .collect::<Vec<_>>();
-                resolve_executable(string, &paths)
-            }
-            Executable::WithSearchPath(ref string, ref paths) => {
-                resolve_executable(string, &paths)
-            },
-        }
+        inner::resolve_executable(self)
     }
-}
-
-fn resolve_executable<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
-    paths.iter()
-        .filter_map(|prefix| prefix.join(&path).canonicalize().ok())
-        .filter(|candidate| is_executable(candidate))
-        .next()
-        .ok_or("File is not found nor executable.".into())
-}
-
-fn is_executable(_path: &std::path::Path) -> bool {
-    unimplemented!()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -116,4 +87,41 @@ pub struct Session {
     pub destination: std::path::PathBuf,
     pub verbose: bool,
     pub modes: InterceptModes,
+}
+
+mod inner {
+    use super::*;
+
+    pub fn resolve_executable(executable: &Executable) -> Result<std::path::PathBuf> {
+        match executable {
+            Executable::WithFilename(ref path) if path.is_absolute() => {
+                Ok(path.clone())
+            },
+            Executable::WithFilename(ref path) => {
+                let cwd = std::env::current_dir()?;
+                find_executable_in(path, vec!(cwd).as_ref())
+            },
+            Executable::WithPath(ref string) => {
+                let path = std::env::var("PATH")?;
+                let paths = std::env::split_paths(&path)
+                    .collect::<Vec<_>>();
+                find_executable_in(string, &paths)
+            }
+            Executable::WithSearchPath(ref string, ref paths) => {
+                find_executable_in(string, &paths)
+            },
+        }
+    }
+
+    fn find_executable_in<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
+        paths.iter()
+            .filter_map(|prefix| prefix.join(&path).canonicalize().ok())
+            .filter(|candidate| is_executable(candidate))
+            .next()
+            .ok_or("File is not found nor executable.".into())
+    }
+
+    fn is_executable(path: &std::path::Path) -> bool {
+        path.exists() && path.is_file()
+    }
 }
