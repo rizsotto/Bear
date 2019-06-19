@@ -619,8 +619,7 @@ class Compilation:
 
         if command:  # not empty list will allow to index '0' and '1:'
             executable = os.path.basename(command[0])  # type: str
-            parameters = command[1:]
-            # type: List[str]
+			parameters = command[1:]  # type: List[str]            
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
             # Additionally, a wrapper can wrap another wrapper.
