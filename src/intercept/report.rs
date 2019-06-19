@@ -78,7 +78,7 @@ pub enum Executable {
 
 impl Executable {
     pub fn resolve(&self) -> Result<std::path::PathBuf> {
-        inner::resolve_executable(self)
+        inner::resolve_executable(&inner::NativeContext, self)
     }
 }
 
@@ -92,72 +92,96 @@ pub struct Session {
 mod inner {
     use super::*;
 
-    pub fn resolve_executable(executable: &Executable) -> Result<std::path::PathBuf> {
+    #[cfg(test)]
+    use mockiato::mockable;
+
+    #[cfg_attr(test, mockable)]
+    pub(super) trait Context {
+        fn get_cwd(&self) -> Result<std::path::PathBuf>;
+        fn get_paths(&self) -> Result<Vec<std::path::PathBuf>>;
+        fn is_executable(&self, file: &std::path::Path) -> bool;
+    }
+
+    pub(super) struct NativeContext;
+
+    impl Context for NativeContext {
+        fn get_cwd(&self) -> Result<std::path::PathBuf> {
+            let result = std::env::current_dir()?;
+            Ok(result)
+        }
+
+        fn get_paths(&self) -> Result<Vec<std::path::PathBuf>> {
+            let path = std::env::var("PATH")?;
+            let paths = std::env::split_paths(&path)
+                .collect::<Vec<_>>();
+            Ok(paths)
+        }
+
+        fn is_executable(&self, file: &std::path::Path) -> bool {
+            file.exists() && file.is_file()
+        }
+    }
+
+    pub(super) fn resolve_executable(context: &Context, executable: &Executable) -> Result<std::path::PathBuf> {
         match executable {
             Executable::WithFilename(ref path) if path.is_absolute() => {
                 Ok(path.clone())
             },
             Executable::WithFilename(ref path) => {
-                let cwd = std::env::current_dir()?;
-                find_executable_in(path, vec!(cwd).as_ref())
+                let cwd = context.get_cwd()?;
+                find_executable_in(context, path, vec!(cwd).as_ref())
             },
             Executable::WithPath(ref string) => {
-                let path = std::env::var("PATH")?;
-                let paths = std::env::split_paths(&path)
-                    .collect::<Vec<_>>();
-                find_executable_in(string, &paths)
+                let paths = context.get_paths()?;
+                find_executable_in(context, string, &paths)
             }
             Executable::WithSearchPath(ref string, ref paths) => {
-                find_executable_in(string, &paths)
+                find_executable_in(context, string, &paths)
             },
         }
     }
 
-    fn find_executable_in<P: AsRef<std::path::Path>>(path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
+    fn find_executable_in<P: AsRef<std::path::Path>>(context: &Context, path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
         paths.iter()
             .filter_map(|prefix| prefix.join(&path).canonicalize().ok())
-            .filter(|candidate| is_executable(candidate))
+            .filter(|candidate| context.is_executable(candidate))
             .next()
             .ok_or("File is not found nor executable.".into())
-    }
-
-    fn is_executable(path: &std::path::Path) -> bool {
-        path.exists() && path.is_file()
     }
 
     #[cfg(test)]
     mod test {
         use super::*;
-        use tempfile;
 
         #[test]
         fn when_absolute_path() -> Result<()> {
-            let dir = tempfile::tempdir()?;
-            let executable = create_executable(dir.path())
-                .map(|candidate| to_absolute_path(dir.path(),candidate.as_path()))?;
+            let mut context = ContextMock::new();
 
-            let sut = Executable::WithFilename(executable.clone());
-            let result = sut.resolve()?;
+            let sut = Executable::WithFilename(std::path::PathBuf::from("/path/to/executable"));
+            let result = resolve_executable(&context, &sut);
 
-            assert_eq!(executable, result);
+            assert_eq!(true, result.is_ok());
 
             Ok(())
         }
 
-        fn to_absolute_path(prefix: &std::path::Path, file: &std::path::Path) -> std::path::PathBuf {
-            prefix.to_path_buf().join(file)
-        }
+//        #[test]
+//        fn when_relative_path() -> Result<()> {
+//            let mut context = ContextMock::new();
+//
+//            context.expect_get_cwd()
+//                .returns(Ok(std::path::PathBuf::from("/path/to")));
+//
+//            context.expect_is_executable(|p| p.partial_eq(std::path::PathBuf::from("/path/to/executable")))
+//                .returns(true);
+//
+//            let sut = Executable::WithFilename(std::path::PathBuf::from("executable"));
+//            let result = resolve_executable(&context, &sut);
+//
+//            assert_eq!(true, result.is_ok());
+//
+//            Ok(())
+//        }
 
-        fn create_executable(path: &std::path::Path) -> Result<std::path::PathBuf> {
-            use std::io::Write;
-
-            let file_name = std::path::PathBuf::from("this_very_unique.exe");
-
-            let abs_file_name = to_absolute_path(path, &file_name.as_path());
-            let mut f = std::fs::File::create(abs_file_name)?;
-            f.write_all(b"content")?;
-
-            Ok(file_name)
-        }
     }
 }

@@ -45,6 +45,9 @@ serde_json = "1.0"
 shellwords = "1.0"
 tempfile = "3.0"
 
+[dev-dependencies]
+mockiato = "0.8"
+
 [target.'cfg(unix)'.dependencies]
 nix = "0.13"
 
