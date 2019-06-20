@@ -42,64 +42,6 @@ pub fn executor(reporter: Sender<Event>) -> impl Executor {
     generic::GenericExecutor::new(reporter)
 }
 
-trait Process {
-    type Handle;
-
-    fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
-        where F: FnMut(Event) -> ();
-
-    fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
-        where F: FnMut(Event) -> ();
-
-    fn run<F>(sink: &mut F, cmd: &[String]) -> Result<ExitCode>
-        where F: FnMut(Event) -> ()
-    {
-        let cwd = env::current_dir()
-            .chain_err(|| "Unable to get current working directory")?;
-
-        let mut child = Self::spawn(sink, cmd, cwd)
-            .chain_err(|| format!("Unable to execute: {}", &cmd[0]))?;
-
-        Self::wait(sink, &mut child)
-    }
-}
-
-pub struct Supervisor<F>
-    where F: FnMut(Event) -> ()
-{
-    sink: F,
-}
-
-impl<F> Supervisor<F>
-    where F: FnMut(Event) -> ()
-{
-    pub fn new(sink: F) -> Supervisor<F>
-    {
-        Supervisor { sink }
-    }
-
-    #[cfg(unix)]
-    pub fn run(&mut self, _cmd: &[String]) -> Result<ExitCode>
-    {
-        debug!("Running: unix supervisor");
-//        unix::ProcessHandle::run(&mut self.sink, cmd)
-        Ok(0)
-    }
-
-    #[cfg(not(unix))]
-    pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
-    {
-        debug!("Running: generic supervisor");
-//        generic::ProcessHandle::run(&mut self.sink, cmd)
-        Ok(0)
-    }
-
-    pub fn fake(&mut self, cmd: &[String]) -> Result<ExitCode> {
-        debug!("Running: fake supervisor");
-        fake::ProcessHandle::run(&mut self.sink, cmd)
-    }
-}
-
 #[cfg(unix)]
 pub fn get_parent_pid() -> ProcessId {
     std::os::unix::process::parent_id()
@@ -727,48 +669,6 @@ mod generic {
 mod fake {
     use super::*;
     use crate::semantic::c_compiler::CompilerCall;
-
-    pub struct ProcessHandle {
-        code: ExitCode,
-    }
-
-    impl Process for ProcessHandle {
-        type Handle = ProcessHandle;
-
-        fn spawn<F>(sink: &mut F, cmd: &[String], cwd: path::PathBuf) -> Result<Self::Handle>
-            where F: FnMut(Event) -> ()
-        {
-            match fake_execution(cmd, cwd.as_path()) {
-                Ok(_) => {
-//                    sink(
-//                        Event::Created {
-//                            pid: process::id() as ProcessId,
-//                            ppid: get_parent_pid(),
-//                            cwd: cwd.clone(),
-//                            cmd: cmd.to_vec(),
-//                            when: chrono::Utc::now(),
-//                        }
-//                    );
-                    sink(
-                        Event::TerminatedNormally {
-                            pid: process::id() as ProcessId,
-                            code: 0,
-                            when:  chrono::Utc::now(),
-                        }
-                    );
-                    Ok(ProcessHandle { code: 0 })
-                },
-                Err(error) =>
-                    Err(Error::with_chain(error, "Faking process execution failed.")),
-            }
-        }
-
-        fn wait<F>(_sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
-            where F: FnMut(Event) -> ()
-        {
-            Ok(handle.code)
-        }
-    }
 
     /// The main responsibility is to fake the program execution by making the
     /// relevant side effects.
