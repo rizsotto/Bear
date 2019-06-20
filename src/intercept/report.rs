@@ -89,6 +89,54 @@ pub struct Session {
     pub modes: InterceptModes,
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn resolve_success_on_existing_command() {
+        let sut = Executable::WithPath("true".to_string());
+        let result = sut.resolve();
+
+        assert_eq!(true, result.is_ok())
+    }
+
+    #[test]
+    fn resolve_fail_on_not_existing_command() {
+        let sut = Executable::WithPath("sure-this-is-not-there".to_string());
+        let result = sut.resolve();
+
+        assert_eq!(true, result.is_err())
+    }
+
+    #[test]
+    fn resolve_success_with_full_path() -> Result<()> {
+        let sut1 = Executable::WithPath("true".to_string());
+        let result1 = sut1.resolve()?;
+
+        let sut2 = Executable::WithFilename(result1.clone());
+        let result2 = sut2.resolve()?;
+
+        assert_eq!(result1, result2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_success_from_path() -> Result<()> {
+        let sut1 = Executable::WithPath("true".to_string());
+        let result1 = sut1.resolve()?;
+        let path1 = result1.parent().map(std::path::Path::to_path_buf).unwrap();
+
+        let sut2 = Executable::WithSearchPath("true".to_string(), vec!(path1));
+        let result2 = sut2.resolve()?;
+
+        assert_eq!(result1, result2);
+
+        Ok(())
+    }
+}
+
 mod inner {
     use super::*;
 
