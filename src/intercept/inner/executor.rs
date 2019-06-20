@@ -39,7 +39,7 @@ pub fn executor(reporter: Sender<Event>) -> impl Executor {
 
 #[cfg(not(unix))]
 pub fn executor(reporter: Sender<Event>) -> impl Executor {
-    generic::Executor::new(reporter)
+    generic::GenericExecutor::new(reporter)
 }
 
 trait Process {
@@ -90,7 +90,8 @@ impl<F> Supervisor<F>
     pub fn run(&mut self, cmd: &[String]) -> Result<ExitCode>
     {
         debug!("Running: generic supervisor");
-        generic::ProcessHandle::run(&mut self.sink, cmd)
+//        generic::ProcessHandle::run(&mut self.sink, cmd)
+        Ok(0)
     }
 
     pub fn fake(&mut self, cmd: &[String]) -> Result<ExitCode> {
@@ -534,66 +535,62 @@ mod unix {
 mod generic {
     use super::*;
 
-    pub struct Executor {
+    pub struct GenericExecutor {
         reporter: Sender<Event>,
     }
 
-    impl Executor {
+    impl GenericExecutor {
         pub fn new(reporter: Sender<Event>) -> Self {
-            Executor { reporter }
-        }
-    }
-
-    impl super::Executor for Executor {
-        fn run(&self, _program: &std::path::Path, _args: &[String], _envs: &Vars) -> Result<ExitCode> {
-            unimplemented!()
-        }
-    }
-
-    pub struct ProcessHandle {
-        child: process::Child,
-    }
-
-    impl Process for ProcessHandle {
-        type Handle = ProcessHandle;
-
-        fn spawn<F>(_sink: &mut F, cmd: &[String], _cwd: path::PathBuf) -> Result<Self::Handle>
-            where F: FnMut(Event) -> ()
-        {
-            let child = process::Command::new(&cmd[0]).args(&cmd[1..]).spawn()
-                .chain_err(|| format!("unable to execute process: {:?}", cmd[0]))?;
-
-//            sink(
-//                Event::Created {
-//                    pid: child.id() as ProcessId,
-//                    ppid: get_parent_pid(),
-//                    cwd: cwd.clone(),
-//                    cmd: cmd.to_vec(),
-//                    when: chrono::Utc::now(),
-//                });
-
-            Ok(ProcessHandle { child })
+            GenericExecutor { reporter }
         }
 
-        fn wait<F>(sink: &mut F, handle: &mut Self::Handle) -> Result<ExitCode>
-            where F: FnMut(Event) -> ()
-        {
-            match handle.child.wait() {
+        fn report(&self, event: Event) {
+            match self.reporter.send(event) {
+                Ok(_) => { debug!("report event: ok."); },
+                Err(error) => { info!("report event: failed. {}", error) },
+            }
+        }
+
+        fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<process::Child> {
+            let cwd = env::current_dir()
+                .chain_err(|| "Unable to get current working directory")?;
+
+            let child = process::Command::new(program)
+                .args(&args[1..])
+                .envs(envs)
+                .spawn()
+                .chain_err(|| format!("unable to execute process: {:?}", program))?;
+
+            self.report(
+                Event::Created {
+                    pid: child.id() as ProcessId,
+                    ppid: get_parent_pid(),
+                    cwd,
+                    program: program.to_path_buf(),
+                    args: args.to_vec(),
+                    when: chrono::Utc::now(),
+                });
+
+            Ok(child)
+        }
+
+        fn wait(&self, handle: &mut process::Child) -> Result<ExitCode> {
+            match handle.wait() {
                 Ok(status) => {
                     match status.code() {
                         Some(code) => {
-                            sink(
+                            self.report(
                                 Event::TerminatedNormally {
-                                    pid: handle.child.id(),
+                                    pid: handle.id(),
                                     code,
                                     when: chrono::Utc::now(),
                                 });
                             Ok(code)
                         }
                         None => {
-                            sink(
+                            self.report(
                                 Event::TerminatedAbnormally {
-                                    pid: handle.child.id(),
+                                    pid: handle.id(),
                                     signal: "unknown".to_string(),
                                     when: chrono::Utc::now(),
                                 });
@@ -602,99 +599,127 @@ mod generic {
                     }
                 }
                 Err(error) => {
-                    warn!("Child process was not running: {:?}", handle.child.id());
+                    warn!("Child process was not running: {:?}", handle.id());
                     Err(Error::with_chain(error, "Waiting for process failed."))
                 }
             }
         }
     }
 
+    impl super::Executor for GenericExecutor {
+        fn run(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<ExitCode> {
+            let mut handle = self.spawn(program, args, envs)?;
+            let exit_code = self.wait(&mut handle)?;
+            Ok(exit_code)
+        }
+    }
+
     #[cfg(test)]
     mod test {
         use super::*;
+        use std::sync::mpsc;
+        use std::thread;
+        use crate::intercept::inner::env;
+        use crate::intercept::report::Executable;
 
         mod exit_code {
             use super::*;
 
+            fn run_test(program: &str) -> Result<ExitCode> {
+                let (tx, _rx) = mpsc::channel();
+                let cmd = Executable::WithPath(program.to_string()).resolve()?;
+                // run the command and return the exit code.
+                let sut = super::GenericExecutor::new(tx);
+                sut.run(
+                    cmd.as_path(),
+                    slice_of_strings!(program),
+                    &env::Builder::new().build())
+            }
+
             #[test]
             fn success() {
-                let mut sink = |_: Event| ();
-
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("true"));
+                let result = run_test("true");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(0i32, result.unwrap());
             }
 
             #[test]
             fn fail() {
-                let mut sink = |_: Event| ();
-
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("false"));
+                let result = run_test("false");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(1i32, result.unwrap());
             }
 
             #[test]
             fn exec_failure() {
-                let mut sink = |_: Event| ();
-
-                let result = super::ProcessHandle::run(&mut sink, slice_of_strings!("./path/to/not/exists"));
+                let result = run_test("sure-this-is-not-there");
                 assert_eq!(false, result.is_ok());
             }
         }
 
         mod events {
             use super::*;
+            use std::process;
 
-            fn run_supervisor(args: &[String]) -> Vec<Event> {
-                let mut events: Vec<Event> = vec![];
+            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<Event> {
+                let (tx, rx) = mpsc::channel();
                 {
-                    let _ = super::ProcessHandle::run(&mut |event: Event| {
-                        (&mut events).push(event);
-                    }, args);
+                    let sut = super::GenericExecutor::new(tx);
+
+                    let _ = sut.run(command, arguments, &env::Builder::new().build());
+                    drop(sut);
                 }
-                events
+                rx.iter().collect::<Vec<Event>>()
             }
 
-//            fn assert_start_stop_events(args: &[String], expected_exit_code: i32) {
-//                let events = run_supervisor(args);
-//
-//                assert_eq!(2usize, (&events).len());
-//                // assert that the pid is not any of us.
-//                assert_ne!(0, events[0].pid());
-//                assert_ne!(process::id(), events[0].pid());
-//                // assert that the all event's pid are the same.
-//                assert_eq!(events[0].pid(), events[1].pid());
-//                match events[0] {
-//                    Event::Created { ref cwd, ref cmd, .. } => {
-//                        assert_eq!(env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
-//                        assert_eq!(args.to_vec(), *cmd);
-//                    },
-//                    _ => assert_eq!(true, false),
-//                }
-//                match events[1] {
-//                    Event::TerminatedNormally { code, .. } => {
-//                        assert_eq!(expected_exit_code, code);
-//                    },
-//                    _ => assert_eq!(true, false),
-//                }
-//            }
-//
-//            #[test]
-//            fn success() {
-//                assert_start_stop_events(slice_of_strings!("true"), 0i32);
-//            }
-//
-//            #[test]
-//            fn fail() {
-//                assert_start_stop_events(slice_of_strings!("false"), 1i32);
-//            }
-//
-//            #[test]
-//            fn exec_failure() {
-//                let events = run_supervisor(slice_of_strings!("./path/to/not/exists"));
-//                assert_eq!(0usize, (&events).len());
-//            }
+            fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
+                let events = run_test(command, arguments);
+
+                assert_eq!(2usize, (&events).len());
+                // assert that the pid is not any of us.
+                assert_ne!(0, events[0].pid());
+                assert_ne!(process::id(), events[0].pid());
+                assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
+                // assert that the all event's pid are the same.
+                assert_eq!(events[0].pid(), events[1].pid());
+                match events[0] {
+                    Event::Created { ppid, ref cwd, ref program, ref args, .. } => {
+                        assert_eq!(std::os::unix::process::parent_id(), ppid);
+                        assert_eq!(std::env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
+                        assert_eq!(arguments, args.as_slice());
+                        assert_eq!(command, program)
+                    },
+                    _ => assert_eq!(true, false),
+                }
+                match events[1] {
+                    Event::TerminatedNormally { code, .. } => {
+                        assert_eq!(expected_exit_code, code);
+                    },
+                    _ => assert_eq!(true, false),
+                }
+            }
+
+            #[test]
+            fn success() {
+                let cmd = Executable::WithPath("true".to_string()).resolve().unwrap();
+
+                assert_start_stop_events(cmd.as_path(), slice_of_strings!("true"), 0i32);
+            }
+
+            #[test]
+            fn fail() {
+                let cmd = Executable::WithPath("false".to_string()).resolve().unwrap();
+
+                assert_start_stop_events(cmd.as_path(), slice_of_strings!("false"), 1i32);
+            }
+
+            #[test]
+            fn exec_failure() {
+                let cmd = std::path::Path::new("sure-this-is-not-there");
+
+                let events = run_test(&cmd, slice_of_strings!("sure-this-is-not-there"));
+                assert_eq!(0usize, (&events).len());
+            }
         }
     }
 }
