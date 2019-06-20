@@ -331,37 +331,39 @@ mod unix {
         use std::sync::mpsc;
         use std::thread;
         use crate::intercept::inner::env;
+        use crate::intercept::report::Executable;
 
         mod exit_code {
             use super::*;
 
             fn run_test(program: &str) -> Result<ExitCode> {
                 let (tx, _rx) = mpsc::channel();
+                let cmd = Executable::WithPath(program.to_string()).resolve()?;
                 // run the command and return the exit code.
                 let sut = super::UnixExecutor::new(tx);
                 sut.run(
-                    std::path::PathBuf::from(program).as_path(),
+                    cmd.as_path(),
                     slice_of_strings!(program),
                     &env::Builder::new().build())
             }
 
             #[test]
             fn success() {
-                let result = run_test("/usr/bin/true");
+                let result = run_test("true");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(0i32, result.unwrap());
             }
 
             #[test]
             fn fail() {
-                let result = run_test("/usr/bin/false");
+                let result = run_test("false");
                 assert_eq!(true, result.is_ok());
                 assert_eq!(1i32, result.unwrap());
             }
 
             #[test]
             fn exec_failure() {
-                let result = run_test("./path/to/not/exists");
+                let result = run_test("sure-this-is-not-there");
                 assert_eq!(false, result.is_ok());
             }
         }
@@ -372,21 +374,19 @@ mod unix {
             use nix::sys::signal;
             use nix::unistd::Pid;
 
-            fn run_test(args: &[String]) -> Vec<Event> {
+            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<Event> {
                 let (tx, rx) = mpsc::channel();
                 {
                     let sut = super::UnixExecutor::new(tx);
-                    let _ = sut.run(
-                        std::path::PathBuf::from(&args[0]).as_path(),
-                        args,
-                        &env::Builder::new().build());
+
+                    let _ = sut.run(command, arguments, &env::Builder::new().build());
                     drop(sut);
                 }
                 rx.iter().collect::<Vec<Event>>()
             }
 
-            fn assert_start_stop_events(cmd: &[String], expected_exit_code: i32) {
-                let events = run_test(cmd);
+            fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
+                let events = run_test(command, arguments);
 
                 assert_eq!(2usize, (&events).len());
                 // assert that the pid is not any of us.
@@ -399,8 +399,8 @@ mod unix {
                     Event::Created { ppid, ref cwd, ref program, ref args, .. } => {
                         assert_eq!(std::os::unix::process::parent_id(), ppid);
                         assert_eq!(std::env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
-                        assert_eq!(cmd.to_vec(), *args);
-                        assert_eq!(std::path::Path::new(&cmd[0]), program)
+                        assert_eq!(arguments, args.as_slice());
+                        assert_eq!(command, program)
                     },
                     _ => assert_eq!(true, false),
                 }
@@ -414,17 +414,23 @@ mod unix {
 
             #[test]
             fn success() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/true"), 0i32);
+                let cmd = Executable::WithPath("true".to_string()).resolve().unwrap();
+
+                assert_start_stop_events(cmd.as_path(), slice_of_strings!("true"), 0i32);
             }
 
             #[test]
             fn fail() {
-                assert_start_stop_events(slice_of_strings!("/usr/bin/false"), 1i32);
+                let cmd = Executable::WithPath("false".to_string()).resolve().unwrap();
+
+                assert_start_stop_events(cmd.as_path(), slice_of_strings!("false"), 1i32);
             }
 
             #[test]
             fn exec_failure() {
-                let events = run_test(slice_of_strings!("./path/to/not/exists"));
+                let cmd = std::path::Path::new("sure-this-is-not-there");
+
+                let events = run_test(&cmd, slice_of_strings!("sure-this-is-not-there"));
                 assert_eq!(0usize, (&events).len());
             }
 
@@ -446,8 +452,9 @@ mod unix {
                 });
                 {
                     let sut = super::UnixExecutor::new(event_tx);
+                    let cmd = Executable::WithPath("sleep".to_string()).resolve().unwrap();
                     let _ = sut.run(
-                        std::path::Path::new("/usr/bin/sleep").as_ref(),
+                        cmd.as_path(),
                         slice_of_strings!("sleep", "5"),
                         &env::Builder::new().build());
                     drop(sut);
@@ -490,8 +497,9 @@ mod unix {
                 });
                 {
                     let sut = super::UnixExecutor::new(event_tx);
+                    let cmd = Executable::WithPath("sleep".to_string()).resolve().unwrap();
                     let _ = sut.run(
-                        std::path::Path::new("/usr/bin/sleep").as_ref(),
+                        cmd.as_path(),
                         slice_of_strings!("sleep", "5"),
                         &env::Builder::new().build());
                     drop(sut);
