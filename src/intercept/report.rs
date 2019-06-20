@@ -90,6 +90,7 @@ pub struct Session {
 }
 
 #[cfg(test)]
+#[cfg(unix)]
 mod test {
     use super::*;
 
@@ -202,6 +203,7 @@ mod inner {
         use super::*;
 
         #[test]
+        #[cfg(unix)]
         fn when_absolute_path() -> Result<()> {
             let mut context = ContextMock::new();
 
