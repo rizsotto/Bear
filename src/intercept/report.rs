@@ -205,7 +205,7 @@ mod inner {
         #[test]
         #[cfg(unix)]
         fn when_absolute_path() -> Result<()> {
-            let mut context = ContextMock::new();
+            let context = ContextMock::new();
 
             let sut = Executable::WithFilename(std::path::PathBuf::from("/path/to/executable"));
             let result = resolve_executable(&context, &sut);
