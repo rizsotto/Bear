@@ -43,24 +43,6 @@ pub fn executor(reporter: Sender<Event>) -> impl Executor {
 }
 
 #[cfg(unix)]
-pub fn get_parent_pid() -> ProcessId {
-    std::os::unix::process::parent_id()
-}
-
-#[cfg(not(unix))]
-pub fn get_parent_pid() -> ProcessId {
-    use super::env;
-
-    env::get::parent_pid()
-        .unwrap_or(0)
-}
-
-#[cfg(test)]
-macro_rules! slice_of_strings {
-    ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
-}
-
-#[cfg(unix)]
 mod unix {
     use std::str;
     use std::ffi;
@@ -274,6 +256,10 @@ mod unix {
         use std::sync::mpsc;
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
+
+        macro_rules! slice_of_strings {
+            ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
+        }
 
         mod exit_code {
             use super::*;
@@ -506,7 +492,7 @@ mod generic {
             self.report(
                 Event::Created {
                     pid: child.id() as ProcessId,
-                    ppid: get_parent_pid(),
+                    ppid: inner::get_parent_pid(),
                     cwd,
                     program: program.to_path_buf(),
                     args: args.to_vec(),
@@ -562,6 +548,10 @@ mod generic {
         use std::sync::mpsc;
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
+
+        macro_rules! slice_of_strings {
+            ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
+        }
 
         #[cfg(unix)]
         mod exit_code {
@@ -690,5 +680,22 @@ mod fake {
             _ =>
                 Ok(()),
         }
+    }
+}
+
+mod inner {
+    use crate::intercept::ProcessId;
+
+    #[cfg(unix)]
+    pub fn get_parent_pid() -> ProcessId {
+        std::os::unix::process::parent_id()
+    }
+
+    #[cfg(not(unix))]
+    pub fn get_parent_pid() -> ProcessId {
+        use crate::intercept::inner::env;
+
+        env::get::parent_pid()
+            .unwrap_or(0)
     }
 }
