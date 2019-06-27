@@ -272,7 +272,6 @@ mod unix {
     mod test {
         use super::*;
         use std::sync::mpsc;
-        use std::thread;
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
 
@@ -314,6 +313,7 @@ mod unix {
         mod events {
             use super::*;
             use std::process;
+            use std::thread;
             use nix::sys::signal;
             use nix::unistd::Pid;
 
@@ -560,10 +560,10 @@ mod generic {
     mod test {
         use super::*;
         use std::sync::mpsc;
-        use std::thread;
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
 
+        #[cfg(unix)]
         mod exit_code {
             use super::*;
 
@@ -599,6 +599,7 @@ mod generic {
             }
         }
 
+        #[cfg(unix)]
         mod events {
             use super::*;
             use std::process;
