@@ -17,6 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+use std::env;
+use crate::intercept::{Result, ResultExt};
+
 pub type ExitCode = i32;
 pub type DateTime = chrono::DateTime<chrono::Utc>;
 pub type ProcessId = u32;
@@ -25,32 +28,38 @@ pub type SignalId = String;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Event {
     Created {
-        when: DateTime,
-        pid: ProcessId,
         ppid: ProcessId,
         cwd: std::path::PathBuf,
         program: std::path::PathBuf,
         args: Vec<String>,
     },
     TerminatedNormally {
-        when: DateTime,
-        pid: ProcessId,
         code: ExitCode,
     },
     TerminatedAbnormally {
-        when: DateTime,
-        pid: ProcessId,
         signal: SignalId,
     },
     Stopped {
-        when: DateTime,
-        pid: ProcessId,
         signal: SignalId,
     },
     Continued {
-        when: DateTime,
-        pid: ProcessId,
     },
+}
+
+impl Event {
+    pub fn created(program: &std::path::Path, args: &[String]) -> Result<Event> {
+        let cwd = env::current_dir()
+            .chain_err(|| "Unable to get current working directory")?;
+
+        let result = Event::Created {
+            ppid: inner::get_parent_pid(),
+            cwd,
+            program: program.to_path_buf(),
+            args: args.to_vec()
+        };
+
+        Ok(result)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -70,6 +79,10 @@ impl EventEnvelope {
         self.id
     }
 
+    pub fn event(&self) -> &Event {
+        &self.content
+    }
+
     pub fn to_execution(&self) -> Option<(Vec<String>, std::path::PathBuf)> {
         match self.content {
             Event::Created { ref args, ref cwd, .. } =>
@@ -77,5 +90,27 @@ impl EventEnvelope {
             _ =>
                 None,
         }
+    }
+
+    #[cfg(test)]
+    pub fn create(id: ProcessId, at: DateTime, content: Event) -> Self {
+        EventEnvelope { id, at, content }
+    }
+}
+
+mod inner {
+    use super::ProcessId;
+
+    #[cfg(unix)]
+    pub fn get_parent_pid() -> ProcessId {
+        std::os::unix::process::parent_id()
+    }
+
+    #[cfg(not(unix))]
+    pub fn get_parent_pid() -> ProcessId {
+        use crate::intercept::inner::env;
+
+        env::get::parent_pid()
+            .unwrap_or(0)
     }
 }

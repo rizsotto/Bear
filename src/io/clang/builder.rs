@@ -23,7 +23,7 @@ use super::{Result, ResultExt};
 use super::{CompilationDatabase, Entry, Entries};
 use super::config::Config;
 use super::file::JsonCompilationDatabase;
-use crate::intercept::Event;
+use crate::intercept::EventEnvelope;
 use crate::semantic::c_compiler::{CompilerCall, CompilerPass};
 
 
@@ -39,7 +39,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build<I>(&self, events: I) -> Result<()>
-        where I: Iterator<Item = Event>
+        where I: Iterator<Item = EventEnvelope>
     {
         let target = JsonCompilationDatabase::new(self.file, &self.config.format);
         let previous =

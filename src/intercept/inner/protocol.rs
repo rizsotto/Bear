@@ -22,7 +22,7 @@ use std::path;
 use tempfile;
 
 use crate::intercept::event::Event;
-use crate::intercept::Result;
+use crate::intercept::{Result, EventEnvelope};
 
 
 pub mod sender {
@@ -37,7 +37,7 @@ pub mod sender {
             Ok(Protocol { path: path.to_path_buf() })
         }
 
-        pub fn send(&mut self, event: Event) {
+        pub fn send(&mut self, event: EventEnvelope) {
             debug!("Event to save: {:?}", &event);
             let name = save(&self.path, &event)
                 .expect("Persist event on filesystem failed.");
@@ -86,7 +86,7 @@ pub mod collector {
     }
 
     impl Iterator for EventIterator {
-        type Item = Event;
+        type Item = EventEnvelope;
 
         fn next(&mut self) -> Option<<Self as Iterator>::Item> {
             match self.input.next() {
@@ -114,14 +114,14 @@ const PREFIX: &str = "report-";
 const SUFFIX: &str = ".json";
 
 /// Read a single event file content from given source.
-fn load(path: &path::Path) -> Result<Event> {
+fn load(path: &path::Path) -> Result<EventEnvelope> {
     let file = fs::File::open(path)?;
     let result = serde_json::from_reader(file)?;
     Ok(result)
 }
 
 /// Write a single event entry into the given target.
-fn save(target: &path::Path, event: &Event) -> Result<path::PathBuf> {
+fn save(target: &path::Path, event: &EventEnvelope) -> Result<path::PathBuf> {
     let mut output = tempfile::Builder::new()
         .prefix(PREFIX)
         .suffix(SUFFIX)
@@ -138,7 +138,6 @@ fn save(target: &path::Path, event: &Event) -> Result<path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::intercept::event::ProcessId;
     use std::io::Write;
 
     #[allow(unused_assignments)]
@@ -177,25 +176,17 @@ mod tests {
     #[test]
     fn temp_directory_finds_event_files() {
         assert_in_temporary_directory(|collector| {
-            const PID: ProcessId = 42u32;
-            const SIGNAL: &'static str = "signal";
-            let when = chrono::Utc::now();
+            let time = chrono::Utc::now();
+            let input = EventEnvelope::create(0, time.clone(), Event::Continued {});
+            let expected = EventEnvelope::create(0, time.clone(), Event::Continued {});
 
             let mut sut = sender::Protocol::new(collector.path())?;
 
-            sut.send(Event::Stopped {
-                pid: PID,
-                signal: SIGNAL.to_string(),
-                when: when.clone(),
-            });
+            sut.send(input);
 
             let mut it = collector.events();
 
-            assert_eq!(it.next(), Some(Event::Stopped {
-                pid: PID,
-                signal: SIGNAL.to_string(),
-                when: when.clone(),
-            }));
+            assert_eq!(it.next(), Some(expected));
             assert_eq!(it.next(), None);
 
             Ok(())

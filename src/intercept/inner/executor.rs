@@ -24,7 +24,7 @@ use std::sync::mpsc::Sender;
 
 use chrono;
 
-use crate::intercept::{Error, Result, ResultExt};
+use crate::intercept::{Error, Result, ResultExt, EventEnvelope};
 use crate::intercept::{Event, ExitCode, ProcessId};
 use super::env::Vars;
 
@@ -33,12 +33,12 @@ pub trait Executor {
 }
 
 #[cfg(unix)]
-pub fn executor(reporter: Sender<Event>) -> impl Executor {
+pub fn executor(reporter: Sender<EventEnvelope>) -> impl Executor {
     unix::UnixExecutor::new(reporter)
 }
 
 #[cfg(not(unix))]
-pub fn executor(reporter: Sender<Event>) -> impl Executor {
+pub fn executor(reporter: Sender<EventEnvelope>) -> impl Executor {
     generic::GenericExecutor::new(reporter)
 }
 
@@ -54,16 +54,18 @@ mod unix {
     use super::*;
 
     pub struct UnixExecutor {
-        reporter: Sender<Event>,
+        reporter: Sender<EventEnvelope>,
     }
 
     impl UnixExecutor {
-        pub fn new(reporter: Sender<Event>) -> Self {
+        pub fn new(reporter: Sender<EventEnvelope>) -> Self {
             UnixExecutor { reporter }
         }
 
-        fn report(&self, event: Event) {
-            match self.reporter.send(event) {
+        fn report(&self, id: ProcessId, event: Event) {
+            let envelope = EventEnvelope::new(id, event);
+
+            match self.reporter.send(envelope) {
                 Ok(_) => { debug!("report event: ok."); },
                 Err(error) => { info!("report event: failed. {}", error) },
             }
@@ -71,60 +73,38 @@ mod unix {
 
         fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<nix::unistd::Pid>
         {
-            let cwd = env::current_dir()
-                .chain_err(|| "Unable to get current working directory")?;
-
             spawn(program, args, envs)
                 .and_then(|pid| {
-                    self.report(
-                        Event::Created {
-                            pid: pid.as_raw() as ProcessId,
-                            ppid: nix::unistd::Pid::parent().as_raw() as ProcessId,
-                            cwd,
-                            program: program.to_path_buf(),
-                            args: args.to_vec(),
-                            when: chrono::Utc::now(),
-                        });
+                    let id = pid.as_raw() as ProcessId;
+                    let event = Event::created(program, args)?;
+                    self.report(id, event);
                     Ok(pid)
                 })
         }
 
         fn wait(&self, pid: nix::unistd::Pid) -> Result<ExitCode>
         {
+            let id = pid.as_raw() as ProcessId;
+
             match wait::waitpid(pid, wait_flags()) {
-                Ok(wait::WaitStatus::Exited(pid, code)) => {
-                    self.report(
-                        Event::TerminatedNormally {
-                            pid: pid.as_raw() as ProcessId,
-                            code,
-                            when: chrono::Utc::now(),
-                        });
+                Ok(wait::WaitStatus::Exited(_pid, code)) => {
+                    let event = Event::TerminatedNormally { code };
+                    self.report(id, event);
                     Ok(code)
                 },
-                Ok(wait::WaitStatus::Signaled(pid, signal, _dump)) => {
-                    self.report(
-                        Event::TerminatedAbnormally {
-                            pid: pid.as_raw() as ProcessId,
-                            signal: format!("{}", signal),
-                            when: chrono::Utc::now(),
-                        });
+                Ok(wait::WaitStatus::Signaled(_pid, signal, _dump)) => {
+                    let event = Event::TerminatedAbnormally { signal: format!("{}", signal) };
+                    self.report(id, event);
                     Ok(127)
                 },
-                Ok(wait::WaitStatus::Stopped(pid, signal)) => {
-                    self.report(
-                        Event::Stopped {
-                            pid: pid.as_raw() as ProcessId,
-                            signal: format!("{}", signal),
-                            when: chrono::Utc::now(),
-                        });
+                Ok(wait::WaitStatus::Stopped(_pid, signal)) => {
+                    let event = Event::Stopped { signal: format!("{}", signal) };
+                    self.report(id, event);
                     Self::wait(self, pid)
                 },
-                Ok(wait::WaitStatus::Continued(pid)) => {
-                    self.report(
-                        Event::Continued {
-                            pid: pid.as_raw() as ProcessId,
-                            when: chrono::Utc::now(),
-                        });
+                Ok(wait::WaitStatus::Continued(_pid)) => {
+                    let event = Event::Continued {};
+                    self.report(id, event);
                     Self::wait(self, pid)
                 },
                 Ok(_) => {
@@ -303,7 +283,7 @@ mod unix {
             use nix::sys::signal;
             use nix::unistd::Pid;
 
-            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<Event> {
+            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<EventEnvelope> {
                 let (tx, rx) = mpsc::channel();
                 {
                     let sut = super::UnixExecutor::new(tx);
@@ -311,7 +291,7 @@ mod unix {
                     let _ = sut.run(command, arguments, &env::Builder::new().build());
                     drop(sut);
                 }
-                rx.iter().collect::<Vec<Event>>()
+                rx.iter().collect::<Vec<EventEnvelope>>()
             }
 
             fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
@@ -324,18 +304,17 @@ mod unix {
                 assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
                 // assert that the all event's pid are the same.
                 assert_eq!(events[0].pid(), events[1].pid());
-                match events[0] {
-                    Event::Created { ppid, ref cwd, ref program, ref args, .. } => {
-                        assert_eq!(std::os::unix::process::parent_id(), ppid);
-                        assert_eq!(std::env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
+                match events[0].event() {
+                    Event::Created { ppid, ref program, ref args, .. } => {
+                        assert_eq!(std::os::unix::process::parent_id(), *ppid);
                         assert_eq!(arguments, args.as_slice());
                         assert_eq!(command, program)
                     },
                     _ => assert_eq!(true, false),
                 }
-                match events[1] {
+                match events[1].event() {
                     Event::TerminatedNormally { code, .. } => {
-                        assert_eq!(expected_exit_code, code);
+                        assert_eq!(expected_exit_code, *code);
                     },
                     _ => assert_eq!(true, false),
                 }
@@ -365,12 +344,13 @@ mod unix {
 
             #[test]
             fn kill_signal() {
-                let (event_tx, event_rx) = mpsc::channel();
-                let (repeat_tx, repeat_rx) = mpsc::channel();
+                let (event_tx, event_rx) = mpsc::channel::<EventEnvelope>();
+                let (repeat_tx, repeat_rx) = mpsc::channel::<EventEnvelope>();
                 let forwarder = thread::spawn(move || {
                     for event in event_rx {
-                        match event {
-                            Event::Created { pid, .. } => {
+                        let pid = event.pid();
+                        match event.event() {
+                            Event::Created { .. } => {
                                 signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
                                     .expect("kill failed");
                             },
@@ -389,10 +369,10 @@ mod unix {
                     drop(sut);
                 }
                 let _ = forwarder.join();
-                let events = repeat_rx.iter().collect::<Vec<Event>>();
+                let events = repeat_rx.iter().collect::<Vec<_>>();
 
                 assert_eq!(2usize, (&events).len());
-                match events[1] {
+                match events[1].event() {
                     Event::TerminatedAbnormally { ref signal, .. } =>
                         assert_eq!("SIGKILL".to_string(), *signal),
                     _ =>
@@ -402,20 +382,21 @@ mod unix {
 
             #[test]
             fn stop_signal() {
-                let (event_tx, event_rx) = mpsc::channel();
-                let (repeat_tx, repeat_rx) = mpsc::channel();
+                let (event_tx, event_rx) = mpsc::channel::<EventEnvelope>();
+                let (repeat_tx, repeat_rx) = mpsc::channel::<EventEnvelope>();
                 let forwarder = thread::spawn(move || {
                     for event in event_rx {
-                        match event {
-                            Event::Created { pid, .. } => {
+                        let pid = event.pid();
+                        match event.event() {
+                            Event::Created { .. } => {
                                 signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP)
                                     .expect("kill failed");
                             },
-                            Event::Stopped { pid, .. } => {
+                            Event::Stopped { .. } => {
                                 signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT)
                                     .expect("kill failed");
                             },
-                            Event::Continued { pid, .. } => {
+                            Event::Continued { .. } => {
                                 signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
                                     .expect("kill failed");
                             }
@@ -434,22 +415,22 @@ mod unix {
                     drop(sut);
                 }
                 let _ = forwarder.join();
-                let events = repeat_rx.iter().collect::<Vec<Event>>();
+                let events = repeat_rx.iter().collect::<Vec<_>>();
 
                 assert_eq!(4usize, (&events).len());
-                match events[1] {
+                match events[1].event() {
                     Event::Stopped { ref signal, .. } =>
                         assert_eq!("SIGSTOP".to_string(), *signal),
                     _ =>
                         assert_eq!(true, false),
                 }
-                match events[2] {
+                match events[2].event() {
                     Event::Continued { .. } =>
                         assert_eq!(true, true),
                     _ =>
                         assert_eq!(true, false),
                 }
-                match events[3] {
+                match events[3].event() {
                     Event::TerminatedAbnormally { ref signal, .. } =>
                         assert_eq!("SIGKILL".to_string(), *signal),
                     _ =>
@@ -464,40 +445,32 @@ mod generic {
     use super::*;
 
     pub struct GenericExecutor {
-        reporter: Sender<Event>,
+        reporter: Sender<EventEnvelope>,
     }
 
     impl GenericExecutor {
-        pub fn new(reporter: Sender<Event>) -> Self {
+        pub fn new(reporter: Sender<EventEnvelope>) -> Self {
             GenericExecutor { reporter }
         }
 
-        fn report(&self, event: Event) {
-            match self.reporter.send(event) {
+        fn report(&self, id: ProcessId, event: Event) {
+            let envelope = EventEnvelope::new(id, event);
+
+            match self.reporter.send(envelope) {
                 Ok(_) => { debug!("report event: ok."); },
                 Err(error) => { info!("report event: failed. {}", error) },
             }
         }
 
         fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<process::Child> {
-            let cwd = env::current_dir()
-                .chain_err(|| "Unable to get current working directory")?;
-
             let child = process::Command::new(program)
                 .args(&args[1..])
                 .envs(envs)
                 .spawn()
                 .chain_err(|| format!("unable to execute process: {:?}", program))?;
 
-            self.report(
-                Event::Created {
-                    pid: child.id() as ProcessId,
-                    ppid: inner::get_parent_pid(),
-                    cwd,
-                    program: program.to_path_buf(),
-                    args: args.to_vec(),
-                    when: chrono::Utc::now(),
-                });
+            let event = Event::created(program, args)?;
+            self.report(child.id() as ProcessId, event);
 
             Ok(child)
         }
@@ -507,21 +480,13 @@ mod generic {
                 Ok(status) => {
                     match status.code() {
                         Some(code) => {
-                            self.report(
-                                Event::TerminatedNormally {
-                                    pid: handle.id(),
-                                    code,
-                                    when: chrono::Utc::now(),
-                                });
+                            let event = Event::TerminatedNormally { code };
+                            self.report(handle.id(), event);
                             Ok(code)
                         }
                         None => {
-                            self.report(
-                                Event::TerminatedAbnormally {
-                                    pid: handle.id(),
-                                    signal: "unknown".to_string(),
-                                    when: chrono::Utc::now(),
-                                });
+                            let event = Event::TerminatedAbnormally { signal: "unknown".to_string() };
+                            self.report(handle.id(), event);
                             Ok(127)
                         }
                     }
@@ -594,7 +559,7 @@ mod generic {
             use super::*;
             use std::process;
 
-            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<Event> {
+            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<EventEnvelope> {
                 let (tx, rx) = mpsc::channel();
                 {
                     let sut = super::GenericExecutor::new(tx);
@@ -602,7 +567,7 @@ mod generic {
                     let _ = sut.run(command, arguments, &env::Builder::new().build());
                     drop(sut);
                 }
-                rx.iter().collect::<Vec<Event>>()
+                rx.iter().collect::<Vec<_>>()
             }
 
             fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
@@ -615,18 +580,18 @@ mod generic {
                 assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
                 // assert that the all event's pid are the same.
                 assert_eq!(events[0].pid(), events[1].pid());
-                match events[0] {
-                    Event::Created { ppid, ref cwd, ref program, ref args, .. } => {
-                        assert_eq!(std::os::unix::process::parent_id(), ppid);
+                match events[0].event() {
+                    Event::Created { ref ppid, ref cwd, ref program, ref args, .. } => {
+                        assert_eq!(std::os::unix::process::parent_id(), *ppid);
                         assert_eq!(std::env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
                         assert_eq!(arguments, args.as_slice());
                         assert_eq!(command, program)
                     },
                     _ => assert_eq!(true, false),
                 }
-                match events[1] {
-                    Event::TerminatedNormally { code, .. } => {
-                        assert_eq!(expected_exit_code, code);
+                match events[1].event() {
+                    Event::TerminatedNormally { ref code, .. } => {
+                        assert_eq!(expected_exit_code, *code);
                     },
                     _ => assert_eq!(true, false),
                 }
@@ -680,22 +645,5 @@ mod fake {
             _ =>
                 Ok(()),
         }
-    }
-}
-
-mod inner {
-    use crate::intercept::ProcessId;
-
-    #[cfg(unix)]
-    pub fn get_parent_pid() -> ProcessId {
-        std::os::unix::process::parent_id()
-    }
-
-    #[cfg(not(unix))]
-    pub fn get_parent_pid() -> ProcessId {
-        use crate::intercept::inner::env;
-
-        env::get::parent_pid()
-            .unwrap_or(0)
     }
 }
