@@ -53,20 +53,26 @@ pub enum Event {
     },
 }
 
-impl Event {
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EventEnvelope {
+    id: ProcessId,
+    at: DateTime,
+    content: Event,
+}
+
+impl EventEnvelope {
+    pub fn new(id: ProcessId, content: Event) -> Self {
+        let at = chrono::Utc::now();
+        EventEnvelope { id, at, content }
+    }
+
     pub fn pid(&self) -> ProcessId {
-        match self {
-            Event::Created { pid, .. } => *pid,
-            Event::TerminatedNormally { pid, .. } => *pid,
-            Event::TerminatedAbnormally { pid, .. } => *pid,
-            Event::Stopped { pid, .. } => *pid,
-            Event::Continued { pid, .. } => *pid,
-        }
+        self.id
     }
 
     pub fn to_execution(&self) -> Option<(Vec<String>, std::path::PathBuf)> {
-        match self {
-            Event::Created { args, cwd, .. } =>
+        match self.content {
+            Event::Created { ref args, ref cwd, .. } =>
                 Some((args.to_vec(), cwd.to_path_buf())),
             _ =>
                 None,
