@@ -17,15 +17,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::env;
 use std::path;
 use std::process;
 use std::sync::mpsc::Sender;
 
-use chrono;
-
 use crate::intercept::{Error, Result, ResultExt, EventEnvelope};
 use crate::intercept::{Event, ExitCode, ProcessId};
+use super::protocol::sender::EventSink;
 use super::env::Vars;
 
 pub trait Executor {
@@ -33,7 +31,7 @@ pub trait Executor {
 }
 
 #[cfg(unix)]
-pub fn executor(reporter: Sender<EventEnvelope>) -> impl Executor {
+pub fn executor(reporter: impl EventSink) -> impl Executor {
     unix::UnixExecutor::new(reporter)
 }
 
@@ -53,22 +51,13 @@ mod unix {
 
     use super::*;
 
-    pub struct UnixExecutor {
-        reporter: Sender<EventEnvelope>,
+    pub struct UnixExecutor<T: EventSink> {
+        reporter: T,
     }
 
-    impl UnixExecutor {
-        pub fn new(reporter: Sender<EventEnvelope>) -> Self {
+    impl<T> UnixExecutor<T> where T: EventSink {
+        pub fn new(reporter: T) -> Self {
             UnixExecutor { reporter }
-        }
-
-        fn report(&self, id: ProcessId, event: Event) {
-            let envelope = EventEnvelope::new(id, event);
-
-            match self.reporter.send(envelope) {
-                Ok(_) => { debug!("report event: ok."); },
-                Err(error) => { info!("report event: failed. {}", error) },
-            }
         }
 
         fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<nix::unistd::Pid>
@@ -77,7 +66,7 @@ mod unix {
                 .and_then(|pid| {
                     let id = pid.as_raw() as ProcessId;
                     let event = Event::created(program, args)?;
-                    self.report(id, event);
+                    self.reporter.report(id, event);
                     Ok(pid)
                 })
         }
@@ -89,22 +78,22 @@ mod unix {
             match wait::waitpid(pid, wait_flags()) {
                 Ok(wait::WaitStatus::Exited(_pid, code)) => {
                     let event = Event::TerminatedNormally { code };
-                    self.report(id, event);
+                    self.reporter.report(id, event);
                     Ok(code)
                 },
                 Ok(wait::WaitStatus::Signaled(_pid, signal, _dump)) => {
                     let event = Event::TerminatedAbnormally { signal: format!("{}", signal) };
-                    self.report(id, event);
+                    self.reporter.report(id, event);
                     Ok(127)
                 },
                 Ok(wait::WaitStatus::Stopped(_pid, signal)) => {
                     let event = Event::Stopped { signal: format!("{}", signal) };
-                    self.report(id, event);
+                    self.reporter.report(id, event);
                     Self::wait(self, pid)
                 },
                 Ok(wait::WaitStatus::Continued(_pid)) => {
                     let event = Event::Continued {};
-                    self.report(id, event);
+                    self.reporter.report(id, event);
                     Self::wait(self, pid)
                 },
                 Ok(_) => {
@@ -117,7 +106,7 @@ mod unix {
         }
     }
 
-    impl super::Executor for UnixExecutor {
+    impl<T> super::Executor for UnixExecutor<T> where T: EventSink {
         fn run(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<ExitCode> {
             let pid = self.spawn(program, args, envs)?;
             let exit_code = self.wait(pid)?;
@@ -233,210 +222,147 @@ mod unix {
     #[cfg(test)]
     mod test {
         use super::*;
-        use std::sync::mpsc;
+
+        use mockers::Scenario;
+        use mockers::matchers::{ANY, eq};
+
+        use std::process;
+        use nix::sys::signal;
+        use nix::unistd::Pid;
+
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
 
-        macro_rules! slice_of_strings {
-            ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
+        macro_rules! vector_of_strings {
+            ($($x:expr),*) => (vec![$($x.to_string()),*]);
         }
 
-        mod exit_code {
-            use super::*;
+        #[test]
+        fn success() {
+            let cmd = vector_of_strings!("true", "with", "arguments");
+            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
 
-            fn run_test(program: &str) -> Result<ExitCode> {
-                let (tx, _rx) = mpsc::channel();
-                let cmd = Executable::WithPath(program.to_string()).resolve()?;
-                // run the command and return the exit code.
-                let sut = super::UnixExecutor::new(tx);
-                sut.run(
-                    cmd.as_path(),
-                    slice_of_strings!(program),
-                    &env::Builder::new().build())
-            }
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-            #[test]
-            fn success() {
-                let result = run_test("true");
-                assert_eq!(true, result.is_ok());
-                assert_eq!(0i32, result.unwrap());
-            }
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::created(&program, &cmd).unwrap()))
+                    .and_return(())
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedNormally { code: 0 }))
+                    .and_return(())
+            );
 
-            #[test]
-            fn fail() {
-                let result = run_test("false");
-                assert_eq!(true, result.is_ok());
-                assert_eq!(1i32, result.unwrap());
-            }
+            let sut = super::UnixExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-            #[test]
-            fn exec_failure() {
-                let result = run_test("sure-this-is-not-there");
-                assert_eq!(false, result.is_ok());
-            }
+            assert_eq!(true, result.is_ok());
+            assert_eq!(0i32, result.unwrap());
         }
 
-        mod events {
-            use super::*;
-            use std::process;
-            use std::thread;
-            use nix::sys::signal;
-            use nix::unistd::Pid;
+        #[test]
+        fn fail() {
+            let cmd = vector_of_strings!("false");
+            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
 
-            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<EventEnvelope> {
-                let (tx, rx) = mpsc::channel();
-                {
-                    let sut = super::UnixExecutor::new(tx);
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-                    let _ = sut.run(command, arguments, &env::Builder::new().build());
-                    drop(sut);
-                }
-                rx.iter().collect::<Vec<EventEnvelope>>()
-            }
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::created(&program, &cmd).unwrap()))
+                    .and_return(())
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedNormally { code: 1 }))
+                    .and_return(())
+            );
 
-            fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
-                let events = run_test(command, arguments);
+            let sut = super::UnixExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-                assert_eq!(2usize, (&events).len());
-                // assert that the pid is not any of us.
-                assert_ne!(0, events[0].pid());
-                assert_ne!(process::id(), events[0].pid());
-                assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
-                // assert that the all event's pid are the same.
-                assert_eq!(events[0].pid(), events[1].pid());
-                match events[0].event() {
-                    Event::Created { ppid, ref program, ref args, .. } => {
-                        assert_eq!(std::os::unix::process::parent_id(), *ppid);
-                        assert_eq!(arguments, args.as_slice());
-                        assert_eq!(command, program)
-                    },
-                    _ => assert_eq!(true, false),
-                }
-                match events[1].event() {
-                    Event::TerminatedNormally { code, .. } => {
-                        assert_eq!(expected_exit_code, *code);
-                    },
-                    _ => assert_eq!(true, false),
-                }
-            }
+            assert_eq!(true, result.is_ok());
+            assert_eq!(1i32, result.unwrap());
+        }
 
-            #[test]
-            fn success() {
-                let cmd = Executable::WithPath("true".to_string()).resolve().unwrap();
+        #[test]
+        fn exec_failure() {
+            let cmd = vector_of_strings!("sure-this-is-not-there");
+            let program = std::path::PathBuf::from(&cmd[0]);
 
-                assert_start_stop_events(cmd.as_path(), slice_of_strings!("true"), 0i32);
-            }
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-            #[test]
-            fn fail() {
-                let cmd = Executable::WithPath("false".to_string()).resolve().unwrap();
+            scenario.expect(
+                sink_handle.report(ANY, ANY).never()
+            );
 
-                assert_start_stop_events(cmd.as_path(), slice_of_strings!("false"), 1i32);
-            }
+            let sut = super::UnixExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-            #[test]
-            fn exec_failure() {
-                let cmd = std::path::Path::new("sure-this-is-not-there");
+            assert_eq!(false, result.is_ok());
+        }
 
-                let events = run_test(&cmd, slice_of_strings!("sure-this-is-not-there"));
-                assert_eq!(0usize, (&events).len());
-            }
+        #[test]
+        fn kill_signal() {
+            let cmd = vector_of_strings!("sleep", "5");
+            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
 
-            #[test]
-            fn kill_signal() {
-                let (event_tx, event_rx) = mpsc::channel::<EventEnvelope>();
-                let (repeat_tx, repeat_rx) = mpsc::channel::<EventEnvelope>();
-                let forwarder = thread::spawn(move || {
-                    for event in event_rx {
-                        let pid = event.pid();
-                        match event.event() {
-                            Event::Created { .. } => {
-                                signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
-                                    .expect("kill failed");
-                            },
-                            _ => (),
-                        }
-                        let _ = repeat_tx.send(event);
-                    }
-                });
-                {
-                    let sut = super::UnixExecutor::new(event_tx);
-                    let cmd = Executable::WithPath("sleep".to_string()).resolve().unwrap();
-                    let _ = sut.run(
-                        cmd.as_path(),
-                        slice_of_strings!("sleep", "5"),
-                        &env::Builder::new().build());
-                    drop(sut);
-                }
-                let _ = forwarder.join();
-                let events = repeat_rx.iter().collect::<Vec<_>>();
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-                assert_eq!(2usize, (&events).len());
-                match events[1].event() {
-                    Event::TerminatedAbnormally { ref signal, .. } =>
-                        assert_eq!("SIGKILL".to_string(), *signal),
-                    _ =>
-                        assert_eq!(true, false),
-                }
-            }
+            scenario.expect(
+                sink_handle.report(ANY, ANY).and_call(|pid, _event| {
+                    signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL).unwrap();
+                })
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedAbnormally { signal: "SIGKILL".to_string() }))
+                    .and_return(())
+            );
 
-            #[test]
-            fn stop_signal() {
-                let (event_tx, event_rx) = mpsc::channel::<EventEnvelope>();
-                let (repeat_tx, repeat_rx) = mpsc::channel::<EventEnvelope>();
-                let forwarder = thread::spawn(move || {
-                    for event in event_rx {
-                        let pid = event.pid();
-                        match event.event() {
-                            Event::Created { .. } => {
-                                signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP)
-                                    .expect("kill failed");
-                            },
-                            Event::Stopped { .. } => {
-                                signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT)
-                                    .expect("kill failed");
-                            },
-                            Event::Continued { .. } => {
-                                signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL)
-                                    .expect("kill failed");
-                            }
-                            _ => (),
-                        }
-                        let _ = repeat_tx.send(event);
-                    }
-                });
-                {
-                    let sut = super::UnixExecutor::new(event_tx);
-                    let cmd = Executable::WithPath("sleep".to_string()).resolve().unwrap();
-                    let _ = sut.run(
-                        cmd.as_path(),
-                        slice_of_strings!("sleep", "5"),
-                        &env::Builder::new().build());
-                    drop(sut);
-                }
-                let _ = forwarder.join();
-                let events = repeat_rx.iter().collect::<Vec<_>>();
+            let sut = super::UnixExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-                assert_eq!(4usize, (&events).len());
-                match events[1].event() {
-                    Event::Stopped { ref signal, .. } =>
-                        assert_eq!("SIGSTOP".to_string(), *signal),
-                    _ =>
-                        assert_eq!(true, false),
-                }
-                match events[2].event() {
-                    Event::Continued { .. } =>
-                        assert_eq!(true, true),
-                    _ =>
-                        assert_eq!(true, false),
-                }
-                match events[3].event() {
-                    Event::TerminatedAbnormally { ref signal, .. } =>
-                        assert_eq!("SIGKILL".to_string(), *signal),
-                    _ =>
-                        assert_eq!(true, false),
-                }
-            }
+            assert_eq!(true, result.is_ok());
+            assert_eq!(127i32, result.unwrap());
+        }
+
+        #[test]
+        fn stop_signal() {
+            let cmd = vector_of_strings!("sleep", "5");
+            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
+
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
+
+            scenario.expect(
+                sink_handle.report(ANY, ANY).and_call(|pid, _event| {
+                    signal::kill(Pid::from_raw(pid as i32), signal::SIGSTOP).unwrap();
+                })
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::Stopped { signal: "SIGSTOP".to_string() }))
+                    .and_call(|pid, _event| {
+                        signal::kill(Pid::from_raw(pid as i32), signal::SIGCONT).unwrap();
+                    })
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::Continued {}))
+                    .and_call(|pid, _event| {
+                        signal::kill(Pid::from_raw(pid as i32), signal::SIGKILL).unwrap();
+                    })
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedAbnormally { signal: "SIGKILL".to_string() }))
+                    .and_return(())
+            );
+
+            let sut = super::UnixExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
+
+            assert_eq!(true, result.is_ok());
+            assert_eq!(127i32, result.unwrap());
         }
     }
 }
