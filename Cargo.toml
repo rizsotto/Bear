@@ -46,7 +46,8 @@ shellwords = "1.0"
 tempfile = "3.0"
 
 [dev-dependencies]
-mockiato = "0.8"
+mockers_derive = "0.21"
+mockers = "0.21"
 
 [target.'cfg(unix)'.dependencies]
 nix = "0.13"

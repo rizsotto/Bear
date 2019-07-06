@@ -142,9 +142,9 @@ mod inner {
     use super::*;
 
     #[cfg(test)]
-    use mockiato::mockable;
+    use mockers_derive::mocked;
 
-    #[cfg_attr(test, mockable)]
+    #[cfg_attr(test, mocked)]
     pub(super) trait Context {
         fn get_cwd(&self) -> Result<std::path::PathBuf>;
         fn get_paths(&self) -> Result<Vec<std::path::PathBuf>>;
@@ -192,20 +192,22 @@ mod inner {
 
     fn find_executable_in<P: AsRef<std::path::Path>>(context: &Context, path: P, paths: &[std::path::PathBuf]) -> Result<std::path::PathBuf> {
         paths.iter()
-            .filter_map(|prefix| prefix.join(&path).canonicalize().ok())
+            .map(|prefix| prefix.join(&path))
+            // .filter_map(|candidate| candidate.canonicalize().ok())
             .filter(|candidate| context.is_executable(candidate))
             .next()
             .ok_or("File is not found nor executable.".into())
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     mod test {
         use super::*;
+        use mockers::Scenario;
 
         #[test]
-        #[cfg(unix)]
         fn when_absolute_path() -> Result<()> {
-            let context = ContextMock::new();
+            let scenario = Scenario::new();
+            let (context, _context_handle) = scenario.create_mock_for::<dyn Context>();
 
             let sut = Executable::WithFilename(std::path::PathBuf::from("/path/to/executable"));
             let result = resolve_executable(&context, &sut);
@@ -215,23 +217,40 @@ mod inner {
             Ok(())
         }
 
-//        #[test]
-//        fn when_relative_path() -> Result<()> {
-//            let mut context = ContextMock::new();
-//
-//            context.expect_get_cwd()
-//                .returns(Ok(std::path::PathBuf::from("/path/to")));
-//
-//            context.expect_is_executable(|p| p.partial_eq(std::path::PathBuf::from("/path/to/executable")))
-//                .returns(true);
-//
-//            let sut = Executable::WithFilename(std::path::PathBuf::from("executable"));
-//            let result = resolve_executable(&context, &sut);
-//
-//            assert_eq!(true, result.is_ok());
-//
-//            Ok(())
-//        }
+        #[test]
+        fn when_relative_path() -> Result<()> {
+            let scenario = Scenario::new();
+            let (context, context_handle) = scenario.create_mock_for::<dyn Context>();
 
+            scenario.expect(context_handle.get_cwd()
+                .and_return(Ok(std::path::PathBuf::from("/path/to"))));
+            scenario.expect(context_handle.is_executable(std::path::Path::new("/path/to/executable"))
+                .and_return(true));
+
+            let sut = Executable::WithFilename(std::path::PathBuf::from("executable"));
+            let result = resolve_executable(&context, &sut);
+
+            assert_eq!(true, result.is_ok());
+
+            Ok(())
+        }
+
+        #[test]
+        fn from_path() -> Result<()> {
+            let scenario = Scenario::new();
+            let (context, context_handle) = scenario.create_mock_for::<dyn Context>();
+
+            scenario.expect(context_handle.get_paths()
+                .and_return(Ok(vec!(std::path::PathBuf::from("/path/to")))));
+            scenario.expect(context_handle.is_executable(std::path::Path::new("/path/to/executable"))
+                .and_return(true));
+
+            let sut = Executable::WithPath("executable".to_string());
+            let result = resolve_executable(&context, &sut);
+
+            assert_eq!(true, result.is_ok());
+
+            Ok(())
+        }
     }
 }
