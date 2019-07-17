@@ -32,7 +32,7 @@ path = "src/bin/cxx.rs"
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "2", default-features = false }
-directories = "1.0"
+directories = "2.0"
 env_logger = "0.6"
 error-chain = "0.12"
 lazy_static = "1.2"
@@ -43,14 +43,14 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 shellwords = "1.0"
-tempfile = "3.0"
+tempfile = "3.1"
 
 [dev-dependencies]
 mockers_derive = "0.21"
 mockers = "0.21"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.13"
+nix = "0.14"
 
 [build-dependencies]
 cmake = "0.1"
