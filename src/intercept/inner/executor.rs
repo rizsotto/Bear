@@ -17,10 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path;
-use std::process;
-use std::sync::mpsc::Sender;
-
 use crate::intercept::{Error, Result, ResultExt, EventEnvelope};
 use crate::intercept::{Event, ExitCode, ProcessId};
 use super::protocol::sender::EventSink;
@@ -36,7 +32,7 @@ pub fn executor(reporter: impl EventSink) -> impl Executor {
 }
 
 #[cfg(not(unix))]
-pub fn executor(reporter: Sender<EventEnvelope>) -> impl Executor {
+pub fn executor(reporter: impl EventSink) -> impl Executor {
     generic::GenericExecutor::new(reporter)
 }
 
@@ -159,7 +155,7 @@ mod unix {
                         let message = error.to_string().into_bytes();
                         let _ = unistd::write(write_fd, message.as_ref());
                         debug!("Child process: exec failed, calling exit.");
-                        process::exit(1);
+                        std::process::exit(1);
                     },
                 }
             },
@@ -226,7 +222,6 @@ mod unix {
         use mockers::Scenario;
         use mockers::matchers::{ANY, eq};
 
-        use std::process;
         use nix::sys::signal;
         use nix::unistd::Pid;
 
@@ -237,10 +232,14 @@ mod unix {
             ($($x:expr),*) => (vec![$($x.to_string()),*]);
         }
 
+        fn resolve_executable(cmd: &[String]) -> std::path::PathBuf {
+            Executable::WithPath(cmd[0].clone()).resolve().unwrap()
+        }
+
         #[test]
         fn success() {
             let cmd = vector_of_strings!("true", "with", "arguments");
-            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
+            let program = resolve_executable(&cmd);
 
             let scenario = Scenario::new();
             let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
@@ -264,7 +263,7 @@ mod unix {
         #[test]
         fn fail() {
             let cmd = vector_of_strings!("false");
-            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
+            let program = resolve_executable(&cmd);
 
             let scenario = Scenario::new();
             let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
@@ -306,7 +305,7 @@ mod unix {
         #[test]
         fn kill_signal() {
             let cmd = vector_of_strings!("sleep", "5");
-            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
+            let program = resolve_executable(&cmd);
 
             let scenario = Scenario::new();
             let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
@@ -331,7 +330,7 @@ mod unix {
         #[test]
         fn stop_signal() {
             let cmd = vector_of_strings!("sleep", "5");
-            let program = Executable::WithPath(cmd[0].clone()).resolve().unwrap();
+            let program = resolve_executable(&cmd);
 
             let scenario = Scenario::new();
             let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
@@ -370,49 +369,40 @@ mod unix {
 mod generic {
     use super::*;
 
-    pub struct GenericExecutor {
-        reporter: Sender<EventEnvelope>,
+    pub struct GenericExecutor<T: EventSink> {
+        reporter: T,
     }
 
-    impl GenericExecutor {
-        pub fn new(reporter: Sender<EventEnvelope>) -> Self {
+    impl<T> GenericExecutor<T> where T: EventSink {
+        pub fn new(reporter: T) -> Self {
             GenericExecutor { reporter }
         }
 
-        fn report(&self, id: ProcessId, event: Event) {
-            let envelope = EventEnvelope::new(id, event);
-
-            match self.reporter.send(envelope) {
-                Ok(_) => { debug!("report event: ok."); },
-                Err(error) => { info!("report event: failed. {}", error) },
-            }
-        }
-
-        fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<process::Child> {
-            let child = process::Command::new(program)
+        fn spawn(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<std::process::Child> {
+            let child = std::process::Command::new(program)
                 .args(&args[1..])
                 .envs(envs)
                 .spawn()
                 .chain_err(|| format!("unable to execute process: {:?}", program))?;
 
             let event = Event::created(program, args)?;
-            self.report(child.id() as ProcessId, event);
+            self.reporter.report(child.id() as ProcessId, event);
 
             Ok(child)
         }
 
-        fn wait(&self, handle: &mut process::Child) -> Result<ExitCode> {
+        fn wait(&self, handle: &mut std::process::Child) -> Result<ExitCode> {
             match handle.wait() {
                 Ok(status) => {
                     match status.code() {
                         Some(code) => {
                             let event = Event::TerminatedNormally { code };
-                            self.report(handle.id(), event);
+                            self.reporter.report(handle.id(), event);
                             Ok(code)
                         }
                         None => {
                             let event = Event::TerminatedAbnormally { signal: "unknown".to_string() };
-                            self.report(handle.id(), event);
+                            self.reporter.report(handle.id(), event);
                             Ok(127)
                         }
                     }
@@ -425,7 +415,7 @@ mod generic {
         }
     }
 
-    impl super::Executor for GenericExecutor {
+    impl<T> super::Executor for GenericExecutor<T> where T: EventSink {
         fn run(&self, program: &std::path::Path, args: &[String], envs: &Vars) -> Result<ExitCode> {
             let mut handle = self.spawn(program, args, envs)?;
             let exit_code = self.wait(&mut handle)?;
@@ -433,117 +423,89 @@ mod generic {
         }
     }
 
+
     #[cfg(test)]
     mod test {
         use super::*;
-        use std::sync::mpsc;
+
+        use mockers::Scenario;
+        use mockers::matchers::{ANY, eq};
+
         use crate::intercept::inner::env;
         use crate::intercept::report::Executable;
 
-        macro_rules! slice_of_strings {
-            ($($x:expr),*) => (vec![$($x.to_string()),*].as_ref());
+        macro_rules! vector_of_strings {
+            ($($x:expr),*) => (vec![$($x.to_string()),*]);
         }
 
-        #[cfg(unix)]
-        mod exit_code {
-            use super::*;
-
-            fn run_test(program: &str) -> Result<ExitCode> {
-                let (tx, _rx) = mpsc::channel();
-                let cmd = Executable::WithPath(program.to_string()).resolve()?;
-                // run the command and return the exit code.
-                let sut = super::GenericExecutor::new(tx);
-                sut.run(
-                    cmd.as_path(),
-                    slice_of_strings!(program),
-                    &env::Builder::new().build())
-            }
-
-            #[test]
-            fn success() {
-                let result = run_test("true");
-                assert_eq!(true, result.is_ok());
-                assert_eq!(0i32, result.unwrap());
-            }
-
-            #[test]
-            fn fail() {
-                let result = run_test("false");
-                assert_eq!(true, result.is_ok());
-                assert_eq!(1i32, result.unwrap());
-            }
-
-            #[test]
-            fn exec_failure() {
-                let result = run_test("sure-this-is-not-there");
-                assert_eq!(false, result.is_ok());
-            }
+        fn resolve_executable(cmd: &[String]) -> std::path::PathBuf {
+            Executable::WithPath(cmd[0].clone()).resolve().unwrap()
         }
 
-        #[cfg(unix)]
-        mod events {
-            use super::*;
-            use std::process;
+        #[test]
+        fn success() {
+            let cmd = vector_of_strings!("true", "with", "arguments");
+            let program = resolve_executable(&cmd);
 
-            fn run_test(command: &std::path::Path, arguments: &[String]) -> Vec<EventEnvelope> {
-                let (tx, rx) = mpsc::channel();
-                {
-                    let sut = super::GenericExecutor::new(tx);
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-                    let _ = sut.run(command, arguments, &env::Builder::new().build());
-                    drop(sut);
-                }
-                rx.iter().collect::<Vec<_>>()
-            }
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::created(&program, &cmd).unwrap()))
+                    .and_return(())
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedNormally { code: 0 }))
+                    .and_return(())
+            );
 
-            fn assert_start_stop_events(command: &std::path::Path, arguments: &[String], expected_exit_code: i32) {
-                let events = run_test(command, arguments);
+            let sut = super::GenericExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-                assert_eq!(2usize, (&events).len());
-                // assert that the pid is not any of us.
-                assert_ne!(0, events[0].pid());
-                assert_ne!(process::id(), events[0].pid());
-                assert_ne!(std::os::unix::process::parent_id(), events[0].pid());
-                // assert that the all event's pid are the same.
-                assert_eq!(events[0].pid(), events[1].pid());
-                match events[0].event() {
-                    Event::Created { ref ppid, ref cwd, ref program, ref args, .. } => {
-                        assert_eq!(std::os::unix::process::parent_id(), *ppid);
-                        assert_eq!(std::env::current_dir().unwrap().as_os_str(), cwd.as_os_str());
-                        assert_eq!(arguments, args.as_slice());
-                        assert_eq!(command, program)
-                    },
-                    _ => assert_eq!(true, false),
-                }
-                match events[1].event() {
-                    Event::TerminatedNormally { ref code, .. } => {
-                        assert_eq!(expected_exit_code, *code);
-                    },
-                    _ => assert_eq!(true, false),
-                }
-            }
+            assert_eq!(true, result.is_ok());
+            assert_eq!(0i32, result.unwrap());
+        }
 
-            #[test]
-            fn success() {
-                let cmd = Executable::WithPath("true".to_string()).resolve().unwrap();
+        #[test]
+        fn fail() {
+            let cmd = vector_of_strings!("false");
+            let program = resolve_executable(&cmd);
 
-                assert_start_stop_events(cmd.as_path(), slice_of_strings!("true"), 0i32);
-            }
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
 
-            #[test]
-            fn fail() {
-                let cmd = Executable::WithPath("false".to_string()).resolve().unwrap();
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::created(&program, &cmd).unwrap()))
+                    .and_return(())
+            );
+            scenario.expect(
+                sink_handle.report(ANY, eq(Event::TerminatedNormally { code: 1 }))
+                    .and_return(())
+            );
 
-                assert_start_stop_events(cmd.as_path(), slice_of_strings!("false"), 1i32);
-            }
+            let sut = super::GenericExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
 
-            #[test]
-            fn exec_failure() {
-                let cmd = std::path::Path::new("sure-this-is-not-there");
+            assert_eq!(true, result.is_ok());
+            assert_eq!(1i32, result.unwrap());
+        }
 
-                let events = run_test(&cmd, slice_of_strings!("sure-this-is-not-there"));
-                assert_eq!(0usize, (&events).len());
-            }
+        #[test]
+        fn exec_failure() {
+            let cmd = vector_of_strings!("sure-this-is-not-there");
+            let program = std::path::PathBuf::from(&cmd[0]);
+
+            let scenario = Scenario::new();
+            let (sink, sink_handle) = scenario.create_mock_for::<dyn EventSink>();
+
+            scenario.expect(
+                sink_handle.report(ANY, ANY).never()
+            );
+
+            let sut = super::GenericExecutor::new(sink);
+            let result = sut.run(program.as_path(), &cmd, &env::Builder::new().build());
+
+            assert_eq!(false, result.is_ok());
         }
     }
 }
@@ -558,7 +520,7 @@ mod fake {
     /// For a compiler, linker call the expected side effect by the build system
     /// is to create the output files. That will make sure that the build tool
     /// will continue the build process.
-    fn fake_execution(cmd: &[String], cwd: &path::Path) -> Result<()> {
+    fn fake_execution(cmd: &[String], cwd: &std::path::Path) -> Result<()> {
         let compilation = CompilerCall::from(cmd, cwd)?;
         match compilation.output() {
             // When the file is not yet exists, create one.
