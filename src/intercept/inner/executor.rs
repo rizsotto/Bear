@@ -443,6 +443,7 @@ mod generic {
         }
 
         #[test]
+        #[cfg(unix)]
         fn success() {
             let cmd = vector_of_strings!("true", "with", "arguments");
             let program = resolve_executable(&cmd);
@@ -467,6 +468,7 @@ mod generic {
         }
 
         #[test]
+        #[cfg(unix)]
         fn fail() {
             let cmd = vector_of_strings!("false");
             let program = resolve_executable(&cmd);
