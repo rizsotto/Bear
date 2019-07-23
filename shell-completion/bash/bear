@@ -1,0 +1,55 @@
+_bear() {
+  for word in "${COMP_WORDS[@]:0:$COMP_CWORD}"
+  do
+    if [[ $word == -- ]]
+    then
+      _command_offset $COMP_CWORD
+      return
+    fi
+  done
+
+  local cur prev
+  if _get_comp_words_by_ref cur prev &>/dev/null; then
+    case $prev in
+      -o|--cdb)
+        _filedir
+        COMPREPLY+=($(compgen -W 'compile_commands.json' -- "$cur"))
+        return
+        ;;
+      --use-cc|--use-c++)
+        _command_offset $COMP_CWORD
+        return
+        ;;
+    esac
+  else
+    cur="${COMP_WORDS[COMP_CWORD]}"
+  fi
+
+  local shortopts=(
+    h
+    v
+    o
+    a
+  )
+
+  local longopts=(
+    help
+    version
+    verbose
+    cdb
+    use-cc
+    use-c++
+    use-only
+  )
+
+  if [[ "$cur" == "--"* ]]; then
+    COMPREPLY=($(compgen -P '--' -W '${longopts[*]}' -- "${cur:2}"))
+  elif [[ "$cur" == "-"* && ${#cur} -gt 1 ]]; then
+    COMPREPLY=($(compgen -P '-' -W '${shortopts[*]}' -- "${cur:1}"))
+  else
+    _command_offset $COMP_CWORD
+    COMPREPLY+=($(compgen -P '-' -W '${shortopts[*]}' -- "${cur:1}")
+                $(compgen -P '--' -W '${longopts[*]}' -- "${cur:2}"))
+  fi
+} &&
+complete -F _bear bear

@@ -30,6 +30,7 @@ add_subdirectory(libear)
 add_subdirectory(bear)
 add_subdirectory(test)
 add_subdirectory(man)
+add_subdirectory(shell-completion)
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
