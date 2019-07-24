@@ -113,7 +113,7 @@ To check you installation, install `lit` and run the test suite.
     PATH=/opt/bear/bin:$PATH lit -v test
     PATH=/opt/bear/bin:$PATH lit -v test -DMULTILIB=true
 
-### Empty compilation database on OS X Captain or Fedora
+### Empty compilation database on OS X / macOS or Fedora
 
 Security extension/modes on different operating systems might disable library
 preloads. This case Bear behaves normally, but the result compilation database
