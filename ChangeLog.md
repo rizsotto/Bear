@@ -1,3 +1,13 @@
+## 2.4.1 (2019.07.30)
+
+Features:
+  - Add bash completion (#231, @1ace)
+
+Bugfixes:
+  - Fix limitation section in readme (#256, @Manouchehri)
+  - Fix preprocessor flags (#239, @bdemick)
+
+
 ## 2.4.0 (2019.05.12)
 
 Features:
