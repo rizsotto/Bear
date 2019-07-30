@@ -647,7 +647,7 @@ class Compilation:
             elif re.match(r'^-(l|L|Wl,).+', arg):
                 pass
             # some parameters look like a filename, take those explicitly
-            elif arg in {'-D', '-I'}:
+            elif arg in {'-D', '-U', '-I', '-include'}:
                 result.flags.extend([arg, next(args)])
             # get the output file separately
             elif arg == '-o':
