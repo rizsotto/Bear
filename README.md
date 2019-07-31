@@ -1,3 +1,10 @@
+[![Packaging status](https://repology.org/badge/tiny-repos/bear.svg)](https://repology.org/project/bear/versions)
+[![GitHub release](https://img.shields.io/github/release/rizsotto/Bear)](https://github.com/rizsotto/Bear/releases)
+[![GitHub Release Date](https://img.shields.io/github/release-date/rizsotto/Bear)](https://github.com/rizsotto/Bear/releases)
+[![Build status](https://api.travis-ci.org/rizsotto/bear.svg?branch=master)](https://travis-ci.org/rizsotto/bear/branches)
+[![Contributors](https://img.shields.io/github/contributors/rizsotto/Bear)](https://github.com/rizsotto/Bear/graphs/contributors)
+[![Gitter](https://img.shields.io/gitter/room/rizsotto/Bear)](https://gitter.im/rizsotto/Bear)
+
 Build EAR (BEAR)
 ================
 
@@ -25,6 +32,13 @@ executable enables the use of the library for child processes and
 writes the output file.
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
+
+
+How to install
+--------------
+
+Bear is packaged for many distribution. Check out your package manager.
+Or build it from source.
 
 
 How to build
@@ -158,4 +172,7 @@ tracker][ISSUES]. Please describing the bug and where you found it. If you
 have a suggestion how to fix it, include that as well. Patches are also
 welcome.
 
+Please follow the [contribution guide][GUIDE] when you do this.
+
   [ISSUES]: https://github.com/rizsotto/Bear/issues
+  [GUIDE]: https://github.com/rizsotto/Bear/blob/master/.github/CONTRIBUTING.md
