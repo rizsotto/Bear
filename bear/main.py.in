@@ -530,13 +530,22 @@ class Compilation:
         """ This method creates a compilation database entry. """
 
         source = os.path.relpath(self.source, self.directory)
-        output = ['-o', self.output] if self.output else []
-        return {
-            'file': source,
-            'arguments':
-                [self.compiler, self.phase] + self.flags + output + [source],
-            'directory': self.directory
-        }
+        if self.output:
+            return {
+                'file': source,
+                'arguments':
+                    [self.compiler, self.phase] + self.flags +
+                    ['-o', self.output] + [source],
+                'directory': self.directory,
+                'output': self.output
+            }
+        else:
+            return {
+                'file': source,
+                'arguments':
+                    [self.compiler, self.phase] + self.flags + [source],
+                'directory': self.directory
+            }
 
     @classmethod
     def from_db_entry(cls, entry, category):

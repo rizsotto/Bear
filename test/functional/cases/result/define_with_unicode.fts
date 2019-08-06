@@ -50,12 +50,14 @@ cat > "${root_dir}/expected.json" << EOF
     {
         "arguments": ["cc", "-c", "-DMESSAGE=\u041a\u0430\u043a \u0434\u0435\u043b\u0430?", "-o", "hello", "src/main.c"],
         "directory": "${root_dir}",
-        "file": "src/main.c"
+        "file": "src/main.c",
+        "output": "hello"
     },
     {
         "arguments": ["cc", "-c", "-DMESSAGE=\u05de\u05d4 \u05e9\u05dc\u05d5\u05de\u05da?", "-o", "hello", "src/main.c"],
         "directory": "${root_dir}",
-        "file": "src/main.c"
+        "file": "src/main.c",
+        "output": "hello"
     }
 ]
 EOF

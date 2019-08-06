@@ -41,7 +41,8 @@ cat > "${root_dir}/expected.json" << EOF
 {
   "command": "cc -c -o src/empty.o src/empty.c",
   "directory": "${root_dir}",
-  "file": "src/empty.c"
+  "file": "src/empty.c",
+  "output": "src/empty.o"
 }
 ,
 {
@@ -53,7 +54,8 @@ cat > "${root_dir}/expected.json" << EOF
 {
   "command": "cc -c -o empty.obj empty.c",
   "directory": "${root_dir}/src",
-  "file": "empty.c"
+  "file": "empty.c",
+  "output": "empty.obj"
 }
 ,
 {
