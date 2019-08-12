@@ -50,7 +50,7 @@ mockers_derive = "0.21"
 mockers = "0.21"
 
 [target.'cfg(unix)'.dependencies]
-nix = "0.14"
+nix = "0.15"
 
 [build-dependencies]
 cmake = "0.1"
