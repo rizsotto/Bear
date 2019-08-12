@@ -40,7 +40,7 @@ EOF
 
 cat > ${root_dir}/src/Makefile << EOF
 all:
-       f95 ex.f95 -o ex
+	f95 ex.f95 -o ex
 EOF
 
 
