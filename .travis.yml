@@ -1,4 +1,5 @@
 language: python
+sudo: required
 
 matrix:
   include:
@@ -34,6 +35,7 @@ addons:
 
 before_install:
   - uname
+  - sudo apt-get install gfortran
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
