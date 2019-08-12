@@ -40,7 +40,7 @@ EOF
 
 cat > ${root_dir}/src/Makefile << EOF
 all:
-	f95 ex.f95 -o ex
+	gfortran ex.f95 -o ex
 EOF
 
 
@@ -48,7 +48,7 @@ cat > "${root_dir}/expected.json" << EOF
 [
     {
         "arguments": [
-            "f95",
+            "gfortran",
             "-c",
             "-o",
             "ex",
