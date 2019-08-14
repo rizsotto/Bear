@@ -41,6 +41,9 @@ writes the output file.
 : 	Specify output file. (Default value provided.) The output is not
 	continuously updated, it's done when the build command finished.
 
+--field-output
+:   Ask to emit the `output` field for each entries in the output file.
+
 \--use-cc *program*
 :	Hint Bear to classify the given program name as C compiler.
 
