@@ -1,3 +1,9 @@
+## 2.4.2
+
+Features:
+  - Support `output` field in the output. (#254, @bofeng17)
+
+
 ## 2.4.1 (2019.07.30)
 
 Features:
