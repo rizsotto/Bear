@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# REQUIRES: preload
-# RUN: bash %s %T/testFortran
-# RUN: cd %T/testFortran; %{intercept-build} --cdb preload.json make -C src
-# RUN: cd %T/testFortran; %{cdb_diff} preload.json expected.json
+# REQUIRES: preload,make,fortran
+# RUN: bash %s %T/fortran
+# RUN: cd %T/fortran; %{intercept-build} --cdb preload.json make -C src
+# RUN: cd %T/fortran; %{cdb_diff} preload.json expected.json
 
 set -o errexit
 set -o nounset
@@ -27,22 +27,10 @@ print *,'This is  my first program'
 end program first
 EOF
 
-# cp "${test_input_dir}/main.c" "${root_dir}/src/main.c"
-
-# cat > ${root_dir}/src/Makefile << EOF
-# main: main.o
-# 	\$(CC) $< -o \$@
-# main.s: main.c
-# 	\$(CC) -S \$< -o \$@
-# main.o: main.s
-# 	\$(CC) -c \$< -o \$@
-# EOF
-
 cat > ${root_dir}/src/Makefile << EOF
 all:
 	gfortran ex.f95 -o ex
 EOF
-
 
 cat > "${root_dir}/expected.json" << EOF
 [

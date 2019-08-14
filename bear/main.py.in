@@ -506,8 +506,8 @@ def create_intercept_parser():
     parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""Only use compilers given to '--use-cc' and
-                '--use-c++' and '--use-fortran'.""")
+        help="""Only use compilers given to '--use-cc', '--use-c++' and
+        '--use-fortran'.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
