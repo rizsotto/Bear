@@ -50,6 +50,9 @@ writes the output file.
 \--use-c++ *program*
 :	Hint Bear to classify the given program name as C++ compiler.
 
+\--use-fortran *program*
+:	Hint Bear to classify the given program name as Fortran compiler.
+
 \--use-only
 :	Force to use only the `--use-cc` and `--use-c++` given compilers.
 
