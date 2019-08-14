@@ -75,26 +75,22 @@ cat > "${root_dir}/expected.json" << EOF
     {
         "command": "cc -c -fpic -o one.o lib.c",
         "directory": "${root_dir}/src",
-        "file": "lib.c",
-        "output": "one.o"
+        "file": "lib.c"
     },
     {
         "command": "cc -c -fpic -o two.o lib.c",
         "directory": "${root_dir}/src",
-        "file": "lib.c",
-        "output": "two.o"
+        "file": "lib.c"
     },
     {
         "command": "cc -c -o fooflag_one main.c",
         "directory": "${root_dir}/src",
-        "file": "main.c",
-        "output": "fooflag_one"
+        "file": "main.c"
     },
     {
         "command": "cc -c -o fooflag_two main.c",
         "directory": "${root_dir}/src",
-        "file": "main.c",
-        "output": "fooflag_two"
+        "file": "main.c"
     }
 ]
 EOF

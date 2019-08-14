@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
 # REQUIRES: preload
-# RUN: bash %s %T/output_kept
-# RUN: cd %T/output_kept; %{intercept-build} --cdb result.json ./run.sh
-# RUN: cd %T/output_kept; %{cdb_diff} result.json expected.json
+# RUN: bash %s %T/field_output
+# RUN: cd %T/field_output; %{intercept-build} --cdb preload.json --field-output ./run.sh
+# RUN: cd %T/field_output; %{cdb_diff} preload.json expected.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
 
 # the test creates a subdirectory inside output dir.
 #
@@ -26,13 +30,7 @@ set -o nounset
 set -o xtrace
 
 \$CC -c -o src/empty.o src/empty.c;
-\$CC -c src/empty.c;
-
-cd src
-\$CC -c -o empty.obj empty.c;
-\$CC -c empty.c;
-
-true;
+\$CC -c -o src/empty.c.o src/empty.c;
 EOF
 chmod +x ${build_file}
 
@@ -41,25 +39,15 @@ cat > "${root_dir}/expected.json" << EOF
 {
   "command": "cc -c -o src/empty.o src/empty.c",
   "directory": "${root_dir}",
-  "file": "src/empty.c"
+  "file": "src/empty.c",
+  "output": "src/empty.o"
 }
 ,
 {
-  "command": "cc -c src/empty.c",
+  "command": "cc -c -o src/empty.c.o src/empty.c",
   "directory": "${root_dir}",
-  "file": "src/empty.c"
-}
-,
-{
-  "command": "cc -c -o empty.obj empty.c",
-  "directory": "${root_dir}/src",
-  "file": "empty.c"
-}
-,
-{
-  "command": "cc -c empty.c",
-  "directory": "${root_dir}/src",
-  "file": "empty.c"
+  "file": "src/empty.c",
+  "output": "src/empty.c.o"
 }
 ]
 EOF

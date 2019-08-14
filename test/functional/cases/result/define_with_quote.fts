@@ -49,8 +49,7 @@ cat > "${root_dir}/expected.json" << EOF
     {
         "arguments": ["c++", "-c", "-DEXPORT=extern \"C\"", "-o", "hello", "src/main.cpp"],
         "directory": "${root_dir}",
-        "file": "src/main.cpp",
-        "output": "hello"
+        "file": "src/main.cpp"
     }
 ]
 EOF

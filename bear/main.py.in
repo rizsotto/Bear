@@ -296,9 +296,9 @@ def intercept_build():
     if args.append and os.path.isfile(args.cdb):
         previous = CompilationDatabase.load(args.cdb, category)
         entries = iter(set(itertools.chain(previous, current)))
-        CompilationDatabase.save(args.cdb, entries)
+        CompilationDatabase.save(entries, args.cdb, args.field_output)
     else:
-        CompilationDatabase.save(args.cdb, current)
+        CompilationDatabase.save(current, args.cdb, args.field_output)
 
     return exit_code
 
@@ -455,6 +455,10 @@ def create_intercept_parser():
         default="compile_commands.json",
         help="""The JSON compilation database.""")
     parser.add_argument(
+        '--field-output',
+        action='store_true',
+        help="""Puts output field to entries if it founds.""")
+    parser.add_argument(
         '--use-cc',
         metavar='<path>',
         dest='use_cc',
@@ -525,20 +529,22 @@ class Compilation:
 
         return vars(self)
 
-    def as_db_entry(self):
-        # type: (Compilation) -> Dict[str, Any]
+    def as_db_entry(self, field_output):
+        # type: (Compilation, bool) -> Dict[str, Any]
         """ This method creates a compilation database entry. """
 
         source = os.path.relpath(self.source, self.directory)
         if self.output:
-            return {
+            result = {
                 'file': source,
                 'arguments':
                     [self.compiler, self.phase] + self.flags +
                     ['-o', self.output] + [source],
                 'directory': self.directory,
-                'output': self.output
             }
+            if field_output:
+                result.update({'output': self.output})
+            return result
         else:
             return {
                 'file': source,
@@ -676,14 +682,14 @@ class CompilationDatabase:
     """ Compilation Database persistence methods. """
 
     @staticmethod
-    def save(filename, iterator):
-        # type: (str, Iterable[Compilation]) -> None
+    def save(iterator, filename, field_output):
+        # type: (Iterable[Compilation], str, bool) -> None
         """ Saves compilations to given file.
 
         :param filename: the destination file name
         :param iterator: iterator of Compilation objects. """
 
-        entries = [entry.as_db_entry() for entry in iterator]
+        entries = [entry.as_db_entry(field_output) for entry in iterator]
         with open(filename, 'w') as handle:
             json.dump(entries, handle, sort_keys=True, indent=4)
 
