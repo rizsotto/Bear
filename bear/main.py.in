@@ -318,8 +318,21 @@ def capture(args, category):
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
         current = compilations(safe_calls, category)
+        currents = excludes(current, args.project_root, args.exclude)
+        return exit_code, iter(set(currents))
 
-        return exit_code, iter(set(current))
+
+def excludes(candidates, project_root, directories):
+    # type: (Iterable[Compilation], List[str]) -> Iterable[Compilation]
+    if not directories:
+        return candidates
+
+    def is_no_excluded(candidate):
+        return not any(
+            candidate.is_in(project_root, directory)
+            for directory in directories)
+
+    return (candidate for candidate in candidates if is_no_excluded(candidate))
 
 
 def compilations(exec_calls, category):
@@ -474,6 +487,18 @@ def create_intercept_parser():
         '--use-only',
         action='store_true',
         help="""Only use compilers given to '--use-cc' and '--use-c++'.""")
+    parser.add_argument(
+        '--project-root',
+        '-p',
+        dest='project_root',
+        default=os.getcwd(),
+        action='store',
+        help="""specify project root directory.""")
+    parser.add_argument(
+        '--exclude',
+        '-e',
+        action='append',
+        help="""exclude directories or files""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
@@ -537,6 +562,14 @@ class Compilation:
                 [self.compiler, self.phase] + self.flags + output + [source],
             'directory': self.directory
         }
+
+    def is_in(self, project_root, target):
+        # type: (Compilation, project_root, target) -> bool
+        """ This method check whether source file is excluded. """
+        abs_path = os.path.normpath(os.path.join(project_root, target))
+        if self.source.startswith(abs_path) and os.path.exists(abs_path):
+            return True
+        return False
 
     @classmethod
     def from_db_entry(cls, entry, category):
