@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env @BEAR_PYTHON_EXECUTABLE@
 # -*- coding: utf-8 -*-
 
 # Copyright (C) 2012-2019 by László Nagy
