@@ -341,8 +341,52 @@ def capture(args, tools):
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
         current = compilations(safe_calls, tools)
+        # filter out not desired entries
+        include_filter = include(args.include, args.exclude)
+        filtered = set(entry for entry in current if include_filter(entry))
+        return exit_code, iter(filtered)
 
-        return exit_code, iter(set(current))
+
+def include(includes, excludes):
+    # type: (str, str) -> Callable[[Compilation], bool]
+    """ Create a predicate to filter out Compilation entries.
+
+    :param includes: list of directories to include.
+    :param excludes: list of directories to exclude.
+    :return: a predicate which returns true if the entry should be
+    in the final output based on the location of the source file. """
+
+    def make_absolute(directory):
+        # type: (str) -> str
+        """ Makes a path like object absolute (to the project root). """
+
+        if os.path.isabs(directory):
+            return directory
+        else:
+            return os.path.normpath(os.path.join(os.getcwd(), directory))
+
+    include_dirs = [make_absolute(directory) for directory in includes]
+    exclude_dirs = [make_absolute(directory) for directory in excludes]
+
+    def include_filter(candidate):
+        # type: (Compilation) -> bool
+        """ The predicate which returns true if the compilation should
+        be included in the final output. """
+
+        def contains(container, directory):
+            # type: (str, str) -> bool
+            """ Returns true if the container contains the directory.  """
+
+            return os.path.commonprefix([container, directory]) == container
+
+        source = candidate.source
+        needed = True if len(include_dirs) == 0 else \
+            any(contains(directory, source) for directory in include_dirs)
+        rejected = False if len(exclude_dirs) == 0 else not \
+            all(not contains(directory, source) for directory in exclude_dirs)
+        return needed and not rejected
+
+    return include_filter
 
 
 def compilations(exec_calls, tools):
@@ -510,6 +554,20 @@ def create_intercept_parser():
         action='store_true',
         help="""Only use compilers given to '--use-cc', '--use-c++' and
         '--use-fortran'.""")
+    parser.add_argument(
+        '--include',
+        action='append',
+        default=[],
+        help="""Only include these directories or files to the output.
+        (Absolute or relative to current working directory.)
+        Use --exclude parameters to filter more entries out.""")
+    parser.add_argument(
+        '--exclude',
+        action='append',
+        default=[],
+        help="""Exclude these directories or files from the output.
+        (Absolute or relative to current working directory.)
+        The --include will not enable entries from these directories.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
