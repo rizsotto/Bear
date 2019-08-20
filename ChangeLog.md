@@ -3,6 +3,7 @@
 Features:
   - Support `output` field in the output. (#254, @bofeng17)
   - Support Fortran compiler (#201, #241, #253, @rubyzhou2014, @chunhualiao)
+  - Support filter options (#261, #252, @liugang)
 
 Bugfixes:
   - Fix Cpack problem to create RPM. (#191, @antmak, @reverendhomer)
