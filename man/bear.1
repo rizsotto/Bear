@@ -74,6 +74,24 @@ given compilers.
 .RS
 .RE
 .TP
+.B \-\-include \f[I]directory\f[]
+Only include this directories or files to the output.
+The flag can be used multiple times.
+The directory is either absolute or relative to current working
+directory.
+Use \f[C]\-\-exclude\f[] to filter entries out from these directory.
+.RS
+.RE
+.TP
+.B \-\-exclude \f[I]directory\f[]
+Exclude these directories or files from the output.
+The flag can be used multiple times.
+The directory is either absolute or relative to current working
+directory.
+The \f[C]\-\-include\f[] will not enable entries from these directories.
+.RS
+.RE
+.TP
 .B \-a, \-\-append
 Use previously generated output file and append the new entries to it.
 This way you can run Bear continuously during work, and it keeps the

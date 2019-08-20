@@ -56,6 +56,18 @@ writes the output file.
 \--use-only
 :	Force to use only the `--use-cc` and `--use-c++` given compilers.
 
+\--include *directory*
+:   Only include this directories or files to the output. The flag can
+    be used multiple times. The directory is either absolute or
+    relative to current working directory. Use `--exclude` to filter
+    entries out from these directory.
+
+\--exclude *directory*
+:   Exclude these directories or files from the output. The flag can
+    be used multiple times. The directory is either absolute or
+    relative to current working directory. The `--include` will
+    not enable entries from these directories.
+
 -a, \--append
 :	Use previously generated output file and append the new entries to it.
 	This way you can run Bear continuously during work, and it keeps the
