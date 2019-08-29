@@ -30,6 +30,7 @@ addons:
     packages:
       - cmake
       - scons
+      - gfortran
       - qt4-qmake
 
 before_install:

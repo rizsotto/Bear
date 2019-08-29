@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env @BEAR_PYTHON_EXECUTABLE@
 # -*- coding: utf-8 -*-
 
 # Copyright (C) 2012-2019 by László Nagy
@@ -92,11 +92,13 @@ IGNORED_FLAGS = {
 
 }  # type: Dict[str, int]
 
+
 # Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
 # Known MPI compiler wrapper name patterns.
-COMPILER_PATTERNS_MPI_WRAPPER = re.compile(r'^mpi(cc|cxx|CC|c\+\+)$')
+COMPILER_PATTERNS_MPI_WRAPPER = re.compile(
+    r'^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$')
 
 # Known C compiler executable name patterns.
 COMPILER_PATTERNS_CC = (
@@ -115,9 +117,18 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^(g|)xl(C|c\+\+)$'),
 )
 
+# Known Fortran compiler executable name patterns
+# Gfortran, Intel Fortran Compilers, PGI compilers
+COMPILER_PATTERNS_FORTRAN = (
+    re.compile(r'^(f95)$'),
+    re.compile(r'^(gfortran)$'),
+    re.compile(r'^(ifort)$'),
+    re.compile(r'^(pg)(f77|f90|f95|fortran)$')
+)
+
 TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
 
-C_LANG, CPLUSPLUS_LANG, OTHER = range(3)
+C_LANG, CPLUSPLUS_LANG, FORTRAN_LANG, OTHER = range(4)
 
 Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
 
@@ -126,36 +137,47 @@ CompilationCommand = collections.namedtuple(
     ['compiler', 'language', 'phase', 'flags', 'files', 'output'])
 
 
-class Category:
-
-    def __init__(self, only_use, c_compilers, cxx_compilers):
+class Tools:
+    def __init__(self, only_use, c_compilers, cxx_compilers,
+                 fortran_compilers):
         self.ignore = only_use
         self.c_compilers = [os.path.basename(cc) for cc in c_compilers]
         self.cxx_compilers = [os.path.basename(cc) for cc in cxx_compilers]
+        self.fortran_compilers = [
+            os.path.basename(cc) for cc in fortran_compilers]
 
-    def is_wrapper(self, cmd):
-        # type: (Category, str) -> bool
+    @classmethod
+    def is_wrapper(cls, cmd):
+        # type: (Type[Tools], str) -> bool
         return True if COMPILER_PATTERN_WRAPPER.match(cmd) else False
 
-    def is_mpi_wrapper(self, cmd):
-        # type: (Category, str) -> bool
+    @classmethod
+    def is_mpi_wrapper(cls, cmd):
+        # type: (Type[Tools], str) -> bool
         return True if COMPILER_PATTERNS_MPI_WRAPPER.match(cmd) else False
 
     def is_c_compiler(self, cmd):
-        # type: (Category, str) -> bool
-        use_match = Category._is_sting_match(cmd, self.c_compilers)
-        pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CC)
+        # type: (Tools, str) -> bool
+        use_match = Tools._is_sting_match(cmd, self.c_compilers)
+        pattern_match = Tools._is_pattern_match(cmd, COMPILER_PATTERNS_CC)
         return use_match if self.ignore else (use_match or pattern_match)
 
     def is_cxx_compiler(self, cmd):
-        # type: (Category, str) -> bool
-        use_match = Category._is_sting_match(cmd, self.cxx_compilers)
-        pattern_match = Category._is_pattern_match(cmd, COMPILER_PATTERNS_CXX)
+        # type: (Tools, str) -> bool
+        use_match = Tools._is_sting_match(cmd, self.cxx_compilers)
+        pattern_match = Tools._is_pattern_match(cmd, COMPILER_PATTERNS_CXX)
+        return use_match if self.ignore else (use_match or pattern_match)
+
+    def is_fortran_compiler(self, cmd):
+        # type: (Tools, str) -> bool
+        use_match = Tools._is_sting_match(cmd, self.fortran_compilers)
+        pattern_match = Tools._is_pattern_match(
+            cmd, COMPILER_PATTERNS_FORTRAN)
         return use_match if self.ignore else (use_match or pattern_match)
 
     @classmethod
     def _is_sting_match(cls, candidate, compilers):
-        # type (Type[Category], str, Iterable[str) -> bool
+        # type (Type[Tools], str, Iterable[str) -> bool
         return any((candidate == compiler) for compiler in compilers)
 
     @classmethod
@@ -288,26 +310,27 @@ def intercept_build():
     """ Entry point for 'intercept-build' command. """
 
     args = parse_args_for_intercept_build()
-    category = Category(args.use_only, args.use_cc, args.use_cxx)
-    exit_code, current = capture(args, category)
+    tools = Tools(args.use_only, args.use_cc,
+                  args.use_cxx, args.use_fortran)
+    exit_code, current = capture(args, tools)
 
     # To support incremental builds, it is desired to read elements from
     # an existing compilation database from a previous run.
     if args.append and os.path.isfile(args.cdb):
-        previous = CompilationDatabase.load(args.cdb, category)
+        previous = CompilationDatabase.load(args.cdb, tools)
         entries = iter(set(itertools.chain(previous, current)))
-        CompilationDatabase.save(args.cdb, entries)
+        CompilationDatabase.save(entries, args.cdb, args.field_output)
     else:
-        CompilationDatabase.save(args.cdb, current)
+        CompilationDatabase.save(current, args.cdb, args.field_output)
 
     return exit_code
 
 
-def capture(args, category):
+def capture(args, tools):
     """ Implementation of compilation database generation.
 
     :param args:        the parsed and validated command line arguments
-    :param category:    helper object to detect compiler
+    :param tools:    helper object to detect compiler
     :return:            the exit status of build process. """
 
     with temporary_directory(prefix='intercept-') as tmp_dir:
@@ -317,23 +340,67 @@ def capture(args, category):
         # read the intercepted exec calls
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
-        current = compilations(safe_calls, category)
+        current = compilations(safe_calls, tools)
+        # filter out not desired entries
+        include_filter = include(args.include, args.exclude)
+        filtered = set(entry for entry in current if include_filter(entry))
+        return exit_code, iter(filtered)
 
-        return exit_code, iter(set(current))
+
+def include(includes, excludes):
+    # type: (str, str) -> Callable[[Compilation], bool]
+    """ Create a predicate to filter out Compilation entries.
+
+    :param includes: list of directories to include.
+    :param excludes: list of directories to exclude.
+    :return: a predicate which returns true if the entry should be
+    in the final output based on the location of the source file. """
+
+    def make_absolute(directory):
+        # type: (str) -> str
+        """ Makes a path like object absolute (to the project root). """
+
+        if os.path.isabs(directory):
+            return directory
+        else:
+            return os.path.normpath(os.path.join(os.getcwd(), directory))
+
+    include_dirs = [make_absolute(directory) for directory in includes]
+    exclude_dirs = [make_absolute(directory) for directory in excludes]
+
+    def include_filter(candidate):
+        # type: (Compilation) -> bool
+        """ The predicate which returns true if the compilation should
+        be included in the final output. """
+
+        def contains(container, directory):
+            # type: (str, str) -> bool
+            """ Returns true if the container contains the directory.  """
+
+            return os.path.commonprefix([container, directory]) == container
+
+        source = candidate.source
+        needed = True if len(include_dirs) == 0 else \
+            any(contains(directory, source) for directory in include_dirs)
+        rejected = False if len(exclude_dirs) == 0 else not \
+            all(not contains(directory, source) for directory in exclude_dirs)
+        return needed and not rejected
+
+    return include_filter
 
 
-def compilations(exec_calls, category):
-    # type: (Iterable[Execution], Category) -> Iterable[Compilation]
+def compilations(exec_calls, tools):
+    # type: (Iterable[Execution], Tools) -> Iterable[Compilation]
     """ Needs to filter out commands which are not compiler calls. And those
     compiler calls shall be compilation (not pre-processing or linking) calls.
     Plus needs to find the source file name from the arguments.
 
     :param exec_calls:  iterator of executions
-    :param category:    helper object to detect compiler
+    :param tools:       helper object to detect compiler
     :return: stream of formatted compilation database entries """
 
     for call in exec_calls:
-        for compilation in Compilation.iter_from_execution(call, category):
+        for compilation in Compilation.iter_from_execution(call, tools):
             yield compilation
 
 
@@ -455,6 +522,10 @@ def create_intercept_parser():
         default="compile_commands.json",
         help="""The JSON compilation database.""")
     parser.add_argument(
+        '--field-output',
+        action='store_true',
+        help="""Puts output field to entries if it founds.""")
+    parser.add_argument(
         '--use-cc',
         metavar='<path>',
         dest='use_cc',
@@ -471,9 +542,32 @@ def create_intercept_parser():
         help="""Hint '%(prog)s' to classify the given program name as C++
         compiler.""")
     parser.add_argument(
+        '--use-fortran',
+        metavar='<path>',
+        dest='use_fortran',
+        action='append',
+        default=['f95'],
+        help="""Hint '%(prog)s' to classify the given program name as Fortan
+        compiler.""")
+    parser.add_argument(
         '--use-only',
         action='store_true',
-        help="""Only use compilers given to '--use-cc' and '--use-c++'.""")
+        help="""Only use compilers given to '--use-cc', '--use-c++' and
+        '--use-fortran'.""")
+    parser.add_argument(
+        '--include',
+        action='append',
+        default=[],
+        help="""Only include these directories or files to the output.
+        (Absolute or relative to current working directory.)
+        Use --exclude parameters to filter more entries out.""")
+    parser.add_argument(
+        '--exclude',
+        action='append',
+        default=[],
+        help="""Exclude these directories or files from the output.
+        (Absolute or relative to current working directory.)
+        The --include will not enable entries from these directories.""")
 
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
@@ -525,46 +619,57 @@ class Compilation:
 
         return vars(self)
 
-    def as_db_entry(self):
-        # type: (Compilation) -> Dict[str, Any]
+    def as_db_entry(self, field_output):
+        # type: (Compilation, bool) -> Dict[str, Any]
         """ This method creates a compilation database entry. """
 
         source = os.path.relpath(self.source, self.directory)
-        output = ['-o', self.output] if self.output else []
-        return {
-            'file': source,
-            'arguments':
-                [self.compiler, self.phase] + self.flags + output + [source],
-            'directory': self.directory
-        }
+        if self.output:
+            result = {
+                'file': source,
+                'arguments':
+                    [self.compiler, self.phase] + self.flags +
+                    ['-o', self.output] + [source],
+                'directory': self.directory,
+            }
+            if field_output:
+                result.update({'output': self.output})
+            return result
+        else:
+            return {
+                'file': source,
+                'arguments':
+                    [self.compiler, self.phase] + self.flags + [source],
+                'directory': self.directory
+            }
 
     @classmethod
-    def from_db_entry(cls, entry, category):
+    def from_db_entry(cls, entry, tools):
         # type: (Type[Compilation], Dict[str, str]) -> Iterable[Compilation]
         """ Parser method for compilation entry.
 
         From compilation database entry it creates the compilation object.
 
-        :param entry:       the compilation database entry
-        :param category:    helper object to detect compiler
+        :param entry:   the compilation database entry
+        :param tools:   helper object to detect compiler
         :return: stream of CompilationDbEntry objects """
 
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
         execution = Execution(cmd=command, cwd=entry['directory'])
-        return cls.iter_from_execution(execution, category)
+        return cls.iter_from_execution(execution, tools)
 
     @classmethod
-    def iter_from_execution(cls, execution, category):
+    def iter_from_execution(cls, execution, tools):
         """ Generator method for compilation entries.
 
         From a single compiler call it can generate zero or more entries.
 
         :param execution:   executed command and working directory
-        :param category:    helper object to detect compiler
+        :param tools:       helper object to detect compiler
         :return: stream of CompilationDbEntry objects """
 
-        candidate = cls._split_command(execution.cmd, category)
+        candidate = cls._split_command(execution.cmd, tools)
         for source in candidate.files if candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
@@ -579,11 +684,11 @@ class Compilation:
                 yield result
 
     @classmethod
-    def _split_compiler(cls, command, category):
+    def _split_compiler(cls, command, tools):
         """ A predicate to decide whether the command is a compiler call.
 
-        :param command:     the command to classify
-        :param category:    helper object to detect compiler
+        :param command: the command to classify
+        :param tools:   helper object to detect compiler
         :return: None if the command is not a compilation, or a tuple
                 (compiler, language, rest of the command) otherwise """
 
@@ -593,34 +698,36 @@ class Compilation:
             # 'wrapper' 'parameters' and
             # 'wrapper' 'compiler' 'parameters' are valid.
             # Additionally, a wrapper can wrap another wrapper.
-            if category.is_wrapper(executable):
-                result = cls._split_compiler(parameters, category)
+            if tools.is_wrapper(executable):
+                result = cls._split_compiler(parameters, tools)
                 # Compiler wrapper without compiler is a 'C' compiler.
                 return result if result else (command[0], C_LANG, parameters)
             # MPI compiler wrappers add extra parameters
-            elif category.is_mpi_wrapper(executable):
+            elif tools.is_mpi_wrapper(executable):
                 # Pass the executable with full path to avoid pick different
                 # executable from PATH.
                 mpi_call = get_mpi_call(command[0])  # type: List[str]
-                return cls._split_compiler(mpi_call + parameters, category)
+                return cls._split_compiler(mpi_call + parameters, tools)
             # and 'compiler' 'parameters' is valid.
-            elif category.is_c_compiler(executable):
+            elif tools.is_c_compiler(executable):
                 return command[0], C_LANG, parameters
-            elif category.is_cxx_compiler(executable):
+            elif tools.is_cxx_compiler(executable):
                 return command[0], CPLUSPLUS_LANG, parameters
+            elif tools.is_fortran_compiler(executable):
+                return command[0], FORTRAN_LANG, parameters
         return None
 
     @classmethod
-    def _split_command(cls, command, category):
+    def _split_command(cls, command, tools):
         """ Returns a value when the command is a compilation, None otherwise.
 
-        :param command:     the command to classify
-        :param category:    helper object to detect compiler
+        :param command: the command to classify
+        :param tools:   helper object to detect compiler
         :return: stream of CompilationCommand objects """
 
         logging.debug('input was: %s', command)
         # quit right now, if the program was not a C/C++ compiler
-        compiler_and_arguments = cls._split_compiler(command, category)
+        compiler_and_arguments = cls._split_compiler(command, tools)
         if compiler_and_arguments is None:
             return None
 
@@ -667,29 +774,29 @@ class CompilationDatabase:
     """ Compilation Database persistence methods. """
 
     @staticmethod
-    def save(filename, iterator):
-        # type: (str, Iterable[Compilation]) -> None
+    def save(iterator, filename, field_output):
+        # type: (Iterable[Compilation], str, bool) -> None
         """ Saves compilations to given file.
 
         :param filename: the destination file name
         :param iterator: iterator of Compilation objects. """
 
-        entries = [entry.as_db_entry() for entry in iterator]
+        entries = [entry.as_db_entry(field_output) for entry in iterator]
         with open(filename, 'w') as handle:
             json.dump(entries, handle, sort_keys=True, indent=4)
 
     @staticmethod
-    def load(filename, category):
-        # type: (str, Category) -> Iterable[Compilation]
+    def load(filename, tools):
+        # type: (str, Tools) -> Iterable[Compilation]
         """ Load compilations from file.
 
         :param filename: the file to read from
-        :param category: helper object to detect compiler
+        :param tools: helper object to detect compiler
         :returns: iterator of Compilation objects. """
 
         with open(filename, 'r') as handle:
             for entry in json.load(handle):
-                for compilation in Compilation.from_db_entry(entry, category):
+                for compilation in Compilation.from_db_entry(entry, tools):
                     yield compilation
 
 
@@ -722,7 +829,19 @@ def classify_source(filename, c_compiler=True):
         '.s': 'assembly',
         '.S': 'assembly',
         '.sx': 'assembly',
-        '.asm': 'assembly'
+        '.asm': 'assembly',
+        '.f95': 'fortran',
+        '.F95': 'fortran',
+        '.f90': 'fortran',
+        '.F90': 'fortran',
+        '.f': 'fortran',
+        '.F': 'fortran',
+        '.FOR': 'fortran',
+        '.f77': 'fortran',
+        '.fc': 'fortran',
+        '.for': 'fortran',
+        '.ftn': 'fortran',
+        '.fpp': 'fortran'
     }
 
     __, extension = os.path.splitext(os.path.basename(filename))

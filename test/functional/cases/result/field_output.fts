@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# REQUIRES: preload
+# RUN: bash %s %T/field_output
+# RUN: cd %T/field_output; %{intercept-build} --cdb preload.json --field-output ./run.sh
+# RUN: cd %T/field_output; %{cdb_diff} preload.json expected.json
+
+set -o errexit
+set -o nounset
+set -o xtrace
+
+# the test creates a subdirectory inside output dir.
+#
+# ${root_dir}
+# ├── run.sh
+# ├── expected.json
+# └── src
+#    └── empty.c
+
+root_dir=$1
+mkdir -p "${root_dir}/src"
+
+touch "${root_dir}/src/empty.c"
+
+build_file="${root_dir}/run.sh"
+cat > ${build_file} << EOF
+#!/usr/bin/env bash
+
+set -o nounset
+set -o xtrace
+
+\$CC -c -o src/empty.o src/empty.c;
+\$CC -c -o src/empty.c.o src/empty.c;
+EOF
+chmod +x ${build_file}
+
+cat > "${root_dir}/expected.json" << EOF
+[
+{
+  "command": "cc -c -o src/empty.o src/empty.c",
+  "directory": "${root_dir}",
+  "file": "src/empty.c",
+  "output": "src/empty.o"
+}
+,
+{
+  "command": "cc -c -o src/empty.c.o src/empty.c",
+  "directory": "${root_dir}",
+  "file": "src/empty.c",
+  "output": "src/empty.c.o"
+}
+]
+EOF

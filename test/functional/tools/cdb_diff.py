@@ -42,7 +42,8 @@ def smooth(entry):
         os.path.normpath(os.path.join(directory, entry['file']))
     arguments = entry['command'].split() if 'command' in entry else \
         entry['arguments']
-    return '-'.join([source[::-1]] + arguments)
+    output = entry['output'] if 'output' in entry else ''
+    return '-'.join([source[::-1]] + arguments + [output])
 
 
 def main():

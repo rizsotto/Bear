@@ -41,14 +41,32 @@ writes the output file.
 : 	Specify output file. (Default value provided.) The output is not
 	continuously updated, it's done when the build command finished.
 
+--field-output
+:   Ask to emit the `output` field for each entries in the output file.
+
 \--use-cc *program*
 :	Hint Bear to classify the given program name as C compiler.
 
 \--use-c++ *program*
 :	Hint Bear to classify the given program name as C++ compiler.
 
+\--use-fortran *program*
+:	Hint Bear to classify the given program name as Fortran compiler.
+
 \--use-only
 :	Force to use only the `--use-cc` and `--use-c++` given compilers.
+
+\--include *directory*
+:   Only include this directories or files to the output. The flag can
+    be used multiple times. The directory is either absolute or
+    relative to current working directory. Use `--exclude` to filter
+    entries out from these directory.
+
+\--exclude *directory*
+:   Exclude these directories or files from the output. The flag can
+    be used multiple times. The directory is either absolute or
+    relative to current working directory. The `--include` will
+    not enable entries from these directories.
 
 -a, \--append
 :	Use previously generated output file and append the new entries to it.
