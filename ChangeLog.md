@@ -1,4 +1,4 @@
-## 2.4.2
+## 2.4.2 (2019.08.29)
 
 Features:
   - Support `output` field in the output. (#254, @bofeng17)
