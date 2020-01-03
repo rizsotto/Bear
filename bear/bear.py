@@ -114,6 +114,7 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$'),
     re.compile(r'^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^icpc$'),
+    re.compile(r'^nvcc$'),
     re.compile(r'^(g|)xl(C|c\+\+)$'),
 )
 
@@ -834,6 +835,7 @@ def classify_source(filename, c_compiler=True):
         '.c++': 'c++',
         '.C++': 'c++',
         '.txx': 'c++',
+        '.cu': 'c++',
         '.s': 'assembly',
         '.S': 'assembly',
         '.sx': 'assembly',
