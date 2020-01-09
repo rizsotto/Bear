@@ -32,6 +32,7 @@ addons:
       - scons
       - gfortran
       - qt4-qmake
+      - nvidia-cuda-toolkit
 
 before_install:
   - uname
