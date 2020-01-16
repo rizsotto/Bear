@@ -56,15 +56,15 @@ cd src
 \$CC -c -o "\$\$.d"   -MM main.c
 
 # preprocessor flags shall be filtered
-\$CC -c -o one.o -fpic -MD  -MT target -MF one.d lib.c
-\$CC -c -o two.o -fpic -MMD -MQ target -MF two.d lib.c
+\$CC -c -o one.o -fpic -MD  -MT target -MF one.d -Dver=one lib.c
+\$CC -c -o two.o -fpic -MMD -MQ target -MF two.d -Dver=two lib.c
 
 # linking shall not in the result
 \$CC ${LD_FLAGS} one.o two.o
 
 # linker flags shall be filtered
-\$CC -o "${PREFIX}_one" "-l${PREFIX}"  -L.  main.c
-\$CC -o "${PREFIX}_two" -l "${PREFIX}" -L . main.c
+\$CC -o "${PREFIX}_one" "-l${PREFIX}"  -L. -Dver=three main.c
+\$CC -o "${PREFIX}_two" -l "${PREFIX}" -L . -Dver=four main.c
 
 true;
 EOF
@@ -73,22 +73,22 @@ chmod +x ${build_file}
 cat > "${root_dir}/expected.json" << EOF
 [
     {
-        "command": "cc -c -fpic -o one.o lib.c",
+        "command": "cc -c -fpic -Dver=one -o one.o lib.c",
         "directory": "${root_dir}/src",
         "file": "lib.c"
     },
     {
-        "command": "cc -c -fpic -o two.o lib.c",
+        "command": "cc -c -fpic  -Dver=two -o two.o lib.c",
         "directory": "${root_dir}/src",
         "file": "lib.c"
     },
     {
-        "command": "cc -c -o fooflag_one main.c",
+        "command": "cc -c -Dver=three -o fooflag_one main.c",
         "directory": "${root_dir}/src",
         "file": "main.c"
     },
     {
-        "command": "cc -c -o fooflag_two main.c",
+        "command": "cc -c -Dver=four -o fooflag_two main.c",
         "directory": "${root_dir}/src",
         "file": "main.c"
     }

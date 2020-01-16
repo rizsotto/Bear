@@ -612,13 +612,20 @@ class Compilation:
 
     def __eq__(self, other):
         # type: (Compilation, object) -> bool
-        return vars(self) == vars(other)
+        return (
+                self.__class__ == other.__class__ and
+                self.as_dict() == other.as_dict()
+        )
 
     def as_dict(self):
         # type: (Compilation) -> Dict[str, str]
         """ This method dumps the object attributes into a dictionary. """
 
-        return vars(self)
+        candidate = vars(self).copy()
+        candidate.pop("compiler", None)
+        candidate.pop("output", None)
+        candidate.pop("language", None)
+        return candidate
 
     def as_db_entry(self, field_output):
         # type: (Compilation, bool) -> Dict[str, Any]

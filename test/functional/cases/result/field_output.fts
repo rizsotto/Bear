@@ -29,25 +29,26 @@ cat > ${build_file} << EOF
 set -o nounset
 set -o xtrace
 
-\$CC -c -o src/empty.o src/empty.c;
-\$CC -c -o src/empty.c.o src/empty.c;
+\$CC -c -Dver=one -o src/one.o src/empty.c;
+\$CC -c -Dver=two -o src/two.o src/empty.c;
+\$CC -c -Dver=two -o src/three.o src/empty.c;
 EOF
 chmod +x ${build_file}
 
 cat > "${root_dir}/expected.json" << EOF
 [
 {
-  "command": "cc -c -o src/empty.o src/empty.c",
+  "command": "cc -c -Dver=one -o src/one.o src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c",
-  "output": "src/empty.o"
+  "output": "src/one.o"
 }
 ,
 {
-  "command": "cc -c -o src/empty.c.o src/empty.c",
+  "command": "cc -c -Dver=two -o src/two.o src/empty.c",
   "directory": "${root_dir}",
   "file": "src/empty.c",
-  "output": "src/empty.c.o"
+  "output": "src/two.o"
 }
 ]
 EOF
