@@ -477,10 +477,11 @@ def exec_trace_files(directory):
     :param directory:   path to directory which contains the trace files.
     :return:            a generator of file names (absolute path). """
 
-    for root, _, files in os.walk(directory):
-        for candidate in files:
-            if candidate.startswith(TRACE_FILE_PREFIX):
-                yield os.path.join(root, candidate)
+    candidates = (os.path.join(directory, file)
+                  for file in os.listdir(directory)
+                  if file.startswith(TRACE_FILE_PREFIX))
+    return sorted((f for f in filter(os.path.isfile, candidates)),
+                  key=os.path.getctime)
 
 
 def parse_args_for_intercept_build():
