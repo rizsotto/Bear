@@ -5,7 +5,7 @@ else()
     message(FATAL_ERROR "Have not found python interpreter")
 endif()
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/main.py.in ${CMAKE_CURRENT_BINARY_DIR}/bear)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bear.py ${CMAKE_CURRENT_BINARY_DIR}/bear)
 
 include(GNUInstallDirs)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bear
