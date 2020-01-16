@@ -25,9 +25,9 @@ import sys
 import os.path
 
 
-def diff(lhs, rhs):
-    left = {smooth(entry): entry for entry in lhs}
-    right = {smooth(entry): entry for entry in rhs}
+def diff(lhs, rhs, ignore_compiler):
+    left = {smooth(entry, ignore_compiler): entry for entry in lhs}
+    right = {smooth(entry, ignore_compiler): entry for entry in rhs}
     for key in left.keys():
         if key not in right:
             yield '> {}'.format(left[key])
@@ -36,19 +36,25 @@ def diff(lhs, rhs):
             yield '< {}'.format(right[key])
 
 
-def smooth(entry):
+def smooth(entry, ignore_compiler):
     directory = os.path.normpath(entry['directory'])
     source = entry['file'] if os.path.isabs(entry['file']) else \
         os.path.normpath(os.path.join(directory, entry['file']))
     arguments = entry['command'].split() if 'command' in entry else \
         entry['arguments']
     output = entry['output'] if 'output' in entry else ''
+    if ignore_compiler:
+        arguments = arguments[1:]
     return '-'.join([source[::-1]] + arguments + [output])
 
 
 def main():
     """ Semantically diff two compilation databases. """
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--ignore-compiler',
+        action='store_true',
+        help="Ignore the first element in the arguments field.")
     parser.add_argument('left', type=argparse.FileType('r'))
     parser.add_argument('right', type=argparse.FileType('r'))
     args = parser.parse_args()
@@ -57,7 +63,7 @@ def main():
     rhs = json.load(args.right)
     # run the diff and print the result
     count = 0
-    for result in diff(lhs, rhs):
+    for result in diff(lhs, rhs, args.ignore_compiler):
         print(result)
         count += 1
     return count
