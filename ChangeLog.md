@@ -1,3 +1,9 @@
+## 2.4.3 (2020-01-26)
+
+Features:
+  - Support CUDA compilations (@nweston, #275, #277, #278)
+  - Better duplicate entry detection (#278)
+
 ## 2.4.2 (2019.08.29)
 
 Features:
