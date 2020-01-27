@@ -216,7 +216,7 @@ void call_execl() {
     char *const file = "execl.c";
     char *const compiler = "/usr/bin/cc";
 
-    expected_out("cc", file);
+    expected_out(compiler, file);
     create_source(file);
 
     FORK(execl(compiler, "cc", "-c", file, (char *)0);)

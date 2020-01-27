@@ -1,38 +1,42 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.9)
 
-project(bear C)
-set(BEAR_VERSION "2.4.3")
-
-include(GNUInstallDirs)
-install(FILES COPYING README.md ChangeLog.md
-  DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-include(CheckCCompilerFlag)
-check_c_compiler_flag("-std=c99" C99_SUPPORTED)
-if (C99_SUPPORTED)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+else()
+    cmake_policy(VERSION 3.12)
 endif()
 
-add_definitions(-D_GNU_SOURCE)
-list(APPEND CMAKE_REQUIRED_DEFINITIONS -D_GNU_SOURCE)
-
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
+set(default_build_type "Release")
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-set(CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
 
-set(EAR_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}ear${CMAKE_SHARED_LIBRARY_SUFFIX})
-set(EAR_LIB_PATH "${CMAKE_INSTALL_LIBDIR}/bear")
-set(DEFAULT_PRELOAD_FILE ${CMAKE_INSTALL_PREFIX}/${EAR_LIB_PATH}/${EAR_LIB_FILE} CACHE STRING "Default path to libear.")
+project(bear
+    VERSION 3.0.0
+    DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
+    LANGUAGES C CXX)
 
-add_subdirectory(libear)
-add_subdirectory(bear)
+enable_testing()
+
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(AddGoogleTest)
+
+add_subdirectory(source)
 add_subdirectory(test)
 add_subdirectory(man)
 add_subdirectory(shell-completion)
 
-set(CPACK_PACKAGE_NAME "bear")
+include(GNUInstallDirs)
+install(FILES COPYING README.md ChangeLog.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+set(CPACK_PACKAGE_NAME "source/bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
 set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
 set(CPACK_PACKAGE_VERSION ${BEAR_VERSION})

@@ -4,20 +4,33 @@ matrix:
   include:
     - os: linux
       sudo: false
-      dist: xenial
-      python: "pypy"
-    - os: linux
-      sudo: required
-      dist: xenial
-      python: 2.7
-    - os: linux
-      sudo: false
-      dist: xenial
+      dist: bionic
       python: 3.6
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-8
+      env:
+        - CC=gcc-8
+        - CXX=g++-8
     - os: linux
       sudo: false
-      dist: xenial
+      dist: bionic
       python: 3.7
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-bionic-8
+            - ubuntu-toolchain-r-test
+          packages:
+            - clang-8
+            - libclang-8-dev
+            - llvm-8-tools
+      env:
+        - CC=clang-8
+        - CXX=clang++-8
     - os: osx
       osx_image: xcode7.3
       language: generic
@@ -28,33 +41,46 @@ matrix:
 addons:
   apt:
     packages:
+      - python-pip
+      - libc6-dev
       - cmake
       - scons
       - gfortran
       - qt4-qmake
       - nvidia-cuda-toolkit
 
-before_install:
+before_script:
+  - mkdir -p "$HOME/install" "$HOME/build"
   - uname
+  - env | sort
+
+before_install:
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       csrutil status || true;
       brew update;
+      brew upgrade cmake;
       brew install scons;
     fi
 
 install:
   - pip --version
   - pip install --upgrade pip
-  - pip install lit pycodestyle
+  - pip install lit pex pycodestyle
 
 script:
-  - mkdir "$HOME/build"; cd "$HOME/build"
-  - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ"
+  - cd "$HOME/build"
+  - cmake --version
+  - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
-  - VERBOSE=1 make check
+  - VERBOSE=1 make test
   - VERBOSE=1 make package
+  - VERBOSE=1 DESTDIR="$HOME/install" make install
   - if [ "$TRAVIS_SUDO" == "true" ]; then
       sudo make install;
       (cd "$TRAVIS_BUILD_DIR"; git clean -fdx;);
       lit -v "$TRAVIS_BUILD_DIR/test";
     fi
+
+branches:
+  except:
+    - experimental

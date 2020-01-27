@@ -23,14 +23,14 @@ build process. The result of that should be a compilation database.
 
 This implementation is using the LD_PRELOAD or DYLD_INSERT_LIBRARIES
 mechanisms provided by the dynamic linker. The related library is implemented
-in C language and can be found under 'libear' directory.
+in C language and can be found under 'libexec' directory.
 
-The 'libear' library is capturing all child process creation and logging the
+The 'libexec' library is capturing all child process creation and logging the
 relevant information about it into separate files in a specified directory.
 The input of the library is therefore the output directory which is passed
 as an environment variable.
 
-This module implements the build command execution with the 'libear' library
+This module implements the build command execution with the 'libexec' library
 and the post-processing of the output files, which will condensates into a
 (might be empty) compilation database. """
 
@@ -127,11 +127,11 @@ COMPILER_PATTERNS_FORTRAN = (
     re.compile(r'^(pg)(f77|f90|f95|fortran)$')
 )
 
-TRACE_FILE_PREFIX = 'execution.'  # same as in ear.c
+TRACE_FILE_SUFFIX = '.process_start.json'  # same as in ear.c
 
 C_LANG, CPLUSPLUS_LANG, FORTRAN_LANG, OTHER = range(4)
 
-Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
+Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
 
 CompilationCommand = collections.namedtuple(
     'CompilationCommand',
@@ -336,8 +336,8 @@ def capture(args, tools):
 
     with temporary_directory(prefix='intercept-') as tmp_dir:
         # run the build command
-        environment = setup_environment(args, tmp_dir)
-        exit_code = run_build(args.build, env=environment)
+        command = build_command(args, tmp_dir)
+        exit_code = run_build(command)
         # read the intercepted exec calls
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
@@ -405,31 +405,41 @@ def compilations(exec_calls, tools):
             yield compilation
 
 
-def setup_environment(args, destination):
-    # type: (argparse.Namespace, str) -> Dict[str, str]
-    """ Sets up the environment for the build command.
+def build_command(args, tmp_dir):
+    # type: (argparse.Namespace, str) -> List[str]
+    session = [ '--session-library', args.libexec ]
+    command = [ '--exec-file', args.build[0], '--exec-command' ] + args.build
+    verbose = [ '--verbose' ] if args.verbose else []
+    return [
+               args.interceptor,
+               '--report-destination', tmp_dir
+           ] + session + verbose + command
 
-    In order to capture the sub-commands (executed by the build process),
-    it needs to prepare the environment. It's either the compiler wrappers
-    shall be announce as compiler or the intercepting library shall be
-    announced for the dynamic linker.
-
-    :param args:        command line arguments
-    :param destination: directory path for the execution trace files
-    :return: a prepared set of environment variables. """
-
-    environment = dict(os.environ)
-    environment.update({'INTERCEPT_BUILD_TARGET_DIR': destination})
-
-    if sys.platform == 'darwin':
-        environment.update({
-            'DYLD_INSERT_LIBRARIES': args.libear,
-            'DYLD_FORCE_FLAT_NAMESPACE': '1'
-        })
-    else:
-        environment.update({'LD_PRELOAD': args.libear})
-
-    return environment
+# def setup_environment(args, destination):
+#     # type: (argparse.Namespace, str) -> Dict[str, str]
+#     """ Sets up the environment for the build command.
+#
+#     In order to capture the sub-commands (executed by the build process),
+#     it needs to prepare the environment. It's either the compiler wrappers
+#     shall be announce as compiler or the intercepting library shall be
+#     announced for the dynamic linker.
+#
+#     :param args:        command line arguments
+#     :param destination: directory path for the execution trace files
+#     :return: a prepared set of environment variables. """
+#
+#     environment = dict(os.environ)
+#     environment.update({'INTERCEPT_BUILD_TARGET_DIR': destination})
+#
+#     if sys.platform == 'darwin':
+#         environment.update({
+#             'DYLD_INSERT_LIBRARIES': args.libear,
+#             'DYLD_FORCE_FLAT_NAMESPACE': '1'
+#         })
+#     else:
+#         environment.update({'LD_PRELOAD': args.libear})
+#
+#     return environment
 
 
 def parse_exec_trace(filename):
@@ -442,33 +452,15 @@ def parse_exec_trace(filename):
     :param filename: path to an execution trace file to read from,
     :return: an Execution object. """
 
-    def byte_to_int(byte):
-        return struct.unpack_from("=I", byte)[0]
-
-    def parse_length(handler, expected_type):
-        type_bytes = handler.read(3)
-        if type_bytes != expected_type:
-            raise Exception("type not expected")
-        length_bytes = handler.read(4)
-        return byte_to_int(length_bytes)
-
-    def parse_string(handler):
-        length = parse_length(handler, b'str')
-        value_bytes = handler.read(length)
-        return value_bytes.decode("utf-8")
-
-    def parse_string_list(handler):
-        length = parse_length(handler, b'lst')
-        return [parse_string(handler) for _ in range(length)]
-
     logging.debug('parse exec trace file: %s', filename)
-    with open(filename, 'rb', buffering=0) as handler:
+    with open(filename, 'r') as handler:
         try:
-            return Execution(cwd=parse_string(handler),
-                             cmd=parse_string_list(handler))
+            entry = json.load(handler)
+            return Execution(pid=entry['pid'],
+                             cwd=entry['cwd'],
+                             cmd=entry['cmd'])
         except Exception as exception:
-            logging.warning('parse exec trace file: %s FAILED: %s',
-                            filename, exception)
+            logging.warning('parse exec trace file: %s FAILED: %s', filename, exception)
             return None
 
 
@@ -480,7 +472,7 @@ def exec_trace_files(directory):
 
     candidates = (os.path.join(directory, file)
                   for file in os.listdir(directory)
-                  if file.startswith(TRACE_FILE_PREFIX))
+                  if file.endswith(TRACE_FILE_SUFFIX))
     return sorted((f for f in filter(os.path.isfile, candidates)),
                   key=os.path.getctime)
 
@@ -580,11 +572,29 @@ def create_intercept_parser():
         The output is not continuously updated, it's done when the build
         command finished. """)
     advanced.add_argument(
-        '--libear', '-l',
-        dest='libear',
+        '--libexec', '-l',
+        dest='libexec',
         default="@DEFAULT_PRELOAD_FILE@",
         action='store',
-        help="""specify libear file location.""")
+        help="""specify libexec file location.""")
+    advanced.add_argument(
+        '--interceptor',
+        dest='interceptor',
+        default="@INTERCEPT_EXE@",
+        action='store',
+        help="""specify the intercept binary location.""")
+    advanced.add_argument(
+        '--intercept-wrapper',
+        dest='intercept_wrapper_cc',
+        default="@INTERCEPT_CC_EXE@",
+        action='store',
+        help="""specify the C compiler wrapper location.""")
+    advanced.add_argument(
+        '--intercept-wrapper++',
+        dest='intercept_wrapper_cxx',
+        default="@INTERCEPT_CXX_EXE@",
+        action='store',
+        help="""specify the C++ compiler wrapper location.""")
 
     parser.add_argument(
         dest='build', nargs=argparse.REMAINDER, help="""Command to run.""")
@@ -665,7 +675,7 @@ class Compilation:
 
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
-        execution = Execution(cmd=command, cwd=entry['directory'])
+        execution = Execution(cmd=command, cwd=entry['directory'], pid=0)
         return cls.iter_from_execution(execution, tools)
 
     @classmethod

@@ -1,10 +1,3 @@
-enable_testing()
-set(CMAKE_CTEST_COMMAND ctest -V)
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
-
-add_dependencies(check ear)
-
-
 message(STATUS "Looking for lit")
 find_program(LIT_EXECUTABLE
   NAMES lit
@@ -15,9 +8,13 @@ if (LIT_EXECUTABLE)
 endif()
 
 if(LIT_FOUND)
-  set(EAR_EXE ${CMAKE_BINARY_DIR}/bear/bear)
-  set(EAR_LIB ${CMAKE_BINARY_DIR}/libear/${EAR_LIB_FILE})
+  set(EXEC_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX})
+  set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/bear/bear)
+  set(INTERCEPT_EXE ${CMAKE_BINARY_DIR}/source/intercept/intercept)
+  set(INTERCEPT_CC_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-cc/intercept-cc)
+  set(INTERCEPT_CXX_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-c++/intercept-c++)
+  set(EXEC_LIB ${CMAKE_BINARY_DIR}/source/libexec/${EXEC_LIB_FILE})
 
   add_test(NAME func_test
-    COMMAND lit -DEAR_EXE=${EAR_EXE} -DEAR_LIB=${EAR_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
+    COMMAND lit -DBEAR_EXE=${BEAR_EXE} -DINTERCEPT_EXE=${INTERCEPT_EXE} -DEXEC_LIB=${EXEC_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
