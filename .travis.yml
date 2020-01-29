@@ -31,12 +31,6 @@ matrix:
       env:
         - CC=clang-8
         - CXX=clang++-8
-    - os: osx
-      osx_image: xcode7.3
-      language: generic
-    - os: osx
-      osx_image: xcode8
-      language: generic
 
 addons:
   apt:
@@ -49,38 +43,25 @@ addons:
       - qt4-qmake
       - nvidia-cuda-toolkit
 
-before_script:
-  - mkdir -p "$HOME/install" "$HOME/build"
+before_install:
   - uname
   - env | sort
-
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      csrutil status || true;
-      brew update;
-      brew upgrade cmake;
-      brew install scons;
-    fi
+  - cmake --version
 
 install:
   - pip --version
   - pip install --upgrade pip
   - pip install lit pex pycodestyle
 
+before_script:
+  - git submodule add https://github.com/google/googletest.git gtest
+  - git apply ./gtest.patch
+
 script:
+  - mkdir -p "$HOME/install" "$HOME/build"
   - cd "$HOME/build"
-  - cmake --version
   - cmake "$TRAVIS_BUILD_DIR" -DCPACK_GENERATOR="TGZ;DEB"
   - VERBOSE=1 make all
-  - VERBOSE=1 make test
+  - CTEST_OUTPUT_ON_FAILURE=1 make test
   - VERBOSE=1 make package
   - VERBOSE=1 DESTDIR="$HOME/install" make install
-  - if [ "$TRAVIS_SUDO" == "true" ]; then
-      sudo make install;
-      (cd "$TRAVIS_BUILD_DIR"; git clean -fdx;);
-      lit -v "$TRAVIS_BUILD_DIR/test";
-    fi
-
-branches:
-  except:
-    - experimental
