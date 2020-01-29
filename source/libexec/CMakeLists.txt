@@ -12,6 +12,8 @@ if(APPLE)
     set(CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING  "Rogue")
     set(CMAKE_MACOSX_RPATH 1)
     set_target_properties(exec PROPERTIES INSTALL_RPATH "@loader_path/${EXEC_LIB_PATH}")
+else()
+    set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
 endif()
 
 install(TARGETS exec

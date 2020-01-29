@@ -75,7 +75,7 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_LIBRARY=/usr/libexec/libexec.so", result[0]);
         EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[1]);
     }
 
@@ -90,7 +90,7 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_LIBRARY=/usr/libexec/libexec.so", result[0]);
         EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so", result[1]);
     }
 
@@ -105,7 +105,7 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_LIBRARY=/usr/libexec/libexec.so", result[0]);
         EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[1]);
     }
 
@@ -120,7 +120,7 @@ namespace {
         auto result = sut->data();
 
         EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("INTERCEPT_SESSION_LIBRARY=/usr/libexec/libexec.so", result[0]);
+        EXPECT_STREQ("INTERCEPT_LIBRARY=/usr/libexec/libexec.so", result[0]);
         EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[1]);
     }
 #endif

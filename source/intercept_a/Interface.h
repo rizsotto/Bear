@@ -23,15 +23,15 @@ namespace pear {
     namespace flag {
 
         constexpr char help[]           = "--help";
-        constexpr char verbose[]        = "--verbose";
-        constexpr char destination[]    = "--report-destination";
+        constexpr char verbose[]        = "--session-verbose";
+        constexpr char destination[]    = "--session-destination";
         constexpr char library[]        = "--session-library";
         constexpr char wrapper_cc[]     = "--session-cc-wrapper";
         constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
         constexpr char path[]           = "--exec-path";
         constexpr char file[]           = "--exec-file";
-        constexpr char search_path[]    = "--exec-search_path";
-        constexpr char command[]        = "--exec-command";
+        constexpr char search_path[]    = "--exec-search-path";
+        constexpr char command[]        = "--";
 
     }
 
@@ -40,7 +40,7 @@ namespace pear {
         constexpr char reporter_key[]    = "INTERCEPT_REPORT_COMMAND";
         constexpr char destination_key[] = "INTERCEPT_REPORT_DESTINATION";
         constexpr char verbose_key[]     = "INTERCEPT_VERBOSE";
-        constexpr char library_key[]     = "INTERCEPT_SESSION_LIBRARY";
+        constexpr char library_key[]     = "INTERCEPT_LIBRARY";
         constexpr char cc_key[]          = "INTERCEPT_SESSION_CC";
         constexpr char cxx_key[]         = "INTERCEPT_SESSION_CXX";
 

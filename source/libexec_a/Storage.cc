@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2017 by László Nagy
+/*  Copyright (C) 2012-2018 by László Nagy
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -25,18 +25,12 @@
 
 namespace ear {
 
-    Storage::Storage(char *const begin, char *const end) noexcept
-            : begin_(begin)
-            , end_(end)
-            , top_(begin)
-    { }
-
     char const *Storage::store(char const *const input) noexcept {
         if (input == nullptr)
             return nullptr;
 
-        auto input_end = ::ear::array::end(input) + 1;  // include the zero element
-        auto top = ::ear::array::copy(input, input_end, top_, end_);
+        auto input_end = ear::array::end(input) + 1;  // include the zero element
+        auto top = ear::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);
         return top;

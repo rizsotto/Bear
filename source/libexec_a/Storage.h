@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2017 by László Nagy
+/*  Copyright (C) 2012-2018 by László Nagy
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -21,12 +21,30 @@
 
 namespace ear {
 
+    /**
+     * Represents a character storage.
+     *
+     * Define helper methods to persist character sequences. The covered
+     * functionality is not more than a `memcpy` to a static char array.
+     */
     class Storage {
     public:
+        /**
+         * Takes the memory addresses of the buffer.
+         *
+         * @param begin of the buffer.
+         * @param end of the buffer.
+         */
         Storage(char *begin, char *end) noexcept;
 
         ~Storage() noexcept = default;
 
+        /**
+         * Copy the input to the buffer.
+         *
+         * @param input to persist.
+         * @return the address of the persisted input.
+         */
         char const *store(char const *input) noexcept;
 
     public:
@@ -43,4 +61,11 @@ namespace ear {
         char *const end_;
         char *top_;
     };
+
+    inline
+    Storage::Storage(char *const begin, char *const end) noexcept
+            : begin_(begin)
+            , end_(end)
+            , top_(begin)
+    { }
 }
