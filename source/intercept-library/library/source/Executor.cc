@@ -19,6 +19,8 @@
 
 #include "Executor.h"
 
+#include "intercept.h"
+
 #include "Array.h"
 #include "Resolver.h"
 #include "Session.h"
@@ -42,18 +44,18 @@ namespace {
 
     const char **copy(Execution const &execution, const char **it, const char **it_end) noexcept {
         if (execution.path != nullptr) {
-            *it++ = ear::FLAG_PATH;
+            *it++ = pear::flag::PATH;
             *it++ = execution.path;
         }
         if (execution.file != nullptr) {
-            *it++ = ear::FLAG_FILE;
+            *it++ = pear::flag::FILE;
             *it++ = execution.file;
         }
         if (execution.search_path != nullptr) {
-            *it++ = ear::FLAG_SEARCH_PATH;
+            *it++ = pear::flag::SEARCH_PATH;
             *it++ = execution.search_path;
         }
-        *it++ = ear::FLAG_COMMAND;
+        *it++ = pear::flag::COMMAND;
         const size_t command_size = ear::array::length(execution.command);
         const char **const command_end = execution.command + (command_size + 1);
         return ear::array::copy(execution.command, command_end, it, it_end);
@@ -65,12 +67,12 @@ namespace {
 
     const char **copy(ear::Session const &session, const char **it, const char **it_end) noexcept {
         *it++ = session.get_reporter();
-        *it++ = ear::FLAG_DESTINATION;
+        *it++ = pear::flag::DESTINATION;
         *it++ = session.get_destination();
-        *it++ = ear::FLAG_LIBRARY;
+        *it++ = pear::flag::LIBRARY;
         *it++ = session.get_library();
         if (session.is_verbose())
-            *it++ = ear::FLAG_VERBOSE;
+            *it++ = pear::flag::VERBOSE;
         return it;
     }
 

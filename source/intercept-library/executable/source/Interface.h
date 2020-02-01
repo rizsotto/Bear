@@ -20,26 +20,11 @@
 #pragma once
 
 namespace pear {
-    namespace flag {
-
-        constexpr char help[]           = "--help";
-        constexpr char verbose[]        = "--session-verbose";
-        constexpr char destination[]    = "--session-destination";
-        constexpr char library[]        = "--session-library";
-        constexpr char wrapper_cc[]     = "--session-cc-wrapper";
-        constexpr char wrapper_cxx[]    = "--session-c++-wrapper";
-        constexpr char path[]           = "--exec-path";
-        constexpr char file[]           = "--exec-file";
-        constexpr char search_path[]    = "--exec-search-path";
-        constexpr char command[]        = "--";
-
-    }
 
     namespace env {
 
         constexpr char KEY_CC[]          = "INTERCEPT_SESSION_CC";
         constexpr char KEY_CXX[]         = "INTERCEPT_SESSION_CXX";
-
     }
 
     struct Execution {

@@ -18,8 +18,8 @@
  */
 
 #include "Session.h"
-#include "Interface.h"
-#include "Result.h"
+
+#include "intercept.h"
 
 #include <cstring>
 #include <string_view>
@@ -27,6 +27,9 @@
 #include <vector>
 #include <initializer_list>
 #include <algorithm>
+
+#include "Interface.h"
+#include "Result.h"
 
 namespace {
 
@@ -121,9 +124,9 @@ namespace {
     };
 
     ::pear::Result<::pear::Context> make_context(const Parameters &parameters) noexcept {
-        if (auto destination_it = parameters.find(::pear::flag::destination); destination_it != parameters.end()) {
+        if (auto destination_it = parameters.find(::pear::flag::DESTINATION); destination_it != parameters.end()) {
             auto const [ destination, _ ] = destination_it->second;
-            const bool verbose = (parameters.find(::pear::flag::verbose) != parameters.end());
+            const bool verbose = (parameters.find(::pear::flag::VERBOSE) != parameters.end());
             auto const [ reporter, __ ] = parameters.find(program_key)->second;
             return ::pear::Ok<::pear::Context>({ *reporter, *destination, verbose });
         } else {
@@ -142,11 +145,11 @@ namespace {
         };
 
         auto const nowhere = parameters.end();
-        if (auto command_it = parameters.find(::pear::flag::command); command_it != nowhere) {
+        if (auto command_it = parameters.find(::pear::flag::COMMAND); command_it != nowhere) {
             auto [ command, _ ] = command_it->second;
-            auto path = get_optional(::pear::flag::path);
-            auto file = get_optional(::pear::flag::file);
-            auto search_path = get_optional(::pear::flag::search_path);
+            auto path = get_optional(::pear::flag::PATH);
+            auto file = get_optional(::pear::flag::FILE);
+            auto search_path = get_optional(::pear::flag::SEARCH_PATH);
             if ((path != nullptr && file == nullptr) ||(path == nullptr && file != nullptr)) {
                 return ::pear::Ok<::pear::Execution>({command, path, file, search_path});
             } else {
@@ -183,36 +186,36 @@ namespace pear {
 
     pear::Result<pear::SessionPtr> parse(int argc, char *argv[]) noexcept {
         const Parser parser({
-            { ::pear::flag::help,        0, "this message" },
-            { ::pear::flag::verbose,     0, "make the interception run verbose" },
-            { ::pear::flag::destination, 1, "path to report directory" },
-            { ::pear::flag::library,     1, "path to the intercept library" },
-            { ::pear::flag::wrapper_cc,  2, "path to the C compiler and the wrapper" },
-            { ::pear::flag::wrapper_cxx, 2, "path to the C++ compiler and the wrapper", },
-            { ::pear::flag::path,        1, "the path parameter for the command" },
-            { ::pear::flag::file,        1, "the file name for the command" },
-            { ::pear::flag::search_path, 1, "the search path for the command" },
-            { ::pear::flag::command,    -1, "the executed command" }
+            { ::pear::flag::HELP,        0,  "this message" },
+            { ::pear::flag::VERBOSE,     0,  "make the interception run verbose" },
+            { ::pear::flag::DESTINATION, 1,  "path to report directory" },
+            { ::pear::flag::LIBRARY,     1,  "path to the intercept library" },
+            { ::pear::flag::WRAPPER_CC,  2,  "path to the C compiler and the wrapper" },
+            { ::pear::flag::WRAPPER_CXX, 2,  "path to the C++ compiler and the wrapper", },
+            { ::pear::flag::PATH,        1,  "the path parameter for the command" },
+            { ::pear::flag::FILE,        1,  "the file name for the command" },
+            { ::pear::flag::SEARCH_PATH, 1,  "the search path for the command" },
+            { ::pear::flag::COMMAND,     -1, "the executed command" }
         });
         return parser.parse(argc, const_cast<const char **>(argv))
                 .bind<::pear::SessionPtr>([&parser, &argv](auto params) -> Result<::pear::SessionPtr> {
-                    if (params.find(::pear::flag::help) != params.end())
+                    if (params.find(::pear::flag::HELP) != params.end())
                         return Err(std::runtime_error(parser.help(argv[0])));
                     else
                         return merge(make_context(params), make_execution(params))
                             .template map<::pear::SessionPtr>([&params](auto in) -> ::pear::SessionPtr {
                                 const auto& [context, execution] = in;
-                                if (auto library_it = params.find(::pear::flag::library); library_it != params.end()) {
+                                if (auto library_it = params.find(::pear::flag::LIBRARY); library_it != params.end()) {
                                     const auto& [library, _] = library_it->second;
                                     auto result = std::make_unique<LibrarySession>(context, execution);
                                     result->library = *library;
                                     return SessionPtr(result.release());
-                                } else if ((params.find(::pear::flag::wrapper_cc) != params.end()) &&
-                                           (params.find(::pear::flag::wrapper_cxx) != params.end())) {
+                                } else if ((params.find(::pear::flag::WRAPPER_CC) != params.end()) &&
+                                           (params.find(::pear::flag::WRAPPER_CXX) != params.end())) {
                                     const auto& [wrapper_cc_begin, wrapper_cc_end] =
-                                         params.find(::pear::flag::wrapper_cc)->second;
+                                         params.find(::pear::flag::WRAPPER_CC)->second;
                                     const auto& [wrapper_cxx_begin, wrapper_cxx_end] =
-                                         params.find(::pear::flag::wrapper_cxx)->second;
+                                         params.find(::pear::flag::WRAPPER_CXX)->second;
                                     auto result = std::make_unique<WrapperSession>(context, execution);
                                     result->cc = *wrapper_cc_begin;
                                     result->cc_wrapper = *(wrapper_cc_begin + 1);

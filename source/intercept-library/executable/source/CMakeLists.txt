@@ -16,6 +16,7 @@ add_library(intercept_a STATIC
 )
 
 target_include_directories(intercept_a PRIVATE ${EXE_CFG_DIR})
+target_include_directories(intercept_a PRIVATE ${EXE_API_DIR})
 target_include_directories(intercept_a PRIVATE ${LIB_API_DIR})
 target_compile_features(intercept_a PUBLIC cxx_std_17)
 target_compile_options(intercept_a PUBLIC -fno-exceptions -fno-rtti)

@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
 
+#include "intercept.h"
+
 #include "Resolver.h"
 #include "Session.h"
 #include "Environment.h"
@@ -42,13 +44,13 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_PATH, argv[5]);
+                EXPECT_STREQ(pear::flag::PATH, argv[5]);
                 EXPECT_STREQ(LS_PATH, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[7]);
                 EXPECT_STREQ(LS_ARGV[0], argv[8]);
                 EXPECT_STREQ(LS_ARGV[1], argv[9]);
                 EXPECT_EQ(LS_ENVP, envp);
@@ -60,14 +62,14 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), path);
                 EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(VERBOSE_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(VERBOSE_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_VERBOSE, argv[5]);
-                EXPECT_STREQ(ear::FLAG_PATH, argv[6]);
+                EXPECT_STREQ(pear::flag::VERBOSE, argv[5]);
+                EXPECT_STREQ(pear::flag::PATH, argv[6]);
                 EXPECT_STREQ(LS_PATH, argv[7]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[8]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[8]);
                 EXPECT_STREQ(LS_ARGV[0], argv[9]);
                 EXPECT_STREQ(LS_ARGV[1], argv[10]);
                 EXPECT_EQ(LS_ENVP, envp);
@@ -79,13 +81,13 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
+                EXPECT_STREQ(pear::flag::FILE, argv[5]);
                 EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[7]);
                 EXPECT_STREQ(LS_ARGV[0], argv[8]);
                 EXPECT_STREQ(LS_ARGV[1], argv[9]);
                 EXPECT_EQ(LS_ENVP, envp);
@@ -97,15 +99,15 @@ namespace {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
+                EXPECT_STREQ(pear::flag::FILE, argv[5]);
                 EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_SEARCH_PATH, argv[7]);
+                EXPECT_STREQ(pear::flag::SEARCH_PATH, argv[7]);
                 EXPECT_STREQ(SEARCH_PATH, argv[8]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[9]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[9]);
                 EXPECT_STREQ(LS_ARGV[0], argv[10]);
                 EXPECT_STREQ(LS_ARGV[1], argv[11]);
                 EXPECT_EQ(LS_ENVP, envp);
@@ -122,13 +124,13 @@ namespace {
                       char *const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_PATH, argv[5]);
+                EXPECT_STREQ(pear::flag::PATH, argv[5]);
                 EXPECT_STREQ(LS_PATH, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[7]);
                 EXPECT_STREQ(LS_ARGV[0], argv[8]);
                 EXPECT_STREQ(LS_ARGV[1], argv[9]);
                 EXPECT_EQ(LS_ENVP, envp);
@@ -145,13 +147,13 @@ namespace {
                       char *const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
-                EXPECT_STREQ(ear::FLAG_DESTINATION, argv[1]);
+                EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
                 EXPECT_STREQ(SILENT_SESSION.get_destination(), argv[2]);
-                EXPECT_STREQ(ear::FLAG_LIBRARY, argv[3]);
+                EXPECT_STREQ(pear::flag::LIBRARY, argv[3]);
                 EXPECT_STREQ(SILENT_SESSION.get_library(), argv[4]);
-                EXPECT_STREQ(ear::FLAG_FILE, argv[5]);
+                EXPECT_STREQ(pear::flag::FILE, argv[5]);
                 EXPECT_STREQ(LS_FILE, argv[6]);
-                EXPECT_STREQ(ear::FLAG_COMMAND, argv[7]);
+                EXPECT_STREQ(pear::flag::COMMAND, argv[7]);
                 EXPECT_STREQ(LS_ARGV[0], argv[8]);
                 EXPECT_STREQ(LS_ARGV[1], argv[9]);
                 EXPECT_EQ(LS_ENVP, envp);

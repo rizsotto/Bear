@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 
 #include "Session.h"
+#include "intercept.h"
 
 namespace {
 
@@ -15,7 +16,7 @@ namespace {
     }
 
     TEST(session, parse_help_fails) {
-        const char *argv[] = { "program", ::pear::flag::help, nullptr };
+        const char *argv[] = {"program", ::pear::flag::HELP, nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
 
         ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
@@ -25,13 +26,13 @@ namespace {
     }
 
     TEST(session, parse_library_success) {
-        const char *argv[] = { "program",
-                               ::pear::flag::library, "/install/path/libexec.so",
-                               ::pear::flag::destination, "/tmp/destination",
-                               ::pear::flag::verbose,
-                               ::pear::flag::path, "/bin/ls",
-                               ::pear::flag::command, "ls", "-l", "-a",
-                               nullptr };
+        const char *argv[] = {"program",
+                              pear::flag::LIBRARY, "/install/path/libexec.so",
+                              pear::flag::DESTINATION, "/tmp/destination",
+                              pear::flag::VERBOSE,
+                              pear::flag::PATH, "/bin/ls",
+                              pear::flag::COMMAND, "ls", "-l", "-a",
+                              nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
 
         ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
@@ -52,13 +53,13 @@ namespace {
     }
 
     TEST(session, parse_wrapper_success) {
-        const char *argv[] = { "program",
-                               ::pear::flag::wrapper_cc, "cc", "/install/path/wrapper-cc",
-                               ::pear::flag::wrapper_cxx, "c++", "/install/path/wrapper-c++",
-                               ::pear::flag::destination, "/tmp/destination",
-                               ::pear::flag::file, "ls",
-                               ::pear::flag::command, "ls", "-l", "-a",
-                               nullptr };
+        const char *argv[] = {"program",
+                              ::pear::flag::WRAPPER_CC, "cc", "/install/path/wrapper-cc",
+                              ::pear::flag::WRAPPER_CXX, "c++", "/install/path/wrapper-c++",
+                              ::pear::flag::DESTINATION, "/tmp/destination",
+                              ::pear::flag::FILE, "ls",
+                              ::pear::flag::COMMAND, "ls", "-l", "-a",
+                              nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
 
         ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
@@ -82,12 +83,12 @@ namespace {
     }
 
     TEST(session, parse_simple_success) {
-        const char *argv[] = { "program",
-                               ::pear::flag::destination, "/tmp/destination",
-                               ::pear::flag::file, "ls",
-                               ::pear::flag::search_path, "/bin:/usr/bin",
-                               ::pear::flag::command, "ls", "-l", "-a",
-                               nullptr };
+        const char *argv[] = {"program",
+                              ::pear::flag::DESTINATION, "/tmp/destination",
+                              ::pear::flag::FILE, "ls",
+                              ::pear::flag::SEARCH_PATH, "/bin:/usr/bin",
+                              ::pear::flag::COMMAND, "ls", "-l", "-a",
+                              nullptr };
         const int argc = sizeof(argv)/sizeof(char *) - 1;
 
         ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));

@@ -7,6 +7,7 @@ add_executable(libexec_unit_test
 
 target_include_directories(libexec_unit_test PRIVATE ${LIB_CFG_DIR})
 target_include_directories(libexec_unit_test PRIVATE ${LIB_SRC_DIR})
+target_include_directories(libexec_unit_test PRIVATE ${EXE_API_DIR})
 target_link_libraries(libexec_unit_test exec_a)
 target_link_libraries(libexec_unit_test gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
 
