@@ -9,11 +9,11 @@ endif()
 
 if(LIT_FOUND)
   set(EXEC_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX})
-  set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/bear/bear)
-  set(INTERCEPT_EXE ${CMAKE_BINARY_DIR}/source/intercept/intercept)
+  set(EXEC_LIB ${CMAKE_BINARY_DIR}/source/intercept-library/library/${EXEC_LIB_FILE})
+  set(INTERCEPT_EXE ${CMAKE_BINARY_DIR}/source/intercept-library/executable/intercept)
   set(INTERCEPT_CC_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-cc/intercept-cc)
   set(INTERCEPT_CXX_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-c++/intercept-c++)
-  set(EXEC_LIB ${CMAKE_BINARY_DIR}/source/libexec/${EXEC_LIB_FILE})
+  set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/intercept/source/bear)
 
   add_test(NAME func_test
     COMMAND lit -DBEAR_EXE=${BEAR_EXE} -DINTERCEPT_EXE=${INTERCEPT_EXE} -DEXEC_LIB=${EXEC_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})

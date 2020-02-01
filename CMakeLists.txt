@@ -22,6 +22,10 @@ project(bear
     DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
     LANGUAGES C CXX)
 
+enable_testing()
+find_package(GTest REQUIRED)
+find_package(Threads REQUIRED)
+
 add_subdirectory(source)
 add_subdirectory(test)
 
