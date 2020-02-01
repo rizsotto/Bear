@@ -1,7 +1,7 @@
 #!/usr/bin/env @BEAR_PYTHON_EXECUTABLE@
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2012-2019 by László Nagy
+# Copyright (C) 2012-2020 by László Nagy
 # This file is part of Bear.
 #
 # Bear is a tool to generate compilation database for clang tooling.
