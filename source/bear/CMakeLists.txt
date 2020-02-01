@@ -10,3 +10,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/bear.py ${CMAKE_CURRENT_BINARY_DIR}/b
 include(GNUInstallDirs)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bear
     DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+add_subdirectory(man)
+add_subdirectory(shell-completion)

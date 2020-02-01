@@ -28,8 +28,6 @@ find_package(Threads REQUIRED)
 
 add_subdirectory(source)
 add_subdirectory(test)
-add_subdirectory(man)
-add_subdirectory(shell-completion)
 
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
