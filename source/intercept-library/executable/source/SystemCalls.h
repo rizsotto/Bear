@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include <unistd.h>
 #include <memory>
+#include <unistd.h>
 
 #include "Result.h"
 
@@ -29,13 +29,13 @@ namespace pear {
     struct SystemCalls {
 
         static Result<pid_t>
-        fork_with_execvp(const char *file, const char *search_path, const char **argv, const char **envp) noexcept;
+        fork_with_execvp(const char* file, const char* search_path, const char** argv, const char** envp) noexcept;
 
         static Result<pid_t>
-        spawn(const char *path, const char **argv, const char **envp) noexcept;
+        spawn(const char* path, const char** argv, const char** envp) noexcept;
 
         static Result<pid_t>
-        spawnp(const char *file, const char **argv, const char **envp) noexcept;
+        spawnp(const char* file, const char** argv, const char** envp) noexcept;
 
         static Result<int>
         wait_pid(pid_t pid) noexcept;
@@ -50,7 +50,7 @@ namespace pear {
         get_cwd() noexcept;
 
         static Result<std::shared_ptr<std::ostream>>
-        temp_file(const char *dir, const char *suffix) noexcept;
+        temp_file(const char* dir, const char* suffix) noexcept;
     };
 
 }

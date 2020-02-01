@@ -22,7 +22,7 @@
 #include "config.h"
 
 #if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
+#include <spawn.h>
 #endif
 
 namespace ear {
@@ -32,41 +32,41 @@ namespace ear {
 
     class Executor {
     public:
-        Executor(ear::Session const &session, ear::Resolver const &resolver) noexcept;
+        Executor(ear::Session const& session, ear::Resolver const& resolver) noexcept;
 
         Executor() noexcept = delete;
 
-        Executor(const Executor &) = delete;
+        Executor(const Executor&) = delete;
 
-        Executor(Executor &&) noexcept = delete;
+        Executor(Executor&&) noexcept = delete;
 
         ~Executor() noexcept = default;
 
-        Executor &operator=(const Executor &) = delete;
+        Executor& operator=(const Executor&) = delete;
 
-        Executor &operator=(Executor &&) noexcept = delete;
+        Executor& operator=(Executor&&) noexcept = delete;
 
     public:
-        int execve(const char *path, char *const argv[], char *const envp[]) const noexcept;
+        int execve(const char* path, char* const argv[], char* const envp[]) const noexcept;
 
-        int execvpe(const char *file, char *const argv[], char *const envp[]) const noexcept;
+        int execvpe(const char* file, char* const argv[], char* const envp[]) const noexcept;
 
-        int execvP(const char *file, const char *search_path, char *const argv[], char *const envp[]) const noexcept;
+        int execvP(const char* file, const char* search_path, char* const argv[], char* const envp[]) const noexcept;
 
-        int posix_spawn(pid_t *pid, const char *path,
-                        const posix_spawn_file_actions_t *file_actions,
-                        const posix_spawnattr_t *attrp,
-                        char *const argv[],
-                        char *const envp[]) const noexcept;
+        int posix_spawn(pid_t* pid, const char* path,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]) const noexcept;
 
-        int posix_spawnp(pid_t *pid, const char *file,
-                         const posix_spawn_file_actions_t *file_actions,
-                         const posix_spawnattr_t *attrp,
-                         char *const argv[],
-                         char *const envp[]) const noexcept;
+        int posix_spawnp(pid_t* pid, const char* file,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]) const noexcept;
 
     private:
-        ear::Session const &session_;
-        ear::Resolver const &resolver_;
+        ear::Session const& session_;
+        ear::Resolver const& resolver_;
     };
 }

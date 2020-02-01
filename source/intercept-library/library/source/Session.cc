@@ -17,29 +17,30 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cstdio>
 #include "Session.h"
+#include <cstdio>
 
-#include "libexec.h"
 #include "Environment.h"
 #include "Storage.h"
-
+#include "libexec.h"
 
 namespace ear {
 
-    Session Session::from(const char **environment) noexcept {
+    Session Session::from(const char** environment) noexcept
+    {
         if (nullptr == environment)
             return {};
         else
             return {
-                    environment::get_env_value(environment, env::KEY_LIBRARY),
-                    environment::get_env_value(environment, env::KEY_REPORTER),
-                    environment::get_env_value(environment, env::KEY_DESTINATION),
-                    environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr
+                environment::get_env_value(environment, env::KEY_LIBRARY),
+                environment::get_env_value(environment, env::KEY_REPORTER),
+                environment::get_env_value(environment, env::KEY_DESTINATION),
+                environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr
             };
     }
 
-    void Session::persist(Storage &storage) noexcept {
+    void Session::persist(Storage& storage) noexcept
+    {
         if (is_not_valid())
             return;
 
@@ -48,7 +49,8 @@ namespace ear {
         destination_ = storage.store(destination_);
     }
 
-    void Session::write_message(const char *message) const noexcept {
+    void Session::write_message(const char* message) const noexcept
+    {
         if (is_verbose())
             fprintf(stderr, "libexec.so: %s\n", message);
     }

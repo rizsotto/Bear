@@ -1,6 +1,3 @@
-#include "gtest/gtest.h"
-
-#include "Session.h"
 /*  Copyright (C) 2012-2020 by László Nagy
     This file is part of Bear.
 
@@ -20,44 +17,59 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "gtest/gtest.h"
+
+#include "Session.h"
 #include "intercept.h"
 
 namespace {
 
-    TEST(session, parse_empty_fails) {
-        const char *argv[] = { "program", nullptr };
-        const int argc = sizeof(argv)/sizeof(char *) - 1;
+    TEST(session, parse_empty_fails)
+    {
+        const char* argv[] = {
+            "program",
+            nullptr
+        };
+        const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
+        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
         ::pear::SessionPtr const expected = ::pear::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.get_or_else(expected));
     }
 
-    TEST(session, parse_help_fails) {
-        const char *argv[] = {"program", ::pear::flag::HELP, nullptr };
-        const int argc = sizeof(argv)/sizeof(char *) - 1;
+    TEST(session, parse_help_fails)
+    {
+        const char* argv[] = {
+            "program",
+            ::pear::flag::HELP,
+            nullptr
+        };
+        const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
+        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
         ::pear::SessionPtr const expected = ::pear::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.get_or_else(expected));
     }
 
-    TEST(session, parse_library_success) {
-        const char *argv[] = {"program",
-                              pear::flag::LIBRARY, "/install/path/libexec.so",
-                              pear::flag::DESTINATION, "/tmp/destination",
-                              pear::flag::VERBOSE,
-                              pear::flag::PATH, "/bin/ls",
-                              pear::flag::COMMAND, "ls", "-l", "-a",
-                              nullptr };
-        const int argc = sizeof(argv)/sizeof(char *) - 1;
+    TEST(session, parse_library_success)
+    {
+        const char* argv[] = {
+            "program",
+            pear::flag::LIBRARY, "/install/path/libexec.so",
+            pear::flag::DESTINATION, "/tmp/destination",
+            pear::flag::VERBOSE,
+            pear::flag::PATH, "/bin/ls",
+            pear::flag::COMMAND, "ls", "-l", "-a",
+            nullptr
+        };
+        const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
+        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
         ::pear::SessionPtr const dummy = ::pear::SessionPtr(nullptr);
         ASSERT_NE(dummy, result.get_or_else(dummy));
-        auto session_result = (::pear::LibrarySession const *)result.get_or_else(dummy).get();
+        auto session_result = (::pear::LibrarySession const*)result.get_or_else(dummy).get();
 
         ASSERT_STREQ(argv[0], session_result->context_.reporter);
         ASSERT_STREQ(argv[4], session_result->context_.destination);
@@ -71,20 +83,23 @@ namespace {
         ASSERT_EQ(argv[2], session_result->library);
     }
 
-    TEST(session, parse_wrapper_success) {
-        const char *argv[] = {"program",
-                              ::pear::flag::WRAPPER_CC, "cc", "/install/path/wrapper-cc",
-                              ::pear::flag::WRAPPER_CXX, "c++", "/install/path/wrapper-c++",
-                              ::pear::flag::DESTINATION, "/tmp/destination",
-                              ::pear::flag::FILE, "ls",
-                              ::pear::flag::COMMAND, "ls", "-l", "-a",
-                              nullptr };
-        const int argc = sizeof(argv)/sizeof(char *) - 1;
+    TEST(session, parse_wrapper_success)
+    {
+        const char* argv[] = {
+            "program",
+            ::pear::flag::WRAPPER_CC, "cc", "/install/path/wrapper-cc",
+            ::pear::flag::WRAPPER_CXX, "c++", "/install/path/wrapper-c++",
+            ::pear::flag::DESTINATION, "/tmp/destination",
+            ::pear::flag::FILE, "ls",
+            ::pear::flag::COMMAND, "ls", "-l", "-a",
+            nullptr
+        };
+        const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
+        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
         ::pear::SessionPtr const dummy = ::pear::SessionPtr(nullptr);
         ASSERT_NE(dummy, result.get_or_else(dummy));
-        auto session_result = (::pear::WrapperSession const *)result.get_or_else(dummy).get();
+        auto session_result = (::pear::WrapperSession const*)result.get_or_else(dummy).get();
 
         ASSERT_STREQ(argv[0], session_result->context_.reporter);
         ASSERT_STREQ(argv[8], session_result->context_.destination);
@@ -101,16 +116,19 @@ namespace {
         ASSERT_STREQ(argv[6], session_result->cxx_wrapper);
     }
 
-    TEST(session, parse_simple_success) {
-        const char *argv[] = {"program",
-                              ::pear::flag::DESTINATION, "/tmp/destination",
-                              ::pear::flag::FILE, "ls",
-                              ::pear::flag::SEARCH_PATH, "/bin:/usr/bin",
-                              ::pear::flag::COMMAND, "ls", "-l", "-a",
-                              nullptr };
-        const int argc = sizeof(argv)/sizeof(char *) - 1;
+    TEST(session, parse_simple_success)
+    {
+        const char* argv[] = {
+            "program",
+            ::pear::flag::DESTINATION, "/tmp/destination",
+            ::pear::flag::FILE, "ls",
+            ::pear::flag::SEARCH_PATH, "/bin:/usr/bin",
+            ::pear::flag::COMMAND, "ls", "-l", "-a",
+            nullptr
+        };
+        const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char **>(argv));
+        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
         ::pear::SessionPtr const dummy = ::pear::SessionPtr(nullptr);
         ASSERT_NE(dummy, result.get_or_else(dummy));
         auto session_result = result.get_or_else(dummy).get();

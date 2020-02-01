@@ -3,7 +3,7 @@ add_executable(libexec_unit_test
         ExecutorTest.cc
         SessionTest.cc
         StorageTest.cc
-)
+        )
 
 target_include_directories(libexec_unit_test PRIVATE ${LIB_CFG_DIR})
 target_include_directories(libexec_unit_test PRIVATE ${LIB_SRC_DIR})

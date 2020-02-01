@@ -19,17 +19,17 @@
 
 #include <algorithm>
 
-#include "Storage.h"
 #include "Array.h"
-
+#include "Storage.h"
 
 namespace ear {
 
-    char const *Storage::store(char const *const input) noexcept {
+    char const* Storage::store(char const* const input) noexcept
+    {
         if (input == nullptr)
             return nullptr;
 
-        auto input_end = ear::array::end(input) + 1;  // include the zero element
+        auto input_end = ear::array::end(input) + 1; // include the zero element
         auto top = ear::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);

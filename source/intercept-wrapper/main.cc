@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <unistd.h>
 #include <cstdio>
+#include <unistd.h>
 
 //#include "libexec_a/Array.h"
 //#include "libexec_a/Environment.h"
@@ -42,23 +42,23 @@
 //    }
 //}
 
-
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char* argv[], char* envp[])
+{
     if (argc <= 0) {
         fprintf(stderr, "intercept-wrapper: not enough arguments.\n");
         return -1;
     }
 
-//    const auto session = ear::environment::wrapper_session(const_cast<const char **>(envp));
-//    if (! session.is_valid()) {
-//        fprintf(stderr, "intercept-wrapper: not initialized.\n");
-//        return -1;
-//    }
-//
-//    // Replace the compiler wrapper to the real compiler.
-//    argv[0] = const_cast<char *>((is_cxx(argv[0])) ? session.cxx : session.cc);
-//
-//    const Executor executor(session);
-//    return executor.execve(argv[0], argv, envp);
+    //    const auto session = ear::environment::wrapper_session(const_cast<const char **>(envp));
+    //    if (! session.is_valid()) {
+    //        fprintf(stderr, "intercept-wrapper: not initialized.\n");
+    //        return -1;
+    //    }
+    //
+    //    // Replace the compiler wrapper to the real compiler.
+    //    argv[0] = const_cast<char *>((is_cxx(argv[0])) ? session.cxx : session.cc);
+    //
+    //    const Executor executor(session);
+    //    return executor.execve(argv[0], argv, envp);
     return 0;
 }

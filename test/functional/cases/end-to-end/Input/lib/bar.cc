@@ -1,11 +1,7 @@
 #include "foo.h"
 
-namespace acme
-{
+namespace acme {
 
-void b1()
-{
-    t1();
-}
+void b1() { t1(); }
 
-}
+} // namespace acme

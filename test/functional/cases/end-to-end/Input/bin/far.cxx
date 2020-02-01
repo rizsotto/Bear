@@ -1,8 +1,7 @@
-#include <foo.h>
 #include "boo.h++"
+#include <foo.h>
 
-void b1()
-{
-    t1();
-    acme::t1();
+void b1() {
+  t1();
+  acme::t1();
 }

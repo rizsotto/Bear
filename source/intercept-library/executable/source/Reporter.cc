@@ -26,57 +26,61 @@
 
 namespace {
 
-    std::string to_json_string(const std::string &value) {
+    std::string to_json_string(const std::string& value)
+    {
         std::string result;
 
-        char const *wsrc_it = value.c_str();
-        char const *const wsrc_end = wsrc_it + value.length();
+        char const* wsrc_it = value.c_str();
+        char const* const wsrc_end = wsrc_it + value.length();
 
         for (; wsrc_it != wsrc_end; ++wsrc_it) {
             // Insert an escape character before control characters.
             switch (*wsrc_it) {
-                case L'\b':
-                    result += "\\b";
-                    break;
-                case L'\f':
-                    result += "\\f";
-                    break;
-                case L'\n':
-                    result += "\\n";
-                    break;
-                case L'\r':
-                    result += "\\r";
-                    break;
-                case L'\t':
-                    result += "\\t";
-                    break;
-                case L'"':
-                    result += "\\\"";
-                    break;
-                case L'\\':
-                    result += "\\\\";
-                    break;
-                default:
-                    result += char(*wsrc_it);
-                    break;
+            case L'\b':
+                result += "\\b";
+                break;
+            case L'\f':
+                result += "\\f";
+                break;
+            case L'\n':
+                result += "\\n";
+                break;
+            case L'\r':
+                result += "\\r";
+                break;
+            case L'\t':
+                result += "\\t";
+                break;
+            case L'"':
+                result += "\\\"";
+                break;
+            case L'\\':
+                result += "\\\\";
+                break;
+            default:
+                result += char(*wsrc_it);
+                break;
             }
         }
         return result;
     }
 
-    void json_string(std::ostream &os, const char *value) {
+    void json_string(std::ostream& os, const char* value)
+    {
         os << '"' << to_json_string(value) << '"';
     }
 
-    void json_attribute(std::ostream &os, const char *key, const char *value) {
+    void json_attribute(std::ostream& os, const char* key, const char* value)
+    {
         os << '"' << key << '"' << ':';
         json_string(os, value);
     }
 
-    void json_attribute(std::ostream &os, const char *key, const char **value) {
+    void json_attribute(std::ostream& os, const char* key, const char** value)
+    {
         os << '"' << key << '"' << ':';
         os << '[';
-        for (const char **it = value; *it != nullptr; ++it) {
+        for (const char** it = value; *it != nullptr; ++it) {
             if (it != value)
                 os << ',';
             json_string(os, *it);
@@ -84,10 +88,10 @@ namespace {
         os << ']';
     }
 
-    void json_attribute(std::ostream &os, const char *key, const int value) {
-        os << '"' << key << '"' << ':'<< value;
+    void json_attribute(std::ostream& os, const char* key, const int value)
+    {
+        os << '"' << key << '"' << ':' << value;
     }
-
 
     class TimedEvent : public pear::Event {
     private:
@@ -96,9 +100,11 @@ namespace {
     public:
         TimedEvent() noexcept
                 : when_(std::chrono::system_clock::now())
-        { }
+        {
+        }
 
-        std::chrono::system_clock::time_point const &when() const noexcept {
+        std::chrono::system_clock::time_point const& when() const noexcept
+        {
             return when_;
         }
     };
@@ -108,26 +114,25 @@ namespace {
         pid_t supervisor_;
         pid_t parent_;
         std::string cwd_;
-        const char **cmd_;
+        const char** cmd_;
 
-        ProcessStartEvent(pid_t child,
-                          pid_t supervisor,
-                          pid_t parent,
-                          std::string cwd,
-                          const char **cmd) noexcept
+        ProcessStartEvent(pid_t child, pid_t supervisor, pid_t parent, std::string cwd, const char** cmd) noexcept
                 : TimedEvent()
                 , child_(child)
                 , supervisor_(supervisor)
                 , parent_(parent)
                 , cwd_(std::move(cwd))
                 , cmd_(cmd)
-        { }
+        {
+        }
 
-        const char *name() const override {
+        const char* name() const override
+        {
             return "process_start";
         }
 
-        void to_json(std::ostream &os) const override {
+        void to_json(std::ostream& os) const override
+        {
             os << '{';
             json_attribute(os, "pid", child_);
             os << ',';
@@ -148,19 +153,22 @@ namespace {
         int exit_;
 
         ProcessStopEvent(pid_t child,
-                         pid_t supervisor,
-                         int exit) noexcept
+            pid_t supervisor,
+            int exit) noexcept
                 : TimedEvent()
                 , child_(child)
                 , supervisor_(supervisor)
                 , exit_(exit)
-        { }
+        {
+        }
 
-        const char *name() const override {
+        const char* name() const override
+        {
             return "process_stop";
         }
 
-        void to_json(std::ostream &os) const override {
+        void to_json(std::ostream& os) const override
+        {
             os << '{';
             json_attribute(os, "pid", child_);
             os << ',';
@@ -171,68 +179,72 @@ namespace {
         }
     };
 
-
     class ReporterImpl : public pear::Reporter {
     public:
-        explicit ReporterImpl(const char *target) noexcept;
+        explicit ReporterImpl(const char* target) noexcept;
 
-        pear::Result<int> send(const pear::EventPtr &event) noexcept override;
+        pear::Result<int> send(const pear::EventPtr& event) noexcept override;
 
     private:
-        pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string &) const;
+        pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
 
         std::string const target_;
     };
 
-    ReporterImpl::ReporterImpl(const char *target) noexcept
+    ReporterImpl::ReporterImpl(const char* target) noexcept
             : pear::Reporter()
             , target_(target)
-    { }
-
-    pear::Result<int> ReporterImpl::send(const pear::EventPtr &event) noexcept {
-        return create_stream(event->name())
-                .map<int>([&event](auto stream) {
-                    event->to_json(*stream);
-                    return 0;
-                });
+    {
     }
 
-    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string &prefix) const {
+    pear::Result<int> ReporterImpl::send(const pear::EventPtr& event) noexcept
+    {
+        return create_stream(event->name())
+            .map<int>([&event](auto stream) {
+                event->to_json(*stream);
+                return 0;
+            });
+    }
+
+    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
+    {
         return pear::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }
 }
 
-
 namespace pear {
 
-    Result<EventPtr> Event::start(pid_t pid, const char **cmd) noexcept {
+    Result<EventPtr> Event::start(pid_t pid, const char** cmd) noexcept
+    {
         const Result<pid_t> current_pid = SystemCalls::get_pid();
         const Result<pid_t> parent_pid = SystemCalls::get_ppid();
         const Result<std::string> working_dir = SystemCalls::get_cwd();
         return merge(current_pid, parent_pid, working_dir)
-                .map<EventPtr>([&pid, &cmd](auto tuple) {
-                    const auto& [ current, parent, cwd ] = tuple;
-                    return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
-                });
+            .map<EventPtr>([&pid, &cmd](auto tuple) {
+                const auto& [current, parent, cwd] = tuple;
+                return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
+            });
     };
 
-    Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept {
+    Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept
+    {
         return SystemCalls::get_pid()
-                .map<EventPtr>([&pid, &exit](auto current) {
-                    return EventPtr(new ProcessStopEvent(pid, current, exit));
-                });
+            .map<EventPtr>([&pid, &exit](auto current) {
+                return EventPtr(new ProcessStopEvent(pid, current, exit));
+            });
     }
 
-    Result<ReporterPtr> Reporter::tempfile(char const *dir_name) noexcept {
-            ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-            return Ok(std::move(result));
+    Result<ReporterPtr> Reporter::tempfile(char const* dir_name) noexcept
+    {
+        ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
+        return Ok(std::move(result));
 
-//        if (std::filesystem::is_directory(dir_name)) {
-//            ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-//            return Ok(std::move(result));
-//        } else {
-//            const std::string message = std::string("Directory does not exists: ") + dir_name;
-//            return Err(std::runtime_error(message));
-//        }
+        //if (std::filesystem::is_directory(dir_name)) {
+        //    ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
+        //    return Ok(std::move(result));
+        //} else {
+        //    const std::string message = std::string("Directory does not exists: ") + dir_name;
+        //    return Err(std::runtime_error(message));
+        //}
     }
 }

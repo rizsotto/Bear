@@ -30,17 +30,17 @@ namespace ear {
     public:
         Session() noexcept = default;
 
-        Session(char const *library, char const *reporter, char const *destination, bool) noexcept;
+        Session(char const* library, char const* reporter, char const* destination, bool) noexcept;
 
         ~Session() noexcept = default;
 
-        Session(Session const &) = delete;
+        Session(Session const&) = delete;
 
-        Session(Session &&) noexcept = default;
+        Session(Session&&) noexcept = default;
 
-        Session &operator=(Session const &) = delete;
+        Session& operator=(Session const&) = delete;
 
-        Session &operator=(Session &&) noexcept = default;
+        Session& operator=(Session&&) noexcept = default;
 
         /**
          * Creates a Session object from the given environment.
@@ -48,14 +48,14 @@ namespace ear {
          * @param environment to initialize from.
          * @return a Session object which might or might not be initialized.
          */
-        static Session from(const char **environment) noexcept;
+        static Session from(const char** environment) noexcept;
 
     public:
-        const char *get_library() const;
+        const char* get_library() const;
 
-        const char *get_reporter() const;
+        const char* get_reporter() const;
 
-        const char *get_destination() const;
+        const char* get_destination() const;
 
         bool is_verbose() const;
 
@@ -75,7 +75,7 @@ namespace ear {
          *
          * @param storage uses a buffer to persist the values.
          */
-        void persist(Storage &storage) noexcept;
+        void persist(Storage& storage) noexcept;
 
         /**
          * Report a function call to stderr.
@@ -84,45 +84,45 @@ namespace ear {
          *
          * @param message to print.
          */
-        void write_message(const char *message) const noexcept;
+        void write_message(const char* message) const noexcept;
 
     private:
-        char const *library_;
-        char const *reporter_;
-        char const *destination_;
+        char const* library_;
+        char const* reporter_;
+        char const* destination_;
         bool verbose_;
     };
 
-    inline
-    Session::Session(char const *library, char const *reporter, char const *destination, bool verbose) noexcept
+    inline Session::Session(char const* library, char const* reporter, char const* destination, bool verbose) noexcept
             : library_(library)
             , reporter_(reporter)
             , destination_(destination)
             , verbose_(verbose)
-    { }
+    {
+    }
 
-    inline
-    const char *Session::get_library() const {
+    inline const char* Session::get_library() const
+    {
         return library_;
     }
 
-    inline
-    const char *Session::get_reporter() const {
+    inline const char* Session::get_reporter() const
+    {
         return reporter_;
     }
 
-    inline
-    const char *Session::get_destination() const {
+    inline const char* Session::get_destination() const
+    {
         return destination_;
     }
 
-    inline
-    bool Session::is_verbose() const {
+    inline bool Session::is_verbose() const
+    {
         return verbose_;
     }
 
-    inline
-    bool Session::is_not_valid() const noexcept {
+    inline bool Session::is_not_valid() const noexcept
+    {
         return (library_ == nullptr || reporter_ == nullptr || destination_ == nullptr);
     }
 }

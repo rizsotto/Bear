@@ -13,7 +13,7 @@ add_library(intercept_a STATIC
         Session.cc
         SystemCalls.h
         SystemCalls.cc
-)
+        )
 
 target_include_directories(intercept_a PRIVATE ${EXE_CFG_DIR})
 target_include_directories(intercept_a PRIVATE ${EXE_API_DIR})

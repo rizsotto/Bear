@@ -1,26 +1,26 @@
 cmake_minimum_required(VERSION 3.9)
 
-if(${CMAKE_VERSION} VERSION_LESS 3.12)
+if (${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-else()
+else ()
     cmake_policy(VERSION 3.12)
-endif()
+endif ()
 
 set(default_build_type "Release")
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
     set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
             STRING "Choose the type of build." FORCE)
     # Set the possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif()
+endif ()
 
 
 project(bear
-    VERSION 3.0.0
-    DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
-    LANGUAGES C CXX)
+        VERSION 3.0.0
+        DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
+        LANGUAGES C CXX)
 
 enable_testing()
 find_package(GTest REQUIRED)
@@ -47,7 +47,7 @@ set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
 set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
 set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
-    "${CMAKE_INSTALL_MANDIR}"
-    "${CMAKE_INSTALL_MANDIR}/man1")
+        "${CMAKE_INSTALL_MANDIR}"
+        "${CMAKE_INSTALL_MANDIR}/man1")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 include(CPack)

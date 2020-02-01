@@ -22,11 +22,10 @@
 #include <unistd.h>
 
 #include <iosfwd>
-#include <utility>
 #include <memory>
+#include <utility>
 
 #include "Result.h"
-
 
 namespace pear {
 
@@ -37,15 +36,14 @@ namespace pear {
     public:
         virtual ~Event() noexcept = default;
 
-        virtual const char *name() const = 0;
+        virtual const char* name() const = 0;
 
-        virtual void to_json(std::ostream &) const = 0;
+        virtual void to_json(std::ostream&) const = 0;
 
     public:
-        static Result<EventPtr> start(pid_t pid, const char **cmd) noexcept;
+        static Result<EventPtr> start(pid_t pid, const char** cmd) noexcept;
         static Result<EventPtr> stop(pid_t pid, int exit) noexcept;
     };
-
 
     class Reporter;
     using ReporterPtr = std::shared_ptr<Reporter>;
@@ -54,9 +52,9 @@ namespace pear {
     public:
         virtual ~Reporter() noexcept = default;
 
-        virtual Result<int> send(const EventPtr &event) noexcept = 0;
+        virtual Result<int> send(const EventPtr& event) noexcept = 0;
 
     public:
-        static Result<ReporterPtr> tempfile(char const *) noexcept;
+        static Result<ReporterPtr> tempfile(char const*) noexcept;
     };
 }

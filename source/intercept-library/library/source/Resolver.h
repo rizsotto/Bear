@@ -22,7 +22,7 @@
 #include "config.h"
 
 #if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
+#include <spawn.h>
 #endif
 
 namespace ear {
@@ -44,21 +44,18 @@ namespace ear {
      */
     class Resolver {
     public:
-        using resolver_t =
-                void *(*)(char const *const name);
+        using resolver_t = void* (*)(char const* const name);
 
-        using execve_t =
-                int (*)(const char *path,
-                        char *const argv[],
-                        char *const envp[]);
+        using execve_t = int (*)(const char* path,
+            char* const argv[],
+            char* const envp[]);
 
-        using posix_spawn_t =
-                int (*)(pid_t *pid,
-                        const char *path,
-                        const posix_spawn_file_actions_t *file_actions,
-                        const posix_spawnattr_t *attrp,
-                        char *const argv[],
-                        char *const envp[]);
+        using posix_spawn_t = int (*)(pid_t* pid,
+            const char* path,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]);
 
     public:
         /**
@@ -77,18 +74,18 @@ namespace ear {
         resolver_t resolver_;
     };
 
-    inline
-    Resolver::Resolver(Resolver::resolver_t resolver) noexcept
+    inline Resolver::Resolver(Resolver::resolver_t resolver) noexcept
             : resolver_(resolver)
-    { }
-
-    inline
-    Resolver::execve_t Resolver::execve() const noexcept {
-        return reinterpret_cast<execve_t >(resolver_("execve"));
+    {
     }
 
-    inline
-    Resolver::posix_spawn_t Resolver::posix_spawn() const noexcept {
-        return reinterpret_cast<posix_spawn_t >(resolver_("posix_spawn"));
+    inline Resolver::execve_t Resolver::execve() const noexcept
+    {
+        return reinterpret_cast<execve_t>(resolver_("execve"));
+    }
+
+    inline Resolver::posix_spawn_t Resolver::posix_spawn() const noexcept
+    {
+        return reinterpret_cast<posix_spawn_t>(resolver_("posix_spawn"));
     }
 }

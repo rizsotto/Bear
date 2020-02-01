@@ -20,19 +20,19 @@ set -o xtrace
 root_dir=$1
 mkdir -p "${root_dir}/src"
 
-cat > "${root_dir}/src/ex.f95" << EOF
+cat >"${root_dir}/src/ex.f95" <<EOF
 ! Test Program
 program first
 print *,'This is  my first program'
 end program first
 EOF
 
-cat > ${root_dir}/src/Makefile << EOF
+cat >${root_dir}/src/Makefile <<EOF
 all:
 	gfortran ex.f95 -o ex
 EOF
 
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
     {
         "arguments": [

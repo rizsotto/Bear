@@ -20,7 +20,7 @@ add_library(exec_a STATIC
         Session.cc
         Storage.h
         Storage.cc
-)
+        )
 
 target_include_directories(exec_a PRIVATE ${LIB_CFG_DIR})
 target_include_directories(exec_a PRIVATE ${LIB_API_DIR})

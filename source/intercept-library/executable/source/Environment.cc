@@ -21,11 +21,11 @@
 
 #include "libexec.h"
 
+#include <cstring>
+#include <functional>
 #include <list>
 #include <numeric>
 #include <string>
-#include <cstring>
-#include <functional>
 
 #include "Environment.h"
 #include "Interface.h"
@@ -39,15 +39,17 @@ namespace {
     constexpr char cxx_key[] = "CXX";
 
     using env_t = std::map<std::string, std::string>;
-    using mapper_t = std::function<std::string (const std::string&, const std::string&)>;
+    using mapper_t = std::function<std::string(const std::string&, const std::string&)>;
 
-    char **to_c_array(const env_t &input) {
+    char**
+    to_c_array(const env_t& input)
+    {
         const size_t result_size = input.size() + 1;
-        const auto result = new char *[result_size];
+        const auto result = new char*[result_size];
         auto result_it = result;
-        for (const auto &it : input) {
+        for (const auto& it : input) {
             const size_t entry_size = it.first.size() + it.second.size() + 2;
-            auto entry = new char [entry_size];
+            auto entry = new char[entry_size];
 
             auto key = std::copy(it.first.begin(), it.first.end(), entry);
             *key++ = '=';
@@ -60,12 +62,13 @@ namespace {
         return result;
     }
 
-    env_t to_map(const char **const input) noexcept {
+    env_t to_map(const char** const input) noexcept
+    {
         env_t result;
         if (input == nullptr)
             return result;
 
-        for (const char **it = input; *it != nullptr; ++it) {
+        for (const char** it = input; *it != nullptr; ++it) {
             const auto end = *it + std::strlen(*it);
             const auto sep = std::find(*it, end, '=');
             const std::string key = (sep != end) ? std::string(*it, sep) : std::string(*it, end);
@@ -75,7 +78,9 @@ namespace {
         return result;
     }
 
-    std::list<std::string> split(const std::string &input, const char sep) noexcept {
+    std::list<std::string>
+    split(const std::string& input, const char sep) noexcept
+    {
         std::list<std::string> result;
 
         std::string::size_type previous = 0;
@@ -88,21 +93,25 @@ namespace {
         return result;
     }
 
-    std::string merge_into_paths(const std::string &current, const std::string &value) noexcept {
+    std::string
+    merge_into_paths(const std::string& current, const std::string& value) noexcept
+    {
         auto paths = split(current, ':');
         if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
             paths.emplace_front(value);
-            return std::accumulate(paths.begin(), paths.end(),
-                                   std::string(),
-                                   [](std::string acc, std::string item) {
-                                       return (acc.empty()) ? item : acc + ':' + item;
-                                   });
+            return std::accumulate(paths.begin(),
+                paths.end(),
+                std::string(),
+                [](std::string acc, std::string item) {
+                    return (acc.empty()) ? item : acc + ':' + item;
+                });
         } else {
             return current;
         }
     }
 
-    void insert_or_assign(env_t &target, const char *key, const char *value) noexcept {
+    void insert_or_assign(env_t& target, const char* key, const char* value) noexcept
+    {
         if (auto it = target.find(key); it != target.end()) {
             it->second = std::string(value);
         } else {
@@ -110,7 +119,11 @@ namespace {
         }
     }
 
-    void insert_or_merge(env_t &target, const char *key, const char *value, const mapper_t &merger) noexcept {
+    void insert_or_merge(env_t& target,
+        const char* key,
+        const char* value,
+        const mapper_t& merger) noexcept
+    {
         if (auto it = target.find(key); it != target.end()) {
             it->second = merger(it->second, std::string(value));
         } else {
@@ -122,74 +135,89 @@ namespace {
 
 namespace pear {
 
-    Environment::Environment(const std::map<std::string, std::string> &environ) noexcept
+    Environment::Environment(
+        const std::map<std::string, std::string>& environ) noexcept
             : data_(to_c_array(environ))
-    { }
+    {
+    }
 
-    Environment::~Environment() noexcept {
-        for (char **it = data_; *it != nullptr; ++it) {
-            delete [] *it;
+    Environment::~Environment() noexcept
+    {
+        for (char** it = data_; *it != nullptr; ++it) {
+            delete[] * it;
         }
-        delete [] data_;
+        delete[] data_;
     }
 
-    const char **Environment::data() const noexcept {
-        return const_cast<const char **>(data_);
+    const char**
+    Environment::data() const noexcept
+    {
+        return const_cast<const char**>(data_);
     }
 
-
-    Environment::Builder::Builder(const char **environment) noexcept
+    Environment::Builder::Builder(const char** environment) noexcept
             : environ_(to_map(environment))
-    { }
+    {
+    }
 
-    Environment::Builder &
-    Environment::Builder::add_reporter(const char *reporter) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_reporter(const char* reporter) noexcept
+    {
         insert_or_assign(environ_, ear::env::KEY_REPORTER, reporter);
         return *this;
     }
 
-    Environment::Builder &
-    Environment::Builder::add_destination(const char *destination) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_destination(const char* destination) noexcept
+    {
         insert_or_assign(environ_, ear::env::KEY_DESTINATION, destination);
         return *this;
     }
 
-    Environment::Builder &
-    Environment::Builder::add_verbose(bool verbose) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_verbose(bool verbose) noexcept
+    {
         if (verbose) {
             insert_or_assign(environ_, ear::env::KEY_VERBOSE, "1");
         }
         return *this;
     }
 
-    Environment::Builder &
-    Environment::Builder::add_library(const char *library) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_library(const char* library) noexcept
+    {
         insert_or_assign(environ_, ear::env::KEY_LIBRARY, library);
 #ifdef APPLE
         insert_or_assign(environ_, osx_namespace_key, "1");
-        const char *key = osx_preload_key;
+        const char* key = osx_preload_key;
 #else
-        const char *key = glibc_preload_key;
+        const char* key = glibc_preload_key;
 #endif
         insert_or_merge(environ_, key, library, merge_into_paths);
         return *this;
     }
 
-    Environment::Builder &
-    Environment::Builder::add_cc_compiler(const char *compiler, const char *wrapper) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_cc_compiler(const char* compiler,
+        const char* wrapper) noexcept
+    {
         insert_or_assign(environ_, cc_key, wrapper);
         insert_or_assign(environ_, ::pear::env::KEY_CC, compiler);
         return *this;
     }
 
-    Environment::Builder &
-    Environment::Builder::add_cxx_compiler(const char *compiler, const char *wrapper) noexcept {
+    Environment::Builder&
+    Environment::Builder::add_cxx_compiler(const char* compiler,
+        const char* wrapper) noexcept
+    {
         insert_or_assign(environ_, cxx_key, wrapper);
         insert_or_assign(environ_, ::pear::env::KEY_CXX, compiler);
         return *this;
     }
 
-    EnvironmentPtr Environment::Builder::build() const noexcept {
+    EnvironmentPtr
+    Environment::Builder::build() const noexcept
+    {
         return std::unique_ptr<Environment>(new Environment(environ_));
     }
 

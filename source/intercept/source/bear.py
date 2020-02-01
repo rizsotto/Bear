@@ -36,20 +36,19 @@ and the post-processing of the output files, which will condensates into a
 
 import argparse
 import collections
-import subprocess
-import json
-import sys
+import contextlib
 import functools
+import itertools
+import json
+import logging
 import os
 import os.path
 import re
 import shlex
-import itertools
-import tempfile
 import shutil
-import struct
-import contextlib
-import logging
+import subprocess
+import sys
+import tempfile
 
 # Map of ignored compiler option for the creation of a compilation database.
 # This map is used in _split_command method, which classifies the parameters
@@ -91,7 +90,6 @@ IGNORED_FLAGS = {
     '-EHa': 0
 
 }  # type: Dict[str, int]
-
 
 # Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
@@ -223,6 +221,7 @@ def run_command(command, cwd=None):
     :param cwd: the working directory where the command will be executed
     :return: output of the command
     """
+
     def decode_when_needed(result):
         # type: (Any) -> str
         """ check_output returns bytes or string depend on python version """
@@ -407,13 +406,14 @@ def compilations(exec_calls, tools):
 
 def build_command(args, tmp_dir):
     # type: (argparse.Namespace, str) -> List[str]
-    verbose = [ '--session-verbose' ] if args.verbose else []
-    session = [ '--session-library', args.libexec ]
-    command = [ '--exec-file', args.build[0], '--' ] + args.build
+    verbose = ['--session-verbose'] if args.verbose else []
+    session = ['--session-library', args.libexec]
+    command = ['--exec-file', args.build[0], '--'] + args.build
     return [
                args.interceptor,
                '--session-destination', tmp_dir
            ] + session + verbose + command
+
 
 # def setup_environment(args, destination):
 #     # type: (argparse.Namespace, str) -> Dict[str, str]

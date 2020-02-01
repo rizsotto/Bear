@@ -6,7 +6,7 @@ include(CheckCCompilerFlag)
 check_c_compiler_flag("-std=c99" C99_SUPPORTED)
 if (C99_SUPPORTED)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
-endif()
+endif ()
 
 include(CheckFunctionExists)
 include(CheckSymbolExists)

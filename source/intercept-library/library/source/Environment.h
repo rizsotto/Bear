@@ -31,7 +31,7 @@ namespace ear {
          *
          * @return the current environment.
          */
-        const char **current() noexcept;
+        const char** current() noexcept;
 
         /**
          * Returns the value for the given environment name, from the given
@@ -43,6 +43,6 @@ namespace ear {
          * @param key the name of the environment.
          * @return the value of the environment.
          */
-        const char *get_env_value(const char **envp, const char *key) noexcept;
+        const char* get_env_value(const char** envp, const char* key) noexcept;
     }
 }

@@ -27,7 +27,7 @@ touch "${root_dir}/src/two.c"
 cp "${test_input_dir}/main.c" "${root_dir}/src/main.c"
 
 build_file="${root_dir}/run.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -39,7 +39,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
 {
   "command": "cc -c -Dver=1 src/one.c",

@@ -31,7 +31,7 @@ touch "${root_dir}/src/one.c"
 touch "${root_dir}/src/two.c"
 
 build_file="${root_dir}/run-one.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -45,7 +45,7 @@ EOF
 chmod +x ${build_file}
 
 build_file="${root_dir}/run-two.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -59,7 +59,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat > "${root_dir}/one.json" << EOF
+cat >"${root_dir}/one.json" <<EOF
 [
 {
   "command": "cc -c -Dver=1 src/one.c",
@@ -75,7 +75,7 @@ cat > "${root_dir}/one.json" << EOF
 ]
 EOF
 
-cat > "${root_dir}/two.json" << EOF
+cat >"${root_dir}/two.json" <<EOF
 [
 {
   "command": "cc -c -Dver=3 two.c",

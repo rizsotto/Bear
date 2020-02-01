@@ -2,9 +2,8 @@
 
 import argparse
 import json
-import sys
 import os.path
-
+import sys
 
 EXPECTED = frozenset(['far.cxx', 'bar.cc', 'foo.cpp', 'boo.c++'])
 

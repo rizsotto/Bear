@@ -22,7 +22,7 @@ mkdir -p "${root_dir}/src"
 
 cp "${test_input_dir}/main.c" "${root_dir}/src/main.c"
 
-cat > ${root_dir}/src/Makefile << EOF
+cat >${root_dir}/src/Makefile <<EOF
 main: main.o
 	\$(CC) $< -o \$@
 
@@ -33,8 +33,7 @@ main.o: main.s
 	\$(CC) -c \$< -o \$@
 EOF
 
-
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
     {
         "arguments": [

@@ -1,9 +1,9 @@
 include(FindPythonInterp)
 if (PYTHONINTERP_FOUND)
     set(BEAR_PYTHON_EXECUTABLE "python${PYTHON_VERSION_MAJOR}")
-else()
+else ()
     message(FATAL_ERROR "Have not found python interpreter")
-endif()
+endif ()
 
 configure_file(bear.py ${CMAKE_CURRENT_BINARY_DIR}/bear)
 

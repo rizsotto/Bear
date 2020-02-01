@@ -2,7 +2,7 @@ add_executable(libintercept_unit_test
         EnvironmentTest.cc
         ResultTest.cc
         SessionTest.cc
-)
+        )
 
 target_include_directories(libintercept_unit_test PRIVATE ${EXE_CFG_DIR})
 target_include_directories(libintercept_unit_test PRIVATE ${EXE_SRC_DIR})

@@ -20,7 +20,7 @@ set -o xtrace
 root_dir=$1
 mkdir -p "${root_dir}/src"
 
-cat > "${root_dir}/src/main.cpp" << EOF
+cat >"${root_dir}/src/main.cpp" <<EOF
 #include <cstdio>
 
 void foo(void) {
@@ -32,9 +32,8 @@ int main() {
 }
 EOF
 
-
 build_file="${root_dir}/run.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -44,7 +43,7 @@ set -o xtrace
 EOF
 chmod +x ${build_file}
 
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
     {
         "arguments": ["c++", "-c", "-DMESSAGE=\\"Hello World\\\\n\\"", "-o", "hello", "src/main.cpp"],

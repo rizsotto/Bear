@@ -19,20 +19,20 @@
 
 #include <iostream>
 
-#include "Interface.h"
-#include "Session.h"
-#include "Result.h"
 #include "Environment.h"
+#include "Interface.h"
 #include "Reporter.h"
+#include "Result.h"
+#include "Session.h"
 #include "SystemCalls.h"
-
 
 namespace {
 
     constexpr char MESSAGE_PREFIX[] = "intercept: ";
 
-    pear::Result<pid_t> spawnp(const ::pear::Execution &config,
-                               const ::pear::EnvironmentPtr &environment) noexcept {
+    pear::Result<pid_t> spawnp(const ::pear::Execution& config,
+        const ::pear::EnvironmentPtr& environment) noexcept
+    {
         if ((config.search_path != nullptr) && (config.file != nullptr)) {
             return pear::SystemCalls::fork_with_execvp(config.file, config.search_path, config.command, environment->data());
         } else if (config.file != nullptr) {
@@ -42,39 +42,43 @@ namespace {
         }
     }
 
-    void report_start(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, const char **cmd) noexcept {
+    void report_start(::pear::Result<pear::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
+    {
         ::pear::merge(reporter, ::pear::Event::start(pid, cmd))
-                .bind<int>([](auto tuple) {
-                    const auto& [ rptr, eptr ] = tuple;
-                    return rptr->send(eptr);
-                })
-                .handle_with([](auto message) {
-                    std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
-                })
-                .get_or_else(0);
+            .bind<int>([](auto tuple) {
+                const auto& [rptr, eptr] = tuple;
+                return rptr->send(eptr);
+            })
+            .handle_with([](auto message) {
+                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+            })
+            .get_or_else(0);
     }
 
-    void report_exit(::pear::Result<pear::ReporterPtr> const &reporter, pid_t pid, int exit) noexcept {
+    void report_exit(::pear::Result<pear::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    {
         ::pear::merge(reporter, ::pear::Event::stop(pid, exit))
-                .bind<int>([](auto tuple) {
-                    const auto& [ rptr, eptr ] = tuple;
-                    return rptr->send(eptr);
-                })
-                .handle_with([](auto message) {
-                    std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
-                })
-                .get_or_else(0);
+            .bind<int>([](auto tuple) {
+                const auto& [rptr, eptr] = tuple;
+                return rptr->send(eptr);
+            })
+            .handle_with([](auto message) {
+                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+            })
+            .get_or_else(0);
     }
 
-    ::pear::EnvironmentPtr create_environment(char *original[], const ::pear::SessionPtr &session) {
-        auto builder = pear::Environment::Builder(const_cast<const char **>(original));
+    ::pear::EnvironmentPtr create_environment(char* original[], const ::pear::SessionPtr& session)
+    {
+        auto builder = pear::Environment::Builder(const_cast<const char**>(original));
         session->configure(builder);
         return builder.build();
     }
 
-    std::ostream &operator<<(std::ostream &os, char *const *values) {
+    std::ostream& operator<<(std::ostream& os, char* const* values)
+    {
         os << '[';
-        for (char *const *it = values; *it != nullptr; ++it) {
+        for (char* const* it = values; *it != nullptr; ++it) {
             if (it != values) {
                 os << ", ";
             }
@@ -87,37 +91,38 @@ namespace {
 
 }
 
-int main(int argc, char *argv[], char *envp[]) {
+int main(int argc, char* argv[], char* envp[])
+{
     return ::pear::parse(argc, argv)
-            .map<pear::SessionPtr>([&argv](auto arguments) {
-                if (arguments->context_.verbose) {
-                    std::cerr << MESSAGE_PREFIX << argv << std::endl;
-                }
-                return arguments;
-            })
-            .bind<int>([&envp](auto arguments) {
-                auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
+        .map<pear::SessionPtr>([&argv](auto arguments) {
+            if (arguments->context_.verbose) {
+                std::cerr << MESSAGE_PREFIX << argv << std::endl;
+            }
+            return arguments;
+        })
+        .bind<int>([&envp](auto arguments) {
+            auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
 
-                auto environment = create_environment(envp, arguments);
-                return spawnp(arguments->execution_, environment)
-                        .template map<pid_t>([&arguments, &reporter](auto &pid) {
-                            report_start(reporter, pid, arguments->execution_.command);
-                            return pid;
-                        })
-                        .template bind<std::tuple<pid_t, int>>([](auto pid) {
-                            return pear::SystemCalls::wait_pid(pid)
-                                    .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
-                                        return std::make_tuple(pid, exit);
-                                    });
-                        })
-                        .template map<int>([&reporter](auto tuple) {
-                            const auto& [pid, exit] = tuple;
-                            report_exit(reporter, pid, exit);
-                            return exit;
+            auto environment = create_environment(envp, arguments);
+            return spawnp(arguments->execution_, environment)
+                .template map<pid_t>([&arguments, &reporter](auto& pid) {
+                    report_start(reporter, pid, arguments->execution_.command);
+                    return pid;
+                })
+                .template bind<std::tuple<pid_t, int>>([](auto pid) {
+                    return pear::SystemCalls::wait_pid(pid)
+                        .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
+                            return std::make_tuple(pid, exit);
                         });
-            })
-            .handle_with([](auto message) {
-                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
-            })
-            .get_or_else(EXIT_FAILURE);
+                })
+                .template map<int>([&reporter](auto tuple) {
+                    const auto& [pid, exit] = tuple;
+                    report_exit(reporter, pid, exit);
+                    return exit;
+                });
+        })
+        .handle_with([](auto message) {
+            std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+        })
+        .get_or_else(EXIT_FAILURE);
 }

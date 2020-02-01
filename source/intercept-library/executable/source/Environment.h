@@ -18,8 +18,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <memory>
 #include <map>
+#include <memory>
 
 namespace pear {
 
@@ -27,46 +27,45 @@ namespace pear {
     public:
         class Builder;
 
-        const char **data() const noexcept;
+        const char** data() const noexcept;
 
     public:
         Environment() = delete;
 
         ~Environment() noexcept;
 
-        Environment(Environment &&) noexcept = delete;
+        Environment(Environment&&) noexcept = delete;
 
-        Environment(Environment const &) = delete;
+        Environment(Environment const&) = delete;
 
-        Environment &operator=(Environment &&) noexcept = delete;
+        Environment& operator=(Environment&&) noexcept = delete;
 
-        Environment &operator=(Environment const &) = delete;
-
-    private:
-        explicit Environment(const std::map<std::string, std::string> &environ) noexcept;
+        Environment& operator=(Environment const&) = delete;
 
     private:
-        char **const data_;
+        explicit Environment(const std::map<std::string, std::string>& environ) noexcept;
+
+    private:
+        char** const data_;
     };
 
     using EnvironmentPtr = std::unique_ptr<Environment>;
 
-
     class Environment::Builder {
     public:
-        explicit Builder(const char **environment) noexcept;
+        explicit Builder(const char** environment) noexcept;
 
-        Builder &add_reporter(const char *reporter) noexcept;
+        Builder& add_reporter(const char* reporter) noexcept;
 
-        Builder &add_destination(const char *target) noexcept;
+        Builder& add_destination(const char* target) noexcept;
 
-        Builder &add_verbose(bool verbose) noexcept;
+        Builder& add_verbose(bool verbose) noexcept;
 
-        Builder &add_library(const char *library) noexcept;
+        Builder& add_library(const char* library) noexcept;
 
-        Builder &add_cc_compiler(const char *compiler, const char *wrapper) noexcept;
+        Builder& add_cc_compiler(const char* compiler, const char* wrapper) noexcept;
 
-        Builder &add_cxx_compiler(const char *compiler, const char *wrapper) noexcept;
+        Builder& add_cxx_compiler(const char* compiler, const char* wrapper) noexcept;
 
         EnvironmentPtr build() const noexcept;
 
@@ -75,13 +74,13 @@ namespace pear {
 
         ~Builder() noexcept = default;
 
-        Builder(Builder &&) noexcept = delete;
+        Builder(Builder&&) noexcept = delete;
 
-        Builder(Builder const &) = delete;
+        Builder(Builder const&) = delete;
 
-        Builder &operator=(Builder &&) noexcept = delete;
+        Builder& operator=(Builder&&) noexcept = delete;
 
-        Builder &operator=(Builder const &) = delete;
+        Builder& operator=(Builder const&) = delete;
 
     private:
         std::map<std::string, std::string> environ_;

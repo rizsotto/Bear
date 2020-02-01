@@ -21,8 +21,8 @@
 
 import argparse
 import json
-import sys
 import os.path
+import sys
 
 
 def diff(lhs, rhs, ignore_compiler):

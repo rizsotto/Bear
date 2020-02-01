@@ -19,32 +19,33 @@
 
 #include "config.h"
 
-#include "Environment.h"
 #include "Array.h"
+#include "Environment.h"
 
 #if defined HAVE_NSGETENVIRON
-# include <crt_externs.h>
+#include <crt_externs.h>
 #else
-extern "C" char **environ;
+extern "C" char** environ;
 #endif
-
 
 namespace ear {
     namespace environment {
 
-        const char **current() noexcept {
+        const char** current() noexcept
+        {
 #ifdef HAVE_NSGETENVIRON
-            return const_cast<const char **>(*_NSGetEnviron());
+            return const_cast<const char**>(*_NSGetEnviron());
 #else
-            return const_cast<const char **>(environ);
+            return const_cast<const char**>(environ);
 #endif
         }
 
-        const char *get_env_value(const char **envp, const char *key) noexcept {
+        const char* get_env_value(const char** envp, const char* key) noexcept
+        {
             const size_t key_size = ear::array::length(key);
 
-            for (const char **it = envp; *it != nullptr; ++it) {
-                const char *const current = *it;
+            for (const char** it = envp; *it != nullptr; ++it) {
+                const char* const current = *it;
                 // Is the key a prefix of the pointed string?
                 if (!ear::array::equal_n(key, current, key_size))
                     continue;

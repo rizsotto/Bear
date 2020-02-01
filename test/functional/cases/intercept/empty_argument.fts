@@ -23,7 +23,7 @@ mkdir -p "${root_dir}/src"
 touch "${root_dir}/src/empty.c"
 
 build_file="${root_dir}/run.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -39,7 +39,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
 {
   "arguments": ["cc", "-c", "", "src/empty.c"],

@@ -21,23 +21,22 @@
 
 #include "intercept.h"
 
+#include "Executor.h"
 #include "Resolver.h"
 #include "Session.h"
-#include "Environment.h"
-#include "Executor.h"
 
 namespace {
 
     constexpr char LS_PATH[] = "/usr/bin/ls";
     constexpr char LS_FILE[] = "ls";
     constexpr char* LS_ARGV[] = {
-            const_cast<char *>("/usr/bin/ls"),
-            const_cast<char *>("-l"),
-            nullptr
+        const_cast<char*>("/usr/bin/ls"),
+        const_cast<char*>("-l"),
+        nullptr
     };
     constexpr char* LS_ENVP[] = {
-            const_cast<char *>("PATH=/usr/bin:/usr/sbin"),
-            nullptr
+        const_cast<char*>("PATH=/usr/bin:/usr/sbin"),
+        nullptr
     };
     constexpr char SEARCH_PATH[] = "/usr/bin:/usr/sbin";
 
@@ -50,16 +49,19 @@ namespace {
         static const ear::Session SILENT_SESSION;
         static const ear::Session VERBOSE_SESSION;
 
-        static void *null_resolver(char const *const) {
+        static void* null_resolver(char const* const)
+        {
             return nullptr;
         }
 
-        static void *not_called(char const *const) {
+        static void* not_called(char const* const)
+        {
             EXPECT_TRUE(false);
             return nullptr;
         }
 
-        static ear::Resolver::execve_t mock_silent_session_execve() noexcept {
+        static ear::Resolver::execve_t mock_silent_session_execve() noexcept
+        {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
@@ -77,7 +79,8 @@ namespace {
             };
         }
 
-        static ear::Resolver::execve_t mock_verbose_session_execve() noexcept {
+        static ear::Resolver::execve_t mock_verbose_session_execve() noexcept
+        {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), path);
                 EXPECT_STREQ(VERBOSE_SESSION.get_reporter(), argv[0]);
@@ -96,7 +99,8 @@ namespace {
             };
         }
 
-        static ear::Resolver::execve_t mock_silent_session_execvpe() noexcept {
+        static ear::Resolver::execve_t mock_silent_session_execvpe() noexcept
+        {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
@@ -114,7 +118,8 @@ namespace {
             };
         }
 
-        static ear::Resolver::execve_t mock_silent_session_execvp2() noexcept {
+        static ear::Resolver::execve_t mock_silent_session_execvp2() noexcept
+        {
             return [](const char* path, char* const argv[], char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
@@ -134,13 +139,14 @@ namespace {
             };
         }
 
-        static ear::Resolver::posix_spawn_t mock_silent_session_spawn() noexcept {
-            return [](pid_t *pid,
-                      const char *path,
-                      const posix_spawn_file_actions_t *file_actions,
-                      const posix_spawnattr_t *attrp,
-                      char *const argv[],
-                      char *const envp[]) -> int {
+        static ear::Resolver::posix_spawn_t mock_silent_session_spawn() noexcept
+        {
+            return [](pid_t* pid,
+                       const char* path,
+                       const posix_spawn_file_actions_t* file_actions,
+                       const posix_spawnattr_t* attrp,
+                       char* const argv[],
+                       char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
                 EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
@@ -157,13 +163,14 @@ namespace {
             };
         }
 
-        static ear::Resolver::posix_spawn_t mock_silent_session_spawnp() noexcept {
-            return [](pid_t *pid,
-                      const char *path,
-                      const posix_spawn_file_actions_t *file_actions,
-                      const posix_spawnattr_t *attrp,
-                      char *const argv[],
-                      char *const envp[]) -> int {
+        static ear::Resolver::posix_spawn_t mock_silent_session_spawnp() noexcept
+        {
+            return [](pid_t* pid,
+                       const char* path,
+                       const posix_spawn_file_actions_t* file_actions,
+                       const posix_spawnattr_t* attrp,
+                       char* const argv[],
+                       char* const envp[]) -> int {
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), path);
                 EXPECT_STREQ(SILENT_SESSION.get_reporter(), argv[0]);
                 EXPECT_STREQ(pear::flag::DESTINATION, argv[1]);
@@ -189,155 +196,127 @@ namespace {
         static const ear::Resolver MOCK_SILENT_SPAWN_RESOLVER;
         static const ear::Resolver MOCK_SILENT_SPAWNP_RESOLVER;
     };
-    const ear::Session ExecutorTest::BROKEN_SESSION = { };
+    const ear::Session ExecutorTest::BROKEN_SESSION = {};
     const ear::Session ExecutorTest::SILENT_SESSION = {
-            "/usr/libexec/libexec.so",
-            "/usr/bin/intercept",
-            "/tmp/intercept.random",
-            false
+        "/usr/libexec/libexec.so",
+        "/usr/bin/intercept",
+        "/tmp/intercept.random",
+        false
     };
     const ear::Session ExecutorTest::VERBOSE_SESSION = {
-            "/usr/libexec/libexec.so",
-            "/usr/bin/intercept",
-            "/tmp/intercept.random",
-            true
+        "/usr/libexec/libexec.so",
+        "/usr/bin/intercept",
+        "/tmp/intercept.random",
+        true
     };
-    const ear::Resolver ExecutorTest::BROKEN_RESOLVER =
-            ear::Resolver(&ExecutorTest::null_resolver);
-    const ear::Resolver ExecutorTest::IGNORED_RESOLVER =
-            ear::Resolver(&ExecutorTest::not_called);
-    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVE_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_silent_session_execve));
-    const ear::Resolver ExecutorTest::MOCK_VERBOSE_EXECVE_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_verbose_session_execve));
-    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVPE_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_silent_session_execvpe));
-    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVP2_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_silent_session_execvp2));
-    const ear::Resolver ExecutorTest::MOCK_SILENT_SPAWN_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_silent_session_spawn));
-    const ear::Resolver ExecutorTest::MOCK_SILENT_SPAWNP_RESOLVER =
-            ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t >(ExecutorTest::mock_silent_session_spawnp));
+    const ear::Resolver ExecutorTest::BROKEN_RESOLVER = ear::Resolver(&ExecutorTest::null_resolver);
+    const ear::Resolver ExecutorTest::IGNORED_RESOLVER = ear::Resolver(&ExecutorTest::not_called);
+    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVE_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_silent_session_execve));
+    const ear::Resolver ExecutorTest::MOCK_VERBOSE_EXECVE_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_verbose_session_execve));
+    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVPE_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_silent_session_execvpe));
+    const ear::Resolver ExecutorTest::MOCK_SILENT_EXECVP2_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_silent_session_execvp2));
+    const ear::Resolver ExecutorTest::MOCK_SILENT_SPAWN_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_silent_session_spawn));
+    const ear::Resolver ExecutorTest::MOCK_SILENT_SPAWNP_RESOLVER = ear::Resolver(reinterpret_cast<ear::Resolver::resolver_t>(ExecutorTest::mock_silent_session_spawnp));
 
-    TEST_F(ExecutorTest, execve_fails_without_env) {
+    TEST_F(ExecutorTest, execve_fails_without_env)
+    {
         auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execve_fails_without_resolver) {
+    TEST_F(ExecutorTest, execve_fails_without_resolver)
+    {
         auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execve_silent_library) {
+    TEST_F(ExecutorTest, execve_silent_library)
+    {
         auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_EXECVE_RESOLVER).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
-    TEST_F(ExecutorTest, execve_verbose_library) {
+    TEST_F(ExecutorTest, execve_verbose_library)
+    {
         auto result = ear::Executor(VERBOSE_SESSION, MOCK_VERBOSE_EXECVE_RESOLVER).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
-    TEST_F(ExecutorTest, execvpe_fails_without_env) {
+    TEST_F(ExecutorTest, execvpe_fails_without_env)
+    {
         auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execvpe_fails_without_resolver) {
+    TEST_F(ExecutorTest, execvpe_fails_without_resolver)
+    {
         auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execvpe_passes) {
+    TEST_F(ExecutorTest, execvpe_passes)
+    {
         auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_EXECVPE_RESOLVER).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
-    TEST_F(ExecutorTest, execvp2_fails_without_env) {
+    TEST_F(ExecutorTest, execvp2_fails_without_env)
+    {
         auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execvp2_fails_without_resolver) {
+    TEST_F(ExecutorTest, execvp2_fails_without_resolver)
+    {
         auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, execvp2_passes) {
+    TEST_F(ExecutorTest, execvp2_passes)
+    {
         auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_EXECVP2_RESOLVER).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
-    TEST_F(ExecutorTest, spawn_fails_without_env) {
+    TEST_F(ExecutorTest, spawn_fails_without_env)
+    {
         pid_t pid;
-        auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).posix_spawn(
-                &pid,
-                LS_PATH,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, spawn_fails_without_resolver) {
+    TEST_F(ExecutorTest, spawn_fails_without_resolver)
+    {
         pid_t pid;
-        auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).posix_spawn(
-                &pid,
-                LS_PATH,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, spawn_passes) {
+    TEST_F(ExecutorTest, spawn_passes)
+    {
         pid_t pid;
-        auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_SPAWN_RESOLVER).posix_spawn(
-                &pid,
-                LS_PATH,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_SPAWN_RESOLVER).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
-    TEST_F(ExecutorTest, spawnp_fails_without_env) {
+    TEST_F(ExecutorTest, spawnp_fails_without_env)
+    {
         pid_t pid;
-        auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).posix_spawnp(
-                &pid,
-                LS_FILE,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(BROKEN_SESSION, IGNORED_RESOLVER).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, spawnp_fails_without_resolver) {
+    TEST_F(ExecutorTest, spawnp_fails_without_resolver)
+    {
         pid_t pid;
-        auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).posix_spawnp(
-                &pid,
-                LS_FILE,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(SILENT_SESSION, BROKEN_RESOLVER).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
-    TEST_F(ExecutorTest, spawnp_passes) {
+    TEST_F(ExecutorTest, spawnp_passes)
+    {
         pid_t pid;
-        auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_SPAWNP_RESOLVER).posix_spawnp(
-                &pid,
-                LS_FILE,
-                nullptr,
-                nullptr,
-                LS_ARGV,
-                LS_ENVP);
+        auto result = ear::Executor(SILENT_SESSION, MOCK_SILENT_SPAWNP_RESOLVER).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 

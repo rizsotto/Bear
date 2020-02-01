@@ -19,41 +19,42 @@
 
 #include "config.h"
 
-#include <cstdio>
-#include <cstdarg>
 #include <atomic>
+#include <cstdarg>
+#include <cstdio>
 
 #if defined HAVE_SPAWN_HEADER
-# include <spawn.h>
+#include <spawn.h>
 #endif
 #include <dlfcn.h>
 
+#include "Environment.h"
+#include "Executor.h"
 #include "Resolver.h"
 #include "Session.h"
-#include "Environment.h"
 #include "Storage.h"
-#include "Executor.h"
-
 
 namespace {
 
-    size_t va_length(va_list &args) {
+    size_t va_length(va_list& args)
+    {
         size_t arg_count = 0;
-        while (va_arg(args, const char *) != nullptr)
+        while (va_arg(args, const char*) != nullptr)
             ++arg_count;
         return arg_count;
     };
 
-    void va_copy_n(va_list &args, char *argv[], size_t const argc) {
+    void va_copy_n(va_list& args, char* argv[], size_t const argc)
+    {
         for (size_t idx = 0; idx <= argc; ++idx)
-            argv[idx] = va_arg(args, char *);
+            argv[idx] = va_arg(args, char*);
     };
 
-    void *dynamic_linker(char const *const name) {
+    void* dynamic_linker(char const* const name)
+    {
         return dlsym(RTLD_NEXT, name);
     }
 }
-
 
 /**
  * Library static data
@@ -71,14 +72,14 @@ namespace {
     ear::Resolver RESOLVER(&dynamic_linker);
 }
 
-
 /**
  * Library entry point.
  *
  * The first method to call after the library is loaded into memory.
  */
 extern "C" void on_load() __attribute__((constructor));
-extern "C" void on_load() {
+extern "C" void on_load()
+{
     // Test whether on_load was called already.
     if (LOADED.exchange(true))
         return;
@@ -98,7 +99,8 @@ extern "C" void on_load() {
  * The last method which needs to be called when the library is unloaded.
  */
 extern "C" void on_unload() __attribute__((destructor));
-extern "C" void on_unload() {
+extern "C" void on_unload()
+{
     // Test whether on_unload was called already.
     if (not LOADED.exchange(false))
         return;
@@ -106,60 +108,53 @@ extern "C" void on_unload() {
     SESSION.write_message("on_unload");
 }
 
-
-extern "C"
-int execve(const char *path, char *const argv[], char *const envp[]) {
+extern "C" int execve(const char* path, char* const argv[], char* const envp[])
+{
     SESSION.write_message("execve");
 
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
-
-extern "C"
-int execv(const char *path, char *const argv[]) {
+extern "C" int execv(const char* path, char* const argv[])
+{
     SESSION.write_message("execv");
 
-    auto envp = const_cast<char *const *>(ear::environment::current());
+    auto envp = const_cast<char* const*>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
-
-extern "C"
-int execvpe(const char *file, char *const argv[], char *const envp[]) {
+extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
+{
     SESSION.write_message("execvpe");
 
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
-
-extern "C"
-int execvp(const char *file, char *const argv[]) {
+extern "C" int execvp(const char* file, char* const argv[])
+{
     SESSION.write_message("execvp");
 
-    auto envp = const_cast<char *const *>(ear::environment::current());
+    auto envp = const_cast<char* const*>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
-
-extern "C"
-int execvP(const char *file, const char *search_path, char *const argv[]) {
+extern "C" int execvP(const char* file, const char* search_path, char* const argv[])
+{
     SESSION.write_message("execvP");
 
-    auto envp = const_cast<char *const *>(ear::environment::current());
+    auto envp = const_cast<char* const*>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execvP(file, search_path, argv, envp);
 }
 
-
-extern "C"
-int exect(const char *path, char *const argv[], char *const envp[]) {
+extern "C" int exect(const char* path, char* const argv[], char* const envp[])
+{
     SESSION.write_message("exect");
 
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
-
-extern "C"
-int execl(const char *path, const char *arg, ...) {
+extern "C" int execl(const char* path, const char* arg, ...)
+{
     SESSION.write_message("execl");
 
     // Count the number of arguments.
@@ -169,18 +164,17 @@ int execl(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 2];
-    argv[0] = const_cast<char *>(path);
+    char* argv[argc + 2];
+    argv[0] = const_cast<char*>(path);
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char *const *>(ear::environment::current());
+    auto envp = const_cast<char* const*>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
-
-extern "C"
-int execlp(const char *file, const char *arg, ...) {
+extern "C" int execlp(const char* file, const char* arg, ...)
+{
     SESSION.write_message("execlp");
 
     // Count the number of arguments.
@@ -190,19 +184,18 @@ int execlp(const char *file, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 2];
-    argv[0] = const_cast<char *>(file);
+    char* argv[argc + 2];
+    argv[0] = const_cast<char*>(file);
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char *const *>(ear::environment::current());
+    auto envp = const_cast<char* const*>(ear::environment::current());
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
-
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
-extern "C"
-int execle(const char *path, const char *arg, ...) {
+extern "C" int execle(const char* path, const char* arg, ...)
+{
     SESSION.write_message("execle");
 
     // Count the number of arguments.
@@ -212,32 +205,30 @@ int execle(const char *path, const char *arg, ...) {
     va_end(ap);
     // Copy the arguments to the stack.
     va_start(ap, arg);
-    char *argv[argc + 2];
-    argv[0] = const_cast<char *>(path);
+    char* argv[argc + 2];
+    argv[0] = const_cast<char*>(path);
     va_copy_n(ap, &argv[1], argc);
-    char **envp = va_arg(ap, char **);
+    char** envp = va_arg(ap, char**);
     va_end(ap);
 
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
-
-extern "C"
-int posix_spawn(pid_t *pid, const char *path,
-                const posix_spawn_file_actions_t *file_actions,
-                const posix_spawnattr_t *attrp,
-                char *const argv[], char *const envp[]) {
+extern "C" int posix_spawn(pid_t* pid, const char* path,
+    const posix_spawn_file_actions_t* file_actions,
+    const posix_spawnattr_t* attrp,
+    char* const argv[], char* const envp[])
+{
     SESSION.write_message("posix_spawn");
 
     return ear::Executor(SESSION, RESOLVER).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
-
-extern "C"
-int posix_spawnp(pid_t *pid, const char *file,
-                 const posix_spawn_file_actions_t *file_actions,
-                 const posix_spawnattr_t *attrp,
-                 char *const argv[], char *const envp[]) {
+extern "C" int posix_spawnp(pid_t* pid, const char* file,
+    const posix_spawn_file_actions_t* file_actions,
+    const posix_spawnattr_t* attrp,
+    char* const argv[], char* const envp[])
+{
     SESSION.write_message("posix_spawnp");
 
     return ear::Executor(SESSION, RESOLVER).posix_spawnp(pid, file, file_actions, attrp, argv, envp);

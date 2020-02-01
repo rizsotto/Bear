@@ -23,11 +23,9 @@ mkdir -p "${root_dir}/src"
 
 cp "${test_input_dir}/main.c" "${root_dir}/src/main.c"
 
-cat > "${root_dir}/src/lib.c" << EOF
+cat >"${root_dir}/src/lib.c" <<EOF
 int foo() { return 2; }
 EOF
-
-
 
 # set up platform specific linker options
 PREFIX="fooflag"
@@ -37,9 +35,8 @@ else
   LD_FLAGS="-o lib${PREFIX}.so -shared -Wl,-soname,${PREFIX}"
 fi
 
-
 build_file="${root_dir}/run.sh"
-cat > ${build_file} << EOF
+cat >${build_file} <<EOF
 #!/usr/bin/env bash
 
 set -o nounset
@@ -70,7 +67,7 @@ true;
 EOF
 chmod +x ${build_file}
 
-cat > "${root_dir}/expected.json" << EOF
+cat >"${root_dir}/expected.json" <<EOF
 [
     {
         "command": "cc -c -fpic -Dver=one -o one.o lib.c",

@@ -10,7 +10,7 @@ set(CMAKE_EXE_LINKER_FLAGS "-static")
 
 add_executable(intercept
         main.cc
-)
+        )
 
 target_include_directories(intercept PRIVATE ${EXE_SRC_DIR})
 target_link_libraries(intercept intercept_a)

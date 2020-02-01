@@ -35,7 +35,7 @@ namespace ear {
          * @param begin of the buffer.
          * @param end of the buffer.
          */
-        Storage(char *begin, char *end) noexcept;
+        Storage(char* begin, char* end) noexcept;
 
         ~Storage() noexcept = default;
 
@@ -45,27 +45,27 @@ namespace ear {
          * @param input to persist.
          * @return the address of the persisted input.
          */
-        char const *store(char const *input) noexcept;
+        char const* store(char const* input) noexcept;
 
     public:
-        Storage(Storage const &) = delete;
+        Storage(Storage const&) = delete;
 
-        Storage(Storage &&) noexcept = delete;
+        Storage(Storage&&) noexcept = delete;
 
-        Storage &operator=(Storage const &) = delete;
+        Storage& operator=(Storage const&) = delete;
 
-        Storage &operator=(Storage &&) noexcept = delete;
+        Storage& operator=(Storage&&) noexcept = delete;
 
     private:
-        char *const begin_;
-        char *const end_;
-        char *top_;
+        char* const begin_;
+        char* const end_;
+        char* top_;
     };
 
-    inline
-    Storage::Storage(char *const begin, char *const end) noexcept
+    inline Storage::Storage(char* const begin, char* const end) noexcept
             : begin_(begin)
             , end_(end)
             , top_(begin)
-    { }
+    {
+    }
 }
