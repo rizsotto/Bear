@@ -17,29 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/**
- * This file implements a shared library. This library can be pre-loaded by
- * the dynamic linker of the Operating System. It implements a few function
- * related to process creation. By pre-load this library the executed process
- * uses these functions instead of those from the standard library.
- *
- * The idea here is to hijack the process creation methods: do not execute
- * the requested file, but execute another one. The another process is a
- * supervisor process, which executes the requested file, but it also
- * reports the lifecycle related events, like start, stop or signal received.
- *
- * Implementation details:
- *
- * - It's written in C++ 14.
- * - It's using symbols only from the `libc` and `libdl`.
- * - Memory handling:
- *    - It does not allocates heap memory. (no malloc, no new)
- *    - It allocates static memory and uses the stack.
- * - Error handling:
- *    - Any error is fatal.
- *    - Errors are reported on `stderr` only if it was requested.
- */
-
 #include <cstdio>
 #include <cstdlib>
 #include <cstdarg>
