@@ -20,17 +20,10 @@
 #include <cstdio>
 #include "Session.h"
 
+#include "libexec.h"
 #include "Environment.h"
 #include "Storage.h"
 
-
-namespace {
-
-    constexpr char KEY_LIBRARY[]     = "INTERCEPT_LIBRARY";
-    constexpr char KEY_REPORTER[]    = "INTERCEPT_REPORT_COMMAND";
-    constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
-    constexpr char KEY_VERBOSE[]     = "INTERCEPT_VERBOSE";
-}
 
 namespace ear {
 
@@ -39,10 +32,10 @@ namespace ear {
             return {};
         else
             return {
-                    environment::get_env_value(environment, KEY_LIBRARY),
-                    environment::get_env_value(environment, KEY_REPORTER),
-                    environment::get_env_value(environment, KEY_DESTINATION),
-                    environment::get_env_value(environment, KEY_VERBOSE) != nullptr
+                    environment::get_env_value(environment, env::KEY_LIBRARY),
+                    environment::get_env_value(environment, env::KEY_REPORTER),
+                    environment::get_env_value(environment, env::KEY_DESTINATION),
+                    environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr
             };
     }
 

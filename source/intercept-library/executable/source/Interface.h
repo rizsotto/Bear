@@ -37,12 +37,8 @@ namespace pear {
 
     namespace env {
 
-        constexpr char reporter_key[]    = "INTERCEPT_REPORT_COMMAND";
-        constexpr char destination_key[] = "INTERCEPT_REPORT_DESTINATION";
-        constexpr char verbose_key[]     = "INTERCEPT_VERBOSE";
-        constexpr char library_key[]     = "INTERCEPT_LIBRARY";
-        constexpr char cc_key[]          = "INTERCEPT_SESSION_CC";
-        constexpr char cxx_key[]         = "INTERCEPT_SESSION_CXX";
+        constexpr char KEY_CC[]          = "INTERCEPT_SESSION_CC";
+        constexpr char KEY_CXX[]         = "INTERCEPT_SESSION_CXX";
 
     }
 

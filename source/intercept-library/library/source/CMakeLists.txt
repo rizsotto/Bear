@@ -9,6 +9,7 @@ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(exec_a STATIC
         config.h
+        ../api/libexec.h
         Array.h
         Environment.h
         Environment.cc
@@ -22,6 +23,7 @@ add_library(exec_a STATIC
 )
 
 target_include_directories(exec_a PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(exec_a PRIVATE ${LIB_API_DIR})
 target_compile_features(exec_a PUBLIC cxx_std_14)
 target_compile_options(exec_a PUBLIC -fno-exceptions -fno-rtti)
 set_target_properties(exec_a PROPERTIES

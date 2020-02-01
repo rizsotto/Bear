@@ -19,8 +19,9 @@
 
 #include "config.h"
 
+#include "libexec.h"
+
 #include <list>
-#include <algorithm>
 #include <numeric>
 #include <string>
 #include <cstring>
@@ -143,27 +144,27 @@ namespace pear {
 
     Environment::Builder &
     Environment::Builder::add_reporter(const char *reporter) noexcept {
-        insert_or_assign(environ_, ::pear::env::reporter_key, reporter);
+        insert_or_assign(environ_, ear::env::KEY_REPORTER, reporter);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_destination(const char *destination) noexcept {
-        insert_or_assign(environ_, ::pear::env::destination_key, destination);
+        insert_or_assign(environ_, ear::env::KEY_DESTINATION, destination);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_verbose(bool verbose) noexcept {
         if (verbose) {
-            insert_or_assign(environ_, ::pear::env::verbose_key, "1");
+            insert_or_assign(environ_, ear::env::KEY_VERBOSE, "1");
         }
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_library(const char *library) noexcept {
-        insert_or_assign(environ_, pear::env::library_key, library);
+        insert_or_assign(environ_, ear::env::KEY_LIBRARY, library);
 #ifdef APPLE
         insert_or_assign(environ_, osx_namespace_key, "1");
         const char *key = osx_preload_key;
@@ -177,14 +178,14 @@ namespace pear {
     Environment::Builder &
     Environment::Builder::add_cc_compiler(const char *compiler, const char *wrapper) noexcept {
         insert_or_assign(environ_, cc_key, wrapper);
-        insert_or_assign(environ_, ::pear::env::cc_key, compiler);
+        insert_or_assign(environ_, ::pear::env::KEY_CC, compiler);
         return *this;
     }
 
     Environment::Builder &
     Environment::Builder::add_cxx_compiler(const char *compiler, const char *wrapper) noexcept {
         insert_or_assign(environ_, cxx_key, wrapper);
-        insert_or_assign(environ_, ::pear::env::cxx_key, compiler);
+        insert_or_assign(environ_, ::pear::env::KEY_CXX, compiler);
         return *this;
     }
 
