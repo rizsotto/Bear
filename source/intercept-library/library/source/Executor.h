@@ -21,6 +21,10 @@
 
 #include "config.h"
 
+#if defined HAVE_SPAWN_HEADER
+# include <spawn.h>
+#endif
+
 namespace ear {
 
     constexpr char FLAG_VERBOSE[]     = "--session-verbose";
