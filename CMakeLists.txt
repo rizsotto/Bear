@@ -22,10 +22,6 @@ project(bear
     DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
     LANGUAGES C CXX)
 
-enable_testing()
-find_package(GTest REQUIRED)
-find_package(Threads REQUIRED)
-
 add_subdirectory(source)
 add_subdirectory(test)
 
@@ -33,7 +29,7 @@ include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
-set(CPACK_PACKAGE_NAME "source/bear")
+set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
 set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
 set(CPACK_PACKAGE_VERSION ${BEAR_VERSION})

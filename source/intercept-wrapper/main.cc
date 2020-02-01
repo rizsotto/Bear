@@ -20,9 +20,9 @@
 #include <unistd.h>
 #include <cstdio>
 
-#include "libexec_a/Array.h"
-#include "libexec_a/Environment.h"
-#include "libexec_a/Executor.h"
+//#include "libexec_a/Array.h"
+//#include "libexec_a/Environment.h"
+//#include "libexec_a/Executor.h"
 
 //namespace {
 //
