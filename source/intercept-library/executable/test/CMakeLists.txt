@@ -4,7 +4,8 @@ add_executable(libintercept_unit_test
         SessionTest.cc
 )
 
-target_include_directories(libintercept_unit_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../source)
+target_include_directories(libintercept_unit_test PRIVATE ${EXE_CFG_DIR})
+target_include_directories(libintercept_unit_test PRIVATE ${EXE_SRC_DIR})
 target_link_libraries(libintercept_unit_test intercept_a)
 target_link_libraries(libintercept_unit_test gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
 

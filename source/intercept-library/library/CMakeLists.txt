@@ -1,3 +1,6 @@
+set(LIB_CFG_DIR ${CMAKE_CURRENT_BINARY_DIR}/source)
+set(LIB_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
+
 add_subdirectory(source)
 add_subdirectory(test)
 
@@ -6,8 +9,8 @@ add_library(exec SHARED
         lib.cc
 )
 
-target_include_directories(exec PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
-target_include_directories(exec PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/source)
+target_include_directories(exec PRIVATE ${LIB_CFG_DIR})
+target_include_directories(exec PRIVATE ${LIB_SRC_DIR})
 target_link_libraries(exec exec_a)
 target_link_libraries(exec ${CMAKE_DL_LIBS})
 target_compile_features(exec PUBLIC cxx_std_14)

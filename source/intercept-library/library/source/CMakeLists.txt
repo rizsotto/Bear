@@ -22,7 +22,7 @@ add_library(exec_a STATIC
         Storage.cc
 )
 
-target_include_directories(exec_a PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(exec_a PRIVATE ${LIB_CFG_DIR})
 target_include_directories(exec_a PRIVATE ${LIB_API_DIR})
 target_compile_features(exec_a PUBLIC cxx_std_14)
 target_compile_options(exec_a PUBLIC -fno-exceptions -fno-rtti)
