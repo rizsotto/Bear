@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-latest]
+        os: [ubuntu-latest]
 
     steps:
       - name: Checkout code
@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update -y
           #sudo apt-get upgrade -y
-          sudo apt-get install -y libc6-dev libgtest-dev virtualenv scons gfortran qt4-qmake nvidia-cuda-toolkit
+          sudo apt-get install -y libc6-dev virtualenv scons gfortran qt4-qmake nvidia-cuda-toolkit
       - name: Install python test dependencies
         run: |
           virtualenv "$HOME/venv"
@@ -28,16 +28,17 @@ jobs:
           pip --version
           pip install --upgrade pip
           pip install lit pex pycodestyle
-      - name: Install gtest
+      - name: Install gtest & gmock
         if:  startsWith( matrix.os, 'ubuntu' )
         env:
-          SRCDIR: "/usr/src/gtest"
+          BUILDDIR: "googletest_build_dir"
         run: |
-          mkdir gtest
-          cd gtest
-          cmake $SRCDIR
-          make
-          sudo cp *.a /usr/lib
+          git clone https://github.com/google/googletest.git
+          mkdir -p $BUILDDIR
+          cd $BUILDDIR
+          cmake ../googletest
+          make -j
+          sudo make install
       - name: Configure
         run: |
           source "$HOME/venv/bin/activate"
@@ -57,7 +58,7 @@ jobs:
           make -C $HOME package
       - name: Test install
         env:
-          DESTDIR: "$HOME/install"
+          DESTDIR: "install"
         run: |
           mkdir -p $DESTDIR
           make -C $HOME install
