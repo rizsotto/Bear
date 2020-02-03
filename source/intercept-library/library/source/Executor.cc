@@ -25,6 +25,8 @@
 #include "Resolver.h"
 #include "Session.h"
 
+#include <unistd.h>
+
 namespace {
 
     struct Execution {
@@ -76,6 +78,14 @@ namespace {
         return it;
     }
 
+#define CHECK_PATH(SESSION_, PATH_)        \
+    do {                                   \
+        if (0 != access(PATH_, X_OK)) {    \
+            SESSION_.write_message(PATH_); \
+            return -1;                     \
+        }                                  \
+    } while (false)
+
 #define CHECK_SESSION(SESSION_)                         \
     do {                                                \
         if (SESSION_.is_not_valid()) {                  \
@@ -114,6 +124,7 @@ namespace ear {
     int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
         CHECK_SESSION(session_);
+        CHECK_PATH(session_, path);
 
         auto fp = resolver_.execve();
         CHECK_FP(session_, fp);
@@ -156,6 +167,7 @@ namespace ear {
         char* const* envp) const noexcept
     {
         CHECK_SESSION(session_);
+        CHECK_PATH(session_, path);
 
         auto fp = resolver_.posix_spawn();
         CHECK_FP(session_, fp);

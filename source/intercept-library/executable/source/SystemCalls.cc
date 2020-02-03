@@ -22,7 +22,6 @@
 #include <spawn.h>
 #include <wait.h>
 
-#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <memory>
