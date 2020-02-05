@@ -79,12 +79,11 @@ namespace {
     }
 
 // TODO: write path out
-// TODO: get access from resolver
-#define CHECK_PATH(SESSION_, PATH_)     \
-    do {                                \
-        if (0 != access(PATH_, X_OK)) { \
-            return -1;                  \
-        }                               \
+#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)    \
+    do {                                          \
+        if (0 != RESOLVER_.access(PATH_, X_OK)) { \
+            return -1;                            \
+        }                                         \
     } while (false)
 
 // TODO: write error message
@@ -93,14 +92,6 @@ namespace {
         if (!ear::session::is_valid(SESSION_)) { \
             return -1;                           \
         }                                        \
-    } while (false)
-
-// TODO: write error message
-#define CHECK_FP(SESSION_, FP_) \
-    do {                        \
-        if (FP_ == nullptr) {   \
-            return -1;          \
-        }                       \
     } while (false)
 
 #define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
@@ -125,28 +116,22 @@ namespace ear {
     int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
         CHECK_SESSION(session_);
-        CHECK_PATH(session_, path);
-
-        auto fp = resolver_.execve();
-        CHECK_FP(session_, fp);
+        CHECK_PATH(session_, resolver_, path);
 
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
+        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
     {
         CHECK_SESSION(session_);
 
-        auto fp = resolver_.execve();
-        CHECK_FP(session_, fp);
-
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
+        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::execvP(const char* file, const char* search_path, char* const* argv,
@@ -154,13 +139,10 @@ namespace ear {
     {
         CHECK_SESSION(session_);
 
-        auto fp = resolver_.execve();
-        CHECK_FP(session_, fp);
-
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, search_path };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
+        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
@@ -168,15 +150,12 @@ namespace ear {
         char* const* envp) const noexcept
     {
         CHECK_SESSION(session_);
-        CHECK_PATH(session_, path);
-
-        auto fp = resolver_.posix_spawn();
-        CHECK_FP(session_, fp);
+        CHECK_PATH(session_, resolver_, path);
 
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
+        return resolver_.posix_spawn(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
@@ -185,12 +164,9 @@ namespace ear {
     {
         CHECK_SESSION(session_);
 
-        auto fp = resolver_.posix_spawn();
-        CHECK_FP(session_, fp);
-
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
+        return resolver_.posix_spawn(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
     }
 }

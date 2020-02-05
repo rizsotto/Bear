@@ -25,7 +25,6 @@
 #if defined HAVE_SPAWN_HEADER
 #include <spawn.h>
 #endif
-#include <dlfcn.h>
 
 #include "Environment.h"
 #include "Executor.h"
@@ -47,11 +46,6 @@ namespace {
         for (size_t idx = 0; idx <= argc; ++idx)
             argv[idx] = va_arg(args, char*);
     };
-
-    void* dynamic_linker(char const* const name)
-    {
-        return dlsym(RTLD_NEXT, name);
-    }
 }
 
 /**
@@ -67,7 +61,7 @@ namespace {
     std::atomic<bool> LOADED(false);
 
     ear::Session SESSION = ear::session::init();
-    ear::Resolver RESOLVER(&dynamic_linker);
+    ear::Resolver RESOLVER;
 }
 
 /**

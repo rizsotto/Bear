@@ -16,6 +16,7 @@ add_library(exec_a STATIC
         Executor.h
         Executor.cc
         Resolver.h
+        Resolver.cc
         Session.h
         Session.cc
         Storage.h

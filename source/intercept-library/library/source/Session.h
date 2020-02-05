@@ -38,7 +38,7 @@ namespace ear {
         // Util method to create instance.
         inline constexpr Session init() noexcept
         {
-            return { nullptr, nullptr, nullptr, false };
+            return { nullptr, nullptr, nullptr, true };
         }
 
         // Util method to initialize instance.

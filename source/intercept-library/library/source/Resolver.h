@@ -32,60 +32,28 @@ namespace ear {
      *
      * It uses the provided symbol resolver method and cast the result
      * to a specific type.
-     *
-     * Design decisions:
-     *
-     * - Could have been just a function pointer, but a class might be
-     * better choice for this language. It also allows multiple
-     * implementation, which might be stateful.
-     *
-     * - Could have been using inheritance. But virtual functions needs
-     * symbols from the `libstdc++` library, which I wanted to avoid.
      */
     class Resolver {
     public:
-        using resolver_t = void* (*)(char const* const name);
+        Resolver() noexcept = default;
 
-        using execve_t = int (*)(const char* path,
+        virtual ~Resolver() = default;
+
+        virtual int execve(
+            const char* path,
             char* const argv[],
-            char* const envp[]);
+            char* const envp[]) const noexcept;
 
-        using posix_spawn_t = int (*)(pid_t* pid,
+        virtual int posix_spawn(
+            pid_t* pid,
             const char* path,
             const posix_spawn_file_actions_t* file_actions,
             const posix_spawnattr_t* attrp,
             char* const argv[],
-            char* const envp[]);
+            char* const envp[]) const noexcept;
 
-    public:
-        /**
-         * Constructor.
-         *
-         * @param resolver function pointer to the OS's dynamic linker
-         * symbol resolver method.
-         */
-        explicit Resolver(resolver_t resolver) noexcept;
-
-        execve_t execve() const noexcept;
-
-        posix_spawn_t posix_spawn() const noexcept;
-
-    private:
-        resolver_t resolver_;
+        virtual int access(
+            const char *pathname,
+            int mode) const noexcept;
     };
-
-    inline Resolver::Resolver(Resolver::resolver_t resolver) noexcept
-            : resolver_(resolver)
-    {
-    }
-
-    inline Resolver::execve_t Resolver::execve() const noexcept
-    {
-        return reinterpret_cast<execve_t>(resolver_("execve"));
-    }
-
-    inline Resolver::posix_spawn_t Resolver::posix_spawn() const noexcept
-    {
-        return reinterpret_cast<posix_spawn_t>(resolver_("posix_spawn"));
-    }
 }
