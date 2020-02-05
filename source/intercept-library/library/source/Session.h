@@ -75,7 +75,7 @@ namespace ear {
          *
          * @param storage uses a buffer to persist the values.
          */
-        void persist(Storage& storage) noexcept;
+        void persist(char* begin, char* end) noexcept;
 
         /**
          * Report a function call to stderr.

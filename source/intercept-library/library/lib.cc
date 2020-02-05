@@ -21,7 +21,6 @@
 
 #include <atomic>
 #include <cstdarg>
-#include <cstdio>
 
 #if defined HAVE_SPAWN_HEADER
 #include <spawn.h>
@@ -32,7 +31,6 @@
 #include "Executor.h"
 #include "Resolver.h"
 #include "Session.h"
-#include "Storage.h"
 
 namespace {
 
@@ -87,8 +85,7 @@ extern "C" void on_load()
     const auto environment = ear::environment::current();
     SESSION = ear::Session::from(environment);
 
-    ear::Storage storage(BUFFER, BUFFER + BUFFER_SIZE);
-    SESSION.persist(storage);
+    SESSION.persist(BUFFER, BUFFER + BUFFER_SIZE);
 
     SESSION.write_message("on_load");
 }

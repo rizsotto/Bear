@@ -39,11 +39,12 @@ namespace ear {
             };
     }
 
-    void Session::persist(Storage& storage) noexcept
+    void Session::persist(char* const begin, char*const  end) noexcept
     {
         if (is_not_valid())
             return;
 
+        Storage storage(begin, end);
         library_ = storage.store(library_);
         reporter_ = storage.store(reporter_);
         destination_ = storage.store(destination_);
