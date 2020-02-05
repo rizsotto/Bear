@@ -63,52 +63,53 @@ namespace {
 
     size_t length(ear::Session const& session) noexcept
     {
-        return session.is_not_valid() ? 5 : 6;
+        return session.verbose ? 5 : 6;
     }
 
     const char** copy(ear::Session const& session, const char** it, const char** it_end) noexcept
     {
-        *it++ = session.get_reporter();
+        *it++ = session.reporter;
         *it++ = pear::flag::DESTINATION;
-        *it++ = session.get_destination();
+        *it++ = session.destination;
         *it++ = pear::flag::LIBRARY;
-        *it++ = session.get_library();
-        if (session.is_verbose())
+        *it++ = session.library;
+        if (session.verbose)
             *it++ = pear::flag::VERBOSE;
         return it;
     }
 
-#define CHECK_PATH(SESSION_, PATH_)        \
-    do {                                   \
-        if (0 != access(PATH_, X_OK)) {    \
-            SESSION_.write_message(PATH_); \
-            return -1;                     \
-        }                                  \
+// TODO: write path out
+// TODO: get access from resolver
+#define CHECK_PATH(SESSION_, PATH_)     \
+    do {                                \
+        if (0 != access(PATH_, X_OK)) { \
+            return -1;                  \
+        }                               \
     } while (false)
 
-#define CHECK_SESSION(SESSION_)                         \
-    do {                                                \
-        if (SESSION_.is_not_valid()) {                  \
-            SESSION_.write_message("not initialized."); \
-            return -1;                                  \
-        }                                               \
+// TODO: write error message
+#define CHECK_SESSION(SESSION_)                  \
+    do {                                         \
+        if (!ear::session::is_valid(SESSION_)) { \
+            return -1;                           \
+        }                                        \
     } while (false)
 
-#define CHECK_FP(SESSION_, FP_)                                  \
-    do {                                                         \
-        if (FP_ == nullptr) {                                    \
-            SESSION_.write_message("could not resolve symbol."); \
-            return -1;                                           \
-        }                                                        \
+// TODO: write error message
+#define CHECK_FP(SESSION_, FP_) \
+    do {                        \
+        if (FP_ == nullptr) {   \
+            return -1;          \
+        }                       \
     } while (false)
 
-#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                       \
-    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_); \
-    const char* VAR_[VAR_##_length];                                    \
-    {                                                                   \
-        const char** const VAR_##_end = VAR_ + VAR_##_length;           \
-        const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);       \
-        copy(EXECUTION_, VAR_##it, VAR_##_end);                         \
+#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
+    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_) + 1; \
+    const char* VAR_[VAR_##_length];                                        \
+    {                                                                       \
+        const char** const VAR_##_end = VAR_ + VAR_##_length;               \
+        const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);           \
+        copy(EXECUTION_, VAR_##it, VAR_##_end);                             \
     }
 
 }
@@ -132,7 +133,7 @@ namespace ear {
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.get_reporter(), const_cast<char* const*>(dst), envp);
+        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
@@ -145,7 +146,7 @@ namespace ear {
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.get_reporter(), const_cast<char* const*>(dst), envp);
+        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::execvP(const char* file, const char* search_path, char* const* argv,
@@ -159,7 +160,7 @@ namespace ear {
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, search_path };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(session_.get_reporter(), const_cast<char* const*>(dst), envp);
+        return fp(session_.reporter, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
@@ -175,7 +176,7 @@ namespace ear {
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+        return fp(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
@@ -190,6 +191,6 @@ namespace ear {
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
 
-        return fp(pid, session_.get_reporter(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+        return fp(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
     }
 }

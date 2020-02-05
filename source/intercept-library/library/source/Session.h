@@ -26,103 +26,28 @@ namespace ear {
     /**
      * Represents an intercept session parameter set.
      */
-    class Session {
-    public:
-        Session() noexcept = default;
-
-        Session(char const* library, char const* reporter, char const* destination, bool) noexcept;
-
-        ~Session() noexcept = default;
-
-        Session(Session const&) = delete;
-
-        Session(Session&&) noexcept = default;
-
-        Session& operator=(Session const&) = delete;
-
-        Session& operator=(Session&&) noexcept = default;
-
-        /**
-         * Creates a Session object from the given environment.
-         *
-         * @param environment to initialize from.
-         * @return a Session object which might or might not be initialized.
-         */
-        static Session from(const char** environment) noexcept;
-
-    public:
-        const char* get_library() const;
-
-        const char* get_reporter() const;
-
-        const char* get_destination() const;
-
-        bool is_verbose() const;
-
-    public:
-        /**
-         * @return true if the session is initialized and can be used to
-         * intercept execution calls.
-         */
-        bool is_not_valid() const noexcept;
-
-        /**
-         * It persist the parameters to a buffer.
-         *
-         * If the values were created from the environment array. Those
-         * pointers can be freed before they get used. (The process calls
-         * a `setenv` method.)
-         *
-         * @param storage uses a buffer to persist the values.
-         */
-        void persist(char* begin, char* end) noexcept;
-
-        /**
-         * Report a function call to stderr.
-         *
-         * It's for debugging purposes.
-         *
-         * @param message to print.
-         */
-        void write_message(const char* message) const noexcept;
-
-    private:
-        char const* library_;
-        char const* reporter_;
-        char const* destination_;
-        bool verbose_;
+    struct Session {
+        char const* library;
+        char const* reporter;
+        char const* destination;
+        bool verbose;
     };
 
-    inline Session::Session(char const* library, char const* reporter, char const* destination, bool verbose) noexcept
-            : library_(library)
-            , reporter_(reporter)
-            , destination_(destination)
-            , verbose_(verbose)
-    {
-    }
+    namespace session {
 
-    inline const char* Session::get_library() const
-    {
-        return library_;
-    }
+        // Util method to create instance.
+        inline constexpr Session init() noexcept
+        {
+            return { nullptr, nullptr, nullptr, false };
+        }
 
-    inline const char* Session::get_reporter() const
-    {
-        return reporter_;
-    }
+        // Util method to initialize instance.
+        void from(Session& session, const char** environment) noexcept;
 
-    inline const char* Session::get_destination() const
-    {
-        return destination_;
-    }
+        // Util method to store the values.
+        void persist(Session& session, char* begin, char* end) noexcept;
 
-    inline bool Session::is_verbose() const
-    {
-        return verbose_;
-    }
-
-    inline bool Session::is_not_valid() const noexcept
-    {
-        return (library_ == nullptr || reporter_ == nullptr || destination_ == nullptr);
+        // Util method to check if session is initialized.
+        bool is_valid(Session const& session) noexcept;
     }
 }

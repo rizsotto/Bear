@@ -25,16 +25,18 @@ namespace {
 
     TEST(Session, dont_crash_on_nullptr)
     {
-        const auto result = ear::Session::from(nullptr);
-        ASSERT_TRUE(result.is_not_valid());
+        ear::Session sut {};
+        ear::session::from(sut, nullptr);
+        ASSERT_FALSE(ear::session::is_valid(sut));
     }
 
     TEST(Session, capture_on_empty)
     {
         const char* envp[] = { "this=is", "these=are", nullptr };
 
-        const auto result = ear::Session::from(envp);
-        ASSERT_TRUE(result.is_not_valid());
+        ear::Session sut {};
+        ear::session::from(sut, envp);
+        ASSERT_FALSE(ear::session::is_valid(sut));
     }
 
     TEST(Session, capture_silent)
@@ -46,13 +48,14 @@ namespace {
             nullptr
         };
 
-        const auto result = ear::Session::from(envp);
-        ASSERT_FALSE(result.is_not_valid());
+        ear::Session sut {};
+        ear::session::from(sut, envp);
+        ASSERT_TRUE(ear::session::is_valid(sut));
 
-        EXPECT_STREQ("/tmp/intercept.random", result.get_destination());
-        EXPECT_STREQ("/usr/libexec/libexec.so", result.get_library());
-        EXPECT_STREQ("/usr/bin/intercept", result.get_reporter());
-        EXPECT_EQ(false, result.is_verbose());
+        EXPECT_STREQ("/tmp/intercept.random", sut.destination);
+        EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);
+        EXPECT_STREQ("/usr/bin/intercept", sut.reporter);
+        EXPECT_EQ(false, sut.verbose);
     }
 
     TEST(Session, capture_verbose)
@@ -65,13 +68,13 @@ namespace {
             nullptr
         };
 
-        const auto result = ear::Session::from(envp);
-        ASSERT_FALSE(result.is_not_valid());
+        ear::Session sut {};
+        ear::session::from(sut, envp);
+        ASSERT_TRUE(ear::session::is_valid(sut));
 
-        EXPECT_STREQ("/tmp/intercept.random", result.get_destination());
-        EXPECT_STREQ("/usr/libexec/libexec.so", result.get_library());
-        EXPECT_STREQ("/usr/bin/intercept", result.get_reporter());
-        EXPECT_EQ(true, result.is_verbose());
+        EXPECT_STREQ("/tmp/intercept.random", sut.destination);
+        EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);
+        EXPECT_STREQ("/usr/bin/intercept", sut.reporter);
+        EXPECT_EQ(true, sut.verbose);
     }
-
 }

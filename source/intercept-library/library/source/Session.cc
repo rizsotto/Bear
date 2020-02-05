@@ -18,7 +18,6 @@
  */
 
 #include "Session.h"
-#include <cstdio>
 
 #include "Environment.h"
 #include "Storage.h"
@@ -26,33 +25,33 @@
 
 namespace ear {
 
-    Session Session::from(const char** environment) noexcept
-    {
-        if (nullptr == environment)
-            return {};
-        else
-            return {
-                environment::get_env_value(environment, env::KEY_LIBRARY),
-                environment::get_env_value(environment, env::KEY_REPORTER),
-                environment::get_env_value(environment, env::KEY_DESTINATION),
-                environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr
-            };
-    }
+    namespace session {
 
-    void Session::persist(char* const begin, char*const  end) noexcept
-    {
-        if (is_not_valid())
-            return;
+        void from(Session& session, const char** environment) noexcept
+        {
+            if (nullptr == environment)
+                return;
 
-        Storage storage(begin, end);
-        library_ = storage.store(library_);
-        reporter_ = storage.store(reporter_);
-        destination_ = storage.store(destination_);
-    }
+            session.library = environment::get_env_value(environment, env::KEY_LIBRARY);
+            session.reporter = environment::get_env_value(environment, env::KEY_REPORTER);
+            session.destination = environment::get_env_value(environment, env::KEY_DESTINATION);
+            session.verbose = environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
+        }
 
-    void Session::write_message(const char* message) const noexcept
-    {
-        if (is_verbose())
-            fprintf(stderr, "libexec.so: %s\n", message);
+        void persist(Session& session, char* begin, char* end) noexcept
+        {
+            if (!is_valid(session))
+                return;
+
+            Storage storage(begin, end);
+            session.library = storage.store(session.library);
+            session.reporter = storage.store(session.reporter);
+            session.destination = storage.store(session.destination);
+        }
+
+        bool is_valid(Session const& session) noexcept
+        {
+            return (session.library != nullptr && session.reporter != nullptr && session.destination != nullptr);
+        }
     }
 }
