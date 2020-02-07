@@ -1,4 +1,5 @@
 add_executable(libexec_unit_test
+        ResolverMock.h
         ArrayTest.cc
         ExecutorTest.cc
         SessionTest.cc

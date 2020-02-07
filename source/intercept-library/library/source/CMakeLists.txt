@@ -26,6 +26,7 @@ add_library(exec_a STATIC
 target_include_directories(exec_a PRIVATE ${LIB_CFG_DIR})
 target_include_directories(exec_a PRIVATE ${LIB_API_DIR})
 target_include_directories(exec_a PRIVATE ${EXE_API_DIR})
+target_link_libraries(exec_a ${CMAKE_DL_LIBS})
 target_compile_features(exec_a PUBLIC cxx_std_14)
 target_compile_options(exec_a PUBLIC -fno-exceptions -fno-rtti)
 set_target_properties(exec_a PROPERTIES
