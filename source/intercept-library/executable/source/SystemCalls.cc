@@ -27,7 +27,7 @@
 #include <memory>
 
 namespace {
-    constexpr char os_path_sep = '/';
+    constexpr char OS_PATH_SEPARATOR = '/';
 }
 
 namespace pear {
@@ -101,7 +101,7 @@ namespace pear {
     Result<std::shared_ptr<std::ostream>> SystemCalls::temp_file(const char* dir, const char* suffix) noexcept
     {
         // TODO: validate input?
-        const auto& path = std::string(dir) + os_path_sep + "XXXXXX" + suffix;
+        const auto& path = std::string(dir) + OS_PATH_SEPARATOR + "XXXXXX" + suffix;
         // create char buffer with this filename.
         const size_t buffer_size = path.length() + 1;
         char buffer[buffer_size];

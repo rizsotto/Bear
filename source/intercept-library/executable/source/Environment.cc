@@ -32,11 +32,11 @@
 
 namespace {
 
-    constexpr char osx_preload_key[] = "DYLD_INSERT_LIBRARIES";
-    constexpr char osx_namespace_key[] = "DYLD_FORCE_FLAT_NAMESPACE";
-    constexpr char glibc_preload_key[] = "LD_PRELOAD";
-    constexpr char cc_key[] = "CC";
-    constexpr char cxx_key[] = "CXX";
+    constexpr char OSX_PRELOAD_KEY[] = "DYLD_INSERT_LIBRARIES";
+    constexpr char OSX_NAMESPACE_KEY[] = "DYLD_FORCE_FLAT_NAMESPACE";
+    constexpr char GLIBC_PRELOAD_KEY[] = "LD_PRELOAD";
+    constexpr char CC_KEY[] = "CC";
+    constexpr char CXX_KEY[] = "CXX";
 
     using env_t = std::map<std::string, std::string>;
     using mapper_t = std::function<std::string(const std::string&, const std::string&)>;
@@ -188,10 +188,10 @@ namespace pear {
     {
         insert_or_assign(environ_, ear::env::KEY_LIBRARY, library);
 #ifdef APPLE
-        insert_or_assign(environ_, osx_namespace_key, "1");
-        const char* key = osx_preload_key;
+        insert_or_assign(environ_, OSX_NAMESPACE_KEY, "1");
+        const char* key = OSX_PRELOAD_KEY;
 #else
-        const char* key = glibc_preload_key;
+        const char* key = GLIBC_PRELOAD_KEY;
 #endif
         insert_or_merge(environ_, key, library, merge_into_paths);
         return *this;
@@ -201,7 +201,7 @@ namespace pear {
     Environment::Builder::add_cc_compiler(const char* compiler,
         const char* wrapper) noexcept
     {
-        insert_or_assign(environ_, cc_key, wrapper);
+        insert_or_assign(environ_, CC_KEY, wrapper);
         insert_or_assign(environ_, ::pear::env::KEY_CC, compiler);
         return *this;
     }
@@ -210,7 +210,7 @@ namespace pear {
     Environment::Builder::add_cxx_compiler(const char* compiler,
         const char* wrapper) noexcept
     {
-        insert_or_assign(environ_, cxx_key, wrapper);
+        insert_or_assign(environ_, CXX_KEY, wrapper);
         insert_or_assign(environ_, ::pear::env::KEY_CXX, compiler);
         return *this;
     }

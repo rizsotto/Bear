@@ -36,7 +36,7 @@ namespace {
     using Parameter = std::tuple<const char**, const char**>;
     using Parameters = std::map<std::string_view, Parameter>;
 
-    constexpr char program_key[] = "program";
+    constexpr char PROGRAM_KEY[] = "program";
 
     struct Option {
         const char* flag;
@@ -94,7 +94,7 @@ namespace {
             if (argc < 2 || argv == nullptr) {
                 return ::pear::Err(std::runtime_error("Empty parameter list."));
             }
-            result.emplace(Parameters::key_type(program_key), std::make_tuple(argv, argv + 1));
+            result.emplace(Parameters::key_type(PROGRAM_KEY), std::make_tuple(argv, argv + 1));
             const char** const args_end = argv + argc;
             for (const char** args_it = ++argv; args_it != args_end;) {
                 // find which option is it.
@@ -134,7 +134,7 @@ namespace {
         if (auto destination_it = parameters.find(::pear::flag::DESTINATION); destination_it != parameters.end()) {
             auto const [destination, _] = destination_it->second;
             const bool verbose = (parameters.find(::pear::flag::VERBOSE) != parameters.end());
-            auto const [reporter, __] = parameters.find(program_key)->second;
+            auto const [reporter, __] = parameters.find(PROGRAM_KEY)->second;
             return ::pear::Ok<::pear::Context>({ *reporter, *destination, verbose });
         } else {
             return ::pear::Err(std::runtime_error("Missing destination."));
