@@ -19,40 +19,40 @@
 
 #include "gtest/gtest.h"
 
-#include "Storage.h"
+#include "Buffer.h"
 
 namespace {
 
-    TEST(Storage, dont_crash_on_nullptr)
+    TEST(Buffer, dont_crash_on_nullptr)
     {
         char buffer[64];
-        ear::Storage sut(buffer, buffer + 64);
+        ear::Buffer sut(buffer, buffer + 64);
 
         EXPECT_EQ(nullptr, sut.store(nullptr));
     }
 
-    TEST(Storage, stores)
+    TEST(Buffer, stores)
     {
         char buffer[64];
-        ear::Storage sut(buffer, buffer + 64);
+        ear::Buffer sut(buffer, buffer + 64);
 
         const char* literal = "Hi there people";
         EXPECT_STREQ(literal, sut.store(literal));
     }
 
-    TEST(Storage, not_same_ptr)
+    TEST(Buffer, not_same_ptr)
     {
         char buffer[64];
-        ear::Storage sut(buffer, buffer + 64);
+        ear::Buffer sut(buffer, buffer + 64);
 
         const char* literal = "Hi there people";
         EXPECT_NE(literal, sut.store(literal));
     }
 
-    TEST(Storage, works_multiple_times)
+    TEST(Buffer, works_multiple_times)
     {
         char buffer[64];
-        ear::Storage sut(buffer, buffer + 64);
+        ear::Buffer sut(buffer, buffer + 64);
 
         const char* literal0 = "Hi there people";
         const char* literal1 = "Hallo Leute";
@@ -64,10 +64,10 @@ namespace {
         EXPECT_STREQ(literal1, result1);
     }
 
-    TEST(Storage, handles_size_issue)
+    TEST(Buffer, handles_size_issue)
     {
         char buffer[8];
-        ear::Storage sut(buffer, buffer + 8);
+        ear::Buffer sut(buffer, buffer + 8);
 
         const char* literal = "Hi there people";
 

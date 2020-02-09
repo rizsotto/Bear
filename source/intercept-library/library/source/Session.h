@@ -21,10 +21,12 @@
 
 namespace ear {
 
-    class Storage;
+    class Buffer;
 
     /**
      * Represents an intercept session parameter set.
+     *
+     * It does not own the memory (of the pointed areas).
      */
     struct Session {
         char const* library;

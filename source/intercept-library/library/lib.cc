@@ -17,14 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
-
 #include <atomic>
 #include <cstdarg>
-
-#if defined HAVE_SPAWN_HEADER
-#include <spawn.h>
-#endif
 
 #include "Environment.h"
 #include "Executor.h"
@@ -54,12 +48,12 @@ namespace {
  * Will be initialized, when the library loaded into memory.
  */
 namespace {
-
+    // This is the only non stack memory that this library is using.
     constexpr size_t BUFFER_SIZE = 15 * 1024;
     char BUFFER[BUFFER_SIZE];
-
+    // This is used for being multi thread safe (loading time only).
     std::atomic<bool> LOADED(false);
-
+    // These are related to the functionality of this library.
     ear::Session SESSION = ear::session::init();
     ear::Resolver RESOLVER;
 }

@@ -22,12 +22,12 @@
 namespace ear {
 
     /**
-     * Represents a character storage.
+     * Represents a character buffer.
      *
      * Define helper methods to persist character sequences. The covered
      * functionality is not more than a `memcpy` to a static char array.
      */
-    class Storage {
+    class Buffer {
     public:
         /**
          * Takes the memory addresses of the buffer.
@@ -35,9 +35,9 @@ namespace ear {
          * @param begin of the buffer.
          * @param end of the buffer.
          */
-        Storage(char* begin, char* end) noexcept;
+        Buffer(char* begin, char* end) noexcept;
 
-        ~Storage() noexcept = default;
+        ~Buffer() noexcept = default;
 
         /**
          * Copy the input to the buffer.
@@ -48,13 +48,13 @@ namespace ear {
         char const* store(char const* input) noexcept;
 
     public:
-        Storage(Storage const&) = delete;
+        Buffer(Buffer const&) = delete;
 
-        Storage(Storage&&) noexcept = delete;
+        Buffer(Buffer&&) noexcept = delete;
 
-        Storage& operator=(Storage const&) = delete;
+        Buffer& operator=(Buffer const&) = delete;
 
-        Storage& operator=(Storage&&) noexcept = delete;
+        Buffer& operator=(Buffer&&) noexcept = delete;
 
     private:
         char* const begin_;
@@ -62,7 +62,7 @@ namespace ear {
         char* top_;
     };
 
-    inline Storage::Storage(char* const begin, char* const end) noexcept
+    inline Buffer::Buffer(char* const begin, char* const end) noexcept
             : begin_(begin)
             , end_(end)
             , top_(begin)

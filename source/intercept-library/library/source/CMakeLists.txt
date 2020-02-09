@@ -11,6 +11,8 @@ add_library(exec_a STATIC
         config.h
         ../api/libexec.h
         Array.h
+        Buffer.h
+        Buffer.cc
         Environment.h
         Environment.cc
         Executor.h
@@ -19,8 +21,6 @@ add_library(exec_a STATIC
         Resolver.cc
         Session.h
         Session.cc
-        Storage.h
-        Storage.cc
         )
 
 target_include_directories(exec_a PRIVATE ${LIB_CFG_DIR})

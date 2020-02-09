@@ -19,8 +19,8 @@
 
 #include "Session.h"
 
+#include "Buffer.h"
 #include "Environment.h"
-#include "Storage.h"
 #include "libexec.h"
 
 namespace ear {
@@ -43,10 +43,10 @@ namespace ear {
             if (!is_valid(session))
                 return;
 
-            Storage storage(begin, end);
-            session.library = storage.store(session.library);
-            session.reporter = storage.store(session.reporter);
-            session.destination = storage.store(session.destination);
+            Buffer buffer(begin, end);
+            session.library = buffer.store(session.library);
+            session.reporter = buffer.store(session.reporter);
+            session.destination = buffer.store(session.destination);
         }
 
         bool is_valid(Session const& session) noexcept

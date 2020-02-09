@@ -20,11 +20,11 @@
 #include <algorithm>
 
 #include "Array.h"
-#include "Storage.h"
+#include "Buffer.h"
 
 namespace ear {
 
-    char const* Storage::store(char const* const input) noexcept
+    char const* Buffer::store(char const* const input) noexcept
     {
         if (input == nullptr)
             return nullptr;
