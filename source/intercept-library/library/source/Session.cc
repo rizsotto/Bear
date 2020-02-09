@@ -32,10 +32,10 @@ namespace ear {
             if (nullptr == environment)
                 return;
 
-            session.library = environment::get_env_value(environment, env::KEY_LIBRARY);
-            session.reporter = environment::get_env_value(environment, env::KEY_REPORTER);
-            session.destination = environment::get_env_value(environment, env::KEY_DESTINATION);
-            session.verbose = environment::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
+            session.library = env::get_env_value(environment, env::KEY_LIBRARY);
+            session.reporter = env::get_env_value(environment, env::KEY_REPORTER);
+            session.destination = env::get_env_value(environment, env::KEY_DESTINATION);
+            session.verbose = env::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
         }
 
         void persist(Session& session, char* begin, char* end) noexcept

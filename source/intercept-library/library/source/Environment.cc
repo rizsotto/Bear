@@ -19,26 +19,11 @@
 
 #include "config.h"
 
-#include "Array.h"
 #include "Environment.h"
-
-#if defined HAVE_NSGETENVIRON
-#include <crt_externs.h>
-#else
-extern "C" char** environ;
-#endif
+#include "Array.h"
 
 namespace ear {
-    namespace environment {
-
-        const char** current() noexcept
-        {
-#ifdef HAVE_NSGETENVIRON
-            return const_cast<const char**>(*_NSGetEnviron());
-#else
-            return const_cast<const char**>(environ);
-#endif
-        }
+    namespace env {
 
         const char* get_env_value(const char** envp, const char* key) noexcept
         {

@@ -20,18 +20,7 @@
 #pragma once
 
 namespace ear {
-    namespace environment {
-
-        /**
-         * Abstraction to get the current environment.
-         *
-         * When the dynamic linker loads the library the `environ` variable
-         * might not be available. (This is the case for OSX.) This method
-         * makes it uniform to access the current environment on all platform.
-         *
-         * @return the current environment.
-         */
-        const char** current() noexcept;
+    namespace env {
 
         /**
          * Returns the value for the given environment name, from the given

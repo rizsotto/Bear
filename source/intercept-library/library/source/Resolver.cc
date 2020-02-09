@@ -21,6 +21,12 @@
 
 #include <dlfcn.h>
 
+#if defined HAVE_NSGETENVIRON
+#include <crt_externs.h>
+#else
+extern "C" char** environ;
+#endif
+
 namespace {
 
     void* dynamic_linker(char const* const name)
@@ -71,5 +77,23 @@ namespace ear {
         return (fp == nullptr)
             ? -1
             : fp(pathname, mode);
+    }
+
+    /**
+     * Abstraction to get the current environment.
+     *
+     * When the dynamic linker loads the library the `environ` variable
+     * might not be available. (This is the case for OSX.) This method
+     * makes it uniform to access the current environment on all platform.
+     *
+     * @return the current environment.
+     */
+    const char** Resolver::environment() const noexcept
+    {
+#ifdef HAVE_NSGETENVIRON
+        return const_cast<const char**>(*_NSGetEnviron());
+#else
+        return const_cast<const char**>(environ);
+#endif
     }
 }

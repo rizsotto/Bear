@@ -20,7 +20,6 @@
 #include <atomic>
 #include <cstdarg>
 
-#include "Environment.h"
 #include "Executor.h"
 #include "Resolver.h"
 #include "Session.h"
@@ -70,8 +69,7 @@ extern "C" void on_load()
     if (LOADED.exchange(true))
         return;
 
-    const auto environment = ear::environment::current();
-    ear::session::from(SESSION, environment);
+    ear::session::from(SESSION, RESOLVER.environment());
     ear::session::persist(SESSION, BUFFER, BUFFER + BUFFER_SIZE);
 
 //    SESSION.write_message("on_load");
@@ -103,7 +101,7 @@ extern "C" int execv(const char* path, char* const argv[])
 {
 //    SESSION.write_message("execv");
 
-    auto envp = const_cast<char* const*>(ear::environment::current());
+    auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
@@ -118,7 +116,7 @@ extern "C" int execvp(const char* file, char* const argv[])
 {
 //    SESSION.write_message("execvp");
 
-    auto envp = const_cast<char* const*>(ear::environment::current());
+    auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 
@@ -126,7 +124,7 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 {
 //    SESSION.write_message("execvP");
 
-    auto envp = const_cast<char* const*>(ear::environment::current());
+    auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(SESSION, RESOLVER).execvP(file, search_path, argv, envp);
 }
 
@@ -153,7 +151,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char* const*>(ear::environment::current());
+    auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
 }
 
@@ -173,7 +171,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
     va_copy_n(ap, &argv[1], argc);
     va_end(ap);
 
-    auto envp = const_cast<char* const*>(ear::environment::current());
+    auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
 }
 

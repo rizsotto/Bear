@@ -55,5 +55,7 @@ namespace ear {
         virtual int access(
             const char *pathname,
             int mode) const noexcept;
+
+        virtual const char** environment() const noexcept;
     };
 }
