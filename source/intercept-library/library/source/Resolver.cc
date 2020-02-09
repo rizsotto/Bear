@@ -29,9 +29,12 @@ extern "C" char** environ;
 
 namespace {
 
-    void* dynamic_linker(char const* const name)
+    constexpr int FAILURE = -1;
+
+    template <typename T>
+    T dynamic_linker(char const* const name)
     {
-        return dlsym(RTLD_NEXT, name);
+        return reinterpret_cast<T>(dlsym(RTLD_NEXT, name));
     }
 }
 
@@ -41,9 +44,9 @@ namespace ear {
     {
         using type = int (*)(const char*, char* const [], char* const []);
 
-        auto fp = reinterpret_cast<type>(dynamic_linker("execve"));
+        auto fp = dynamic_linker<type>("execve");
         return (fp == nullptr)
-            ? -1
+            ? FAILURE
             : fp(path, argv, envp);
     }
 
@@ -63,9 +66,9 @@ namespace ear {
             char* const argv[],
             char* const envp[]);
 
-        auto fp = reinterpret_cast<type>(dynamic_linker("posix_spawn"));
+        auto fp = dynamic_linker<type>( "posix_spawn");
         return (fp == nullptr)
-            ? -1
+            ? FAILURE
             : fp(pid, path, file_actions, attrp, argv, envp);
     }
 
@@ -73,9 +76,9 @@ namespace ear {
     {
         using type = int (*)(const char*, int);
 
-        auto fp = reinterpret_cast<type>(dynamic_linker("access"));
+        auto fp = dynamic_linker<type>( "access");
         return (fp == nullptr)
-            ? -1
+            ? FAILURE
             : fp(pathname, mode);
     }
 
@@ -93,6 +96,12 @@ namespace ear {
 #ifdef HAVE_NSGETENVIRON
         return const_cast<const char**>(*_NSGetEnviron());
 #else
+        // This should be implemented as:
+        //
+        //   return reinterpret_cast<const char**>(dlsym(RTLD_NEXT, "environ"));
+        //
+        // But the symbol `environ` is a weak symbol and the call would not
+        // resolve the real address of it and will return always null pointer.
         return const_cast<const char**>(environ);
 #endif
     }
