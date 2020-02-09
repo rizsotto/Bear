@@ -22,6 +22,7 @@
 #include "intercept.h"
 
 #include "Array.h"
+#include "Logger.h"
 #include "Resolver.h"
 #include "Session.h"
 
@@ -78,20 +79,20 @@ namespace {
         return it;
     }
 
-// TODO: write path out
-#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)    \
-    do {                                          \
-        if (0 != RESOLVER_.access(PATH_, X_OK)) { \
-            return -1;                            \
-        }                                         \
+#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
+    do {                                                                               \
+        if (0 != RESOLVER_.access(PATH_, X_OK)) {                                      \
+            ear::Logger(RESOLVER_, SESSION_).debug("access failed for: path=", PATH_); \
+            return -1;                                                                 \
+        }                                                                              \
     } while (false)
 
-// TODO: write error message
-#define CHECK_SESSION(SESSION_)                  \
-    do {                                         \
-        if (!ear::session::is_valid(SESSION_)) { \
-            return -1;                           \
-        }                                        \
+#define CHECK_SESSION(SESSION_, RESOLVER_)                                        \
+    do {                                                                          \
+        if (!ear::session::is_valid(SESSION_)) {                                  \
+            ear::Logger(RESOLVER_, SESSION_).debug("session is not initialized"); \
+            return -1;                                                            \
+        }                                                                         \
     } while (false)
 
 #define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
@@ -115,7 +116,7 @@ namespace ear {
 
     int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_);
+        CHECK_SESSION(session_, resolver_);
         CHECK_PATH(session_, resolver_, path);
 
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
@@ -126,7 +127,7 @@ namespace ear {
 
     int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_);
+        CHECK_SESSION(session_, resolver_);
 
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
@@ -137,7 +138,7 @@ namespace ear {
     int Executor::execvP(const char* file, const char* search_path, char* const* argv,
         char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_);
+        CHECK_SESSION(session_, resolver_);
 
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, search_path };
         CREATE_BUFFER(dst, session_, execution);
@@ -149,7 +150,7 @@ namespace ear {
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_);
+        CHECK_SESSION(session_, resolver_);
         CHECK_PATH(session_, resolver_, path);
 
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
@@ -162,7 +163,7 @@ namespace ear {
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_);
+        CHECK_SESSION(session_, resolver_);
 
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);

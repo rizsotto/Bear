@@ -28,7 +28,15 @@
 
 namespace {
 
-    constexpr char MESSAGE_PREFIX[] = "intercept: ";
+    std::ostream& error_stream()
+    {
+        std::cerr << "intercept: [pid: "
+                  << pear::SystemCalls::get_pid().get_or_else(0)
+                  << ", ppid: "
+                  << pear::SystemCalls::get_ppid().get_or_else(0)
+                  << "] ";
+        return std::cerr;
+    }
 
     pear::Result<pid_t> spawnp(const ::pear::Execution& config,
         const ::pear::EnvironmentPtr& environment) noexcept
@@ -50,7 +58,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
-                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+                error_stream() << message.what() << std::endl;
             })
             .get_or_else(0);
     }
@@ -63,7 +71,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
-                std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+                error_stream() << message.what() << std::endl;
             })
             .get_or_else(0);
     }
@@ -96,7 +104,7 @@ int main(int argc, char* argv[], char* envp[])
     return ::pear::parse(argc, argv)
         .map<pear::SessionPtr>([&argv](auto arguments) {
             if (arguments->context_.verbose) {
-                std::cerr << MESSAGE_PREFIX << argv << std::endl;
+                error_stream() << argv << std::endl;
             }
             return arguments;
         })
@@ -122,7 +130,7 @@ int main(int argc, char* argv[], char* envp[])
                 });
         })
         .handle_with([](auto message) {
-            std::cerr << MESSAGE_PREFIX << message.what() << std::endl;
+            error_stream() << message.what() << std::endl;
         })
         .get_or_else(EXIT_FAILURE);
 }

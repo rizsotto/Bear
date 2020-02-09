@@ -24,7 +24,7 @@
 #if defined HAVE_NSGETENVIRON
 #include <crt_externs.h>
 #else
-extern "C" char** environ;
+#include <unistd.h>
 #endif
 
 namespace {

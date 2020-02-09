@@ -17,6 +17,8 @@ add_library(exec_a STATIC
         Environment.cc
         Executor.h
         Executor.cc
+        Logger.h
+        Logger.cc
         Resolver.h
         Resolver.cc
         Session.h

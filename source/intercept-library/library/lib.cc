@@ -21,6 +21,7 @@
 #include <cstdarg>
 
 #include "Executor.h"
+#include "Logger.h"
 #include "Resolver.h"
 #include "Session.h"
 
@@ -72,7 +73,7 @@ extern "C" void on_load()
     ear::session::from(SESSION, RESOLVER.environment());
     ear::session::persist(SESSION, BUFFER, BUFFER + BUFFER_SIZE);
 
-//    SESSION.write_message("on_load");
+    ear::Logger(RESOLVER, SESSION).debug("on_load");
 }
 
 /**
@@ -87,19 +88,19 @@ extern "C" void on_unload()
     if (not LOADED.exchange(false))
         return;
 
-//    SESSION.write_message("on_unload");
+    ear::Logger(RESOLVER, SESSION).debug("on_unload");
 }
 
 extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 {
-//    SESSION.write_message("execve");
+    ear::Logger(RESOLVER, SESSION).debug("execve path=", path);
 
     return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execv(const char* path, char* const argv[])
 {
-//    SESSION.write_message("execv");
+    ear::Logger(RESOLVER, SESSION).debug("execv path=", path);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
@@ -107,14 +108,14 @@ extern "C" int execv(const char* path, char* const argv[])
 
 extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 {
-//    SESSION.write_message("execvpe");
+    ear::Logger(RESOLVER, SESSION).debug("execvpe file=", file);
 
     return ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
 }
 
 extern "C" int execvp(const char* file, char* const argv[])
 {
-//    SESSION.write_message("execvp");
+    ear::Logger(RESOLVER, SESSION).debug("execvp file=", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
@@ -122,7 +123,7 @@ extern "C" int execvp(const char* file, char* const argv[])
 
 extern "C" int execvP(const char* file, const char* search_path, char* const argv[])
 {
-//    SESSION.write_message("execvP");
+    ear::Logger(RESOLVER, SESSION).debug("execvP file=", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     return ear::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
@@ -130,14 +131,14 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 
 extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 {
-//    SESSION.write_message("exect");
+    ear::Logger(RESOLVER, SESSION).debug("exect path=", path);
 
     return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execl(const char* path, const char* arg, ...)
 {
-//    SESSION.write_message("execl");
+    ear::Logger(RESOLVER, SESSION).debug("execl path=", path);
 
     // Count the number of arguments.
     va_list ap;
@@ -157,7 +158,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
 
 extern "C" int execlp(const char* file, const char* arg, ...)
 {
-//    SESSION.write_message("execlp");
+    ear::Logger(RESOLVER, SESSION).debug("execlp file=", file);
 
     // Count the number of arguments.
     va_list ap;
@@ -178,7 +179,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 extern "C" int execle(const char* path, const char* arg, ...)
 {
-//    SESSION.write_message("execle");
+    ear::Logger(RESOLVER, SESSION).debug("execle path=", path);
 
     // Count the number of arguments.
     va_list ap;
@@ -201,7 +202,7 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
     const posix_spawnattr_t* attrp,
     char* const argv[], char* const envp[])
 {
-//    SESSION.write_message("posix_spawn");
+    ear::Logger(RESOLVER, SESSION).debug("posix_spawn path=", path);
 
     return ear::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
@@ -211,7 +212,7 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
     const posix_spawnattr_t* attrp,
     char* const argv[], char* const envp[])
 {
-//    SESSION.write_message("posix_spawnp");
+    ear::Logger(RESOLVER, SESSION).debug("posix_spawnp file=", file);
 
     return ear::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
