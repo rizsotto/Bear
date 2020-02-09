@@ -75,13 +75,13 @@ namespace {
         EXPECT_CALL(resolver, posix_spawn(_, _, _, _, _, _)).Times(0);
         EXPECT_CALL(resolver, access(_, _)).Times(0);
 
-        EXPECT_EQ(FAILURE, ear::Executor(session, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(FAILURE, ear::Executor(session, resolver).execvpe(LS_FILE, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(FAILURE, ear::Executor(session, resolver).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(FAILURE, ear::Executor(resolver, session).execve(LS_PATH, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(FAILURE, ear::Executor(resolver, session).execvpe(LS_FILE, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(FAILURE, ear::Executor(resolver, session).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP));
 
         pid_t pid;
-        EXPECT_EQ(FAILURE, ear::Executor(session, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(FAILURE, ear::Executor(session, resolver).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(FAILURE, ear::Executor(resolver, session).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(FAILURE, ear::Executor(resolver, session).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP));
     }
 
     TEST(Executo, execve_silent_library)
@@ -109,7 +109,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(SILENT_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -139,7 +139,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -150,7 +150,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(FAILURE));
 
-        auto result = ear::Executor(SILENT_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -176,7 +176,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -204,7 +204,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -236,7 +236,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 
@@ -249,7 +249,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(FAILURE));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(FAILURE, result);
     }
 
@@ -277,7 +277,7 @@ namespace {
             .Times(1)
             .WillOnce(Return(SUCCESS));
 
-        auto result = ear::Executor(VERBOSE_SESSION, resolver).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
+        auto result = ear::Executor(resolver, VERBOSE_SESSION).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
     }
 }

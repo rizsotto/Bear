@@ -107,9 +107,9 @@ namespace {
 
 namespace ear {
 
-    Executor::Executor(ear::Session const& session, ear::Resolver const& resolver) noexcept
-            : session_(session)
-            , resolver_(resolver)
+    Executor::Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept
+            : resolver_(resolver)
+            , session_(session)
     {
     }
 

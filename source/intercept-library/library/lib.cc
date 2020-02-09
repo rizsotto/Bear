@@ -94,7 +94,7 @@ extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 {
 //    SESSION.write_message("execve");
 
-    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execv(const char* path, char* const argv[])
@@ -102,14 +102,14 @@ extern "C" int execv(const char* path, char* const argv[])
 //    SESSION.write_message("execv");
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 {
 //    SESSION.write_message("execvpe");
 
-    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
 }
 
 extern "C" int execvp(const char* file, char* const argv[])
@@ -117,7 +117,7 @@ extern "C" int execvp(const char* file, char* const argv[])
 //    SESSION.write_message("execvp");
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
 }
 
 extern "C" int execvP(const char* file, const char* search_path, char* const argv[])
@@ -125,14 +125,14 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 //    SESSION.write_message("execvP");
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    return ear::Executor(SESSION, RESOLVER).execvP(file, search_path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
 }
 
 extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 {
 //    SESSION.write_message("exect");
 
-    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execl(const char* path, const char* arg, ...)
@@ -152,7 +152,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int execlp(const char* file, const char* arg, ...)
@@ -172,7 +172,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    return ear::Executor(SESSION, RESOLVER).execvpe(file, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
 }
 
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
@@ -193,7 +193,7 @@ extern "C" int execle(const char* path, const char* arg, ...)
     char** envp = va_arg(ap, char**);
     va_end(ap);
 
-    return ear::Executor(SESSION, RESOLVER).execve(path, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
 }
 
 extern "C" int posix_spawn(pid_t* pid, const char* path,
@@ -203,7 +203,7 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
 {
 //    SESSION.write_message("posix_spawn");
 
-    return ear::Executor(SESSION, RESOLVER).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
 
 extern "C" int posix_spawnp(pid_t* pid, const char* file,
@@ -213,7 +213,7 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
 {
 //    SESSION.write_message("posix_spawnp");
 
-    return ear::Executor(SESSION, RESOLVER).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    return ear::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
 
 //extern "C"
