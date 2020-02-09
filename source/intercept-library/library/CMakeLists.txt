@@ -23,6 +23,7 @@ if (APPLE)
     set_target_properties(exec PROPERTIES INSTALL_RPATH "@loader_path/${EXEC_LIB_PATH}")
 else ()
     set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+    set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
 endif ()
 
 install(TARGETS exec
