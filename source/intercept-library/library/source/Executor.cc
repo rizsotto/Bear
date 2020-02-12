@@ -22,6 +22,7 @@
 #include "intercept.h"
 
 #include "Array.h"
+#include "Environment.h"
 #include "Logger.h"
 #include "Resolver.h"
 #include "Session.h"
@@ -29,6 +30,11 @@
 #include <unistd.h>
 
 namespace {
+
+    constexpr int FAILURE = -1;
+
+    constexpr char PATH_SEPARATOR = ':';
+    constexpr char DIR_SEPARATOR = '/';
 
     struct Execution {
         const char** command;
@@ -79,6 +85,15 @@ namespace {
         return it;
     }
 
+    bool contains_dir_separator(const char *const candidate) {
+        for (auto it = candidate; *it != 0; ++it) {
+            if (*it == DIR_SEPARATOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 #define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
     do {                                                                               \
         if (0 != RESOLVER_.access(PATH_, X_OK)) {                                      \
@@ -103,7 +118,6 @@ namespace {
         const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);           \
         copy(EXECUTION_, VAR_##it, VAR_##_end);                             \
     }
-
 }
 
 namespace ear {
@@ -127,12 +141,21 @@ namespace ear {
 
     int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_, resolver_);
+        // the file contains a dir separator, it is treated as path.
+        if (contains_dir_separator(file)) {
+            return execve(file, argv, envp);
+        }
+        // otherwise use the PATH variable to locate the executable.
+        const char *paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+        if (paths != nullptr) {
+            return execvP(file, paths, argv, envp);
+        }
+        // fall back to `confstr` PATH value if the environment has no value.
+        const size_t len = resolver_.confstr(_CS_PATH, nullptr, 0);
+        char buffer[len];
+        confstr(_CS_PATH, buffer, len);
 
-        const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
-        CREATE_BUFFER(dst, session_, execution);
-
-        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+        return execvP(file, buffer, argv, envp);
     }
 
     int Executor::execvP(const char* file, const char* search_path, char* const* argv,

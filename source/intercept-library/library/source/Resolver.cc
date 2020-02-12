@@ -82,6 +82,16 @@ namespace ear {
             : fp(pathname, mode);
     }
 
+    size_t Resolver::confstr(int name, char* buf, size_t len) const noexcept
+    {
+        using type = size_t (*)(int, char*, size_t);
+
+        auto fp = dynamic_linker<type>( "confstr");
+        return (fp == nullptr)
+               ? FAILURE
+               : fp(name, buf, len);
+    }
+
     /**
      * Abstraction to get the current environment.
      *

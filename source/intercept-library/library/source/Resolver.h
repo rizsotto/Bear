@@ -56,6 +56,8 @@ namespace ear {
             const char *pathname,
             int mode) const noexcept;
 
+        virtual size_t confstr(int name, char *buf, size_t len) const noexcept;
+
         virtual const char** environment() const noexcept;
     };
 }
