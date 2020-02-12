@@ -34,17 +34,7 @@ namespace ear {
     public:
         Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept;
 
-        Executor() noexcept = delete;
-
-        Executor(const Executor&) = delete;
-
-        Executor(Executor&&) noexcept = delete;
-
         ~Executor() noexcept = default;
-
-        Executor& operator=(const Executor&) = delete;
-
-        Executor& operator=(Executor&&) noexcept = delete;
 
     public:
         int execve(const char* path, char* const argv[], char* const envp[]) const noexcept;

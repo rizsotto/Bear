@@ -33,15 +33,6 @@ namespace ear {
         void debug(char const* message) noexcept;
         void debug(char const* message, char const* variable) noexcept;
 
-    public:
-        Logger(Logger const&) = delete;
-
-        Logger(Logger&&) noexcept = delete;
-
-        Logger& operator=(Logger const&) = delete;
-
-        Logger& operator=(Logger&&) noexcept = delete;
-
     private:
         const Resolver& resolver_;
         const bool enabled_;
