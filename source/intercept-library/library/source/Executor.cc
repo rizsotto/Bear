@@ -85,13 +85,23 @@ namespace {
         return it;
     }
 
-    bool contains_dir_separator(const char *const candidate) {
+    bool contains_dir_separator(const char* const candidate)
+    {
         for (auto it = candidate; *it != 0; ++it) {
             if (*it == DIR_SEPARATOR) {
                 return true;
             }
         }
         return false;
+    }
+
+    const char* next_path_separator(const char* input)
+    {
+        auto it = input;
+        while ((*it != 0) && (*it != PATH_SEPARATOR)) {
+            ++it;
+        }
+        return it;
     }
 
 #define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
@@ -146,7 +156,7 @@ namespace ear {
             return execve(file, argv, envp);
         }
         // otherwise use the PATH variable to locate the executable.
-        const char *paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+        const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
         if (paths != nullptr) {
             return execvP(file, paths, argv, envp);
         }
@@ -163,10 +173,38 @@ namespace ear {
     {
         CHECK_SESSION(session_, resolver_);
 
-        const Execution execution = { const_cast<const char**>(argv), nullptr, file, search_path };
-        CREATE_BUFFER(dst, session_, execution);
+        const char* current = search_path;
+        do {
+            const char* next = next_path_separator(current);
+            // ignore empty entries
+            if (current - next == 0) {
+                continue;
+            }
+            // create a path
+            const size_t path_length = ear::array::length(file) + (next - current) + 2;
+            char path[path_length];
+            {
+                char* path_it = path;
+                char* const path_end = path + path_length;
+                path_it = ear::array::copy(current, next, path_it, path_end);
+                *path_it++ = DIR_SEPARATOR;
+                path_it = ear::array::copy(file, ear::array::end(file), path_it, path_end);
+                *path_it = 0;
+            }
+            // check if path points to an executable.
+            if (0 == resolver_.access(path, X_OK)) {
+                // execute the wrapper
+                const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
+                CREATE_BUFFER(dst, session_, execution);
 
-        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+                return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+            }
+            ear::Logger(resolver_, session_).debug("access failed for: path=", path);
+            // try the next one
+            current = (*next == 0) ? nullptr : ++next;
+        } while (current != nullptr);
+        // if all attempt were failing, then quit with a failure.
+        return FAILURE;
     }
 
     int Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
