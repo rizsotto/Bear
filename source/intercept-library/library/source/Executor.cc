@@ -27,6 +27,7 @@
 #include "Resolver.h"
 #include "Session.h"
 
+#include <cerrno>
 #include <unistd.h>
 
 namespace {
@@ -85,14 +86,13 @@ namespace {
         return it;
     }
 
-    bool contains_dir_separator(const char* const candidate)
-    {
-        for (auto it = candidate; *it != 0; ++it) {
-            if (*it == DIR_SEPARATOR) {
-                return true;
-            }
-        }
-        return false;
+#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
+    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_) + 1; \
+    const char* VAR_[VAR_##_length];                                        \
+    {                                                                       \
+        const char** const VAR_##_end = VAR_ + VAR_##_length;               \
+        const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);           \
+        copy(EXECUTION_, VAR_##it, VAR_##_end);                             \
     }
 
     const char* next_path_separator(const char* input)
@@ -104,75 +104,12 @@ namespace {
         return it;
     }
 
-#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
-    do {                                                                               \
-        if (0 != RESOLVER_.access(PATH_, X_OK)) {                                      \
-            ear::Logger(RESOLVER_, SESSION_).debug("access failed for: path=", PATH_); \
-            return -1;                                                                 \
-        }                                                                              \
-    } while (false)
+    int execute_from_search_path(
+        ear::Resolver const& resolver, ear::Session const& session,
+        const char* file, const char* search_path, char* const* argv, char* const* envp) noexcept
 
-#define CHECK_SESSION(SESSION_, RESOLVER_)                                        \
-    do {                                                                          \
-        if (!ear::session::is_valid(SESSION_)) {                                  \
-            ear::Logger(RESOLVER_, SESSION_).debug("session is not initialized"); \
-            return -1;                                                            \
-        }                                                                         \
-    } while (false)
-
-#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
-    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_) + 1; \
-    const char* VAR_[VAR_##_length];                                        \
-    {                                                                       \
-        const char** const VAR_##_end = VAR_ + VAR_##_length;               \
-        const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);           \
-        copy(EXECUTION_, VAR_##it, VAR_##_end);                             \
-    }
-}
-
-namespace ear {
-
-    Executor::Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept
-            : resolver_(resolver)
-            , session_(session)
     {
-    }
-
-    int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_PATH(session_, resolver_, path);
-
-        const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
-        CREATE_BUFFER(dst, session_, execution);
-
-        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
-    }
-
-    int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
-    {
-        // the file contains a dir separator, it is treated as path.
-        if (contains_dir_separator(file)) {
-            return execve(file, argv, envp);
-        }
-        // otherwise use the PATH variable to locate the executable.
-        const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
-        if (paths != nullptr) {
-            return execvP(file, paths, argv, envp);
-        }
-        // fall back to `confstr` PATH value if the environment has no value.
-        const size_t len = resolver_.confstr(_CS_PATH, nullptr, 0);
-        char buffer[len];
-        confstr(_CS_PATH, buffer, len);
-
-        return execvP(file, buffer, argv, envp);
-    }
-
-    int Executor::execvP(const char* file, const char* search_path, char* const* argv,
-        char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-
+        // otherwise do search for the executable in the search path.
         const char* current = search_path;
         do {
             const char* next = next_path_separator(current);
@@ -192,14 +129,14 @@ namespace ear {
                 *path_it = 0;
             }
             // check if path points to an executable.
-            if (0 == resolver_.access(path, X_OK)) {
+            if (0 == resolver.access(path, X_OK)) {
                 // execute the wrapper
                 const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
-                CREATE_BUFFER(dst, session_, execution);
+                CREATE_BUFFER(dst, session, execution);
 
-                return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+                return resolver.execve(session.reporter, const_cast<char* const*>(dst), envp);
             }
-            ear::Logger(resolver_, session_).debug("access failed for: path=", path);
+            ear::Logger(resolver, session).debug("access failed for: path=", path);
             // try the next one
             current = (*next == 0) ? nullptr : ++next;
         } while (current != nullptr);
@@ -207,11 +144,107 @@ namespace ear {
         return FAILURE;
     }
 
+#define CHECK_POINTER(SESSION_, RESOLVER_, PTR_)                             \
+    do {                                                                     \
+        if (nullptr == PTR_) {                                               \
+            ear::Logger(RESOLVER_, SESSION_).debug("null pointer received"); \
+            errno = ENOENT;                                                  \
+            return FAILURE;                                                  \
+        }                                                                    \
+    } while (false)
+
+#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
+    do {                                                                               \
+        if (0 != RESOLVER_.access(PATH_, X_OK)) {                                      \
+            ear::Logger(RESOLVER_, SESSION_).debug("access failed for: path=", PATH_); \
+            errno = ENOEXEC;                                                           \
+            return -1;                                                                 \
+        }                                                                              \
+    } while (false)
+
+#define CHECK_SESSION(SESSION_, RESOLVER_)                                        \
+    do {                                                                          \
+        if (!ear::session::is_valid(SESSION_)) {                                  \
+            ear::Logger(RESOLVER_, SESSION_).debug("session is not initialized"); \
+            return -1;                                                            \
+        }                                                                         \
+    } while (false)
+
+    bool contains_dir_separator(const char* const candidate)
+    {
+        for (auto it = candidate; *it != 0; ++it) {
+            if (*it == DIR_SEPARATOR) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+namespace ear {
+
+    Executor::Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept
+            : resolver_(resolver)
+            , session_(session)
+    {
+    }
+
+    int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_, resolver_);
+        CHECK_POINTER(session_, resolver_, path);
+        CHECK_PATH(session_, resolver_, path);
+
+        const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
+        CREATE_BUFFER(dst, session_, execution);
+
+        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+    }
+
+    int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_, resolver_);
+        CHECK_POINTER(session_, resolver_, file);
+
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return execve(file, argv, envp);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            if (paths != nullptr) {
+                return execute_from_search_path(resolver_, session_, file, paths, argv, envp);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
+            char search_path[search_path_length];
+            confstr(_CS_PATH, search_path, search_path_length);
+
+            return execute_from_search_path(resolver_, session_, file, search_path, argv, envp);
+        }
+    }
+
+    int Executor::execvP(const char* file, const char* search_path, char* const* argv,
+        char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_, resolver_);
+        CHECK_POINTER(session_, resolver_, file);
+
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return execve(file, argv, envp);
+        } else {
+            // otherwise use the given search path to locate the executable.
+            return execute_from_search_path(resolver_, session_, file, search_path, argv, envp);
+        }
+    }
+
     int Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const noexcept
     {
         CHECK_SESSION(session_, resolver_);
+        CHECK_POINTER(session_, resolver_, path);
         CHECK_PATH(session_, resolver_, path);
 
         const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
@@ -224,7 +257,9 @@ namespace ear {
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const noexcept
     {
+        // TODO: search PATH for the file
         CHECK_SESSION(session_, resolver_);
+        CHECK_POINTER(session_, resolver_, file);
 
         const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
         CREATE_BUFFER(dst, session_, execution);
