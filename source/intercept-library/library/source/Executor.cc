@@ -28,6 +28,7 @@
 #include "Session.h"
 
 #include <cerrno>
+#include <functional>
 #include <unistd.h>
 
 namespace {
@@ -40,29 +41,17 @@ namespace {
     struct Execution {
         const char** command;
         const char* path;
-        const char* file;
-        const char* search_path;
     };
 
     size_t length(Execution const& execution) noexcept
     {
-        return ((execution.path != nullptr) ? 2 : 0) + ((execution.file != nullptr) ? 2 : 0) + ((execution.search_path != nullptr) ? 2 : 0) + ear::array::length(execution.command) + 2;
+        return ear::array::length(execution.command) + 4;
     }
 
     const char** copy(Execution const& execution, const char** it, const char** it_end) noexcept
     {
-        if (execution.path != nullptr) {
-            *it++ = pear::flag::PATH;
-            *it++ = execution.path;
-        }
-        if (execution.file != nullptr) {
-            *it++ = pear::flag::FILE;
-            *it++ = execution.file;
-        }
-        if (execution.search_path != nullptr) {
-            *it++ = pear::flag::SEARCH_PATH;
-            *it++ = execution.search_path;
-        }
+        *it++ = pear::flag::PATH;
+        *it++ = execution.path;
         *it++ = pear::flag::COMMAND;
         const size_t command_size = ear::array::length(execution.command);
         const char** const command_end = execution.command + (command_size + 1);
@@ -105,11 +94,12 @@ namespace {
     }
 
     int execute_from_search_path(
-        ear::Resolver const& resolver, ear::Session const& session,
-        const char* file, const char* search_path, char* const* argv, char* const* envp) noexcept
-
+        const ear::Resolver& resolver,
+        const ear::Session& session,
+        const char* search_path,
+        const char* file,
+        std::function<int(const char*)> const& function) noexcept
     {
-        // otherwise do search for the executable in the search path.
         const char* current = search_path;
         do {
             const char* next = next_path_separator(current);
@@ -131,10 +121,7 @@ namespace {
             // check if path points to an executable.
             if (0 == resolver.access(path, X_OK)) {
                 // execute the wrapper
-                const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
-                CREATE_BUFFER(dst, session, execution);
-
-                return resolver.execve(session.reporter, const_cast<char* const*>(dst), envp);
+                return function(path);
             }
             ear::Logger(resolver, session).debug("access failed for: path=", path);
             // try the next one
@@ -195,7 +182,7 @@ namespace ear {
         CHECK_POINTER(session_, resolver_, path);
         CHECK_PATH(session_, resolver_, path);
 
-        const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
+        const Execution execution = { const_cast<const char**>(argv), path };
         CREATE_BUFFER(dst, session_, execution);
 
         return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
@@ -213,14 +200,14 @@ namespace ear {
             // otherwise use the PATH variable to locate the executable.
             const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
             if (paths != nullptr) {
-                return execute_from_search_path(resolver_, session_, file, paths, argv, envp);
+                return execve_from_search_path(paths, file, argv, envp);
             }
             // fall back to `confstr` PATH value if the environment has no value.
             const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
             char search_path[search_path_length];
             confstr(_CS_PATH, search_path, search_path_length);
 
-            return execute_from_search_path(resolver_, session_, file, search_path, argv, envp);
+            return execve_from_search_path(search_path, file, argv, envp);
         }
     }
 
@@ -235,7 +222,7 @@ namespace ear {
             return execve(file, argv, envp);
         } else {
             // otherwise use the given search path to locate the executable.
-            return execute_from_search_path(resolver_, session_, file, search_path, argv, envp);
+            return execve_from_search_path(search_path, file, argv, envp);
         }
     }
 
@@ -247,7 +234,7 @@ namespace ear {
         CHECK_POINTER(session_, resolver_, path);
         CHECK_PATH(session_, resolver_, path);
 
-        const Execution execution = { const_cast<const char**>(argv), path, nullptr, nullptr };
+        const Execution execution = { const_cast<const char**>(argv), path };
         CREATE_BUFFER(dst, session_, execution);
 
         return resolver_.posix_spawn(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
@@ -257,13 +244,83 @@ namespace ear {
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const noexcept
     {
-        // TODO: search PATH for the file
         CHECK_SESSION(session_, resolver_);
         CHECK_POINTER(session_, resolver_, file);
 
-        const Execution execution = { const_cast<const char**>(argv), nullptr, file, nullptr };
-        CREATE_BUFFER(dst, session_, execution);
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return posix_spawn(pid, file, file_actions, attrp, argv, envp);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            if (paths != nullptr) {
+                return posix_spawn_from_search_path(paths, pid, file, file_actions, attrp, argv, envp);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
+            char search_path[search_path_length];
+            confstr(_CS_PATH, search_path, search_path_length);
 
-        return resolver_.posix_spawn(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
+            return posix_spawn_from_search_path(search_path, pid, file, file_actions, attrp, argv, envp);
+        }
+    }
+
+    int Executor::execve_from_search_path(const char* search_path, const char* file, char* const* argv, char* const* envp) const
+    {
+        // To avoid heap allocations with std::function
+        //
+        // Are you familiar with the "small string optimization" for std::string? Basically,
+        // the data for a std::string is stored on the heap -- the size is unbounded, so heap
+        // allocation is obviously necessary. But in real programs, the vast majority of strings
+        // are actually pretty small, so the heap allocation can be avoided by storing the string
+        // inside the std::string object instance (re-purposing the memory used for the pointers,
+        // usually).
+        //
+        // The same thing is happening here with std::function. The size of the function object
+        // it might be storing is unbounded, so heap allocation is the default behavior. But most
+        // function objects are pretty small, so a similar "small function object optimization" is
+        // possible.
+        struct Context {
+            const Resolver& resolver;
+            const Session& session;
+            char* const* argv;
+            char* const* envp;
+        } ctx = {
+            resolver_, session_, argv, envp
+        };
+        // Capture context variable by reference.
+        const std::function<int(const char*)> fp = [&ctx](const char* path) {
+            const Execution execution = { const_cast<const char**>(ctx.argv), path };
+            CREATE_BUFFER(dst, ctx.session, execution);
+
+            return (ctx.resolver).execve((ctx.session).reporter, const_cast<char* const*>(dst), ctx.envp);
+        };
+
+        return execute_from_search_path(resolver_, session_, search_path, file, fp);
+    }
+
+    int Executor::posix_spawn_from_search_path(const char* search_path, pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions, const posix_spawnattr_t* attrp, char* const* argv, char* const* envp) const
+    {
+        // See comment in `Executor::execve_from_search_path` method.
+        struct Context {
+            const Resolver& resolver;
+            const Session& session;
+            pid_t* pid;
+            const posix_spawn_file_actions_t* file_actions;
+            const posix_spawnattr_t* attrp;
+            char* const* argv;
+            char* const* envp;
+        } ctx = {
+            resolver_, session_, pid, file_actions, attrp, argv, envp
+        };
+
+        const std::function<int(const char*)> fp = [&ctx](const char* path) {
+            const Execution execution = { const_cast<const char**>(ctx.argv), path };
+            CREATE_BUFFER(dst, ctx.session, execution);
+
+            return (ctx.resolver).posix_spawn(ctx.pid, (ctx.session).reporter, ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
+        };
+
+        return execute_from_search_path(resolver_, session_, search_path, file, fp);
     }
 }

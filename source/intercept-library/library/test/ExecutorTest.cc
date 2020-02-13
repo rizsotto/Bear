@@ -157,6 +157,10 @@ namespace {
     TEST(Executor, execvpe_passes)
     {
         ResolverMock resolver;
+        EXPECT_CALL(resolver, access(_, _))
+            .Times(1)
+            .WillOnce(Return(SUCCESS));
+
         // TODO: verify the arguments
         //    const char* argv[] = {
         //        SILENT_SESSION.reporter,
@@ -183,6 +187,10 @@ namespace {
     TEST(Executor, execvp2_passes)
     {
         ResolverMock resolver;
+        EXPECT_CALL(resolver, access(_, _))
+            .Times(1)
+            .WillOnce(Return(SUCCESS));
+
         // TODO: verify the arguments
         //    const char* argv[] = {
         //        SILENT_SESSION.reporter,
@@ -258,6 +266,10 @@ namespace {
         pid_t pid;
 
         ResolverMock resolver;
+        EXPECT_CALL(resolver, access(_, _))
+            .Times(1)
+            .WillOnce(Return(SUCCESS));
+
         // TODO: verify the arguments
         //    const char* argv[] = {
         //        VERBOSE_SESSION.reporter,

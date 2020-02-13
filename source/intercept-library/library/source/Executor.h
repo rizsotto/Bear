@@ -56,6 +56,20 @@ namespace ear {
             char* const envp[]) const noexcept;
 
     private:
+        int execve_from_search_path(const char* search_path,
+            const char* file,
+            char* const* argv,
+            char* const* envp) const noexcept;
+
+        int posix_spawn_from_search_path(const char* search_path,
+            pid_t* pid,
+            const char* file,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const* argv,
+            char* const* envp) const;
+
+    private:
         ear::Resolver const& resolver_;
         ear::Session const& session_;
     };
