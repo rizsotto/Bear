@@ -38,53 +38,110 @@ namespace {
     constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
-    struct Execution {
-        const char** command;
+    class CommandBuilder {
+    public:
+        constexpr CommandBuilder(const ear::Session& session, const char* path, char* const* const argv)
+                : session(session)
+                , path(path)
+                , argv(argv)
+        {
+        }
+
+        constexpr size_t length() const noexcept
+        {
+            return (session.verbose ? 5 : 6) + ear::array::length(argv) + 4;
+        }
+
+        constexpr void assemble(const char** it) const noexcept
+        {
+            const char** const it_end = it + length();
+
+            *it++ = session.reporter;
+            *it++ = pear::flag::DESTINATION;
+            *it++ = session.destination;
+            *it++ = pear::flag::LIBRARY;
+            *it++ = session.library;
+            if (session.verbose) {
+                *it++ = pear::flag::VERBOSE;
+            }
+            *it++ = pear::flag::PATH;
+            *it++ = path;
+            *it++ = pear::flag::COMMAND;
+            {
+                char* const* const argv_end = ear::array::end(argv);
+                it = ear::array::copy(argv, argv_end, it, it_end);
+            }
+            *it = nullptr;
+        }
+
+        constexpr const char* file() const noexcept
+        {
+            return session.reporter;
+        }
+
+    private:
+        const ear::Session& session;
         const char* path;
+        char* const* const argv;
     };
 
-    size_t length(Execution const& execution) noexcept
-    {
-        return ear::array::length(execution.command) + 4;
-    }
+    class StringView {
+    public:
+        constexpr StringView(const char* ptr) noexcept
+                : begin(ptr)
+                , end(ear::array::end(ptr))
+        {
+        }
 
-    const char** copy(Execution const& execution, const char** it, const char** it_end) noexcept
-    {
-        *it++ = pear::flag::PATH;
-        *it++ = execution.path;
-        *it++ = pear::flag::COMMAND;
-        const size_t command_size = ear::array::length(execution.command);
-        const char** const command_end = execution.command + (command_size + 1);
-        return ear::array::copy(execution.command, command_end, it, it_end);
-    }
+        constexpr StringView(const char* begin, const char* end) noexcept
+                : begin(begin)
+                , end(end)
+        {
+        }
 
-    size_t length(ear::Session const& session) noexcept
-    {
-        return session.verbose ? 5 : 6;
-    }
+        constexpr size_t length() const noexcept
+        {
+            return (end - begin);
+        }
 
-    const char** copy(ear::Session const& session, const char** it, const char** it_end) noexcept
-    {
-        *it++ = session.reporter;
-        *it++ = pear::flag::DESTINATION;
-        *it++ = session.destination;
-        *it++ = pear::flag::LIBRARY;
-        *it++ = session.library;
-        if (session.verbose)
-            *it++ = pear::flag::VERBOSE;
-        return it;
-    }
+        constexpr bool empty() const noexcept
+        {
+            return 0 == length();
+        }
 
-#define CREATE_BUFFER(VAR_, SESSION_, EXECUTION_)                           \
-    const size_t VAR_##_length = length(EXECUTION_) + length(SESSION_) + 1; \
-    const char* VAR_[VAR_##_length];                                        \
-    {                                                                       \
-        const char** const VAR_##_end = VAR_ + VAR_##_length;               \
-        const char** VAR_##it = copy(SESSION_, VAR_, VAR_##_end);           \
-        copy(EXECUTION_, VAR_##it, VAR_##_end);                             \
-    }
+        const char* begin;
+        const char* end;
+    };
 
-    const char* next_path_separator(const char* input)
+    class PathBuilder {
+    public:
+        constexpr PathBuilder(const StringView& prefix, const StringView& file)
+                : prefix(prefix)
+                , file(file)
+        {
+        }
+
+        constexpr size_t length() const noexcept
+        {
+            return prefix.length() + file.length() + 2;
+        }
+
+        constexpr void assemble(char* it) const noexcept
+        {
+            char* end = it + length();
+
+            it = ear::array::copy(prefix.begin, prefix.end, it, end);
+            *it++ = DIR_SEPARATOR;
+            it = ear::array::copy(file.begin, file.end, it, end);
+            *it = 0;
+        }
+
+    private:
+        const StringView prefix;
+        const StringView file;
+    };
+
+    constexpr const char* next_path_separator(const char* input)
     {
         auto it = input;
         while ((*it != 0) && (*it != PATH_SEPARATOR)) {
@@ -103,21 +160,15 @@ namespace {
         const char* current = search_path;
         do {
             const char* next = next_path_separator(current);
+            const StringView prefix(current, next);
             // ignore empty entries
-            if (current - next == 0) {
+            if (prefix.empty()) {
                 continue;
             }
             // create a path
-            const size_t path_length = ear::array::length(file) + (next - current) + 2;
-            char path[path_length];
-            {
-                char* path_it = path;
-                char* const path_end = path + path_length;
-                path_it = ear::array::copy(current, next, path_it, path_end);
-                *path_it++ = DIR_SEPARATOR;
-                path_it = ear::array::copy(file, ear::array::end(file), path_it, path_end);
-                *path_it = 0;
-            }
+            const PathBuilder path_builder(prefix, StringView(file));
+            char path[path_builder.length()];
+            path_builder.assemble(path);
             // check if path points to an executable.
             if (0 == resolver.access(path, X_OK)) {
                 // execute the wrapper
@@ -182,10 +233,11 @@ namespace ear {
         CHECK_POINTER(session_, resolver_, path);
         CHECK_PATH(session_, resolver_, path);
 
-        const Execution execution = { const_cast<const char**>(argv), path };
-        CREATE_BUFFER(dst, session_, execution);
+        const CommandBuilder cmd(session_, path, argv);
+        const char* dst[cmd.length()];
+        cmd.assemble(dst);
 
-        return resolver_.execve(session_.reporter, const_cast<char* const*>(dst), envp);
+        return resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
     }
 
     int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
@@ -234,10 +286,11 @@ namespace ear {
         CHECK_POINTER(session_, resolver_, path);
         CHECK_PATH(session_, resolver_, path);
 
-        const Execution execution = { const_cast<const char**>(argv), path };
-        CREATE_BUFFER(dst, session_, execution);
+        const CommandBuilder cmd(session_, path, argv);
+        const char* dst[cmd.length()];
+        cmd.assemble(dst);
 
-        return resolver_.posix_spawn(pid, session_.reporter, file_actions, attrp, const_cast<char* const*>(dst), envp);
+        return resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
     }
 
     int Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
@@ -290,10 +343,11 @@ namespace ear {
         };
         // Capture context variable by reference.
         const std::function<int(const char*)> fp = [&ctx](const char* path) {
-            const Execution execution = { const_cast<const char**>(ctx.argv), path };
-            CREATE_BUFFER(dst, ctx.session, execution);
+            const CommandBuilder cmd(ctx.session, path, ctx.argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
 
-            return (ctx.resolver).execve((ctx.session).reporter, const_cast<char* const*>(dst), ctx.envp);
+            return (ctx.resolver).execve(cmd.file(), const_cast<char* const*>(dst), ctx.envp);
         };
 
         return execute_from_search_path(resolver_, session_, search_path, file, fp);
@@ -315,10 +369,11 @@ namespace ear {
         };
 
         const std::function<int(const char*)> fp = [&ctx](const char* path) {
-            const Execution execution = { const_cast<const char**>(ctx.argv), path };
-            CREATE_BUFFER(dst, ctx.session, execution);
+            const CommandBuilder cmd(ctx.session, path, ctx.argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
 
-            return (ctx.resolver).posix_spawn(ctx.pid, (ctx.session).reporter, ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
+            return (ctx.resolver).posix_spawn(ctx.pid, cmd.file(), ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
         };
 
         return execute_from_search_path(resolver_, session_, search_path, file, fp);
