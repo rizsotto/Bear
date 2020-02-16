@@ -28,18 +28,41 @@
 #include "Session.h"
 
 #include <cerrno>
+#include <climits>
 #include <functional>
 #include <unistd.h>
 
 namespace {
-
-    constexpr int FAILURE = -1;
 
     constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
     const ear::log::Logger LOGGER("Executor.cc");
 
+    constexpr ear::Executor::Result failure(int const error_code) noexcept
+    {
+        return ear::Executor::Result { -1, error_code };
+    }
+
+#define CHECK_SESSION(SESSION_)                           \
+    do {                                                  \
+        if (!ear::session::is_valid(SESSION_)) {          \
+            LOGGER.warning("session is not initialized"); \
+            return failure(EIO);                          \
+        }                                                 \
+    } while (false)
+
+#define CHECK_POINTER(PTR_)                        \
+    do {                                           \
+        if (nullptr == PTR_) {                     \
+            LOGGER.debug("null pointer received"); \
+            return failure(EFAULT);                \
+        }                                          \
+    } while (false)
+
+    // Util class to create command arguments to execute the intercept process.
+    //
+    // Use this class to allocate buffer and assemble the content of it.
     class CommandBuilder {
     public:
         constexpr CommandBuilder(const ear::Session& session, const char* path, char* const* const argv)
@@ -87,6 +110,9 @@ namespace {
         char* const* const argv;
     };
 
+    // Represents a region which contains a string value. The content is
+    // not owned by the instance in any given time. It's just a util class
+    // for zero copy string handling.
     class StringView {
     public:
         constexpr explicit StringView(const char* ptr) noexcept
@@ -115,6 +141,9 @@ namespace {
         const char* end;
     };
 
+    // Util class to concatenate directory and file.
+    //
+    // Use this class to allocate buffer and assemble the content of it.
     class PathBuilder {
     public:
         constexpr PathBuilder(const StringView& prefix, const StringView& file)
@@ -152,9 +181,22 @@ namespace {
         return it;
     }
 
-    int execute_from_search_path(
+    int is_executable(const ear::Resolver& resolver, const char* path)
+    {
+        if (0 == resolver.access(path, X_OK)) {
+            LOGGER.debug("is executable check [passed]: path=", path);
+            return 0;
+        }
+        if (0 == resolver.access(path, F_OK)) {
+            LOGGER.debug("is executable check [file exists]): path=", path);
+            return EACCES;
+        }
+        LOGGER.debug("is executable check [failed]: path=", path);
+        return ENOENT;
+    }
+
+    ear::Executor::Result execute_from_search_path(
         const ear::Resolver& resolver,
-        const ear::Session& session,
         const char* search_path,
         const char* file,
         std::function<int(const char*)> const& function) noexcept
@@ -171,44 +213,40 @@ namespace {
             const PathBuilder path_builder(prefix, StringView(file));
             char path[path_builder.length()];
             path_builder.assemble(path);
-            // check if path points to an executable.
-            if (0 == resolver.access(path, X_OK)) {
-                // execute the wrapper
-                return function(path);
+            // check if it's okay to execute.
+            if (0 == is_executable(resolver, path)) {
+                // execute if everything looks good.
+                const int return_value = function(path);
+                const int error_number = errno;
+                return { return_value, error_number };
             }
-            LOGGER.debug("access failed for: path=", path);
             // try the next one
             current = (*next == 0) ? nullptr : ++next;
         } while (current != nullptr);
         // if all attempt were failing, then quit with a failure.
-        return FAILURE;
+        return failure(ENOENT);
     }
 
-#define CHECK_POINTER(SESSION_, RESOLVER_, PTR_)   \
-    do {                                           \
-        if (nullptr == PTR_) {                     \
-            LOGGER.debug("null pointer received"); \
-            errno = ENOENT;                        \
-            return FAILURE;                        \
-        }                                          \
-    } while (false)
-
-#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)               \
-    do {                                                     \
-        if (0 != RESOLVER_.access(PATH_, X_OK)) {            \
-            LOGGER.debug("access failed for: path=", PATH_); \
-            errno = ENOEXEC;                                 \
-            return -1;                                       \
-        }                                                    \
-    } while (false)
-
-#define CHECK_SESSION(SESSION_, RESOLVER_)              \
-    do {                                                \
-        if (!ear::session::is_valid(SESSION_)) {        \
-            LOGGER.debug("session is not initialized"); \
-            return -1;                                  \
-        }                                               \
-    } while (false)
+    ear::Executor::Result execute_from_current_directory(
+        const ear::Resolver& resolver,
+        const char* file,
+        std::function<int(const char*)> const& function) noexcept
+    {
+        // create absolute path to the given file.
+        char path[PATH_MAX];
+        if (nullptr == resolver.realpath(file, path)) {
+            return failure(ENOENT);
+        }
+        // check if it's okay to execute.
+        const int error_code = is_executable(resolver, path);
+        if (0 != error_code) {
+            return failure(error_code);
+        }
+        // execute if everything looks good.
+        const int return_value = function(path);
+        const int error_number = errno;
+        return { return_value, error_number };
+    }
 
     bool contains_dir_separator(const char* const candidate)
     {
@@ -229,99 +267,11 @@ namespace ear {
     {
     }
 
-    int Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
+    Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_POINTER(session_, resolver_, path);
-        CHECK_PATH(session_, resolver_, path);
+        CHECK_SESSION(session_);
+        CHECK_POINTER(path);
 
-        const CommandBuilder cmd(session_, path, argv);
-        const char* dst[cmd.length()];
-        cmd.assemble(dst);
-
-        return resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-    }
-
-    int Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_POINTER(session_, resolver_, file);
-
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return execve(file, argv, envp);
-        } else {
-            // otherwise use the PATH variable to locate the executable.
-            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
-            if (paths != nullptr) {
-                return execve_from_search_path(paths, file, argv, envp);
-            }
-            // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
-            char search_path[search_path_length];
-            confstr(_CS_PATH, search_path, search_path_length);
-
-            return execve_from_search_path(search_path, file, argv, envp);
-        }
-    }
-
-    int Executor::execvP(const char* file, const char* search_path, char* const* argv,
-        char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_POINTER(session_, resolver_, file);
-
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return execve(file, argv, envp);
-        } else {
-            // otherwise use the given search path to locate the executable.
-            return execve_from_search_path(search_path, file, argv, envp);
-        }
-    }
-
-    int Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
-        const posix_spawnattr_t* attrp, char* const* argv,
-        char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_POINTER(session_, resolver_, path);
-        CHECK_PATH(session_, resolver_, path);
-
-        const CommandBuilder cmd(session_, path, argv);
-        const char* dst[cmd.length()];
-        cmd.assemble(dst);
-
-        return resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
-    }
-
-    int Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
-        const posix_spawnattr_t* attrp, char* const* argv,
-        char* const* envp) const noexcept
-    {
-        CHECK_SESSION(session_, resolver_);
-        CHECK_POINTER(session_, resolver_, file);
-
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return posix_spawn(pid, file, file_actions, attrp, argv, envp);
-        } else {
-            // otherwise use the PATH variable to locate the executable.
-            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
-            if (paths != nullptr) {
-                return posix_spawn_from_search_path(paths, pid, file, file_actions, attrp, argv, envp);
-            }
-            // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
-            char search_path[search_path_length];
-            confstr(_CS_PATH, search_path, search_path_length);
-
-            return posix_spawn_from_search_path(search_path, pid, file, file_actions, attrp, argv, envp);
-        }
-    }
-
-    int Executor::execve_from_search_path(const char* search_path, const char* file, char* const* argv, char* const* envp) const
-    {
         // To avoid heap allocations with std::function
         //
         // Are you familiar with the "small string optimization" for std::string? Basically,
@@ -343,21 +293,64 @@ namespace ear {
         } ctx = {
             resolver_, session_, argv, envp
         };
-        // Capture context variable by reference.
-        const std::function<int(const char*)> fp = [&ctx](const char* path) {
-            const CommandBuilder cmd(ctx.session, path, ctx.argv);
+
+        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
+            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
             return (ctx.resolver).execve(cmd.file(), const_cast<char* const*>(dst), ctx.envp);
         };
 
-        return execute_from_search_path(resolver_, session_, search_path, file, fp);
+        return execute_from_current_directory(resolver_, path, fp);
     }
 
-    int Executor::posix_spawn_from_search_path(const char* search_path, pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions, const posix_spawnattr_t* attrp, char* const* argv, char* const* envp) const
+    Executor::Result Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
     {
-        // See comment in `Executor::execve_from_search_path` method.
+        CHECK_SESSION(session_);
+        CHECK_POINTER(file);
+
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return execve(file, argv, envp);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            if (paths != nullptr) {
+                return execve_from_search_path(paths, file, argv, envp);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
+            char search_path[search_path_length];
+            confstr(_CS_PATH, search_path, search_path_length);
+
+            return execve_from_search_path(search_path, file, argv, envp);
+        }
+    }
+
+    Executor::Result Executor::execvP(const char* file, const char* search_path, char* const* argv,
+        char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_);
+        CHECK_POINTER(file);
+
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return execve(file, argv, envp);
+        } else {
+            // otherwise use the given search path to locate the executable.
+            return execve_from_search_path(search_path, file, argv, envp);
+        }
+    }
+
+    Executor::Result Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
+        const posix_spawnattr_t* attrp, char* const* argv,
+        char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_);
+        CHECK_POINTER(path);
+
+        // See comment in `Executor::execve` method.
         struct Context {
             const Resolver& resolver;
             const Session& session;
@@ -370,14 +363,88 @@ namespace ear {
             resolver_, session_, pid, file_actions, attrp, argv, envp
         };
 
-        const std::function<int(const char*)> fp = [&ctx](const char* path) {
-            const CommandBuilder cmd(ctx.session, path, ctx.argv);
+        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
+            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
             return (ctx.resolver).posix_spawn(ctx.pid, cmd.file(), ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
         };
 
-        return execute_from_search_path(resolver_, session_, search_path, file, fp);
+        return execute_from_current_directory(resolver_, path, fp);
+    }
+
+    Executor::Result Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
+        const posix_spawnattr_t* attrp, char* const* argv,
+        char* const* envp) const noexcept
+    {
+        CHECK_SESSION(session_);
+        CHECK_POINTER(file);
+
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return posix_spawn(pid, file, file_actions, attrp, argv, envp);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            if (paths != nullptr) {
+                return posix_spawn_from_search_path(paths, pid, file, file_actions, attrp, argv, envp);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
+            char search_path[search_path_length];
+            confstr(_CS_PATH, search_path, search_path_length);
+
+            return posix_spawn_from_search_path(search_path, pid, file, file_actions, attrp, argv, envp);
+        }
+    }
+
+    Executor::Result Executor::execve_from_search_path(const char* search_path, const char* file, char* const* argv, char* const* envp) const
+    {
+        // See comment in `Executor::execve` method.
+        struct Context {
+            const Resolver& resolver;
+            const Session& session;
+            char* const* argv;
+            char* const* envp;
+        } ctx = {
+            resolver_, session_, argv, envp
+        };
+        // Capture context variable by reference.
+        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
+            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
+
+            return (ctx.resolver).execve(cmd.file(), const_cast<char* const*>(dst), ctx.envp);
+        };
+
+        return execute_from_search_path(resolver_, search_path, file, fp);
+    }
+
+    Executor::Result Executor::posix_spawn_from_search_path(const char* search_path, pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions, const posix_spawnattr_t* attrp, char* const* argv, char* const* envp) const
+    {
+        // See comment in `Executor::execve` method.
+        struct Context {
+            const Resolver& resolver;
+            const Session& session;
+            pid_t* pid;
+            const posix_spawn_file_actions_t* file_actions;
+            const posix_spawnattr_t* attrp;
+            char* const* argv;
+            char* const* envp;
+        } ctx = {
+            resolver_, session_, pid, file_actions, attrp, argv, envp
+        };
+
+        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
+            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
+
+            return (ctx.resolver).posix_spawn(ctx.pid, cmd.file(), ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
+        };
+
+        return execute_from_search_path(resolver_, search_path, file, fp);
     }
 }

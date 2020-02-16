@@ -42,7 +42,7 @@ namespace ear {
 
     int Resolver::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
-        using type = int (*)(const char*, char* const [], char* const []);
+        using type = int (*)(const char*, char* const[], char* const[]);
 
         auto fp = dynamic_linker<type>("execve");
         return (fp == nullptr)
@@ -66,7 +66,7 @@ namespace ear {
             char* const argv[],
             char* const envp[]);
 
-        auto fp = dynamic_linker<type>( "posix_spawn");
+        auto fp = dynamic_linker<type>("posix_spawn");
         return (fp == nullptr)
             ? FAILURE
             : fp(pid, path, file_actions, attrp, argv, envp);
@@ -76,20 +76,30 @@ namespace ear {
     {
         using type = int (*)(const char*, int);
 
-        auto fp = dynamic_linker<type>( "access");
+        auto fp = dynamic_linker<type>("access");
         return (fp == nullptr)
             ? FAILURE
             : fp(pathname, mode);
+    }
+
+    char* Resolver::realpath(const char* path, char* resolved_path) const noexcept
+    {
+        using type = char* (*)(const char*, char*);
+
+        auto fp = dynamic_linker<type>("realpath");
+        return (fp == nullptr)
+            ? nullptr
+            : fp(path, resolved_path);
     }
 
     size_t Resolver::confstr(int name, char* buf, size_t len) const noexcept
     {
         using type = size_t (*)(int, char*, size_t);
 
-        auto fp = dynamic_linker<type>( "confstr");
+        auto fp = dynamic_linker<type>("confstr");
         return (fp == nullptr)
-               ? FAILURE
-               : fp(name, buf, len);
+            ? FAILURE
+            : fp(name, buf, len);
     }
 
     /**

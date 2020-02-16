@@ -50,4 +50,25 @@ public:
         (const char *pathname, int mode),
         (const, noexcept, override)
     );
+
+    MOCK_METHOD(
+        char*,
+        realpath,
+        (const char* path, char* resolved_path),
+        (const, noexcept, override)
+    );
+
+    MOCK_METHOD(
+        size_t,
+        confstr,
+        (int name, char* buf, size_t len),
+        (const, noexcept, override)
+    );
+
+    MOCK_METHOD(
+        const char**,
+        environment,
+        (),
+        (const, noexcept, override)
+    );
 };

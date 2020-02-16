@@ -35,6 +35,29 @@ the requested file, but execute another one. The another process is a
 supervisor process, which executes the requested file, but it also
 reports the lifecycle related events, like start, stop or signal received.
 
+## Limitations
+
+* If a process can be executed it will execute it. But if the execution request
+would fail for some reason, it might report a successful execution because
+the statically linked executable will start (but the child process might
+fail).
+
+  The type of errors that are might not detected by the library are: E2BIG,
+EAGAIN, EINVAL, EIO, ELIBAD, ELOOP, ENFILE, ENAMETOOLONG, ENOEXEC, EPERM.
+
+* The IO redirection might not working properly. Since the requested execution
+is not a direct child process (indirect child process relationship) the standard
+input/output might not be closed/forwarded as requested.
+
+* `posix_spawn` and `posix_spawn` some of the attributes might not making
+effect, because the indirect child process relationship.
+
+* There are still a few POSIX system call that are not covered by the library.
+(Like `execveat` or `fexecve` which are using file descriptor to identify
+the file to execute.)
+
+With these limitation, an average build process can still be intercepted.
+
 ## Implementation details
 
 ### `libexec`

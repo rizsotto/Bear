@@ -53,10 +53,12 @@ namespace ear {
             char* const envp[]) const noexcept;
 
         virtual int access(
-            const char *pathname,
+            const char* pathname,
             int mode) const noexcept;
 
-        virtual size_t confstr(int name, char *buf, size_t len) const noexcept;
+        virtual char* realpath(const char* path, char* resolved_path) const noexcept;
+
+        virtual size_t confstr(int name, char* buf, size_t len) const noexcept;
 
         virtual const char** environment() const noexcept;
     };
