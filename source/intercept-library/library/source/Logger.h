@@ -21,20 +21,30 @@
 
 namespace ear {
 
-    class Resolver;
-    class Session;
+    namespace log {
 
-    class Logger {
-    public:
-        Logger(const Resolver& resolver, const Session& session) noexcept;
+        enum Level {
+            SILENT = 0,
+            VERBOSE = 1
+        };
 
-        ~Logger() noexcept = default;
+        // Not MT safe
+        void set(Level);
 
-        void debug(char const* message) noexcept;
-        void debug(char const* message, char const* variable) noexcept;
+        class Logger {
+        public:
+            explicit Logger(const char *name) noexcept;
 
-    private:
-        const Resolver& resolver_;
-        const bool enabled_;
-    };
+            ~Logger() noexcept = default;
+
+            void debug(char const* message) const noexcept;
+            void debug(char const* message, char const* variable) const noexcept;
+
+            void warning(char const* message) const noexcept;
+            void warning(char const* message, char const* variable) const noexcept;
+
+        private:
+            const char* name_;
+        };
+    }
 }

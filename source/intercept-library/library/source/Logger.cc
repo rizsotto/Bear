@@ -25,27 +25,51 @@
 #include <cstdio>
 #include <unistd.h>
 
+namespace {
+
+    ear::log::Level LEVEL = ear::log::SILENT;
+
+}
+
 namespace ear {
+    namespace log {
 
-    Logger::Logger(const Resolver& resolver, const Session& session) noexcept
-            : resolver_(resolver)
-            , enabled_(session.verbose)
-    {
-    }
-
-    void Logger::debug(char const* message) noexcept
-    {
-        if (enabled_) {
-            auto pid = getpid();
-            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s\n", pid, message);
+        void set(Level level)
+        {
+            LEVEL = level;
         }
-    }
 
-    void Logger::debug(char const* message, char const* variable) noexcept
-    {
-        if (enabled_) {
+        Logger::Logger(const char* name) noexcept
+                : name_(name)
+        {
+        }
+
+        void Logger::debug(char const* message) const noexcept
+        {
+            if (ear::log::VERBOSE == LEVEL) {
+                auto pid = getpid();
+                dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s\n", pid, name_, message);
+            }
+        }
+
+        void Logger::debug(char const* message, char const* variable) const noexcept
+        {
+            if (ear::log::VERBOSE == LEVEL) {
+                auto pid = getpid();
+                dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s%s\n", pid, name_, message, variable);
+            }
+        }
+
+        void Logger::warning(char const* message) const noexcept
+        {
             auto pid = getpid();
-            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s%s\n", pid, message, variable);
+            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s\n", pid, name_, message);
+        }
+
+        void Logger::warning(char const* message, char const* variable) const noexcept
+        {
+            auto pid = getpid();
+            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s%s\n", pid, name_, message, variable);
         }
     }
 }

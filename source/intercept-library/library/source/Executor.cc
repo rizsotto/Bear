@@ -38,6 +38,8 @@ namespace {
     constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
+    const ear::log::Logger LOGGER("Executor.cc");
+
     class CommandBuilder {
     public:
         constexpr CommandBuilder(const ear::Session& session, const char* path, char* const* const argv)
@@ -87,7 +89,7 @@ namespace {
 
     class StringView {
     public:
-        constexpr StringView(const char* ptr) noexcept
+        constexpr explicit StringView(const char* ptr) noexcept
                 : begin(ptr)
                 , end(ear::array::end(ptr))
         {
@@ -174,7 +176,7 @@ namespace {
                 // execute the wrapper
                 return function(path);
             }
-            ear::Logger(resolver, session).debug("access failed for: path=", path);
+            LOGGER.debug("access failed for: path=", path);
             // try the next one
             current = (*next == 0) ? nullptr : ++next;
         } while (current != nullptr);
@@ -182,30 +184,30 @@ namespace {
         return FAILURE;
     }
 
-#define CHECK_POINTER(SESSION_, RESOLVER_, PTR_)                             \
-    do {                                                                     \
-        if (nullptr == PTR_) {                                               \
-            ear::Logger(RESOLVER_, SESSION_).debug("null pointer received"); \
-            errno = ENOENT;                                                  \
-            return FAILURE;                                                  \
-        }                                                                    \
+#define CHECK_POINTER(SESSION_, RESOLVER_, PTR_)   \
+    do {                                           \
+        if (nullptr == PTR_) {                     \
+            LOGGER.debug("null pointer received"); \
+            errno = ENOENT;                        \
+            return FAILURE;                        \
+        }                                          \
     } while (false)
 
-#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)                                         \
-    do {                                                                               \
-        if (0 != RESOLVER_.access(PATH_, X_OK)) {                                      \
-            ear::Logger(RESOLVER_, SESSION_).debug("access failed for: path=", PATH_); \
-            errno = ENOEXEC;                                                           \
-            return -1;                                                                 \
-        }                                                                              \
+#define CHECK_PATH(SESSION_, RESOLVER_, PATH_)               \
+    do {                                                     \
+        if (0 != RESOLVER_.access(PATH_, X_OK)) {            \
+            LOGGER.debug("access failed for: path=", PATH_); \
+            errno = ENOEXEC;                                 \
+            return -1;                                       \
+        }                                                    \
     } while (false)
 
-#define CHECK_SESSION(SESSION_, RESOLVER_)                                        \
-    do {                                                                          \
-        if (!ear::session::is_valid(SESSION_)) {                                  \
-            ear::Logger(RESOLVER_, SESSION_).debug("session is not initialized"); \
-            return -1;                                                            \
-        }                                                                         \
+#define CHECK_SESSION(SESSION_, RESOLVER_)              \
+    do {                                                \
+        if (!ear::session::is_valid(SESSION_)) {        \
+            LOGGER.debug("session is not initialized"); \
+            return -1;                                  \
+        }                                               \
     } while (false)
 
     bool contains_dir_separator(const char* const candidate)
