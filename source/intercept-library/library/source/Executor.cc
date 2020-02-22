@@ -27,7 +27,6 @@
 #include "Resolver.h"
 #include "Session.h"
 
-#include <cerrno>
 #include <climits>
 #include <functional>
 #include <unistd.h>
@@ -217,8 +216,7 @@ namespace {
             if (0 == is_executable(resolver, path)) {
                 // execute if everything looks good.
                 const int return_value = function(path);
-                const int error_number = errno;
-                return { return_value, error_number };
+                return { return_value, resolver.error_code() };
             }
             // try the next one
             current = (*next == 0) ? nullptr : ++next;
@@ -244,8 +242,7 @@ namespace {
         }
         // execute if everything looks good.
         const int return_value = function(path);
-        const int error_number = errno;
-        return { return_value, error_number };
+        return { return_value, resolver.error_code() };
     }
 
     bool contains_dir_separator(const char* const candidate)

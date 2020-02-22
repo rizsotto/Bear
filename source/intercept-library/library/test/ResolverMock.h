@@ -71,4 +71,11 @@ public:
         (),
         (const, noexcept, override)
     );
+
+    MOCK_METHOD(
+        int,
+        error_code,
+        (),
+        (const, noexcept, override)
+    );
 };

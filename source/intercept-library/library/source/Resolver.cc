@@ -20,6 +20,7 @@
 #include "Resolver.h"
 
 #include <dlfcn.h>
+#include <cerrno>
 
 #if defined HAVE_NSGETENVIRON
 #include <crt_externs.h>
@@ -124,5 +125,10 @@ namespace ear {
         // resolve the real address of it and will return always null pointer.
         return const_cast<const char**>(environ);
 #endif
+    }
+
+    int Resolver::error_code() const noexcept
+    {
+        return errno;
     }
 }
