@@ -8,16 +8,16 @@ add_subdirectory(test)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 set(CMAKE_EXE_LINKER_FLAGS "-static")
 
-add_executable(intercept
+add_executable(er
         main.cc
         )
 
-target_include_directories(intercept PRIVATE ${EXE_SRC_DIR})
-target_link_libraries(intercept intercept_a)
-target_compile_features(intercept PUBLIC cxx_std_17)
-target_compile_options(intercept PUBLIC -fno-exceptions -fno-rtti)
-set_target_properties(intercept PROPERTIES LINKER_LANGUAGE "C")
+target_include_directories(er PRIVATE ${EXE_SRC_DIR})
+target_link_libraries(er er_a)
+target_compile_features(er PUBLIC cxx_std_17)
+target_compile_options(er PUBLIC -fno-exceptions -fno-rtti)
+set_target_properties(er PROPERTIES LINKER_LANGUAGE "C")
 
 include(GNUInstallDirs)
-install(TARGETS intercept
+install(TARGETS er
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})

@@ -73,7 +73,7 @@ It's a shared library.
    - Any error is fatal.
    - Errors are reported on `stderr` only if it was requested.
 
-## `intercept`
+## `er`
 
 It's statically linked executable.
 
