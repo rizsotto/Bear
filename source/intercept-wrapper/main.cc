@@ -17,48 +17,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cstdio>
-#include <unistd.h>
-
-//#include "libexec_a/Array.h"
-//#include "libexec_a/Environment.h"
-//#include "libexec_a/Executor.h"
-
-//namespace {
+// How it should works?
 //
-//    struct LibC {
-//        using execve_t = int (*)(const char *path, char *const argv[], char *const envp[]);
-//        static execve_t resolve_execve() noexcept {
-//            return &execve;
-//        }
-//    };
-//
-//    using Executor = ear::Executor<LibC>;
-//
-//    /// It's a C++ compiler if the name ends with "++".
-//    bool is_cxx(const char * name) noexcept {
-//        const size_t length = ear::array::length(name);
-//        return (length > 2) && (name[length - 1] == '+') && (name[length - 2] == '+');
-//    }
-//}
+// - Figures out what commands it wraps. (`cc`, `c++`, `ar`, `ld`, `as`, etc...)
+// - Look up what is the real executable for that command (full path)
+// - Calls `er`, pass the real executable and the arguments itself received.
+//   (calls mean `execve`)  `er` will report the call and supervise the process.
 
 int main(int argc, char* argv[], char* envp[])
 {
-    if (argc <= 0) {
-        fprintf(stderr, "intercept-wrapper: not enough arguments.\n");
-        return -1;
-    }
-
-    //    const auto session = ear::environment::wrapper_session(const_cast<const char **>(envp));
-    //    if (! session.is_valid()) {
-    //        fprintf(stderr, "intercept-wrapper: not initialized.\n");
-    //        return -1;
-    //    }
-    //
-    //    // Replace the compiler wrapper to the real compiler.
-    //    argv[0] = const_cast<char *>((is_cxx(argv[0])) ? session.cxx : session.cc);
-    //
-    //    const Executor executor(session);
-    //    return executor.execve(argv[0], argv, envp);
     return 0;
 }
