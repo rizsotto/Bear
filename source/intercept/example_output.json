@@ -1,0 +1,67 @@
+{
+  "context": {
+    "machine": "`uname -m` output",
+    "kernel": "`uname -s` output",
+    "release": "`uname -r` output",
+    "intercept": "preload",
+    "confstr": {
+      "_CS_PATH": "confstr result",
+      "_CS_GNU_LIBC_VERSION": "confstr result",
+      "_CS_GNU_LIBPTHREAD_VERSION": "confstr result"
+    }
+  },
+  "executions": [
+    {
+      "command": {
+        "working_dir": "/home/user",
+        "program": "/usr/bin/bash",
+        "arguments": ["bash", "-c", "sleep 1"]
+      },
+      "run": {
+        "pid": 122,
+        "ppid": 121,
+        "events": [
+          {
+            "type": "start",
+            "at": "2020-02-16T21:00:00.000Z"
+          },
+          {
+            "type": "stop",
+            "at": "2020-02-16T21:00:01.022Z",
+            "status": 0
+          }
+        ],
+        "environment": {
+          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+          "HOME": "/home/user"
+        }
+      }
+    },
+    {
+      "command": {
+        "working_dir": "/home/user",
+        "program": "/usr/bin/sleep",
+        "arguments": ["sleep", "1"]
+      },
+      "run": {
+        "pid": 123,
+        "ppid": 122,
+        "events": [
+          {
+            "type": "start",
+            "at": "2020-02-16T21:00:00.010Z"
+          },
+          {
+            "type": "stop",
+            "at": "2020-02-16T21:00:01.017Z",
+            "status": 0
+          }
+        ],
+        "environment": {
+          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+          "HOME": "/home/user"
+        }
+      }
+    }
+  ]
+}
