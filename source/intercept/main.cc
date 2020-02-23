@@ -26,7 +26,7 @@
 // - Calls `er` to supervise the build (with the received command).
 //   - Wait until the child process terminates. (store exit code)
 // - Close communication channel.
-// - Flush output.
+// - Writes output.
 // - Return child exit code.
 //
 // Communication channel means: filesystem or socket. Do migration easy,

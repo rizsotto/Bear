@@ -19,10 +19,18 @@
 
 // How it should works?
 //
-// - Figures out what commands it wraps. (`cc`, `c++`, `ar`, `ld`, `as`, etc...)
+// - The `wrapper` shall be a single executable with soft links created to it
+//   with the name of the wrapped command. (`cc`, `c++`, `ar`, `ld`, `as`, etc...)
+//
+// - When it's executed: it figures out what commands it wraps.
+//   (The name comes from the argument, get the `basename` of it, and that's it)
 // - Look up what is the real executable for that command (full path)
+//   (This can be a file what the the `intercept` plants for the session.
+//   The location of that file might come from an environment variable.
+//   The `wrapper` needs to read that file and find the path to the wrapped command.)
 // - Calls `er`, pass the real executable and the arguments itself received.
 //   (calls mean `execve`)  `er` will report the call and supervise the process.
+
 
 int main(int argc, char* argv[], char* envp[])
 {
