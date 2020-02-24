@@ -45,7 +45,7 @@ namespace {
 
 #define CHECK_SESSION(SESSION_)                           \
     do {                                                  \
-        if (!exec::session::is_valid(SESSION_)) {          \
+        if (!el::session::is_valid(SESSION_)) {          \
             LOGGER.warning("session is not initialized"); \
             return failure(EIO);                          \
         }                                                 \
