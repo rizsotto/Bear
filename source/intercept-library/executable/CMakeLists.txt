@@ -3,6 +3,7 @@ set(EXE_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
 
 add_subdirectory(source)
 add_subdirectory(test)
+add_subdirectory(man)
 
 # Create a static executable from the sub projects.
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
