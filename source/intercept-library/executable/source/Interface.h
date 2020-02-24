@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace pear {
+namespace er {
 
     struct Execution {
         const char* path;

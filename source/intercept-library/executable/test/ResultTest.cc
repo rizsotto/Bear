@@ -24,7 +24,7 @@
 namespace {
 
     using Error = const char*;
-    using namespace pear;
+    using namespace er;
 
     TEST(result, get_or_else_on_success)
     {

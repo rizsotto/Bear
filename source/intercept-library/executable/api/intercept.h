@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace pear {
+namespace er {
     namespace flag {
 
         constexpr char HELP[] = "--help";

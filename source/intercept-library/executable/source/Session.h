@@ -25,14 +25,14 @@
 #include "Interface.h"
 #include "Result.h"
 
-namespace pear {
+namespace er {
 
     /// Used by `intercept-cc` to report single execution.
     struct Session {
-        ::pear::Context context_;
-        ::pear::Execution execution_;
+        ::er::Context context_;
+        ::er::Execution execution_;
 
-        Session(const ::pear::Context& context, const ::pear::Execution& execution)
+        Session(const ::er::Context& context, const ::er::Execution& execution)
                 : context_(context)
                 , execution_(execution)
         {
@@ -40,15 +40,15 @@ namespace pear {
 
         virtual ~Session() noexcept = default;
 
-        virtual void configure(::pear::Environment::Builder& builder) const noexcept;
+        virtual void configure(::er::Environment::Builder& builder) const noexcept;
     };
 
     /// Used by `intercept-build` and `libexec` to report execution
     /// and prepare for more executions.
-    struct LibrarySession : public ::pear::Session {
+    struct LibrarySession : public ::er::Session {
         const char* library;
 
-        LibrarySession(const ::pear::Context& context, const ::pear::Execution& execution)
+        LibrarySession(const ::er::Context& context, const ::er::Execution& execution)
                 : Session(context, execution)
                 , library(nullptr)
         {
@@ -56,10 +56,10 @@ namespace pear {
 
         ~LibrarySession() noexcept override = default;
 
-        void configure(::pear::Environment::Builder& builder) const noexcept override;
+        void configure(::er::Environment::Builder& builder) const noexcept override;
     };
 
     using SessionPtr = std::shared_ptr<Session>;
-    pear::Result<pear::SessionPtr> parse(int argc, char* argv[]) noexcept;
+    er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept;
 
 }

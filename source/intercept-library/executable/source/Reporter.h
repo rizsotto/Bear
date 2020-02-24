@@ -27,7 +27,7 @@
 
 #include "Result.h"
 
-namespace pear {
+namespace er {
 
     class Event;
     using EventPtr = std::shared_ptr<Event>;

@@ -131,7 +131,7 @@ namespace {
 
 }
 
-namespace pear {
+namespace er {
 
     Environment::Environment(
         const std::map<std::string, std::string>& environ) noexcept

@@ -25,7 +25,7 @@ namespace {
 
     TEST(environment, empty_gets_empty_list)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         auto sut = builder.build();
         auto result = sut->data();
 
@@ -39,7 +39,7 @@ namespace {
             "THIS=that",
             nullptr
         };
-        ::pear::Environment::Builder builder(envp);
+        ::er::Environment::Builder builder(envp);
         auto sut = builder.build();
         auto result = sut->data();
 
@@ -49,7 +49,7 @@ namespace {
 
     TEST(environment, reporter_inserted)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         builder.add_reporter("/usr/libexec/intercept");
         auto sut = builder.build();
         auto result = sut->data();
@@ -60,7 +60,7 @@ namespace {
 
     TEST(environment, destination_inserted)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         builder.add_destination("/tmp/intercept");
         auto sut = builder.build();
         auto result = sut->data();
@@ -71,7 +71,7 @@ namespace {
 
     TEST(environment, verbose_enabled)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         builder.add_verbose(true);
         auto sut = builder.build();
         auto result = sut->data();
@@ -82,7 +82,7 @@ namespace {
 
     TEST(environment, verbose_disabled)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         builder.add_verbose(false);
         auto sut = builder.build();
         auto result = sut->data();
@@ -95,7 +95,7 @@ namespace {
 #else
     TEST(environment, empty_library)
     {
-        ::pear::Environment::Builder builder(nullptr);
+        ::er::Environment::Builder builder(nullptr);
         builder.add_library("/usr/libexec/libexec.so");
         auto sut = builder.build();
         auto result = sut->data();
@@ -111,7 +111,7 @@ namespace {
             "LD_PRELOAD=/usr/libexec/libexec.so",
             nullptr
         };
-        ::pear::Environment::Builder builder(envp);
+        ::er::Environment::Builder builder(envp);
         builder.add_library("/usr/libexec/libexec.so");
         auto sut = builder.build();
         auto result = sut->data();
@@ -127,7 +127,7 @@ namespace {
             "LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so",
             nullptr
         };
-        ::pear::Environment::Builder builder(envp);
+        ::er::Environment::Builder builder(envp);
         builder.add_library("/usr/libexec/libexec.so");
         auto sut = builder.build();
         auto result = sut->data();
@@ -143,7 +143,7 @@ namespace {
             "LD_PRELOAD=/usr/libexec/libio.so",
             nullptr
         };
-        ::pear::Environment::Builder builder(envp);
+        ::er::Environment::Builder builder(envp);
         builder.add_library("/usr/libexec/libexec.so");
         auto sut = builder.build();
         auto result = sut->data();

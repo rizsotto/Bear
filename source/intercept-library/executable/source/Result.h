@@ -25,7 +25,7 @@
 #include <string>
 #include <variant>
 
-namespace pear {
+namespace er {
 
     namespace types {
 
@@ -179,7 +179,7 @@ namespace pear {
     }
 
     template <typename T>
-    pear::Result<T> Err(const char* message) noexcept
+    er::Result<T> Err(const char* message) noexcept
     {
         std::string result = message != nullptr ? std::string(message) : std::string();
 
@@ -192,7 +192,7 @@ namespace pear {
             result += std::string(": unkown error.");
         }
         errno = ENOENT;
-        return ::pear::Err(std::runtime_error(result));
+        return ::er::Err(std::runtime_error(result));
     };
 
 }

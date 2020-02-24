@@ -30,7 +30,7 @@ namespace {
     constexpr char OS_PATH_SEPARATOR = '/';
 }
 
-namespace pear {
+namespace er {
 
     Result<pid_t> SystemCalls::fork_with_execvp(
         const char* file,

@@ -88,11 +88,11 @@ namespace {
         {
         }
 
-        ::pear::Result<Parameters> parse(const int argc, const char** argv) const noexcept
+        ::er::Result<Parameters> parse(const int argc, const char** argv) const noexcept
         {
             Parameters result;
             if (argc < 2 || argv == nullptr) {
-                return ::pear::Err(std::runtime_error("Empty parameter list."));
+                return ::er::Err(std::runtime_error("Empty parameter list."));
             }
             result.emplace(Parameters::key_type(PROGRAM_KEY), std::make_tuple(argv, argv + 1));
             const char** const args_end = argv + argc;
@@ -106,13 +106,13 @@ namespace {
                         result.emplace(Parameters::key_type(*args_it), params.value());
                         args_it = std::get<1>(params.value());
                     } else {
-                        return ::pear::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
+                        return ::er::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
                     }
                 } else {
-                    return ::pear::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
+                    return ::er::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
                 }
             }
-            return ::pear::Ok(std::move(result));
+            return ::er::Ok(std::move(result));
         }
 
         std::string help(const char* const name) const noexcept
@@ -129,19 +129,19 @@ namespace {
         const std::vector<Option> options_;
     };
 
-    ::pear::Result<::pear::Context> make_context(const Parameters& parameters) noexcept
+    ::er::Result<::er::Context> make_context(const Parameters& parameters) noexcept
     {
-        if (auto destination_it = parameters.find(::pear::flag::DESTINATION); destination_it != parameters.end()) {
+        if (auto destination_it = parameters.find(::er::flag::DESTINATION); destination_it != parameters.end()) {
             auto const [destination, _] = destination_it->second;
-            const bool verbose = (parameters.find(::pear::flag::VERBOSE) != parameters.end());
+            const bool verbose = (parameters.find(::er::flag::VERBOSE) != parameters.end());
             auto const [reporter, __] = parameters.find(PROGRAM_KEY)->second;
-            return ::pear::Ok<::pear::Context>({ *reporter, *destination, verbose });
+            return ::er::Ok<::er::Context>({ *reporter, *destination, verbose });
         } else {
-            return ::pear::Err(std::runtime_error("Missing destination."));
+            return ::er::Err(std::runtime_error("Missing destination."));
         }
     }
 
-    ::pear::Result<::pear::Execution> make_execution(const Parameters& parameters) noexcept
+    ::er::Result<::er::Execution> make_execution(const Parameters& parameters) noexcept
     {
         auto get_optional = [&parameters](const char* const name) -> const char* {
             if (auto it = parameters.find(name); it != parameters.end()) {
@@ -153,53 +153,53 @@ namespace {
         };
 
         auto const nowhere = parameters.end();
-        if (auto command_it = parameters.find(::pear::flag::COMMAND); command_it != nowhere) {
+        if (auto command_it = parameters.find(::er::flag::COMMAND); command_it != nowhere) {
             auto [command, _] = command_it->second;
-            auto path = get_optional(::pear::flag::PATH);
+            auto path = get_optional(::er::flag::PATH);
             if (path != nullptr) {
-                return ::pear::Ok<::pear::Execution>({ path, command });
+                return ::er::Ok<::er::Execution>({ path, command });
             } else {
-                return ::pear::Err(std::runtime_error("The 'path' needs to be specified."));
+                return ::er::Err(std::runtime_error("The 'path' needs to be specified."));
             }
         } else {
-            return ::pear::Err(std::runtime_error("Missing command."));
+            return ::er::Err(std::runtime_error("Missing command."));
         }
     }
 
 }
 
-namespace pear {
+namespace er {
 
-    void Session::configure(::pear::Environment::Builder& builder) const noexcept
+    void Session::configure(::er::Environment::Builder& builder) const noexcept
     {
         builder.add_reporter(context_.reporter);
         builder.add_destination(context_.destination);
         builder.add_verbose(context_.verbose);
     }
 
-    void LibrarySession::configure(::pear::Environment::Builder& builder) const noexcept
+    void LibrarySession::configure(::er::Environment::Builder& builder) const noexcept
     {
         Session::configure(builder);
         builder.add_library(library);
     }
 
-    pear::Result<pear::SessionPtr> parse(int argc, char* argv[]) noexcept
+    er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
-        const Parser parser({ { ::pear::flag::HELP, 0, "this message" },
-            { ::pear::flag::VERBOSE, 0, "make the interception run verbose" },
-            { ::pear::flag::DESTINATION, 1, "path to report directory" },
-            { ::pear::flag::LIBRARY, 1, "path to the intercept library" },
-            { ::pear::flag::PATH, 1, "the path parameter for the command" },
-            { ::pear::flag::COMMAND, -1, "the executed command" } });
+        const Parser parser({ { ::er::flag::HELP, 0, "this message" },
+            { ::er::flag::VERBOSE, 0, "make the interception run verbose" },
+            { ::er::flag::DESTINATION, 1, "path to report directory" },
+            { ::er::flag::LIBRARY, 1, "path to the intercept library" },
+            { ::er::flag::PATH, 1, "the path parameter for the command" },
+            { ::er::flag::COMMAND, -1, "the executed command" } });
         return parser.parse(argc, const_cast<const char**>(argv))
-            .bind<::pear::SessionPtr>([&parser, &argv](auto params) -> Result<::pear::SessionPtr> {
-                if (params.find(::pear::flag::HELP) != params.end())
+            .bind<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
+                if (params.find(::er::flag::HELP) != params.end())
                     return Err(std::runtime_error(parser.help(argv[0])));
                 else
                     return merge(make_context(params), make_execution(params))
-                        .template map<::pear::SessionPtr>([&params](auto in) -> ::pear::SessionPtr {
+                        .template map<::er::SessionPtr>([&params](auto in) -> ::er::SessionPtr {
                             const auto& [context, execution] = in;
-                            if (auto library_it = params.find(::pear::flag::LIBRARY); library_it != params.end()) {
+                            if (auto library_it = params.find(::er::flag::LIBRARY); library_it != params.end()) {
                                 const auto& [library, _] = library_it->second;
                                 auto result = std::make_unique<LibrarySession>(context, execution);
                                 result->library = *library;

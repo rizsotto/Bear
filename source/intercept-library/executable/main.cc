@@ -31,22 +31,22 @@ namespace {
     std::ostream& error_stream()
     {
         std::cerr << "intercept: [pid: "
-                  << pear::SystemCalls::get_pid().get_or_else(0)
+                  << er::SystemCalls::get_pid().get_or_else(0)
                   << ", ppid: "
-                  << pear::SystemCalls::get_ppid().get_or_else(0)
+                  << er::SystemCalls::get_ppid().get_or_else(0)
                   << "] ";
         return std::cerr;
     }
 
-    pear::Result<pid_t> spawnp(const ::pear::Execution& config,
-        const ::pear::EnvironmentPtr& environment) noexcept
+    er::Result<pid_t> spawnp(const ::er::Execution& config,
+        const ::er::EnvironmentPtr& environment) noexcept
     {
-        return pear::SystemCalls::spawn(config.path, config.command, environment->data());
+        return er::SystemCalls::spawn(config.path, config.command, environment->data());
     }
 
-    void report_start(::pear::Result<pear::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
+    void report_start(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
     {
-        ::pear::merge(reporter, ::pear::Event::start(pid, cmd))
+        ::er::merge(reporter, ::er::Event::start(pid, cmd))
             .bind<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
@@ -57,9 +57,9 @@ namespace {
             .get_or_else(0);
     }
 
-    void report_exit(::pear::Result<pear::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    void report_exit(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
     {
-        ::pear::merge(reporter, ::pear::Event::stop(pid, exit))
+        ::er::merge(reporter, ::er::Event::stop(pid, exit))
             .bind<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
@@ -70,9 +70,9 @@ namespace {
             .get_or_else(0);
     }
 
-    ::pear::EnvironmentPtr create_environment(char* original[], const ::pear::SessionPtr& session)
+    ::er::EnvironmentPtr create_environment(char* original[], const ::er::SessionPtr& session)
     {
-        auto builder = pear::Environment::Builder(const_cast<const char**>(original));
+        auto builder = er::Environment::Builder(const_cast<const char**>(original));
         session->configure(builder);
         return builder.build();
     }
@@ -95,15 +95,15 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    return ::pear::parse(argc, argv)
-        .map<pear::SessionPtr>([&argv](auto arguments) {
+    return ::er::parse(argc, argv)
+        .map<er::SessionPtr>([&argv](auto arguments) {
             if (arguments->context_.verbose) {
                 error_stream() << argv << std::endl;
             }
             return arguments;
         })
         .bind<int>([&envp](auto arguments) {
-            auto reporter = pear::Reporter::tempfile(arguments->context_.destination);
+            auto reporter = er::Reporter::tempfile(arguments->context_.destination);
 
             auto environment = create_environment(envp, arguments);
             return spawnp(arguments->execution_, environment)
@@ -112,7 +112,7 @@ int main(int argc, char* argv[], char* envp[])
                     return pid;
                 })
                 .template bind<std::tuple<pid_t, int>>([](auto pid) {
-                    return pear::SystemCalls::wait_pid(pid)
+                    return er::SystemCalls::wait_pid(pid)
                         .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                             return std::make_tuple(pid, exit);
                         });

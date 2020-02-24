@@ -81,16 +81,16 @@ namespace {
             const char** const it_end = it + length();
 
             *it++ = session.reporter;
-            *it++ = pear::flag::DESTINATION;
+            *it++ = er::flag::DESTINATION;
             *it++ = session.destination;
-            *it++ = pear::flag::LIBRARY;
+            *it++ = er::flag::LIBRARY;
             *it++ = session.library;
             if (session.verbose) {
-                *it++ = pear::flag::VERBOSE;
+                *it++ = er::flag::VERBOSE;
             }
-            *it++ = pear::flag::PATH;
+            *it++ = er::flag::PATH;
             *it++ = path;
-            *it++ = pear::flag::COMMAND;
+            *it++ = er::flag::COMMAND;
             {
                 char* const* const argv_end = ear::array::end(argv);
                 it = ear::array::copy(argv, argv_end, it, it_end);

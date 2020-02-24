@@ -24,7 +24,7 @@
 
 #include "Result.h"
 
-namespace pear {
+namespace er {
 
     struct SystemCalls {
 

@@ -32,8 +32,8 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
-        ::pear::SessionPtr const expected = ::pear::SessionPtr(nullptr);
+        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.get_or_else(expected));
     }
@@ -42,13 +42,13 @@ namespace {
     {
         const char* argv[] = {
             "program",
-            ::pear::flag::HELP,
+            ::er::flag::HELP,
             nullptr
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
-        ::pear::SessionPtr const expected = ::pear::SessionPtr(nullptr);
+        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.get_or_else(expected));
     }
@@ -57,19 +57,19 @@ namespace {
     {
         const char* argv[] = {
             "program",
-            pear::flag::LIBRARY, "/install/path/libexec.so",
-            pear::flag::DESTINATION, "/tmp/destination",
-            pear::flag::VERBOSE,
-            pear::flag::PATH, "/bin/ls",
-            pear::flag::COMMAND, "ls", "-l", "-a",
+            er::flag::LIBRARY, "/install/path/libexec.so",
+            er::flag::DESTINATION, "/tmp/destination",
+            er::flag::VERBOSE,
+            er::flag::PATH, "/bin/ls",
+            er::flag::COMMAND, "ls", "-l", "-a",
             nullptr
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::pear::Result<::pear::SessionPtr> const result = ::pear::parse(argc, const_cast<char**>(argv));
-        ::pear::SessionPtr const dummy = ::pear::SessionPtr(nullptr);
+        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::er::SessionPtr const dummy = ::er::SessionPtr(nullptr);
         ASSERT_NE(dummy, result.get_or_else(dummy));
-        auto session_result = (::pear::LibrarySession const*)result.get_or_else(dummy).get();
+        auto session_result = (::er::LibrarySession const*)result.get_or_else(dummy).get();
 
         ASSERT_STREQ(argv[0], session_result->context_.reporter);
         ASSERT_STREQ(argv[4], session_result->context_.destination);

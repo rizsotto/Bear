@@ -93,7 +93,7 @@ namespace {
         os << '"' << key << '"' << ':' << value;
     }
 
-    class TimedEvent : public pear::Event {
+    class TimedEvent : public er::Event {
     private:
         std::chrono::system_clock::time_point const when_;
 
@@ -179,25 +179,25 @@ namespace {
         }
     };
 
-    class ReporterImpl : public pear::Reporter {
+    class ReporterImpl : public er::Reporter {
     public:
         explicit ReporterImpl(const char* target) noexcept;
 
-        pear::Result<int> send(const pear::EventPtr& event) noexcept override;
+        er::Result<int> send(const er::EventPtr& event) noexcept override;
 
     private:
-        pear::Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
+        er::Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
 
         std::string const target_;
     };
 
     ReporterImpl::ReporterImpl(const char* target) noexcept
-            : pear::Reporter()
+            : er::Reporter()
             , target_(target)
     {
     }
 
-    pear::Result<int> ReporterImpl::send(const pear::EventPtr& event) noexcept
+    er::Result<int> ReporterImpl::send(const er::EventPtr& event) noexcept
     {
         return create_stream(event->name())
             .map<int>([&event](auto stream) {
@@ -206,13 +206,13 @@ namespace {
             });
     }
 
-    pear::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
+    er::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
     {
-        return pear::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
+        return er::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }
 }
 
-namespace pear {
+namespace er {
 
     Result<EventPtr> Event::start(pid_t pid, const char** cmd) noexcept
     {

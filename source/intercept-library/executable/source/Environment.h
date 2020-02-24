@@ -21,7 +21,7 @@
 #include <map>
 #include <memory>
 
-namespace pear {
+namespace er {
 
     class Environment {
     public:
