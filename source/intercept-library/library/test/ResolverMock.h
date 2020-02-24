@@ -23,7 +23,7 @@
 
 #include "gmock/gmock.h"
 
-class ResolverMock : public ear::Resolver {
+class ResolverMock : public el::Resolver {
 public:
     MOCK_METHOD(
         int,

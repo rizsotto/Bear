@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace ear {
+namespace el {
     namespace env {
 
         constexpr char KEY_LIBRARY[] = "INTERCEPT_LIBRARY";

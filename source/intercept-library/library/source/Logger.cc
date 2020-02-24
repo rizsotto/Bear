@@ -27,11 +27,11 @@
 
 namespace {
 
-    ear::log::Level LEVEL = ear::log::SILENT;
+    el::log::Level LEVEL = el::log::SILENT;
 
 }
 
-namespace ear {
+namespace el {
     namespace log {
 
         void set(Level level)
@@ -46,7 +46,7 @@ namespace ear {
 
         void Logger::debug(char const* message) const noexcept
         {
-            if (ear::log::VERBOSE == LEVEL) {
+            if (el::log::VERBOSE == LEVEL) {
                 auto pid = getpid();
                 dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s\n", pid, name_, message);
             }
@@ -54,7 +54,7 @@ namespace ear {
 
         void Logger::debug(char const* message, char const* variable) const noexcept
         {
-            if (ear::log::VERBOSE == LEVEL) {
+            if (el::log::VERBOSE == LEVEL) {
                 auto pid = getpid();
                 dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s%s\n", pid, name_, message, variable);
             }

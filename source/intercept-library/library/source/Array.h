@@ -21,7 +21,7 @@
 
 #include <cstddef>
 
-namespace ear {
+namespace el {
     namespace array {
 
         /**

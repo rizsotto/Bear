@@ -22,15 +22,15 @@
 #include "Array.h"
 #include "Buffer.h"
 
-namespace ear {
+namespace el {
 
     char const* Buffer::store(char const* const input) noexcept
     {
         if (input == nullptr)
             return nullptr;
 
-        auto input_end = ear::array::end(input) + 1; // include the zero element
-        auto top = ear::array::copy(input, input_end, top_, end_);
+        auto input_end = el::array::end(input) + 1; // include the zero element
+        auto top = el::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);
         return top;

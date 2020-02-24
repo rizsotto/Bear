@@ -22,17 +22,17 @@
 #include "Environment.h"
 #include "Array.h"
 
-namespace ear {
+namespace el {
     namespace env {
 
         const char* get_env_value(const char** envp, const char* key) noexcept
         {
-            const size_t key_size = ear::array::length(key);
+            const size_t key_size = el::array::length(key);
 
             for (const char** it = envp; *it != nullptr; ++it) {
                 const char* const current = *it;
                 // Is the key a prefix of the pointed string?
-                if (!ear::array::equal_n(key, current, key_size))
+                if (!el::array::equal_n(key, current, key_size))
                     continue;
                 // Is the next character is the equal sign?
                 if (current[key_size] != '=')

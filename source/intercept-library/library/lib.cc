@@ -55,10 +55,10 @@ namespace {
     // This is used for being multi thread safe (loading time only).
     std::atomic<bool> LOADED(false);
     // These are related to the functionality of this library.
-    ear::Session SESSION = ear::session::init();
-    ear::Resolver RESOLVER;
+    el::Session SESSION = el::session::init();
+    el::Resolver RESOLVER;
 
-    const ear::log::Logger LOGGER("lib.cc");
+    const el::log::Logger LOGGER("lib.cc");
 }
 
 /**
@@ -73,11 +73,11 @@ extern "C" void on_load()
     if (LOADED.exchange(true))
         return;
 
-    ear::session::from(SESSION, RESOLVER.environment());
-    ear::session::persist(SESSION, BUFFER, BUFFER + BUFFER_SIZE);
+    el::session::from(SESSION, RESOLVER.environment());
+    el::session::persist(SESSION, BUFFER, BUFFER + BUFFER_SIZE);
 
-    ear::log::Level level = SESSION.verbose ? ear::log::VERBOSE : ear::log::SILENT;
-    ear::log::set(level);
+    el::log::Level level = SESSION.verbose ? el::log::VERBOSE : el::log::SILENT;
+    el::log::set(level);
 
     LOGGER.debug("on_load");
 }
@@ -101,7 +101,7 @@ extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 {
     LOGGER.debug("execve path=", path);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -111,7 +111,7 @@ extern "C" int execv(const char* path, char* const argv[])
     LOGGER.debug("execv path=", path);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -120,7 +120,7 @@ extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 {
     LOGGER.debug("execvpe file=", file);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -130,7 +130,7 @@ extern "C" int execvp(const char* file, char* const argv[])
     LOGGER.debug("execvp file=", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -140,7 +140,7 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
     LOGGER.debug("execvP file=", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -149,7 +149,7 @@ extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 {
     LOGGER.debug("exect path=", path);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -171,7 +171,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -193,7 +193,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -216,7 +216,7 @@ extern "C" int execle(const char* path, const char* arg, ...)
     char** envp = va_arg(ap, char**);
     va_end(ap);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -228,7 +228,7 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
 {
     LOGGER.debug("posix_spawn path=", path);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -240,7 +240,7 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
 {
     LOGGER.debug("posix_spawnp file=", file);
 
-    const ear::Executor::Result result = ear::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }

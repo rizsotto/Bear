@@ -39,7 +39,7 @@ namespace {
     }
 }
 
-namespace ear {
+namespace el {
 
     int Resolver::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {

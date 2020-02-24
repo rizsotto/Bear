@@ -161,14 +161,14 @@ namespace er {
     Environment::Builder&
     Environment::Builder::add_reporter(const char* reporter) noexcept
     {
-        insert_or_assign(environ_, ear::env::KEY_REPORTER, reporter);
+        insert_or_assign(environ_, el::env::KEY_REPORTER, reporter);
         return *this;
     }
 
     Environment::Builder&
     Environment::Builder::add_destination(const char* destination) noexcept
     {
-        insert_or_assign(environ_, ear::env::KEY_DESTINATION, destination);
+        insert_or_assign(environ_, el::env::KEY_DESTINATION, destination);
         return *this;
     }
 
@@ -176,7 +176,7 @@ namespace er {
     Environment::Builder::add_verbose(bool verbose) noexcept
     {
         if (verbose) {
-            insert_or_assign(environ_, ear::env::KEY_VERBOSE, "1");
+            insert_or_assign(environ_, el::env::KEY_VERBOSE, "1");
         }
         return *this;
     }
@@ -184,7 +184,7 @@ namespace er {
     Environment::Builder&
     Environment::Builder::add_library(const char* library) noexcept
     {
-        insert_or_assign(environ_, ear::env::KEY_LIBRARY, library);
+        insert_or_assign(environ_, el::env::KEY_LIBRARY, library);
 #ifdef APPLE
         insert_or_assign(environ_, OSX_NAMESPACE_KEY, "1");
         const char* key = OSX_PRELOAD_KEY;

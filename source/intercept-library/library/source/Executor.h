@@ -25,7 +25,7 @@
 #include <spawn.h>
 #endif
 
-namespace ear {
+namespace el {
 
     class Resolver;
     class Session;
@@ -55,7 +55,7 @@ namespace ear {
         };
 
     public:
-        Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept;
+        Executor(el::Resolver const& resolver, el::Session const& session) noexcept;
 
         ~Executor() noexcept = default;
 
@@ -93,7 +93,7 @@ namespace ear {
             char* const* envp) const;
 
     private:
-        ear::Resolver const& resolver_;
-        ear::Session const& session_;
+        el::Resolver const& resolver_;
+        el::Session const& session_;
     };
 }

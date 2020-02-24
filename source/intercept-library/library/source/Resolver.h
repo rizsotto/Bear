@@ -25,7 +25,7 @@
 #include <spawn.h>
 #endif
 
-namespace ear {
+namespace el {
 
     /**
      * It is an abstraction of the symbol resolver.

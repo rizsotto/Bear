@@ -25,18 +25,18 @@ namespace {
 
     TEST(Session, dont_crash_on_nullptr)
     {
-        ear::Session sut {};
-        ear::session::from(sut, nullptr);
-        ASSERT_FALSE(ear::session::is_valid(sut));
+        el::Session sut {};
+        el::session::from(sut, nullptr);
+        ASSERT_FALSE(el::session::is_valid(sut));
     }
 
     TEST(Session, capture_on_empty)
     {
         const char* envp[] = { "this=is", "these=are", nullptr };
 
-        ear::Session sut {};
-        ear::session::from(sut, envp);
-        ASSERT_FALSE(ear::session::is_valid(sut));
+        el::Session sut {};
+        el::session::from(sut, envp);
+        ASSERT_FALSE(el::session::is_valid(sut));
     }
 
     TEST(Session, capture_silent)
@@ -48,9 +48,9 @@ namespace {
             nullptr
         };
 
-        ear::Session sut {};
-        ear::session::from(sut, envp);
-        ASSERT_TRUE(ear::session::is_valid(sut));
+        el::Session sut {};
+        el::session::from(sut, envp);
+        ASSERT_TRUE(el::session::is_valid(sut));
 
         EXPECT_STREQ("/tmp/intercept.random", sut.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);
@@ -68,9 +68,9 @@ namespace {
             nullptr
         };
 
-        ear::Session sut {};
-        ear::session::from(sut, envp);
-        ASSERT_TRUE(ear::session::is_valid(sut));
+        el::Session sut {};
+        el::session::from(sut, envp);
+        ASSERT_TRUE(el::session::is_valid(sut));
 
         EXPECT_STREQ("/tmp/intercept.random", sut.destination);
         EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);

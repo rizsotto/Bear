@@ -36,16 +36,16 @@ namespace {
     constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
-    const ear::log::Logger LOGGER("Executor.cc");
+    const el::log::Logger LOGGER("Executor.cc");
 
-    constexpr ear::Executor::Result failure(int const error_code) noexcept
+    constexpr el::Executor::Result failure(int const error_code) noexcept
     {
-        return ear::Executor::Result { -1, error_code };
+        return el::Executor::Result { -1, error_code };
     }
 
 #define CHECK_SESSION(SESSION_)                           \
     do {                                                  \
-        if (!ear::session::is_valid(SESSION_)) {          \
+        if (!exec::session::is_valid(SESSION_)) {          \
             LOGGER.warning("session is not initialized"); \
             return failure(EIO);                          \
         }                                                 \
@@ -64,7 +64,7 @@ namespace {
     // Use this class to allocate buffer and assemble the content of it.
     class CommandBuilder {
     public:
-        constexpr CommandBuilder(const ear::Session& session, const char* path, char* const* const argv)
+        constexpr CommandBuilder(const el::Session& session, const char* path, char* const* const argv)
                 : session(session)
                 , path(path)
                 , argv(argv)
@@ -73,7 +73,7 @@ namespace {
 
         constexpr size_t length() const noexcept
         {
-            return (session.verbose ? 5 : 6) + ear::array::length(argv) + 4;
+            return (session.verbose ? 5 : 6) + el::array::length(argv) + 4;
         }
 
         constexpr void assemble(const char** it) const noexcept
@@ -92,8 +92,8 @@ namespace {
             *it++ = path;
             *it++ = er::flag::COMMAND;
             {
-                char* const* const argv_end = ear::array::end(argv);
-                it = ear::array::copy(argv, argv_end, it, it_end);
+                char* const* const argv_end = el::array::end(argv);
+                it = el::array::copy(argv, argv_end, it, it_end);
             }
             *it = nullptr;
         }
@@ -104,7 +104,7 @@ namespace {
         }
 
     private:
-        const ear::Session& session;
+        const el::Session& session;
         const char* path;
         char* const* const argv;
     };
@@ -116,7 +116,7 @@ namespace {
     public:
         constexpr explicit StringView(const char* ptr) noexcept
                 : begin(ptr)
-                , end(ear::array::end(ptr))
+                , end(el::array::end(ptr))
         {
         }
 
@@ -160,9 +160,9 @@ namespace {
         {
             char* end = it + length();
 
-            it = ear::array::copy(prefix.begin, prefix.end, it, end);
+            it = el::array::copy(prefix.begin, prefix.end, it, end);
             *it++ = DIR_SEPARATOR;
-            it = ear::array::copy(file.begin, file.end, it, end);
+            it = el::array::copy(file.begin, file.end, it, end);
             *it = 0;
         }
 
@@ -180,7 +180,7 @@ namespace {
         return it;
     }
 
-    int is_executable(const ear::Resolver& resolver, const char* path)
+    int is_executable(const el::Resolver& resolver, const char* path)
     {
         if (0 == resolver.access(path, X_OK)) {
             LOGGER.debug("is executable check [passed]: path=", path);
@@ -194,8 +194,8 @@ namespace {
         return ENOENT;
     }
 
-    ear::Executor::Result execute_from_search_path(
-        const ear::Resolver& resolver,
+    el::Executor::Result execute_from_search_path(
+        const el::Resolver& resolver,
         const char* search_path,
         const char* file,
         std::function<int(const char*)> const& function) noexcept
@@ -225,8 +225,8 @@ namespace {
         return failure(ENOENT);
     }
 
-    ear::Executor::Result execute_from_current_directory(
-        const ear::Resolver& resolver,
+    el::Executor::Result execute_from_current_directory(
+        const el::Resolver& resolver,
         const char* file,
         std::function<int(const char*)> const& function) noexcept
     {
@@ -256,9 +256,9 @@ namespace {
     }
 }
 
-namespace ear {
+namespace el {
 
-    Executor::Executor(ear::Resolver const& resolver, ear::Session const& session) noexcept
+    Executor::Executor(el::Resolver const& resolver, el::Session const& session) noexcept
             : resolver_(resolver)
             , session_(session)
     {
@@ -312,7 +312,7 @@ namespace ear {
             return execve(file, argv, envp);
         } else {
             // otherwise use the PATH variable to locate the executable.
-            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            const char* paths = el::env::get_env_value(const_cast<const char**>(envp), "PATH");
             if (paths != nullptr) {
                 return execve_from_search_path(paths, file, argv, envp);
             }
@@ -383,7 +383,7 @@ namespace ear {
             return posix_spawn(pid, file, file_actions, attrp, argv, envp);
         } else {
             // otherwise use the PATH variable to locate the executable.
-            const char* paths = ear::env::get_env_value(const_cast<const char**>(envp), "PATH");
+            const char* paths = el::env::get_env_value(const_cast<const char**>(envp), "PATH");
             if (paths != nullptr) {
                 return posix_spawn_from_search_path(paths, pid, file, file_actions, attrp, argv, envp);
             }

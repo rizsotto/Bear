@@ -26,7 +26,7 @@ namespace {
     TEST(Buffer, dont_crash_on_nullptr)
     {
         char buffer[64];
-        ear::Buffer sut(buffer, buffer + 64);
+        el::Buffer sut(buffer, buffer + 64);
 
         EXPECT_EQ(nullptr, sut.store(nullptr));
     }
@@ -34,7 +34,7 @@ namespace {
     TEST(Buffer, stores)
     {
         char buffer[64];
-        ear::Buffer sut(buffer, buffer + 64);
+        el::Buffer sut(buffer, buffer + 64);
 
         const char* literal = "Hi there people";
         EXPECT_STREQ(literal, sut.store(literal));
@@ -43,7 +43,7 @@ namespace {
     TEST(Buffer, not_same_ptr)
     {
         char buffer[64];
-        ear::Buffer sut(buffer, buffer + 64);
+        el::Buffer sut(buffer, buffer + 64);
 
         const char* literal = "Hi there people";
         EXPECT_NE(literal, sut.store(literal));
@@ -52,7 +52,7 @@ namespace {
     TEST(Buffer, works_multiple_times)
     {
         char buffer[64];
-        ear::Buffer sut(buffer, buffer + 64);
+        el::Buffer sut(buffer, buffer + 64);
 
         const char* literal0 = "Hi there people";
         const char* literal1 = "Hallo Leute";
@@ -67,7 +67,7 @@ namespace {
     TEST(Buffer, handles_size_issue)
     {
         char buffer[8];
-        ear::Buffer sut(buffer, buffer + 8);
+        el::Buffer sut(buffer, buffer + 8);
 
         const char* literal = "Hi there people";
 

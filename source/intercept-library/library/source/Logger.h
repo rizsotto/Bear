@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace ear {
+namespace el {
 
     namespace log {
 

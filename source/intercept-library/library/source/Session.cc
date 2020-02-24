@@ -23,7 +23,7 @@
 #include "Environment.h"
 #include "libexec.h"
 
-namespace ear {
+namespace el {
 
     namespace session {
 
