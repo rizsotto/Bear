@@ -41,13 +41,7 @@ namespace {
     pear::Result<pid_t> spawnp(const ::pear::Execution& config,
         const ::pear::EnvironmentPtr& environment) noexcept
     {
-        if ((config.search_path != nullptr) && (config.file != nullptr)) {
-            return pear::SystemCalls::fork_with_execvp(config.file, config.search_path, config.command, environment->data());
-        } else if (config.file != nullptr) {
-            return pear::SystemCalls::spawnp(config.file, config.command, environment->data());
-        } else {
-            return pear::SystemCalls::spawn(config.path, config.command, environment->data());
-        }
+        return pear::SystemCalls::spawn(config.path, config.command, environment->data());
     }
 
     void report_start(::pear::Result<pear::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept

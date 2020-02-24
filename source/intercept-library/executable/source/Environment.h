@@ -27,6 +27,7 @@ namespace pear {
     public:
         class Builder;
 
+        [[nodiscard]]
         const char** data() const noexcept;
 
     public:
@@ -63,10 +64,7 @@ namespace pear {
 
         Builder& add_library(const char* library) noexcept;
 
-        Builder& add_cc_compiler(const char* compiler, const char* wrapper) noexcept;
-
-        Builder& add_cxx_compiler(const char* compiler, const char* wrapper) noexcept;
-
+        [[nodiscard]]
         EnvironmentPtr build() const noexcept;
 
     public:

@@ -59,28 +59,6 @@ namespace pear {
         void configure(::pear::Environment::Builder& builder) const noexcept override;
     };
 
-    /// Used by `intercept-build` to report single execution
-    /// and prepare for `intercept-cc`.
-    struct WrapperSession : public ::pear::Session {
-        const char* cc;
-        const char* cxx;
-        const char* cc_wrapper;
-        const char* cxx_wrapper;
-
-        WrapperSession(const ::pear::Context& context, const ::pear::Execution& execution)
-                : Session(context, execution)
-                , cc(nullptr)
-                , cxx(nullptr)
-                , cc_wrapper(nullptr)
-                , cxx_wrapper(nullptr)
-        {
-        }
-
-        ~WrapperSession() noexcept override = default;
-
-        void configure(::pear::Environment::Builder& builder) const noexcept override;
-    };
-
     using SessionPtr = std::shared_ptr<Session>;
     pear::Result<pear::SessionPtr> parse(int argc, char* argv[]) noexcept;
 

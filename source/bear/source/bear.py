@@ -408,38 +408,35 @@ def build_command(args, tmp_dir):
     # type: (argparse.Namespace, str) -> List[str]
     verbose = ['--session-verbose'] if args.verbose else []
     session = ['--session-library', args.libexec]
-    command = ['--exec-file', args.build[0], '--'] + args.build
+    command = ['--exec-path', which(args.build[0]), '--'] + args.build
     return [
                args.interceptor,
                '--session-destination', tmp_dir
            ] + session + verbose + command
 
 
-# def setup_environment(args, destination):
-#     # type: (argparse.Namespace, str) -> Dict[str, str]
-#     """ Sets up the environment for the build command.
-#
-#     In order to capture the sub-commands (executed by the build process),
-#     it needs to prepare the environment. It's either the compiler wrappers
-#     shall be announce as compiler or the intercepting library shall be
-#     announced for the dynamic linker.
-#
-#     :param args:        command line arguments
-#     :param destination: directory path for the execution trace files
-#     :return: a prepared set of environment variables. """
-#
-#     environment = dict(os.environ)
-#     environment.update({'INTERCEPT_BUILD_TARGET_DIR': destination})
-#
-#     if sys.platform == 'darwin':
-#         environment.update({
-#             'DYLD_INSERT_LIBRARIES': args.libear,
-#             'DYLD_FORCE_FLAT_NAMESPACE': '1'
-#         })
-#     else:
-#         environment.update({'LD_PRELOAD': args.libear})
-#
-#     return environment
+def which(program):
+    # type: (str) -> Optional[str]
+    """ Return full path for the given program name.
+
+    If the path contains directory separator, it uses the value as is.
+    If the path is a single program name, it looks up from the PATH
+    environment variable. """
+
+    def is_exe(candidate):
+        return os.path.isfile(candidate) and os.access(candidate, os.X_OK)
+
+    directory, filename = os.path.split(program)
+    if directory:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
 
 
 def parse_exec_trace(filename):

@@ -156,12 +156,10 @@ namespace {
         if (auto command_it = parameters.find(::pear::flag::COMMAND); command_it != nowhere) {
             auto [command, _] = command_it->second;
             auto path = get_optional(::pear::flag::PATH);
-            auto file = get_optional(::pear::flag::FILE);
-            auto search_path = get_optional(::pear::flag::SEARCH_PATH);
-            if ((path != nullptr && file == nullptr) || (path == nullptr && file != nullptr)) {
-                return ::pear::Ok<::pear::Execution>({ command, path, file, search_path });
+            if (path != nullptr) {
+                return ::pear::Ok<::pear::Execution>({ path, command });
             } else {
-                return ::pear::Err(std::runtime_error("Either 'path' or 'file' needs to be specified."));
+                return ::pear::Err(std::runtime_error("The 'path' needs to be specified."));
             }
         } else {
             return ::pear::Err(std::runtime_error("Missing command."));
@@ -185,28 +183,13 @@ namespace pear {
         builder.add_library(library);
     }
 
-    void WrapperSession::configure(::pear::Environment::Builder& builder) const noexcept
-    {
-        Session::configure(builder);
-        builder.add_cc_compiler(cc, cc_wrapper);
-        builder.add_cxx_compiler(cxx, cxx_wrapper);
-    }
-
     pear::Result<pear::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
         const Parser parser({ { ::pear::flag::HELP, 0, "this message" },
             { ::pear::flag::VERBOSE, 0, "make the interception run verbose" },
             { ::pear::flag::DESTINATION, 1, "path to report directory" },
             { ::pear::flag::LIBRARY, 1, "path to the intercept library" },
-            { ::pear::flag::WRAPPER_CC, 2, "path to the C compiler and the wrapper" },
-            {
-                ::pear::flag::WRAPPER_CXX,
-                2,
-                "path to the C++ compiler and the wrapper",
-            },
             { ::pear::flag::PATH, 1, "the path parameter for the command" },
-            { ::pear::flag::FILE, 1, "the file name for the command" },
-            { ::pear::flag::SEARCH_PATH, 1, "the search path for the command" },
             { ::pear::flag::COMMAND, -1, "the executed command" } });
         return parser.parse(argc, const_cast<const char**>(argv))
             .bind<::pear::SessionPtr>([&parser, &argv](auto params) -> Result<::pear::SessionPtr> {
@@ -220,15 +203,6 @@ namespace pear {
                                 const auto& [library, _] = library_it->second;
                                 auto result = std::make_unique<LibrarySession>(context, execution);
                                 result->library = *library;
-                                return SessionPtr(result.release());
-                            } else if ((params.find(::pear::flag::WRAPPER_CC) != params.end()) && (params.find(::pear::flag::WRAPPER_CXX) != params.end())) {
-                                const auto& [wrapper_cc_begin, wrapper_cc_end] = params.find(::pear::flag::WRAPPER_CC)->second;
-                                const auto& [wrapper_cxx_begin, wrapper_cxx_end] = params.find(::pear::flag::WRAPPER_CXX)->second;
-                                auto result = std::make_unique<WrapperSession>(context, execution);
-                                result->cc = *wrapper_cc_begin;
-                                result->cc_wrapper = *(wrapper_cc_begin + 1);
-                                result->cxx = *wrapper_cxx_begin;
-                                result->cxx_wrapper = *(wrapper_cxx_begin + 1);
                                 return SessionPtr(result.release());
                             } else {
                                 return std::make_shared<Session>(context, execution);

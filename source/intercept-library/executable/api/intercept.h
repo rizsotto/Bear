@@ -24,16 +24,10 @@ namespace pear {
 
         constexpr char HELP[] = "--help";
 
-        constexpr char WRAPPER_CC[] = "--session-cc-wrapper";
-        constexpr char WRAPPER_CXX[] = "--session-c++-wrapper";
-
         constexpr char VERBOSE[] = "--session-verbose";
         constexpr char DESTINATION[] = "--session-destination";
         constexpr char LIBRARY[] = "--session-library";
         constexpr char PATH[] = "--exec-path";
-        constexpr char FILE[] = "--exec-file";
-        constexpr char SEARCH_PATH[] = "--exec-search-path";
         constexpr char COMMAND[] = "--";
-
     }
 }

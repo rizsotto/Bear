@@ -21,17 +21,9 @@
 
 namespace pear {
 
-    namespace env {
-
-        constexpr char KEY_CC[] = "INTERCEPT_SESSION_CC";
-        constexpr char KEY_CXX[] = "INTERCEPT_SESSION_CXX";
-    }
-
     struct Execution {
-        const char** command;
         const char* path;
-        const char* file;
-        const char* search_path;
+        const char** command;
     };
 
     struct Context {

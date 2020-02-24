@@ -153,29 +153,4 @@ namespace {
         EXPECT_STREQ("LD_PRELOAD=/usr/libexec/libexec.so:/usr/libexec/libio.so", result[1]);
     }
 #endif
-
-    TEST(environment, cc_wrapper_inserted)
-    {
-        ::pear::Environment::Builder builder(nullptr);
-        builder.add_cc_compiler("cc", "/usr/libexec/intercept-cc");
-        auto sut = builder.build();
-        auto result = sut->data();
-
-        EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("CC=/usr/libexec/intercept-cc", result[0]);
-        EXPECT_STREQ("INTERCEPT_SESSION_CC=cc", result[1]);
-    }
-
-    TEST(environment, cxx_wrapper_inserted)
-    {
-        ::pear::Environment::Builder builder(nullptr);
-        builder.add_cxx_compiler("c++", "/usr/libexec/intercept-c++");
-        auto sut = builder.build();
-        auto result = sut->data();
-
-        EXPECT_NE(nullptr, result);
-        EXPECT_STREQ("CXX=/usr/libexec/intercept-c++", result[0]);
-        EXPECT_STREQ("INTERCEPT_SESSION_CXX=c++", result[1]);
-    }
-
 }
