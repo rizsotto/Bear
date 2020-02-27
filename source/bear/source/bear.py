@@ -406,12 +406,12 @@ def compilations(exec_calls, tools):
 
 def build_command(args, tmp_dir):
     # type: (argparse.Namespace, str) -> List[str]
-    verbose = ['--session-verbose'] if args.verbose else []
-    session = ['--session-library', args.libexec]
-    command = ['--exec-path', which(args.build[0]), '--'] + args.build
+    verbose = ['--verbose'] if args.verbose else []
+    session = ['--library', args.libexec]
+    command = ['--execute', which(args.build[0]), '--'] + args.build
     return [
                args.interceptor,
-               '--session-destination', tmp_dir
+               '--destination', tmp_dir
            ] + session + verbose + command
 
 

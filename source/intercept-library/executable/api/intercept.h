@@ -23,11 +23,12 @@ namespace er {
     namespace flag {
 
         constexpr char HELP[] = "--help";
+        constexpr char VERSION[] = "--version";
 
-        constexpr char VERBOSE[] = "--session-verbose";
-        constexpr char DESTINATION[] = "--session-destination";
-        constexpr char LIBRARY[] = "--session-library";
-        constexpr char PATH[] = "--exec-path";
+        constexpr char VERBOSE[] = "--verbose";
+        constexpr char DESTINATION[] = "--destination";
+        constexpr char LIBRARY[] = "--library";
+        constexpr char EXECUTE[] = "--execute";
         constexpr char COMMAND[] = "--";
     }
 }

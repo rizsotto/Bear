@@ -155,7 +155,7 @@ namespace {
         auto const nowhere = parameters.end();
         if (auto command_it = parameters.find(::er::flag::COMMAND); command_it != nowhere) {
             auto [command, _] = command_it->second;
-            auto path = get_optional(::er::flag::PATH);
+            auto path = get_optional(::er::flag::EXECUTE);
             if (path != nullptr) {
                 return ::er::Ok<::er::Execution>({ path, command });
             } else {
@@ -189,7 +189,7 @@ namespace er {
             { ::er::flag::VERBOSE, 0, "make the interception run verbose" },
             { ::er::flag::DESTINATION, 1, "path to report directory" },
             { ::er::flag::LIBRARY, 1, "path to the intercept library" },
-            { ::er::flag::PATH, 1, "the path parameter for the command" },
+            { ::er::flag::EXECUTE, 1, "the path parameter for the command" },
             { ::er::flag::COMMAND, -1, "the executed command" } });
         return parser.parse(argc, const_cast<const char**>(argv))
             .bind<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {

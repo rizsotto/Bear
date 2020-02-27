@@ -60,7 +60,7 @@ namespace {
             er::flag::LIBRARY, "/install/path/libexec.so",
             er::flag::DESTINATION, "/tmp/destination",
             er::flag::VERBOSE,
-            er::flag::PATH, "/bin/ls",
+            er::flag::EXECUTE, "/bin/ls",
             er::flag::COMMAND, "ls", "-l", "-a",
             nullptr
         };

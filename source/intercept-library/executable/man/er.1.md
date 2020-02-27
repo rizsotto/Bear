@@ -16,14 +16,27 @@ Supervise a program execution and report metrics about it.
 
 # OPTIONS
 
+\--help
+:   Prints a short help message about the usage and exits.
+
 \--version
-:	Print out er version number.
+:	Prints out `er` version number and exits. 
 
--v, \--verbose
-:	Enable verbose output from er. A second, third and fourth flags
-	increases verbosity.
+\--verbose
+:	Enables verbose output from `er`. (optional)
 
-TODO
+\--destination
+:   Specifies the directory path for the execution reports. (required)
+
+\--library
+:   Full path to the intercept library. (optional)
+
+\--execute
+:   Full path to the executable to supervise. (required)
+
+\--
+:   The list of arguments to the executable. (required)
+    The first argument (by convention) is the executable name.
 
 # OUTPUT
 

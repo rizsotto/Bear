@@ -13,14 +13,31 @@ er [\f[I]options\f[R]] [\f[I]build command\f[R]]
 Supervise a program execution and report metrics about it.
 .SH OPTIONS
 .TP
-.B \-\-version
-Print out er version number.
+.B \-\-help
+Prints a short help message about the usage and exits.
 .TP
-.B \-v, \-\-verbose
-Enable verbose output from er.
-A second, third and fourth flags increases verbosity.
-.PP
-TODO
+.B \-\-version
+Prints out \f[C]er\f[R] version number and exits.
+.TP
+.B \-\-verbose
+Enables verbose output from \f[C]er\f[R].
+(optional)
+.TP
+.B \-\-destination
+Specifies the directory path for the execution reports.
+(required)
+.TP
+.B \-\-library
+Full path to the intercept library.
+(optional)
+.TP
+.B \-\-execute
+Full path to the executable to supervise.
+(required)
+.TP
+.B \-\-
+The list of arguments to the executable.
+(required) The first argument (by convention) is the executable name.
 .SH OUTPUT
 .PP
 If verbose execution is not requested, it shall not print out to the

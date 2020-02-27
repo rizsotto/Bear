@@ -88,7 +88,7 @@ namespace {
             if (session.verbose) {
                 *it++ = er::flag::VERBOSE;
             }
-            *it++ = er::flag::PATH;
+            *it++ = er::flag::EXECUTE;
             *it++ = path;
             *it++ = er::flag::COMMAND;
             {
