@@ -19,7 +19,7 @@
 
 #include "Executor.h"
 
-#include "intercept.h"
+#include "flags.h"
 
 #include "Array.h"
 #include "Environment.h"
@@ -81,16 +81,16 @@ namespace {
             const char** const it_end = it + length();
 
             *it++ = session.reporter;
-            *it++ = er::flag::DESTINATION;
+            *it++ = er::flags::DESTINATION;
             *it++ = session.destination;
-            *it++ = er::flag::LIBRARY;
+            *it++ = er::flags::LIBRARY;
             *it++ = session.library;
             if (session.verbose) {
-                *it++ = er::flag::VERBOSE;
+                *it++ = er::flags::VERBOSE;
             }
-            *it++ = er::flag::EXECUTE;
+            *it++ = er::flags::EXECUTE;
             *it++ = path;
-            *it++ = er::flag::COMMAND;
+            *it++ = er::flags::COMMAND;
             {
                 char* const* const argv_end = el::array::end(argv);
                 it = el::array::copy(argv, argv_end, it, it_end);

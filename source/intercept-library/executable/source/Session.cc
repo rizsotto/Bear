@@ -19,7 +19,7 @@
 
 #include "Session.h"
 
-#include "intercept.h"
+#include "flags.h"
 
 #include <algorithm>
 #include <cstring>
@@ -131,9 +131,9 @@ namespace {
 
     ::er::Result<::er::Context> make_context(const Parameters& parameters) noexcept
     {
-        if (auto destination_it = parameters.find(::er::flag::DESTINATION); destination_it != parameters.end()) {
+        if (auto destination_it = parameters.find(::er::flags::DESTINATION); destination_it != parameters.end()) {
             auto const [destination, _] = destination_it->second;
-            const bool verbose = (parameters.find(::er::flag::VERBOSE) != parameters.end());
+            const bool verbose = (parameters.find(::er::flags::VERBOSE) != parameters.end());
             auto const [reporter, __] = parameters.find(PROGRAM_KEY)->second;
             return ::er::Ok<::er::Context>({ *reporter, *destination, verbose });
         } else {
@@ -153,9 +153,9 @@ namespace {
         };
 
         auto const nowhere = parameters.end();
-        if (auto command_it = parameters.find(::er::flag::COMMAND); command_it != nowhere) {
+        if (auto command_it = parameters.find(::er::flags::COMMAND); command_it != nowhere) {
             auto [command, _] = command_it->second;
-            auto path = get_optional(::er::flag::EXECUTE);
+            auto path = get_optional(::er::flags::EXECUTE);
             if (path != nullptr) {
                 return ::er::Ok<::er::Execution>({ path, command });
             } else {
@@ -185,21 +185,21 @@ namespace er {
 
     er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
-        const Parser parser({ { ::er::flag::HELP, 0, "this message" },
-            { ::er::flag::VERBOSE, 0, "make the interception run verbose" },
-            { ::er::flag::DESTINATION, 1, "path to report directory" },
-            { ::er::flag::LIBRARY, 1, "path to the intercept library" },
-            { ::er::flag::EXECUTE, 1, "the path parameter for the command" },
-            { ::er::flag::COMMAND, -1, "the executed command" } });
+        const Parser parser({ { ::er::flags::HELP, 0, "this message" },
+            { ::er::flags::VERBOSE, 0, "make the interception run verbose" },
+            { ::er::flags::DESTINATION, 1, "path to report directory" },
+            { ::er::flags::LIBRARY, 1, "path to the intercept library" },
+            { ::er::flags::EXECUTE, 1, "the path parameter for the command" },
+            { ::er::flags::COMMAND, -1, "the executed command" } });
         return parser.parse(argc, const_cast<const char**>(argv))
             .bind<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
-                if (params.find(::er::flag::HELP) != params.end())
+                if (params.find(::er::flags::HELP) != params.end())
                     return Err(std::runtime_error(parser.help(argv[0])));
                 else
                     return merge(make_context(params), make_execution(params))
                         .template map<::er::SessionPtr>([&params](auto in) -> ::er::SessionPtr {
                             const auto& [context, execution] = in;
-                            if (auto library_it = params.find(::er::flag::LIBRARY); library_it != params.end()) {
+                            if (auto library_it = params.find(::er::flags::LIBRARY); library_it != params.end()) {
                                 const auto& [library, _] = library_it->second;
                                 auto result = std::make_unique<LibrarySession>(context, execution);
                                 result->library = *library;

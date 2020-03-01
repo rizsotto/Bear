@@ -20,7 +20,7 @@
 #include "gtest/gtest.h"
 
 #include "Session.h"
-#include "intercept.h"
+#include "flags.h"
 
 namespace {
 
@@ -42,7 +42,7 @@ namespace {
     {
         const char* argv[] = {
             "program",
-            ::er::flag::HELP,
+            ::er::flags::HELP,
             nullptr
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
@@ -57,11 +57,11 @@ namespace {
     {
         const char* argv[] = {
             "program",
-            er::flag::LIBRARY, "/install/path/libexec.so",
-            er::flag::DESTINATION, "/tmp/destination",
-            er::flag::VERBOSE,
-            er::flag::EXECUTE, "/bin/ls",
-            er::flag::COMMAND, "ls", "-l", "-a",
+            er::flags::LIBRARY, "/install/path/libexec.so",
+            er::flags::DESTINATION, "/tmp/destination",
+            er::flags::VERBOSE,
+            er::flags::EXECUTE, "/bin/ls",
+            er::flags::COMMAND, "ls", "-l", "-a",
             nullptr
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
