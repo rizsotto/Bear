@@ -1,0 +1,3 @@
+[submodule "source/dependencies/json"]
+	path = source/dependencies/json
+	url = https://github.com/nlohmann/json.git
