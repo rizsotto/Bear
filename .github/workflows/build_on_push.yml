@@ -15,6 +15,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v1
+      - name: Checkout submodules
+        uses: srt32/git-actions@v0.0.3
+        with:
+          args: git submodule update --init --recursive
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |

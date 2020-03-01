@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "../api/messages.h"
 #include "Reporter.h"
 #include "Result.h"
 #include "SystemCalls.h"

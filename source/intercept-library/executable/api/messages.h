@@ -19,8 +19,49 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 namespace er {
     namespace messages {
 
+        struct Event;
+        using EventPtr = std::shared_ptr<Event>;
+
+        struct Message {
+            // either: started, stopped, signalled.
+            std::string type;
+            // iso time format with milliseconds.
+            std::string at;
+            // the content of the event defined under.
+            EventPtr event;
+        };
+
+        struct Event {
+            pid_t pid;
+
+            virtual ~Event() = default;
+        };
+
+        struct ProcessStarted : public Event {
+            // executable
+            // arguments
+            // environment
+            // parent pid ???
+        };
+
+        struct ProcessStopped : public Event {
+            // exit status
+        };
+
+        struct ProcessSignalled : public Event {
+            // signal number
+        };
+
+        void to_json(json& j, const Message& message);
+        void from_json(const json& j, Message& message);
     }
 }
