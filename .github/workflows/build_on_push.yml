@@ -32,17 +32,6 @@ jobs:
           pip --version
           pip install --upgrade pip
           pip install lit pex pycodestyle
-      - name: Install gtest & gmock
-        if:  startsWith( matrix.os, 'ubuntu' )
-        env:
-          BUILDDIR: "googletest_build_dir"
-        run: |
-          git clone https://github.com/google/googletest.git
-          mkdir -p $BUILDDIR
-          cd $BUILDDIR
-          cmake ../googletest
-          make -j
-          sudo make install
       - name: Configure
         run: |
           source "$HOME/venv/bin/activate"

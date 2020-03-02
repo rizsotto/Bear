@@ -1,3 +1,6 @@
 [submodule "source/dependencies/json"]
 	path = source/dependencies/json
 	url = https://github.com/nlohmann/json.git
+[submodule "source/dependencies/googletest"]
+	path = source/dependencies/googletest
+	url = https://github.com/google/googletest.git

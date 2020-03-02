@@ -12,6 +12,9 @@ set(JSON_Install OFF CACHE INTERNAL "")
 # include(...) for pulling in other CMake projects anyways.
 add_subdirectory(dependencies/json)
 
+set(INSTALL_GTEST OFF CACHE INTERNAL "")
+add_subdirectory(dependencies/googletest)
+
 add_subdirectory(bear)
 add_subdirectory(intercept)
 add_subdirectory(intercept-wrapper)
