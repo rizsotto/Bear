@@ -1,0 +1,65 @@
+/*  Copyright (C) 2012-2020 by László Nagy
+    This file is part of Bear.
+
+    Bear is a tool to generate compilation database for clang tooling.
+
+    Bear is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Bear is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+syntax = "proto3";
+
+package supervise;
+option cc_enable_arenas = true;
+
+service Interceptor {
+
+    rpc Report (stream Event) returns (Summary) {
+    }
+}
+
+message Event {
+
+    // Use more efficient time representation would be good.
+    // Eg.:
+    //  import "google/protobuf/timestamp.proto";
+    string timestamp = 1;
+
+    reserved 2 to 10;
+
+    oneof event {
+        Started started = 11;
+        Stopped stopped = 12;
+        Signalled signalled = 13;
+    }
+
+    message Started {
+        int64 pid = 1;
+        int64 ppid = 2;
+        string executable = 3;
+        repeated string arguments = 4;
+        map<string, string> environment = 5;
+    }
+
+    message Stopped {
+        int64 status = 1;
+    }
+
+    message Signalled {
+        int32 number = 1;
+    }
+}
+
+message Summary {
+    int64 pid = 1;
+}

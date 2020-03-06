@@ -15,10 +15,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v1
-      - name: Checkout submodules
-        uses: srt32/git-actions@v0.0.3
         with:
-          args: git submodule update --init --recursive
+          submodules: recursive
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |
@@ -45,7 +43,8 @@ jobs:
           CTEST_OUTPUT_ON_FAILURE: 1
         run: |
           source "$HOME/venv/bin/activate"
-          make -C $HOME test
+          cd "$HOME"
+          ctest --tests-regex "^bear::.*"
       - name: Test package creation
         run: |
           make -C $HOME package

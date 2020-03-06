@@ -15,6 +15,6 @@ if (LIT_FOUND)
     set(INTERCEPT_CXX_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-c++/intercept-c++)
     set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/bear/source/bear)
 
-    add_test(NAME func_test
+    add_test(NAME bear::func_test
             COMMAND lit -DBEAR_EXE=${BEAR_EXE} -DINTERCEPT_EXE=${INTERCEPT_EXE} -DEXEC_LIB=${EXEC_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
 endif ()

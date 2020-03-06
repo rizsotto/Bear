@@ -13,4 +13,4 @@ target_link_libraries(libexec_unit_test exec_a)
 target_link_libraries(libexec_unit_test gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(libexec_unit_test gmock)
 
-add_test(NAME libexec_unit_test COMMAND libexec_unit_test)
+add_test(NAME bear::libexec_unit_test COMMAND libexec_unit_test)

@@ -10,4 +10,4 @@ target_include_directories(er_unit_test PRIVATE ${EXE_API_DIR})
 target_link_libraries(er_unit_test er_a)
 target_link_libraries(er_unit_test gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
 
-add_test(NAME LibInterceptUnitTests COMMAND er_unit_test)
+add_test(NAME bear::er_unit_test COMMAND er_unit_test)

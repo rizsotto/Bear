@@ -4,3 +4,6 @@
 [submodule "source/dependencies/googletest"]
 	path = source/dependencies/googletest
 	url = https://github.com/google/googletest.git
+[submodule "source/dependencies/grpc"]
+	path = source/dependencies/grpc
+	url = https://github.com/grpc/grpc.git
