@@ -80,9 +80,26 @@ namespace er {
         Result<U, E> map(std::function<U(const T&)> const& f) const noexcept;
 
         template <typename U>
-        Result<U, E> bind(std::function<Result<U, E>(const T&)> const& f) const noexcept;
+        Result<U, E> map_or(U&& value, std::function<U(const T&)> const& f) const noexcept;
 
-        const T& get_or_else(const T& value) const noexcept;
+        template <typename U>
+        Result<U, E> map_or_else(std::function<U(const E&)> const& provider, std::function<U(const T&)> const& f) const noexcept;
+
+        template <typename F>
+        Result<T, F> map_err(std::function<F(const E&)> const& f) const noexcept;
+
+        Result<T,E> and_(const Result<T,E> & rhs) const noexcept;
+
+        template <typename U>
+        Result<U, E> and_then(std::function<Result<U, E>(const T&)> const& f) const noexcept;
+
+        Result<T,E> or_(const Result<T,E> & rhs) const noexcept;
+
+        Result<T, E> or_else(std::function<Result<T,E>(const E&)> const& f) const noexcept;
+
+        const T& unwrap_or(const T& value) const noexcept;
+
+        const T& unwrap_or_else(std::function<T(const E&)> const& provider) const noexcept;
 
         Result<T, E> const& handle_with(std::function<void(const E&)> const& f) const noexcept;
 
@@ -119,7 +136,7 @@ namespace er {
 
     template <typename T, typename E>
     template <typename U>
-    Result<U, E> Result<T, E>::bind(std::function<Result<U, E>(const T&)> const& f) const noexcept
+    Result<U, E> Result<T, E>::and_then(std::function<Result<U, E>(const T&)> const& f) const noexcept
     {
         if (std::holds_alternative<T>(state_))
             return f(std::get<T>(state_));
@@ -128,7 +145,7 @@ namespace er {
     }
 
     template <typename T, typename E>
-    const T& Result<T, E>::get_or_else(const T& value) const noexcept
+    const T& Result<T, E>::unwrap_or(const T& value) const noexcept
     {
         return (std::holds_alternative<T>(state_))
             ? std::get<T>(state_)
@@ -159,7 +176,7 @@ namespace er {
     template <typename T1, typename T2>
     Result<std::tuple<T1, T2>> merge(const Result<T1>& t1, const Result<T2>& t2)
     {
-        return t1.template bind<std::tuple<T1, T2>>([&t2](auto& t1_value) {
+        return t1.template and_then<std::tuple<T1, T2>>([&t2](auto& t1_value) {
             return t2.template map<std::tuple<T1, T2>>([&t1_value](auto& t2_value) {
                 return std::make_tuple(t1_value, t2_value);
             });
@@ -169,8 +186,8 @@ namespace er {
     template <typename T1, typename T2, typename T3>
     Result<std::tuple<T1, T2, T3>> merge(const Result<T1>& t1, const Result<T2>& t2, const Result<T3>& t3)
     {
-        return t1.template bind<std::tuple<T1, T2, T3>>([&t2, &t3](auto& t1_value) {
-            return t2.template bind<std::tuple<T1, T2, T3>>([&t1_value, &t3](auto& t2_value) {
+        return t1.template and_then<std::tuple<T1, T2, T3>>([&t2, &t3](auto& t1_value) {
+            return t2.template and_then<std::tuple<T1, T2, T3>>([&t1_value, &t3](auto& t2_value) {
                 return t3.template map<std::tuple<T1, T2, T3>>([&t1_value, &t2_value](auto& t3_value) {
                     return std::make_tuple(t1_value, t2_value, t3_value);
                 });

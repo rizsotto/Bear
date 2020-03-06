@@ -31,9 +31,9 @@ namespace {
     std::ostream& error_stream()
     {
         std::cerr << "er: [pid: "
-                  << er::SystemCalls::get_pid().get_or_else(0)
+                  << er::SystemCalls::get_pid().unwrap_or(0)
                   << ", ppid: "
-                  << er::SystemCalls::get_ppid().get_or_else(0)
+                  << er::SystemCalls::get_ppid().unwrap_or(0)
                   << "] ";
         return std::cerr;
     }
@@ -47,27 +47,27 @@ namespace {
     void report_start(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
     {
         ::er::merge(reporter, ::er::Event::start(pid, cmd))
-            .bind<int>([](auto tuple) {
+            .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
                 error_stream() << "report start: " << message.what() << std::endl;
             })
-            .get_or_else(0);
+            .unwrap_or(0);
     }
 
     void report_exit(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
     {
         ::er::merge(reporter, ::er::Event::stop(pid, exit))
-            .bind<int>([](auto tuple) {
+            .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
                 error_stream() << "report stop: " << message.what() << std::endl;
             })
-            .get_or_else(0);
+            .unwrap_or(0);
     }
 
     ::er::EnvironmentPtr create_environment(char* original[], const ::er::SessionPtr& session)
@@ -102,7 +102,7 @@ int main(int argc, char* argv[], char* envp[])
             }
             return arguments;
         })
-        .bind<int>([&envp](auto arguments) {
+        .and_then<int>([&envp](auto arguments) {
             auto reporter = er::Reporter::tempfile(arguments->context_.destination);
 
             auto environment = create_environment(envp, arguments);
@@ -111,7 +111,7 @@ int main(int argc, char* argv[], char* envp[])
                     report_start(reporter, pid, arguments->execution_.command);
                     return pid;
                 })
-                .template bind<std::tuple<pid_t, int>>([](auto pid) {
+                .template and_then<std::tuple<pid_t, int>>([](auto pid) {
                     return er::SystemCalls::wait_pid(pid)
                         .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                             return std::make_tuple(pid, exit);
@@ -126,5 +126,5 @@ int main(int argc, char* argv[], char* envp[])
         .handle_with([](auto message) {
             error_stream() << message.what() << std::endl;
         })
-        .get_or_else(EXIT_FAILURE);
+        .unwrap_or(EXIT_FAILURE);
 }

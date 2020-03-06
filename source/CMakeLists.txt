@@ -35,6 +35,7 @@ find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
 message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
 
 add_subdirectory(bear)
+add_subdirectory(libresult)
 add_subdirectory(intercept)
 add_subdirectory(intercept-wrapper)
 add_subdirectory(intercept-library)

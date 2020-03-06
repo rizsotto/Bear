@@ -35,7 +35,7 @@ namespace {
         ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
-        ASSERT_EQ(expected, result.get_or_else(expected));
+        ASSERT_EQ(expected, result.unwrap_or(expected));
     }
 
     TEST(session, parse_help_fails)
@@ -50,7 +50,7 @@ namespace {
         ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
-        ASSERT_EQ(expected, result.get_or_else(expected));
+        ASSERT_EQ(expected, result.unwrap_or(expected));
     }
 
     TEST(session, parse_library_success)
@@ -68,8 +68,8 @@ namespace {
 
         ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const dummy = ::er::SessionPtr(nullptr);
-        ASSERT_NE(dummy, result.get_or_else(dummy));
-        auto session_result = (::er::LibrarySession const*)result.get_or_else(dummy).get();
+        ASSERT_NE(dummy, result.unwrap_or(dummy));
+        auto session_result = (::er::LibrarySession const*)result.unwrap_or(dummy).get();
 
         ASSERT_STREQ(argv[0], session_result->context_.reporter);
         ASSERT_STREQ(argv[4], session_result->context_.destination);

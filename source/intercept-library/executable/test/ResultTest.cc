@@ -30,20 +30,20 @@ namespace {
     {
         EXPECT_EQ(2,
             (Result<int, Error>(Ok(2))
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('c',
             (Result<char, Error>(Ok('c'))
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
     }
 
     TEST(result, get_or_else_on_failure)
     {
         EXPECT_EQ(8,
             (Result<int, Error>(Err("problem"))
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
     }
 
     TEST(result, map_on_success)
@@ -53,19 +53,19 @@ namespace {
                     .map<int>([](auto& in) {
                         return in * 2;
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ(2.5f,
             (Result<int, Error>(Ok(2))
                     .map<float>([](auto& in) {
                         return in + 0.5f;
                     })
-                    .get_or_else(8.0f)));
+                    .unwrap_or(8.0f)));
         EXPECT_EQ('d',
             (Result<char, Error>(Ok('c'))
                     .map<int>([](auto& in) {
                         return in + 1;
                     })
-                    .get_or_else(42)));
+                    .unwrap_or(42)));
     }
 
     TEST(result, map_on_failure)
@@ -75,69 +75,69 @@ namespace {
                     .map<int>([](auto& in) {
                         return in * 2;
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
                     .map<char>([](const char& in) {
                         return char(in + 1);
                     })
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
     }
 
     TEST(result, bind_on_success)
     {
         EXPECT_EQ(2,
             (Result<int, Error>(Ok(1))
-                    .bind<int>([](auto& in) {
+                    .and_then<int>([](auto& in) {
                         return Ok(in * 2);
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('d',
             (Result<char, Error>(Ok('c'))
-                    .bind<char>([](auto& in) {
+                    .and_then<char>([](auto& in) {
                         return Ok(char(in + 1));
                     })
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
         EXPECT_EQ(8,
             (Result<int, Error>(Ok(1))
-                    .bind<int>([](auto& in) {
+                    .and_then<int>([](auto& in) {
                         return Err("problem");
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Ok('c'))
-                    .bind<char>([](auto& in) {
+                    .and_then<char>([](auto& in) {
                         return Err("problem");
                     })
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
     }
 
     TEST(result, bind_on_failure)
     {
         EXPECT_EQ(8,
             (Result<int, Error>(Err("problem"))
-                    .bind<int>([](auto& in) {
+                    .and_then<int>([](auto& in) {
                         return Ok(in * 2);
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
-                    .bind<char>([](auto& in) {
+                    .and_then<char>([](auto& in) {
                         return Ok(char(in + 1));
                     })
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
         EXPECT_EQ(8,
             (Result<int, Error>(Err("problem"))
-                    .bind<int>([](auto& in) {
+                    .and_then<int>([](auto& in) {
                         return Err("another problem");
                     })
-                    .get_or_else(8)));
+                    .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
-                    .bind<char>([](auto& in) {
+                    .and_then<char>([](auto& in) {
                         return Err("another problem");
                     })
-                    .get_or_else('+')));
+                    .unwrap_or('+')));
     }
 
     TEST(result, handle_with_on_success)

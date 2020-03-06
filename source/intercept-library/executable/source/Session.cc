@@ -192,7 +192,7 @@ namespace er {
             { ::er::flags::EXECUTE, 1, "the path parameter for the command" },
             { ::er::flags::COMMAND, -1, "the executed command" } });
         return parser.parse(argc, const_cast<const char**>(argv))
-            .bind<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
+            .and_then<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
                 if (params.find(::er::flags::HELP) != params.end())
                     return Err(std::runtime_error(parser.help(argv[0])));
                 else
