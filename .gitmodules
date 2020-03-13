@@ -1,9 +1,9 @@
 [submodule "source/dependencies/json"]
-	path = source/dependencies/json
+	path = third_party/json
 	url = https://github.com/nlohmann/json.git
 [submodule "source/dependencies/googletest"]
-	path = source/dependencies/googletest
+	path = third_party/googletest
 	url = https://github.com/google/googletest.git
 [submodule "source/dependencies/grpc"]
-	path = source/dependencies/grpc
+	path = third_party/grpc
 	url = https://github.com/grpc/grpc.git

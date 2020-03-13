@@ -24,6 +24,11 @@ project(bear
 
 enable_testing()
 
+option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
+option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
+option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
+
+add_subdirectory(third_party)
 add_subdirectory(source)
 add_subdirectory(test)
 
