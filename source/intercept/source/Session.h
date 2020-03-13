@@ -19,4 +19,19 @@
 
 #pragma once
 
-#include "config.h"
+#include <string>
+#include <map>
+
+namespace ic {
+
+    class Session {
+    public:
+        virtual ~Session() = default;
+
+        // TODO: these shall return `Result<>`
+        virtual const char* resolve(const std::string& name) const noexcept = 0;
+
+        virtual std::map<std::string, std::string> appends() const noexcept = 0;
+        virtual std::map<std::string, std::string> overrides() const noexcept = 0;
+    };
+}

@@ -27,7 +27,7 @@ service Interceptor {
     rpc GetWrappedCommand (WrapperRequest) returns (WrapperResponse) {}
     rpc GetEnvironmentUpdate (Empty) returns (EnvironmentUpdate) {}
 
-    rpc Report (stream Event) returns (Summary) {}
+    rpc Report (stream Event) returns (Empty) {}
 }
 
 message WrapperRequest {
@@ -75,8 +75,4 @@ message Event {
     message Signalled {
         int32 number = 1;
     }
-}
-
-message Summary {
-    int64 pid = 1;
 }

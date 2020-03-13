@@ -12,7 +12,6 @@ target_include_directories(intercept PRIVATE ${EXE_SRC_DIR})
 target_link_libraries(intercept intercept_a)
 target_compile_features(intercept PUBLIC cxx_std_14)
 target_compile_options(intercept PUBLIC -fno-exceptions -fno-rtti)
-#set_target_properties(intercept PROPERTIES LINKER_LANGUAGE "C")
 
 include(GNUInstallDirs)
 install(TARGETS intercept

@@ -17,4 +17,32 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "SystemCalls.h"
+#include "Reporter.h"
+
+namespace ic {
+
+    Execution::Builder::Builder()
+            : execution_(nullptr)
+    {
+    }
+
+    Execution::Builder& Execution::Builder::add(supervise::Event const& event)
+    {
+        //    // Create an instance if it's not yet there.
+        //    if (execution_.get() == nullptr) {
+        //        execution_.reset(new Execution());
+        //    }
+        //    ::Execution &execution = *execution_;
+        // TODO
+        return *this;
+    }
+
+    ExecutionPtr Execution::Builder::build() noexcept
+    {
+        return execution_;
+    }
+
+    void Reporter::report(const ExecutionPtr& execution) noexcept
+    {
+    }
+}
