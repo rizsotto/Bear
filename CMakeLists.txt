@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
-
+cmake_minimum_required(VERSION 3.1...3.15)
 if (${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 else ()
@@ -24,13 +23,36 @@ project(bear
 
 enable_testing()
 
-option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
-option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
-option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
+find_package(Threads REQUIRED)
+find_package(nlohmann_json REQUIRED)
+find_package(GTest REQUIRED NO_CMAKE_PATH)
+#set(protobuf_MODULE_COMPATIBLE TRUE)
+find_package(Protobuf REQUIRED NO_CMAKE_PATH)
+#message(STATUS "Using protobuf ${protobuf_VERSION}")
+#
+#set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
+##if (CMAKE_CROSSCOMPILING)
+    find_program(_PROTOBUF_PROTOC protoc HINTS ${gRPC_BINDIR})
+    message(STATUS "Looking for protoc ... ${_PROTOBUF_PROTOC}")
+##else ()
+##    set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
+##endif ()
+#
+find_package(gRPC REQUIRED NO_CMAKE_PATH)
+#message(STATUS "Using gRPC ${gRPC_VERSION}")
+#
+#set(_GRPC_GRPCPP_UNSECURE gRPC::grpc++_unsecure)
+##if (CMAKE_CROSSCOMPILING)
+    find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
+    message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
+##else ()
+##    set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
+##endif ()
 
-add_subdirectory(third_party)
+
+#add_subdirectory(third_party)
 add_subdirectory(source)
-add_subdirectory(test)
+#add_subdirectory(test)
 
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
