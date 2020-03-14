@@ -179,19 +179,14 @@ namespace er {
     }
 
     template <typename T>
-    er::Result<T> Err(const char* message) noexcept
+    er::Result<T> Err(const char* message, const int error) noexcept
     {
-        std::string result = message != nullptr ? std::string(message) : std::string();
+        std::string result = message != nullptr ? std::string(message) : std::string("generic error");
 
-        const size_t buffer_length = 1024 + std::strlen(message);
-        char buffer[buffer_length];
-        if (0 == strerror_r(errno, buffer, buffer_length)) {
-            result += std::string(": ");
-            result += std::string(buffer);
-        } else {
-            result += std::string(": unkown error.");
-        }
-        errno = ENOENT;
+        result += " (errno: ";
+        result += std::to_string(error);
+        result += ")";
+
         return ::er::Err(std::runtime_error(result));
     };
 

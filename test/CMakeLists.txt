@@ -1,20 +1,23 @@
+cmake_minimum_required(VERSION 3.1...3.16)
+
+project(Bear-FunctionalTest)
+
+enable_testing()
+
 message(STATUS "Looking for lit")
 find_program(LIT_EXECUTABLE
         NAMES lit
         PATHS ENV LIT_PATH)
-if (LIT_EXECUTABLE)
-    set(LIT_FOUND 1)
-    message(STATUS "Looking for lit -- found")
-endif ()
 
-if (LIT_FOUND)
-    set(EXEC_LIB_FILE ${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX})
-    set(EXEC_LIB ${CMAKE_BINARY_DIR}/source/intercept-library/library/${EXEC_LIB_FILE})
-    set(INTERCEPT_EXE ${CMAKE_BINARY_DIR}/source/intercept-library/executable/er)
-    set(INTERCEPT_CC_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-cc/intercept-cc)
-    set(INTERCEPT_CXX_EXE ${CMAKE_BINARY_DIR}/source/intercept-wrapper/intercept-c++/intercept-c++)
-    set(BEAR_EXE ${CMAKE_BINARY_DIR}/source/bear/source/bear)
+if (LIT_EXECUTABLE)
+    message(STATUS "Looking for lit -- found")
+
+    set(EXEC_LIB_FILE "${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    set(EXEC_LIB "${_BEAR_LIB_DIR}/${EXEC_LIB_FILE}")
+    set(ER_EXE "${_BEAR_LIBEXEC_DIR}/er")
+    set(BEAR_EXE "${_BEAR_BIN_DIR}/bear")
+    set(INTERCEPT_EXE "${_BEAR_BIN_DIR}/intercept")
 
     add_test(NAME bear::func_test
-            COMMAND lit -DBEAR_EXE=${BEAR_EXE} -DINTERCEPT_EXE=${INTERCEPT_EXE} -DEXEC_LIB=${EXEC_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
+            COMMAND ${LIT_EXECUTABLE} -DBEAR_EXE=${BEAR_EXE} -DINTERCEPT_EXE=${ER_EXE} -DEXEC_LIB=${EXEC_LIB} -v ${CMAKE_CURRENT_SOURCE_DIR})
 endif ()

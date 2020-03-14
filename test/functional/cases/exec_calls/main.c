@@ -103,7 +103,7 @@ void wait_for(pid_t child) {
     exit(EXIT_FAILURE);
   }
   if (WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE) {
-    fprintf(stderr, "children process has non zero exit code\n");
+    fprintf(stderr, "child process has non zero exit code\n");
     exit(EXIT_FAILURE);
   }
 }
@@ -115,7 +115,7 @@ void wait_for(pid_t child) {
       perror("fork");                                                          \
       exit(EXIT_FAILURE);                                                      \
     } else if (0 == child) {                                                   \
-      FUNC fprintf(stderr, "children process failed to exec\n");               \
+      FUNC fprintf(stderr, "child process failed to exec\n");                  \
       exit(EXIT_FAILURE);                                                      \
     } else {                                                                   \
       wait_for(child);                                                         \

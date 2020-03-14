@@ -49,8 +49,6 @@ endif ()
 ExternalProject_Add(Bear
         PREFIX bear
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source"
-        BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear"
-        INSTALL_COMMAND ""
         TEST_BEFORE_INSTALL 1
         CMAKE_CACHE_ARGS
         -Dnlohmann_json_DIR:PATH=${json_CMAKE_DIR}
@@ -58,5 +56,21 @@ ExternalProject_Add(Bear
         -DProtobuf_DIR:PATH=${protobuf_CMAKE_DIR}
         -DgRPC_DIR:PATH=${grpc_CMAKE_DIR}
         -DgRPC_BINDIR:PATH=${grpc_BIN_DIR}
+        -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/bear
         DEPENDS json googletest grpc
+        )
+set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
+set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/lib64")
+set(BEAR_LIBEXEC_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/libexec")
+
+ExternalProject_Add(BearTest
+        PREFIX test
+        INSTALL_COMMAND ""
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/test"
+        TEST_BEFORE_INSTALL 1
+        CMAKE_CACHE_ARGS
+        -D_BEAR_BIN_DIR:PATH=${BEAR_BIN_DIR}
+        -D_BEAR_LIB_DIR:PATH=${BEAR_LIB_DIR}
+        -D_BEAR_LIBEXEC_DIR:PATH=${BEAR_LIBEXEC_DIR}
+        DEPENDS Bear
         )

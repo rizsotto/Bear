@@ -30,7 +30,7 @@ namespace {
 
     std::ostream& error_stream()
     {
-        std::cerr << "intercept: [pid: "
+        std::cerr << "er: [pid: "
                   << er::SystemCalls::get_pid().get_or_else(0)
                   << ", ppid: "
                   << er::SystemCalls::get_ppid().get_or_else(0)
@@ -52,7 +52,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
-                error_stream() << message.what() << std::endl;
+                error_stream() << "report start: " << message.what() << std::endl;
             })
             .get_or_else(0);
     }
@@ -65,7 +65,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .handle_with([](auto message) {
-                error_stream() << message.what() << std::endl;
+                error_stream() << "report stop: " << message.what() << std::endl;
             })
             .get_or_else(0);
     }

@@ -21,8 +21,10 @@
 
 #include <spawn.h>
 #include <wait.h>
+#include <limits.h>
 
 #include <cstring>
+#include <cerrno>
 #include <fstream>
 #include <memory>
 
@@ -47,9 +49,10 @@ namespace er {
 
     Result<int> SystemCalls::spawn(const char* path, const char** argv, const char** envp) noexcept
     {
+        errno = ENOENT;
         pid_t child;
         if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return Err<pid_t>("posix_spawn");
+            return Err<pid_t>("posix_spawn", errno);
         } else {
             return Ok(child);
         }
@@ -57,9 +60,10 @@ namespace er {
 
     Result<int> SystemCalls::spawnp(const char* file, const char** argv, const char** envp) noexcept
     {
+        errno = ENOENT;
         pid_t child;
         if (0 != posix_spawnp(&child, file, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return Err<pid_t>("posix_spawn");
+            return Err<pid_t>("posix_spawn", errno);
         } else {
             return Ok(child);
         }
@@ -67,9 +71,10 @@ namespace er {
 
     Result<int> SystemCalls::wait_pid(pid_t pid) noexcept
     {
+        errno = ENOENT;
         int status;
         if (-1 == waitpid(pid, &status, 0)) {
-            return Err<int>("waitpid");
+            return Err<int>("waitpid", errno);
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
             return Ok(result);
@@ -88,11 +93,12 @@ namespace er {
 
     Result<std::string> SystemCalls::get_cwd() noexcept
     {
-        constexpr static const size_t buffer_size = 8192;
+        constexpr static const size_t buffer_size = PATH_MAX;
+        errno = ENOENT;
 
         char buffer[buffer_size];
         if (nullptr == getcwd(buffer, buffer_size)) {
-            return Err<std::string>("getcwd");
+            return Err<std::string>("getcwd", errno);
         } else {
             return Ok(std::string(buffer));
         }
@@ -107,12 +113,12 @@ namespace er {
         char buffer[buffer_size];
         std::copy(path.c_str(), path.c_str() + path.length() + 1, (char*)buffer);
         // create the temporary file.
+        errno = ENOENT;
         if (-1 == mkstemps(buffer, strlen(suffix))) {
-            return Err<std::shared_ptr<std::ostream>>("mkstemp");
+            return Err<std::shared_ptr<std::ostream>>("mkstemp", errno);
         } else {
             auto result = std::make_shared<std::ofstream>(std::string(buffer));
             return Ok(std::dynamic_pointer_cast<std::ostream>(result));
         }
     }
-
 }
