@@ -1,78 +1,62 @@
-cmake_minimum_required(VERSION 3.1...3.15)
-if (${CMAKE_VERSION} VERSION_LESS 3.12)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-else ()
-    cmake_policy(VERSION 3.12)
+cmake_minimum_required(VERSION 3.1...3.16)
+
+project(Bear-SuperBuild C CXX)
+
+option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
+option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
+option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
+
+include(ExternalProject)
+
+if (NOT USE_SYSTEM_JSON)
+    ExternalProject_Add(json
+            PREFIX json
+            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/json"
+            CMAKE_CACHE_ARGS
+            -DJSON_Install:BOOL=ON
+            -DJSON_BuildTests:BOOL=OFF
+            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/json
+            )
+    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/lib64/cmake/nlohmann_json/")
 endif ()
 
-set(default_build_type "Release")
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
-    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
-            STRING "Choose the type of build." FORCE)
-    # Set the possible values of build type for cmake-gui
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+if (NOT USE_SYSTEM_GTEST)
+    ExternalProject_Add(googletest
+            PREFIX googletest
+            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest"
+            CMAKE_CACHE_ARGS
+            -DINSTALL_GTEST:BOOL=ON
+            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/googletest
+            )
+    set(googletest_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/googletest/lib64/cmake/GTest/")
 endif ()
 
+if (NOT USE_SYSTEM_GRPC)
+    ExternalProject_Add(grpc
+            PREFIX grpc
+            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/grpc"
+            CMAKE_CACHE_ARGS
+            -DgRPC_INSTALL:BOOL=ON
+            -DgRPC_BUILD_TESTS:BOOL=OFF
+            -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
+            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
+            )
+    set(protobuf_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/lib64/cmake/protobuf/")
+    set(grpc_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc/")
+    set(grpc_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/bin/")
+endif ()
 
-project(bear
-        VERSION 3.0.0
-        DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
-        LANGUAGES C CXX)
-
-enable_testing()
-
-find_package(Threads REQUIRED)
-find_package(nlohmann_json REQUIRED)
-find_package(GTest REQUIRED NO_CMAKE_PATH)
-#set(protobuf_MODULE_COMPATIBLE TRUE)
-find_package(Protobuf REQUIRED NO_CMAKE_PATH)
-#message(STATUS "Using protobuf ${protobuf_VERSION}")
-#
-#set(_PROTOBUF_LIBPROTOBUF protobuf::libprotobuf)
-##if (CMAKE_CROSSCOMPILING)
-    find_program(_PROTOBUF_PROTOC protoc HINTS ${gRPC_BINDIR})
-    message(STATUS "Looking for protoc ... ${_PROTOBUF_PROTOC}")
-##else ()
-##    set(_PROTOBUF_PROTOC $<TARGET_FILE:protobuf::protoc>)
-##endif ()
-#
-find_package(gRPC REQUIRED NO_CMAKE_PATH)
-#message(STATUS "Using gRPC ${gRPC_VERSION}")
-#
-#set(_GRPC_GRPCPP_UNSECURE gRPC::grpc++_unsecure)
-##if (CMAKE_CROSSCOMPILING)
-    find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
-    message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
-##else ()
-##    set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:gRPC::grpc_cpp_plugin>)
-##endif ()
-
-
-#add_subdirectory(third_party)
-add_subdirectory(source)
-#add_subdirectory(test)
-
-include(GNUInstallDirs)
-install(FILES COPYING README.md ChangeLog.md
-        DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-set(CPACK_PACKAGE_NAME "bear")
-set(CPACK_PACKAGE_CONTACT "László Nagy")
-set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
-set(CPACK_PACKAGE_VERSION ${BEAR_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "BuildEAR")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
-set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
-set(CPACK_RPM_PACKAGE_RELEASE "1%{?dist}")
-set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
-set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
-set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
-set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
-        "${CMAKE_INSTALL_MANDIR}"
-        "${CMAKE_INSTALL_MANDIR}/man1")
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-include(CPack)
+ExternalProject_Add(Bear
+        PREFIX bear
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source"
+        BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear"
+        INSTALL_COMMAND ""
+        TEST_BEFORE_INSTALL 1
+        CMAKE_CACHE_ARGS
+        -Dnlohmann_json_DIR:PATH=${json_CMAKE_DIR}
+        -DGTest_DIR:PATH=${googletest_CMAKE_DIR}
+        -DProtobuf_DIR:PATH=${protobuf_CMAKE_DIR}
+        -DgRPC_DIR:PATH=${grpc_CMAKE_DIR}
+        -DgRPC_BINDIR:PATH=${grpc_BIN_DIR}
+        DEPENDS json googletest grpc
+        )
