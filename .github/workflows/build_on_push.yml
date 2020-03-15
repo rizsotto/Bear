@@ -34,23 +34,10 @@ jobs:
         run: |
           source "$HOME/venv/bin/activate"
           cd $HOME
-          cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCPACK_GENERATOR="TGZ;DEB" "$GITHUB_WORKSPACE"
+          cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCPACK_GENERATOR="TGZ;DEB" -DLIBRARY_DIRECTORY_NAME=lib "$GITHUB_WORKSPACE"
       - name: Build
-        run: |
-          make -C $HOME all
-      - name: Test
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
         run: |
           source "$HOME/venv/bin/activate"
-          cd "$HOME"
-          ctest --tests-regex "^bear::.*"
-      - name: Test package creation
-        run: |
-          make -C $HOME package
-      - name: Test install
-        env:
-          DESTDIR: "install"
-        run: |
-          mkdir -p $DESTDIR
-          make -C $HOME install
+          make -C $HOME all

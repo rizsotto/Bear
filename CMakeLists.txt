@@ -6,6 +6,12 @@ option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
 option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
 option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
 
+# Some systems are using different library directory names for
+# 64 bit and 32 bit libraries.
+if (NOT LIBRARY_DIRECTORY_NAME)
+    set(LIBRARY_DIRECTORY_NAME "lib64")
+endif ()
+
 include(ExternalProject)
 
 if (NOT USE_SYSTEM_JSON)
@@ -17,7 +23,7 @@ if (NOT USE_SYSTEM_JSON)
             -DJSON_BuildTests:BOOL=OFF
             -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/json
             )
-    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/lib64/cmake/nlohmann_json/")
+    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
 endif ()
 
 if (NOT USE_SYSTEM_GTEST)
@@ -28,7 +34,7 @@ if (NOT USE_SYSTEM_GTEST)
             -DINSTALL_GTEST:BOOL=ON
             -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/googletest
             )
-    set(googletest_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/googletest/lib64/cmake/GTest/")
+    set(googletest_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/googletest/${LIBRARY_DIRECTORY_NAME}/cmake/GTest/")
 endif ()
 
 if (NOT USE_SYSTEM_GRPC)
@@ -41,7 +47,7 @@ if (NOT USE_SYSTEM_GRPC)
             -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
             -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
             )
-    set(protobuf_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/lib64/cmake/protobuf/")
+    set(protobuf_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
     set(grpc_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc/")
     set(grpc_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/bin/")
 endif ()
@@ -60,7 +66,7 @@ ExternalProject_Add(Bear
         DEPENDS json googletest grpc
         )
 set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
-set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/lib64")
+set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/${LIBRARY_DIRECTORY_NAME}")
 set(BEAR_LIBEXEC_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/libexec")
 
 ExternalProject_Add(BearTest
