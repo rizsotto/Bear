@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1...3.16)
+cmake_minimum_required(VERSION 3.16)
 
 project(Bear-SuperBuild C CXX)
 
@@ -8,7 +8,9 @@ option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
 
 # Some systems are using different library directory names for
 # 64 bit and 32 bit libraries.
-if (NOT LIBRARY_DIRECTORY_NAME)
+if (APPLE)
+    set(LIBRARY_DIRECTORY_NAME "lib")
+elseif (NOT LIBRARY_DIRECTORY_NAME)
     set(LIBRARY_DIRECTORY_NAME "lib64")
 endif ()
 

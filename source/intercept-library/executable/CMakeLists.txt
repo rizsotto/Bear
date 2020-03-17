@@ -7,7 +7,9 @@ add_subdirectory(man)
 
 # Create a static executable from the sub projects.
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-set(CMAKE_EXE_LINKER_FLAGS "-static")
+if (NOT APPLE)
+    set(CMAKE_EXE_LINKER_FLAGS "-static")
+endif()
 
 add_executable(er
         main.cc

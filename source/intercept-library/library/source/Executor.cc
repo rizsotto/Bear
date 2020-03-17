@@ -29,6 +29,7 @@
 
 #include <climits>
 #include <functional>
+#include <errno.h>
 #include <unistd.h>
 
 namespace {

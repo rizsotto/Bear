@@ -91,7 +91,7 @@ namespace {
         EXPECT_EQ(nullptr, result[0]);
     }
 
-#ifdef APPLE
+#ifdef __APPLE__
 #else
     TEST(environment, empty_library)
     {

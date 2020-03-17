@@ -20,7 +20,7 @@
 #include "SystemCalls.h"
 
 #include <spawn.h>
-#include <wait.h>
+#include <sys/wait.h>
 #include <limits.h>
 
 #include <cstring>
