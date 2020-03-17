@@ -1,6 +1,11 @@
 include(FindPythonInterp)
 if (PYTHONINTERP_FOUND)
-    set(BEAR_PYTHON_EXECUTABLE "python${PYTHON_VERSION_MAJOR}")
+    if (PYTHON_VERSION_MAJOR GREATER 2)
+        set(BEAR_PYTHON_EXECUTABLE "python${PYTHON_VERSION_MAJOR}")
+    else()
+        # Some systems (e.g. macOS) don't install python2 but only python2.7
+        set(BEAR_PYTHON_EXECUTABLE "python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}")
+    endif()
 else()
     message(FATAL_ERROR "Have not found python interpreter")
 endif()
