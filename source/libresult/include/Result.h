@@ -219,6 +219,27 @@ namespace rust {
         internals::Storage<T, E> storage_;
     };
 
+    template <typename T1, typename T2>
+    Result<std::tuple<T1, T2>> merge(const Result<T1>& t1, const Result<T2>& t2)
+    {
+        return t1.template and_then<std::tuple<T1, T2>>([&t2](auto& t1_value) {
+            return t2.template map<std::tuple<T1, T2>>([&t1_value](auto& t2_value) {
+                return std::make_tuple(t1_value, t2_value);
+            });
+        });
+    }
+
+    template <typename T1, typename T2, typename T3>
+    Result<std::tuple<T1, T2, T3>> merge(const Result<T1>& t1, const Result<T2>& t2, const Result<T3>& t3)
+    {
+        return t1.template and_then<std::tuple<T1, T2, T3>>([&t2, &t3](auto& t1_value) {
+            return t2.template and_then<std::tuple<T1, T2, T3>>([&t1_value, &t3](auto& t2_value) {
+                return t3.template map<std::tuple<T1, T2, T3>>([&t1_value, &t2_value](auto& t3_value) {
+                    return std::make_tuple(t1_value, t2_value, t3_value);
+                });
+            });
+        });
+    }
 
     template <typename T, typename E>
     Result<T, E>::~Result()

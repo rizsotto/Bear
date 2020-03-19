@@ -10,7 +10,6 @@ add_library(er_a STATIC
         Interface.h
         Reporter.h
         Reporter.cc
-        Result.h
         Session.h
         Session.cc
         SystemCalls.h
@@ -20,6 +19,7 @@ add_library(er_a STATIC
 target_include_directories(er_a PRIVATE ${EXE_CFG_DIR})
 target_include_directories(er_a PRIVATE ${EXE_API_DIR})
 target_include_directories(er_a PRIVATE ${LIB_API_DIR})
+target_include_directories(er_a PRIVATE ${LIBRESULT_INCLUDE_DIR})
 target_include_directories(er_a PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(er_a PRIVATE nlohmann_json::nlohmann_json)
 target_compile_features(er_a PUBLIC cxx_std_17)

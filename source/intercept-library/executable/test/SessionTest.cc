@@ -32,7 +32,7 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::rust::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.unwrap_or(expected));
@@ -47,7 +47,7 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::rust::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
 
         ASSERT_EQ(expected, result.unwrap_or(expected));
@@ -66,7 +66,7 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
+        ::rust::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
         ::er::SessionPtr const dummy = ::er::SessionPtr(nullptr);
         ASSERT_NE(dummy, result.unwrap_or(dummy));
         auto session_result = (::er::LibrarySession const*)result.unwrap_or(dummy).get();

@@ -1,12 +1,12 @@
 add_executable(er_unit_test
         EnvironmentTest.cc
-        ResultTest.cc
         SessionTest.cc
         )
 
 target_include_directories(er_unit_test PRIVATE ${EXE_CFG_DIR})
 target_include_directories(er_unit_test PRIVATE ${EXE_SRC_DIR})
 target_include_directories(er_unit_test PRIVATE ${EXE_API_DIR})
+target_include_directories(er_unit_test PRIVATE ${LIBRESULT_INCLUDE_DIR})
 target_include_directories(er_unit_test PRIVATE GTest::gtest)
 target_include_directories(er_unit_test PRIVATE GMock::gmock)
 target_link_libraries(er_unit_test er_a)

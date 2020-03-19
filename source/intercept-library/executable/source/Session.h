@@ -60,6 +60,6 @@ namespace er {
     };
 
     using SessionPtr = std::shared_ptr<Session>;
-    er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept;
+    rust::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept;
 
 }

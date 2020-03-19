@@ -26,6 +26,11 @@
 #include "Session.h"
 #include "SystemCalls.h"
 
+using rust::Result;
+using rust::Ok;
+using rust::Err;
+using rust::merge;
+
 namespace {
 
     std::ostream& error_stream()
@@ -38,36 +43,36 @@ namespace {
         return std::cerr;
     }
 
-    er::Result<pid_t> spawnp(const ::er::Execution& config,
+    Result<pid_t> spawnp(const ::er::Execution& config,
         const ::er::EnvironmentPtr& environment) noexcept
     {
         return er::SystemCalls::spawn(config.path, config.command, environment->data());
     }
 
-    void report_start(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
+    void report_start(Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
     {
-        ::er::merge(reporter, ::er::Event::start(pid, cmd))
+        merge(reporter, ::er::Event::start(pid, cmd))
             .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
-            .handle_with([](auto message) {
+            .unwrap_or_else([](auto message) {
                 error_stream() << "report start: " << message.what() << std::endl;
-            })
-            .unwrap_or(0);
+                return 0;
+            });
     }
 
-    void report_exit(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    void report_exit(Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
     {
-        ::er::merge(reporter, ::er::Event::stop(pid, exit))
+        merge(reporter, ::er::Event::stop(pid, exit))
             .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
-            .handle_with([](auto message) {
+            .unwrap_or_else([](auto message) {
                 error_stream() << "report stop: " << message.what() << std::endl;
-            })
-            .unwrap_or(0);
+                return 0;
+            });
     }
 
     ::er::EnvironmentPtr create_environment(char* original[], const ::er::SessionPtr& session)
@@ -123,8 +128,8 @@ int main(int argc, char* argv[], char* envp[])
                     return exit;
                 });
         })
-        .handle_with([](auto message) {
+        .unwrap_or_else([](auto message) {
             error_stream() << message.what() << std::endl;
-        })
-        .unwrap_or(EXIT_FAILURE);
+            return EXIT_FAILURE;
+        });
 }

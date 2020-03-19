@@ -31,6 +31,10 @@
 #include "Interface.h"
 #include "Result.h"
 
+using rust::Result;
+using rust::Ok;
+using rust::Err;
+
 namespace {
 
     using Parameter = std::tuple<const char**, const char**>;
@@ -88,11 +92,11 @@ namespace {
         {
         }
 
-        ::er::Result<Parameters> parse(const int argc, const char** argv) const noexcept
+        Result<Parameters> parse(const int argc, const char** argv) const noexcept
         {
             Parameters result;
             if (argc < 2 || argv == nullptr) {
-                return ::er::Err(std::runtime_error("Empty parameter list."));
+                return Err(std::runtime_error("Empty parameter list."));
             }
             result.emplace(Parameters::key_type(PROGRAM_KEY), std::make_tuple(argv, argv + 1));
             const char** const args_end = argv + argc;
@@ -106,13 +110,13 @@ namespace {
                         result.emplace(Parameters::key_type(*args_it), params.value());
                         args_it = std::get<1>(params.value());
                     } else {
-                        return ::er::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
+                        return Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
                     }
                 } else {
-                    return ::er::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
+                    return Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
                 }
             }
-            return ::er::Ok(std::move(result));
+            return Ok(std::move(result));
         }
 
         std::string help(const char* const name) const noexcept
@@ -129,19 +133,19 @@ namespace {
         const std::vector<Option> options_;
     };
 
-    ::er::Result<::er::Context> make_context(const Parameters& parameters) noexcept
+    Result<::er::Context> make_context(const Parameters& parameters) noexcept
     {
         if (auto destination_it = parameters.find(::er::flags::DESTINATION); destination_it != parameters.end()) {
             auto const [destination, _] = destination_it->second;
             const bool verbose = (parameters.find(::er::flags::VERBOSE) != parameters.end());
             auto const [reporter, __] = parameters.find(PROGRAM_KEY)->second;
-            return ::er::Ok<::er::Context>({ *reporter, *destination, verbose });
+            return Ok<::er::Context>({ *reporter, *destination, verbose });
         } else {
-            return ::er::Err(std::runtime_error("Missing destination."));
+            return Err(std::runtime_error("Missing destination."));
         }
     }
 
-    ::er::Result<::er::Execution> make_execution(const Parameters& parameters) noexcept
+    Result<::er::Execution> make_execution(const Parameters& parameters) noexcept
     {
         auto get_optional = [&parameters](const char* const name) -> const char* {
             if (auto it = parameters.find(name); it != parameters.end()) {
@@ -157,12 +161,12 @@ namespace {
             auto [command, _] = command_it->second;
             auto path = get_optional(::er::flags::EXECUTE);
             if (path != nullptr) {
-                return ::er::Ok<::er::Execution>({ path, command });
+                return Ok<::er::Execution>({ path, command });
             } else {
-                return ::er::Err(std::runtime_error("The 'path' needs to be specified."));
+                return Err(std::runtime_error("The 'path' needs to be specified."));
             }
         } else {
-            return ::er::Err(std::runtime_error("Missing command."));
+            return Err(std::runtime_error("Missing command."));
         }
     }
 
@@ -183,7 +187,7 @@ namespace er {
         builder.add_library(library);
     }
 
-    er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
+    Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
         const Parser parser({ { ::er::flags::HELP, 0, "this message" },
             { ::er::flags::VERBOSE, 0, "make the interception run verbose" },
