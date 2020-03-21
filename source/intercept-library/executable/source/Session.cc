@@ -21,117 +21,14 @@
 
 #include "flags.h"
 
-#include <algorithm>
-#include <cstring>
-#include <initializer_list>
-#include <list>
-#include <string_view>
-#include <vector>
-
+#include "Flags.h"
 #include "Interface.h"
 #include "Result.h"
 
-using rust::Result;
-using rust::Ok;
-using rust::Err;
+using namespace rust;
+using namespace flags;
 
 namespace {
-
-    using Parameter = std::tuple<const char**, const char**>;
-    using Parameters = std::map<std::string_view, Parameter>;
-
-    constexpr char PROGRAM_KEY[] = "program";
-
-    struct Option {
-        const char* flag;
-        int arguments;
-        const char* help;
-
-        bool match(const char* input) const noexcept
-        {
-            return (std::strcmp(input, flag) == 0);
-        }
-
-        std::optional<Parameter>
-        take(const char** const begin, const char** const end) const noexcept
-        {
-            return (arguments < 0)
-                ? std::optional(std::make_tuple(begin, end))
-                : (begin + arguments > end)
-                    ? std::optional<Parameter>()
-                    : std::optional(std::make_tuple(begin, begin + arguments));
-        }
-
-        std::string format_option_line() const noexcept
-        {
-            const size_t flag_size = std::strlen(flag);
-
-            std::string result;
-            result += spaces(2);
-            result += flag;
-            result += (flag_size > 22)
-                ? "\n" + spaces(15)
-                : spaces(23 - flag_size);
-            result += std::string(help) + "\n";
-            return result;
-        }
-
-        static std::string spaces(size_t num) noexcept
-        {
-            std::string result;
-            for (; num > 0; --num)
-                result += ' ';
-            return result;
-        }
-    };
-
-    class Parser {
-    public:
-        Parser(std::initializer_list<Option> options)
-                : options_(options)
-        {
-        }
-
-        Result<Parameters> parse(const int argc, const char** argv) const noexcept
-        {
-            Parameters result;
-            if (argc < 2 || argv == nullptr) {
-                return Err(std::runtime_error("Empty parameter list."));
-            }
-            result.emplace(Parameters::key_type(PROGRAM_KEY), std::make_tuple(argv, argv + 1));
-            const char** const args_end = argv + argc;
-            for (const char** args_it = ++argv; args_it != args_end;) {
-                // find which option is it.
-                if (auto option = std::find_if(options_.begin(), options_.end(), [&args_it](const auto& option) {
-                        return option.match(*args_it);
-                    });
-                    option != options_.end()) {
-                    if (const auto params = option->take(args_it + 1, args_end); params) {
-                        result.emplace(Parameters::key_type(*args_it), params.value());
-                        args_it = std::get<1>(params.value());
-                    } else {
-                        return Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
-                    }
-                } else {
-                    return Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
-                }
-            }
-            return Ok(std::move(result));
-        }
-
-        std::string help(const char* const name) const noexcept
-        {
-            std::string result;
-            result += std::string("Usage: ") + name + std::string(" [OPTION]\n\n");
-            std::for_each(options_.begin(), options_.end(), [&result](auto it) {
-                result += it.format_option_line();
-            });
-            return result;
-        }
-
-    private:
-        const std::vector<Option> options_;
-    };
 
     Result<::er::Context> make_context(const Parameters& parameters) noexcept
     {
@@ -189,12 +86,12 @@ namespace er {
 
     Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
-        const Parser parser({ { ::er::flags::HELP, 0, "this message" },
-            { ::er::flags::VERBOSE, 0, "make the interception run verbose" },
-            { ::er::flags::DESTINATION, 1, "path to report directory" },
-            { ::er::flags::LIBRARY, 1, "path to the intercept library" },
-            { ::er::flags::EXECUTE, 1, "the path parameter for the command" },
-            { ::er::flags::COMMAND, -1, "the executed command" } });
+        const Parser parser({ { ::er::flags::HELP, { 0, "this message" } },
+            { ::er::flags::VERBOSE, { 0, "make the interception run verbose" } },
+            { ::er::flags::DESTINATION, { 1, "path to report directory" } },
+            { ::er::flags::LIBRARY, { 1, "path to the intercept library" } },
+            { ::er::flags::EXECUTE, { 1, "the path parameter for the command" } },
+            { ::er::flags::COMMAND, { -1, "the executed command" } } });
         return parser.parse(argc, const_cast<const char**>(argv))
             .and_then<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
                 if (params.find(::er::flags::HELP) != params.end())
