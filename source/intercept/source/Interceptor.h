@@ -32,7 +32,7 @@ namespace ic {
         ~InterceptorImpl() override = default;
 
         ::grpc::Status GetWrappedCommand(::grpc::ServerContext* context, const ::supervise::WrapperRequest* request, ::supervise::WrapperResponse* response) override;
-        ::grpc::Status GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::Empty* request, ::supervise::EnvironmentUpdate* response) override;
+        ::grpc::Status GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::EnvironmentRequest* request, ::supervise::EnvironmentResponse* response);
         ::grpc::Status Report(::grpc::ServerContext* context, ::grpc::ServerReader<::supervise::Event>* reader, ::supervise::Empty* response) override;
 
     private:

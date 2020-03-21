@@ -25,7 +25,7 @@ option cc_enable_arenas = true;
 service Interceptor {
 
     rpc GetWrappedCommand (WrapperRequest) returns (WrapperResponse) {}
-    rpc GetEnvironmentUpdate (Empty) returns (EnvironmentUpdate) {}
+    rpc GetEnvironmentUpdate (EnvironmentRequest) returns (EnvironmentResponse) {}
 
     rpc Report (stream Event) returns (Empty) {}
 }
@@ -38,11 +38,12 @@ message WrapperResponse {
     string path = 1;
 }
 
-message Empty {}
+message EnvironmentRequest {
+    map<string, string> environment = 1;
+}
 
-message EnvironmentUpdate {
-    map<string, string> overrides = 1;
-    map<string, string> appends = 2;
+message EnvironmentResponse {
+    map<string, string> environment = 1;
 }
 
 message Event {
@@ -76,3 +77,5 @@ message Event {
         int32 number = 1;
     }
 }
+
+message Empty {}
