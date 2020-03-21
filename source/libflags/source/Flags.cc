@@ -42,7 +42,7 @@ namespace {
                 : std::optional(std::make_tuple(begin, begin + option.arguments));
     }
 
-    std::string format_option_line(const flags::Parser::OptionValue & optionValue) noexcept
+    std::string format_option_line(const flags::OptionValue & optionValue) noexcept
     {
         // TODO: Print out how many arguments it takes
         const flags::Option &option = std::get<1>(optionValue);

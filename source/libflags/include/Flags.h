@@ -38,11 +38,10 @@ namespace flags {
         const char* help;
     };
 
-    class Parser {
-    public:
-        using OptionMap = std::map<std::string_view, Option>;
-        using OptionValue = OptionMap::value_type;
+    using OptionMap = std::map<std::string_view, Option>;
+    using OptionValue = OptionMap::value_type;
 
+    class Parser {
     public:
         Parser(std::initializer_list<OptionValue> options);
         ~Parser() = default;

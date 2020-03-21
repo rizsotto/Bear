@@ -157,8 +157,6 @@ namespace rust {
     //
     // The public interface is also trimmed down. The main motivation was:
     //
-    // * remove the query methods `is_ok()` or `is_err()` methods.
-    //   (no access methods, so these would not be useful.)
     // * remove the access methods `ok()` or `err()` methods.
     //   (std::optional in C++17 only)
     // * remove the access methods `unwrap()` or `expect(...)` methods.
@@ -188,6 +186,9 @@ namespace rust {
         Result(types::Err<E>&& err); // NOLINT
 
     public:
+        [[nodiscard]] bool is_ok() const;
+        [[nodiscard]] bool is_err() const;
+
         template <typename U>
         Result<U, E> map(std::function<U(const T&)> const& f) const;
 
@@ -345,6 +346,18 @@ namespace rust {
             , storage_()
     {
         storage_.construct(std::move(err));
+    }
+
+    template <typename T, typename E>
+    bool Result<T, E>::is_ok() const
+    {
+        return ok_;
+    }
+
+    template <typename T, typename E>
+    bool Result<T, E>::is_err() const
+    {
+        return !ok_;
     }
 
     template <typename T, typename E>
