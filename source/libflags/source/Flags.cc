@@ -61,9 +61,9 @@ namespace {
 
 namespace flags {
 
-    Arguments::Arguments(const std::string_view& program)
+    Arguments::Arguments(std::string_view&& program, Arguments::Parameters&& parameters)
             : program_(program)
-            , parameters_()
+            , parameters_(parameters)
     {
     }
 
@@ -109,14 +109,6 @@ namespace flags {
         return rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Parameter is not available.")));
     }
 
-    Arguments& Arguments::add(const std::string_view& key, const char** begin, const char** end)
-    {
-        auto args = std::vector<std::string_view>(begin, end);
-        parameters_.emplace(key, args);
-
-        return *this;
-    }
-
     Parser::Parser(std::string_view name, std::initializer_list<OptionValue> options)
             : name_(name)
             , options_(options)
@@ -128,14 +120,19 @@ namespace flags {
         if (argc < 1 || argv == nullptr) {
             return rust::Err(std::runtime_error("Empty argument list."));
         }
-        Arguments result(argv[0]);
+        std::string_view program(argv[0]);
+        Arguments::Parameters parameters;
+
         const char** const args_end = argv + argc;
         for (const char** args_it = ++argv; args_it != args_end;) {
             // find which option is it.
             if (auto option = options_.find(*args_it); option != options_.end()) {
                 if (const auto params = take(option->second, args_it + 1, args_end); params) {
-                    result.add(*args_it, std::get<0>(params.value()), std::get<1>(params.value()));
-                    args_it = std::get<1>(params.value());
+                    auto [begin, end] = params.value();
+                    auto args = std::vector<std::string_view>(begin, end);
+                    parameters.emplace(option->first, args);
+
+                    args_it = end;
                 } else {
                     return rust::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
                 }
@@ -143,8 +140,14 @@ namespace flags {
                 return rust::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
             }
         }
-        // TODO: add default values to the result
-        return rust::Ok(result);
+        // add default values to the parameters as it would given by the user.
+        for (auto& option : options_) {
+            if (option.second.default_value.has_value() && parameters.find(option.first) == parameters.end()) {
+                std::vector<std::string_view> args = { option.second.default_value.value() };
+                parameters.emplace(option.first, args);
+            }
+        }
+        return rust::Ok(Arguments(std::move(program), std::move(parameters)));
     }
 
     void Parser::print_help(std::ostream& os, bool expose_hidden) const

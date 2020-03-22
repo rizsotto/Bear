@@ -77,6 +77,41 @@ namespace {
             });
     }
 
+    TEST(flags, parse_with_default_values)
+    {
+        const char* argv[] = { "executable" };
+        const int argc = sizeof(argv) / sizeof(const char*);
+
+        const Parser parser("test",
+            { { HELP, { 0, false, "this message", std::nullopt } },
+                { FLAG, { 0, false, "a single flag", { "true" } } },
+                { OPTION, { 1, false, "a flag with a value", { "42" } } } });
+        parser.parse(argc, const_cast<const char**>(argv))
+            .map<int>([](auto params) {
+                EXPECT_STREQ(params.program().data(), "executable");
+
+                EXPECT_TRUE(params.as_bool(HELP).is_ok());
+                EXPECT_FALSE(params.as_bool(HELP).unwrap_or(true));
+
+                EXPECT_TRUE(params.as_bool(FLAG).is_ok());
+                EXPECT_TRUE(params.as_bool(FLAG).unwrap_or(true));
+
+                auto option = params.as_string(OPTION);
+                EXPECT_TRUE(option.is_ok());
+                EXPECT_STREQ(option.unwrap_or("").data(), "42");
+
+                auto option_int = params.as_int(OPTION);
+                EXPECT_TRUE(option_int.is_ok());
+                EXPECT_EQ(option_int.unwrap_or(2), 42);
+
+                return 0;
+            })
+            .map_err<int>([](auto error) {
+                EXPECT_FALSE(true);
+                return 0;
+            });
+    }
+
     TEST(flags, parse_fails_for_unkown_flags)
     {
         const char* argv[] = { "executable", FLAG, OPTION, "0" };

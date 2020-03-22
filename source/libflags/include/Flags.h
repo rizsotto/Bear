@@ -48,15 +48,14 @@ namespace flags {
         Arguments& operator=(Arguments&&) noexcept = default;
 
     private:
-        friend class Parser;
-
-        explicit Arguments(const std::string_view& program);
-        Arguments& add(const std::string_view& key, const char** begin, const char** end);
-
-    private:
         using Parameter = std::vector<std::string_view>;
         using Parameters = std::map<std::string_view, Parameter>;
 
+        friend class Parser;
+
+        Arguments(std::string_view&& program, Parameters&& parameters);
+
+    private:
         std::string_view program_;
         Parameters parameters_;
     };
