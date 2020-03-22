@@ -7,7 +7,6 @@ add_library(er_a STATIC
         ../api/messages.h
         Environment.h
         Environment.cc
-        Interface.h
         Reporter.h
         Reporter.cc
         Session.h

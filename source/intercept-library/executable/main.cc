@@ -20,7 +20,6 @@
 #include <iostream>
 
 #include "Environment.h"
-#include "Interface.h"
 #include "Reporter.h"
 #include "Result.h"
 #include "Session.h"

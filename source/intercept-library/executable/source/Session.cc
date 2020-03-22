@@ -22,7 +22,6 @@
 #include "flags.h"
 
 #include "Flags.h"
-#include "Interface.h"
 #include "Result.h"
 
 using namespace rust;

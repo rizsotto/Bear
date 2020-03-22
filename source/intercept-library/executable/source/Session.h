@@ -20,17 +20,29 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 #include "Environment.h"
-#include "Interface.h"
 #include "Result.h"
 
 namespace er {
 
+    struct Execution {
+        const std::string_view path;
+        const std::vector<std::string_view> command;
+    };
+
+    struct Context {
+        const std::string_view reporter;
+        const std::string_view destination;
+        bool verbose;
+    };
+
     struct Session {
-        ::er::Context context_;
-        ::er::Execution execution_;
+        Context context_;
+        Execution execution_;
         std::string_view library_;
     };
 
