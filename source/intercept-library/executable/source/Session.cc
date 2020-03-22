@@ -55,20 +55,7 @@ namespace {
 
 namespace er {
 
-    void Session::configure(::er::Environment::Builder& builder) const noexcept
-    {
-        builder.add_reporter(context_.reporter.data());
-        builder.add_destination(context_.destination.data());
-        builder.add_verbose(context_.verbose);
-    }
-
-    void LibrarySession::configure(::er::Environment::Builder& builder) const noexcept
-    {
-        Session::configure(builder);
-        builder.add_library(library);
-    }
-
-    Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
+    Result<er::Session> parse(int argc, char* argv[]) noexcept
     {
         const Parser parser("er",
             { { ::er::flags::HELP, { 0, false, "this message", std::nullopt } },
@@ -78,16 +65,14 @@ namespace er {
                 { ::er::flags::EXECUTE, { 1, false, "the path parameter for the command", std::nullopt } },
                 { ::er::flags::COMMAND, { -1, false, "the executed command", std::nullopt } } });
         return parser.parse(argc, const_cast<const char**>(argv))
-            .and_then<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
+            .and_then<::er::Session>([&parser, &argv](auto params) -> Result<::er::Session> {
                 if (params.as_bool(::er::flags::HELP).unwrap_or(false))
                     return Err(std::runtime_error(parser.help()));
                 else
                     return merge(make_context(params), make_execution(params), params.as_string(::er::flags::LIBRARY))
-                        .template map<::er::SessionPtr>([&params](auto in) -> ::er::SessionPtr {
+                        .template map<::er::Session>([&params](auto in) {
                             const auto& [context, execution, library] = in;
-                            auto result = std::make_unique<LibrarySession>(context, execution);
-                            result->library = library.data();
-                            return SessionPtr(result.release());
+                            return Session { context, execution, library };
                         });
             });
     }

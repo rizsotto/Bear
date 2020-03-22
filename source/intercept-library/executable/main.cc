@@ -84,11 +84,14 @@ namespace {
             });
     }
 
-    ::er::EnvironmentPtr create_environment(char* original[], const ::er::SessionPtr& session)
+    ::er::EnvironmentPtr create_environment(char* original[], const ::er::Session& session)
     {
-        auto builder = er::Environment::Builder(const_cast<const char**>(original));
-        session->configure(builder);
-        return builder.build();
+        return er::Environment::Builder(const_cast<const char**>(original))
+            .add_reporter(session.context_.reporter.data())
+            .add_destination(session.context_.destination.data())
+            .add_verbose(session.context_.verbose)
+            .add_library(session.library_.data())
+            .build();
     }
 
     std::ostream& operator<<(std::ostream& os, char* const* values)
@@ -110,19 +113,19 @@ namespace {
 int main(int argc, char* argv[], char* envp[])
 {
     return ::er::parse(argc, argv)
-        .map<er::SessionPtr>([&argv](auto arguments) {
-            if (arguments->context_.verbose) {
+        .map<er::Session>([&argv](auto arguments) {
+            if (arguments.context_.verbose) {
                 error_stream() << argv << std::endl;
             }
             return arguments;
         })
         .and_then<int>([&envp](auto arguments) {
-            auto reporter = er::Reporter::tempfile(arguments->context_.destination.data());
+            auto reporter = er::Reporter::tempfile(arguments.context_.destination.data());
 
             auto environment = create_environment(envp, arguments);
-            return spawnp(arguments->execution_, environment)
+            return spawnp(arguments.execution_, environment)
                 .template map<pid_t>([&arguments, &reporter](auto& pid) {
-                    report_start(reporter, pid, to_char_vector(arguments->execution_.command).data());
+                    report_start(reporter, pid, to_char_vector(arguments.execution_.command).data());
                     return pid;
                 })
                 .template and_then<std::tuple<pid_t, int>>([](auto pid) {
