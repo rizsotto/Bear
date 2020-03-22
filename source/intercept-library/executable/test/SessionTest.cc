@@ -71,13 +71,14 @@ namespace {
         ASSERT_NE(dummy, result.unwrap_or(dummy));
         auto session_result = (::er::LibrarySession const*)result.unwrap_or(dummy).get();
 
-        ASSERT_STREQ(argv[0], session_result->context_.reporter);
-        ASSERT_STREQ(argv[4], session_result->context_.destination);
+        ASSERT_EQ("program", session_result->context_.reporter);
+        ASSERT_EQ("/tmp/destination", session_result->context_.destination);
         ASSERT_EQ(true, session_result->context_.verbose);
 
-        ASSERT_EQ(argv + 9, session_result->execution_.command);
-        ASSERT_EQ(argv[7], session_result->execution_.path);
+        std::vector<std::string_view > expected_command = { "ls", "-l", "-a" };
+        ASSERT_EQ(expected_command, session_result->execution_.command);
+        ASSERT_EQ("/bin/ls", session_result->execution_.path);
 
-        ASSERT_EQ(argv[2], session_result->library);
+        ASSERT_EQ("/install/path/libexec.so", session_result->library);
     }
 }

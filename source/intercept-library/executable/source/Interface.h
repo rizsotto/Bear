@@ -19,17 +19,19 @@
 
 #pragma once
 
+#include <string_view>
+#include <vector>
+
 namespace er {
 
     struct Execution {
-        const char* path;
-        const char** command;
+        const std::string_view path;
+        const std::vector<std::string_view> command;
     };
 
     struct Context {
-        char const* reporter;
-        char const* destination;
+        const std::string_view reporter;
+        const std::string_view destination;
         bool verbose;
     };
-
 }

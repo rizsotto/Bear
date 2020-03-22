@@ -43,10 +43,19 @@ namespace {
         return std::cerr;
     }
 
+    std::vector<const char*> to_char_vector(const std::vector<std::string_view>& input)
+    {
+        auto result = std::vector<const char*>(input.size());
+        std::transform(input.begin(), input.end(), result.begin(), [](auto it) { return it.data(); });
+        result.push_back(nullptr);
+        return result;
+    }
+
     Result<pid_t> spawnp(const ::er::Execution& config,
         const ::er::EnvironmentPtr& environment) noexcept
     {
-        return er::SystemCalls::spawn(config.path, config.command, environment->data());
+        auto command = to_char_vector(config.command);
+        return er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
     }
 
     void report_start(Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
@@ -108,12 +117,12 @@ int main(int argc, char* argv[], char* envp[])
             return arguments;
         })
         .and_then<int>([&envp](auto arguments) {
-            auto reporter = er::Reporter::tempfile(arguments->context_.destination);
+            auto reporter = er::Reporter::tempfile(arguments->context_.destination.data());
 
             auto environment = create_environment(envp, arguments);
             return spawnp(arguments->execution_, environment)
                 .template map<pid_t>([&arguments, &reporter](auto& pid) {
-                    report_start(reporter, pid, arguments->execution_.command);
+                    report_start(reporter, pid, to_char_vector(arguments->execution_.command).data());
                     return pid;
                 })
                 .template and_then<std::tuple<pid_t, int>>([](auto pid) {

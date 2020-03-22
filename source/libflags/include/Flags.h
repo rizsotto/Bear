@@ -28,14 +28,44 @@
 
 namespace flags {
 
-    constexpr char PROGRAM_KEY[] = "program";
+    class Parser;
 
-    using Parameter = std::tuple<const char**, const char**>;
-    using Parameters = std::map<std::string_view, Parameter>;
+    class Arguments {
+    public:
+        std::string_view program() const;
+
+        rust::Result<bool> as_bool(const std::string_view& key) const;
+        rust::Result<int> as_int(const std::string_view& key) const;
+        rust::Result<std::string_view> as_string(const std::string_view& key) const;
+        rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
+
+        ~Arguments() = default;
+
+        Arguments(const Arguments&) = default;
+        Arguments(Arguments&&) noexcept = default;
+
+        Arguments& operator=(const Arguments&) = default;
+        Arguments& operator=(Arguments&&) noexcept = default;
+
+    private:
+        friend class Parser;
+
+        explicit Arguments(const std::string_view& program);
+        Arguments& add(const std::string_view& key, const char** begin, const char** end);
+
+    private:
+        using Parameter = std::vector<std::string_view>;
+        using Parameters = std::map<std::string_view, Parameter>;
+
+        std::string_view program_;
+        Parameters parameters_;
+    };
 
     struct Option {
         int arguments;
-        const char* help;
+        bool hidden;
+        const std::string_view help;
+        const std::optional<std::string_view> default_value;
     };
 
     using OptionMap = std::map<std::string_view, Option>;
@@ -43,12 +73,16 @@ namespace flags {
 
     class Parser {
     public:
-        Parser(std::initializer_list<OptionValue> options);
+        Parser(std::string_view name, std::initializer_list<OptionValue> options);
         ~Parser() = default;
 
-        rust::Result<Parameters> parse(int argc, const char** argv) const noexcept;
+        rust::Result<Arguments> parse(int argc, const char** argv) const;
 
-        std::string help(const char* name) const noexcept;
+        void print_help(std::ostream&, bool expose_hidden) const;
+        void print_help_short(std::ostream&) const;
+
+        // TODO: deprecate it
+        std::string help() const;
 
     public:
         Parser() = delete;
@@ -59,6 +93,7 @@ namespace flags {
         Parser& operator=(Parser&&) noexcept = delete;
 
     private:
+        const std::string_view name_;
         const OptionMap options_;
     };
 }

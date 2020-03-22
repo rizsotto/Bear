@@ -30,51 +30,35 @@ using namespace flags;
 
 namespace {
 
-    Result<::er::Context> make_context(const Parameters& parameters) noexcept
+    Result<::er::Context> make_context(const Arguments& args) noexcept
     {
-        if (auto destination_it = parameters.find(::er::flags::DESTINATION); destination_it != parameters.end()) {
-            auto const [destination, _] = destination_it->second;
-            const bool verbose = (parameters.find(::er::flags::VERBOSE) != parameters.end());
-            auto const [reporter, __] = parameters.find(PROGRAM_KEY)->second;
-            return Ok<::er::Context>({ *reporter, *destination, verbose });
-        } else {
-            return Err(std::runtime_error("Missing destination."));
-        }
+        return args.as_string(::er::flags::DESTINATION)
+            .map<::er::Context>([&args](const auto destination) {
+                const auto reporter = args.program();
+                const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
+                return er::Context { reporter, destination, verbose };
+            });
     }
 
-    Result<::er::Execution> make_execution(const Parameters& parameters) noexcept
+    Result<::er::Execution> make_execution(const Arguments& args) noexcept
     {
-        auto get_optional = [&parameters](const char* const name) -> const char* {
-            if (auto it = parameters.find(name); it != parameters.end()) {
-                auto [result, _] = it->second;
-                return *result;
-            } else {
-                return nullptr;
-            }
-        };
+        auto path = args.as_string(::er::flags::EXECUTE);
+        auto command = args.as_string_list(::er::flags::COMMAND);
 
-        auto const nowhere = parameters.end();
-        if (auto command_it = parameters.find(::er::flags::COMMAND); command_it != nowhere) {
-            auto [command, _] = command_it->second;
-            auto path = get_optional(::er::flags::EXECUTE);
-            if (path != nullptr) {
-                return Ok<::er::Execution>({ path, command });
-            } else {
-                return Err(std::runtime_error("The 'path' needs to be specified."));
-            }
-        } else {
-            return Err(std::runtime_error("Missing command."));
-        }
+        return merge(path, command)
+            .map<::er::Execution>([](auto tuple) {
+                const auto& [path, command] = tuple;
+                return ::er::Execution { path, command };
+            });
     }
-
 }
 
 namespace er {
 
     void Session::configure(::er::Environment::Builder& builder) const noexcept
     {
-        builder.add_reporter(context_.reporter);
-        builder.add_destination(context_.destination);
+        builder.add_reporter(context_.reporter.data());
+        builder.add_destination(context_.destination.data());
         builder.add_verbose(context_.verbose);
     }
 
@@ -86,28 +70,24 @@ namespace er {
 
     Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept
     {
-        const Parser parser({ { ::er::flags::HELP, { 0, "this message" } },
-            { ::er::flags::VERBOSE, { 0, "make the interception run verbose" } },
-            { ::er::flags::DESTINATION, { 1, "path to report directory" } },
-            { ::er::flags::LIBRARY, { 1, "path to the intercept library" } },
-            { ::er::flags::EXECUTE, { 1, "the path parameter for the command" } },
-            { ::er::flags::COMMAND, { -1, "the executed command" } } });
+        const Parser parser("er",
+            { { ::er::flags::HELP, { 0, false, "this message", std::nullopt } },
+                { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt } },
+                { ::er::flags::DESTINATION, { 1, false, "path to report directory", std::nullopt } },
+                { ::er::flags::LIBRARY, { 1, false, "path to the intercept library", std::nullopt } },
+                { ::er::flags::EXECUTE, { 1, false, "the path parameter for the command", std::nullopt } },
+                { ::er::flags::COMMAND, { -1, false, "the executed command", std::nullopt } } });
         return parser.parse(argc, const_cast<const char**>(argv))
             .and_then<::er::SessionPtr>([&parser, &argv](auto params) -> Result<::er::SessionPtr> {
-                if (params.find(::er::flags::HELP) != params.end())
-                    return Err(std::runtime_error(parser.help(argv[0])));
+                if (params.as_bool(::er::flags::HELP).unwrap_or(false))
+                    return Err(std::runtime_error(parser.help()));
                 else
-                    return merge(make_context(params), make_execution(params))
+                    return merge(make_context(params), make_execution(params), params.as_string(::er::flags::LIBRARY))
                         .template map<::er::SessionPtr>([&params](auto in) -> ::er::SessionPtr {
-                            const auto& [context, execution] = in;
-                            if (auto library_it = params.find(::er::flags::LIBRARY); library_it != params.end()) {
-                                const auto& [library, _] = library_it->second;
-                                auto result = std::make_unique<LibrarySession>(context, execution);
-                                result->library = *library;
-                                return SessionPtr(result.release());
-                            } else {
-                                return std::make_shared<Session>(context, execution);
-                            }
+                            const auto& [context, execution, library] = in;
+                            auto result = std::make_unique<LibrarySession>(context, execution);
+                            result->library = library.data();
+                            return SessionPtr(result.release());
                         });
             });
     }
