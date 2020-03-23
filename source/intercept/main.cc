@@ -19,20 +19,15 @@
 
 // How it should works?
 //
-// - Choose interception mode (wrapper or preload)
-//   - Set up environment variables accordingly
 // - Create communication channel for `er` to report process execution
 //   - Listens to the channel and collect the received reports
-// - Calls `er` to supervise the build (with the received command).
+// - Choose interception mode (wrapper or preload)
+//   - Set up environment variables accordingly
+//   - Execute the build command.
 //   - Wait until the child process terminates. (store exit code)
 // - Close communication channel.
 // - Writes output.
 // - Return child exit code.
-//
-// Communication channel means: filesystem or socket. Do migration easy,
-// start with the filesystem (means create a temporary directory and
-// delete it when everything is finished). This can be later changed to
-// UNIX or TCP sockets.
 
 #include <iostream>
 #include <string>
@@ -42,7 +37,10 @@
 
 namespace {
 
-    constexpr char VERSION[] = INTERCEPT_VERSION;
+    constexpr char VERSION[] = _INTERCEPT_VERSION;
+    constexpr char LIBRARY_PATH[] = _LIBRARY_PATH;
+    constexpr char EXECUTOR_PATH[] = _EXECUTOR_PATH;
+    constexpr char WRAPPER_PATH[] = _WRAPPER_PATH;
 
     struct Error {
         int code;
@@ -53,13 +51,14 @@ namespace {
 int main(int argc, char* argv[])
 {
     const flags::Parser parser("intercept",
-        { { "--help", { 0, false, "this message", std::nullopt } },
+        { { "--help", { 0, false, "print help and exit", std::nullopt } },
             { "--version", { 0, false, "print version and exit", std::nullopt } },
-            { "--verbose", { 0, false, "make the interception run verbose", std::nullopt } },
-            { "--output", { 1, false, "where the result shall be written", { "commands.json" } } },
-            // { ::er::flags::LIBRARY, { 1, false, "path to the intercept library", std::nullopt } },
-            // { ::er::flags::EXECUTE, { 1, false, "the path parameter for the command", std::nullopt } },
-            { "--", { -1, false, "the executed command", std::nullopt } } });
+            { "--verbose", { 0, false, "run the interception verbose", std::nullopt } },
+            { "--output", { 1, false, "path of the result file", { "commands.json" } } },
+            { "--library", { 1, true, "path to the preload library", { LIBRARY_PATH } } },
+            { "--executor", { 1, true, "path to the preload executable", { EXECUTOR_PATH } } },
+            { "--wrapper", { 1, true, "path to the wrapper executable", { WRAPPER_PATH } } },
+            { "--", { -1, false, "command to execute", std::nullopt } } });
     return parser.parse(argc, const_cast<const char**>(argv))
         // if parsing fail, set the return value and fall through
         .map_err<Error>([](auto error) {

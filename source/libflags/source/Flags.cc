@@ -20,6 +20,7 @@
 #include "Flags.h"
 
 #include <cstring>
+#include <iostream>
 #include <optional>
 
 namespace {
@@ -34,14 +35,6 @@ namespace {
                 : std::optional(std::make_tuple(begin, begin + option.arguments));
     }
 
-    std::string fill_space(size_t num) noexcept
-    {
-        std::string result;
-        for (; num > 0; --num)
-            result += ' ';
-        return result;
-    }
-
     std::string format_option_line(const flags::OptionValue& optionValue) noexcept
     {
         const auto& [flag, option] = optionValue;
@@ -49,11 +42,11 @@ namespace {
 
         // TODO: Print out how many arguments it takes
         std::string result;
-        result += fill_space(2);
+        result += std::string(2, ' ');
         result += flag;
         result += (flag_size > 22)
-            ? "\n" + fill_space(15)
-            : fill_space(23 - flag_size);
+            ? "\n" + std::string(15, ' ')
+            : std::string(23 - flag_size, ' ');
         result += std::string(option.help) + "\n";
         return result;
     }
@@ -152,7 +145,28 @@ namespace flags {
 
     void Parser::print_help(std::ostream& os, bool expose_hidden) const
     {
-        // TODO: implement it
+        os << "Usage: " << name_ << " [OPTIONS]" << std::endl;
+        os << std::endl;
+
+        std::for_each(options_.begin(), options_.end(), [&os](auto it) {
+            const auto& [flag, option] = it;
+            const size_t flag_size = flag.length();
+
+            // print flag name
+            os << std::string(2, ' ') << flag;
+            // decide if the help text goes into the same line or not
+            if (flag_size > 22) {
+                os << std::endl << std::string(15, ' ');
+            } else {
+                os << std::string(23 - flag_size, ' ');
+            }
+            os << option.help;
+            // print default value if exists
+            if (option.default_value) {
+                os << " (default: " << option.default_value.value() << ')';
+            }
+            os << std::endl;
+        });
     }
 
     void Parser::print_help_short(std::ostream& os) const
