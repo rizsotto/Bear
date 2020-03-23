@@ -34,6 +34,68 @@
 // delete it when everything is finished). This can be later changed to
 // UNIX or TCP sockets.
 
-int main() {
-    return 0;
+#include <iostream>
+#include <string>
+
+#include "Command.h"
+#include "Flags.h"
+
+namespace {
+
+    constexpr char VERSION[] = INTERCEPT_VERSION;
+
+    struct Error {
+        int code;
+        std::string message;
+    };
+}
+
+int main(int argc, char* argv[])
+{
+    const flags::Parser parser("intercept",
+        { { "--help", { 0, false, "this message", std::nullopt } },
+            { "--version", { 0, false, "print version and exit", std::nullopt } },
+            { "--verbose", { 0, false, "make the interception run verbose", std::nullopt } },
+            { "--output", { 1, false, "where the result shall be written", { "commands.json" } } },
+            // { ::er::flags::LIBRARY, { 1, false, "path to the intercept library", std::nullopt } },
+            // { ::er::flags::EXECUTE, { 1, false, "the path parameter for the command", std::nullopt } },
+            { "--", { -1, false, "the executed command", std::nullopt } } });
+    return parser.parse(argc, const_cast<const char**>(argv))
+        // if parsing fail, set the return value and fall through
+        .map_err<Error>([](auto error) {
+            return Error { EXIT_FAILURE, std::string(error.what()) };
+        })
+        // if parsing success, check for the `--help` and `--version` flags
+        .and_then<flags::Arguments>([&parser](auto args) {
+            // print help message and exit zero
+            if (args.as_bool("--help").unwrap_or(false)) {
+                parser.print_help(std::cout, true);
+                Error error = { EXIT_SUCCESS, std::string() };
+                return rust::Result<flags::Arguments, Error>(rust::Err(error));
+            }
+            // print version message and exit zero
+            if (args.as_bool("--version").unwrap_or(false)) {
+                std::cout << "intercept " << VERSION << std::endl;
+                return rust::Result<flags::Arguments, Error>(rust::Err(Error { EXIT_SUCCESS, std::string() }));
+            }
+            return rust::Result<flags::Arguments, Error>(rust::Ok(args));
+        })
+        // if parsing success, we create the main command and execute it
+        .and_then<int>([](auto args) {
+            return ic::create(args)
+                .template and_then<int>([](auto command) {
+                    return command();
+                })
+                .template map_err<Error>([](auto error) {
+                    return Error { EXIT_FAILURE, error.what() };
+                });
+        })
+        // set the return code from error and print message
+        .unwrap_or_else([&parser](auto error) {
+            if (error.code != EXIT_SUCCESS) {
+                std::cerr << error.message << std::endl;
+                parser.print_help_short(std::cerr);
+            }
+            return error.code;
+        });
 }

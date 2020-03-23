@@ -32,12 +32,12 @@ namespace flags {
 
     class Arguments {
     public:
-        std::string_view program() const;
+        [[nodiscard]] std::string_view program() const;
 
-        rust::Result<bool> as_bool(const std::string_view& key) const;
-        rust::Result<int> as_int(const std::string_view& key) const;
-        rust::Result<std::string_view> as_string(const std::string_view& key) const;
-        rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<bool> as_bool(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<int> as_int(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<std::string_view> as_string(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
         ~Arguments() = default;
 
