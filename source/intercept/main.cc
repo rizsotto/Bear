@@ -38,6 +38,7 @@
 namespace {
 
     constexpr char VERSION[] = _INTERCEPT_VERSION;
+
     constexpr char LIBRARY_PATH[] = _LIBRARY_PATH;
     constexpr char EXECUTOR_PATH[] = _EXECUTOR_PATH;
     constexpr char WRAPPER_PATH[] = _WRAPPER_PATH;
@@ -46,19 +47,26 @@ namespace {
         int code;
         std::string message;
     };
+
+    rust::Result<flags::Arguments, Error> EARLY_EXIT =
+        rust::Result<flags::Arguments, Error>(rust::Err(Error { EXIT_SUCCESS, std::string() }));
+    constexpr std::optional<std::string_view> QUERY_GROUP =
+        { "query options" };
+    constexpr std::optional<std::string_view> DEVELOPER_GROUP =
+        { "developer options" };
 }
 
 int main(int argc, char* argv[])
 {
     const flags::Parser parser("intercept",
-        { { "--help", { 0, false, "print help and exit", std::nullopt } },
-            { "--version", { 0, false, "print version and exit", std::nullopt } },
-            { "--verbose", { 0, false, "run the interception verbose", std::nullopt } },
-            { "--output", { 1, false, "path of the result file", { "commands.json" } } },
-            { "--library", { 1, true, "path to the preload library", { LIBRARY_PATH } } },
-            { "--executor", { 1, true, "path to the preload executable", { EXECUTOR_PATH } } },
-            { "--wrapper", { 1, true, "path to the wrapper executable", { WRAPPER_PATH } } },
-            { "--", { -1, false, "command to execute", std::nullopt } } });
+        { { "--help", { 0, false, "print help and exit", std::nullopt, QUERY_GROUP } },
+            { "--version", { 0, false, "print version and exit", std::nullopt, QUERY_GROUP } },
+            { "--verbose", { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
+            { "--output", { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
+            { "--library", { 1, false, "path to the preload library", { LIBRARY_PATH }, DEVELOPER_GROUP } },
+            { "--executor", { 1, false, "path to the preload executable", { EXECUTOR_PATH }, DEVELOPER_GROUP } },
+            { "--wrapper", { 1, false, "path to the wrapper executable", { WRAPPER_PATH }, DEVELOPER_GROUP } },
+            { "--", { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse(argc, const_cast<const char**>(argv))
         // if parsing fail, set the return value and fall through
         .map_err<Error>([](auto error) {
@@ -68,14 +76,13 @@ int main(int argc, char* argv[])
         .and_then<flags::Arguments>([&parser](auto args) {
             // print help message and exit zero
             if (args.as_bool("--help").unwrap_or(false)) {
-                parser.print_help(std::cout, true);
-                Error error = { EXIT_SUCCESS, std::string() };
-                return rust::Result<flags::Arguments, Error>(rust::Err(error));
+                parser.print_help(std::cout);
+                return EARLY_EXIT;
             }
             // print version message and exit zero
             if (args.as_bool("--version").unwrap_or(false)) {
                 std::cout << "intercept " << VERSION << std::endl;
-                return rust::Result<flags::Arguments, Error>(rust::Err(Error { EXIT_SUCCESS, std::string() }));
+                return EARLY_EXIT;
             }
             return rust::Result<flags::Arguments, Error>(rust::Ok(args));
         })
@@ -93,7 +100,7 @@ int main(int argc, char* argv[])
         .unwrap_or_else([&parser](auto error) {
             if (error.code != EXIT_SUCCESS) {
                 std::cerr << error.message << std::endl;
-                parser.print_help_short(std::cerr);
+                parser.print_usage(std::cerr);
             }
             return error.code;
         });

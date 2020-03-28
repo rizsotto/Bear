@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <list>
 #include <map>
 #include <string_view>
 #include <tuple>
@@ -35,7 +36,6 @@ namespace flags {
         [[nodiscard]] std::string_view program() const;
 
         [[nodiscard]] rust::Result<bool> as_bool(const std::string_view& key) const;
-        [[nodiscard]] rust::Result<int> as_int(const std::string_view& key) const;
         [[nodiscard]] rust::Result<std::string_view> as_string(const std::string_view& key) const;
         [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
@@ -62,9 +62,10 @@ namespace flags {
 
     struct Option {
         int arguments;
-        bool hidden;
+        bool required;
         const std::string_view help;
         const std::optional<std::string_view> default_value;
+        const std::optional<std::string_view> group_name;
     };
 
     using OptionMap = std::map<std::string_view, Option>;
@@ -77,8 +78,8 @@ namespace flags {
 
         rust::Result<Arguments> parse(int argc, const char** argv) const;
 
-        void print_help(std::ostream&, bool expose_hidden) const;
-        void print_help_short(std::ostream&) const;
+        void print_help(std::ostream&) const;
+        void print_usage(std::ostream&) const;
 
         // TODO: deprecate it
         std::string help() const;

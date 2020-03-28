@@ -37,11 +37,11 @@ namespace {
         const int argc = sizeof(argv) / sizeof(const char*);
 
         const Parser parser("test",
-            { { HELP, { 0, false, "this message", std::nullopt } },
-                { FLAG, { 0, false, "a single flag", std::nullopt } },
-                { OPTION, { 1, false, "a flag with a value", std::nullopt } },
-                { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt } },
-                { SEPARATOR, { -1, false, "rest of the arguments", std::nullopt } } });
+            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
+                { OPTION, { 1, false, "a flag with a value", std::nullopt, std::nullopt } },
+                { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } },
+                { SEPARATOR, { -1, false, "rest of the arguments", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
             .map<int>([](auto params) {
                 EXPECT_STREQ(params.program().data(), "executable");
@@ -55,10 +55,6 @@ namespace {
                 auto option = params.as_string(OPTION);
                 EXPECT_TRUE(option.is_ok());
                 EXPECT_STREQ(option.unwrap_or("").data(), "0");
-
-                auto option_int = params.as_int(OPTION);
-                EXPECT_TRUE(option_int.is_ok());
-                EXPECT_EQ(option_int.unwrap_or(2), 0);
 
                 std::vector<std::string_view> expected_options = { "1", "2", "3" };
                 auto options = params.as_string_list(OPTIONS);
@@ -83,9 +79,9 @@ namespace {
         const int argc = sizeof(argv) / sizeof(const char*);
 
         const Parser parser("test",
-            { { HELP, { 0, false, "this message", std::nullopt } },
-                { FLAG, { 0, false, "a single flag", { "true" } } },
-                { OPTION, { 1, false, "a flag with a value", { "42" } } } });
+            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                { FLAG, { 0, false, "a single flag", { "true" }, std::nullopt } },
+                { OPTION, { 1, false, "a flag with a value", { "42" }, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
             .map<int>([](auto params) {
                 EXPECT_STREQ(params.program().data(), "executable");
@@ -99,10 +95,6 @@ namespace {
                 auto option = params.as_string(OPTION);
                 EXPECT_TRUE(option.is_ok());
                 EXPECT_STREQ(option.unwrap_or("").data(), "42");
-
-                auto option_int = params.as_int(OPTION);
-                EXPECT_TRUE(option_int.is_ok());
-                EXPECT_EQ(option_int.unwrap_or(2), 42);
 
                 return 0;
             })
@@ -118,8 +110,8 @@ namespace {
         const int argc = sizeof(argv) / sizeof(const char*);
 
         const Parser parser("test",
-            { { HELP, { 0, false, "this message", std::nullopt } },
-                { FLAG, { 0, false, "a single flag", std::nullopt } } });
+            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
             .map<int>([](auto params) {
                 EXPECT_FALSE(true);
@@ -138,9 +130,9 @@ namespace {
         const int argc = sizeof(argv) / sizeof(const char*);
 
         const Parser parser("test",
-            { { HELP, { 0, false, "this message", std::nullopt } },
-                { FLAG, { 0, false, "a single flag", std::nullopt } },
-                { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt } } });
+                            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                              { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
+                              { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
             .map<int>([](auto params) {
                 EXPECT_FALSE(true);
