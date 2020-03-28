@@ -7,3 +7,6 @@
 [submodule "source/dependencies/grpc"]
 	path = third_party/grpc
 	url = https://github.com/grpc/grpc.git
+[submodule "third_party/fmt"]
+	path = third_party/fmt
+	url = https://github.com/fmtlib/fmt.git

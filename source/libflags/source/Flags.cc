@@ -26,11 +26,14 @@
 #include <set>
 #include <optional>
 
+#include <fmt/format.h>
+
 namespace {
 
     std::optional<std::tuple<const char**, const char**>>
     take(const flags::Option& option, const char** const begin, const char** const end) noexcept
     {
+        // TODO: return error message if fails to take
         return (option.arguments < 0)
             ? std::optional(std::make_tuple(begin, end))
             : (begin + option.arguments > end)
@@ -83,41 +86,45 @@ namespace {
         return result;
     }
 
+    std::string format_parameters(const flags::Option& option)
+    {
+        switch (option.arguments) {
+        case 0:
+            return "";
+        case 1:
+            return " <arg>";
+        case 2:
+            return " <arg0> <arg1>>";
+        case 3:
+            return " <arg0> <arg1> <arg2>";
+        default:
+            return " ...";
+        }
+    }
+
     void format_options(std::ostream& os, const std::list<flags::OptionValue>& main_options)
     {
         for (auto& it : main_options) {
             const auto& [flag, option] = it;
-            const bool optional = !option.required;
-            // mark optional with braces
-            if (optional) {
-                os << " [" << flag;
-            } else {
-                os << " " << flag;
-            }
-            // format the option value
-            if (option.arguments < 0) {
-                os << " ...";
-            } else if (option.arguments > 0) {
-                for (int i = option.arguments; i != 0; --i) {
-                    os << " _";
-                }
-            }
-            // mark optional with braces
-            if (optional) {
-                os << "]";
-            }
+
+            const std::string parameters = format_parameters(option);
+            const std::string short_help = option.required
+                ? fmt::format(" {0}{1}", flag, parameters)
+                : fmt::format(" [{0}{1}]", flag, parameters);
+            os << short_help;
         }
     }
 
     void format_options_long(std::ostream& os, const std::list<flags::OptionValue>& main_options)
     {
-        // TODO: print parameters
         for (auto& it : main_options) {
             const auto& [flag, option] = it;
-            const size_t flag_size = flag.length();
+
+            const std::string flag_name = fmt::format("  {0}{1}", flag, format_parameters(option));
+            const size_t flag_size = flag_name.length();
 
             // print flag name
-            os << std::string(2, ' ') << flag;
+            os << flag_name;
             // decide if the help text goes into the same line or not
             if (flag_size > 22) {
                 os << std::endl << std::string(15, ' ');
@@ -154,22 +161,26 @@ namespace flags {
 
     rust::Result<std::string_view> Arguments::as_string(const std::string_view& key) const
     {
-        // TODO: use fmt to write proper error message
         if (auto values = parameters_.find(key); values != parameters_.end()) {
             return (values->second.size() == 1)
                 ? (rust::Ok(values->second.front()))
-                : rust::Result<std::string_view>(rust::Err(std::runtime_error("Parameter is not a single string.")));
+                : rust::Result<std::string_view>(
+                    rust::Err(std::runtime_error(
+                        fmt::format("Parameter \"{0}\" is not a single string.", key))));
         }
-        return rust::Result<std::string_view>(rust::Err(std::runtime_error("Parameter is not available.")));
+        return rust::Result<std::string_view>(
+            rust::Err(std::runtime_error(
+                fmt::format("Parameter \"{0}\" is not available.", key))));
     }
 
     rust::Result<std::vector<std::string_view>> Arguments::as_string_list(const std::string_view& key) const
     {
-        // TODO: use fmt to write proper error message
         if (auto values = parameters_.find(key); values != parameters_.end()) {
             return rust::Ok(values->second);
         }
-        return rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Parameter is not available.")));
+        return rust::Result<std::vector<std::string_view>>(
+            rust::Err(std::runtime_error(
+                fmt::format("Parameter \"{0}\" is not available.", key))));
     }
 
     Parser::Parser(std::string_view name, std::initializer_list<OptionValue> options)
@@ -198,10 +209,12 @@ namespace flags {
 
                     args_it = end;
                 } else {
-                    return rust::Err(std::runtime_error((std::string("Not enough parameters for flag: ") + *args_it)));
+                    return rust::Err(std::runtime_error(
+                        fmt::format("Not enough parameters for: {0}", *args_it)));
                 }
             } else {
-                return rust::Err(std::runtime_error((std::string("Unrecognized parameter: ") + *args_it)));
+                return rust::Err(std::runtime_error(
+                    fmt::format("Unrecognized parameter: {0}", *args_it)));
             }
         }
         for (auto& option : options_) {

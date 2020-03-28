@@ -140,7 +140,7 @@ namespace {
             })
             .map_err<int>([](auto error) {
                 EXPECT_TRUE(true);
-                EXPECT_STREQ(error.what(), "Not enough parameters for flag: --options");
+                EXPECT_STREQ(error.what(), "Not enough parameters for: --options");
                 return 0;
             });
     }

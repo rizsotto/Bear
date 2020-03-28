@@ -25,6 +25,7 @@ enable_testing()
 
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(fmt REQUIRED)
 find_package(GTest REQUIRED NO_CMAKE_PATH)
 find_package(Protobuf REQUIRED NO_CMAKE_PATH)
 find_package(gRPC REQUIRED NO_CMAKE_PATH)

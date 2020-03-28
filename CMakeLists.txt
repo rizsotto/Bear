@@ -4,6 +4,7 @@ project(Bear-SuperBuild C CXX)
 
 option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
 option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
+option(USE_SYSTEM_FMT "Use system installed fmt library" OFF)
 option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
 
 # Some systems are using different library directory names for
@@ -37,6 +38,20 @@ if (NOT USE_SYSTEM_GTEST)
     set(googletest_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/googletest/${LIBRARY_DIRECTORY_NAME}/cmake/GTest/")
 endif ()
 
+if (NOT USE_SYSTEM_FMT)
+    ExternalProject_Add(fmt
+            PREFIX grpc
+            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt"
+            CMAKE_CACHE_ARGS
+            -DFMT_INSTALL:BOOL=ON
+            -DFMT_TEST:BOOL=OFF
+            -DFMT_FUZZ:BOOL=OFF
+            -DFMT_DOC:BOOL=OFF
+            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/fmt
+            )
+    set(fmt_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/fmt/${LIBRARY_DIRECTORY_NAME}/cmake/fmt/")
+endif ()
+
 if (NOT USE_SYSTEM_GRPC)
     ExternalProject_Add(grpc
             PREFIX grpc
@@ -62,8 +77,9 @@ ExternalProject_Add(Bear
         -DProtobuf_DIR:PATH=${protobuf_CMAKE_DIR}
         -DgRPC_DIR:PATH=${grpc_CMAKE_DIR}
         -DgRPC_BINDIR:PATH=${grpc_BIN_DIR}
+        -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/bear
-        DEPENDS json googletest grpc
+        DEPENDS json googletest fmt grpc
         )
 set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
 set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/${LIBRARY_DIRECTORY_NAME}")
