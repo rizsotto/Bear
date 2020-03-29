@@ -119,7 +119,7 @@ namespace {
             })
             .map_err<int>([](auto error) {
                 EXPECT_TRUE(true);
-                EXPECT_STREQ(error.what(), "Unrecognized parameter: --option");
+                EXPECT_STREQ(error.what(), "Unrecognized parameter: \"--option\"");
                 return 0;
             });
     }
@@ -130,9 +130,9 @@ namespace {
         const int argc = sizeof(argv) / sizeof(const char*);
 
         const Parser parser("test", "version",
-                            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
-                              { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
-                              { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } } });
+            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
+                { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
             .map<int>([](auto params) {
                 EXPECT_FALSE(true);
@@ -140,7 +140,28 @@ namespace {
             })
             .map_err<int>([](auto error) {
                 EXPECT_TRUE(true);
-                EXPECT_STREQ(error.what(), "Not enough parameters for: --options");
+                EXPECT_STREQ(error.what(), "Not enough parameters for: \"--options\"");
+                return 0;
+            });
+    }
+
+    TEST(flags, parse_fails_for_required_parameters_missing)
+    {
+        const char* argv[] = { "executable", OPTIONS, "1", "2" };
+        const int argc = sizeof(argv) / sizeof(const char*);
+
+        const Parser parser("test", "version",
+            { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
+                { OPTION, { 1, true, "a flag with 1 value", std::nullopt, std::nullopt } },
+                { OPTIONS, { 2, false, "a flag with 2 values", std::nullopt, std::nullopt } } });
+        parser.parse(argc, const_cast<const char**>(argv))
+            .map<int>([](auto params) {
+                EXPECT_FALSE(true);
+                return 0;
+            })
+            .map_err<int>([](auto error) {
+                EXPECT_TRUE(true);
+                EXPECT_STREQ(error.what(), "Parameter is required, but not given: \"--option\"");
                 return 0;
             });
     }

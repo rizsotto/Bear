@@ -23,21 +23,11 @@
 #include "er.h"
 
 #include <iostream>
-#include <string>
+#include <string_view>
 
 namespace {
 
     constexpr char VERSION[] = _ER_VERSION;
-
-    struct Error {
-        int code;
-        std::string message;
-    };
-
-    rust::Result<flags::Arguments, Error> EARLY_EXIT =
-        rust::Result<flags::Arguments, Error>(rust::Err(Error { EXIT_SUCCESS, std::string() }));
-
-    constexpr std::optional<std::string_view> QUERY_GROUP = { "query options" };
 
     std::ostream& error_stream()
     {
@@ -67,50 +57,28 @@ namespace {
 int main(int argc, char* argv[], char* envp[])
 {
     const flags::Parser parser("er", VERSION,
-        { { ::er::flags::HELP, { 0, false, "this message", std::nullopt, QUERY_GROUP } },
-            { ::er::flags::VERSION, { 0, false, "print version and exit", std::nullopt, QUERY_GROUP } },
-            { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
+        { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
             { ::er::flags::LIBRARY, { 1, true, "path to the intercept library", std::nullopt, std::nullopt } },
             { ::er::flags::EXECUTE, { 1, true, "the path parameter for the command", std::nullopt, std::nullopt } },
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
-    return parser.parse(argc, const_cast<const char**>(argv))
-        // if parsing fail, set the return value and fall through
-        .map_err<Error>([](auto error) {
-            return Error { EXIT_FAILURE, std::string(error.what()) };
-        })
-        // if parsing success, check for the `--help` and `--version` flags
-        .and_then<flags::Arguments>([&parser](auto args) {
-            // print help message and exit zero
-            if (args.as_bool(::er::flags::HELP).unwrap_or(false)) {
-                parser.print_help(std::cout);
-                return EARLY_EXIT;
-            }
-            // print version message and exit zero
-            if (args.as_bool(::er::flags::VERSION).unwrap_or(false)) {
-                parser.print_version(std::cout);
-                return EARLY_EXIT;
-            }
-            return rust::Result<flags::Arguments, Error>(rust::Ok(args));
-        })
-        // if parsing success, we create the main command and execute it
-        .and_then<int>([&argv, &envp](auto args) {
+    return parser.parse_or_exit(argc, const_cast<const char**>(argv))
+        // log the original command line as it was received.
+        .map<flags::Arguments>([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 error_stream() << argv << std::endl;
             }
-            return er::create(args)
-                .template and_then<int>([&envp](auto command) {
-                    return er::run(std::move(command), envp);
-                })
-                .template map_err<Error>([](auto error) {
-                    return Error { EXIT_FAILURE, error.what() };
-                });
+            return args;
+        })
+        // if parsing success, we create the main command and execute it.
+        .and_then<er::Session>([](auto args) {
+            return er::create(args);
+        })
+        .and_then<int>([&envp](auto command) {
+            return er::run(std::move(command), envp);
         })
         // set the return code from error and print message
-        .unwrap_or_else([&parser](auto error) {
-            if (error.code != EXIT_SUCCESS) {
-                error_stream() << error.message << std::endl;
-            }
-            return error.code;
+        .unwrap_or_else([](auto error) {
+            return EXIT_FAILURE;
         });
 }

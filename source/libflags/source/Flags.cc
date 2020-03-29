@@ -30,10 +30,14 @@
 
 namespace {
 
+    constexpr char HELP[] = "--help";
+    constexpr char VERSION[] = "--version";
+
+    constexpr char QUERY_GROUP[] = "query options";
+
     std::optional<std::tuple<const char**, const char**>>
     take(const flags::Option& option, const char** const begin, const char** const end) noexcept
     {
-        // TODO: return error message if fails to take
         return (option.arguments < 0)
             ? std::optional(std::make_tuple(begin, end))
             : (begin + option.arguments > end)
@@ -56,8 +60,8 @@ namespace {
     {
         // find out what are the option groups.
         std::set<std::string_view> groups;
-        for (const auto &option : options) {
-            if (auto group = option.second.group_name; group) {
+        for (const auto &[_, option] : options) {
+            if (auto group = option.group_name; group) {
                 groups.emplace(group.value());
             }
         }
@@ -178,6 +182,8 @@ namespace flags {
             , version_(version)
             , options_(options)
     {
+        options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, {QUERY_GROUP} } });
+        options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, {QUERY_GROUP} } });
     }
 
     rust::Result<Arguments> Parser::parse(const int argc, const char** argv) const
@@ -194,28 +200,64 @@ namespace flags {
             if (auto option = options_.find(*args_it); option != options_.end()) {
                 // take the required number of arguments if founded.
                 if (const auto params = take(option->second, args_it + 1, args_end); params) {
-                    auto [begin, end] = params.value();
+                    const auto& [begin, end] = params.value();
                     auto args = std::vector<std::string_view>(begin, end);
                     parameters.emplace(option->first, args);
 
                     args_it = end;
                 } else {
                     return rust::Err(std::runtime_error(
-                        fmt::format("Not enough parameters for: {0}", *args_it)));
+                        fmt::format("Not enough parameters for: \"{0}\"", *args_it)));
                 }
             } else {
                 return rust::Err(std::runtime_error(
-                    fmt::format("Unrecognized parameter: {0}", *args_it)));
+                    fmt::format("Unrecognized parameter: \"{0}\"", *args_it)));
             }
         }
-        for (auto& option : options_) {
-            // add default values to the parameters as it would given by the user.
-            if (option.second.default_value.has_value() && parameters.find(option.first) == parameters.end()) {
-                std::vector<std::string_view> args = { option.second.default_value.value() };
-                parameters.emplace(option.first, args);
+        // add default values to the parameters as it would given by the user.
+        for (const auto& [flag, option] : options_) {
+            if (option.default_value.has_value() && parameters.find(flag) == parameters.end()) {
+                std::vector<std::string_view> args = { option.default_value.value() };
+                parameters.emplace(flag, args);
+            }
+        }
+        // if this is not a help or version query, then validate the parameters strict.
+        if (parameters.find(HELP) == parameters.end() && parameters.find(VERSION) == parameters.end()) {
+            for (const auto& [flag, option] : options_) {
+                // check if the parameter is required, but not present.
+                if (option.required && parameters.find(flag) == parameters.end()) {
+                    return rust::Err(std::runtime_error(
+                        fmt::format("Parameter is required, but not given: \"{0}\"", flag)));
+                }
             }
         }
         return rust::Ok(Arguments(std::move(program), std::move(parameters)));
+    }
+
+    rust::Result<Arguments> Parser::parse_or_exit(int argc, const char** argv) const
+    {
+        return parse(argc, argv)
+            // print error if anything bad happens.
+            .or_else([=](auto error) {
+                std::cerr << error.what() << std::endl;
+                print_usage(std::cerr);
+                exit(EXIT_FAILURE);
+                return rust::Err(error); // to fix the compiler error
+            })
+            // if parsing success, check for the `--help` and `--version` flags
+            .and_then<flags::Arguments>([=](auto args) {
+                // print help message and exit zero
+                if (args.as_bool(HELP).unwrap_or(false)) {
+                    print_help(std::cout);
+                    exit(EXIT_SUCCESS);
+                }
+                // print version message and exit zero
+                if (args.as_bool(VERSION).unwrap_or(false)) {
+                    print_version(std::cout);
+                    exit(EXIT_SUCCESS);
+                }
+                return rust::Ok(args);
+            });
     }
 
     void Parser::print_help(std::ostream& os) const

@@ -78,6 +78,7 @@ namespace flags {
         ~Parser() = default;
 
         rust::Result<Arguments> parse(int argc, const char** argv) const;
+        rust::Result<Arguments> parse_or_exit(int argc, const char** argv) const;
 
         void print_help(std::ostream&) const;
         void print_usage(std::ostream&) const;
@@ -95,6 +96,6 @@ namespace flags {
     private:
         const std::string_view name_;
         const std::string_view version_;
-        const OptionMap options_;
+        OptionMap options_;
     };
 }
