@@ -81,9 +81,6 @@ namespace flags {
         void print_help(std::ostream&) const;
         void print_usage(std::ostream&) const;
 
-        // TODO: deprecate it
-        std::string help() const;
-
     public:
         Parser() = delete;
         Parser(const Parser&) = delete;

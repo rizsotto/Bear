@@ -41,22 +41,6 @@ namespace {
                 : std::optional(std::make_tuple(begin, begin + option.arguments));
     }
 
-    std::string format_option_line(const flags::OptionValue& optionValue) noexcept
-    {
-        const auto& [flag, option] = optionValue;
-        const size_t flag_size = flag.length();
-
-        // TODO: Print out how many arguments it takes
-        std::string result;
-        result += std::string(2, ' ');
-        result += flag;
-        result += (flag_size > 22)
-            ? "\n" + std::string(15, ' ')
-            : std::string(23 - flag_size, ' ');
-        result += std::string(option.help) + "\n";
-        return result;
-    }
-
     std::list<flags::OptionValue> order_by_relevance(const flags::OptionMap& options, const std::optional<std::string_view>& group) {
         std::list<flags::OptionValue> result;
         std::copy_if(std::begin(options), std::end(options),
@@ -253,15 +237,5 @@ namespace flags {
         os << "Usage: " << name_;
         format_options(os, main_options);
         os << std::endl;
-    }
-
-    std::string Parser::help() const
-    {
-        std::string result;
-        result += std::string("Usage: ") + std::string(name_) + std::string(" [OPTION]\n\n");
-        std::for_each(options_.begin(), options_.end(), [&result](auto it) {
-            result += format_option_line(it);
-        });
-        return result;
     }
 }
