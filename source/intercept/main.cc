@@ -29,11 +29,11 @@
 // - Writes output.
 // - Return child exit code.
 
-#include <iostream>
-#include <string>
-
 #include "Command.h"
 #include "Flags.h"
+
+#include <iostream>
+#include <string>
 
 namespace {
 

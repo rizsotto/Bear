@@ -1,6 +1,6 @@
 add_executable(er_unit_test
         EnvironmentTest.cc
-        SessionTest.cc
+#        SessionTest.cc
         )
 
 target_include_directories(er_unit_test PRIVATE ${EXE_CFG_DIR})

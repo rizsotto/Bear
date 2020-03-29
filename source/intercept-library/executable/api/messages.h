@@ -22,9 +22,6 @@
 #include <memory>
 #include <string>
 
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
-
 namespace er {
     namespace messages {
 
@@ -60,8 +57,5 @@ namespace er {
         struct ProcessSignalled : public Event {
             // signal number
         };
-
-        void to_json(json& j, const Message& message);
-        void from_json(const json& j, Message& message);
     }
 }

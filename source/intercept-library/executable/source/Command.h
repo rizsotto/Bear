@@ -19,12 +19,7 @@
 
 #pragma once
 
-#include <memory>
-#include <string_view>
-#include <utility>
-#include <vector>
-
-#include "Environment.h"
+#include "Flags.h"
 #include "Result.h"
 
 namespace er {
@@ -46,5 +41,6 @@ namespace er {
         std::string_view library_;
     };
 
-    rust::Result<Session> parse(int argc, char* argv[]) noexcept;
+    ::rust::Result<Session> create(const ::flags::Arguments& args);
+    ::rust::Result<int> run(Session&& session, char* envp[]);
 }

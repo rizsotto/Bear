@@ -10,7 +10,7 @@ add_executable(intercept
 
 target_include_directories(intercept PRIVATE ${EXE_SRC_DIR})
 target_include_directories(intercept PRIVATE ${LIBRESULT_INCLUDE_DIR})
-target_include_directories(intercept PRIVATE ${LIBFLAGS_INCLUDE_DIR})
+#target_include_directories(intercept PRIVATE ${LIBFLAGS_INCLUDE_DIR})
 target_compile_definitions(intercept PRIVATE _INTERCEPT_VERSION="${CMAKE_PROJECT_VERSION}")
 target_compile_definitions(intercept PRIVATE _LIBRARY_PATH="${LIBRARY_PATH}")
 target_compile_definitions(intercept PRIVATE _EXECUTOR_PATH="${EXECUTOR_PATH}")

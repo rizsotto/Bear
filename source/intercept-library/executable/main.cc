@@ -17,20 +17,27 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-
-#include "Environment.h"
-#include "Reporter.h"
-#include "Result.h"
-#include "Session.h"
+#include "Command.h"
+#include "Flags.h"
+#include "flags.h"
 #include "SystemCalls.h"
 
-using rust::Result;
-using rust::Ok;
-using rust::Err;
-using rust::merge;
+#include <iostream>
+#include <string>
 
 namespace {
+
+    constexpr char VERSION[] = _ER_VERSION;
+
+    struct Error {
+        int code;
+        std::string message;
+    };
+
+    rust::Result<flags::Arguments, Error> EARLY_EXIT =
+        rust::Result<flags::Arguments, Error>(rust::Err(Error { EXIT_SUCCESS, std::string() }));
+
+    constexpr std::optional<std::string_view> QUERY_GROUP = { "query options" };
 
     std::ostream& error_stream()
     {
@@ -40,57 +47,6 @@ namespace {
                   << er::SystemCalls::get_ppid().unwrap_or(0)
                   << "] ";
         return std::cerr;
-    }
-
-    std::vector<const char*> to_char_vector(const std::vector<std::string_view>& input)
-    {
-        auto result = std::vector<const char*>(input.size());
-        std::transform(input.begin(), input.end(), result.begin(), [](auto it) { return it.data(); });
-        result.push_back(nullptr);
-        return result;
-    }
-
-    Result<pid_t> spawnp(const ::er::Execution& config,
-        const ::er::EnvironmentPtr& environment) noexcept
-    {
-        auto command = to_char_vector(config.command);
-        return er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
-    }
-
-    void report_start(Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
-    {
-        merge(reporter, ::er::Event::start(pid, cmd))
-            .and_then<int>([](auto tuple) {
-                const auto& [rptr, eptr] = tuple;
-                return rptr->send(eptr);
-            })
-            .unwrap_or_else([](auto message) {
-                error_stream() << "report start: " << message.what() << std::endl;
-                return 0;
-            });
-    }
-
-    void report_exit(Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
-    {
-        merge(reporter, ::er::Event::stop(pid, exit))
-            .and_then<int>([](auto tuple) {
-                const auto& [rptr, eptr] = tuple;
-                return rptr->send(eptr);
-            })
-            .unwrap_or_else([](auto message) {
-                error_stream() << "report stop: " << message.what() << std::endl;
-                return 0;
-            });
-    }
-
-    ::er::EnvironmentPtr create_environment(char* original[], const ::er::Session& session)
-    {
-        return er::Environment::Builder(const_cast<const char**>(original))
-            .add_reporter(session.context_.reporter.data())
-            .add_destination(session.context_.destination.data())
-            .add_verbose(session.context_.verbose)
-            .add_library(session.library_.data())
-            .build();
     }
 
     std::ostream& operator<<(std::ostream& os, char* const* values)
@@ -106,41 +62,55 @@ namespace {
 
         return os;
     }
-
 }
 
 int main(int argc, char* argv[], char* envp[])
 {
-    return ::er::parse(argc, argv)
-        .map<er::Session>([&argv](auto arguments) {
-            if (arguments.context_.verbose) {
+    const flags::Parser parser("er",
+        { { ::er::flags::HELP, { 0, false, "this message", std::nullopt, QUERY_GROUP } },
+            { ::er::flags::VERSION, { 0, false, "print version and exit", std::nullopt, QUERY_GROUP } },
+            { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
+            { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
+            { ::er::flags::LIBRARY, { 1, true, "path to the intercept library", std::nullopt, std::nullopt } },
+            { ::er::flags::EXECUTE, { 1, true, "the path parameter for the command", std::nullopt, std::nullopt } },
+            { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
+    return parser.parse(argc, const_cast<const char**>(argv))
+        // if parsing fail, set the return value and fall through
+        .map_err<Error>([](auto error) {
+            return Error { EXIT_FAILURE, std::string(error.what()) };
+        })
+        // if parsing success, check for the `--help` and `--version` flags
+        .and_then<flags::Arguments>([&parser](auto args) {
+            // print help message and exit zero
+            if (args.as_bool(::er::flags::HELP).unwrap_or(false)) {
+                parser.print_help(std::cout);
+                return EARLY_EXIT;
+            }
+            // print version message and exit zero
+            if (args.as_bool(::er::flags::VERSION).unwrap_or(false)) {
+                std::cout << "er " << VERSION << std::endl;
+                return EARLY_EXIT;
+            }
+            return rust::Result<flags::Arguments, Error>(rust::Ok(args));
+        })
+        // if parsing success, we create the main command and execute it
+        .and_then<int>([&argv, &envp](auto args) {
+            if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 error_stream() << argv << std::endl;
             }
-            return arguments;
-        })
-        .and_then<int>([&envp](auto arguments) {
-            auto reporter = er::Reporter::tempfile(arguments.context_.destination.data());
-
-            auto environment = create_environment(envp, arguments);
-            return spawnp(arguments.execution_, environment)
-                .template map<pid_t>([&arguments, &reporter](auto& pid) {
-                    report_start(reporter, pid, to_char_vector(arguments.execution_.command).data());
-                    return pid;
+            return er::create(args)
+                .template and_then<int>([&envp](auto command) {
+                    return er::run(std::move(command), envp);
                 })
-                .template and_then<std::tuple<pid_t, int>>([](auto pid) {
-                    return er::SystemCalls::wait_pid(pid)
-                        .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
-                            return std::make_tuple(pid, exit);
-                        });
-                })
-                .template map<int>([&reporter](auto tuple) {
-                    const auto& [pid, exit] = tuple;
-                    report_exit(reporter, pid, exit);
-                    return exit;
+                .template map_err<Error>([](auto error) {
+                    return Error { EXIT_FAILURE, error.what() };
                 });
         })
-        .unwrap_or_else([](auto message) {
-            error_stream() << message.what() << std::endl;
-            return EXIT_FAILURE;
+        // set the return code from error and print message
+        .unwrap_or_else([&parser](auto error) {
+            if (error.code != EXIT_SUCCESS) {
+                error_stream() << error.message << std::endl;
+            }
+            return error.code;
         });
 }
