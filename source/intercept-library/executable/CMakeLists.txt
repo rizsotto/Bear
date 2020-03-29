@@ -16,11 +16,10 @@ add_executable(er
         )
 
 target_include_directories(er PRIVATE ${EXE_SRC_DIR})
+target_include_directories(er PRIVATE ${LIBRESULT_INCLUDE_DIR})
 target_link_libraries(er er_a)
 target_compile_features(er PUBLIC cxx_std_17)
 target_compile_options(er PUBLIC -fno-exceptions -fno-rtti)
-set_target_properties(er PROPERTIES LINKER_LANGUAGE "C")
-
-include(GNUInstallDirs)
-install(TARGETS er
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+set_target_properties(er PROPERTIES
+        LINKER_LANGUAGE "C"
+        )

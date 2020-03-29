@@ -500,7 +500,7 @@ def create_intercept_parser():
     parser.add_argument(
         '--version',
         action='version',
-        version='%(prog)s @BEAR_VERSION@')
+        version='%(prog)s @CMAKE_PROJECT_VERSION@')
     parser.add_argument(
         '--verbose', '-v',
         action='count',

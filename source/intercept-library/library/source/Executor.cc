@@ -27,6 +27,7 @@
 #include "Resolver.h"
 #include "Session.h"
 
+#include <cerrno>
 #include <climits>
 #include <functional>
 #include <errno.h>

@@ -19,51 +19,43 @@
 
 #include "SystemCalls.h"
 
+#include <climits>
 #include <spawn.h>
 #include <sys/wait.h>
-#include <limits.h>
 
 #include <cstring>
 #include <cerrno>
 #include <fstream>
 #include <memory>
 
+using rust::Result;
+using rust::Ok;
+using rust::Err;
+
 namespace {
     constexpr char OS_PATH_SEPARATOR = '/';
+
+    template <typename T>
+    Result<T> error(const char* message, const int error) noexcept
+    {
+        std::string result = message != nullptr ? std::string(message) : std::string("generic error");
+
+        result += " (errno: ";
+        result += std::to_string(error);
+        result += ")";
+
+        return Err(std::runtime_error(result));
+    };
 }
 
 namespace er {
-
-    Result<pid_t> SystemCalls::fork_with_execvp(
-        const char* file,
-        const char* search_path,
-        const char** argv,
-        const char** envp) noexcept
-    {
-#ifdef HAVE_EXECVP2
-        // TODO: implement it
-#else
-        return spawnp(file, argv, envp);
-#endif
-    }
 
     Result<int> SystemCalls::spawn(const char* path, const char** argv, const char** envp) noexcept
     {
         errno = ENOENT;
         pid_t child;
         if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return Err<pid_t>("posix_spawn", errno);
-        } else {
-            return Ok(child);
-        }
-    }
-
-    Result<int> SystemCalls::spawnp(const char* file, const char** argv, const char** envp) noexcept
-    {
-        errno = ENOENT;
-        pid_t child;
-        if (0 != posix_spawnp(&child, file, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return Err<pid_t>("posix_spawn", errno);
+            return error<pid_t>("posix_spawn", errno);
         } else {
             return Ok(child);
         }
@@ -74,7 +66,7 @@ namespace er {
         errno = ENOENT;
         int status;
         if (-1 == waitpid(pid, &status, 0)) {
-            return Err<int>("waitpid", errno);
+            return error<int>("waitpid", errno);
         } else {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
             return Ok(result);
@@ -98,7 +90,7 @@ namespace er {
 
         char buffer[buffer_size];
         if (nullptr == getcwd(buffer, buffer_size)) {
-            return Err<std::string>("getcwd", errno);
+            return error<std::string>("getcwd", errno);
         } else {
             return Ok(std::string(buffer));
         }
@@ -115,7 +107,7 @@ namespace er {
         // create the temporary file.
         errno = ENOENT;
         if (-1 == mkstemps(buffer, strlen(suffix))) {
-            return Err<std::shared_ptr<std::ostream>>("mkstemp", errno);
+            return error<std::shared_ptr<std::ostream>>("mkstemp", errno);
         } else {
             auto result = std::make_shared<std::ofstream>(std::string(buffer));
             return Ok(std::dynamic_pointer_cast<std::ostream>(result));

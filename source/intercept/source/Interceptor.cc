@@ -40,12 +40,11 @@ namespace ic {
         return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper");
     }
 
-    ::grpc::Status InterceptorImpl::GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::Empty* request, ::supervise::EnvironmentUpdate* response)
+    ::grpc::Status InterceptorImpl::GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::EnvironmentRequest* request, ::supervise::EnvironmentResponse* response)
     {
-        auto appends = session_.appends();
-        response->mutable_appends()->insert(appends.begin(), appends.end());
-        auto overrides = session_.overrides();
-        response->mutable_overrides()->insert(overrides.begin(), overrides.end());
+        std::map<std::string, std::string> copy(request->environment().begin(), request->environment().end());
+        auto update = session_.update(std::move(copy));
+        response->mutable_environment()->insert(update.begin(), update.end());
         return ::grpc::Status::OK;
     }
 

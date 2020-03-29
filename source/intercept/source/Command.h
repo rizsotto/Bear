@@ -19,17 +19,14 @@
 
 #pragma once
 
-namespace er {
+#include "Flags.h"
+#include <memory>
 
-    struct Execution {
-        const char* path;
-        const char** command;
+namespace ic {
+
+    struct Command {
+        rust::Result<int> operator()() { return rust::Ok(0); };
     };
 
-    struct Context {
-        char const* reporter;
-        char const* destination;
-        bool verbose;
-    };
-
+    rust::Result<Command> create(const flags::Arguments& args) { return rust::Ok( Command {}); }
 }

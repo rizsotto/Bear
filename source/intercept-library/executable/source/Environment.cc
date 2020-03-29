@@ -28,7 +28,6 @@
 #include <string>
 
 #include "Environment.h"
-#include "Interface.h"
 
 namespace {
 

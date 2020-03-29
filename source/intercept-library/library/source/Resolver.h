@@ -19,11 +19,7 @@
 
 #pragma once
 
-#include "config.h"
-
-#if defined HAVE_SPAWN_HEADER
 #include <spawn.h>
-#endif
 
 namespace el {
 

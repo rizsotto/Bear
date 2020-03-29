@@ -32,10 +32,9 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
-        ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
+        auto result = ::er::parse(argc, const_cast<char**>(argv));
 
-        ASSERT_EQ(expected, result.get_or_else(expected));
+        ASSERT_FALSE(result.is_ok());
     }
 
     TEST(session, parse_help_fails)
@@ -47,10 +46,9 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
-        ::er::SessionPtr const expected = ::er::SessionPtr(nullptr);
+        auto result = ::er::parse(argc, const_cast<char**>(argv));
 
-        ASSERT_EQ(expected, result.get_or_else(expected));
+        ASSERT_FALSE(result.is_ok());
     }
 
     TEST(session, parse_library_success)
@@ -66,18 +64,18 @@ namespace {
         };
         const int argc = sizeof(argv) / sizeof(char*) - 1;
 
-        ::er::Result<::er::SessionPtr> const result = ::er::parse(argc, const_cast<char**>(argv));
-        ::er::SessionPtr const dummy = ::er::SessionPtr(nullptr);
-        ASSERT_NE(dummy, result.get_or_else(dummy));
-        auto session_result = (::er::LibrarySession const*)result.get_or_else(dummy).get();
+        const auto result = ::er::parse(argc, const_cast<char**>(argv));
+        ASSERT_TRUE(result.is_ok());
+        const auto session_result = result.unwrap_or({});
 
-        ASSERT_STREQ(argv[0], session_result->context_.reporter);
-        ASSERT_STREQ(argv[4], session_result->context_.destination);
-        ASSERT_EQ(true, session_result->context_.verbose);
+        ASSERT_EQ("program", session_result.context_.reporter);
+        ASSERT_EQ("/tmp/destination", session_result.context_.destination);
+        ASSERT_EQ(true, session_result.context_.verbose);
 
-        ASSERT_EQ(argv + 9, session_result->execution_.command);
-        ASSERT_EQ(argv[7], session_result->execution_.path);
+        std::vector<std::string_view > expected_command = { "ls", "-l", "-a" };
+        ASSERT_EQ(expected_command, session_result.execution_.command);
+        ASSERT_EQ("/bin/ls", session_result.execution_.path);
 
-        ASSERT_EQ(argv[2], session_result->library);
+        ASSERT_EQ("/install/path/libexec.so", session_result.library_);
     }
 }

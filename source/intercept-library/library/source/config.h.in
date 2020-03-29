@@ -20,6 +20,5 @@
 #pragma once
 
 #cmakedefine HAVE_NSGETENVIRON
-#cmakedefine HAVE_SPAWN_HEADER
 
 #cmakedefine APPLE

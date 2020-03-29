@@ -25,6 +25,10 @@
 #include <chrono>
 #include <iostream>
 
+using rust::Result;
+using rust::Ok;
+using rust::Err;
+
 namespace {
 
     std::string to_json_string(const std::string& value)
@@ -184,10 +188,10 @@ namespace {
     public:
         explicit ReporterImpl(const char* target) noexcept;
 
-        er::Result<int> send(const er::EventPtr& event) noexcept override;
+        Result<int> send(const er::EventPtr& event) noexcept override;
 
     private:
-        er::Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
+        Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
 
         std::string const target_;
     };
@@ -198,7 +202,7 @@ namespace {
     {
     }
 
-    er::Result<int> ReporterImpl::send(const er::EventPtr& event) noexcept
+    Result<int> ReporterImpl::send(const er::EventPtr& event) noexcept
     {
         return create_stream(event->name())
             .map<int>([&event](auto stream) {
@@ -207,7 +211,7 @@ namespace {
             });
     }
 
-    er::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
+    Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
     {
         return er::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }

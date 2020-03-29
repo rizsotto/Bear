@@ -20,61 +20,77 @@
 #include <iostream>
 
 #include "Environment.h"
-#include "Interface.h"
 #include "Reporter.h"
 #include "Result.h"
 #include "Session.h"
 #include "SystemCalls.h"
+
+using rust::Result;
+using rust::Ok;
+using rust::Err;
+using rust::merge;
 
 namespace {
 
     std::ostream& error_stream()
     {
         std::cerr << "er: [pid: "
-                  << er::SystemCalls::get_pid().get_or_else(0)
+                  << er::SystemCalls::get_pid().unwrap_or(0)
                   << ", ppid: "
-                  << er::SystemCalls::get_ppid().get_or_else(0)
+                  << er::SystemCalls::get_ppid().unwrap_or(0)
                   << "] ";
         return std::cerr;
     }
 
-    er::Result<pid_t> spawnp(const ::er::Execution& config,
+    std::vector<const char*> to_char_vector(const std::vector<std::string_view>& input)
+    {
+        auto result = std::vector<const char*>(input.size());
+        std::transform(input.begin(), input.end(), result.begin(), [](auto it) { return it.data(); });
+        result.push_back(nullptr);
+        return result;
+    }
+
+    Result<pid_t> spawnp(const ::er::Execution& config,
         const ::er::EnvironmentPtr& environment) noexcept
     {
-        return er::SystemCalls::spawn(config.path, config.command, environment->data());
+        auto command = to_char_vector(config.command);
+        return er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
     }
 
-    void report_start(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
+    void report_start(Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
     {
-        ::er::merge(reporter, ::er::Event::start(pid, cmd))
-            .bind<int>([](auto tuple) {
+        merge(reporter, ::er::Event::start(pid, cmd))
+            .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
-            .handle_with([](auto message) {
+            .unwrap_or_else([](auto message) {
                 error_stream() << "report start: " << message.what() << std::endl;
-            })
-            .get_or_else(0);
+                return 0;
+            });
     }
 
-    void report_exit(::er::Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    void report_exit(Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
     {
-        ::er::merge(reporter, ::er::Event::stop(pid, exit))
-            .bind<int>([](auto tuple) {
+        merge(reporter, ::er::Event::stop(pid, exit))
+            .and_then<int>([](auto tuple) {
                 const auto& [rptr, eptr] = tuple;
                 return rptr->send(eptr);
             })
-            .handle_with([](auto message) {
+            .unwrap_or_else([](auto message) {
                 error_stream() << "report stop: " << message.what() << std::endl;
-            })
-            .get_or_else(0);
+                return 0;
+            });
     }
 
-    ::er::EnvironmentPtr create_environment(char* original[], const ::er::SessionPtr& session)
+    ::er::EnvironmentPtr create_environment(char* original[], const ::er::Session& session)
     {
-        auto builder = er::Environment::Builder(const_cast<const char**>(original));
-        session->configure(builder);
-        return builder.build();
+        return er::Environment::Builder(const_cast<const char**>(original))
+            .add_reporter(session.context_.reporter.data())
+            .add_destination(session.context_.destination.data())
+            .add_verbose(session.context_.verbose)
+            .add_library(session.library_.data())
+            .build();
     }
 
     std::ostream& operator<<(std::ostream& os, char* const* values)
@@ -96,22 +112,22 @@ namespace {
 int main(int argc, char* argv[], char* envp[])
 {
     return ::er::parse(argc, argv)
-        .map<er::SessionPtr>([&argv](auto arguments) {
-            if (arguments->context_.verbose) {
+        .map<er::Session>([&argv](auto arguments) {
+            if (arguments.context_.verbose) {
                 error_stream() << argv << std::endl;
             }
             return arguments;
         })
-        .bind<int>([&envp](auto arguments) {
-            auto reporter = er::Reporter::tempfile(arguments->context_.destination);
+        .and_then<int>([&envp](auto arguments) {
+            auto reporter = er::Reporter::tempfile(arguments.context_.destination.data());
 
             auto environment = create_environment(envp, arguments);
-            return spawnp(arguments->execution_, environment)
+            return spawnp(arguments.execution_, environment)
                 .template map<pid_t>([&arguments, &reporter](auto& pid) {
-                    report_start(reporter, pid, arguments->execution_.command);
+                    report_start(reporter, pid, to_char_vector(arguments.execution_.command).data());
                     return pid;
                 })
-                .template bind<std::tuple<pid_t, int>>([](auto pid) {
+                .template and_then<std::tuple<pid_t, int>>([](auto pid) {
                     return er::SystemCalls::wait_pid(pid)
                         .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                             return std::make_tuple(pid, exit);
@@ -123,8 +139,8 @@ int main(int argc, char* argv[], char* envp[])
                     return exit;
                 });
         })
-        .handle_with([](auto message) {
+        .unwrap_or_else([](auto message) {
             error_stream() << message.what() << std::endl;
-        })
-        .get_or_else(EXIT_FAILURE);
+            return EXIT_FAILURE;
+        });
 }

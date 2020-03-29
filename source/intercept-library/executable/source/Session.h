@@ -20,46 +20,31 @@
 #pragma once
 
 #include <memory>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "Environment.h"
-#include "Interface.h"
 #include "Result.h"
 
 namespace er {
 
-    /// Used by `intercept-cc` to report single execution.
+    struct Execution {
+        const std::string_view path;
+        const std::vector<std::string_view> command;
+    };
+
+    struct Context {
+        const std::string_view reporter;
+        const std::string_view destination;
+        bool verbose;
+    };
+
     struct Session {
-        ::er::Context context_;
-        ::er::Execution execution_;
-
-        Session(const ::er::Context& context, const ::er::Execution& execution)
-                : context_(context)
-                , execution_(execution)
-        {
-        }
-
-        virtual ~Session() noexcept = default;
-
-        virtual void configure(::er::Environment::Builder& builder) const noexcept;
+        Context context_;
+        Execution execution_;
+        std::string_view library_;
     };
 
-    /// Used by `intercept-build` and `libexec` to report execution
-    /// and prepare for more executions.
-    struct LibrarySession : public ::er::Session {
-        const char* library;
-
-        LibrarySession(const ::er::Context& context, const ::er::Execution& execution)
-                : Session(context, execution)
-                , library(nullptr)
-        {
-        }
-
-        ~LibrarySession() noexcept override = default;
-
-        void configure(::er::Environment::Builder& builder) const noexcept override;
-    };
-
-    using SessionPtr = std::shared_ptr<Session>;
-    er::Result<er::SessionPtr> parse(int argc, char* argv[]) noexcept;
-
+    rust::Result<Session> parse(int argc, char* argv[]) noexcept;
 }
