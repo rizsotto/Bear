@@ -30,6 +30,8 @@ add_custom_command(
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a STATIC
+        Command.h
+        Command.cc
         Interceptor.h
         Interceptor.cc
         Reporter.h
@@ -43,12 +45,11 @@ add_library(intercept_a STATIC
 
 target_include_directories(intercept_a PRIVATE "${EXE_CFG_DIR}")
 target_include_directories(intercept_a PRIVATE "${EXE_API_DIR}")
-target_include_directories(intercept_a PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
-target_include_directories(intercept_a PRIVATE gRPC::grpc)
-target_include_directories(intercept_a PRIVATE protobuf::libprotobuf)
+target_include_directories(intercept_a PRIVATE "${LIBRESULT_INCLUDE_DIR}")
 target_compile_definitions(intercept_a PRIVATE GOOGLE_PROTOBUF_NO_RTTI)
+target_link_libraries(intercept_a PRIVATE flags_a)
 target_link_libraries(intercept_a PRIVATE nlohmann_json::nlohmann_json)
-target_link_libraries(intercept_a PRIVATE gRPC::grpc)
 target_link_libraries(intercept_a PRIVATE protobuf::libprotobuf)
-target_compile_features(intercept_a PUBLIC cxx_std_14)
+target_link_libraries(intercept_a PRIVATE gRPC::grpc)
+target_compile_features(intercept_a PUBLIC cxx_std_17)
 target_compile_options(intercept_a PUBLIC -fno-exceptions -fno-rtti)

@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 
 namespace ic {
 
@@ -29,8 +29,23 @@ namespace ic {
         virtual ~Session() = default;
 
         // TODO: these shall return `Result<>`
-        virtual const char* resolve(const std::string& name) const noexcept = 0;
+        virtual const char* resolve(const std::string& name) const = 0;
 
-        virtual std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const noexcept = 0;
+        virtual std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const = 0;
     };
+
+    struct FakeSession : public Session {
+        const char* resolve(const std::string& name) const override
+        {
+            return "null pointer";
+        }
+
+        std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const override
+        {
+            return std::move(env);
+        }
+    };
+
+    using SessionPtr = std::shared_ptr<Session>;
+    using SessionConstPtr = std::shared_ptr<const Session>;
 }

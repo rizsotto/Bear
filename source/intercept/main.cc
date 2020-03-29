@@ -57,7 +57,7 @@ int main(int argc, char* argv[])
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // if parsing success, we create the main command and execute it.
         .and_then<ic::Command>([](auto args) {
-            return ic::create(args);
+            return ic::Command::create(args);
         })
         .and_then<int>([](auto command) {
             return command();

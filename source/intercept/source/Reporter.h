@@ -22,7 +22,11 @@
 #include <memory>
 #include <string>
 
-#include "supervise.pb.h"
+//#include "supervise.pb.h"
+
+namespace supervise {
+    class Event;
+}
 
 namespace ic {
 
@@ -47,8 +51,10 @@ namespace ic {
         ExecutionPtr execution_;
     };
 
-    class Reporter {
-    public:
-        void report(const ExecutionPtr& execution) noexcept;
+    // Will be responsible to append execution to the output
+    struct Reporter {
+        void report(const ExecutionPtr& execution);
     };
+
+    using ReporterPtr = std::shared_ptr<Reporter>;
 }

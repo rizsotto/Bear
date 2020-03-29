@@ -20,13 +20,34 @@
 #pragma once
 
 #include "Flags.h"
+#include "Result.h"
+#include "Reporter.h"
+#include "Session.h"
+
 #include <memory>
 
 namespace ic {
 
-    struct Command {
-        rust::Result<int> operator()() { return rust::Ok(0); };
-    };
+    class Command {
+    public:
+        static ::rust::Result<Command> create(const ::flags::Arguments& args);
 
-    rust::Result<Command> create(const flags::Arguments& args) { return rust::Ok( Command {}); }
+        ::rust::Result<int> operator()();
+
+    public:
+        Command() = delete;
+        ~Command() = default;
+
+        Command(const Command&) = default;
+        Command(Command&&) noexcept = default;
+
+        Command& operator=(const Command&) = default;
+        Command& operator=(Command&&) noexcept = default;
+
+    private:
+        Command(ReporterPtr reporter, SessionConstPtr session);
+
+        ReporterPtr reporter_;
+        SessionConstPtr session_;
+    };
 }
