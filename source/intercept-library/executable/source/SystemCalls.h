@@ -29,13 +29,7 @@ namespace er {
     struct SystemCalls {
 
         static rust::Result<pid_t>
-        fork_with_execvp(const char* file, const char* search_path, const char** argv, const char** envp) noexcept;
-
-        static rust::Result<pid_t>
         spawn(const char* path, const char** argv, const char** envp) noexcept;
-
-        static rust::Result<pid_t>
-        spawnp(const char* file, const char** argv, const char** envp) noexcept;
 
         static rust::Result<int>
         wait_pid(pid_t pid) noexcept;

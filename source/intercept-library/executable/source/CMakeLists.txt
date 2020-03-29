@@ -1,4 +1,8 @@
 # Create a header file with the relevant configuration values.
+include(CheckIncludeFile)
+check_include_file(spawn.h HAVE_SPAWN_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+check_include_file(sys/wait.h HAVE_WAIT_H)
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 # Create a static library, which is used for unit tests and the final shared library.

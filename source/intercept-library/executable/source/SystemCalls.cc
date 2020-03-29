@@ -19,9 +19,9 @@
 
 #include "SystemCalls.h"
 
+#include <climits>
 #include <spawn.h>
-#include <wait.h>
-#include <limits.h>
+#include <sys/wait.h>
 
 #include <cstring>
 #include <cerrno>
@@ -50,35 +50,11 @@ namespace {
 
 namespace er {
 
-    Result<pid_t> SystemCalls::fork_with_execvp(
-        const char* file,
-        const char* search_path,
-        const char** argv,
-        const char** envp) noexcept
-    {
-#ifdef HAVE_EXECVP2
-        // TODO: implement it
-#else
-        return spawnp(file, argv, envp);
-#endif
-    }
-
     Result<int> SystemCalls::spawn(const char* path, const char** argv, const char** envp) noexcept
     {
         errno = ENOENT;
         pid_t child;
         if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return error<pid_t>("posix_spawn", errno);
-        } else {
-            return Ok(child);
-        }
-    }
-
-    Result<int> SystemCalls::spawnp(const char* file, const char** argv, const char** envp) noexcept
-    {
-        errno = ENOENT;
-        pid_t child;
-        if (0 != posix_spawnp(&child, file, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
             return error<pid_t>("posix_spawn", errno);
         } else {
             return Ok(child);
