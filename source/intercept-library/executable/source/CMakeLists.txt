@@ -7,8 +7,7 @@ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(er_a STATIC
-        ../api/flags.h
-        ../api/messages.h
+        ../include/er.h
         Command.h
         Command.cc
         Environment.h

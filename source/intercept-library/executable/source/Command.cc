@@ -21,7 +21,7 @@
 #include "Environment.h"
 #include "Reporter.h"
 #include "SystemCalls.h"
-#include "flags.h"
+#include "er.h"
 
 #include <iostream>
 

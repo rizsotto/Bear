@@ -19,16 +19,14 @@
 
 #pragma once
 
-namespace er {
-    namespace flags {
+namespace er::flags {
 
-        constexpr char HELP[] = "--help";
-        constexpr char VERSION[] = "--version";
+    constexpr char HELP[] = "--help";
+    constexpr char VERSION[] = "--version";
 
-        constexpr char VERBOSE[] = "--verbose";
-        constexpr char DESTINATION[] = "--destination";
-        constexpr char LIBRARY[] = "--library";
-        constexpr char EXECUTE[] = "--execute";
-        constexpr char COMMAND[] = "--";
-    }
+    constexpr char VERBOSE[] = "--verbose";
+    constexpr char DESTINATION[] = "--destination";
+    constexpr char LIBRARY[] = "--library";
+    constexpr char EXECUTE[] = "--execute";
+    constexpr char COMMAND[] = "--";
 }

@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "flags.h"
+#include "er.h"
 
 #include "Executor.h"
 #include "ResolverMock.h"

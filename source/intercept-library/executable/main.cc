@@ -19,8 +19,8 @@
 
 #include "Command.h"
 #include "Flags.h"
-#include "flags.h"
 #include "SystemCalls.h"
+#include "er.h"
 
 #include <iostream>
 #include <string>
