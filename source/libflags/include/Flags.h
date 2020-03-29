@@ -33,13 +33,13 @@ namespace flags {
 
     class Arguments {
     public:
-        [[nodiscard]] std::string_view program() const;
+        [[nodiscard]] virtual std::string_view program() const;
 
-        [[nodiscard]] rust::Result<bool> as_bool(const std::string_view& key) const;
-        [[nodiscard]] rust::Result<std::string_view> as_string(const std::string_view& key) const;
-        [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
+        [[nodiscard]] virtual rust::Result<bool> as_bool(const std::string_view& key) const;
+        [[nodiscard]] virtual rust::Result<std::string_view> as_string(const std::string_view& key) const;
+        [[nodiscard]] virtual rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
-        ~Arguments() = default;
+        virtual ~Arguments() = default;
 
         Arguments(const Arguments&) = default;
         Arguments(Arguments&&) noexcept = default;
@@ -47,12 +47,13 @@ namespace flags {
         Arguments& operator=(const Arguments&) = default;
         Arguments& operator=(Arguments&&) noexcept = default;
 
-    private:
+    protected:
         using Parameter = std::vector<std::string_view>;
         using Parameters = std::map<std::string_view, Parameter>;
 
         friend class Parser;
 
+        Arguments();
         Arguments(std::string_view&& program, Parameters&& parameters);
 
     private:

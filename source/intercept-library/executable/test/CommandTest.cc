@@ -18,58 +18,69 @@
  */
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
-#include "Session.h"
-#include "flags.h"
+#include "Command.h"
+#include "Flags.h"
+#include "er.h"
+
+using ::testing::Return;
 
 namespace {
 
-    TEST(session, parse_empty_fails)
-    {
-        const char* argv[] = {
-            "program",
-            nullptr
-        };
-        const int argc = sizeof(argv) / sizeof(char*) - 1;
+    class MockArguments : public ::flags::Arguments {
+    public:
+        MOCK_METHOD(std::string_view, program, (), (override, const));
+        MOCK_METHOD(rust::Result<bool>, as_bool, (const std::string_view& key), (override, const));
+        MOCK_METHOD(rust::Result<std::string_view>, as_string, (const std::string_view& key), (override, const));
+        MOCK_METHOD(rust::Result<std::vector<std::string_view>>, as_string_list, (const std::string_view& key), (override, const));
+    };
 
-        auto result = ::er::parse(argc, const_cast<char**>(argv));
+    TEST(command, create_fails_if_no_command)
+    {
+        MockArguments arguments;
+        EXPECT_CALL(arguments, program())
+            .WillOnce(Return("program"));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::DESTINATION)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::LIBRARY)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
+        EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
+            .WillOnce(Return(rust::Result<bool>(rust::Ok(false))));
+        EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
+            .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("")))));
+
+        auto result = ::er::create(arguments);
 
         ASSERT_FALSE(result.is_ok());
     }
 
-    TEST(session, parse_help_fails)
+    TEST(command, create_success)
     {
-        const char* argv[] = {
-            "program",
-            ::er::flags::HELP,
-            nullptr
-        };
-        const int argc = sizeof(argv) / sizeof(char*) - 1;
+        const std::vector<std::string_view> command = { "ls", "-l", "-a" };
+        MockArguments arguments;
+        EXPECT_CALL(arguments, program())
+            .WillOnce(Return("program"));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::DESTINATION)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/destdir")))));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/bin/ls")))));
+        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::LIBRARY)))
+            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/install/path/libexec.so")))));
+        EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
+            .WillOnce(Return(rust::Result<bool>(rust::Ok(true))));
+        EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
+            .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Ok(command))));
 
-        auto result = ::er::parse(argc, const_cast<char**>(argv));
+        auto result = ::er::create(arguments);
 
-        ASSERT_FALSE(result.is_ok());
-    }
-
-    TEST(session, parse_library_success)
-    {
-        const char* argv[] = {
-            "program",
-            er::flags::LIBRARY, "/install/path/libexec.so",
-            er::flags::DESTINATION, "/tmp/destination",
-            er::flags::VERBOSE,
-            er::flags::EXECUTE, "/bin/ls",
-            er::flags::COMMAND, "ls", "-l", "-a",
-            nullptr
-        };
-        const int argc = sizeof(argv) / sizeof(char*) - 1;
-
-        const auto result = ::er::parse(argc, const_cast<char**>(argv));
         ASSERT_TRUE(result.is_ok());
         const auto session_result = result.unwrap_or({});
 
         ASSERT_EQ("program", session_result.context_.reporter);
-        ASSERT_EQ("/tmp/destination", session_result.context_.destination);
+        ASSERT_EQ("/destdir", session_result.context_.destination);
         ASSERT_EQ(true, session_result.context_.verbose);
 
         std::vector<std::string_view > expected_command = { "ls", "-l", "-a" };

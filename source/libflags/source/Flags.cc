@@ -127,6 +127,12 @@ namespace {
 
 namespace flags {
 
+    Arguments::Arguments()
+            : program_()
+            , parameters_()
+    {
+    }
+
     Arguments::Arguments(std::string_view&& program, Arguments::Parameters&& parameters)
             : program_(program)
             , parameters_(parameters)
