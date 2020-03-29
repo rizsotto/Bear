@@ -173,8 +173,9 @@ namespace flags {
                 fmt::format("Parameter \"{0}\" is not available.", key))));
     }
 
-    Parser::Parser(std::string_view name, std::initializer_list<OptionValue> options)
+    Parser::Parser(std::string_view name, std::string_view version, std::initializer_list<OptionValue> options)
             : name_(name)
+            , version_(version)
             , options_(options)
     {
     }
@@ -243,5 +244,10 @@ namespace flags {
         os << "Usage: " << name_;
         format_options(os, main_options);
         os << std::endl;
+    }
+
+    void Parser::print_version(std::ostream& os) const
+    {
+        os << name_ << " " << version_ << std::endl;
     }
 }

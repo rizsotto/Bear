@@ -66,7 +66,7 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    const flags::Parser parser("er",
+    const flags::Parser parser("er", VERSION,
         { { ::er::flags::HELP, { 0, false, "this message", std::nullopt, QUERY_GROUP } },
             { ::er::flags::VERSION, { 0, false, "print version and exit", std::nullopt, QUERY_GROUP } },
             { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
@@ -88,7 +88,7 @@ int main(int argc, char* argv[], char* envp[])
             }
             // print version message and exit zero
             if (args.as_bool(::er::flags::VERSION).unwrap_or(false)) {
-                std::cout << "er " << VERSION << std::endl;
+                parser.print_version(std::cout);
                 return EARLY_EXIT;
             }
             return rust::Result<flags::Arguments, Error>(rust::Ok(args));

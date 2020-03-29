@@ -74,13 +74,15 @@ namespace flags {
 
     class Parser {
     public:
-        Parser(std::string_view name, std::initializer_list<OptionValue> options);
+        Parser(std::string_view name, std::string_view version, std::initializer_list<OptionValue> options);
         ~Parser() = default;
 
         rust::Result<Arguments> parse(int argc, const char** argv) const;
 
         void print_help(std::ostream&) const;
         void print_usage(std::ostream&) const;
+
+        void print_version(std::ostream&) const;
 
     public:
         Parser() = delete;
@@ -92,6 +94,7 @@ namespace flags {
 
     private:
         const std::string_view name_;
+        const std::string_view version_;
         const OptionMap options_;
     };
 }

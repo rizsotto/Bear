@@ -36,7 +36,7 @@ namespace {
         const char* argv[] = { "executable", FLAG, OPTION, "0", OPTIONS, "1", "2", "3", SEPARATOR, "4", "5" };
         const int argc = sizeof(argv) / sizeof(const char*);
 
-        const Parser parser("test",
+        const Parser parser("test", "version",
             { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
                 { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
                 { OPTION, { 1, false, "a flag with a value", std::nullopt, std::nullopt } },
@@ -78,7 +78,7 @@ namespace {
         const char* argv[] = { "executable" };
         const int argc = sizeof(argv) / sizeof(const char*);
 
-        const Parser parser("test",
+        const Parser parser("test", "version",
             { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
                 { FLAG, { 0, false, "a single flag", { "true" }, std::nullopt } },
                 { OPTION, { 1, false, "a flag with a value", { "42" }, std::nullopt } } });
@@ -109,7 +109,7 @@ namespace {
         const char* argv[] = { "executable", FLAG, OPTION, "0" };
         const int argc = sizeof(argv) / sizeof(const char*);
 
-        const Parser parser("test",
+        const Parser parser("test", "version",
             { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
                 { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
@@ -129,7 +129,7 @@ namespace {
         const char* argv[] = { "executable", FLAG, OPTIONS, "1" };
         const int argc = sizeof(argv) / sizeof(const char*);
 
-        const Parser parser("test",
+        const Parser parser("test", "version",
                             { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
                               { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
                               { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } } });
@@ -143,18 +143,5 @@ namespace {
                 EXPECT_STREQ(error.what(), "Not enough parameters for: --options");
                 return 0;
             });
-    }
-
-    TEST(flags, parse_help)
-    {
-//        const std::string expected = "Usage: thing [OPTION]\n"
-//                                     "\n"
-//                                     "  --flag                 a single flag\n"
-//                                     "  --help                 this message\n";
-//        const Parser parser({ { HELP, { 0, "this message" } },
-//            { FLAG, { 0, "a single flag" } } });
-//        const std::string help = parser.help("thing");
-//
-//        EXPECT_EQ(help, expected);
     }
 }
