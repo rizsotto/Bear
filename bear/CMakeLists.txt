@@ -1,6 +1,6 @@
 include(FindPythonInterp)
 if (PYTHONINTERP_FOUND)
-    set(BEAR_PYTHON_EXECUTABLE "python${PYTHON_VERSION_MAJOR}")
+    get_filename_component(BEAR_PYTHON_EXECUTABLE ${PYTHON_EXECUTABLE} NAME)
 else()
     message(FATAL_ERROR "Have not found python interpreter")
 endif()
