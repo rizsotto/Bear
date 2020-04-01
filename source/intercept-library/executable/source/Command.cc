@@ -19,8 +19,8 @@
 
 #include "Command.h"
 #include "Environment.h"
+#include "Output.h"
 #include "Reporter.h"
-#include "SystemCalls.h"
 #include "er.h"
 
 #include <iostream>
@@ -32,14 +32,37 @@ using rust::Result;
 
 namespace {
 
-    std::ostream& error_stream()
+    struct Execution {
+        const std::string_view path;
+        const std::vector<std::string_view> command;
+    };
+
+    struct Context {
+        const std::string_view reporter;
+        const std::string_view destination;
+        bool verbose;
+    };
+
+    Result<Context> make_context(const ::flags::Arguments& args) noexcept
     {
-        std::cerr << "er: [pid: "
-                  << er::SystemCalls::get_pid().unwrap_or(0)
-                  << ", ppid: "
-                  << er::SystemCalls::get_ppid().unwrap_or(0)
-                  << "] ";
-        return std::cerr;
+        return args.as_string(::er::flags::DESTINATION)
+            .map<Context>([&args](const auto destination) {
+                const auto reporter = args.program();
+                const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
+                return Context { reporter, destination, verbose };
+            });
+    }
+
+    Result<Execution> make_execution(const ::flags::Arguments& args) noexcept
+    {
+        auto path = args.as_string(::er::flags::EXECUTE);
+        auto command = args.as_string_list(::er::flags::COMMAND);
+
+        return merge(path, command)
+            .map<Execution>([](auto tuple) {
+                const auto& [path, command] = tuple;
+                return Execution { path, command };
+            });
     }
 
     std::vector<const char*> to_char_vector(const std::vector<std::string_view>& input)
@@ -50,14 +73,14 @@ namespace {
         return result;
     }
 
-    Result<pid_t> spawnp(const ::er::Execution& config,
+    Result<pid_t> spawnp(const Execution& config,
         const ::er::EnvironmentPtr& environment) noexcept
     {
         auto command = to_char_vector(config.command);
-        return er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
+        return ::er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
     }
 
-    void report_start(Result<er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
+    void report_start(Result<::er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
     {
         merge(reporter, ::er::Event::start(pid, cmd))
             .and_then<int>([](auto tuple) {
@@ -65,12 +88,12 @@ namespace {
                 return rptr->send(eptr);
             })
             .unwrap_or_else([](auto message) {
-                error_stream() << "report start: " << message.what() << std::endl;
+                ::er::error_stream() << "report start: " << message.what() << std::endl;
                 return 0;
             });
     }
 
-    void report_exit(Result<er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    void report_exit(Result<::er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
     {
         merge(reporter, ::er::Event::stop(pid, exit))
             .and_then<int>([](auto tuple) {
@@ -78,75 +101,82 @@ namespace {
                 return rptr->send(eptr);
             })
             .unwrap_or_else([](auto message) {
-                error_stream() << "report stop: " << message.what() << std::endl;
+                ::er::error_stream() << "report stop: " << message.what() << std::endl;
                 return 0;
-            });
-    }
-
-    ::er::EnvironmentPtr create_environment(char* original[], const ::er::Session& session)
-    {
-        return er::Environment::Builder(const_cast<const char**>(original))
-            .add_reporter(session.context_.reporter.data())
-            .add_destination(session.context_.destination.data())
-            .add_verbose(session.context_.verbose)
-            .add_library(session.library_.data())
-            .build();
-    }
-
-    Result<::er::Context> make_context(const ::flags::Arguments& args) noexcept
-    {
-        return args.as_string(::er::flags::DESTINATION)
-            .map<::er::Context>([&args](const auto destination) {
-                const auto reporter = args.program();
-                const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
-                return er::Context { reporter, destination, verbose };
-            });
-    }
-
-    Result<::er::Execution> make_execution(const ::flags::Arguments& args) noexcept
-    {
-        auto path = args.as_string(::er::flags::EXECUTE);
-        auto command = args.as_string_list(::er::flags::COMMAND);
-
-        return merge(path, command)
-            .map<::er::Execution>([](auto tuple) {
-                const auto& [path, command] = tuple;
-                return ::er::Execution { path, command };
             });
     }
 }
 
 namespace er {
 
-    ::rust::Result<Session> create(const ::flags::Arguments& params)
+    struct Command::State {
+        Context context_;
+        Execution execution_;
+        std::string_view library_;
+    };
+
+    ::rust::Result<Command> Command::create(const ::flags::Arguments& params)
     {
         return merge(make_context(params), make_execution(params), params.as_string(::er::flags::LIBRARY))
-            .template map<Session>([&params](auto in) {
+            .map<Command>([&params](auto in) {
                 const auto& [context, execution, library] = in;
-                return Session { context, execution, library };
+                auto state = new Command::State { context, execution, library };
+                return Command(state);
             });
     }
 
-    ::rust::Result<int> run(Session&& session, char* envp[])
+    ::rust::Result<int> Command::operator()(const char** envp) const
     {
-        auto reporter = er::Reporter::tempfile(session.context_.destination.data());
+        auto reporter = ::er::Reporter::tempfile(impl_->context_.destination.data());
 
-        auto environment = create_environment(envp, session);
-        return spawnp(session.execution_, environment)
-            .template map<pid_t>([&session, &reporter](auto& pid) {
-                report_start(reporter, pid, to_char_vector(session.execution_.command).data());
+        auto environment = ::er::Environment::Builder(const_cast<const char**>(envp))
+                               .add_reporter(impl_->context_.reporter.data())
+                               .add_destination(impl_->context_.destination.data())
+                               .add_verbose(impl_->context_.verbose)
+                               .add_library(impl_->library_.data())
+                               .build();
+
+        return spawnp(impl_->execution_, environment)
+            .map<pid_t>([this, &reporter](auto& pid) {
+                report_start(reporter, pid, to_char_vector(impl_->execution_.command).data());
                 return pid;
             })
-            .template and_then<std::tuple<pid_t, int>>([](auto pid) {
-                return er::SystemCalls::wait_pid(pid)
+            .and_then<std::tuple<pid_t, int>>([](auto pid) {
+                return ::er::SystemCalls::wait_pid(pid)
                     .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                         return std::make_tuple(pid, exit);
                     });
             })
-            .template map<int>([&reporter](auto tuple) {
+            .map<int>([&reporter](auto tuple) {
                 const auto& [pid, exit] = tuple;
                 report_exit(reporter, pid, exit);
                 return exit;
             });
+    }
+
+    Command::Command(Command::State* const impl)
+            : impl_(impl)
+    {
+    }
+
+    Command::Command(Command&& rhs) noexcept
+            : impl_(rhs.impl_)
+    {
+        rhs.impl_ = nullptr;
+    }
+
+    Command& Command::operator=(Command&& rhs) noexcept
+    {
+        if (&rhs != this) {
+            delete impl_;
+            impl_ = rhs.impl_;
+        }
+        return *this;
+    }
+
+    Command::~Command()
+    {
+        delete impl_;
+        impl_ = nullptr;
     }
 }

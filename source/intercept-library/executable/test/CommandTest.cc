@@ -52,7 +52,7 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("")))));
 
-        auto result = ::er::create(arguments);
+        auto result = ::er::Command::create(arguments);
 
         ASSERT_FALSE(result.is_ok());
     }
@@ -74,19 +74,8 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Ok(command))));
 
-        auto result = ::er::create(arguments);
+        auto result = ::er::Command::create(arguments);
 
         ASSERT_TRUE(result.is_ok());
-        const auto session_result = result.unwrap_or({});
-
-        ASSERT_EQ("program", session_result.context_.reporter);
-        ASSERT_EQ("/destdir", session_result.context_.destination);
-        ASSERT_EQ(true, session_result.context_.verbose);
-
-        std::vector<std::string_view > expected_command = { "ls", "-l", "-a" };
-        ASSERT_EQ(expected_command, session_result.execution_.command);
-        ASSERT_EQ("/bin/ls", session_result.execution_.path);
-
-        ASSERT_EQ("/install/path/libexec.so", session_result.library_);
     }
 }

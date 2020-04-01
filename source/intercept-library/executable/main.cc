@@ -19,25 +19,15 @@
 
 #include "Command.h"
 #include "Flags.h"
-#include "SystemCalls.h"
+#include "Output.h"
 #include "er.h"
 
 #include <iostream>
-#include <string_view>
+#include <optional>
 
 namespace {
 
     constexpr char VERSION[] = _ER_VERSION;
-
-    std::ostream& error_stream()
-    {
-        std::cerr << "er: [pid: "
-                  << er::SystemCalls::get_pid().unwrap_or(0)
-                  << ", ppid: "
-                  << er::SystemCalls::get_ppid().unwrap_or(0)
-                  << "] ";
-        return std::cerr;
-    }
 
     std::ostream& operator<<(std::ostream& os, char* const* values)
     {
@@ -66,16 +56,17 @@ int main(int argc, char* argv[], char* envp[])
         // log the original command line as it was received.
         .map<flags::Arguments>([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
-                error_stream() << argv << std::endl;
+                ::er::error_stream() << argv << std::endl;
             }
             return args;
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<er::Session>([](auto args) {
-            return er::create(args);
+        .and_then<er::Command>([](auto args) {
+            return er::Command::create(args);
         })
-        .and_then<int>([&envp](auto command) {
-            return er::run(std::move(command), envp);
+        .and_then<int>([&envp](const auto& command) {
+            const char** environment = const_cast<const char**>(envp);
+            return command(environment);
         })
         // set the return code from error and print message
         .unwrap_or_else([](auto error) {

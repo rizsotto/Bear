@@ -19,33 +19,20 @@
 
 #pragma once
 
-#include "Flags.h"
-#include "Result.h"
+#include "SystemCalls.h"
+
+#include <iostream>
 
 namespace er {
 
-    class Command {
-    public:
-        static ::rust::Result<Command> create(const ::flags::Arguments& args);
-
-        ::rust::Result<int> operator()(const char** envp) const;
-
-    public:
-        Command() = delete;
-        ~Command();
-
-        Command(const Command&) = delete;
-        Command(Command&&) noexcept;
-
-        Command& operator=(const Command&) = delete;
-        Command& operator=(Command&&) noexcept;
-
-    private:
-        struct State;
-
-        explicit Command(State*);
-
-    private:
-        State const* impl_;
-    };
+    inline
+    std::ostream& error_stream()
+    {
+        std::cerr << "er: [pid: "
+                  << er::SystemCalls::get_pid().unwrap_or(0)
+                  << ", ppid: "
+                  << er::SystemCalls::get_ppid().unwrap_or(0)
+                  << "] ";
+        return std::cerr;
+    }
 }
