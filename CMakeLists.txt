@@ -5,6 +5,7 @@ project(Bear-SuperBuild C CXX)
 option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
 option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
 option(USE_SYSTEM_FMT "Use system installed fmt library" OFF)
+option(USE_SYSTEM_SPDLOG "Use system installed spdlog library" OFF)
 option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
 
 # Some systems are using different library directory names for
@@ -52,6 +53,23 @@ if (NOT USE_SYSTEM_FMT)
     set(fmt_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/fmt/${LIBRARY_DIRECTORY_NAME}/cmake/fmt/")
 endif ()
 
+if (NOT USE_SYSTEM_SPDLOG)
+    ExternalProject_Add(spdlog
+            PREFIX grpc
+            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog"
+            CMAKE_CACHE_ARGS
+            -DSPDLOG_FMT_EXTERNAL:BOOL=ON
+            -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
+            -DSPDLOG_INSTALL:BOOL=ON
+            -DSPDLOG_NO_EXCEPTIONS:BOOL=ON
+            -DSPDLOG_BUILD_TESTS:BOOL=OFF
+            -DSPDLOG_BUILD_EXAMPLE:BOOL=OFF
+            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/spdlog
+            DEPENDS fmt
+            )
+    set(spdlog_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/spdlog/${LIBRARY_DIRECTORY_NAME}/cmake/spdlog/")
+endif ()
+
 if (NOT USE_SYSTEM_GRPC)
     ExternalProject_Add(grpc
             PREFIX grpc
@@ -78,8 +96,9 @@ ExternalProject_Add(Bear
         -DgRPC_DIR:PATH=${grpc_CMAKE_DIR}
         -DgRPC_BINDIR:PATH=${grpc_BIN_DIR}
         -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
+        -Dspdlog_DIR:PATH=${spdlog_CMAKE_DIR}
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/bear
-        DEPENDS json googletest fmt grpc
+        DEPENDS json googletest fmt spdlog grpc
         )
 set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
 set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/${LIBRARY_DIRECTORY_NAME}")

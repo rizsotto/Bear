@@ -32,6 +32,8 @@
 #include "Command.h"
 #include "Flags.h"
 
+#include <spdlog/spdlog.h>
+
 #include <optional>
 #include <string_view>
 
@@ -48,6 +50,9 @@ namespace {
 
 int main(int argc, char* argv[])
 {
+    spdlog::set_pattern("intercept [pid: %P, level: %l] %v");
+    spdlog::set_level(spdlog::level::info);
+
     const flags::Parser parser("intercept", VERSION,
         { { "--verbose", { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
             { "--output", { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },

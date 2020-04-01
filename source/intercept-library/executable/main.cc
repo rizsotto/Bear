@@ -19,8 +19,12 @@
 
 #include "Command.h"
 #include "Flags.h"
-#include "Output.h"
+#include "SystemCalls.h"
 #include "er.h"
+
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/sinks/stdout_sinks.h>
 
 #include <iostream>
 #include <optional>
@@ -29,11 +33,15 @@ namespace {
 
     constexpr char VERSION[] = _ER_VERSION;
 
-    std::ostream& operator<<(std::ostream& os, char* const* values)
+    struct Arguments {
+        char *const * values;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
     {
         os << '[';
-        for (char* const* it = values; *it != nullptr; ++it) {
-            if (it != values) {
+        for (char* const* it = arguments.values; *it != nullptr; ++it) {
+            if (it != arguments.values) {
                 os << ", ";
             }
             os << '"' << *it << '"';
@@ -46,6 +54,11 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
+    int const pid = er::SystemCalls::get_pid().unwrap_or(0);
+    int const ppid = er::SystemCalls::get_ppid().unwrap_or(0);
+    spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", pid, ppid));
+    spdlog::set_level(spdlog::level::info);
+
     const flags::Parser parser("er", VERSION,
         { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
@@ -56,7 +69,8 @@ int main(int argc, char* argv[], char* envp[])
         // log the original command line as it was received.
         .map<flags::Arguments>([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
-                ::er::error_stream() << argv << std::endl;
+                spdlog::set_level(spdlog::level::debug);
+                spdlog::debug("arguments: {}", Arguments { argv });
             }
             return args;
         })

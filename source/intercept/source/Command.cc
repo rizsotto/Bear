@@ -23,6 +23,7 @@
 #include "Reporter.h"
 #include "Session.h"
 
+#include <spdlog/spdlog.h>
 #include <grpc/grpc.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
@@ -50,6 +51,7 @@ namespace ic {
 
     ::rust::Result<int> Command::operator()() const
     {
+        spdlog::info("Running command now.");
         //    InterceptorImpl server_;
         ::grpc::ServerBuilder builder;
         //    std::thread supervisor_;

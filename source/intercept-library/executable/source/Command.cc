@@ -19,11 +19,11 @@
 
 #include "Command.h"
 #include "Environment.h"
-#include "Output.h"
 #include "Reporter.h"
+#include "SystemCalls.h"
 #include "er.h"
 
-#include <iostream>
+#include <spdlog/spdlog.h>
 
 using rust::Err;
 using rust::merge;
@@ -88,7 +88,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .unwrap_or_else([](auto message) {
-                ::er::error_stream() << "report start: " << message.what() << std::endl;
+                spdlog::warn("report process start failed: ", message.what());
                 return 0;
             });
     }
@@ -101,7 +101,7 @@ namespace {
                 return rptr->send(eptr);
             })
             .unwrap_or_else([](auto message) {
-                ::er::error_stream() << "report stop: " << message.what() << std::endl;
+                spdlog::error("report process stop failed: ", message.what());
                 return 0;
             });
     }
