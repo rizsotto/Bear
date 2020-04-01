@@ -66,14 +66,14 @@ namespace ic {
     struct Application::State {
         Command command;
         ReporterPtr reporter_;
-        SessionPtr session_;
+        Session::SharedPtr session_;
     };
 
     ::rust::Result<Application> Application::from(const ::flags::Arguments& args)
     {
         auto command = Command::from(args);
         rust::Result<ReporterPtr> reporter = rust::Ok(std::make_shared<Reporter>());
-        rust::Result<SessionPtr> session = rust::Ok(std::shared_ptr<Session>(new FakeSession()));
+        auto session = Session::from(args);
 
         return rust::merge(command, reporter, session)
                    .map<Application::State*>([](auto tuple) {

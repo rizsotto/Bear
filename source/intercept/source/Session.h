@@ -20,7 +20,12 @@
 #pragma once
 
 #include <map>
+#include <memory>
 #include <string>
+#include <string_view>
+
+#include "Result.h"
+#include "Flags.h"
 
 namespace ic {
 
@@ -28,23 +33,25 @@ namespace ic {
     public:
         virtual ~Session() = default;
 
-        // TODO: these shall return `Result<>`
-        virtual const char* resolve(const std::string& name) const = 0;
-
-        virtual std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const = 0;
+        virtual rust::Result<std::string_view> resolve(const std::string& name) const = 0;
+        virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
 
         virtual void set_server_address(const std::string&) = 0;
+
+    public:
+        using SharedPtr = std::shared_ptr<Session>;
+        static rust::Result<Session::SharedPtr> from(const flags::Arguments&);
     };
 
     struct FakeSession : public Session {
-        const char* resolve(const std::string& name) const override
+        rust::Result<std::string_view> resolve(const std::string& name) const override
         {
-            return "null pointer";
+            return rust::Err(std::runtime_error("The session does not support resolve."));
         }
 
-        std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const override
+        rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const override
         {
-            return std::move(env);
+            return rust::Ok(env);
         }
 
         void set_server_address(const std::string &) override
@@ -53,5 +60,9 @@ namespace ic {
         }
     };
 
-    using SessionPtr = std::shared_ptr<Session>;
+    inline
+    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args)
+    {
+        return rust::Ok(std::shared_ptr<Session>(new FakeSession()));
+    }
 }

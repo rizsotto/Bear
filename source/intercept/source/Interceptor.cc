@@ -32,20 +32,23 @@ namespace ic {
 
     ::grpc::Status InterceptorImpl::GetWrappedCommand(::grpc::ServerContext* context, const ::supervise::WrapperRequest* request, ::supervise::WrapperResponse* response)
     {
-        const char* path = session_.resolve(request->name());
-        if (path != nullptr) {
-            response->set_path(path);
-            return ::grpc::Status::OK;
-        }
-        return ::grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper");
+        return session_.resolve(request->name())
+                .map<grpc::Status>([&response](auto path) {
+                    response->set_path(path.data());
+                    return ::grpc::Status::OK;
+                })
+                .unwrap_or(grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper"));
     }
 
     ::grpc::Status InterceptorImpl::GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::EnvironmentRequest* request, ::supervise::EnvironmentResponse* response)
     {
-        std::map<std::string, std::string> copy(request->environment().begin(), request->environment().end());
-        auto update = session_.update(std::move(copy));
-        response->mutable_environment()->insert(update.begin(), update.end());
-        return ::grpc::Status::OK;
+        const std::map<std::string, std::string> copy(request->environment().begin(), request->environment().end());
+        return session_.update(copy)
+            .map<grpc::Status>([&response](auto update) {
+                response->mutable_environment()->insert(update.begin(), update.end());
+                return grpc::Status::OK;
+            })
+            .unwrap_or(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "environment update failed"));
     }
 
     ::grpc::Status InterceptorImpl::Report(::grpc::ServerContext* context, ::grpc::ServerReader<::supervise::Event>* reader, ::supervise::Empty* response)
