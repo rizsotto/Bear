@@ -26,26 +26,33 @@
 
 namespace ic {
 
-    class Command {
+    class Application {
     public:
-        static ::rust::Result<Command> create(const ::flags::Arguments& args);
+        static constexpr char VERBOSE[] = "--verbose";
+        static constexpr char OUTPUT[] = "--output";
+        static constexpr char LIBRARY[] = "--library";
+        static constexpr char EXECUTOR[] = "--executor";
+        static constexpr char WRAPPER[] = "--wrapper";
+        static constexpr char COMMAND[] = "--";
+
+        static ::rust::Result<Application> from(const ::flags::Arguments& args);
 
         ::rust::Result<int> operator()() const;
 
     public:
-        Command() = delete;
-        ~Command();
+        Application() = delete;
+        ~Application();
 
-        Command(const Command&) = delete;
-        Command(Command&&) noexcept;
+        Application(const Application&) = delete;
+        Application(Application&&) noexcept;
 
-        Command& operator=(const Command&) = delete;
-        Command& operator=(Command&&) noexcept;
+        Application& operator=(const Application&) = delete;
+        Application& operator=(Application&&) noexcept;
 
     private:
         struct State;
 
-        explicit Command(State*);
+        explicit Application(State*);
 
     private:
         State const* impl_;

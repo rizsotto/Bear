@@ -29,7 +29,7 @@
 // - Writes output.
 // - Return child exit code.
 
-#include "Command.h"
+#include "Application.h"
 #include "Flags.h"
 
 #include <spdlog/spdlog.h>
@@ -54,16 +54,16 @@ int main(int argc, char* argv[])
     spdlog::set_level(spdlog::level::info);
 
     const flags::Parser parser("intercept", VERSION,
-        { { "--verbose", { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
-            { "--output", { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
-            { "--library", { 1, false, "path to the preload library", { LIBRARY_PATH }, DEVELOPER_GROUP } },
-            { "--executor", { 1, false, "path to the preload executable", { EXECUTOR_PATH }, DEVELOPER_GROUP } },
-            { "--wrapper", { 1, false, "path to the wrapper executable", { WRAPPER_PATH }, DEVELOPER_GROUP } },
-            { "--", { -1, true, "command to execute", std::nullopt, std::nullopt } } });
+        { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
+            { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
+            { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::WRAPPER, { 1, false, "path to the wrapper executable", { WRAPPER_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // if parsing success, we create the main command and execute it.
-        .and_then<ic::Command>([](auto args) {
-            return ic::Command::create(args);
+        .and_then<ic::Application>([](auto args) {
+            return ic::Application::from(args);
         })
         .and_then<int>([](const auto& command) {
             return command();

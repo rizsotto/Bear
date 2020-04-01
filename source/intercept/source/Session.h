@@ -32,6 +32,8 @@ namespace ic {
         virtual const char* resolve(const std::string& name) const = 0;
 
         virtual std::map<std::string, std::string>&& update(std::map<std::string, std::string>&& env) const = 0;
+
+        virtual void set_server_address(const std::string&) = 0;
     };
 
     struct FakeSession : public Session {
@@ -44,8 +46,12 @@ namespace ic {
         {
             return std::move(env);
         }
+
+        void set_server_address(const std::string &) override
+        {
+            return;
+        }
     };
 
     using SessionPtr = std::shared_ptr<Session>;
-    using SessionConstPtr = std::shared_ptr<const Session>;
 }

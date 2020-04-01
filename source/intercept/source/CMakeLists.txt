@@ -30,8 +30,8 @@ add_custom_command(
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a STATIC
-        Command.h
-        Command.cc
+        Application.h
+        Application.cc
         Interceptor.h
         Interceptor.cc
         Reporter.h
