@@ -54,7 +54,7 @@ namespace {
     rust::Result<int> spawn(const Command& command, const ic::Session& session)
     {
         auto current = current_environment();
-        auto updated = session.update(std::move(current));
+        auto updated = session.update(current);
         // TODO: execute and wait
         return rust::Ok(0);
     }
@@ -65,14 +65,14 @@ namespace ic {
 
     struct Application::State {
         Command command;
-        ReporterPtr reporter_;
+        Reporter::SharedPtr reporter_;
         Session::SharedPtr session_;
     };
 
     ::rust::Result<Application> Application::from(const ::flags::Arguments& args)
     {
         auto command = Command::from(args);
-        rust::Result<ReporterPtr> reporter = rust::Ok(std::make_shared<Reporter>());
+        auto reporter = Reporter::from(args);
         auto session = Session::from(args);
 
         return rust::merge(command, reporter, session)

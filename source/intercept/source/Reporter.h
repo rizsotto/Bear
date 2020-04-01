@@ -19,14 +19,14 @@
 
 #pragma once
 
+#include "Flags.h"
+#include "Result.h"
+#include "Session.h"
+
+#include "supervise.pb.h"
+
 #include <memory>
 #include <string>
-
-//#include "supervise.pb.h"
-
-namespace supervise {
-    class Event;
-}
 
 namespace ic {
 
@@ -34,9 +34,8 @@ namespace ic {
         class Builder;
 
         // TODO define types and attributes
+        using SharedPtr = std::shared_ptr<Execution>;
     };
-
-    using ExecutionPtr = std::shared_ptr<Execution>;
 
     class Execution::Builder {
     public:
@@ -45,16 +44,17 @@ namespace ic {
 
         Builder& add(supervise::Event const& event);
 
-        ExecutionPtr build() noexcept;
+        Execution::SharedPtr build();
 
     private:
-        ExecutionPtr execution_;
+        Execution::SharedPtr execution_;
     };
 
     // Will be responsible to append execution to the output
     struct Reporter {
-        void report(const ExecutionPtr& execution);
-    };
+        void report(const Execution::SharedPtr& execution);
 
-    using ReporterPtr = std::shared_ptr<Reporter>;
+        using SharedPtr = std::shared_ptr<Reporter>;
+        static rust::Result<SharedPtr> from(const flags::Arguments&);
+    };
 }

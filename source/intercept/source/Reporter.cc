@@ -37,12 +37,17 @@ namespace ic {
         return *this;
     }
 
-    ExecutionPtr Execution::Builder::build() noexcept
+    Execution::SharedPtr Execution::Builder::build()
     {
         return execution_;
     }
 
-    void Reporter::report(const ExecutionPtr& execution) noexcept
+    void Reporter::report(const Execution::SharedPtr& execution)
     {
+    }
+
+    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments&)
+    {
+        return rust::Err(std::runtime_error("not implemented"));
     }
 }
