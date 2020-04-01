@@ -21,8 +21,6 @@
 
 #include "Flags.h"
 #include "Result.h"
-#include "Reporter.h"
-#include "Session.h"
 
 #include <memory>
 
@@ -32,22 +30,24 @@ namespace ic {
     public:
         static ::rust::Result<Command> create(const ::flags::Arguments& args);
 
-        ::rust::Result<int> operator()();
+        ::rust::Result<int> operator()() const;
 
     public:
         Command() = delete;
-        ~Command() = default;
+        ~Command();
 
-        Command(const Command&) = default;
-        Command(Command&&) noexcept = default;
+        Command(const Command&) = delete;
+        Command(Command&&) noexcept;
 
-        Command& operator=(const Command&) = default;
-        Command& operator=(Command&&) noexcept = default;
+        Command& operator=(const Command&) = delete;
+        Command& operator=(Command&&) noexcept;
 
     private:
-        Command(ReporterPtr reporter, SessionConstPtr session);
+        struct State;
 
-        ReporterPtr reporter_;
-        SessionConstPtr session_;
+        explicit Command(State*);
+
+    private:
+        State const* impl_;
     };
 }

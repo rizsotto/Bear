@@ -20,6 +20,8 @@
 #include "Command.h"
 
 #include "Interceptor.h"
+#include "Reporter.h"
+#include "Session.h"
 
 #include <grpc/grpc.h>
 #include <grpcpp/server.h>
@@ -33,14 +35,20 @@
 
 namespace ic {
 
+    struct Command::State {
+        ReporterPtr reporter_;
+        SessionConstPtr session_;
+    };
+
     ::rust::Result<Command> Command::create(const ::flags::Arguments& args)
     {
-        ReporterPtr reporter = std::make_shared<Reporter>();
-        SessionConstPtr session = std::shared_ptr<const Session>(new FakeSession());
-        return rust::Ok<Command>({ reporter, session });
+        auto reporter = std::make_shared<Reporter>();
+        auto session = std::shared_ptr<const Session>(new FakeSession());
+        auto impl = new Command::State { reporter, session };
+        return rust::Ok<Command>(Command { impl });
     }
 
-    ::rust::Result<int> Command::operator()()
+    ::rust::Result<int> Command::operator()() const
     {
         //    InterceptorImpl server_;
         ::grpc::ServerBuilder builder;
@@ -49,9 +57,29 @@ namespace ic {
         return rust::Ok<int>(0);
     }
 
-    Command::Command(ReporterPtr reporter, SessionConstPtr session)
-            : reporter_(reporter)
-            , session_(session)
+    Command::Command(Command::State* const impl)
+            : impl_(impl)
     {
+    }
+
+    Command::Command(Command&& rhs) noexcept
+            : impl_(rhs.impl_)
+    {
+        rhs.impl_ = nullptr;
+    }
+
+    Command& Command::operator=(Command&& rhs) noexcept
+    {
+        if (&rhs != this) {
+            delete impl_;
+            impl_ = rhs.impl_;
+        }
+        return *this;
+    }
+
+    Command::~Command()
+    {
+        delete impl_;
+        impl_ = nullptr;
     }
 }

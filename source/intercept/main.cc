@@ -32,6 +32,7 @@
 #include "Command.h"
 #include "Flags.h"
 
+#include <optional>
 #include <string_view>
 
 namespace {
@@ -59,7 +60,7 @@ int main(int argc, char* argv[])
         .and_then<ic::Command>([](auto args) {
             return ic::Command::create(args);
         })
-        .and_then<int>([](auto command) {
+        .and_then<int>([](const auto& command) {
             return command();
         })
         // set the return code from error and print message

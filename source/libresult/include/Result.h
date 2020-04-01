@@ -35,7 +35,7 @@ namespace rust {
             }
 
             explicit Ok(T&& value) noexcept
-                    : value_(value)
+                    : value_(std::move(value))
             {
             }
 
