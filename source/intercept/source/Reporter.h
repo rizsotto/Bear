@@ -89,12 +89,30 @@ namespace ic {
         Execution::UniquePtr execution_;
     };
 
-    // Responsible to append execution to the final output. Serializing the
-    // execution objects and persist in a file.
-    struct Reporter {
+    // Responsible to collect executions and persist them into an output file.
+    class Reporter {
+    public:
+        using SharedPtr = std::shared_ptr<Reporter>;
+        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&);
+
+        // MT-safe method to add a new execution and persist into the output file.
         void report(const Execution::UniquePtr& execution);
 
-        using SharedPtr = std::shared_ptr<Reporter>;
-        static rust::Result<SharedPtr> from(const flags::Arguments&);
+    public:
+        Reporter() = delete;
+        ~Reporter();
+
+        Reporter(const Reporter&) = delete;
+        Reporter(Reporter&&) noexcept = delete;
+
+        Reporter& operator=(const Reporter&) = delete;
+        Reporter& operator=(Reporter&&) noexcept = delete;
+
+    private:
+        struct State;
+        explicit Reporter(State*);
+
+    private:
+        State* impl_;
     };
 }
