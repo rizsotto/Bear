@@ -13,9 +13,13 @@
   "executions": [
     {
       "command": {
-        "working_dir": "/home/user",
         "program": "/usr/bin/bash",
-        "arguments": ["bash", "-c", "sleep 1"]
+        "arguments": ["bash", "-c", "sleep 1"],
+        "working_dir": "/home/user",
+        "environment": {
+          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+          "HOME": "/home/user"
+        }
       },
       "run": {
         "pid": 122,
@@ -30,18 +34,18 @@
             "at": "2020-02-16T21:00:01.022Z",
             "status": 0
           }
-        ],
-        "environment": {
-          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-          "HOME": "/home/user"
-        }
+        ]
       }
     },
     {
       "command": {
-        "working_dir": "/home/user",
         "program": "/usr/bin/sleep",
-        "arguments": ["sleep", "1"]
+        "arguments": ["sleep", "1"],
+        "working_dir": "/home/user",
+        "environment": {
+          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
+          "HOME": "/home/user"
+        }
       },
       "run": {
         "pid": 123,
@@ -56,11 +60,7 @@
             "at": "2020-02-16T21:00:01.017Z",
             "status": 0
           }
-        ],
-        "environment": {
-          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-          "HOME": "/home/user"
-        }
+        ]
       }
     }
   ]
