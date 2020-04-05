@@ -56,6 +56,7 @@ add_library(intercept_a STATIC
 target_include_directories(intercept_a PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(intercept_a PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
 target_include_directories(intercept_a PUBLIC "${LIBRESULT_INCLUDE_DIR}")
+target_include_directories(intercept_a PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../intercept-library/library/include")
 target_compile_definitions(intercept_a PUBLIC GOOGLE_PROTOBUF_NO_RTTI)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC nlohmann_json::nlohmann_json)
