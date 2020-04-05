@@ -21,12 +21,13 @@
 
 #include "Flags.h"
 #include "Result.h"
-#include "Session.h"
 
 #include "supervise.pb.h"
 
 #include <memory>
 #include <string>
+#include <list>
+#include <vector>
 
 namespace ic {
 
@@ -70,7 +71,7 @@ namespace ic {
         struct Run {
             std::optional<int> pid;
             std::optional<int> ppid;
-            std::vector<Event> events;
+            std::list<Event> events;
         } run;
     };
 
@@ -94,6 +95,9 @@ namespace ic {
     public:
         using SharedPtr = std::shared_ptr<Reporter>;
         static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&);
+
+        void set_host_info(const std::map<std::string, std::string>&);
+        void set_session_type(const std::string& name);
 
         // MT-safe method to add a new execution and persist into the output file.
         void report(const Execution::UniquePtr& execution);

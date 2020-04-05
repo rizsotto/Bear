@@ -24,45 +24,29 @@
 #include <string>
 #include <string_view>
 
-#include "Result.h"
 #include "Flags.h"
+#include "Result.h"
 
 namespace ic {
 
     class Session {
     public:
-        virtual ~Session() = default;
-
-        virtual rust::Result<std::string_view> resolve(const std::string& name) const = 0;
-        virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
-
-        virtual void set_server_address(const std::string&) = 0;
-
-    public:
         using SharedPtr = std::shared_ptr<Session>;
         static rust::Result<Session::SharedPtr> from(const flags::Arguments&);
+
+    public:
+        virtual ~Session() = default;
+
+        [[nodiscard]] virtual rust::Result<std::string_view> resolve(const std::string& name) const = 0;
+        [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
+        [[nodiscard]] virtual rust::Result<int> supervise(const std::vector<std::string_view>& command) const = 0;
+
+    public:
+        virtual void set_server_address(const std::string&) = 0;
+
+        using HostInfo = std::map<std::string, std::string>;
+        [[nodiscard]] virtual const HostInfo& get_host_info() const = 0;
+
+        [[nodiscard]] virtual std::string get_session_type() const = 0;
     };
-
-    struct FakeSession : public Session {
-        rust::Result<std::string_view> resolve(const std::string& name) const override
-        {
-            return rust::Err(std::runtime_error("The session does not support resolve."));
-        }
-
-        rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const override
-        {
-            return rust::Ok(env);
-        }
-
-        void set_server_address(const std::string &) override
-        {
-            return;
-        }
-    };
-
-    inline
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args)
-    {
-        return rust::Ok(std::shared_ptr<Session>(new FakeSession()));
-    }
 }

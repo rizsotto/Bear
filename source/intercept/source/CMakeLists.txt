@@ -1,4 +1,13 @@
 # Create a header file with the relevant configuration values.
+include(CheckIncludeFile)
+check_include_file(sys/utsname.h HAVE_SYS_UTSNAME_H)
+include(CheckSymbolExists)
+set(CMAKE_REQUIRED_FLAGS -D_GNU_SOURCE)
+check_symbol_exists(uname "sys/utsname.h" HAVE_UNAME)
+check_symbol_exists(confstr "unistd.h" HAVE_CONFSTR)
+check_symbol_exists(_CS_PATH "unistd.h" HAVE_CS_PATH)
+check_symbol_exists(_CS_GNU_LIBC_VERSION "unistd.h" HAVE_CS_GNU_LIBC_VERSION)
+check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD_VERSION)
 configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
 # Create grpc stubs
@@ -37,6 +46,7 @@ add_library(intercept_a STATIC
         Reporter.h
         Reporter.cc
         Session.h
+        Session.cc
         "${proto_srcs}"
         "${proto_hdrs}"
         "${grpc_srcs}"

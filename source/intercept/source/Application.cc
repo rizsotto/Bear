@@ -31,40 +31,22 @@
 #include <spdlog/spdlog.h>
 
 #include <map>
-#include <memory>
 #include <vector>
 
 namespace {
 
     struct Command {
-        std::vector<std::string_view> arguments;
-
-        static rust::Result<Command> from(const flags::Arguments& args)
+        static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
         {
-            return args.as_string_list(ic::Application::COMMAND)
-                .map<Command>([](auto vec) { return Command { vec }; });
+            return args.as_string_list(ic::Application::COMMAND);
         }
     };
-
-    std::map<std::string, std::string> current_environment()
-    {
-        return std::map<std::string, std::string>();
-    }
-
-    rust::Result<int> spawn(const Command& command, const ic::Session& session)
-    {
-        auto current = current_environment();
-        auto updated = session.update(current);
-        // TODO: execute and wait
-        return rust::Ok(0);
-    }
-
 }
 
 namespace ic {
 
     struct Application::State {
-        Command command;
+        std::vector<std::string_view> command;
         Reporter::SharedPtr reporter_;
         Session::SharedPtr session_;
     };
@@ -95,9 +77,12 @@ namespace ic {
         builder.RegisterService(&service);
         builder.AddListeningPort("dns:///localhost", grpc::InsecureServerCredentials(), &server_port);
         auto server = builder.BuildAndStart();
-        // Execute the build command
+        // Configure the session and the reporter objects
         impl_->session_->set_server_address(fmt::format("dns:///localhost:{0}", server_port));
-        auto result = spawn(impl_->command, *(impl_->session_));
+        impl_->reporter_->set_host_info(impl_->session_->get_host_info());
+        impl_->reporter_->set_session_type(impl_->session_->get_session_type());
+        // Execute the build command
+        auto result = impl_->session_->supervise(impl_->command);
         // Stop the gRPC server
         server->Shutdown();
         // Exit with the build status

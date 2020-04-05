@@ -32,11 +32,8 @@ using json = nlohmann::json;
 namespace ic {
 
     struct Context {
-        std::string machine;
-        std::string kernel;
-        std::string release;
-        std::string intercept;
-        std::map<std::string, std::string> confstr;
+        std::string session_type;
+        std::map<std::string, std::string> host_info;
     };
 
     struct Content {
@@ -87,11 +84,8 @@ namespace ic {
     void to_json(json& j, const Context& rhs)
     {
         j = json {
-            { "machine", rhs.machine },
-            { "kernel", rhs.kernel },
-            { "release", rhs.release },
-            { "intercept", rhs.intercept },
-            { "confstr", json(rhs.confstr) }
+            { "intercept", rhs.session_type },
+            { "host_info", json(rhs.host_info) }
         };
     }
 
@@ -167,7 +161,7 @@ namespace {
         auto run = ic::Execution::Run {
             to_optional(started.pid()),
             to_optional(started.ppid()),
-            std::vector<ic::Execution::Event>()
+            std::list<ic::Execution::Event>()
         };
         update_run_with_started(run, source);
 
@@ -208,22 +202,6 @@ namespace ic {
 
 namespace {
 
-    rust::Result<ic::Context> create_context()
-    {
-        // TODO: implement it!!!
-        //    struct Context {
-        //        std::string machine; // "`uname -m` output",
-        //        std::string kernel; // "`uname -s` output",
-        //        std::string release; // "`uname -r` output",
-        //        std::string intercept; // "preload" or "wrapper"
-        //        std::map<std::string, std::string> confstr;
-        //        //    "_CS_PATH": "confstr result",
-        //        //    "_CS_GNU_LIBC_VERSION": "confstr result",
-        //        //    "_CS_GNU_LIBPTHREAD_VERSION": "confstr result"
-        //    };
-        return rust::Err(std::runtime_error("not implemented"));
-    }
-
     void persist(const ic::Content& content, const std::string& target)
     {
         json j = content;
@@ -240,6 +218,18 @@ namespace ic {
         Content content;
     };
 
+    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags)
+    {
+        return flags.as_string(Application::OUTPUT)
+            .map<Reporter::State*>([](auto output) {
+                auto context = Context { "unknown", {} };
+                return new Reporter::State { std::mutex(), std::string(output), context };
+            })
+            .map<Reporter::SharedPtr>([](auto state) {
+                return Reporter::SharedPtr(new Reporter(state));
+            });
+    }
+
     Reporter::Reporter(Reporter::State* impl)
             : impl_(impl)
     {
@@ -251,26 +241,25 @@ namespace ic {
         impl_ = nullptr;
     }
 
+    void Reporter::set_host_info(const std::map<std::string, std::string>& value)
+    {
+        const std::lock_guard<std::mutex> lock(impl_->mutex);
+
+        impl_->content.context.host_info = value;
+    }
+
+    void Reporter::set_session_type(const std::string& value)
+    {
+        const std::lock_guard<std::mutex> lock(impl_->mutex);
+
+        impl_->content.context.session_type = value;
+    }
+
     void Reporter::report(const Execution::UniquePtr& ptr)
     {
         const std::lock_guard<std::mutex> lock(impl_->mutex);
 
         impl_->content.executions.push_back(*ptr);
         persist(impl_->content, impl_->output);
-    }
-
-    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags)
-    {
-        auto context = create_context();
-        auto output = flags.as_string(Application::OUTPUT);
-
-        return rust::merge(context, output)
-            .map<Reporter::State*>([](auto input) {
-                const auto& [context, output] = input;
-                return new Reporter::State { std::mutex(), std::string(output), context };
-            })
-            .map<Reporter::SharedPtr>([](auto state) {
-                return Reporter::SharedPtr(new Reporter(state));
-            });
     }
 }

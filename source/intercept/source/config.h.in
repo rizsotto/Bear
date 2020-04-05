@@ -20,3 +20,10 @@
 #pragma once
 
 #cmakedefine APPLE
+
+#cmakedefine HAVE_SYS_UTSNAME_H
+#cmakedefine HAVE_UNAME
+#cmakedefine HAVE_CONFSTR
+#cmakedefine HAVE_CS_PATH
+#cmakedefine HAVE_CS_GNU_LIBC_VERSION
+#cmakedefine HAVE_CS_GNU_LIBPTHREAD_VERSION
