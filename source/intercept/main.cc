@@ -61,6 +61,14 @@ int main(int argc, char* argv[])
             { ic::Application::WRAPPER, { 1, false, "path to the wrapper executable", { WRAPPER_PATH }, DEVELOPER_GROUP } },
             { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
+        // change the log verbosity if requested.
+        .map<flags::Arguments>([&argv](const auto& args) {
+            if (args.as_bool(ic::Application::VERBOSE).unwrap_or(false)) {
+                spdlog::set_level(spdlog::level::debug);
+                // TODO: log the parsed arguments at debug level
+            }
+            return args;
+        })
         // if parsing success, we create the main command and execute it.
         .and_then<ic::Application>([](auto args) {
             return ic::Application::from(args);
