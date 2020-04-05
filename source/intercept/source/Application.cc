@@ -38,7 +38,12 @@ namespace {
     struct Command {
         static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
         {
-            return args.as_string_list(ic::Application::COMMAND);
+            return args.as_string_list(ic::Application::COMMAND)
+                    .and_then<std::vector<std::string_view>>([](auto cmd) {
+                        return (cmd.empty())
+                                ? rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Command is empty.")))
+                                : rust::Result<std::vector<std::string_view>>(rust::Ok(cmd));
+                    });
         }
     };
 }
