@@ -69,22 +69,29 @@ namespace ic {
 
     ::rust::Result<int> Application::operator()() const
     {
-        spdlog::info("Running command now.");
         // Create and start the gRPC server
+        spdlog::debug("Running gRPC server.");
         ic::InterceptorImpl service(*(impl_->reporter_), *(impl_->session_));
         int server_port = 0;
         grpc::ServerBuilder builder;
         builder.RegisterService(&service);
         builder.AddListeningPort("dns:///localhost", grpc::InsecureServerCredentials(), &server_port);
         auto server = builder.BuildAndStart();
+        spdlog::debug("Running gRPC server. [Listening on dns:///localhost:{0}]", server_port);
         // Configure the session and the reporter objects
         impl_->session_->set_server_address(fmt::format("dns:///localhost:{0}", server_port));
         impl_->reporter_->set_host_info(impl_->session_->get_host_info());
         impl_->reporter_->set_session_type(impl_->session_->get_session_type());
         // Execute the build command
-        auto result = impl_->session_->supervise(impl_->command);
+        spdlog::debug("Running command.");
+        auto result = impl_->session_->supervise(impl_->command)
+            .map<int>([](auto status) {
+                spdlog::debug("Running command. [Exited with {0}]", status);
+                return status;
+            });
         // Stop the gRPC server
         server->Shutdown();
+        spdlog::debug("Stopping gRPC server.");
         // Exit with the build status
         return result;
     }

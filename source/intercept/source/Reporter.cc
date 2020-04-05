@@ -205,8 +205,9 @@ namespace {
     void persist(const ic::Content& content, const std::string& target)
     {
         json j = content;
-        std::ofstream o(target);
-        o << std::setw(4) << j << std::endl;
+
+        std::ofstream target_file(target);
+        target_file << std::setw(4) << j << std::endl;
     }
 }
 
@@ -243,6 +244,7 @@ namespace ic {
 
     void Reporter::set_host_info(const std::map<std::string, std::string>& value)
     {
+        // The method has to be MT safe!!!
         const std::lock_guard<std::mutex> lock(impl_->mutex);
 
         impl_->content.context.host_info = value;
@@ -250,6 +252,7 @@ namespace ic {
 
     void Reporter::set_session_type(const std::string& value)
     {
+        // The method has to be MT safe!!!
         const std::lock_guard<std::mutex> lock(impl_->mutex);
 
         impl_->content.context.session_type = value;
@@ -257,6 +260,7 @@ namespace ic {
 
     void Reporter::report(const Execution::UniquePtr& ptr)
     {
+        // The method has to be MT safe!!!
         const std::lock_guard<std::mutex> lock(impl_->mutex);
 
         impl_->content.executions.push_back(*ptr);

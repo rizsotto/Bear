@@ -172,15 +172,18 @@ namespace {
             , library_(library)
             , executor_(executor)
     {
+        spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
 
     rust::Result<std::string_view> LibraryPreloadSession::resolve(const std::string& name) const
     {
+        // The method has to be MT safe!!!
         return rust::Err(std::runtime_error("The session does not support resolve."));
     }
 
     rust::Result<std::map<std::string, std::string>> LibraryPreloadSession::update(const env_t& env) const
     {
+        // The method has to be MT safe!!!
         env_t copy(env);
         insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
         insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
