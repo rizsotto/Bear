@@ -15,7 +15,6 @@ add_executable(er
 
 target_include_directories(er PRIVATE ${EXE_SRC_DIR})
 target_include_directories(er PRIVATE ${EXE_API_DIR})
-target_include_directories(er PRIVATE ${LIBRESULT_INCLUDE_DIR})
 target_compile_definitions(er PRIVATE _ER_VERSION="${CMAKE_PROJECT_VERSION}")
 target_link_libraries(er PRIVATE flags_a)
 target_link_libraries(er PRIVATE spdlog::spdlog)

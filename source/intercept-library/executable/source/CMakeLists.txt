@@ -21,7 +21,7 @@ add_library(er_a STATIC
 target_include_directories(er_a PRIVATE ${EXE_CFG_DIR})
 target_include_directories(er_a PRIVATE ${EXE_API_DIR})
 target_include_directories(er_a PRIVATE ${LIB_API_DIR})
-target_include_directories(er_a PRIVATE ${LIBRESULT_INCLUDE_DIR})
+target_link_libraries(er_a PRIVATE result_a)
 target_link_libraries(er_a PRIVATE flags_a)
 target_link_libraries(er_a PRIVATE spdlog::spdlog)
 target_compile_features(er_a PUBLIC cxx_std_17)

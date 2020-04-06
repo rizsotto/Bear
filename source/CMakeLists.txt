@@ -21,6 +21,7 @@ project(bear
         DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
         LANGUAGES C CXX)
 
+include(CTest)
 enable_testing()
 
 find_package(Threads REQUIRED)
@@ -37,9 +38,6 @@ find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
 message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
 
 include(GNUInstallDirs)
-
-set(LIBRESULT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libresult/include")
-set(LIBFLAGS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libflags/include")
 
 set(INTERCEPT_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/intercept")
 set(LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX}")

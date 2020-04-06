@@ -17,16 +17,11 @@ target_compile_features(exec PUBLIC cxx_std_14)
 target_compile_options(exec PUBLIC -fno-exceptions -fno-rtti)
 set_target_properties(exec PROPERTIES
         LINKER_LANGUAGE "C"
+        OSX_ARCHITECTURES:STRING "i386;x86_64"
+        MACOSX_RPATH:BOOL ON
         )
 
-if (APPLE)
-    set(CMAKE_OSX_ARCHITECTURES "i386;x86_64" CACHE STRING "Rogue")
-    set(CMAKE_MACOSX_RPATH 1)
-    # Setting RPATH is disabled temporarily. Need help to find the proper value for it.
-    # I'm guessing it shall be the path to the standard `libc.so` and `libdl.so`.
-    # But what would be the right way to set it in CMake?
-    #set_target_properties(exec PROPERTIES INSTALL_RPATH "@loader_path/${EXEC_LIB_PATH}")
-else ()
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
     set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
 endif ()
