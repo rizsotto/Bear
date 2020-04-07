@@ -1,26 +1,72 @@
-set(EXE_CFG_DIR ${CMAKE_CURRENT_BINARY_DIR}/source)
-set(EXE_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/source)
+# Create a header file with the relevant configuration values.
+include(CheckIncludeFile)
+check_include_file(spawn.h HAVE_SPAWN_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+check_include_file(sys/wait.h HAVE_WAIT_H)
+configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
-add_subdirectory(source)
-add_subdirectory(test)
-add_subdirectory(man)
+# Create library for the interface only
+add_library(er_api INTERFACE
+        )
+
+target_include_directories(er_api INTERFACE include/)
+
+# Create a static library, which is used for unit tests and the final shared library.
+add_library(er_a OBJECT
+        source/Command.cc
+        source/Environment.cc
+        source/Reporter.cc
+        source/SystemCalls.cc
+        )
+
+target_include_directories(er_a PUBLIC source/)
+target_include_directories(er_a PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(er_a PUBLIC er_api)
+target_link_libraries(er_a PUBLIC exec_api)
+target_link_libraries(er_a PUBLIC result_a)
+target_link_libraries(er_a PUBLIC flags_a)
+target_link_libraries(er_a PUBLIC spdlog::spdlog)
+set_target_properties(er_a PROPERTIES
+        LINKER_LANGUAGE "C"
+        )
 
 # Create a static executable from the sub projects.
-set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-set(CMAKE_EXE_LINKER_FLAGS "-static")
-
 add_executable(er
         main.cc
         )
 
-target_include_directories(er PRIVATE ${EXE_SRC_DIR})
-target_include_directories(er PRIVATE ${EXE_API_DIR})
 target_compile_definitions(er PRIVATE _ER_VERSION="${CMAKE_PROJECT_VERSION}")
-target_link_libraries(er PRIVATE flags_a)
-target_link_libraries(er PRIVATE spdlog::spdlog)
-target_link_libraries(er PRIVATE er_a)
-target_compile_features(er PUBLIC cxx_std_17)
-target_compile_options(er PUBLIC -fno-exceptions -fno-rtti)
+target_link_libraries(er -static)
+target_link_libraries(er er_a)
+target_link_libraries(er flags_a)
+target_link_libraries(er spdlog::spdlog)
 set_target_properties(er PROPERTIES
         LINKER_LANGUAGE "C"
         )
+
+# Create unit test
+add_executable(er_unit_test
+        test/EnvironmentTest.cc
+        test/CommandTest.cc
+        )
+
+target_link_libraries(er_unit_test er_a)
+target_link_libraries(er_unit_test result_a)
+target_link_libraries(er_unit_test flags_a)
+target_link_libraries(er_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(er_unit_test GTest::gmock)
+
+add_test(NAME bear::er_unit_test COMMAND er_unit_test)
+
+# Markdown file is the source to the man file. Please modify that and generate
+# the man file from it with pandoc.
+#
+#   $ pandoc -s -t man man/er.1.md -o man/er.1
+#
+# This is not automated, because pandoc has big dependencies on different OS
+# distributions and packaging would require to install those. Which might be
+# too much effort to generate a single text file.
+
+include(GNUInstallDirs)
+install(FILES man/er.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)

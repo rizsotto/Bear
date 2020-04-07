@@ -38,14 +38,10 @@ add_custom_command(
 )
 
 # Create a static library, which is used for unit tests and the final shared library.
-add_library(intercept_a STATIC
-        Application.h
+add_library(intercept_a OBJECT
         Application.cc
-        Interceptor.h
         Interceptor.cc
-        Reporter.h
         Reporter.cc
-        Session.h
         Session.cc
         "${proto_srcs}"
         "${proto_hdrs}"
@@ -55,14 +51,12 @@ add_library(intercept_a STATIC
 
 target_include_directories(intercept_a PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(intercept_a PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
-target_include_directories(intercept_a PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../intercept-library/library/include")
-target_include_directories(intercept_a PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../intercept-library/executable/include")
 target_compile_definitions(intercept_a PUBLIC GOOGLE_PROTOBUF_NO_RTTI)
+target_link_libraries(intercept_a PUBLIC er_api)
+target_link_libraries(intercept_a PUBLIC exec_api)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
 target_link_libraries(intercept_a PUBLIC protobuf::libprotobuf)
 target_link_libraries(intercept_a PUBLIC gRPC::grpc gRPC::grpc++)
-target_compile_features(intercept_a PUBLIC cxx_std_17)
-target_compile_options(intercept_a PUBLIC -fno-exceptions -fno-rtti)
