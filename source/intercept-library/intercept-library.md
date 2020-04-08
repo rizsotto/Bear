@@ -42,8 +42,9 @@ would fail for some reason, it might report a successful execution because
 the statically linked executable will start (but the child process might
 fail).
 
-  The type of errors that are might not detected by the library are: E2BIG,
-EAGAIN, EINVAL, EIO, ELIBAD, ELOOP, ENFILE, ENAMETOOLONG, ENOEXEC, EPERM.
+  The type of errors that are might not detected by the library are: `E2BIG`,
+`EAGAIN`, `EINVAL`, `EIO`, `ELIBAD`, `ELOOP`, `ENFILE`, `ENAMETOOLONG`, `ENOEXEC`
+and `EPERM`.
 
 * The IO redirection might not working properly. Since the requested execution
 is not a direct child process (indirect child process relationship) the standard
@@ -71,7 +72,7 @@ It's a shared library.
    - It allocates static memory and uses the stack.
 - Error handling:
    - Any error is fatal.
-   - Errors are reported on `stderr` only if it was requested.
+   - Errors are reported on `stderr` only if requested.
 
 ## `er`
 
@@ -83,4 +84,4 @@ It's statically linked executable.
    - It does allocates heap memory.
 - Error handling:
    - Any error is fatal.
-   - Errors are reported on `stderr` only if it was requested.
+   - Errors are reported on `stderr` only if requested.
