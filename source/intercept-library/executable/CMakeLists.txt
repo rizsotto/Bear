@@ -1,10 +1,3 @@
-# Create a header file with the relevant configuration values.
-include(CheckIncludeFile)
-check_include_file(spawn.h HAVE_SPAWN_H)
-check_include_file(unistd.h HAVE_UNISTD_H)
-check_include_file(sys/wait.h HAVE_WAIT_H)
-configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-
 # Create library for the interface only
 add_library(er_api INTERFACE
         )
@@ -20,7 +13,6 @@ add_library(er_a OBJECT
         )
 
 target_include_directories(er_a PUBLIC source/)
-target_include_directories(er_a PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(er_a PUBLIC er_api)
 target_link_libraries(er_a PUBLIC exec_api)
 target_link_libraries(er_a PUBLIC result_a)
@@ -35,7 +27,6 @@ add_executable(er
         main.cc
         )
 
-target_compile_definitions(er PRIVATE _ER_VERSION="${CMAKE_PROJECT_VERSION}")
 target_link_libraries(er -static)
 target_link_libraries(er er_a)
 target_link_libraries(er flags_a)
@@ -43,6 +34,10 @@ target_link_libraries(er spdlog::spdlog)
 set_target_properties(er PROPERTIES
         LINKER_LANGUAGE "C"
         )
+
+include(GNUInstallDirs)
+install(TARGETS er
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 # Create unit test
 add_executable(er_unit_test

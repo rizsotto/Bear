@@ -21,6 +21,7 @@
 #include "Flags.h"
 #include "SystemCalls.h"
 #include "er.h"
+#include "config.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -30,8 +31,6 @@
 #include <optional>
 
 namespace {
-
-    constexpr char VERSION[] = _ER_VERSION;
 
     struct Arguments {
         char *const * values;

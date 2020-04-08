@@ -1,16 +1,10 @@
-# Create a header file with the relevant configuration values.
-include(CheckIncludeFile)
-check_include_file(sys/utsname.h HAVE_SYS_UTSNAME_H)
-include(CheckSymbolExists)
-set(CMAKE_REQUIRED_FLAGS -D_GNU_SOURCE)
-check_symbol_exists(uname "sys/utsname.h" HAVE_UNAME)
-check_symbol_exists(confstr "unistd.h" HAVE_CONFSTR)
-check_symbol_exists(_CS_PATH "unistd.h" HAVE_CS_PATH)
-check_symbol_exists(_CS_GNU_LIBC_VERSION "unistd.h" HAVE_CS_GNU_LIBC_VERSION)
-check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD_VERSION)
-configure_file(config.h.in "${CMAKE_CURRENT_BINARY_DIR}/config.h")
-
+# TODO: this shall go into a separate proto library (libintercept_a)
 # Create grpc stubs
+find_program(_PROTOBUF_PROTOC protoc HINTS ${gRPC_BINDIR})
+message(STATUS "Looking for protoc ... ${_PROTOBUF_PROTOC}")
+find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
+message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
+
 get_filename_component(proto "../proto/supervise.proto" ABSOLUTE)
 get_filename_component(proto_path "${proto}" PATH)
 set(proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/supervise.pb.cc")

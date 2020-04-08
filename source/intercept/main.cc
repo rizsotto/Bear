@@ -31,6 +31,7 @@
 
 #include "Application.h"
 #include "Flags.h"
+#include "config.h"
 
 #include <spdlog/spdlog.h>
 
@@ -38,12 +39,6 @@
 #include <string_view>
 
 namespace {
-
-    constexpr char VERSION[] = _INTERCEPT_VERSION;
-
-    constexpr char LIBRARY_PATH[] = _LIBRARY_PATH;
-    constexpr char EXECUTOR_PATH[] = _EXECUTOR_PATH;
-    constexpr char WRAPPER_PATH[] = _WRAPPER_PATH;
 
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 }
@@ -56,9 +51,9 @@ int main(int argc, char* argv[])
     const flags::Parser parser("intercept", VERSION,
         { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
-            { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::WRAPPER, { 1, false, "path to the wrapper executable", { WRAPPER_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::WRAPPER, { 1, false, "path to the wrapper executable", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // change the log verbosity if requested.

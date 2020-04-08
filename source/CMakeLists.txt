@@ -21,9 +21,6 @@ project(bear
         DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
         LANGUAGES C CXX)
 
-include(CTest)
-enable_testing()
-
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
@@ -32,17 +29,34 @@ find_package(GTest REQUIRED NO_CMAKE_PATH)
 find_package(Protobuf REQUIRED NO_CMAKE_PATH)
 find_package(gRPC REQUIRED NO_CMAKE_PATH)
 
-find_program(_PROTOBUF_PROTOC protoc HINTS ${gRPC_BINDIR})
-message(STATUS "Looking for protoc ... ${_PROTOBUF_PROTOC}")
-find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin HINTS ${gRPC_BINDIR})
-message(STATUS "Looking for grpc_cpp_plugin ... ${_GRPC_CPP_PLUGIN_EXECUTABLE}")
+include(CheckIncludeFile)
+check_include_file(spawn.h HAVE_SPAWN_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+check_include_file(sys/wait.h HAVE_WAIT_H)
+check_include_file(spawn.h HAVE_SPAWN_H)
+check_include_file(dlfcn.h HAVE_DLFCN_H)
+check_include_file(errno.h HAVE_ERRNO_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+check_include_file(sys/utsname.h HAVE_SYS_UTSNAME_H)
+include(CheckSymbolExists)
+set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+set(CMAKE_REQUIRED_FLAGS -D_GNU_SOURCE)
+check_symbol_exists(_NSGetEnviron "crt_externs.h" HAVE_NSGETENVIRON)
+check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
+check_symbol_exists(RTLD_NEXT "dlfcn.h" HAVE_RTLD_NEXT)
+check_symbol_exists(EACCES "errno.h" HAVE_EACCES)
+check_symbol_exists(ENOENT "errno.h" HAVE_ENOENT)
+check_symbol_exists(uname "sys/utsname.h" HAVE_UNAME)
+check_symbol_exists(confstr "unistd.h" HAVE_CONFSTR)
+check_symbol_exists(_CS_PATH "unistd.h" HAVE_CS_PATH)
+check_symbol_exists(_CS_GNU_LIBC_VERSION "unistd.h" HAVE_CS_GNU_LIBC_VERSION)
+check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD_VERSION)
 
-include(GNUInstallDirs)
+configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-set(INTERCEPT_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}/intercept")
-set(LIBRARY_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}exec${CMAKE_SHARED_LIBRARY_SUFFIX}")
-set(EXECUTOR_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/er")
-set(WRAPPER_PATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/wrapper")
+include(CTest)
+enable_testing()
 
 add_subdirectory(bear)
 add_subdirectory(libresult)
@@ -51,16 +65,9 @@ add_subdirectory(intercept)
 add_subdirectory(intercept-wrapper)
 add_subdirectory(intercept-library)
 
+include(GNUInstallDirs)
 install(FILES ../COPYING ../README.md ../ChangeLog.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(TARGETS intercept
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-install(TARGETS exec
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS er
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
-install(TARGETS wrapper
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
