@@ -28,21 +28,6 @@ namespace er {
 
     struct SystemCalls {
 
-        static rust::Result<pid_t>
-        spawn(const char* path, const char** argv, const char** envp) noexcept;
-
-        static rust::Result<int>
-        wait_pid(pid_t pid) noexcept;
-
-        static rust::Result<pid_t>
-        get_pid() noexcept;
-
-        static rust::Result<pid_t>
-        get_ppid() noexcept;
-
-        static rust::Result<std::string>
-        get_cwd() noexcept;
-
         static rust::Result<std::shared_ptr<std::ostream>>
         temp_file(const char* dir, const char* suffix) noexcept;
     };

@@ -20,6 +20,8 @@
 #include "Reporter.h"
 #include "SystemCalls.h"
 #include "libresult/Result.h"
+#include "libsys/FileSystem.h"
+#include "libsys/Process.h"
 
 #include <chrono>
 #include <iostream>
@@ -220,22 +222,19 @@ namespace er {
 
     Result<EventPtr> Event::start(pid_t pid, const char** cmd) noexcept
     {
-        const Result<pid_t> current_pid = SystemCalls::get_pid();
-        const Result<pid_t> parent_pid = SystemCalls::get_ppid();
-        const Result<std::string> working_dir = SystemCalls::get_cwd();
-        return merge(current_pid, parent_pid, working_dir)
-            .map<EventPtr>([&pid, &cmd](auto tuple) {
-                const auto& [current, parent, cwd] = tuple;
+        return sys::FileSystem().get_cwd()
+            .map<EventPtr>([&pid, &cmd](auto cwd) {
+                const auto current = sys::Process::get_pid();
+                const auto parent = sys::Process::get_ppid();
+
                 return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
             });
     };
 
     Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept
     {
-        return SystemCalls::get_pid()
-            .map<EventPtr>([&pid, &exit](auto current) {
-                return EventPtr(new ProcessStopEvent(pid, current, exit));
-            });
+        const auto current = sys::Process::get_pid();
+        return Ok(EventPtr(new ProcessStopEvent(pid, current, exit)));
     }
 
     Result<ReporterPtr> Reporter::tempfile(char const* dir_name) noexcept

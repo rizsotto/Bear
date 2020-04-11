@@ -17,6 +17,7 @@ target_link_libraries(er_a PUBLIC er_api)
 target_link_libraries(er_a PUBLIC exec_api)
 target_link_libraries(er_a PUBLIC result_a)
 target_link_libraries(er_a PUBLIC flags_a)
+target_link_libraries(er_a PUBLIC sys_a)
 target_link_libraries(er_a PUBLIC spdlog::spdlog)
 set_target_properties(er_a PROPERTIES
         LINKER_LANGUAGE "C"
@@ -30,6 +31,7 @@ add_executable(er
 target_link_libraries(er -static)
 target_link_libraries(er er_a)
 target_link_libraries(er flags_a)
+target_link_libraries(er sys_a)
 target_link_libraries(er spdlog::spdlog)
 set_target_properties(er PROPERTIES
         LINKER_LANGUAGE "C"
@@ -48,6 +50,7 @@ add_executable(er_unit_test
 target_link_libraries(er_unit_test er_a)
 target_link_libraries(er_unit_test result_a)
 target_link_libraries(er_unit_test flags_a)
+target_link_libraries(er_unit_test sys_a)
 target_link_libraries(er_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(er_unit_test GTest::gmock)
 

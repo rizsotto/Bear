@@ -19,10 +19,6 @@
 
 #include "SystemCalls.h"
 
-#include <climits>
-#include <spawn.h>
-#include <sys/wait.h>
-
 #include <cstring>
 #include <cerrno>
 #include <fstream>
@@ -50,52 +46,6 @@ namespace {
 
 namespace er {
 
-    Result<int> SystemCalls::spawn(const char* path, const char** argv, const char** envp) noexcept
-    {
-        errno = ENOENT;
-        pid_t child;
-        if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-            return error<pid_t>("posix_spawn", errno);
-        } else {
-            return Ok(child);
-        }
-    }
-
-    Result<int> SystemCalls::wait_pid(pid_t pid) noexcept
-    {
-        errno = ENOENT;
-        int status;
-        if (-1 == waitpid(pid, &status, 0)) {
-            return error<int>("waitpid", errno);
-        } else {
-            const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return Ok(result);
-        }
-    }
-
-    Result<pid_t> SystemCalls::get_pid() noexcept
-    {
-        return Ok(getpid());
-    }
-
-    Result<pid_t> SystemCalls::get_ppid() noexcept
-    {
-        return Ok(getppid());
-    }
-
-    Result<std::string> SystemCalls::get_cwd() noexcept
-    {
-        constexpr static const size_t buffer_size = PATH_MAX;
-        errno = ENOENT;
-
-        char buffer[buffer_size];
-        if (nullptr == getcwd(buffer, buffer_size)) {
-            return error<std::string>("getcwd", errno);
-        } else {
-            return Ok(std::string(buffer));
-        }
-    }
-
     Result<std::shared_ptr<std::ostream>> SystemCalls::temp_file(const char* dir, const char* suffix) noexcept
     {
         // TODO: validate input?
@@ -105,7 +55,7 @@ namespace er {
         char buffer[buffer_size];
         std::copy(path.c_str(), path.c_str() + path.length() + 1, (char*)buffer);
         // create the temporary file.
-        errno = ENOENT;
+        errno = 0;
         if (-1 == mkstemps(buffer, strlen(suffix))) {
             return error<std::shared_ptr<std::ostream>>("mkstemp", errno);
         } else {

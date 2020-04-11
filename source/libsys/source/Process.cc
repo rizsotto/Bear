@@ -31,6 +31,16 @@
 
 namespace sys {
 
+    pid_t Process::get_pid()
+    {
+        return getpid();
+    }
+
+    pid_t Process::get_ppid()
+    {
+        return getppid();
+    }
+
     rust::Result<pid_t> Process::spawn(const char* path, const char** argv, const char** envp) const
     {
         errno = 0;
@@ -55,15 +65,5 @@ namespace sys {
             const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
             return rust::Ok(result);
         }
-    }
-
-    rust::Result<pid_t> Process::get_pid() const
-    {
-        return rust::Ok(getpid());
-    }
-
-    rust::Result<pid_t> Process::get_ppid() const
-    {
-        return rust::Ok(getppid());
     }
 }

@@ -18,10 +18,10 @@
  */
 
 #include "Command.h"
-#include "SystemCalls.h"
 #include "config.h"
 #include "er/Flags.h"
 #include "libflags/Flags.h"
+#include "libsys/Process.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -53,8 +53,8 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    int const pid = er::SystemCalls::get_pid().unwrap_or(0);
-    int const ppid = er::SystemCalls::get_ppid().unwrap_or(0);
+    int const pid = sys::Process::get_pid();
+    int const ppid = sys::Process::get_ppid();
     spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", pid, ppid));
     spdlog::set_level(spdlog::level::info);
 

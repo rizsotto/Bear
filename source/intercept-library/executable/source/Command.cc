@@ -20,8 +20,8 @@
 #include "Command.h"
 #include "Environment.h"
 #include "Reporter.h"
-#include "SystemCalls.h"
 #include "er/Flags.h"
+#include "libsys/Process.h"
 
 #include <spdlog/spdlog.h>
 
@@ -77,7 +77,7 @@ namespace {
         const ::er::EnvironmentPtr& environment) noexcept
     {
         auto command = to_char_vector(config.command);
-        return ::er::SystemCalls::spawn(config.path.data(), command.data(), environment->data());
+        return sys::Process().spawn(config.path.data(), command.data(), environment->data());
     }
 
     void report_start(Result<::er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
@@ -142,7 +142,7 @@ namespace er {
                 return pid;
             })
             .and_then<std::tuple<pid_t, int>>([](auto pid) {
-                return ::er::SystemCalls::wait_pid(pid)
+                return sys::Process().wait_pid(pid)
                     .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                         return std::make_tuple(pid, exit);
                     });

@@ -26,12 +26,12 @@
 namespace sys {
 
     struct Process {
+        static pid_t get_pid();
+        static pid_t get_ppid();
+
         virtual ~Process() = default;
 
         virtual rust::Result<pid_t> spawn(const char* path, const char** argv, const char** envp) const;
         virtual rust::Result<int> wait_pid(pid_t pid) const;
-
-        virtual rust::Result<pid_t> get_pid() const;
-        virtual rust::Result<pid_t> get_ppid() const;
     };
 }
