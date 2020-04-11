@@ -29,6 +29,7 @@ find_package(GTest REQUIRED NO_CMAKE_PATH)
 find_package(Protobuf REQUIRED NO_CMAKE_PATH)
 find_package(gRPC REQUIRED NO_CMAKE_PATH)
 
+include(GNUInstallDirs)
 include(CheckIncludeFile)
 check_include_file(spawn.h HAVE_SPAWN_H)
 check_include_file(unistd.h HAVE_UNISTD_H)
@@ -66,7 +67,6 @@ add_subdirectory(intercept)
 add_subdirectory(intercept-wrapper)
 add_subdirectory(intercept-library)
 
-include(GNUInstallDirs)
 install(FILES ../COPYING ../README.md ../ChangeLog.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 

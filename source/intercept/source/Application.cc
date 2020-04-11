@@ -77,14 +77,14 @@ namespace ic {
         // Create and start the gRPC server
         spdlog::debug("Running gRPC server.");
         ic::InterceptorImpl service(*(impl_->reporter_), *(impl_->session_));
-        int server_port = 0;
+        std::string server_address("0.0.0.0:99999");
         grpc::ServerBuilder builder;
         builder.RegisterService(&service);
-        builder.AddListeningPort("dns:///localhost", grpc::InsecureServerCredentials(), &server_port);
+        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
         auto server = builder.BuildAndStart();
-        spdlog::debug("Running gRPC server. [Listening on dns:///localhost:{0}]", server_port);
+        spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
         // Configure the session and the reporter objects
-        impl_->session_->set_server_address(fmt::format("dns:///localhost:{0}", server_port));
+        impl_->session_->set_server_address(server_address);
         impl_->reporter_->set_host_info(impl_->session_->get_host_info());
         impl_->reporter_->set_session_type(impl_->session_->get_session_type());
         // Execute the build command

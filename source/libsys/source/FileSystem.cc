@@ -54,6 +54,16 @@ namespace {
             });
         return result;
     }
+
+    bool contains_separator(const std::string& path)
+    {
+        return (std::find(path.begin(), path.end(), sys::FileSystem::OS_SEPARATOR) != path.end());
+    }
+
+    bool starts_with_separator(const std::string& path)
+    {
+        return (!path.empty()) && (path.at(0) == sys::FileSystem::OS_SEPARATOR);
+    }
 }
 
 namespace sys {
@@ -85,14 +95,25 @@ namespace sys {
     rust::Result<std::string> FileSystem::find_in_path(const std::string& name, const std::string& paths) const
     {
         int error = ENOENT;
-        if (auto absolute = real_path(name); absolute.is_ok()) {
-            auto executable = absolute
+        // If the requested program name contains a separator, then we need to use
+        // that as is. Otherwise we need to search the paths given.
+        if (contains_separator(name)) {
+            // If the requested program name starts with the separator, then it's
+            // absolute and will be used as is. Otherwise we need to create it from
+            // the current working directory.
+            auto path = starts_with_separator(name)
+                ? rust::Ok(name)
+                : get_cwd().map<std::string>([&name](const auto& cwd) {
+                    return fmt::format("{0}{1}{2}", cwd, OS_SEPARATOR, name);
+                });
+            auto candidate = path.and_then<std::string>([this](const auto& path) { return real_path(path); });
+            auto executable = candidate
                                   .map<bool>([this](auto real) {
                                       return (0 == is_executable(real));
                                   })
                                   .unwrap_or(false);
             if (executable) {
-                return absolute;
+                return candidate;
             }
         } else {
             auto directories = split(paths, OS_PATH_SEPARATOR);

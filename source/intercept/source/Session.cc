@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 
 namespace {
 
@@ -117,6 +118,13 @@ namespace env {
     }
 }
 
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
+{
+    std::copy(v.begin(), v.end(), std::ostream_iterator<T>(os, " "));
+    return os;
+}
+
 namespace {
 
     class LibraryPreloadSession : public ic::Session {
@@ -191,12 +199,18 @@ namespace {
                 };
                 std::transform(command.begin(), command.end(), std::back_insert_iterator(args),
                     [](const auto& it) { return it.data(); });
+                spdlog::debug("command execution requested: {}", args);
+                args.push_back(nullptr);
                 // create environment pointer
                 sys::env::Guard guard(environment);
                 return process.spawn(executor_.c_str(), args.data(), guard.data());
             })
             .and_then<int>([&process](auto pid) {
                 return process.wait_pid(pid);
+            })
+            .map_err<std::runtime_error>([](auto error) {
+                spdlog::warn("command execution failed: {}", error.what());
+                return error;
             });
     }
 
