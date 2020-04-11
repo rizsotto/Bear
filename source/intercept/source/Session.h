@@ -24,8 +24,8 @@
 #include <string>
 #include <string_view>
 
-#include "Flags.h"
-#include "Result.h"
+#include "libflags/Flags.h"
+#include "libresult/Result.h"
 
 namespace ic {
 

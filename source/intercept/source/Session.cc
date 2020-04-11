@@ -21,12 +21,12 @@
 
 #include "Application.h"
 #include "Session.h"
-#include "er.h"
-#include "libexec.h"
+#include "er/Flags.h"
+#include "libexec/Environment.h"
 #include "libsys/Environment.h"
-#include <libsys/FileSystem.h>
-#include <libsys/Os.h>
-#include <libsys/Process.h>
+#include "libsys/FileSystem.h"
+#include "libsys/Os.h"
+#include "libsys/Process.h"
 
 #include <functional>
 #include <numeric>
@@ -59,11 +59,11 @@ namespace {
                 return result;
             })
 #endif
-#ifdef HAVE__CS_GNU_LIBPTHREAD_VERSION
+#ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
             .map<ic::Session::HostInfo>([&os](auto result) {
-                os.get_confstr(__CS_GNU_LIBPTHREAD_VERSION)
+                os.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
                     .map<int>([&result](auto value) {
-                        result.insert({ "__CS_GNU_LIBPTHREAD_VERSION", value });
+                        result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
                         return 0;
                     });
                 return result;

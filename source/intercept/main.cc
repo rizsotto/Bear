@@ -30,8 +30,8 @@
 // - Return child exit code.
 
 #include "Application.h"
-#include "Flags.h"
 #include "config.h"
+#include "libflags/Flags.h"
 
 #include <spdlog/spdlog.h>
 

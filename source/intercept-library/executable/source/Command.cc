@@ -21,7 +21,7 @@
 #include "Environment.h"
 #include "Reporter.h"
 #include "SystemCalls.h"
-#include "er.h"
+#include "er/Flags.h"
 
 #include <spdlog/spdlog.h>
 

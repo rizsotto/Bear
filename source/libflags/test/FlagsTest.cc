@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Flags.h"
+#include "libflags/Flags.h"
 
 using namespace flags;
 

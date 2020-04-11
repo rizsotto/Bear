@@ -19,7 +19,7 @@
 
 #include "Executor.h"
 
-#include "er.h"
+#include "er/Flags.h"
 
 #include "Array.h"
 #include "Environment.h"

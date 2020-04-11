@@ -18,10 +18,10 @@
  */
 
 #include "Command.h"
-#include "Flags.h"
 #include "SystemCalls.h"
-#include "er.h"
 #include "config.h"
+#include "er/Flags.h"
+#include "libflags/Flags.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>

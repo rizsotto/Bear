@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Result.h"
+#include "libresult/Result.h"
 
 namespace {
 

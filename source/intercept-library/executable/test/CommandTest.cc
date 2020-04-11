@@ -21,8 +21,8 @@
 #include "gmock/gmock.h"
 
 #include "Command.h"
-#include "Flags.h"
-#include "er.h"
+#include "er/Flags.h"
+#include "libflags/Flags.h"
 
 using ::testing::Return;
 

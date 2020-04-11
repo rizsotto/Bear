@@ -22,7 +22,7 @@
 #include <memory>
 #include <unistd.h>
 
-#include "Result.h"
+#include "libresult/Result.h"
 
 namespace er {
 

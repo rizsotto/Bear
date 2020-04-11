@@ -18,8 +18,8 @@
  */
 
 #include "Reporter.h"
-#include "Result.h"
 #include "SystemCalls.h"
+#include "libresult/Result.h"
 
 #include <chrono>
 #include <iostream>

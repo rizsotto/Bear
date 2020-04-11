@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-#include "libexec.h"
+#include "libexec/Environment.h"
 
 #include <cstring>
 #include <functional>
