@@ -23,16 +23,11 @@
 #include "Session.h"
 #include "er.h"
 #include "libexec.h"
+#include "libsys/Environment.h"
+#include <libsys/FileSystem.h>
+#include <libsys/Os.h>
+#include <libsys/Process.h>
 
-#ifdef HAVE_SYS_UTSNAME_H
-#include <sys/utsname.h>
-#endif
-#include <spawn.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-
-#include <cerrno>
-#include <filesystem>
 #include <functional>
 #include <numeric>
 #include <unistd.h>
@@ -41,57 +36,42 @@
 
 namespace {
 
-#ifdef HAVE_CONFSTR
-    rust::Result<std::string> get_confstr(const int key)
+    rust::Result<ic::Session::HostInfo> create_host_info(const sys::Os& os)
     {
-        if (const size_t buffer_size = confstr(key, nullptr, 0); buffer_size != 0) {
-            char buffer[buffer_size];
-            if (const size_t size = confstr(key, buffer, buffer_size); size != 0) {
-                return rust::Ok(std::string(buffer));
-            }
-        }
-        return rust::Err(std::runtime_error("confstr failed."));
-    }
-#endif
-
-    rust::Result<ic::Session::HostInfo> create_host_info()
-    {
-        std::map<std::string, std::string> result;
-#ifdef HAVE_UNAME
-        utsname name = utsname {};
-        if (const int status = uname(&name); status >= 0) {
-            result.insert({ "sysname", std::string(name.sysname) });
-            result.insert({ "release", std::string(name.release) });
-            result.insert({ "version", std::string(name.version) });
-            result.insert({ "machine", std::string(name.machine) });
-        }
-#endif
-#ifdef HAVE_CONFSTR
+        return os.get_uname()
 #ifdef HAVE_CS_PATH
-        get_confstr(_CS_PATH)
-            .map<int>([&result](auto value) {
-                result.insert({ "_CS_PATH", value });
-                return 0;
-            });
+            .map<ic::Session::HostInfo>([&os](auto result) {
+                os.get_confstr(_CS_PATH)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "_CS_PATH", value });
+                        return 0;
+                    });
+                return result;
+            })
 #endif
 #ifdef HAVE_CS_GNU_LIBC_VERSION
-        get_confstr(_CS_GNU_LIBC_VERSION)
-            .map<int>([&result](auto value) {
-                result.insert({ "_CS_GNU_LIBC_VERSION", value });
-                return 0;
-            });
+            .map<ic::Session::HostInfo>([&os](auto result) {
+                os.get_confstr(_CS_GNU_LIBC_VERSION)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "_CS_GNU_LIBC_VERSION", value });
+                        return 0;
+                    });
+                return result;
+            })
 #endif
 #ifdef HAVE__CS_GNU_LIBPTHREAD_VERSION
-        get_confstr(__CS_GNU_LIBPTHREAD_VERSION)
-            .map<int>([&result](auto value) {
-                result.insert({ "__CS_GNU_LIBPTHREAD_VERSION", value });
-                return 0;
+            .map<ic::Session::HostInfo>([&os](auto result) {
+                os.get_confstr(__CS_GNU_LIBPTHREAD_VERSION)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "__CS_GNU_LIBPTHREAD_VERSION", value });
+                        return 0;
+                    });
+                return result;
+            })
+#endif
+            .map_err<std::runtime_error>([](auto error) {
+                return std::runtime_error("failed to get host info.");
             });
-#endif
-#endif
-        return (result.empty())
-            ? rust::Result<ic::Session::HostInfo>(rust::Err(std::runtime_error("failed to get host info.")))
-            : rust::Result<ic::Session::HostInfo>(rust::Ok(result));
     }
 }
 
@@ -102,33 +82,13 @@ namespace env {
     using env_t = std::map<std::string, std::string>;
     using mapper_t = std::function<std::string(const std::string&, const std::string&)>;
 
-    std::list<std::string>
-    split(const std::string& input, const char sep) noexcept
-    {
-        std::list<std::string> result;
-
-        std::string::size_type previous = 0;
-        do {
-            const std::string::size_type current = input.find(sep, previous);
-            result.emplace_back(input.substr(previous, current - previous));
-            previous = (current != std::string::npos) ? current + 1 : current;
-        } while (previous != std::string::npos);
-
-        return result;
-    }
-
     std::string
     merge_into_paths(const std::string& current, const std::string& value) noexcept
     {
-        auto paths = split(current, ':');
+        auto paths = sys::FileSystem::split_path(current);
         if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
             paths.emplace_front(value);
-            return std::accumulate(paths.begin(),
-                paths.end(),
-                std::string(),
-                [](std::string acc, std::string item) {
-                    return (acc.empty()) ? item : acc + ':' + item;
-                });
+            return sys::FileSystem::join_path(paths);
         } else {
             return current;
         }
@@ -157,119 +117,8 @@ namespace env {
     }
 }
 
-namespace start {
-
-    std::map<std::string, std::string> to_map(const char** const input) noexcept
-    {
-        std::map<std::string, std::string> result;
-        if (input == nullptr)
-            return result;
-
-        for (const char** it = input; *it != nullptr; ++it) {
-            const auto end = *it + std::strlen(*it);
-            const auto sep = std::find(*it, end, '=');
-            const std::string key = (sep != end) ? std::string(*it, sep) : std::string(*it, end);
-            const std::string value = (sep != end) ? std::string(sep + 1, end) : std::string();
-            result.emplace(key, value);
-        }
-        return result;
-    }
-
-    //    char**
-    //    to_c_array(const std::map<std::string, std::string>& input)
-    //    {
-    //        const size_t result_size = input.size() + 1;
-    //        const auto result = new char*[result_size];
-    //        auto result_it = result;
-    //        for (const auto& it : input) {
-    //            const size_t entry_size = it.first.size() + it.second.size() + 2;
-    //            auto entry = new char[entry_size];
-    //
-    //            auto key = std::copy(it.first.begin(), it.first.end(), entry);
-    //            *key++ = '=';
-    //            auto value = std::copy(it.second.begin(), it.second.end(), key);
-    //            *value = '\0';
-    //
-    //            *result_it++ = entry;
-    //        }
-    //        *result_it = nullptr;
-    //        return result;
-    //    }
-
-    rust::Result<std::string> get_path()
-    {
-        if (auto env = getenv("PATH"); env != nullptr) {
-            return rust::Ok(std::string(env));
-        }
-#ifdef HAVE_CONFSTR
-        return get_confstr(_CS_PATH);
-#else
-        return rust::Err(std::runtime_error("Could not find PATH in environment"));
-#endif
-    }
-
-    // TODO: validate if this is the right logic for execvp
-    rust::Result<std::filesystem::path> executable_name(const std::string_view& program)
-    {
-        namespace fs = std::filesystem;
-        constexpr fs::perms any_exec = fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec;
-
-        // first check if the given program name is absolute.
-        if (fs::path program_as_path = program; program_as_path.is_absolute()) {
-            return rust::Ok(program_as_path);
-        } else {
-            // otherwise take the PATH environment directories and check if there are available
-            // executable program with this name.
-            return get_path()
-                .and_then<std::filesystem::path>([&program](const auto& path) {
-                    // the PATH is a list of directories separated by a colon character.
-                    const std::list<std::string> directories = env::split(std::string(path), ':');
-                    for (const auto& directory : directories) {
-                        // any file which exists with the desired permission is the result.
-                        fs::path candidate = fs::path(directory).append(program);
-                        if ((fs::exists(candidate))
-                            && (fs::is_regular_file(candidate))
-                            && ((fs::status(candidate).permissions() & any_exec) != fs::perms::none)) {
-                            return rust::Result<std::filesystem::path>(rust::Ok(candidate));
-                        }
-                    }
-                    return rust::Result<std::filesystem::path>(rust::Err(std::runtime_error(
-                        fmt::format("Could not find executable: {0}", program))));
-                });
-        }
-    }
-
-    rust::Result<pid_t> spawn(
-        const std::filesystem::path& path,
-        const std::vector<std::string_view> args,
-        const std::map<std::string, std::string>& environment)
-    {
-        // TODO
-        errno = ENOENT;
-        pid_t child;
-        //        if (0 != posix_spawn(&child, path.c_str(), nullptr, nullptr, const_cast<char**>(args), const_cast<char**>(envp))) {
-        const auto message = fmt::format("posix_spawn system call failed. [errno: {0}]", errno);
-        return rust::Err(std::runtime_error(message));
-        //        } else {
-        //            return rust::Ok(child);
-        //        }
-    }
-
-    rust::Result<int> wait(const pid_t pid)
-    {
-        errno = ENOENT;
-        int status;
-        if (-1 == waitpid(pid, &status, 0)) {
-            const auto message = fmt::format("wait system call failed. [errno: {0}]", errno);
-            return rust::Err(std::runtime_error(message));
-        } else {
-            const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return rust::Ok(result);
-        }
-    }
-}
-
 namespace {
+
     class LibraryPreloadSession : public ic::Session {
     public:
         LibraryPreloadSession(HostInfo&& host_info, const std::string_view& library, const std::string_view& executor);
@@ -320,21 +169,17 @@ namespace {
 
     rust::Result<int> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
-        auto environment = rust::Result<const char**>(rust::Ok(const_cast<const char**>(environ)))
-                               .and_then<std::map<std::string, std::string>>([](auto ptr) {
-                                   auto map = start::to_map(ptr);
-                                   return rust::Ok(map);
-                               })
-                               .and_then<std::map<std::string, std::string>>([this](auto map) {
-                                   return update(map);
-                               });
-        auto program = start::executable_name(command.front());
+        auto environment = update(sys::env::from(const_cast<const char**>(environ)));
+        auto program = sys::Os().get_path().and_then<std::string>([&command](auto path) {
+            return sys::FileSystem().find_in_path(std::string(command.front()), path);
+        });
 
+        sys::Process process;
         return rust::merge(program, environment)
-            .and_then<pid_t>([&command, this](auto pair) {
+            .and_then<pid_t>([&command, &process, this](auto pair) {
                 const auto& [program, environment] = pair;
                 // create the argument list
-                std::vector<std::string_view> args = {
+                std::vector<const char*> args = {
                     executor_.c_str(),
                     er::flags::DESTINATION,
                     server_address_.c_str(),
@@ -344,11 +189,14 @@ namespace {
                     program.c_str(),
                     er::flags::COMMAND
                 };
-                std::copy(command.begin(), command.end(), std::back_insert_iterator(args));
-                return start::spawn(executor_, args, environment);
+                std::transform(command.begin(), command.end(), std::back_insert_iterator(args),
+                    [](const auto& it) { return it.data(); });
+                // create environment pointer
+                sys::env::Guard guard(environment);
+                return process.spawn(executor_.c_str(), args.data(), guard.data());
             })
-            .and_then<int>([](auto pid) {
-                return start::wait(pid);
+            .and_then<int>([&process](auto pid) {
+                return process.wait_pid(pid);
             });
     }
 
@@ -372,7 +220,8 @@ namespace ic {
 
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args)
     {
-        auto host_info = create_host_info()
+        sys::Os os;
+        auto host_info = create_host_info(os)
                              .unwrap_or_else([](auto error) {
                                  spdlog::info(error.what());
                                  return std::map<std::string, std::string>();

@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "FileSystem.h"
+#include "libsys/FileSystem.h"
 #include "Errors.h"
 #include "config.h"
 
@@ -25,16 +25,13 @@
 #include <climits>
 #include <cstdlib>
 #include <list>
+#include <numeric>
 #include <string>
 #include <unistd.h>
 
 namespace {
 
-    constexpr char OS_SEPARATOR = '/';
-    constexpr char OS_PATH_SEPARATOR = ':';
-
-    std::list<std::string>
-    split(const std::string& input, const char sep)
+    std::list<std::string> split(const std::string& input, const char sep)
     {
         std::list<std::string> result;
 
@@ -47,9 +44,29 @@ namespace {
 
         return result;
     }
+
+    std::string join(const std::list<std::string>& input, const char sep)
+    {
+        std::string result;
+        std::accumulate(input.begin(), input.end(), result,
+            [&sep](std::string& acc, const std::string& item) {
+                return (acc.empty()) ? item : acc + sep + item;
+            });
+        return result;
+    }
 }
 
 namespace sys {
+
+    std::list<std::string> FileSystem::split_path(const std::string& input)
+    {
+        return split(input, FileSystem::OS_PATH_SEPARATOR);
+    }
+
+    std::string FileSystem::join_path(const std::list<std::string>& input)
+    {
+        return join(input, FileSystem::OS_PATH_SEPARATOR);
+    }
 
     rust::Result<std::string> FileSystem::get_cwd() const
     {
@@ -105,7 +122,6 @@ namespace sys {
         }
         return ENOENT;
     }
-
 
     rust::Result<std::string> FileSystem::real_path(const std::string& path) const
     {

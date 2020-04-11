@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Process.h"
+#include "libsys/Process.h"
 #include "Errors.h"
 #include "config.h"
 

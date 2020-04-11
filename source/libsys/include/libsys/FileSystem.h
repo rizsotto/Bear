@@ -20,6 +20,7 @@
 #pragma once
 
 #include <memory>
+#include <list>
 #include <string>
 
 #include "Result.h"
@@ -27,6 +28,13 @@
 namespace sys {
 
     struct FileSystem {
+        static constexpr char OS_SEPARATOR = '/';
+        static constexpr char OS_PATH_SEPARATOR = ':';
+
+        static std::list<std::string> split_path(const std::string& input);
+        static std::string join_path(const std::list<std::string>& input);
+
+    public:
         virtual ~FileSystem() = default;
 
         virtual rust::Result<std::string> get_cwd() const;
