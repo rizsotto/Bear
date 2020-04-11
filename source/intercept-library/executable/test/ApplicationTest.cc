@@ -20,7 +20,7 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-#include "Command.h"
+#include "Application.h"
 #include "er/Flags.h"
 #include "libflags/Flags.h"
 
@@ -36,7 +36,7 @@ namespace {
         MOCK_METHOD(rust::Result<std::vector<std::string_view>>, as_string_list, (const std::string_view& key), (override, const));
     };
 
-    TEST(command, create_fails_if_no_command)
+    TEST(application, create_fails_if_no_command)
     {
         MockArguments arguments;
         EXPECT_CALL(arguments, program())
@@ -52,12 +52,13 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("")))));
 
-        auto result = ::er::Command::create(arguments);
+        sys::Context* ctx = nullptr;
+        auto result = er::Application::create(arguments, *ctx);
 
         ASSERT_FALSE(result.is_ok());
     }
 
-    TEST(command, create_success)
+    TEST(application, create_success)
     {
         const std::vector<std::string_view> command = { "ls", "-l", "-a" };
         MockArguments arguments;
@@ -74,7 +75,8 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Ok(command))));
 
-        auto result = ::er::Command::create(arguments);
+        sys::Context* ctx = nullptr;
+        auto result = er::Application::create(arguments, *ctx);
 
         ASSERT_TRUE(result.is_ok());
     }

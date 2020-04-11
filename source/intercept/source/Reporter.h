@@ -24,9 +24,9 @@
 
 #include "supervise.pb.h"
 
+#include <list>
 #include <memory>
 #include <string>
-#include <list>
 #include <vector>
 
 namespace ic {

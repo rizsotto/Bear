@@ -21,29 +21,30 @@
 
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
+#include "libsys/Context.h"
 
 namespace er {
 
-    class Command {
+    class Application {
     public:
-        static ::rust::Result<Command> create(const ::flags::Arguments& args);
+        static ::rust::Result<Application> create(const flags::Arguments& args, const sys::Context&);
 
         ::rust::Result<int> operator()(const char** envp) const;
 
     public:
-        Command() = delete;
-        ~Command();
+        Application() = delete;
+        ~Application();
 
-        Command(const Command&) = delete;
-        Command(Command&&) noexcept;
+        Application(const Application&) = delete;
+        Application(Application&&) noexcept;
 
-        Command& operator=(const Command&) = delete;
-        Command& operator=(Command&&) noexcept;
+        Application& operator=(const Application&) = delete;
+        Application& operator=(Application&&) noexcept;
 
     private:
         struct State;
 
-        explicit Command(State*);
+        explicit Application(State*);
 
     private:
         State const* impl_;

@@ -32,7 +32,9 @@
 #include "Application.h"
 #include "config.h"
 #include "libflags/Flags.h"
+#include "libsys/Context.h"
 
+#include <unistd.h>
 #include <spdlog/spdlog.h>
 
 #include <optional>
@@ -43,8 +45,12 @@ namespace {
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[], char* envp[])
 {
+    int const pid = getpid();
+    int const ppid = getppid();
+    const sys::Context context(pid, ppid, envp);
+
     spdlog::set_pattern("intercept [pid: %P, level: %l] %v");
     spdlog::set_level(spdlog::level::info);
 
@@ -65,8 +71,8 @@ int main(int argc, char* argv[])
             return args;
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<ic::Application>([](auto args) {
-            return ic::Application::from(args);
+        .and_then<ic::Application>([&context](auto args) {
+            return ic::Application::from(args, context);
         })
         .and_then<int>([](const auto& command) {
             return command();

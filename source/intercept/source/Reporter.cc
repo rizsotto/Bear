@@ -223,8 +223,8 @@ namespace ic {
     {
         return flags.as_string(Application::OUTPUT)
             .map<Reporter::State*>([](auto output) {
-                auto context = Context { "unknown", {} };
-                return new Reporter::State { std::mutex(), std::string(output), context };
+                auto content = ic::Content { ic::Context { "unknown", {} }, {} };
+                return new Reporter::State { std::mutex(), std::string(output), content };
             })
             .map<Reporter::SharedPtr>([](auto state) {
                 return Reporter::SharedPtr(new Reporter(state));

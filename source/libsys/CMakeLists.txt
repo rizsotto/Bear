@@ -1,8 +1,6 @@
 add_library(sys_a OBJECT
+        source/Context.cc
         source/Environment.cc
-        source/FileSystem.cc
-        source/Os.cc
-        source/Process.cc
         )
 
 target_include_directories(sys_a PUBLIC include/)

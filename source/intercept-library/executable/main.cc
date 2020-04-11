@@ -17,12 +17,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Command.h"
+#include "Application.h"
 #include "config.h"
 #include "er/Flags.h"
 #include "libflags/Flags.h"
-#include "libsys/Process.h"
+#include "libsys/Context.h"
 
+#include <unistd.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
@@ -53,8 +54,10 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    int const pid = sys::Process::get_pid();
-    int const ppid = sys::Process::get_ppid();
+    int const pid = getpid();
+    int const ppid = getppid();
+    const sys::Context context(pid, ppid, envp);
+
     spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", pid, ppid));
     spdlog::set_level(spdlog::level::info);
 
@@ -74,8 +77,8 @@ int main(int argc, char* argv[], char* envp[])
             return args;
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<er::Command>([](auto args) {
-            return er::Command::create(args);
+        .and_then<er::Application>([&context](auto args) {
+            return er::Application::create(args, context);
         })
         .and_then<int>([&envp](const auto& command) {
             const char** environment = const_cast<const char**>(envp);

@@ -25,12 +25,12 @@
 // header checks
 #cmakedefine HAVE_SPAWN_H
 #cmakedefine HAVE_UNISTD_H
-#cmakedefine HAVE_WAIT_H
 #cmakedefine HAVE_SPAWN_H
 #cmakedefine HAVE_DLFCN_H
 #cmakedefine HAVE_ERRNO_H
 #cmakedefine HAVE_UNISTD_H
 #cmakedefine HAVE_SYS_UTSNAME_H
+#cmakedefine HAVE_SYS_WAIT_H
 
 // OSX specific (needs to be deprecated)
 #cmakedefine HAVE_NSGETENVIRON

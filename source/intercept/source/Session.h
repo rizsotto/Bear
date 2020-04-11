@@ -26,13 +26,14 @@
 
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
+#include "libsys/Context.h"
 
 namespace ic {
 
     class Session {
     public:
         using SharedPtr = std::shared_ptr<Session>;
-        static rust::Result<Session::SharedPtr> from(const flags::Arguments&);
+        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const sys::Context&);
 
     public:
         virtual ~Session() = default;

@@ -21,6 +21,7 @@
 
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
+#include "libsys/Context.h"
 
 #include <memory>
 
@@ -35,7 +36,7 @@ namespace ic {
         static constexpr char WRAPPER[] = "--wrapper";
         static constexpr char COMMAND[] = "--";
 
-        static ::rust::Result<Application> from(const ::flags::Arguments& args);
+        static ::rust::Result<Application> from(const flags::Arguments& args, const sys::Context& ctx);
 
         ::rust::Result<int> operator()() const;
 

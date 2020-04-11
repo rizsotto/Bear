@@ -35,7 +35,6 @@ install(TARGETS intercept
 # Create unit test
 add_executable(intercept_unit_test
         test/ReporterTest.cc
-        test/SystemCallsTest.cc
         )
 
 target_link_libraries(intercept_unit_test intercept_a)

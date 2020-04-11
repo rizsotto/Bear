@@ -17,11 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Command.h"
+#include "Application.h"
 #include "Environment.h"
 #include "Reporter.h"
 #include "er/Flags.h"
-#include "libsys/Process.h"
 
 #include <spdlog/spdlog.h>
 
@@ -37,19 +36,24 @@ namespace {
         const std::vector<std::string_view> command;
     };
 
-    struct Context {
+    struct Session {
         const std::string_view reporter;
         const std::string_view destination;
+        const std::string_view library;
         bool verbose;
     };
 
-    Result<Context> make_context(const ::flags::Arguments& args) noexcept
+    Result<Session> make_session(const ::flags::Arguments& args) noexcept
     {
-        return args.as_string(::er::flags::DESTINATION)
-            .map<Context>([&args](const auto destination) {
+        auto library = args.as_string(er::flags::LIBRARY);
+        auto destination = args.as_string(er::flags::DESTINATION);
+
+        return rust::merge(library, destination)
+            .map<Session>([&args](const auto& pair) {
+                const auto& [library, destination] = pair;
                 const auto reporter = args.program();
                 const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
-                return Context { reporter, destination, verbose };
+                return Session { reporter, destination, library, verbose };
             });
     }
 
@@ -73,19 +77,11 @@ namespace {
         return result;
     }
 
-    Result<pid_t> spawnp(const Execution& config,
-        const ::er::EnvironmentPtr& environment) noexcept
+    void report_start(const er::Reporter::SharedPtr& reporter, pid_t pid, const char** cmd) noexcept
     {
-        auto command = to_char_vector(config.command);
-        return sys::Process().spawn(config.path.data(), command.data(), environment->data());
-    }
-
-    void report_start(Result<::er::ReporterPtr> const& reporter, pid_t pid, const char** cmd) noexcept
-    {
-        merge(reporter, ::er::Event::start(pid, cmd))
-            .and_then<int>([](auto tuple) {
-                const auto& [rptr, eptr] = tuple;
-                return rptr->send(eptr);
+        reporter->start(pid, cmd)
+            .and_then<int>([&reporter](auto message) {
+                return reporter->send(message);
             })
             .unwrap_or_else([](auto message) {
                 spdlog::warn("report process start failed: ", message.what());
@@ -93,12 +89,11 @@ namespace {
             });
     }
 
-    void report_exit(Result<::er::ReporterPtr> const& reporter, pid_t pid, int exit) noexcept
+    void report_exit(const er::Reporter::SharedPtr& reporter, pid_t pid, int exit) noexcept
     {
-        merge(reporter, ::er::Event::stop(pid, exit))
-            .and_then<int>([](auto tuple) {
-                const auto& [rptr, eptr] = tuple;
-                return rptr->send(eptr);
+        reporter->stop(pid, exit)
+            .and_then<int>([&reporter](auto message) {
+                return reporter->send(message);
             })
             .unwrap_or_else([](auto message) {
                 spdlog::error("report process stop failed: ", message.what());
@@ -109,63 +104,70 @@ namespace {
 
 namespace er {
 
-    struct Command::State {
-        Context context_;
+    struct Application::State {
+        Session session_;
         Execution execution_;
-        std::string_view library_;
+        Reporter::SharedPtr reporter_;
+        const sys::Context& context_;
     };
 
-    ::rust::Result<Command> Command::create(const ::flags::Arguments& params)
+    rust::Result<Application> Application::create(const ::flags::Arguments& args, const sys::Context& context)
     {
-        return merge(make_context(params), make_execution(params), params.as_string(::er::flags::LIBRARY))
-            .map<Command>([&params](auto in) {
-                const auto& [context, execution, library] = in;
-                auto state = new Command::State { context, execution, library };
-                return Command(state);
+        auto session = make_session(args);
+        auto reporter = session.and_then<Reporter::SharedPtr>([&context](const auto& session_value) {
+            return Reporter::from(session_value.destination.data(), context);
+        });
+        auto execution = make_execution(args);
+
+        return merge(session, execution, reporter)
+            .map<Application>([&args, &context](auto in) {
+                const auto& [session, execution, reporter] = in;
+                auto state = new Application::State { session, execution, reporter, context };
+                return Application(state);
             });
     }
 
-    ::rust::Result<int> Command::operator()(const char** envp) const
+    rust::Result<int> Application::operator()(const char** envp) const
     {
-        auto reporter = ::er::Reporter::tempfile(impl_->context_.destination.data());
-
         auto environment = ::er::Environment::Builder(const_cast<const char**>(envp))
-                               .add_reporter(impl_->context_.reporter.data())
-                               .add_destination(impl_->context_.destination.data())
-                               .add_verbose(impl_->context_.verbose)
-                               .add_library(impl_->library_.data())
+                               .add_reporter(impl_->session_.reporter.data())
+                               .add_destination(impl_->session_.destination.data())
+                               .add_library(impl_->session_.library.data())
+                               .add_verbose(impl_->session_.verbose)
                                .build();
 
-        return spawnp(impl_->execution_, environment)
-            .map<pid_t>([this, &reporter](auto& pid) {
-                report_start(reporter, pid, to_char_vector(impl_->execution_.command).data());
+        auto command = to_char_vector(impl_->execution_.command);
+
+        return impl_->context_.spawn(impl_->execution_.path.data(), command.data(), environment->data())
+            .map<pid_t>([this](auto& pid) {
+                report_start(impl_->reporter_, pid, to_char_vector(impl_->execution_.command).data());
                 return pid;
             })
-            .and_then<std::tuple<pid_t, int>>([](auto pid) {
-                return sys::Process().wait_pid(pid)
+            .and_then<std::tuple<pid_t, int>>([this](auto pid) {
+                return impl_->context_.wait_pid(pid)
                     .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
                         return std::make_tuple(pid, exit);
                     });
             })
-            .map<int>([&reporter](auto tuple) {
+            .map<int>([this](auto tuple) {
                 const auto& [pid, exit] = tuple;
-                report_exit(reporter, pid, exit);
+                report_exit(impl_->reporter_, pid, exit);
                 return exit;
             });
     }
 
-    Command::Command(Command::State* const impl)
+    Application::Application(Application::State* const impl)
             : impl_(impl)
     {
     }
 
-    Command::Command(Command&& rhs) noexcept
+    Application::Application(Application&& rhs) noexcept
             : impl_(rhs.impl_)
     {
         rhs.impl_ = nullptr;
     }
 
-    Command& Command::operator=(Command&& rhs) noexcept
+    Application& Application::operator=(Application&& rhs) noexcept
     {
         if (&rhs != this) {
             delete impl_;
@@ -174,7 +176,7 @@ namespace er {
         return *this;
     }
 
-    Command::~Command()
+    Application::~Application()
     {
         delete impl_;
         impl_ = nullptr;

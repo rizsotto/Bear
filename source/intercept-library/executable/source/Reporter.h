@@ -19,42 +19,39 @@
 
 #pragma once
 
+#include "libresult/Result.h"
+#include "libsys/Context.h"
+
 #include <unistd.h>
 
 #include <iosfwd>
 #include <memory>
 #include <utility>
 
-#include "libresult/Result.h"
-
 namespace er {
-
-    class Event;
-    using EventPtr = std::shared_ptr<Event>;
 
     class Event {
     public:
+        using SharedPtr = std::shared_ptr<Event>;
+
         virtual ~Event() noexcept = default;
 
         virtual const char* name() const = 0;
-
         virtual void to_json(std::ostream&) const = 0;
-
-    public:
-        static rust::Result<EventPtr> start(pid_t pid, const char** cmd) noexcept;
-        static rust::Result<EventPtr> stop(pid_t pid, int exit) noexcept;
     };
-
-    class Reporter;
-    using ReporterPtr = std::shared_ptr<Reporter>;
 
     class Reporter {
     public:
+        using SharedPtr = std::shared_ptr<Reporter>;
+
         virtual ~Reporter() noexcept = default;
 
-        virtual rust::Result<int> send(const EventPtr& event) noexcept = 0;
+        virtual rust::Result<int> send(Event::SharedPtr event) noexcept = 0;
+
+        virtual rust::Result<Event::SharedPtr> start(pid_t pid, const char** cmd) = 0;
+        virtual rust::Result<Event::SharedPtr> stop(pid_t pid, int exit) = 0;
 
     public:
-        static rust::Result<ReporterPtr> tempfile(char const*) noexcept;
+        static rust::Result<SharedPtr> from(char const* path, const sys::Context& context) noexcept;
     };
 }

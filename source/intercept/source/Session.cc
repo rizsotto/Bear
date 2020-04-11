@@ -24,25 +24,22 @@
 #include "er/Flags.h"
 #include "libexec/Environment.h"
 #include "libsys/Environment.h"
-#include "libsys/FileSystem.h"
-#include "libsys/Os.h"
-#include "libsys/Process.h"
 
 #include <functional>
 #include <numeric>
 #include <unistd.h>
 
-#include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
+#include <spdlog/spdlog.h>
 
 namespace {
 
-    rust::Result<ic::Session::HostInfo> create_host_info(const sys::Os& os)
+    rust::Result<ic::Session::HostInfo> create_host_info(const sys::Context& context)
     {
-        return os.get_uname()
+        return context.get_uname()
 #ifdef HAVE_CS_PATH
-            .map<ic::Session::HostInfo>([&os](auto result) {
-                os.get_confstr(_CS_PATH)
+            .map<ic::Session::HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_PATH)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_PATH", value });
                         return 0;
@@ -51,8 +48,8 @@ namespace {
             })
 #endif
 #ifdef HAVE_CS_GNU_LIBC_VERSION
-            .map<ic::Session::HostInfo>([&os](auto result) {
-                os.get_confstr(_CS_GNU_LIBC_VERSION)
+            .map<ic::Session::HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_GNU_LIBC_VERSION)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_GNU_LIBC_VERSION", value });
                         return 0;
@@ -61,8 +58,8 @@ namespace {
             })
 #endif
 #ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
-            .map<ic::Session::HostInfo>([&os](auto result) {
-                os.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
+            .map<ic::Session::HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
                         return 0;
@@ -86,10 +83,10 @@ namespace env {
     std::string
     merge_into_paths(const std::string& current, const std::string& value) noexcept
     {
-        auto paths = sys::FileSystem::split_path(current);
+        auto paths = sys::Context::split_path(current);
         if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
             paths.emplace_front(value);
-            return sys::FileSystem::join_path(paths);
+            return sys::Context::join_path(paths);
         } else {
             return current;
         }
@@ -129,7 +126,7 @@ namespace {
 
     class LibraryPreloadSession : public ic::Session {
     public:
-        LibraryPreloadSession(HostInfo&& host_info, const std::string_view& library, const std::string_view& executor);
+        LibraryPreloadSession(HostInfo&& host_info, const std::string_view& library, const std::string_view& executor, const sys::Context& context);
 
     public:
         [[nodiscard]] rust::Result<std::string_view> resolve(const std::string& name) const override;
@@ -146,13 +143,15 @@ namespace {
         std::string server_address_;
         std::string library_;
         std::string executor_;
+        const sys::Context& context_;
     };
 
-    LibraryPreloadSession::LibraryPreloadSession(ic::Session::HostInfo&& host_info, const std::string_view& library, const std::string_view& executor)
+    LibraryPreloadSession::LibraryPreloadSession(ic::Session::HostInfo&& host_info, const std::string_view& library, const std::string_view& executor, const sys::Context& context)
             : host_info_(host_info)
             , server_address_()
             , library_(library)
             , executor_(executor)
+            , context_(context)
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
@@ -177,14 +176,11 @@ namespace {
 
     rust::Result<int> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
-        auto environment = update(sys::env::from(const_cast<const char**>(environ)));
-        auto program = sys::Os().get_path().and_then<std::string>([&command](auto path) {
-            return sys::FileSystem().find_in_path(std::string(command.front()), path);
-        });
+        auto environment = update(context_.get_environment());
+        auto program = context_.resolve_executable(std::string(command.front()));
 
-        sys::Process process;
         return rust::merge(program, environment)
-            .and_then<pid_t>([&command, &process, this](auto pair) {
+            .and_then<pid_t>([&command, this](auto pair) {
                 const auto& [program, environment] = pair;
                 // create the argument list
                 std::vector<const char*> args = {
@@ -203,10 +199,10 @@ namespace {
                 args.push_back(nullptr);
                 // create environment pointer
                 sys::env::Guard guard(environment);
-                return process.spawn(executor_.c_str(), args.data(), guard.data());
+                return context_.spawn(executor_.c_str(), args.data(), guard.data());
             })
-            .and_then<int>([&process](auto pid) {
-                return process.wait_pid(pid);
+            .and_then<int>([this](auto pid) {
+                return context_.wait_pid(pid);
             })
             .map_err<std::runtime_error>([](auto error) {
                 spdlog::warn("command execution failed: {}", error.what());
@@ -232,10 +228,9 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args)
+    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        sys::Os os;
-        auto host_info = create_host_info(os)
+        auto host_info = create_host_info(ctx)
                              .unwrap_or_else([](auto error) {
                                  spdlog::info(error.what());
                                  return std::map<std::string, std::string>();
@@ -245,9 +240,9 @@ namespace ic {
         auto executor = args.as_string(ic::Application::EXECUTOR);
 
         return merge(library, executor)
-            .map<Session::SharedPtr>([&host_info](auto pair) {
+            .map<Session::SharedPtr>([&host_info, &ctx](auto pair) {
                 const auto& [library, executor] = pair;
-                auto result = new LibraryPreloadSession(std::move(host_info), library, executor);
+                auto result = new LibraryPreloadSession(std::move(host_info), library, executor, ctx);
                 return std::shared_ptr<Session>(result);
             });
     }

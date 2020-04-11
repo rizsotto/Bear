@@ -22,6 +22,7 @@
 #include "Interceptor.h"
 #include "Reporter.h"
 #include "Session.h"
+#include "libsys/Context.h"
 
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
@@ -56,11 +57,11 @@ namespace ic {
         Session::SharedPtr session_;
     };
 
-    ::rust::Result<Application> Application::from(const ::flags::Arguments& args)
+    ::rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& context)
     {
         auto command = Command::from(args);
         auto reporter = Reporter::from(args);
-        auto session = Session::from(args);
+        auto session = Session::from(args, context);
 
         return rust::merge(command, reporter, session)
                    .map<Application::State*>([](auto tuple) {

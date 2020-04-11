@@ -20,15 +20,9 @@
 #include "Reporter.h"
 #include "SystemCalls.h"
 #include "libresult/Result.h"
-#include "libsys/FileSystem.h"
-#include "libsys/Process.h"
 
 #include <chrono>
 #include <iostream>
-
-using rust::Result;
-using rust::Ok;
-using rust::Err;
 
 namespace {
 
@@ -187,23 +181,28 @@ namespace {
 
     class ReporterImpl : public er::Reporter {
     public:
-        explicit ReporterImpl(const char* target) noexcept;
+        explicit ReporterImpl(const char* target, const sys::Context& context) noexcept;
 
-        Result<int> send(const er::EventPtr& event) noexcept override;
+        rust::Result<int> send(er::Event::SharedPtr event) noexcept override;
+
+        rust::Result<er::Event::SharedPtr> start(pid_t pid, const char** cmd) override;
+        rust::Result<er::Event::SharedPtr> stop(pid_t pid, int exit) override;
 
     private:
-        Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
+        rust::Result<std::shared_ptr<std::ostream>> create_stream(const std::string&) const;
 
         std::string const target_;
+        const sys::Context& context_;
     };
 
-    ReporterImpl::ReporterImpl(const char* target) noexcept
+    ReporterImpl::ReporterImpl(const char* target, const sys::Context& context) noexcept
             : er::Reporter()
             , target_(target)
+            , context_(context)
     {
     }
 
-    Result<int> ReporterImpl::send(const er::EventPtr& event) noexcept
+    rust::Result<int> ReporterImpl::send(er::Event::SharedPtr event) noexcept
     {
         return create_stream(event->name())
             .map<int>([&event](auto stream) {
@@ -212,7 +211,24 @@ namespace {
             });
     }
 
-    Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
+    rust::Result<er::Event::SharedPtr> ReporterImpl::start(pid_t pid, const char** cmd)
+    {
+        return context_.get_cwd()
+            .map<er::Event::SharedPtr>([&pid, &cmd, this](auto cwd) {
+                const auto current = context_.get_pid();
+                const auto parent = context_.get_ppid();
+
+                return er::Event::SharedPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
+            });
+    }
+
+    rust::Result<er::Event::SharedPtr> ReporterImpl::stop(pid_t pid, int exit)
+    {
+        const auto current = context_.get_pid();
+        return rust::Ok(er::Event::SharedPtr(new ProcessStopEvent(pid, current, exit)));
+    }
+
+    rust::Result<std::shared_ptr<std::ostream>> ReporterImpl::create_stream(const std::string& prefix) const
     {
         return er::SystemCalls::temp_file(target_.c_str(), ("." + prefix + ".json").c_str());
     }
@@ -220,34 +236,9 @@ namespace {
 
 namespace er {
 
-    Result<EventPtr> Event::start(pid_t pid, const char** cmd) noexcept
+    rust::Result<Reporter::SharedPtr> Reporter::from(char const* path, const sys::Context& context) noexcept
     {
-        return sys::FileSystem().get_cwd()
-            .map<EventPtr>([&pid, &cmd](auto cwd) {
-                const auto current = sys::Process::get_pid();
-                const auto parent = sys::Process::get_ppid();
-
-                return EventPtr(new ProcessStartEvent(pid, current, parent, cwd, cmd));
-            });
-    };
-
-    Result<EventPtr> Event::stop(pid_t pid, int exit) noexcept
-    {
-        const auto current = sys::Process::get_pid();
-        return Ok(EventPtr(new ProcessStopEvent(pid, current, exit)));
-    }
-
-    Result<ReporterPtr> Reporter::tempfile(char const* dir_name) noexcept
-    {
-        ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-        return Ok(std::move(result));
-
-        //if (std::filesystem::is_directory(dir_name)) {
-        //    ReporterPtr result = std::make_unique<ReporterImpl>(dir_name);
-        //    return Ok(std::move(result));
-        //} else {
-        //    const std::string message = std::string("Directory does not exists: ") + dir_name;
-        //    return Err(std::runtime_error(message));
-        //}
+        SharedPtr result = std::make_unique<ReporterImpl>(path, context);
+        return rust::Ok(std::move(result));
     }
 }
