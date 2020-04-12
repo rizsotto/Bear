@@ -278,6 +278,7 @@ namespace sys {
         }
     }
 
+    // TODO: return either the status code or the signal number
     rust::Result<int> Context::wait_pid(pid_t pid) const
     {
         errno = 0;

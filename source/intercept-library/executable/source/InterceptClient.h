@@ -19,34 +19,29 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
 #include "libresult/Result.h"
-#include "libsys/Context.h"
+
+#include "supervise.grpc.pb.h"
 
 namespace er {
 
-    class Application {
+    class InterceptClient {
     public:
-        static ::rust::Result<Application> create(const flags::Arguments& args, const sys::Context&);
+        explicit InterceptClient(const std::string_view& address);
 
-        ::rust::Result<int> operator()() const;
+        InterceptClient() = delete;
+        InterceptClient(const InterceptClient&) = delete;
+        InterceptClient(InterceptClient&&) noexcept = delete;
+
+        InterceptClient& operator=(const InterceptClient&) = delete;
+        InterceptClient& operator=(InterceptClient&&) noexcept = delete;
 
     public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
+        rust::Result<std::string> get_wrapped_command(const std::string&);
+        rust::Result<std::map<std::string, std::string>> get_environment_update(const std::map<std::string, std::string>&);
+        rust::Result<int> report(const std::list<supervise::Event>&);
 
     private:
-        struct State;
-
-        explicit Application(State*);
-
-    private:
-        State const* impl_;
+        std::unique_ptr<supervise::Interceptor::Stub> stub_;
     };
 }

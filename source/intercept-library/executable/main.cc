@@ -81,8 +81,7 @@ int main(int argc, char* argv[], char* envp[])
             return er::Application::create(args, context);
         })
         .and_then<int>([&envp](const auto& command) {
-            const char** environment = const_cast<const char**>(envp);
-            return command(environment);
+            return command();
         })
         // set the return code from error and print message
         .unwrap_or_else([](auto error) {

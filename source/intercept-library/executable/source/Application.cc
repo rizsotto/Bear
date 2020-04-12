@@ -18,16 +18,18 @@
  */
 
 #include "Application.h"
-#include "Environment.h"
+#include "InterceptClient.h"
 #include "Reporter.h"
 #include "er/Flags.h"
+#include "supervise.grpc.pb.h"
 
+#include <fmt/chrono.h>
+#include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
-using rust::Err;
-using rust::merge;
-using rust::Ok;
-using rust::Result;
+#include <chrono>
+#include <libsys/Environment.h>
+#include <memory>
 
 namespace {
 
@@ -43,7 +45,7 @@ namespace {
         bool verbose;
     };
 
-    Result<Session> make_session(const ::flags::Arguments& args) noexcept
+    rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
     {
         auto library = args.as_string(er::flags::LIBRARY);
         auto destination = args.as_string(er::flags::DESTINATION);
@@ -57,7 +59,7 @@ namespace {
             });
     }
 
-    Result<Execution> make_execution(const ::flags::Arguments& args) noexcept
+    rust::Result<Execution> make_execution(const ::flags::Arguments& args) noexcept
     {
         auto path = args.as_string(::er::flags::EXECUTE);
         auto command = args.as_string_list(::er::flags::COMMAND);
@@ -100,6 +102,61 @@ namespace {
                 return 0;
             });
     }
+
+    long to_millis(const std::chrono::time_point<std::chrono::high_resolution_clock>& t)
+    {
+        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch());
+        return millis.count() % 1000;
+    }
+
+    std::string now_as_string()
+    {
+        const auto now = std::chrono::system_clock::now();
+        const auto millis = to_millis(now);
+
+        // TODO: fix this!!!
+        return "todo";
+        //        return fmt::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::to_time_t(now));
+
+        //        return fmt::format("{:%Y-%m-%dT%H:%M:%S}.{03d}Z",
+        //            std::chrono::system_clock::to_time_t(now),
+        //            millis);
+    }
+
+    std::shared_ptr<supervise::Event> start(
+        pid_t pid,
+        pid_t ppid,
+        const Execution& execution,
+        const std::string& cwd,
+        const std::map<std::string, std::string>& env)
+    {
+        std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
+        result->set_timestamp(now_as_string());
+
+        std::unique_ptr<supervise::Event_Started> event = std::make_unique<supervise::Event_Started>();
+        event->set_pid(pid);
+        event->set_ppid(ppid);
+        event->set_executable(execution.path.data());
+        for (const auto& arg : execution.command) {
+            event->add_arguments(arg.data());
+        }
+        event->set_working_dir(cwd);
+        event->mutable_environment()->insert(env.begin(), env.end());
+        result->set_allocated_started(event.release());
+        return result;
+    }
+
+    std::shared_ptr<supervise::Event> stop(int status)
+    {
+        std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
+        result->set_timestamp(now_as_string());
+
+        std::unique_ptr<supervise::Event_Stopped> event = std::make_unique<supervise::Event_Stopped>();
+        event->set_status(status);
+
+        result->set_allocated_stopped(event.release());
+        return result;
+    }
 }
 
 namespace er {
@@ -119,7 +176,7 @@ namespace er {
         });
         auto execution = make_execution(args);
 
-        return merge(session, execution, reporter)
+        return rust::merge(session, execution, reporter)
             .map<Application>([&args, &context](auto in) {
                 const auto& [session, execution, reporter] = in;
                 auto state = new Application::State { session, execution, reporter, context };
@@ -127,20 +184,29 @@ namespace er {
             });
     }
 
-    rust::Result<int> Application::operator()(const char** envp) const
+    rust::Result<int> Application::operator()() const
     {
-        auto environment = ::er::Environment::Builder(const_cast<const char**>(envp))
-                               .add_reporter(impl_->session_.reporter.data())
-                               .add_destination(impl_->session_.destination.data())
-                               .add_library(impl_->session_.library.data())
-                               .add_verbose(impl_->session_.verbose)
-                               .build();
+        er::InterceptClient client(impl_->session_.destination);
+        std::list<supervise::Event> events;
 
-        auto command = to_char_vector(impl_->execution_.command);
+        return client.get_environment_update(impl_->context_.get_environment())
+            .and_then<pid_t>([this](auto environment) {
+                auto command = to_char_vector(impl_->execution_.command);
+                sys::env::Guard guard(environment);
 
-        return impl_->context_.spawn(impl_->execution_.path.data(), command.data(), environment->data())
-            .map<pid_t>([this](auto& pid) {
+                return impl_->context_.spawn(impl_->execution_.path.data(), command.data(), guard.data());
+            })
+            .map<pid_t>([this, &events](auto& pid) {
                 report_start(impl_->reporter_, pid, to_char_vector(impl_->execution_.command).data());
+                // gRPC event update
+                impl_->context_.get_cwd()
+                    .template map<std::shared_ptr<supervise::Event>>([this, &pid](auto cwd) {
+                        return start(pid, impl_->context_.get_ppid(), impl_->execution_, cwd, impl_->context_.get_environment());
+                    })
+                    .template map<int>([&events](auto event_ptr) {
+                        events.push_back(*event_ptr);
+                        return 0;
+                    });
                 return pid;
             })
             .and_then<std::tuple<pid_t, int>>([this](auto pid) {
@@ -149,9 +215,14 @@ namespace er {
                         return std::make_tuple(pid, exit);
                     });
             })
-            .map<int>([this](auto tuple) {
+            .map<int>([this, &client, &events](auto tuple) {
                 const auto& [pid, exit] = tuple;
                 report_exit(impl_->reporter_, pid, exit);
+                // gRPC event update
+                auto event_ptr = stop(exit);
+                events.push_back(*event_ptr);
+                client.report(events);
+                // exit with the client exit code
                 return exit;
             });
     }

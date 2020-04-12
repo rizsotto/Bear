@@ -8,6 +8,7 @@ target_include_directories(er_api INTERFACE include/)
 add_library(er_a OBJECT
         source/Application.cc
         source/Environment.cc
+        source/InterceptClient.cc
         source/Reporter.cc
         source/SystemCalls.cc
         )
