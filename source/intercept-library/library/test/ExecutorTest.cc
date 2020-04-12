@@ -69,14 +69,12 @@ namespace {
     char SEARCH_PATH[] = "/usr/bin:/usr/sbin";
 
     el::Session SILENT_SESSION = {
-        "/usr/libexec/libexec.so",
         "/usr/bin/intercept",
         "/tmp/intercept.random",
         false
     };
 
     el::Session VERBOSE_SESSION = {
-        "/usr/libexec/libexec.so",
         "/usr/bin/intercept",
         "/tmp/intercept.random",
         true
@@ -127,8 +125,6 @@ namespace {
         //        session.reporter,
         //        pear::flag::DESTINATION,
         //        session.destination,
-        //        pear::flag::LIBRARY,
-        //        session.library,
         //        pear::flag::PATH,
         //        LS_PATH,
         //        pear::flag::COMMAND,
@@ -166,8 +162,6 @@ namespace {
         //        pear::flag::DESTINATION,
         //        session.destination,
         //        pear::flag::LIBRARY,
-        //        session.library,
-        //        pear::flag::PATH,
         //        LS_PATH,
         //        pear::flag::COMMAND,
         //        LS_ARGV[0],
@@ -214,8 +208,6 @@ namespace {
         //        pear::flag::VERBOSE,
         //        pear::flag::DESTINATION,
         //        SILENT_SESSION.destination,
-        //        pear::flag::LIBRARY,
-        //        SILENT_SESSION.library,
         //        pear::flag::FILE,
         //        LS_FILE,
         //        pear::flag::COMMAND,
@@ -244,8 +236,6 @@ namespace {
         //        pear::flag::VERBOSE,
         //        pear::flag::DESTINATION,
         //        SILENT_SESSION.destination,
-        //        pear::flag::LIBRARY,
-        //        SILENT_SESSION.library,
         //        pear::flag::FILE,
         //        LS_FILE,
         //        pear::flag::SEARCH_PATH
@@ -286,8 +276,6 @@ namespace {
         //        pear::flag::VERBOSE,
         //        pear::flag::DESTINATION,
         //        VERBOSE_SESSION.destination,
-        //        pear::flag::LIBRARY,
-        //        VERBOSE_SESSION.library,
         //        pear::flag::PATH,
         //        LS_PATH,
         //        pear::flag::COMMAND,
@@ -339,8 +327,6 @@ namespace {
         //        pear::flag::VERBOSE,
         //        pear::flag::DESTINATION,
         //        VERBOSE_SESSION.destination,
-        //        pear::flag::LIBRARY,
-        //        VERBOSE_SESSION.library,
         //        pear::flag::FILE,
         //        LS_FILE,
         //        pear::flag::COMMAND,

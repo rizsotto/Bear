@@ -74,7 +74,7 @@ namespace {
 
         constexpr size_t length() const noexcept
         {
-            return (session.verbose ? 5 : 6) + el::array::length(argv) + 4;
+            return (session.verbose ? 3 : 4) + el::array::length(argv) + 4;
         }
 
         constexpr void assemble(const char** it) const noexcept
@@ -84,8 +84,6 @@ namespace {
             *it++ = session.reporter;
             *it++ = er::flags::DESTINATION;
             *it++ = session.destination;
-            *it++ = er::flags::LIBRARY;
-            *it++ = session.library;
             if (session.verbose) {
                 *it++ = er::flags::VERBOSE;
             }

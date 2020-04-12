@@ -40,21 +40,16 @@ namespace {
     struct Session {
         const std::string_view reporter;
         const std::string_view destination;
-        const std::string_view library;
         bool verbose;
     };
 
     rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
     {
-        auto library = args.as_string(er::flags::LIBRARY);
-        auto destination = args.as_string(er::flags::DESTINATION);
-
-        return rust::merge(library, destination)
-            .map<Session>([&args](const auto& pair) {
-                const auto& [library, destination] = pair;
+        return args.as_string(er::flags::DESTINATION)
+            .map<Session>([&args](const auto& destination) {
                 const auto reporter = args.program();
                 const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
-                return Session { reporter, destination, library, verbose };
+                return Session { reporter, destination, verbose };
             });
     }
 

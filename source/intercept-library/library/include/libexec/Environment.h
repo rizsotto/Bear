@@ -21,7 +21,6 @@
 
 namespace el::env {
 
-    constexpr char KEY_LIBRARY[] = "INTERCEPT_LIBRARY";
     constexpr char KEY_REPORTER[] = "INTERCEPT_REPORT_COMMAND";
     constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
     constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";

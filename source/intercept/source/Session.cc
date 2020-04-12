@@ -168,7 +168,6 @@ namespace {
         std::map<std::string, std::string> copy(env);
         env::insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
         env::insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
-        env::insert_or_assign(copy, el::env::KEY_LIBRARY, library_); // TODO: deprecate it
         env::insert_or_merge(copy, env::GLIBC_PRELOAD_KEY, library_, env::merge_into_paths);
 
         return rust::Ok(copy);
@@ -187,8 +186,6 @@ namespace {
                     executor_.c_str(),
                     er::flags::DESTINATION,
                     server_address_.c_str(),
-                    er::flags::LIBRARY, // TODO: deprecate it
-                    library_.c_str(), // TODO: deprecate it
                     er::flags::EXECUTE,
                     program.c_str(),
                     er::flags::COMMAND

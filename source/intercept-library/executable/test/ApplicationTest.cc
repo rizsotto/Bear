@@ -45,8 +45,6 @@ namespace {
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
-        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::LIBRARY)))
-            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
         EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
             .WillOnce(Return(rust::Result<bool>(rust::Ok(false))));
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
@@ -68,8 +66,6 @@ namespace {
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/destdir")))));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/bin/ls")))));
-        EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::LIBRARY)))
-            .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/install/path/libexec.so")))));
         EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
             .WillOnce(Return(rust::Result<bool>(rust::Ok(true))));
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))

@@ -53,7 +53,6 @@ namespace {
         ASSERT_TRUE(el::session::is_valid(sut));
 
         EXPECT_STREQ("/tmp/intercept.random", sut.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);
         EXPECT_STREQ("/usr/bin/intercept", sut.reporter);
         EXPECT_EQ(false, sut.verbose);
     }
@@ -73,7 +72,6 @@ namespace {
         ASSERT_TRUE(el::session::is_valid(sut));
 
         EXPECT_STREQ("/tmp/intercept.random", sut.destination);
-        EXPECT_STREQ("/usr/libexec/libexec.so", sut.library);
         EXPECT_STREQ("/usr/bin/intercept", sut.reporter);
         EXPECT_EQ(true, sut.verbose);
     }

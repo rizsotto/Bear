@@ -64,7 +64,6 @@ int main(int argc, char* argv[], char* envp[])
     const flags::Parser parser("er", VERSION,
         { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
-            { ::er::flags::LIBRARY, { 1, true, "path to the intercept library", std::nullopt, std::nullopt } },
             { ::er::flags::EXECUTE, { 1, true, "the path parameter for the command", std::nullopt, std::nullopt } },
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))

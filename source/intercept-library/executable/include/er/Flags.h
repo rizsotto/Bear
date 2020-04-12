@@ -23,7 +23,6 @@ namespace er::flags {
 
     constexpr char VERBOSE[] = "--verbose";
     constexpr char DESTINATION[] = "--destination";
-    constexpr char LIBRARY[] = "--library";
     constexpr char EXECUTE[] = "--execute";
     constexpr char COMMAND[] = "--";
 }

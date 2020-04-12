@@ -32,7 +32,6 @@ namespace el {
             if (nullptr == environment)
                 return;
 
-            session.library = env::get_env_value(environment, env::KEY_LIBRARY);
             session.reporter = env::get_env_value(environment, env::KEY_REPORTER);
             session.destination = env::get_env_value(environment, env::KEY_DESTINATION);
             session.verbose = env::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
@@ -44,14 +43,13 @@ namespace el {
                 return;
 
             Buffer buffer(begin, end);
-            session.library = buffer.store(session.library);
             session.reporter = buffer.store(session.reporter);
             session.destination = buffer.store(session.destination);
         }
 
         bool is_valid(Session const& session) noexcept
         {
-            return (session.library != nullptr && session.reporter != nullptr && session.destination != nullptr);
+            return (session.reporter != nullptr && session.destination != nullptr);
         }
     }
 }
