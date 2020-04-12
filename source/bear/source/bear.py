@@ -431,7 +431,6 @@ def parse_intercept_report(filename):
                                 cwd=command['working_dir'])
         except Exception as exception:
             logging.warning('parse exec trace file: %s FAILED: %s', filename, exception)
-            return None
 
 
 def parse_args_for_intercept_build():
