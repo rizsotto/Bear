@@ -1,66 +1,72 @@
 {
   "context": {
-    "machine": "`uname -m` output",
-    "kernel": "`uname -s` output",
-    "release": "`uname -r` output",
-    "intercept": "preload",
-    "confstr": {
-      "_CS_PATH": "confstr result",
-      "_CS_GNU_LIBC_VERSION": "confstr result",
-      "_CS_GNU_LIBPTHREAD_VERSION": "confstr result"
-    }
+    "host_info": {
+      "_CS_GNU_LIBC_VERSION": "glibc 2.30",
+      "_CS_GNU_LIBPTHREAD_VERSION": "NPTL 2.30",
+      "_CS_PATH": "/usr/bin",
+      "machine": "x86_64",
+      "release": "5.5.13-200.fc31.x86_64",
+      "sysname": "Linux",
+      "version": "#1 SMP Wed Mar 25 21:55:30 UTC 2020"
+    },
+    "intercept": "library preload"
   },
   "executions": [
     {
       "command": {
-        "program": "/usr/bin/bash",
-        "arguments": ["bash", "-c", "sleep 1"],
-        "working_dir": "/home/user",
+        "arguments": [
+          "sleep",
+          "1"
+        ],
         "environment": {
-          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-          "HOME": "/home/user"
-        }
+          "PATH": "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"
+        },
+        "program": "/usr/bin/sleep",
+        "working_dir": "/home/lnagy/Code/Bear.git"
       },
       "run": {
-        "pid": 122,
-        "ppid": 121,
         "events": [
           {
-            "type": "start",
-            "at": "2020-02-16T21:00:00.000Z"
+            "at": "2020-02-16T21:00:00.000Z",
+            "type": "start"
           },
           {
-            "type": "stop",
-            "at": "2020-02-16T21:00:01.022Z",
-            "status": 0
+            "at": "2020-02-16T21:00:00.000Z",
+            "status": 0,
+            "type": "stop"
           }
-        ]
+        ],
+        "pid": 503092,
+        "ppid": 503083
       }
     },
     {
       "command": {
-        "program": "/usr/bin/sleep",
-        "arguments": ["sleep", "1"],
-        "working_dir": "/home/user",
+        "arguments": [
+          "sh",
+          "-c",
+          "sleep 1"
+        ],
         "environment": {
-          "PATH": "/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
-          "HOME": "/home/user"
-        }
+          "PATH": "/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"
+        },
+        "program": "/usr/bin/bash",
+        "working_dir": "/home/lnagy/Code/Bear.git"
       },
       "run": {
-        "pid": 123,
-        "ppid": 122,
         "events": [
           {
-            "type": "start",
-            "at": "2020-02-16T21:00:00.010Z"
+            "at": "2020-02-16T21:00:00.000Z",
+            "type": "start"
           },
           {
-            "type": "stop",
-            "at": "2020-02-16T21:00:01.017Z",
-            "status": 0
+            "at": "2020-02-16T21:00:00.000Z",
+            "status": 0,
+            "type": "stop"
           }
-        ]
+        ],
+        "pid": 503088,
+        "ppid": 503078
       }
     }
   ]

@@ -7,10 +7,7 @@ target_include_directories(er_api INTERFACE include/)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(er_a OBJECT
         source/Application.cc
-        source/Environment.cc
         source/InterceptClient.cc
-        source/Reporter.cc
-        source/SystemCalls.cc
         )
 
 target_include_directories(er_a PUBLIC source/)
@@ -47,7 +44,6 @@ install(TARGETS er
 
 # Create unit test
 add_executable(er_unit_test
-        test/EnvironmentTest.cc
         test/ApplicationTest.cc
         )
 

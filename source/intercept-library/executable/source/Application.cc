@@ -19,7 +19,6 @@
 
 #include "Application.h"
 #include "InterceptClient.h"
-#include "Reporter.h"
 #include "er/Flags.h"
 #include "supervise.grpc.pb.h"
 
@@ -77,30 +76,6 @@ namespace {
         std::transform(input.begin(), input.end(), result.begin(), [](auto it) { return it.data(); });
         result.push_back(nullptr);
         return result;
-    }
-
-    void report_start(const er::Reporter::SharedPtr& reporter, pid_t pid, const char** cmd) noexcept
-    {
-        reporter->start(pid, cmd)
-            .and_then<int>([&reporter](auto message) {
-                return reporter->send(message);
-            })
-            .unwrap_or_else([](auto message) {
-                spdlog::warn("report process start failed: ", message.what());
-                return 0;
-            });
-    }
-
-    void report_exit(const er::Reporter::SharedPtr& reporter, pid_t pid, int exit) noexcept
-    {
-        reporter->stop(pid, exit)
-            .and_then<int>([&reporter](auto message) {
-                return reporter->send(message);
-            })
-            .unwrap_or_else([](auto message) {
-                spdlog::error("report process stop failed: ", message.what());
-                return 0;
-            });
     }
 
     long to_millis(const std::chrono::time_point<std::chrono::high_resolution_clock>& t)
@@ -164,22 +139,15 @@ namespace er {
     struct Application::State {
         Session session_;
         Execution execution_;
-        Reporter::SharedPtr reporter_;
         const sys::Context& context_;
     };
 
     rust::Result<Application> Application::create(const ::flags::Arguments& args, const sys::Context& context)
     {
-        auto session = make_session(args);
-        auto reporter = session.and_then<Reporter::SharedPtr>([&context](const auto& session_value) {
-            return Reporter::from(session_value.destination.data(), context);
-        });
-        auto execution = make_execution(args);
-
-        return rust::merge(session, execution, reporter)
+        return rust::merge(make_session(args), make_execution(args))
             .map<Application>([&args, &context](auto in) {
-                const auto& [session, execution, reporter] = in;
-                auto state = new Application::State { session, execution, reporter, context };
+                const auto& [session, execution] = in;
+                auto state = new Application::State { session, execution, context };
                 return Application(state);
             });
     }
@@ -197,7 +165,6 @@ namespace er {
                 return impl_->context_.spawn(impl_->execution_.path.data(), command.data(), guard.data());
             })
             .map<pid_t>([this, &events](auto& pid) {
-                report_start(impl_->reporter_, pid, to_char_vector(impl_->execution_.command).data());
                 // gRPC event update
                 impl_->context_.get_cwd()
                     .template map<std::shared_ptr<supervise::Event>>([this, &pid](auto cwd) {
@@ -217,7 +184,6 @@ namespace er {
             })
             .map<int>([this, &client, &events](auto tuple) {
                 const auto& [pid, exit] = tuple;
-                report_exit(impl_->reporter_, pid, exit);
                 // gRPC event update
                 auto event_ptr = stop(exit);
                 events.push_back(*event_ptr);
