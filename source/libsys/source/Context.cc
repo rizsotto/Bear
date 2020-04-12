@@ -37,6 +37,12 @@
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+#ifdef HAVE_GNU_LIB_NAMES_H
+#include <gnu/lib-names.h>
+#endif
 
 #include <fmt/format.h>
 
@@ -229,12 +235,45 @@ namespace sys {
 
     rust::Result<pid_t> Context::spawn(const char* path, const char** argv, const char** envp) const
     {
+        using spawn_t = int (*)(pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*,
+                                char* const argv[], char* const envp[]);
+
+#if defined(HAVE_DLOPEN) && defined(HAVE_DLSYM) && defined(HAVE_DLERROR)
+        // This is just a workaround to not call the preloaded execution methods.
+        //
+        // With static linking the `er` target would deprecate this solution. But
+        // The gRPC library brings in a dynamic library. See reported bug:
+        //
+        //   https://github.com/grpc/grpc/issues/22646
+        auto handle = dlopen(LIBC_SO, RTLD_LAZY);
+        if (handle == nullptr) {
+            return rust::Err(std::runtime_error(
+                fmt::format("System call \"dlopen\" failed: {}", error_string(errno))));
+        }
+        dlerror();
+
+        auto fp = reinterpret_cast<spawn_t>(dlsym(handle, "posix_spawn"));
+        if (fp == nullptr) {
+            return rust::Err(std::runtime_error(
+                fmt::format("System call \"dlsym\" failed: {}", error_string(errno))));
+        }
+        dlerror();
+#else
+        auto fp = &posix_spawn;
+#endif
+
         errno = 0;
         pid_t child;
-        if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+        if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+#if defined(HAVE_DLCLOSE)
+            dlclose(handle);
+#endif
             return rust::Err(std::runtime_error(
                 fmt::format("System call \"posix_spawn\" failed: {}", error_string(errno))));
         } else {
+#if defined(HAVE_DLCLOSE)
+            dlclose(handle);
+#endif
             return rust::Ok(child);
         }
     }

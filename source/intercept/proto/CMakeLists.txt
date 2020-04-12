@@ -34,4 +34,4 @@ add_library(supervise_a OBJECT
 target_include_directories(supervise_a PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_definitions(supervise_a PUBLIC GOOGLE_PROTOBUF_NO_RTTI)
 target_link_libraries(supervise_a PUBLIC protobuf::libprotobuf)
-target_link_libraries(supervise_a PUBLIC gRPC::grpc gRPC::grpc++)
+target_link_libraries(supervise_a PUBLIC gRPC::grpc++)

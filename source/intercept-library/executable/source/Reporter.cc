@@ -24,6 +24,13 @@
 #include <chrono>
 #include <iostream>
 
+#include <grpc/grpc.h>
+#include <grpcpp/channel.h>
+#include <grpcpp/client_context.h>
+#include <grpcpp/create_channel.h>
+#include <grpcpp/security/credentials.h>
+#include "supervise.grpc.pb.h"
+
 namespace {
 
     std::string to_json_string(const std::string& value)
@@ -181,7 +188,7 @@ namespace {
 
     class ReporterImpl : public er::Reporter {
     public:
-        explicit ReporterImpl(const char* target, const sys::Context& context) noexcept;
+        ReporterImpl(const char* target, const sys::Context& context) noexcept;
 
         rust::Result<int> send(er::Event::SharedPtr event) noexcept override;
 

@@ -31,12 +31,16 @@
 #cmakedefine HAVE_UNISTD_H
 #cmakedefine HAVE_SYS_UTSNAME_H
 #cmakedefine HAVE_SYS_WAIT_H
+#cmakedefine HAVE_GNU_LIB_NAMES_H
 
 // OSX specific (needs to be deprecated)
 #cmakedefine HAVE_NSGETENVIRON
 
 // dynamic linker
+#cmakedefine HAVE_DLOPEN
 #cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_DLERROR
+#cmakedefine HAVE_DLCLOSE
 #cmakedefine HAVE_RTLD_NEXT
 
 // errno values
