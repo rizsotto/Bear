@@ -24,7 +24,6 @@
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <libsys/Environment.h>
@@ -73,24 +72,14 @@ namespace {
         return result;
     }
 
-    long to_millis(const std::chrono::time_point<std::chrono::high_resolution_clock>& t)
-    {
-        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch());
-        return millis.count() % 1000;
-    }
-
     std::string now_as_string()
     {
         const auto now = std::chrono::system_clock::now();
-        const auto millis = to_millis(now);
+        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
 
-        // TODO: fix this!!!
-        return "todo";
-        //        return fmt::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::to_time_t(now));
-
-        //        return fmt::format("{:%Y-%m-%dT%H:%M:%S}.{03d}Z",
-        //            std::chrono::system_clock::to_time_t(now),
-        //            millis);
+        return fmt::format("{:%Y-%m-%dT%H:%M:%S}.{:06d}Z",
+            fmt::localtime(std::chrono::system_clock::to_time_t(now)),
+            micros.count() % 1000000);
     }
 
     std::shared_ptr<supervise::Event> start(
