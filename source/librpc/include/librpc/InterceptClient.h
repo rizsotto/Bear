@@ -21,7 +21,7 @@
 
 #include "libresult/Result.h"
 
-#include "supervise.grpc.pb.h"
+#include "librpc/supervise.grpc.pb.h"
 
 namespace er {
 

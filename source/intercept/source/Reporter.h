@@ -22,8 +22,7 @@
 #include "Report.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
-
-#include "supervise.pb.h"
+#include "librpc/supervise.pb.h"
 
 namespace ic {
 
@@ -51,8 +50,9 @@ namespace ic {
         void set_host_info(const std::map<std::string, std::string>&);
         void set_session_type(const std::string& name);
 
-        // MT-safe method to add a new execution and persist into the output file.
+        // add a new execution and persist into the output file.
         void report(const Execution::UniquePtr& execution);
+        void flush();
 
     public:
         Reporter() = delete;

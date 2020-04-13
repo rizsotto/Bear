@@ -108,6 +108,7 @@ namespace ic {
             });
         // Stop the gRPC server
         server->Shutdown();
+        impl_->reporter_->flush();
         spdlog::debug("Stopping gRPC server.");
         // Exit with the build status
         return result;

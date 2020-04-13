@@ -132,21 +132,9 @@ namespace ic {
     }
 }
 
-namespace {
-
-    void persist(const ic::Report& content, const std::string& target)
-    {
-        nlohmann::json j = content;
-
-        std::ofstream target_file(target);
-        target_file << std::setw(4) << j << std::endl;
-    }
-}
-
 namespace ic {
 
     struct Reporter::State {
-        std::mutex mutex;
         std::string output;
         Report content;
     };
@@ -156,7 +144,7 @@ namespace ic {
         return flags.as_string(Application::OUTPUT)
             .map<Reporter::State*>([](auto output) {
                 auto content = ic::Report { ic::Context { "unknown", {} }, {} };
-                return new Reporter::State { std::mutex(), std::string(output), content };
+                return new Reporter::State { std::string(output), content };
             })
             .map<Reporter::SharedPtr>([](auto state) {
                 return Reporter::SharedPtr(new Reporter(state)); // NOLINT
@@ -176,26 +164,26 @@ namespace ic {
 
     void Reporter::set_host_info(const std::map<std::string, std::string>& value)
     {
-        // The method has to be MT safe!!!
-        const std::lock_guard<std::mutex> lock(impl_->mutex);
-
         impl_->content.context.host_info = value;
     }
 
     void Reporter::set_session_type(const std::string& value)
     {
-        // The method has to be MT safe!!!
-        const std::lock_guard<std::mutex> lock(impl_->mutex);
-
         impl_->content.context.session_type = value;
     }
 
     void Reporter::report(const Execution::UniquePtr& ptr)
     {
-        // The method has to be MT safe!!!
-        const std::lock_guard<std::mutex> lock(impl_->mutex);
-
         impl_->content.executions.push_back(*ptr);
-        persist(impl_->content, impl_->output);
+        flush();
+    }
+
+    void Reporter::flush()
+    {
+        const Report& content = impl_->content;
+        nlohmann::json j = content;
+
+        std::ofstream targetFile(impl_->output);
+        targetFile << std::setw(4) << j << std::endl;
     }
 }

@@ -18,9 +18,9 @@
  */
 
 #include "Application.h"
-#include "InterceptClient.h"
+#include "librpc/InterceptClient.h"
+#include "librpc/supervise.grpc.pb.h"
 #include "er/Flags.h"
-#include "supervise.grpc.pb.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>

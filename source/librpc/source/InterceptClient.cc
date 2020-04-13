@@ -17,9 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "InterceptClient.h"
-#include <grpcpp/create_channel.h>
+#include "librpc/InterceptClient.h"
+
 #include <fmt/format.h>
+#include <grpcpp/create_channel.h>
 #include <spdlog/spdlog.h>
 
 namespace {

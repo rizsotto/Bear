@@ -7,7 +7,6 @@ target_include_directories(er_api INTERFACE include/)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(er_a OBJECT
         source/Application.cc
-        source/InterceptClient.cc
         )
 
 target_include_directories(er_a PUBLIC source/)
@@ -16,7 +15,7 @@ target_link_libraries(er_a PUBLIC exec_api)
 target_link_libraries(er_a PUBLIC result_a)
 target_link_libraries(er_a PUBLIC flags_a)
 target_link_libraries(er_a PRIVATE sys_a)
-target_link_libraries(er_a PRIVATE supervise_a)
+target_link_libraries(er_a PRIVATE rpc_a)
 target_link_libraries(er_a PUBLIC spdlog::spdlog)
 set_target_properties(er_a PROPERTIES
         LINKER_LANGUAGE "C"
@@ -32,8 +31,8 @@ target_link_libraries(er ${CMAKE_DL_LIBS}) # TODO: remove it when static linking
 target_link_libraries(er er_a)
 target_link_libraries(er flags_a)
 target_link_libraries(er sys_a)
+target_link_libraries(er rpc_a)
 target_link_libraries(er spdlog::spdlog)
-target_link_libraries(er supervise_a)
 set_target_properties(er PROPERTIES
         LINKER_LANGUAGE "C"
         )
@@ -51,7 +50,7 @@ target_link_libraries(er_unit_test er_a)
 target_link_libraries(er_unit_test result_a)
 target_link_libraries(er_unit_test flags_a)
 target_link_libraries(er_unit_test sys_a)
-target_link_libraries(er_unit_test supervise_a)
+target_link_libraries(er_unit_test rpc_a)
 target_link_libraries(er_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(er_unit_test GTest::gmock)
 

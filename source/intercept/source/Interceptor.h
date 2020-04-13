@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "supervise.grpc.pb.h"
+#include "librpc/supervise.grpc.pb.h"
 
 namespace ic {
 
