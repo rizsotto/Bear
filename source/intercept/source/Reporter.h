@@ -19,61 +19,13 @@
 
 #pragma once
 
+#include "Report.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 
 #include "supervise.pb.h"
 
-#include <list>
-#include <memory>
-#include <string>
-#include <vector>
-
 namespace ic {
-
-    // This represents a program execution, which is assembled from multiple
-    // events. The events are representing a process execution event, like
-    // the program is started or the program stopped.
-    struct Execution {
-        class Builder;
-
-        using UniquePtr = std::unique_ptr<Execution>;
-
-        // This represents the executed command itself. Describes all the
-        // context that the caller was given. And these are the those parameters
-        // which are essential for re-run the command.
-        struct Command {
-            std::string program;
-            std::vector<std::string> arguments;
-            std::string working_dir;
-            std::map<std::string, std::string> environment;
-        } command;
-
-        // Merged view of all possible events that can happen to a process.
-        // An instance can represent a process start event or a stop event
-        // (but only one of them).
-        //
-        // - The `type` attribute tells which event was the source of it.
-        // - The `at` attribute tells when that event has happened.
-        // - The `status` is present for a stop event, and holds the value
-        // of the exit status of the process.
-        // - The `signal` is present for a signal event, and holds the value
-        // of the signal number that the process received.
-        struct Event {
-            std::string type; // TODO: maybe use enum for this?
-            std::string at; // TODO: maybe use std::chrono::time_point?
-            std::optional<int> status;
-            std::optional<int> signal;
-        };
-
-        // This represents a single run and holds the attributes which are
-        // the history of the execution.
-        struct Run {
-            std::optional<int> pid;
-            std::optional<int> ppid;
-            std::list<Event> events;
-        } run;
-    };
 
     // A helper to build an execution object. Takes the raw process execution
     // events and builds the execution object defined above.

@@ -27,74 +27,6 @@
 #include <iomanip>
 #include <memory>
 
-using json = nlohmann::json;
-
-namespace ic {
-
-    struct Context {
-        std::string session_type;
-        std::map<std::string, std::string> host_info;
-    };
-
-    struct Content {
-        Context context;
-        std::list<Execution> executions;
-    };
-
-    void to_json(json& j, const Execution::Command& rhs)
-    {
-        j = json {
-            { "program", rhs.program },
-            { "arguments", json(rhs.arguments) },
-            { "working_dir", rhs.working_dir },
-            { "environment", json(rhs.environment) }
-        };
-    }
-
-    void to_json(json& j, const Execution::Event& rhs)
-    {
-        j = json {
-            { "at", rhs.at },
-            { "type", rhs.type }
-        };
-        if (rhs.status) {
-            j["status"] = rhs.status.value();
-        }
-        if (rhs.signal) {
-            j["signal"] = rhs.signal.value();
-        }
-    }
-
-    void to_json(json& j, const Execution::Run& rhs)
-    {
-        if (rhs.pid) {
-            j["pid"] = rhs.pid.value();
-        }
-        if (rhs.ppid) {
-            j["ppid"] = rhs.ppid.value();
-        }
-        j["events"] = json(rhs.events);
-    }
-
-    void to_json(json& j, const Execution& rhs)
-    {
-        j = json { { "command", rhs.command }, { "run", rhs.run } };
-    }
-
-    void to_json(json& j, const Context& rhs)
-    {
-        j = json {
-            { "intercept", rhs.session_type },
-            { "host_info", json(rhs.host_info) }
-        };
-    }
-
-    void to_json(json& j, const Content& rhs)
-    {
-        j = json { { "executions", rhs.executions }, { "context", rhs.context } };
-    }
-}
-
 namespace {
 
     void update_run_with_started(ic::Execution::Run& target, const supervise::Event& source)
@@ -133,9 +65,9 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    inline std::vector<std::string> to_vector(const google::protobuf::RepeatedPtrField<std::string>& field)
+    inline std::list<std::string> to_list(const google::protobuf::RepeatedPtrField<std::string>& field)
     {
-        return std::vector<std::string>(field.begin(), field.end());
+        return std::list<std::string>(field.begin(), field.end());
     }
 
     inline std::map<std::string, std::string> to_map(const google::protobuf::Map<std::string, std::string>& map)
@@ -154,7 +86,7 @@ namespace {
 
         auto command = ic::Execution::Command {
             started.executable(),
-            to_vector(started.arguments()),
+            to_list(started.arguments()),
             started.working_dir(),
             to_map(started.environment())
         };
@@ -202,9 +134,9 @@ namespace ic {
 
 namespace {
 
-    void persist(const ic::Content& content, const std::string& target)
+    void persist(const ic::Report& content, const std::string& target)
     {
-        json j = content;
+        nlohmann::json j = content;
 
         std::ofstream target_file(target);
         target_file << std::setw(4) << j << std::endl;
@@ -216,18 +148,18 @@ namespace ic {
     struct Reporter::State {
         std::mutex mutex;
         std::string output;
-        Content content;
+        Report content;
     };
 
     rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags)
     {
         return flags.as_string(Application::OUTPUT)
             .map<Reporter::State*>([](auto output) {
-                auto content = ic::Content { ic::Context { "unknown", {} }, {} };
+                auto content = ic::Report { ic::Context { "unknown", {} }, {} };
                 return new Reporter::State { std::mutex(), std::string(output), content };
             })
             .map<Reporter::SharedPtr>([](auto state) {
-                return Reporter::SharedPtr(new Reporter(state));
+                return Reporter::SharedPtr(new Reporter(state)); // NOLINT
             });
     }
 

@@ -4,6 +4,7 @@ add_subdirectory(proto)
 add_library(intercept_a OBJECT
         source/Application.cc
         source/Interceptor.cc
+        source/Report.cc
         source/Reporter.cc
         source/Session.cc
         )
