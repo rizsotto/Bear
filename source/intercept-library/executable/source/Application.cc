@@ -64,14 +64,6 @@ namespace {
             });
     }
 
-    std::vector<const char*> to_char_vector(const std::vector<std::string_view>& input)
-    {
-        auto result = std::vector<const char*>(input.size());
-        std::transform(input.begin(), input.end(), result.begin(), [](auto it) { return it.data(); });
-        result.push_back(nullptr);
-        return result;
-    }
-
     std::string now_as_string()
     {
         const auto now = std::chrono::system_clock::now();
@@ -138,7 +130,7 @@ namespace er {
 
     rust::Result<int> Application::operator()() const
     {
-        er::InterceptClient client(impl_->session_.destination);
+        rpc::InterceptClient client(impl_->session_.destination);
         std::list<supervise::Event> events;
 
         return client.get_environment_update(impl_->context_.get_environment())

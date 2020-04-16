@@ -37,7 +37,7 @@ namespace {
     }
 }
 
-namespace er {
+namespace rpc {
 
     InterceptClient::InterceptClient(const std::string_view& address)
             : stub_(create_stub(address))

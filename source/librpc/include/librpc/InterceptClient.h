@@ -23,7 +23,7 @@
 
 #include "librpc/supervise.grpc.pb.h"
 
-namespace er {
+namespace rpc {
 
     class InterceptClient {
     public:
