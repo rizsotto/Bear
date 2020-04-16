@@ -65,16 +65,6 @@ namespace sys {
         // Filesystem related operations
         [[nodiscard]] virtual rust::Result<std::string> get_cwd() const;
 
-        // Process management
-        [[nodiscard]] virtual rust::Result<std::string> resolve_executable(const std::string& path) const;
-        [[nodiscard]] virtual rust::Result<pid_t> spawn(const char* path, const char** argv, const char** envp) const;
-
-        [[nodiscard]] virtual rust::Result<int> wait_pid(pid_t pid) const;
-
-    protected:
-        [[nodiscard]] virtual int is_executable(const std::string& path) const;
-        [[nodiscard]] virtual rust::Result<std::string> real_path(const std::string& path) const;
-
     private:
         const pid_t current_;
         const pid_t parent_;

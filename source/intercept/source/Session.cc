@@ -23,7 +23,7 @@
 #include "Session.h"
 #include "er/Flags.h"
 #include "libexec/Environment.h"
-#include "libsys/Environment.h"
+#include "libsys/Process.h"
 
 #include <functional>
 #include <numeric>
@@ -176,30 +176,24 @@ namespace {
     rust::Result<int> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
         auto environment = update(context_.get_environment());
-        auto program = context_.resolve_executable(std::string(command.front()));
+        auto program = sys::Process::Builder(command.front()).resolve_executable();
 
         return rust::merge(program, environment)
-            .and_then<pid_t>([&command, this](auto pair) {
+            .and_then<sys::Process>([&command, this](auto pair) {
                 const auto& [program, environment] = pair;
-                // create the argument list
-                std::vector<const char*> args = {
-                    executor_.c_str(),
-                    er::flags::DESTINATION,
-                    server_address_.c_str(),
-                    er::flags::EXECUTE,
-                    program.c_str(),
-                    er::flags::COMMAND
-                };
-                std::transform(command.begin(), command.end(), std::back_insert_iterator(args),
-                    [](const auto& it) { return it.data(); });
-                spdlog::debug("command execution requested: {}", args);
-                args.push_back(nullptr);
-                // create environment pointer
-                sys::env::Guard guard(environment);
-                return context_.spawn(executor_.c_str(), args.data(), guard.data());
+                return sys::Process::Builder(executor_)
+                    .add_argument(executor_)
+                    .add_argument(er::flags::DESTINATION)
+                    .add_argument(server_address_)
+                    .add_argument(er::flags::EXECUTE)
+                    .add_argument(program)
+                    .add_argument(er::flags::COMMAND)
+                    .add_arguments(command.begin(), command.end())
+                    .set_environment(environment)
+                    .spawn(false);
             })
-            .and_then<int>([this](auto pid) {
-                return context_.wait_pid(pid);
+            .and_then<int>([](auto child) {
+                return child.wait();
             })
             .map_err<std::runtime_error>([](auto error) {
                 spdlog::warn("command execution failed: {}", error.what());

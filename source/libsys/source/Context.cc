@@ -18,9 +18,9 @@
  */
 
 #include "libsys/Context.h"
+#include "Environment.h"
 #include "Errors.h"
 #include "config.h"
-#include "libsys/Environment.h"
 
 #include <cerrno>
 #include <climits>
@@ -70,16 +70,6 @@ namespace {
                 return (acc.empty()) ? item : acc + sep + item;
             });
         return result;
-    }
-
-    bool contains_separator(const std::string& path)
-    {
-        return (std::find(path.begin(), path.end(), sys::Context::OS_SEPARATOR) != path.end());
-    }
-
-    bool starts_with_separator(const std::string& path)
-    {
-        return (!path.empty()) && (path.at(0) == sys::Context::OS_SEPARATOR);
     }
 }
 
@@ -182,138 +172,6 @@ namespace sys {
                 fmt::format("System call \"getcwd\" failed: {}", error_string(errno))));
         } else {
             return rust::Ok(std::string(buffer));
-        }
-    }
-
-    rust::Result<std::string> Context::resolve_executable(const std::string& name) const
-    {
-        int error = ENOENT;
-        // If the requested program name contains a separator, then we need to use
-        // that as is. Otherwise we need to search the paths given.
-        if (contains_separator(name)) {
-            // If the requested program name starts with the separator, then it's
-            // absolute and will be used as is. Otherwise we need to create it from
-            // the current working directory.
-            auto path = starts_with_separator(name)
-                ? rust::Ok(name)
-                : get_cwd().map<std::string>([&name](const auto& cwd) {
-                      return fmt::format("{0}{1}{2}", cwd, OS_SEPARATOR, name);
-                  });
-            auto candidate = path.and_then<std::string>([this](const auto& path) { return real_path(path); });
-            auto executable = candidate
-                                  .map<bool>([this](auto real) {
-                                      return (0 == is_executable(real));
-                                  })
-                                  .unwrap_or(false);
-            if (executable) {
-                return candidate;
-            }
-        } else {
-            return get_path()
-                .and_then<std::string>([this, &name](const auto& directories) {
-                    for (const auto& directory : directories) {
-                        auto candidate = real_path(fmt::format("{0}{1}{2}", directory, OS_SEPARATOR, name));
-                        // TODO: check if this is the right thing to do. Shall we look for the
-                        //       next executable entry, or shall we fail if we found one with the
-                        //       correct name, but has not access rights?
-                        auto executable = candidate
-                                              .template map<bool>([this](auto real) {
-                                                  return (0 == is_executable(real));
-                                              })
-                                              .unwrap_or(false);
-                        if (executable) {
-                            return candidate;
-                        }
-                    }
-                    return rust::Result<std::string>(rust::Err(std::runtime_error(
-                        fmt::format("Could not find executable: {}", error_string(ENOENT)))));
-                });
-        }
-        return rust::Err(std::runtime_error(
-            fmt::format("Could not find executable: {}", error_string(error))));
-    }
-
-    rust::Result<pid_t> Context::spawn(const char* path, const char** argv, const char** envp) const
-    {
-        using spawn_t = int (*)(pid_t*, const char*, const posix_spawn_file_actions_t*, const posix_spawnattr_t*,
-                                char* const argv[], char* const envp[]);
-
-#if defined(HAVE_DLOPEN) && defined(HAVE_DLSYM) && defined(HAVE_DLERROR)
-        // This is just a workaround to not call the preloaded execution methods.
-        //
-        // With static linking the `er` target would deprecate this solution. But
-        // The gRPC library brings in a dynamic library. See reported bug:
-        //
-        //   https://github.com/grpc/grpc/issues/22646
-        auto handle = dlopen(LIBC_SO, RTLD_LAZY);
-        if (handle == nullptr) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"dlopen\" failed: {}", error_string(errno))));
-        }
-        dlerror();
-
-        auto fp = reinterpret_cast<spawn_t>(dlsym(handle, "posix_spawn"));
-        if (fp == nullptr) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"dlsym\" failed: {}", error_string(errno))));
-        }
-        dlerror();
-#else
-        auto fp = &posix_spawn;
-#endif
-
-        errno = 0;
-        pid_t child;
-        if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-#if defined(HAVE_DLCLOSE)
-            dlclose(handle);
-#endif
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"posix_spawn\" failed: {}", error_string(errno))));
-        } else {
-#if defined(HAVE_DLCLOSE)
-            dlclose(handle);
-#endif
-            return rust::Ok(child);
-        }
-    }
-
-    // TODO: return either the status code or the signal number
-    rust::Result<int> Context::wait_pid(pid_t pid) const
-    {
-        errno = 0;
-        int status;
-        if (-1 == waitpid(pid, &status, 0)) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"waitpid\" failed: {}", error_string(errno))));
-
-        } else {
-            const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return rust::Ok(result);
-        }
-    }
-
-    int Context::is_executable(const std::string& path) const
-    {
-        if (0 == access(path.data(), X_OK)) {
-            return 0;
-        }
-        if (0 == access(path.data(), F_OK)) {
-            return EACCES;
-        }
-        return ENOENT;
-    }
-
-    rust::Result<std::string> Context::real_path(const std::string& path) const
-    {
-        errno = 0;
-        if (char* result_ptr = realpath(path.data(), nullptr); result_ptr != nullptr) {
-            std::string result(result_ptr);
-            free(result_ptr);
-            return rust::Ok(result);
-        } else {
-            return rust::Err(std::runtime_error(
-                fmt::format("Could not create absolute path for \"{}\": ", path, error_string(errno))));
         }
     }
 }

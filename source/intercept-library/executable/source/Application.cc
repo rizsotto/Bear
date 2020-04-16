@@ -21,12 +21,12 @@
 #include "librpc/InterceptClient.h"
 #include "librpc/supervise.grpc.pb.h"
 #include "er/Flags.h"
+#include "libsys/Process.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 
 #include <chrono>
-#include <libsys/Environment.h>
 #include <memory>
 
 namespace {
@@ -142,32 +142,28 @@ namespace er {
         std::list<supervise::Event> events;
 
         return client.get_environment_update(impl_->context_.get_environment())
-            .and_then<pid_t>([this](auto environment) {
-                auto command = to_char_vector(impl_->execution_.command);
-                sys::env::Guard guard(environment);
-
-                return impl_->context_.spawn(impl_->execution_.path.data(), command.data(), guard.data());
+            .and_then<sys::Process>([this](auto environment) {
+                return sys::Process::Builder(impl_->execution_.path)
+                    .add_arguments(impl_->execution_.command.begin(), impl_->execution_.command.end())
+                    .set_environment(environment)
+                    .spawn(true);
             })
-            .map<pid_t>([this, &events](auto& pid) {
+            .map<sys::Process>([this, &events](auto& child) {
                 // gRPC event update
                 impl_->context_.get_cwd()
-                    .template map<std::shared_ptr<supervise::Event>>([this, &pid](auto cwd) {
-                        return start(pid, impl_->context_.get_ppid(), impl_->execution_, cwd, impl_->context_.get_environment());
+                    .template map<std::shared_ptr<supervise::Event>>([this, &child](auto cwd) {
+                        return start(child.get_pid(), impl_->context_.get_ppid(), impl_->execution_, cwd, impl_->context_.get_environment());
                     })
                     .template map<int>([&events](auto event_ptr) {
                         events.push_back(*event_ptr);
                         return 0;
                     });
-                return pid;
+                return child;
             })
-            .and_then<std::tuple<pid_t, int>>([this](auto pid) {
-                return impl_->context_.wait_pid(pid)
-                    .template map<std::tuple<pid_t, int>>([&pid](auto exit) {
-                        return std::make_tuple(pid, exit);
-                    });
+            .and_then<int>([this](auto child) {
+                return child.wait();
             })
-            .map<int>([this, &client, &events](auto tuple) {
-                const auto& [pid, exit] = tuple;
+            .map<int>([this, &client, &events](auto exit) {
                 // gRPC event update
                 auto event_ptr = stop(exit);
                 events.push_back(*event_ptr);
