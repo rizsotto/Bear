@@ -161,7 +161,7 @@ namespace {
     rust::Result<std::string> resolve_executable(const std::string& name)
     {
         // TODO: inject this!
-        sys::Context ctx(getpid(), getppid(), environ);
+        sys::Context ctx;
 
         int error = ENOENT;
         // If the requested program name contains a separator, then we need to use

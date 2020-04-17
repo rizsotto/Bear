@@ -54,11 +54,9 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    int const pid = getpid();
-    int const ppid = getppid();
-    const sys::Context context(pid, ppid, envp);
+    const sys::Context ctx;
 
-    spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", pid, ppid));
+    spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", ctx.get_pid(), ctx.get_ppid()));
     spdlog::set_level(spdlog::level::info);
 
     const flags::Parser parser("er", VERSION,
@@ -76,8 +74,8 @@ int main(int argc, char* argv[], char* envp[])
             return args;
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<er::Application>([&context](auto args) {
-            return er::Application::create(args, context);
+        .and_then<er::Application>([&ctx](auto args) {
+            return er::Application::create(args, ctx);
         })
         .and_then<int>([&envp](const auto& command) {
             return command();

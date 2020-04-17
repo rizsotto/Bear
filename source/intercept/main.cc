@@ -47,9 +47,7 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    int const pid = getpid();
-    int const ppid = getppid();
-    const sys::Context context(pid, ppid, envp);
+    const sys::Context ctx;
 
     spdlog::set_pattern("intercept [pid: %P, level: %l] %v");
     spdlog::set_level(spdlog::level::info);
@@ -71,8 +69,8 @@ int main(int argc, char* argv[], char* envp[])
             return args;
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<ic::Application>([&context](auto args) {
-            return ic::Application::from(args, context);
+        .and_then<ic::Application>([&ctx](auto args) {
+            return ic::Application::from(args, ctx);
         })
         .and_then<int>([](const auto& command) {
             return command();

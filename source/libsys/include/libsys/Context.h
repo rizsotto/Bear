@@ -29,12 +29,11 @@ namespace sys {
 
     class Context {
     public:
-        Context(pid_t current, pid_t parent, char** envp);
+        Context();
 
         virtual ~Context() noexcept = default;
 
     public:
-        Context() = delete;
         Context(const Context&) = delete;
         Context(Context&&) noexcept = delete;
 

@@ -75,10 +75,10 @@ namespace {
 
 namespace sys {
 
-    Context::Context(pid_t current, pid_t parent, char** envp)
-            : current_(current)
-            , parent_(parent)
-            , envp_(const_cast<const char**>(envp))
+    Context::Context()
+            : current_(getpid())
+            , parent_(getppid())
+            , envp_(const_cast<const char**>(environ))
     {
     }
 
