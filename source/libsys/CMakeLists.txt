@@ -13,6 +13,7 @@ target_link_libraries(sys_a PRIVATE fmt::fmt)
 add_executable(sys_unit_test
         test/EnvironmentTest.cc
         test/ErrorsTest.cc
+        test/PathTest.cc
         )
 
 target_include_directories(sys_unit_test PRIVATE source/)

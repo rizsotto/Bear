@@ -26,7 +26,11 @@ namespace {
     std::list<std::string> split_by(const std::string& input, const char sep)
     {
         std::list<std::string> result;
-
+        // make an early return if there is no chance to have something.
+        if (input.empty()) {
+            return result;
+        }
+        // otherwise start to collect the elements into result.
         std::string::size_type previous = 0;
         do {
             const std::string::size_type current = input.find(sep, previous);
@@ -39,12 +43,16 @@ namespace {
 
     std::string join_with(const std::list<std::string>& input, const char sep)
     {
-        std::string result;
-        std::accumulate(input.begin(), input.end(), result,
-                        [&sep](std::string& acc, const std::string& item) {
-                            return (acc.empty()) ? item : acc + sep + item;
-                        });
-        return result;
+        // make an early return if there is no chance to have something.
+        if (input.empty()) {
+            return "";
+        }
+        // otherwise start to collect the elements into result.
+        return std::accumulate(std::next(input.begin()), input.end(),
+            *input.begin(),
+            [&sep](std::string acc, const std::string& item) {
+                return std::move(acc) + sep + item;
+            });
     }
 }
 
