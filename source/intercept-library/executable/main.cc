@@ -68,8 +68,9 @@ int main(int argc, char* argv[], char* envp[])
         .on_success([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 spdlog::set_level(spdlog::level::debug);
-                spdlog::debug("arguments: {}", Arguments { argv });
             }
+            spdlog::debug("arguments raw: {}", Arguments { argv });
+            spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.
         .and_then<er::Application>([&ctx](auto args) {

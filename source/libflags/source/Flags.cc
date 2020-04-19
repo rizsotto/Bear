@@ -21,10 +21,10 @@
 
 #include <cstring>
 #include <iostream>
-#include <numeric>
 #include <list>
-#include <set>
+#include <numeric>
 #include <optional>
+#include <set>
 
 #include <fmt/format.h>
 
@@ -45,14 +45,15 @@ namespace {
                 : std::optional(std::make_tuple(begin, begin + option.arguments));
     }
 
-    std::list<flags::OptionValue> order_by_relevance(const flags::OptionMap& options, const std::optional<std::string_view>& group) {
+    std::list<flags::OptionValue> order_by_relevance(const flags::OptionMap& options, const std::optional<std::string_view>& group)
+    {
         std::list<flags::OptionValue> result;
         std::copy_if(std::begin(options), std::end(options),
-                     std::back_inserter(result),
-                     [&group](auto &option) { return option.second.group_name == group && option.second.arguments >= 0; });
+            std::back_inserter(result),
+            [&group](auto& option) { return option.second.group_name == group && option.second.arguments >= 0; });
         std::copy_if(std::begin(options), std::end(options),
-                     std::back_inserter(result),
-                     [&group](auto &option) { return option.second.group_name == group && option.second.arguments < 0; });
+            std::back_inserter(result),
+            [&group](auto& option) { return option.second.group_name == group && option.second.arguments < 0; });
         return result;
     }
 
@@ -60,7 +61,7 @@ namespace {
     {
         // find out what are the option groups.
         std::set<std::string_view> groups;
-        for (const auto &[_, option] : options) {
+        for (const auto& [_, option] : options) {
             if (auto group = option.group_name; group) {
                 groups.emplace(group.value());
             }
@@ -115,7 +116,8 @@ namespace {
             os << flag_name;
             // decide if the help text goes into the same line or not
             if (flag_size > 22) {
-                os << std::endl << std::string(15, ' ');
+                os << std::endl
+                   << std::string(15, ' ');
             } else {
                 os << std::string(23 - flag_size, ' ');
             }
@@ -177,13 +179,34 @@ namespace flags {
                 fmt::format("Parameter \"{0}\" is not available.", key))));
     }
 
+    std::ostream& operator<<(std::ostream& os, const Arguments& args)
+    {
+        os << '{';
+        os << "program: " << args.program() << ", arguments: [";
+        for (auto arg_it = args.parameters_.begin(); arg_it != args.parameters_.end(); ++arg_it) {
+            if (arg_it != args.parameters_.begin()) {
+                os << ", ";
+            }
+            os << '{' << arg_it->first << ": [";
+            for (auto param_it = arg_it->second.begin(); param_it != arg_it->second.end(); ++param_it) {
+                if (param_it != arg_it->second.begin()) {
+                    os << ", ";
+                }
+                os << *param_it;
+            }
+            os << "]}";
+        }
+        os << "]}";
+        return os;
+    }
+
     Parser::Parser(std::string_view name, std::string_view version, std::initializer_list<OptionValue> options)
             : name_(name)
             , version_(version)
             , options_(options)
     {
-        options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, {QUERY_GROUP} } });
-        options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, {QUERY_GROUP} } });
+        options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
+        options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, { QUERY_GROUP } } });
     }
 
     rust::Result<Arguments> Parser::parse(const int argc, const char** argv) const

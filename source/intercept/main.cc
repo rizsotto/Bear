@@ -34,7 +34,6 @@
 #include "libflags/Flags.h"
 #include "libsys/Context.h"
 
-#include <unistd.h>
 #include <spdlog/spdlog.h>
 
 #include <optional>
@@ -64,8 +63,8 @@ int main(int argc, char* argv[], char* envp[])
         .on_success([](const auto& args) {
             if (args.as_bool(ic::Application::VERBOSE).unwrap_or(false)) {
                 spdlog::set_level(spdlog::level::debug);
-                // TODO: log the parsed arguments at debug level
             }
+            spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.
         .and_then<ic::Application>([&ctx](auto args) {

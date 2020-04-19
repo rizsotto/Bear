@@ -27,6 +27,8 @@
 
 #include "libresult/Result.h"
 
+#include <fmt/ostream.h>
+
 namespace flags {
 
     class Parser;
@@ -52,6 +54,7 @@ namespace flags {
         using Parameters = std::map<std::string_view, Parameter>;
 
         friend class Parser;
+        friend std::ostream& operator<<(std::ostream&, const Arguments&);
 
         Arguments();
         Arguments(std::string_view&& program, Parameters&& parameters);
@@ -60,6 +63,8 @@ namespace flags {
         std::string_view program_;
         Parameters parameters_;
     };
+
+    std::ostream& operator<<(std::ostream&, const Arguments&);
 
     struct Option {
         int arguments;

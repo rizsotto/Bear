@@ -12,6 +12,7 @@ add_executable(flags_unit_test
 
 target_link_libraries(flags_unit_test result_a)
 target_link_libraries(flags_unit_test flags_a)
+target_link_libraries(flags_unit_test fmt::fmt)
 target_link_libraries(flags_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
 
 add_test(NAME bear::flags_unit_test COMMAND flags_unit_test)
