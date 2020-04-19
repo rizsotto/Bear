@@ -18,93 +18,37 @@
  */
 
 #include "libsys/Context.h"
+#include "libsys/Path.h"
 #include "Environment.h"
 #include "Errors.h"
 #include "config.h"
 
 #include <cerrno>
 #include <climits>
-#include <cstdlib>
-#include <numeric>
 #include <unistd.h>
 
-#ifdef HAVE_SPAWN_H
-#include <spawn.h>
-#endif
 #ifdef HAVE_SYS_UTSNAME_H
 #include <sys/utsname.h>
-#endif
-#ifdef HAVE_SYS_WAIT_H
-#include <sys/wait.h>
-#endif
-#ifdef HAVE_DLFCN_H
-#include <dlfcn.h>
-#endif
-#ifdef HAVE_GNU_LIB_NAMES_H
-#include <gnu/lib-names.h>
 #endif
 
 #include <fmt/format.h>
 
-namespace {
-
-    std::list<std::string> split(const std::string& input, const char sep)
-    {
-        std::list<std::string> result;
-
-        std::string::size_type previous = 0;
-        do {
-            const std::string::size_type current = input.find(sep, previous);
-            result.emplace_back(input.substr(previous, current - previous));
-            previous = (current != std::string::npos) ? current + 1 : current;
-        } while (previous != std::string::npos);
-
-        return result;
-    }
-
-    std::string join(const std::list<std::string>& input, const char sep)
-    {
-        std::string result;
-        std::accumulate(input.begin(), input.end(), result,
-            [&sep](std::string& acc, const std::string& item) {
-                return (acc.empty()) ? item : acc + sep + item;
-            });
-        return result;
-    }
-}
 
 namespace sys {
 
-    Context::Context()
-            : current_(getpid())
-            , parent_(getppid())
-            , envp_(const_cast<const char**>(environ))
-    {
-    }
-
-    std::list<std::string> Context::split_path(const std::string& input)
-    {
-        return split(input, Context::OS_PATH_SEPARATOR);
-    }
-
-    std::string Context::join_path(const std::list<std::string>& input)
-    {
-        return join(input, Context::OS_PATH_SEPARATOR);
-    }
-
     std::map<std::string, std::string> Context::get_environment() const
     {
-        return sys::env::from(envp_);
+        return sys::env::from(const_cast<const char**>(environ));
     }
 
     pid_t Context::get_pid() const
     {
-        return current_;
+        return getpid();
     }
 
     pid_t Context::get_ppid() const
     {
-        return parent_;
+        return getppid();
     }
 
     rust::Result<std::string> Context::get_confstr(const int key) const
@@ -145,12 +89,12 @@ namespace sys {
     {
         const auto environment = get_environment();
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
-            return rust::Ok(split_path(candidate->second));
+            return rust::Ok(sys::path::split(candidate->second));
         }
 #ifdef HAVE_CS_PATH
         return get_confstr(_CS_PATH)
             .map<std::list<std::string>>([](const auto& paths) {
-                return split_path(paths);
+                return sys::path::split(paths);
             })
             .map_err<std::runtime_error>([](auto error) {
                 return std::runtime_error(

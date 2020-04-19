@@ -27,27 +27,9 @@
 
 namespace sys {
 
-    class Context {
-    public:
-        Context();
-
+    struct Context {
         virtual ~Context() noexcept = default;
 
-    public:
-        Context(const Context&) = delete;
-        Context(Context&&) noexcept = delete;
-
-        Context& operator=(const Context&) = delete;
-        Context& operator=(Context&&) noexcept = delete;
-
-    public:
-        static constexpr char OS_SEPARATOR = '/';
-        static constexpr char OS_PATH_SEPARATOR = ':';
-
-        static std::list<std::string> split_path(const std::string& input);
-        static std::string join_path(const std::list<std::string>& input);
-
-    public:
         // Query methods about the process.
         [[nodiscard]] virtual std::map<std::string, std::string> get_environment() const;
 
@@ -63,10 +45,5 @@ namespace sys {
 
         // Filesystem related operations
         [[nodiscard]] virtual rust::Result<std::string> get_cwd() const;
-
-    private:
-        const pid_t current_;
-        const pid_t parent_;
-        const char** const envp_;
     };
 }

@@ -17,17 +17,17 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libsys/Process.h"
-#include "Errors.h"
 #include "config.h"
+#include "libsys/Process.h"
 #include "libsys/Context.h"
+#include "libsys/Path.h"
+#include "Errors.h"
 #include "Environment.h"
 
 #include <cerrno>
 #include <climits>
 #include <csignal>
 #include <cstdlib>
-#include <numeric>
 #include <utility>
 
 #ifdef HAVE_SYS_WAIT_H
@@ -150,12 +150,12 @@ namespace {
 
     bool contains_separator(const std::string& path)
     {
-        return (std::find(path.begin(), path.end(), sys::Context::OS_SEPARATOR) != path.end());
+        return (std::find(path.begin(), path.end(), sys::path::OS_SEPARATOR) != path.end());
     }
 
     bool starts_with_separator(const std::string& path)
     {
-        return (!path.empty()) && (path.at(0) == sys::Context::OS_SEPARATOR);
+        return (!path.empty()) && (path.at(0) == sys::path::OS_SEPARATOR);
     }
 
     rust::Result<std::string> resolve_executable(const std::string& name)
@@ -173,7 +173,7 @@ namespace {
             auto path = starts_with_separator(name)
                 ? rust::Ok(name)
                 : ctx.get_cwd().map<std::string>([&name](const auto& cwd) {
-                      return fmt::format("{0}{1}{2}", cwd, sys::Context::OS_SEPARATOR, name);
+                      return fmt::format("{0}{1}{2}", cwd, sys::path::OS_SEPARATOR, name);
                   });
             auto candidate = path.and_then<std::string>([](const auto& path) { return real_path(path); });
             auto executable = candidate
@@ -188,7 +188,7 @@ namespace {
             return ctx.get_path()
                 .and_then<std::string>([&name](const auto& directories) {
                     for (const auto& directory : directories) {
-                        auto candidate = real_path(fmt::format("{0}{1}{2}", directory, sys::Context::OS_SEPARATOR, name));
+                        auto candidate = real_path(fmt::format("{0}{1}{2}", directory, sys::path::OS_SEPARATOR, name));
                         // TODO: check if this is the right thing to do. Shall we look for the
                         //       next executable entry, or shall we fail if we found one with the
                         //       correct name, but has not access rights?

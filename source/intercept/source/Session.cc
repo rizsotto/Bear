@@ -23,6 +23,7 @@
 #include "Session.h"
 #include "er/Flags.h"
 #include "libexec/Environment.h"
+#include "libsys/Path.h"
 #include "libsys/Process.h"
 
 #include <functional>
@@ -83,10 +84,10 @@ namespace env {
     std::string
     merge_into_paths(const std::string& current, const std::string& value) noexcept
     {
-        auto paths = sys::Context::split_path(current);
+        auto paths = sys::path::split(current);
         if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
             paths.emplace_front(value);
-            return sys::Context::join_path(paths);
+            return sys::path::join(paths);
         } else {
             return current;
         }

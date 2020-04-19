@@ -1,5 +1,6 @@
 add_library(sys_a OBJECT
         source/Context.cc
+        source/Path.cc
         source/Process.cc
         source/Environment.cc
         )
