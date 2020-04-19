@@ -23,7 +23,6 @@
 #include "libflags/Flags.h"
 #include "libsys/Context.h"
 
-#include <unistd.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
@@ -66,12 +65,11 @@ int main(int argc, char* argv[], char* envp[])
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // log the original command line as it was received.
-        .map<flags::Arguments>([&argv](const auto& args) {
+        .on_success([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 spdlog::set_level(spdlog::level::debug);
                 spdlog::debug("arguments: {}", Arguments { argv });
             }
-            return args;
         })
         // if parsing success, we create the main command and execute it.
         .and_then<er::Application>([&ctx](auto args) {
@@ -80,7 +78,14 @@ int main(int argc, char* argv[], char* envp[])
         .and_then<int>([&envp](const auto& command) {
             return command();
         })
-        // set the return code from error and print message
+        // print out the result of the run
+        .on_error([](auto error) {
+            spdlog::error(fmt::format("failed with: {}", error.what()));
+        })
+        .on_success([](auto status_code) {
+            spdlog::debug(fmt::format("succeeded with: {}", status_code));
+        })
+        // set the return code from error
         .unwrap_or_else([](auto error) {
             return EXIT_FAILURE;
         });

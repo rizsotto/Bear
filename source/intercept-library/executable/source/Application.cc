@@ -48,8 +48,8 @@ namespace {
     {
         auto path = args.as_string(::er::flags::EXECUTE);
         auto command = args.as_string_list(::er::flags::COMMAND);
-        auto environment = context.get_environment();
         auto working_dir = context.get_cwd();
+        auto environment = context.get_environment();
 
         return merge(path, command, working_dir)
             .map<Execution>([&environment](auto tuple) {
@@ -141,22 +141,18 @@ namespace er {
                     .set_environment(environment)
                     .spawn(true);
             })
-            .map<sys::Process>([this, &events](auto& child) {
+            .on_success([this, &events](auto& child) {
                 // gRPC event update
                 auto event_ptr = make_start_event(child.get_pid(), getppid(), impl_->execution);
                 events.push_back(*event_ptr);
-
-                return child;
             })
-            .and_then<int>([this](auto child) {
+            .and_then<int>([](auto child) {
                 return child.wait();
             })
-            .map<int>([this, &client, &events](auto exit) {
+            .on_success([&events](auto exit) {
                 // gRPC event update
                 auto event_ptr = make_stop_event(exit);
                 events.push_back(*event_ptr);
-
-                return exit;
             });
 
         client.report(events);

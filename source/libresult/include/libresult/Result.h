@@ -215,6 +215,9 @@ namespace rust {
 
         T unwrap_or_else(std::function<T(const E&)> const& provider) const;
 
+        const Result<T, E>& on_success(std::function<void(const T&)> const& f) const;
+        const Result<T, E>& on_error(std::function<void(const E&)> const& f) const;
+
     private:
         bool ok_;
         internals::Storage<T, E> storage_;
@@ -471,5 +474,23 @@ namespace rust {
         } else {
             return provider(storage_.template get<E>());
         }
+    }
+
+    template <typename T, typename E>
+    const Result<T, E>& Result<T, E>::on_success(const std::function<void(const T&)>& f) const
+    {
+        if (ok_) {
+            f(storage_.template get<T>());
+        }
+        return *this;
+    }
+
+    template <typename T, typename E>
+    const Result<T, E>& Result<T, E>::on_error(const std::function<void(const E&)>& f) const
+    {
+        if (!ok_) {
+            f(storage_.template get<E>());
+        }
+        return *this;
     }
 }
