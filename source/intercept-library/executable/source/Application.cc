@@ -39,9 +39,7 @@ namespace {
     };
 
     struct Session {
-        const std::string_view reporter;
         const std::string_view destination;
-        bool verbose;
     };
 
     rust::Result<Execution> make_execution(const ::flags::Arguments& args, const sys::Context& context) noexcept
@@ -61,10 +59,8 @@ namespace {
     rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
     {
         return args.as_string(er::flags::DESTINATION)
-            .map<Session>([&args](const auto& destination) {
-                const auto reporter = args.program();
-                const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
-                return Session { reporter, destination, verbose };
+            .map<Session>([](const auto& destination) {
+                return Session { destination };
             });
     }
 
@@ -95,6 +91,7 @@ namespace {
         }
         event->set_working_dir(execution.working_directory);
         event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
+
         result->set_allocated_started(event.release());
         return result;
     }

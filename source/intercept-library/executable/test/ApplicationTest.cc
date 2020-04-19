@@ -46,14 +46,10 @@ namespace {
     TEST(application, create_fails_if_no_command)
     {
         MockArguments arguments;
-        EXPECT_CALL(arguments, program())
-            .WillOnce(Return("program"));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::DESTINATION)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("")))));
-        EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
-            .WillOnce(Return(rust::Result<bool>(rust::Ok(false))));
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("")))));
 
@@ -72,14 +68,10 @@ namespace {
     {
         const std::vector<std::string_view> command = { "ls", "-l", "-a" };
         MockArguments arguments;
-        EXPECT_CALL(arguments, program())
-            .WillOnce(Return("program"));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::DESTINATION)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/destdir")))));
         EXPECT_CALL(arguments, as_string(std::string_view(::er::flags::EXECUTE)))
             .WillOnce(Return(rust::Result<std::string_view>(rust::Ok(std::string_view("/bin/ls")))));
-        EXPECT_CALL(arguments, as_bool(std::string_view(::er::flags::VERBOSE)))
-            .WillOnce(Return(rust::Result<bool>(rust::Ok(true))));
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Ok(command))));
 
