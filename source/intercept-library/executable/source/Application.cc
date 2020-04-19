@@ -132,27 +132,36 @@ namespace er {
         std::list<supervise::Event> events;
 
         auto result = client.get_environment_update(impl_->execution.environment)
-            .and_then<sys::Process>([this](auto environment) {
-                return sys::Process::Builder(impl_->execution.path)
-                    .add_arguments(impl_->execution.command.begin(), impl_->execution.command.end())
-                    .set_environment(environment)
-                    .spawn(true);
+            .map<Execution>([this](auto environment) {
+                return Execution {
+                    impl_->execution.path,
+                    impl_->execution.command,
+                    impl_->execution.working_directory,
+                    environment
+                };
             })
-            .on_success([this, &events](auto& child) {
-                // gRPC event update
-                auto event_ptr = make_start_event(child.get_pid(), getppid(), impl_->execution);
-                events.push_back(*event_ptr);
+            .and_then<sys::Process>([&events](auto execution) {
+                return sys::Process::Builder(execution.path)
+                    .add_arguments(execution.command.begin(), execution.command.end())
+                    .set_environment(execution.environment)
+                    .spawn(true)
+                    .on_success([&events, &execution](auto& child) {
+                        auto event_ptr = make_start_event(child.get_pid(), getppid(), execution);
+                        events.push_back(*event_ptr);
+                    });
             })
-            .and_then<int>([](auto child) {
-                return child.wait();
-            })
-            .on_success([&events](auto exit) {
-                // gRPC event update
-                auto event_ptr = make_stop_event(exit);
-                events.push_back(*event_ptr);
+            .and_then<int>([&events](auto child) {
+                return child.wait()
+                    .on_success([&events](auto exit) {
+                        // gRPC event update
+                        auto event_ptr = make_stop_event(exit);
+                        events.push_back(*event_ptr);
+                    });
             });
 
-        client.report(events);
+        if (!events.empty()) {
+            client.report(events);
+        }
 
         return result;
     }
