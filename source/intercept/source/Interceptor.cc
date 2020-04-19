@@ -27,11 +27,14 @@ namespace ic {
             : ::supervise::Interceptor::Service()
             , reporter_(reporter)
             , session_(session)
+            , lock()
     {
     }
 
     ::grpc::Status InterceptorImpl::GetWrappedCommand(::grpc::ServerContext* context, const ::supervise::WrapperRequest* request, ::supervise::WrapperResponse* response)
     {
+        std::lock_guard<std::mutex> guard(lock);
+
         return session_.resolve(request->name())
                 .map<grpc::Status>([&response](auto path) {
                     response->set_path(path.data());
@@ -42,6 +45,8 @@ namespace ic {
 
     ::grpc::Status InterceptorImpl::GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::EnvironmentRequest* request, ::supervise::EnvironmentResponse* response)
     {
+        std::lock_guard<std::mutex> guard(lock);
+
         const std::map<std::string, std::string> copy(request->environment().begin(), request->environment().end());
         return session_.update(copy)
             .map<grpc::Status>([&response](auto update) {
@@ -53,6 +58,8 @@ namespace ic {
 
     ::grpc::Status InterceptorImpl::Report(::grpc::ServerContext* context, ::grpc::ServerReader<::supervise::Event>* reader, ::supervise::Empty* response)
     {
+        std::lock_guard<std::mutex> guard(lock);
+
         Execution::Builder builder;
 
         ::supervise::Event event;

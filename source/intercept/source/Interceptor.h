@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "librpc/supervise.grpc.pb.h"
 
 namespace ic {
@@ -38,5 +39,6 @@ namespace ic {
     private:
         Reporter& reporter_;
         const Session& session_;
+        std::mutex lock;
     };
 }
