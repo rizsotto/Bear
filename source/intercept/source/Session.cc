@@ -159,13 +159,11 @@ namespace {
 
     rust::Result<std::string_view> LibraryPreloadSession::resolve(const std::string& name) const
     {
-        // The method has to be MT safe!!!
         return rust::Err(std::runtime_error("The session does not support resolve."));
     }
 
     rust::Result<std::map<std::string, std::string>> LibraryPreloadSession::update(const std::map<std::string, std::string>& env) const
     {
-        // The method has to be MT safe!!!
         std::map<std::string, std::string> copy(env);
         env::insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
         env::insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
