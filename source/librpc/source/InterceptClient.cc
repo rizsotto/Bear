@@ -40,7 +40,7 @@ namespace {
 namespace rpc {
 
     InterceptClient::InterceptClient(const std::string_view& address)
-            : stub_(create_stub(address))
+            : address_(address)
     {
     }
 
@@ -54,7 +54,8 @@ namespace rpc {
 
         request.set_name(name);
 
-        const grpc::Status status = stub_->GetWrappedCommand(&context, request, &response);
+        auto stub = create_stub(address_);
+        const grpc::Status status = stub->GetWrappedCommand(&context, request, &response);
         spdlog::debug("gRPC call finished: {}", status.ok());
         return status.ok()
             ? rust::Result<std::string>(rust::Ok(response.path()))
@@ -71,7 +72,8 @@ namespace rpc {
 
         request.mutable_environment()->insert(input.begin(), input.end());
 
-        const grpc::Status status = stub_->GetEnvironmentUpdate(&context, request, &response);
+        auto stub = create_stub(address_);
+        const grpc::Status status = stub->GetEnvironmentUpdate(&context, request, &response);
         spdlog::debug("gRPC call finished: {}", status.ok());
         if (status.ok()) {
             std::map<std::string, std::string> copy(response.environment().begin(), response.environment().end());
@@ -87,7 +89,8 @@ namespace rpc {
         grpc::ClientContext context;
         supervise::Empty stats;
 
-        std::unique_ptr<grpc::ClientWriter<supervise::Event> > writer(stub_->Report(&context, &stats));
+        auto stub = create_stub(address_);
+        std::unique_ptr<grpc::ClientWriter<supervise::Event> > writer(stub->Report(&context, &stats));
         for (const auto& event : events) {
             if (!writer->Write(event)) {
                 break;

@@ -42,6 +42,6 @@ namespace rpc {
         rust::Result<int> report(const std::list<supervise::Event>&);
 
     private:
-        std::unique_ptr<supervise::Interceptor::Stub> stub_;
+        std::string address_;
     };
 }
