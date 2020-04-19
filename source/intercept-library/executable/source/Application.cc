@@ -34,6 +34,8 @@ namespace {
     struct Execution {
         const std::string_view path;
         const std::vector<std::string_view> command;
+        const std::string working_directory;
+        const std::map<std::string, std::string> environment;
     };
 
     struct Session {
@@ -42,6 +44,20 @@ namespace {
         bool verbose;
     };
 
+    rust::Result<Execution> make_execution(const ::flags::Arguments& args, const sys::Context& context) noexcept
+    {
+        auto path = args.as_string(::er::flags::EXECUTE);
+        auto command = args.as_string_list(::er::flags::COMMAND);
+        auto environment = context.get_environment();
+        auto working_dir = context.get_cwd();
+
+        return merge(path, command, working_dir)
+            .map<Execution>([&environment](auto tuple) {
+                const auto& [_path, _command, _working_dir] = tuple;
+                return Execution { _path, _command, _working_dir, environment };
+            });
+    }
+
     rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
     {
         return args.as_string(er::flags::DESTINATION)
@@ -49,18 +65,6 @@ namespace {
                 const auto reporter = args.program();
                 const bool verbose = args.as_bool(::er::flags::VERBOSE).unwrap_or(false);
                 return Session { reporter, destination, verbose };
-            });
-    }
-
-    rust::Result<Execution> make_execution(const ::flags::Arguments& args) noexcept
-    {
-        auto path = args.as_string(::er::flags::EXECUTE);
-        auto command = args.as_string_list(::er::flags::COMMAND);
-
-        return merge(path, command)
-            .map<Execution>([](auto tuple) {
-                const auto& [path, command] = tuple;
-                return Execution { path, command };
             });
     }
 
@@ -74,12 +78,10 @@ namespace {
             micros.count() % 1000000);
     }
 
-    std::shared_ptr<supervise::Event> start(
+    std::shared_ptr<supervise::Event> make_start_event(
         pid_t pid,
         pid_t ppid,
-        const Execution& execution,
-        const std::string& cwd,
-        const std::map<std::string, std::string>& env)
+        const Execution& execution)
     {
         std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
         result->set_timestamp(now_as_string());
@@ -91,13 +93,13 @@ namespace {
         for (const auto& arg : execution.command) {
             event->add_arguments(arg.data());
         }
-        event->set_working_dir(cwd);
-        event->mutable_environment()->insert(env.begin(), env.end());
+        event->set_working_dir(execution.working_directory);
+        event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
         result->set_allocated_started(event.release());
         return result;
     }
 
-    std::shared_ptr<supervise::Event> stop(int status)
+    std::shared_ptr<supervise::Event> make_stop_event(int status)
     {
         std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
         result->set_timestamp(now_as_string());
@@ -113,43 +115,37 @@ namespace {
 namespace er {
 
     struct Application::State {
-        Session session_;
-        Execution execution_;
-        const sys::Context& context_;
+        Session session;
+        Execution execution;
     };
 
     rust::Result<Application> Application::create(const ::flags::Arguments& args, const sys::Context& context)
     {
-        return rust::merge(make_session(args), make_execution(args))
+        return rust::merge(make_session(args), make_execution(args, context))
             .map<Application>([&args, &context](auto in) {
                 const auto& [session, execution] = in;
-                auto state = new Application::State { session, execution, context };
+                auto state = new Application::State { session, execution };
                 return Application(state);
             });
     }
 
     rust::Result<int> Application::operator()() const
     {
-        rpc::InterceptClient client(impl_->session_.destination);
+        rpc::InterceptClient client(impl_->session.destination);
         std::list<supervise::Event> events;
 
-        return client.get_environment_update(impl_->context_.get_environment())
+        auto result = client.get_environment_update(impl_->execution.environment)
             .and_then<sys::Process>([this](auto environment) {
-                return sys::Process::Builder(impl_->execution_.path)
-                    .add_arguments(impl_->execution_.command.begin(), impl_->execution_.command.end())
+                return sys::Process::Builder(impl_->execution.path)
+                    .add_arguments(impl_->execution.command.begin(), impl_->execution.command.end())
                     .set_environment(environment)
                     .spawn(true);
             })
             .map<sys::Process>([this, &events](auto& child) {
                 // gRPC event update
-                impl_->context_.get_cwd()
-                    .template map<std::shared_ptr<supervise::Event>>([this, &child](auto cwd) {
-                        return start(child.get_pid(), impl_->context_.get_ppid(), impl_->execution_, cwd, impl_->context_.get_environment());
-                    })
-                    .template map<int>([&events](auto event_ptr) {
-                        events.push_back(*event_ptr);
-                        return 0;
-                    });
+                auto event_ptr = make_start_event(child.get_pid(), getppid(), impl_->execution);
+                events.push_back(*event_ptr);
+
                 return child;
             })
             .and_then<int>([this](auto child) {
@@ -157,12 +153,15 @@ namespace er {
             })
             .map<int>([this, &client, &events](auto exit) {
                 // gRPC event update
-                auto event_ptr = stop(exit);
+                auto event_ptr = make_stop_event(exit);
                 events.push_back(*event_ptr);
-                client.report(events);
-                // exit with the client exit code
+
                 return exit;
             });
+
+        client.report(events);
+
+        return result;
     }
 
     Application::Application(Application::State* const impl)
