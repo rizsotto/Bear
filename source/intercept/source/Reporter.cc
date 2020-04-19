@@ -175,7 +175,6 @@ namespace ic {
     void Reporter::report(const Execution::UniquePtr& ptr)
     {
         impl_->content.executions.push_back(*ptr);
-        flush();
     }
 
     void Reporter::flush()
