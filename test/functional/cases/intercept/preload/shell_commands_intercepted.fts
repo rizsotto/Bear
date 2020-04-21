@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# REQUIRES: preload
+# RUN: mkdir -p %T/shell_commands_intercepted
+# RUN: cd %T/shell_commands_intercepted; %{intercept} -- sh -c "/usr/true || true; /usr/false || true; /usr/bin/true || true;"
