@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/multiple_source_build
-# RUN: cd %T/multiple_source_build; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/multiple_source_build; %{bear} --cdb result.json ./run.sh
 # RUN: cd %T/multiple_source_build; %{cdb_diff} result.json expected.json
 
 set -o errexit

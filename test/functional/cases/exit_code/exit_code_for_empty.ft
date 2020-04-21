@@ -1,2 +1,2 @@
 # XFAIL: *
-# RUN: %{intercept-build}
+# RUN: %{bear}

@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/define_with_escaped_quote
-# RUN: cd %T/define_with_escaped_quote; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/define_with_escaped_quote; %{bear} --cdb result.json ./run.sh
 # RUN: cd %T/define_with_escaped_quote; %{cdb_diff} result.json expected.json
 
 set -o errexit

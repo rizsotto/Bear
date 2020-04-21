@@ -2,9 +2,9 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/unkown_compiler_recognised
-# RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper.json ./run.sh
+# RUN: cd %T/unkown_compiler_recognised; %{bear} --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper.json ./run.sh
 # RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper.json expected.json
-# RUN: cd %T/unkown_compiler_recognised; %{intercept-build} --use-only --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper_only.json ./run.sh
+# RUN: cd %T/unkown_compiler_recognised; %{bear} --use-only --use-cc=%T/unkown_compiler_recognised/wrapper --use-c++=%T/unkown_compiler_recognised/wrapper++ --cdb wrapper_only.json ./run.sh
 # RUN: cd %T/unkown_compiler_recognised; %{cdb_diff} wrapper_only.json expected_wrapper_only.json
 
 set -o errexit

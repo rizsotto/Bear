@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/flags_filtered
-# RUN: cd %T/flags_filtered; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/flags_filtered; %{bear} --cdb result.json ./run.sh
 # RUN: cd %T/flags_filtered; %{cdb_diff} result.json expected.json
 
 set -o errexit

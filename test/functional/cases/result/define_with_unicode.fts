@@ -2,7 +2,7 @@
 
 # REQUIRES: preload
 # RUN: bash %s %T/define_with_unicode
-# RUN: cd %T/define_with_unicode; %{intercept-build} --cdb result.json ./run.sh
+# RUN: cd %T/define_with_unicode; %{bear} --cdb result.json ./run.sh
 # RUN: cd %T/define_with_unicode; %{cdb_diff} result.json expected.json
 
 set -o errexit

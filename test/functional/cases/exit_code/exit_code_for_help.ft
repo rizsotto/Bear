@@ -1,1 +1,1 @@
-# RUN: %{intercept-build} --help
+# RUN: %{bear} --help

@@ -2,7 +2,7 @@
 
 # REQUIRES: preload,cuda
 # RUN: bash %s %T/successful_build
-# RUN: cd %T/successful_build; %{intercept-build} --cdb preload.json ./run.sh
+# RUN: cd %T/successful_build; %{bear} --cdb preload.json ./run.sh
 # RUN: cd %T/successful_build; %{cdb_diff} --ignore-compiler preload.json expected.json
 
 set -o errexit
