@@ -3,7 +3,7 @@
 # REQUIRES: preload,make,fortran
 # RUN: bash %s %T/fortran
 # RUN: cd %T/fortran; %{bear} --cdb preload.json make -C src
-# RUN: cd %T/fortran; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/fortran; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset

@@ -1,5 +1,5 @@
 # REQUIRES: make,qmake,preload
 # RUN: mkdir -p %T/qmake_build
-# RUN: cd %T/qmake_build; %{qmake} ../../Input/qmake.pro
+# RUN: cd %T/qmake_build; %{qmake} %S/Input/qmake.pro
 # RUN: cd %T/qmake_build; %{bear} --cdb qmake.json %{make}
 # RUN: %{python} %S/check_files.py %T/qmake_build/qmake.json

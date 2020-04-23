@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/output_kept
 # RUN: cd %T/output_kept; %{bear} --cdb result.json ./run.sh
-# RUN: cd %T/output_kept; %{cdb_diff} result.json expected.json
+# RUN: cd %T/output_kept; diff_compilations result.json expected.json
 
 # the test creates a subdirectory inside output dir.
 #

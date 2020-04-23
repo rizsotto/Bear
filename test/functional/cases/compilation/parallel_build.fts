@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/parallel_build
 # RUN: cd %T/parallel_build; %{bear} --cdb preload.json ./run.sh
-# RUN: cd %T/parallel_build; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/parallel_build; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset

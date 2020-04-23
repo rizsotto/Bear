@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/assembly_sources
 # RUN: cd %T/assembly_sources; %{bear} --cdb preload.json make -C src
-# RUN: cd %T/assembly_sources; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/assembly_sources; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset

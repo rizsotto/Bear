@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/exclude
 # RUN: cd %T/exclude; %{bear} --cdb preload.json --include src/target --exclude src/target/test ./run.sh
-# RUN: cd %T/exclude; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/exclude; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset

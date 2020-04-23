@@ -1,4 +1,4 @@
 # REQUIRES: scons,preload
 # RUN: mkdir -p %T/scons_build
-# RUN: cd %T/scons_build; %{bear} --cdb scons.json scons -Y ../../Input
+# RUN: cd %T/scons_build; %{bear} --cdb scons.json scons -Y %S/Input
 # RUN: %{python} %S/check_files.py %T/scons_build/scons.json

@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/field_output
 # RUN: cd %T/field_output; %{bear} --cdb preload.json --field-output ./run.sh
-# RUN: cd %T/field_output; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/field_output; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset

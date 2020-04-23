@@ -3,7 +3,7 @@
 # REQUIRES: preload
 # RUN: bash %s %T/empty_argument
 # RUN: cd %T/empty_argument; %{bear} --cdb preload.json ./run.sh
-# RUN: cd %T/empty_argument; %{cdb_diff} preload.json expected.json
+# RUN: cd %T/empty_argument; diff_compilations preload.json expected.json
 
 set -o errexit
 set -o nounset
