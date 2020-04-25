@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+import time
+
+if len(sys.argv) == 2:
+    delay = int(sys.argv[1])
+    time.sleep(delay)
+    sys.exit(0)
+else:
+    sys.exit(1)
