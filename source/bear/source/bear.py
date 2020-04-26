@@ -445,6 +445,9 @@ def parse_args_for_intercept_build():
     # short validation logic
     if not args.build:
         parser.error(message='missing build command')
+    # backward compatible for older releases
+    if '--' == args.build[0]:
+        args.build = args.build[1:]
 
     logging.debug('Parsed arguments: %s', args)
     return args

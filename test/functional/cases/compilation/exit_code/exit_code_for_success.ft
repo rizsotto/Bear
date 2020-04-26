@@ -1,2 +1,0 @@
-# RUN: mkdir -p %T/exit_code_for_success
-# RUN: cd %T/exit_code_for_success; %{bear} true
