@@ -52,7 +52,8 @@ def main():
         check = filter_from(args)
         count = len([cmd for cmd in commands if check(cmd)])
         if count == 0:
-            logging.info('failed: expected at least entry, but found none')
+            request = to_string(args)
+            logging.info('failed: expected at least one entry, but found none: %s', request)
             return 1
 
     return 0
@@ -66,6 +67,13 @@ def filter_from(args):
         return p1 and p2 and p3
 
     return test
+
+
+def to_string(args):
+    p1 = '' if args.program is None else '-program {}'.format(args.program)
+    p2 = '' if args.working_dir is None else '-working_dir {}'.format(args.working_dir)
+    p3 = '' if args.arguments is None else ' '.join(['-arguments'] + args.arguments)
+    return ' '.join([p1, p2, p3])
 
 
 if __name__ == "__main__":

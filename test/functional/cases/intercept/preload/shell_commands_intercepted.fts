@@ -1,6 +1,0 @@
-# REQUIRES: preload
-# RUN: mkdir -p %T/shell_commands_intercepted
-# RUN: cd %T/shell_commands_intercepted; %{intercept} -- sh -c "t_success; t_success; t_success;"
-# RUN: assert_intercepted %T/shell_commands_intercepted/commands.json count -gt 4
-# RUN: assert_intercepted %T/shell_commands_intercepted/commands.json contains -arguments t_success
-# RUN: assert_intercepted %T/shell_commands_intercepted/commands.json contains -arguments sh -c "t_success; t_success; t_success;"
