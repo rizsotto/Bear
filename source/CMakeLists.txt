@@ -23,7 +23,6 @@ project(bear
         LANGUAGES C CXX)
 
 find_package(Threads REQUIRED)
-find_package(Fruit REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)

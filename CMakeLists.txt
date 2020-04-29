@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.2)
 
 project(Bear-SuperBuild C CXX)
 
-option(USE_SYSTEM_FRUIT "Use system installed Fruit library" OFF)
 option(USE_SYSTEM_JSON "Use system installed JSON library" OFF)
 option(USE_SYSTEM_GTEST "Use system installed GoogleTest library" OFF)
 option(USE_SYSTEM_FMT "Use system installed fmt library" OFF)
@@ -16,20 +15,6 @@ if (NOT LIBRARY_DIRECTORY_NAME)
 endif ()
 
 include(ExternalProject)
-
-if (NOT USE_SYSTEM_FRUIT)
-    ExternalProject_Add(fruit
-            PREFIX fruit
-            SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/fruit"
-            CMAKE_CACHE_ARGS
-            -DFRUIT_USES_BOOST:BOOL=False
-            -DCMAKE_CXX_FLAGS:STRING=-fno-rtti
-            -DBUILD_SHARED_LIBS:BOOL=OFF
-            -DCMAKE_BUILD_TYPE:STRING=Release
-            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/fruit
-            )
-    set(fruit_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/fruit/")
-endif ()
 
 if (NOT USE_SYSTEM_JSON)
     ExternalProject_Add(json
@@ -105,7 +90,6 @@ ExternalProject_Add(Bear
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source"
         TEST_BEFORE_INSTALL 1
         CMAKE_CACHE_ARGS
-        -DFRUIT_INSTALLED_DIR:PATH=${fruit_CMAKE_DIR}
         -Dnlohmann_json_DIR:PATH=${json_CMAKE_DIR}
         -DGTest_DIR:PATH=${googletest_CMAKE_DIR}
         -DProtobuf_DIR:PATH=${protobuf_CMAKE_DIR}
@@ -114,7 +98,7 @@ ExternalProject_Add(Bear
         -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
         -Dspdlog_DIR:PATH=${spdlog_CMAKE_DIR}
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/bear
-        DEPENDS fruit json googletest fmt spdlog grpc
+        DEPENDS json googletest fmt spdlog grpc
         )
 set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
 set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/${LIBRARY_DIRECTORY_NAME}")

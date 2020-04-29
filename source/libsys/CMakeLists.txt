@@ -6,7 +6,6 @@ add_library(sys_a OBJECT
         )
 
 target_include_directories(sys_a PUBLIC include/)
-target_include_directories(sys_a PUBLIC ${Fruit_INCLUDES})
 target_link_libraries(sys_a PUBLIC result_a)
 target_link_libraries(sys_a PRIVATE fmt::fmt)
 
