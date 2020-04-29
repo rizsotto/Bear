@@ -483,7 +483,7 @@ def create_intercept_parser():
         metavar='<path>',
         dest='use_cc',
         action='append',
-        default=[os.getenv('CC', 'cc')],
+        default=[],
         help="""Hint '%(prog)s' to classify the given program name as C
         compiler.""")
     parser.add_argument(
@@ -491,7 +491,7 @@ def create_intercept_parser():
         metavar='<path>',
         dest='use_cxx',
         action='append',
-        default=[os.getenv('CXX', 'c++')],
+        default=[],
         help="""Hint '%(prog)s' to classify the given program name as C++
         compiler.""")
     parser.add_argument(
@@ -499,7 +499,7 @@ def create_intercept_parser():
         metavar='<path>',
         dest='use_fortran',
         action='append',
-        default=['f95'],
+        default=[],
         help="""Hint '%(prog)s' to classify the given program name as Fortan
         compiler.""")
     parser.add_argument(
