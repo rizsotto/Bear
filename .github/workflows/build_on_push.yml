@@ -22,14 +22,14 @@ jobs:
         run: |
           sudo apt-get update -y
           #sudo apt-get upgrade -y
-          sudo apt-get install -y libc6-dev virtualenv scons gfortran qt4-qmake nvidia-cuda-toolkit
+          sudo apt-get install -y libc6-dev virtualenv gfortran qt4-qmake nvidia-cuda-toolkit
       - name: Install python test dependencies
         run: |
-          virtualenv "$HOME/venv"
+          virtualenv -p python3 "$HOME/venv"
           source "$HOME/venv/bin/activate"
           pip --version
           pip install --upgrade pip
-          pip install lit pex pycodestyle
+          pip install lit pex pycodestyle scons
       - name: Configure
         run: |
           source "$HOME/venv/bin/activate"

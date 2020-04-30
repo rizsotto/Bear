@@ -2,7 +2,7 @@
 
 # REQUIRES: preload, shell, dynamic-shell
 # RUN: %{intercept} --verbose --output %t.json -- %{shell} %s
-# RUN: assert_intercepted %t.json count -ge 6
+# RUN: assert_intercepted %t.json count -ge 7
 # RUN: assert_intercepted %t.json contains -program %{true}
 # RUN: assert_intercepted %t.json contains -program %{echo} -arguments %{echo} "hi there \"people\""
 # RUN: assert_intercepted %t.json contains -program %{echo} -arguments %{echo} "hi	again"
