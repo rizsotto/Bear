@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: preload, shell, dynamic-shell
+# REQUIRES: shell, dynamic-shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 3
 # TODO: fix the output file name?

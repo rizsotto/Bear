@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+# -*- coding: iso-8859-2 -*-
+
+assert_intercepted $1 count -ge 2
+assert_intercepted $1 contains -program $TRUE
+assert_intercepted $1 contains -program $ECHO -arguments $ECHO "árvíztûrõ tükörfúrógép"
