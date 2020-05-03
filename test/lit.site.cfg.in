@@ -1,0 +1,8 @@
+config.test_src_root = '@CMAKE_SOURCE_DIR@'
+config.test_bin_root = '@CMAKE_BINARY_DIR@'
+
+config.substitutions.append(('%{compile}', 'cc -I @CMAKE_CURRENT_BINARY_DIR@'))
+
+lit_config.load_config(config, '@CMAKE_CURRENT_SOURCE_DIR@/lit.cfg')
+
+# TODO: add more macros to requires based on cmake checks.

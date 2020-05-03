@@ -1,3 +1,5 @@
+// RUN: true
+
 /*  Copyright (C) 2012-2020 by László Nagy
     This file is part of Bear.
 

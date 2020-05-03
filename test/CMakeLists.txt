@@ -1,6 +1,44 @@
 cmake_minimum_required(VERSION 3.2)
+if (${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+else ()
+    cmake_policy(VERSION 3.12)
+endif ()
 
-project(Bear-FunctionalTest LANGUAGES NONE)
+project(Bear-FunctionalTest LANGUAGES C)
+
+set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+set(CMAKE_REQUIRED_FLAGS -D_GNU_SOURCE)
+include(CheckIncludeFile)
+check_include_file(spawn.h HAVE_SPAWN_H)
+check_include_file(unistd.h HAVE_UNISTD_H)
+check_include_file(sys/wait.h HAVE_SYS_WAIT_H)
+check_include_file(sys/types.h HAVE_SYS_TYPES_H)
+include(CheckSymbolExists)
+check_symbol_exists(execve "unistd.h" HAVE_EXECVE)
+check_symbol_exists(execv "unistd.h" HAVE_EXECV)
+check_symbol_exists(execvpe "unistd.h" HAVE_EXECVPE)
+check_symbol_exists(execvp "unistd.h" HAVE_EXECVP)
+check_symbol_exists(execvP "unistd.h" HAVE_EXECVP2)
+check_symbol_exists(exect "unistd.h" HAVE_EXECT)
+check_symbol_exists(execl "unistd.h" HAVE_EXECL)
+check_symbol_exists(execlp "unistd.h" HAVE_EXECLP)
+check_symbol_exists(execle "unistd.h" HAVE_EXECLE)
+check_symbol_exists(execveat "unistd.h" HAVE_EXECVEAT)
+check_symbol_exists(fexecve "unistd.h" HAVE_FEXECVE)
+check_symbol_exists(posix_spawn "spawn.h" HAVE_POSIX_SPAWN)
+check_symbol_exists(posix_spawnp "spawn.h" HAVE_POSIX_SPAWNP)
+check_symbol_exists(popen "stdio.h" HAVE_POPEN)
+check_symbol_exists(system "stdlib.h" HAVE_SYSTEM)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in
+    ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg
+    @ONLY)
 
 enable_testing()
 
@@ -17,5 +55,5 @@ if (LIT_EXECUTABLE)
             -D_TEST_EXEC_ROOT=${CMAKE_CURRENT_BINARY_DIR}
             -D_BEAR_BIN_DIR=${_BEAR_BIN_DIR}
             -v
-            ${CMAKE_CURRENT_SOURCE_DIR})
+            ${CMAKE_CURRENT_BINARY_DIR})
 endif ()

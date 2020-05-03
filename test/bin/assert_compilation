@@ -8,7 +8,7 @@ import logging
 
 
 def main():
-    logging.basicConfig(format="assert_intercepted: %(message)s", level=logging.INFO)
+    logging.basicConfig(format="assert_compilation: %(message)s", level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     parser.add_argument(dest='input', type=argparse.FileType(mode='r'))
