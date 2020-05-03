@@ -125,7 +125,6 @@ under `/opt/bear` on a non Debian system.
 To check you installation, install `lit` and run the test suite.
 
     PATH=/opt/bear/bin:$PATH lit -v test
-    PATH=/opt/bear/bin:$PATH lit -v test -DMULTILIB=true
 
 ### Empty compilation database on OS X / macOS or Fedora
 

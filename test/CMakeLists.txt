@@ -10,7 +10,7 @@ find_program(LIT_EXECUTABLE
         PATHS ENV LIT_PATH)
 
 if (LIT_EXECUTABLE)
-    message(STATUS "Looking for lit -- found")
+    message(STATUS "Looking for lit -- ${LIT_EXECUTABLE}")
 
     add_test(NAME bear::func_test
             COMMAND ${LIT_EXECUTABLE}
