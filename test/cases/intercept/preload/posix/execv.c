@@ -6,7 +6,10 @@
 // RUN: assert_intercepted %t.json contains -program %{echo} -arguments %{echo} "hi there"
 
 #include "config.h"
+
+#if defined HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 
 int main()
 {

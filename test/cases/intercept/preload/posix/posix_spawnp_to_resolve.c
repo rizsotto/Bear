@@ -11,14 +11,14 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#if define HAVE_SPAWN_H
+#if defined HAVE_SPAWN_H
 #include <spawn.h>
 #endif
 
-#if define HAVE_SYS_TYPES_H
+#if defined HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
-#if define HAVE_SYS_WAIT_H
+#if defined HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
 
