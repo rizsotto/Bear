@@ -1,5 +1,0 @@
-# REQUIRES: preload
-# RUN: cmake -B%T -H%S
-# RUN: make -C %T
-# RUN: %{bear} --cdb %T/result.json %T/exec -C %T -o expected.json
-# RUN: diff_compilations %T/result.json %T/expected.json
