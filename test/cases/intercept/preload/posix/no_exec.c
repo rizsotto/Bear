@@ -1,3 +1,4 @@
+// REQUIRES: preload
 // RUN: cd %T; %{compile} -o %t %s
 // RUN: %{intercept} --verbose --output %t.json -- %t
 // RUN: assert_intercepted %t.json count -ge 1
