@@ -1,4 +1,4 @@
-// REQUIRES: preload, c_api_execve
+// REQUIRES: preload, c_api_execv
 // RUN: cd %T; %{compile} '-D_PROGRAM="%{echo}"' -o %t %s
 // RUN: %{intercept} --verbose --output %t.json -- %t
 // RUN: assert_intercepted %t.json count -eq 2
@@ -12,6 +12,5 @@ int main()
 {
     char *const program = _PROGRAM;
     char *const argv[] = { _PROGRAM, "hi there", 0 };
-    char *const envp[] = { "THIS=THAT", 0 };
-    return execve(program, argv, envp);
+    return execv(program, argv);
 }
