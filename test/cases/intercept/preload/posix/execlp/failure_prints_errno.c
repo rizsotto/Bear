@@ -1,5 +1,5 @@
 // REQUIRES: preload, c_api_execlp
-// RUN: cd %T; %{compile} '-D_PROGRAM="/path/to/not/existing"' -o %t %s
+// RUN: %{compile} '-D_PROGRAM="/path/to/not/existing"' -o %t %s
 // RUN: %t > %t.without.errno
 // RUN: %{intercept} --output %t.json -- %t > %t.with.errno
 // RUN: diff %t.with.errno %t.without.errno

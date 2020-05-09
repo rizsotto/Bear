@@ -1,5 +1,5 @@
 // REQUIRES: preload, c_api_execvP
-// RUN: cd %T; %{compile} '-D_PROGRAM="echo"' -o %t %s
+// RUN: %{compile} '-D_PROGRAM="echo"' -o %t %s
 // RUN: %{intercept} --verbose --output %t.json -- %t
 // RUN: assert_intercepted %t.json count -eq 2
 // RUN: assert_intercepted %t.json contains -program %t -arguments %t
