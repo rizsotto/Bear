@@ -34,18 +34,8 @@
 
 #include <map>
 #include <vector>
-#include <random>
 
 namespace {
-
-    unsigned int generate_random_port()
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(1025, 65535);
-
-        return dis(gen);
-    }
 
     struct Command {
         static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
@@ -87,13 +77,15 @@ namespace ic {
     ::rust::Result<int> Application::operator()() const
     {
         // Create and start the gRPC server
-        std::string server_address = fmt::format("0.0.0.0:{}", generate_random_port());
-        spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
+        int port = 0;
         ic::InterceptorImpl service(*(impl_->reporter_), *(impl_->session_));
         auto server = grpc::ServerBuilder()
                           .RegisterService(&service)
-                          .AddListeningPort(server_address, grpc::InsecureServerCredentials())
+                          .AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
+
+        std::string server_address = fmt::format("0.0.0.0:{}", port);
+        spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
         // Configure the session and the reporter objects
         impl_->session_->set_server_address(server_address);
         impl_->reporter_->set_host_info(impl_->session_->get_host_info());
