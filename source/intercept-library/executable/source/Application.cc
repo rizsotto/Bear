@@ -96,15 +96,22 @@ namespace {
         return result;
     }
 
-    std::shared_ptr<supervise::Event> make_stop_event(int status)
+    std::shared_ptr<supervise::Event> make_status_event(sys::ExitStatus status)
     {
         std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
         result->set_timestamp(now_as_string());
 
-        std::unique_ptr<supervise::Event_Stopped> event = std::make_unique<supervise::Event_Stopped>();
-        event->set_status(status);
+        if (status.is_signaled()) {
+            std::unique_ptr<supervise::Event_Signalled> event = std::make_unique<supervise::Event_Signalled>();
+            event->set_number(status.signal().value());
 
-        result->set_allocated_stopped(event.release());
+            result->set_allocated_signalled(event.release());
+        } else {
+            std::unique_ptr<supervise::Event_Stopped> event = std::make_unique<supervise::Event_Stopped>();
+            event->set_status(status.code().value());
+
+            result->set_allocated_stopped(event.release());
+        }
         return result;
     }
 }
@@ -150,13 +157,21 @@ namespace er {
                         events.push_back(*event_ptr);
                     });
             })
-            .and_then<int>([&events](auto child) {
-                return child.wait()
-                    .on_success([&events](auto exit) {
+            .and_then<sys::ExitStatus>([&events](auto child) {
+                while (true) {
+                    auto status = child.wait(true);
+                    status.on_success([&events](auto exit) {
                         // gRPC event update
-                        auto event_ptr = make_stop_event(exit);
+                        auto event_ptr = make_status_event(exit);
                         events.push_back(*event_ptr);
                     });
+                    if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
+                        return status;
+                    }
+                }
+            })
+            .map<int>([](auto status) {
+                return status.code().value_or(EXIT_FAILURE);
             });
 
         if (!events.empty()) {

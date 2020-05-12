@@ -212,6 +212,32 @@ namespace {
 
 namespace sys {
 
+    ExitStatus::ExitStatus(bool is_code, int code)
+            : is_code_(is_code)
+            , code_(code)
+    {
+    }
+
+    std::optional<int> ExitStatus::code() const
+    {
+        return is_code_ ? std::make_optional(code_) : std::optional<int>();
+    }
+
+    std::optional<int> ExitStatus::signal() const
+    {
+        return is_code_ ? std::optional<int>() : std::make_optional(code_);
+    }
+
+    bool ExitStatus::is_signaled() const
+    {
+        return !is_code_;
+    }
+
+    bool ExitStatus::is_exited() const
+    {
+        return is_code_ || ((code_ != SIGCONT) && (code_ != SIGSTOP));
+    }
+
     Process::Process(pid_t pid)
             : pid_(pid)
     {
@@ -222,12 +248,22 @@ namespace sys {
         return pid_;
     }
 
-    rust::Result<int> Process::wait()
+    rust::Result<ExitStatus> Process::wait(bool request_for_signals)
     {
         errno = 0;
-        if (int status; - 1 != waitpid(pid_, &status, 0)) {
-            const int result = WIFEXITED(status) ? WEXITSTATUS(status) : EXIT_FAILURE;
-            return rust::Ok(result);
+        const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
+        if (int status; - 1 != waitpid(pid_, &status, mask)) {
+            if (WIFEXITED(status)) {
+                return rust::Ok(ExitStatus(true, WEXITSTATUS(status)));
+            } else if (WIFSIGNALED(status)) {
+                return rust::Ok(ExitStatus(false, WTERMSIG(status)));
+            } else if (WIFSTOPPED(status)) {
+                return rust::Ok(ExitStatus(false, WSTOPSIG(status)));
+            } else if (WIFCONTINUED(status)) {
+                return rust::Ok(ExitStatus(false, SIGCONT));
+            } else {
+                return rust::Err(std::runtime_error("System call \"waitpid\" result is broken."));
+            }
         } else {
             auto message = fmt::format("System call \"waitpid\" failed: {}", error_string(errno));
             return rust::Err(std::runtime_error(message));
@@ -235,10 +271,10 @@ namespace sys {
     }
 
     // TODO: make this to return Result<void>
-    rust::Result<int> Process::signal(int num)
+    rust::Result<int> Process::kill(int num)
     {
         errno = 0;
-        if (const int result = kill(pid_, num); 0 == result) {
+        if (const int result = ::kill(pid_, num); 0 == result) {
             return rust::Ok(result);
         } else {
             auto message = fmt::format("System call \"kill\" failed: {}", error_string(errno));

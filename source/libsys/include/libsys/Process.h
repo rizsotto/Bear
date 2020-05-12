@@ -30,14 +30,32 @@
 
 namespace sys {
 
+    class ExitStatus {
+    public:
+        ExitStatus(bool is_code, int code);
+
+        ExitStatus() = delete ;
+        ~ExitStatus() noexcept = default;
+
+        std::optional<int> code() const;
+        std::optional<int> signal() const;
+
+        bool is_signaled() const;
+        bool is_exited() const;
+
+    private:
+        bool is_code_;
+        int code_;
+    };
+
     class Process {
     public:
         class Builder;
 
         [[nodiscard]] pid_t get_pid() const;
 
-        rust::Result<int> wait(); // TODO: return signal too
-        rust::Result<int> signal(int num);
+        rust::Result<ExitStatus> wait(bool request_for_signals = false);
+        rust::Result<int> kill(int num);
 
     public:
         Process() = delete;

@@ -191,8 +191,11 @@ namespace {
                     .set_environment(environment)
                     .spawn(false);
             })
-            .and_then<int>([](auto child) {
+            .and_then<sys::ExitStatus>([](auto child) {
                 return child.wait();
+            })
+            .map<int>([](auto status) {
+                return status.code().value_or(EXIT_FAILURE);
             })
             .map_err<std::runtime_error>([](auto error) {
                 spdlog::warn("command execution failed: {}", error.what());
