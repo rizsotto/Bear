@@ -60,6 +60,13 @@ check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_program(MEMORYCHECK_COMMAND NAMES valgrind)
+set(MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --leak-check=full")
+
 include(CTest)
 enable_testing()
 

@@ -22,7 +22,7 @@ jobs:
         run: |
           sudo apt-get update -y
           #sudo apt-get upgrade -y
-          sudo apt-get install -y libc6-dev virtualenv gfortran nvidia-cuda-toolkit
+          sudo apt-get install -y libc6-dev virtualenv gfortran nvidia-cuda-toolkit valgrind
       - name: Install python test dependencies
         run: |
           virtualenv -p python3 "$HOME/venv"

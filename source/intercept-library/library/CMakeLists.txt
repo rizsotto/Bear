@@ -18,10 +18,12 @@ target_include_directories(exec_a PUBLIC source)
 target_link_libraries(exec_a PUBLIC exec_api)
 target_link_libraries(exec_a PUBLIC er_api)
 target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
-target_compile_features(exec_a PUBLIC cxx_std_14)
 target_compile_options(exec_a PUBLIC -fno-exceptions -fno-rtti)
 set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"
+        CMAKE_CXX_STANDARD 14
+        CMAKE_CXX_EXTENSIONS OFF
+        CMAKE_CXX_STANDARD_REQUIRED ON
         POSITION_INDEPENDENT_CODE 1)
 
 # Create a shared library from the sub projects.
@@ -34,6 +36,9 @@ set_target_properties(exec PROPERTIES
         LINKER_LANGUAGE "C"
         OSX_ARCHITECTURES:STRING "i386;x86_64"
         MACOSX_RPATH:BOOL ON
+        CMAKE_CXX_STANDARD 14
+        CMAKE_CXX_EXTENSIONS OFF
+        CMAKE_CXX_STANDARD_REQUIRED ON
         )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
