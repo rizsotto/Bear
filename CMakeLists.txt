@@ -1,6 +1,24 @@
 cmake_minimum_required(VERSION 3.2)
+if (${CMAKE_VERSION} VERSION_LESS 3.12)
+    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
+else ()
+    cmake_policy(VERSION 3.12)
+endif ()
 
-project(Bear-SuperBuild C CXX)
+set(default_build_type "Release")
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
+
+project(Bear-SuperBuild
+        VERSION 3.0.0
+        LANGUAGES C CXX
+        )
 
 option(ENABLE_UNIT_TESTS "Build and run unit test for this project" ON)
 option(ENABLE_FUNC_TESTS "Build and run functional test for this project" ON)
@@ -11,33 +29,25 @@ option(USE_SYSTEM_FMT "Use system installed fmt library" OFF)
 option(USE_SYSTEM_SPDLOG "Use system installed spdlog library" OFF)
 option(USE_SYSTEM_GRPC "Use system installed gRPC" OFF)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
+set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
+
+include(ExternalProject)
+
 # Some systems are using different library directory names for
 # 64 bit and 32 bit libraries.
 if (NOT LIBRARY_DIRECTORY_NAME)
     set(LIBRARY_DIRECTORY_NAME "lib64")
 endif ()
 
-include(ExternalProject)
-
-if (NOT USE_SYSTEM_JSON)
-    ExternalProject_Add(json
-            PREFIX
-                json
-            SOURCE_DIR
-                "${CMAKE_CURRENT_SOURCE_DIR}/third_party/json"
-            CMAKE_CACHE_ARGS
-                -DJSON_Install:BOOL=ON
-                -DJSON_BuildTests:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/json
-            )
-    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
-endif ()
 
 if (ENABLE_UNIT_TESTS)
     if (NOT USE_SYSTEM_GTEST)
         ExternalProject_Add(googletest
-                PREFIX
-                    googletest
                 SOURCE_DIR
                     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest"
                 CMAKE_CACHE_ARGS
@@ -50,10 +60,20 @@ else ()
     add_custom_target(googletest)
 endif ()
 
+if (NOT USE_SYSTEM_JSON)
+    ExternalProject_Add(json
+            SOURCE_DIR
+                "${CMAKE_CURRENT_SOURCE_DIR}/third_party/json"
+            CMAKE_CACHE_ARGS
+                -DJSON_Install:BOOL=ON
+                -DJSON_BuildTests:BOOL=OFF
+                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/json
+            )
+    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
+endif ()
+
 if (NOT USE_SYSTEM_FMT)
     ExternalProject_Add(fmt
-            PREFIX
-                grpc
             SOURCE_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt"
             CMAKE_CACHE_ARGS
@@ -68,8 +88,6 @@ endif ()
 
 if (NOT USE_SYSTEM_SPDLOG)
     ExternalProject_Add(spdlog
-            PREFIX
-                grpc
             SOURCE_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog"
             DEPENDS
@@ -88,8 +106,6 @@ endif ()
 
 if (NOT USE_SYSTEM_GRPC)
     ExternalProject_Add(grpc
-            PREFIX
-                grpc
             SOURCE_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/third_party/grpc"
             CMAKE_CACHE_ARGS
@@ -104,15 +120,21 @@ if (NOT USE_SYSTEM_GRPC)
 endif ()
 
 ExternalProject_Add(Bear
-        PREFIX
-            bear
         SOURCE_DIR
             "${CMAKE_CURRENT_SOURCE_DIR}/source"
         DEPENDS
             json googletest fmt spdlog grpc
         CMAKE_ARGS
-            -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+            -DCMAKE_CXX_EXTENSIONS=${CMAKE_CXX_EXTENSIONS}
+            -DCMAKE_CXX_STANDARD_REQUIRED=${CMAKE_CXX_STANDARD_REQUIRED}
+            -DCMAKE_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
         CMAKE_CACHE_ARGS
+            -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+            -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
+            -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
+#        CMAKE_CACHE_ARGS
             -Dnlohmann_json_DIR:PATH=${json_CMAKE_DIR}
             -DGTest_DIR:PATH=${googletest_CMAKE_DIR}
             -DProtobuf_DIR:PATH=${protobuf_CMAKE_DIR}
@@ -120,21 +142,21 @@ ExternalProject_Add(Bear
             -DgRPC_BINDIR:PATH=${grpc_BIN_DIR}
             -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
             -Dspdlog_DIR:PATH=${spdlog_CMAKE_DIR}
-            -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/bear
+        BUILD_ALWAYS
+            1
         TEST_BEFORE_INSTALL
             1
         TEST_COMMAND
             ctest
 #            ctest -T memcheck
         )
-set(BEAR_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/bin")
-set(BEAR_LIB_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/${LIBRARY_DIRECTORY_NAME}")
-set(BEAR_LIBEXEC_DIR "${CMAKE_CURRENT_BINARY_DIR}/bear/libexec")
 
 if (ENABLE_FUNC_TESTS)
+    set(BEAR_BIN_DIR "${STAGED_INSTALL_PREFIX}/bin")
+    set(BEAR_LIB_DIR "${STAGED_INSTALL_PREFIX}/${LIBRARY_DIRECTORY_NAME}")
+    set(BEAR_LIBEXEC_DIR "${STAGED_INSTALL_PREFIX}/libexec")
+
     ExternalProject_Add(BearTest
-            PREFIX
-                test
             SOURCE_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/test"
             DEPENDS
@@ -149,3 +171,11 @@ if (ENABLE_FUNC_TESTS)
                 ""
             )
 endif ()
+
+install(
+        DIRECTORY
+            ${STAGED_INSTALL_PREFIX}/
+        DESTINATION
+            .
+        USE_SOURCE_PERMISSIONS
+        )

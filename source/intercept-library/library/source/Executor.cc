@@ -263,7 +263,7 @@ namespace el {
     {
     }
 
-    Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const noexcept
+    Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
@@ -301,7 +301,7 @@ namespace el {
         return execute_from_current_directory(resolver_, path, fp);
     }
 
-    Executor::Result Executor::execvpe(const char* file, char* const* argv, char* const* envp) const noexcept
+    Executor::Result Executor::execvpe(const char* file, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
@@ -325,7 +325,7 @@ namespace el {
     }
 
     Executor::Result Executor::execvP(const char* file, const char* search_path, char* const* argv,
-        char* const* envp) const noexcept
+        char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
@@ -341,7 +341,7 @@ namespace el {
 
     Executor::Result Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
         const posix_spawnattr_t* attrp, char* const* argv,
-        char* const* envp) const noexcept
+        char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
@@ -372,7 +372,7 @@ namespace el {
 
     Executor::Result Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
         const posix_spawnattr_t* attrp, char* const* argv,
-        char* const* envp) const noexcept
+        char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
