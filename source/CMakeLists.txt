@@ -15,18 +15,29 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake)
-
 project(bear
         VERSION 3.0.0
         DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
         LANGUAGES C CXX)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if (ENABLE_UNIT_TESTS)
+    find_program(MEMORYCHECK_COMMAND NAMES valgrind)
+    set(MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --leak-check=full")
+
+    include(CTest)
+    enable_testing()
+
+    find_package(GTest REQUIRED NO_CMAKE_PATH)
+endif ()
+
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(GTest REQUIRED NO_CMAKE_PATH)
 find_package(Protobuf REQUIRED NO_CMAKE_PATH)
 find_package(gRPC REQUIRED NO_CMAKE_PATH)
 
@@ -59,16 +70,6 @@ check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD
 
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-find_program(MEMORYCHECK_COMMAND NAMES valgrind)
-set(MEMORYCHECK_COMMAND_OPTIONS "--trace-children=yes --leak-check=full")
-
-include(CTest)
-enable_testing()
 
 add_subdirectory(bear)
 add_subdirectory(libresult)

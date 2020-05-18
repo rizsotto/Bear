@@ -42,19 +42,21 @@ install(TARGETS er
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 # Create unit test
-add_executable(er_unit_test
-        test/ApplicationTest.cc
-        )
+if (ENABLE_UNIT_TESTS)
+    add_executable(er_unit_test
+            test/ApplicationTest.cc
+            )
 
-target_link_libraries(er_unit_test er_a)
-target_link_libraries(er_unit_test result_a)
-target_link_libraries(er_unit_test flags_a)
-target_link_libraries(er_unit_test sys_a)
-target_link_libraries(er_unit_test rpc_a)
-target_link_libraries(er_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(er_unit_test GTest::gmock)
+    target_link_libraries(er_unit_test er_a)
+    target_link_libraries(er_unit_test result_a)
+    target_link_libraries(er_unit_test flags_a)
+    target_link_libraries(er_unit_test sys_a)
+    target_link_libraries(er_unit_test rpc_a)
+    target_link_libraries(er_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(er_unit_test GTest::gmock)
 
-add_test(NAME bear::er_unit_test COMMAND er_unit_test)
+    add_test(NAME bear::er_unit_test COMMAND $<TARGET_FILE:er_unit_test>)
+endif ()
 
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.

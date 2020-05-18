@@ -51,17 +51,19 @@ install(TARGETS exec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # Create unit test.
-add_executable(exec_unit_test
-        test/ArrayTest.cc
-        test/BufferTest.cc
-        test/ExecutorTest.cc
-        test/SessionTest.cc
-        )
+if (ENABLE_UNIT_TESTS)
+    add_executable(exec_unit_test
+            test/ArrayTest.cc
+            test/BufferTest.cc
+            test/ExecutorTest.cc
+            test/SessionTest.cc
+            )
 
-target_include_directories(exec_unit_test PRIVATE test)
-target_link_libraries(exec_unit_test exec_api)
-target_link_libraries(exec_unit_test exec_a)
-target_link_libraries(exec_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(exec_unit_test GTest::gmock)
+    target_include_directories(exec_unit_test PRIVATE test)
+    target_link_libraries(exec_unit_test exec_api)
+    target_link_libraries(exec_unit_test exec_a)
+    target_link_libraries(exec_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(exec_unit_test GTest::gmock)
 
-add_test(NAME bear::exec_unit_test COMMAND exec_unit_test)
+    add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
+endif ()
