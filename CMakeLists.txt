@@ -35,6 +35,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
+set(DEPENDENCIES_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/subprojects/Install)
 
 include(ExternalProject)
 
@@ -52,9 +53,9 @@ if (ENABLE_UNIT_TESTS)
                     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest"
                 CMAKE_CACHE_ARGS
                     -DINSTALL_GTEST:BOOL=ON
-                    -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/googletest
+                    -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/googletest
                 )
-        set(googletest_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/googletest/${LIBRARY_DIRECTORY_NAME}/cmake/GTest/")
+	    set(googletest_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/googletest/${LIBRARY_DIRECTORY_NAME}/cmake/GTest/")
     endif ()
 else ()
     add_custom_target(googletest)
@@ -67,9 +68,9 @@ if (NOT USE_SYSTEM_JSON)
             CMAKE_CACHE_ARGS
                 -DJSON_Install:BOOL=ON
                 -DJSON_BuildTests:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/json
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/json
             )
-    set(json_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
+    set(json_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
 endif ()
 
 if (NOT USE_SYSTEM_FMT)
@@ -81,9 +82,9 @@ if (NOT USE_SYSTEM_FMT)
                 -DFMT_TEST:BOOL=OFF
                 -DFMT_FUZZ:BOOL=OFF
                 -DFMT_DOC:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/fmt
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/fmt
             )
-    set(fmt_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/fmt/${LIBRARY_DIRECTORY_NAME}/cmake/fmt/")
+    set(fmt_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/fmt/${LIBRARY_DIRECTORY_NAME}/cmake/fmt/")
 endif ()
 
 if (NOT USE_SYSTEM_SPDLOG)
@@ -99,9 +100,9 @@ if (NOT USE_SYSTEM_SPDLOG)
                 -DSPDLOG_NO_EXCEPTIONS:BOOL=ON
                 -DSPDLOG_BUILD_TESTS:BOOL=OFF
                 -DSPDLOG_BUILD_EXAMPLE:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/spdlog
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/spdlog
             )
-    set(spdlog_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/spdlog/${LIBRARY_DIRECTORY_NAME}/cmake/spdlog/")
+    set(spdlog_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/spdlog/lib/cmake/spdlog/")
 endif ()
 
 if (NOT USE_SYSTEM_GRPC)
@@ -112,11 +113,11 @@ if (NOT USE_SYSTEM_GRPC)
                 -DgRPC_INSTALL:BOOL=ON
                 -DgRPC_BUILD_TESTS:BOOL=OFF
                 -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/grpc
+		        -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc
             )
-    set(protobuf_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
-    set(grpc_CMAKE_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/lib/cmake/grpc/")
-    set(grpc_BIN_DIR "${CMAKE_CURRENT_BINARY_DIR}/grpc/bin/")
+    set(protobuf_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
+    set(grpc_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/lib/cmake/grpc/")
+    set(grpc_BIN_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/bin/")
 endif ()
 
 ExternalProject_Add(Bear
