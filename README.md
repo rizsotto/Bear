@@ -56,6 +56,21 @@ tested on FreeBSD, GNU/Linux and OS X.
    Python. (version >= 2.7)
 5. **lit** is an optional dependency to run the functional tests
 
+### Dependencies
+
+The dependencies can come from OS packages or the build will fetch the sources
+and build locally.
+
+- [gRPC](https://github.com/grpc/grpc) >= 1.26
+- [googletest](https://github.com/google/googletest) >= 1.10
+- [fmt](https://github.com/fmtlib/fmt) >= 6.2
+- [spdlog](https://github.com/gabime/spdlog) >= 1.5
+- [json](https://github.com/nlohmann/json) >= 3.7
+
+Install from packages on Fedora 32
+
+    dnf install json-devel spdlog-devel fmt-devel grpc-devel grpc-plugins
+
 ### Build commands
 
 Ideally, you should build Bear in a separate build directory.
