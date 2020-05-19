@@ -1,7 +1,8 @@
 #!/usr/bin/env make
 
 # REQUIRES: make, dynamic-make
-# RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{make} -C %T -f %s
+# RUN: %{make} -C %T -f %s clean
+# RUN: %{bear} -vvvv --cdb %t.json -- %{make} -C %T -f %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file main.c -directory %T -arguments %{c_compiler} -S -o main.s main.c
 # RUN: assert_compilation %t.json contains -file main.s -directory %T -arguments %{c_compiler} -c -o main.o main.s
@@ -17,3 +18,6 @@ main.o: main.s
 
 main.c:
 	echo "int main() { return 0; }" > $@
+
+clean:
+	rm -f main main.o main.s main.c
