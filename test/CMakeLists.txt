@@ -56,4 +56,8 @@ if (LIT_EXECUTABLE)
             -D_BEAR_BIN_DIR=${_BEAR_BIN_DIR}
             -v
             ${CMAKE_CURRENT_BINARY_DIR})
+
+    set_tests_properties(bear::func_test PROPERTIES
+            TIMEOUT 60
+            )
 endif ()

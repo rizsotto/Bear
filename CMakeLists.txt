@@ -57,14 +57,6 @@ ExternalProject_Add(Bear
             ctest # or `ctest -T memcheck`
         )
 
-install(
-        DIRECTORY
-            ${STAGED_INSTALL_PREFIX}/
-        DESTINATION
-            .
-        USE_SOURCE_PERMISSIONS
-)
-
 if (ENABLE_FUNC_TESTS)
     include(GNUInstallDirs)
     ExternalProject_Add(BearTest
@@ -83,3 +75,33 @@ if (ENABLE_FUNC_TESTS)
                 ""
             )
 endif ()
+
+include(GNUInstallDirs)
+install(
+        DIRECTORY
+            ${STAGED_INSTALL_PREFIX}/
+        DESTINATION
+            .
+        USE_SOURCE_PERMISSIONS
+)
+install(FILES COPYING README.md ChangeLog.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR})
+
+set(CPACK_PACKAGE_NAME "bear")
+set(CPACK_PACKAGE_CONTACT "László Nagy")
+set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
+set(CPACK_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "BuildEAR")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
+set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
+set(CPACK_RPM_PACKAGE_RELEASE "1%{?dist}")
+set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
+set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
+set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
+set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+        "${CMAKE_INSTALL_MANDIR}"
+        "${CMAKE_INSTALL_MANDIR}/man1")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+include(CPack)

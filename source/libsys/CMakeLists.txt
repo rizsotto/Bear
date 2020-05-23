@@ -6,6 +6,7 @@ add_library(sys_a OBJECT
         )
 
 target_include_directories(sys_a PUBLIC include/)
+target_link_libraries(sys_a PUBLIC ${CMAKE_DL_LIBS})
 target_link_libraries(sys_a PUBLIC result_a)
 target_link_libraries(sys_a PRIVATE fmt::fmt)
 
@@ -17,7 +18,6 @@ if (ENABLE_UNIT_TESTS)
             )
 
     target_include_directories(sys_unit_test PRIVATE source/)
-    target_link_libraries(sys_unit_test ${CMAKE_DL_LIBS}) # TODO: remove it when static linking is done
     target_link_libraries(sys_unit_test sys_a)
     target_link_libraries(sys_unit_test result_a)
     target_link_libraries(sys_unit_test fmt::fmt)

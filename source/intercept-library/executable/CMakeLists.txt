@@ -27,7 +27,6 @@ add_executable(er
         )
 
 #target_link_libraries(er -static)
-target_link_libraries(er ${CMAKE_DL_LIBS}) # TODO: remove it when static linking is done
 target_link_libraries(er er_a)
 target_link_libraries(er flags_a)
 target_link_libraries(er sys_a)

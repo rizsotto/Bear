@@ -64,7 +64,7 @@ else ()
                 fmt
             CMAKE_CACHE_ARGS
                 -DSPDLOG_FMT_EXTERNAL:BOOL=ON
-                -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
+#                -Dfmt_DIR:PATH=${fmt_CMAKE_DIR}
                 -DSPDLOG_INSTALL:BOOL=ON
                 -DSPDLOG_NO_EXCEPTIONS:BOOL=ON
                 -DSPDLOG_BUILD_TESTS:BOOL=OFF
@@ -74,28 +74,29 @@ else ()
 #    set(spdlog_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/spdlog/lib/cmake/spdlog/")
 endif ()
 
-message(STATUS "Looking for protoc")
-find_program(PROTOC protoc)
-if (PROTOC)
-    message(STATUS "Looking for protoc -- found")
-else()
-    message(FATAL_ERROR "Looking for protoc -- not found")
-endif()
-
-message(STATUS "Looking for grpc_cpp_plugin")
-find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
-if (GRPC_CPP_PLUGIN)
-    message(STATUS "Looking for grpc_cpp_plugin -- found")
-else()
-    message(FATAL_ERROR "Looking for grpc_cpp_plugin -- not found")
-endif()
 
 message(STATUS "Looking for gRPC::grpc++ dependency")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC IMPORTED_TARGET grpc++>=1.26)
-
+pkg_check_modules(gRPC grpc++>=1.26)
 if (gRPC_FOUND)
     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
+
+    message(STATUS "Looking for protoc")
+    find_program(PROTOC protoc)
+    if (PROTOC)
+        message(STATUS "Looking for protoc -- found")
+    else()
+        message(FATAL_ERROR "Looking for protoc -- not found")
+    endif()
+
+    message(STATUS "Looking for grpc_cpp_plugin")
+    find_program(GRPC_CPP_PLUGIN grpc_cpp_plugin)
+    if (GRPC_CPP_PLUGIN)
+        message(STATUS "Looking for grpc_cpp_plugin -- found")
+    else()
+        message(FATAL_ERROR "Looking for grpc_cpp_plugin -- not found")
+    endif()
+
     add_custom_target(grpc_dependency)
 else ()
     message(STATUS "Looking for gRPC::grpc++ dependency -- not found")
@@ -103,12 +104,12 @@ else ()
     include(ExternalProject)
     ExternalProject_Add(grpc_dependency
             SOURCE_DIR
-            "${CMAKE_CURRENT_SOURCE_DIR}/grpc"
+                "${CMAKE_CURRENT_SOURCE_DIR}/grpc"
             CMAKE_CACHE_ARGS
-            -DgRPC_INSTALL:BOOL=ON
-            -DgRPC_BUILD_TESTS:BOOL=OFF
-            -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
-            -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc
+                -DgRPC_INSTALL:BOOL=ON
+                -DgRPC_BUILD_TESTS:BOOL=OFF
+                -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc
             )
 #    set(protobuf_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
 #    set(grpc_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/lib/cmake/grpc/")
@@ -131,10 +132,10 @@ if (ENABLE_UNIT_TESTS)
         include(ExternalProject)
         ExternalProject_Add(googletest_dependency
                 SOURCE_DIR
-                "${CMAKE_CURRENT_SOURCE_DIR}/googletest"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/googletest"
                 CMAKE_CACHE_ARGS
-                -DINSTALL_GTEST:BOOL=ON
-                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/googletest
+                    -DINSTALL_GTEST:BOOL=ON
+                    -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/googletest
                 )
 #        set(googletest_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/googletest/${LIBRARY_DIRECTORY_NAME}/cmake/GTest/")
     endif ()

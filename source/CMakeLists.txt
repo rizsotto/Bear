@@ -11,9 +11,9 @@ project(bear
         LANGUAGES C CXX
         )
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSPDLOG_NO_EXCEPTIONS")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGOOGLE_PROTOBUF_NO_RTTI")
 
 if (ENABLE_UNIT_TESTS)
     find_program(MEMORYCHECK_COMMAND NAMES valgrind)
@@ -29,9 +29,9 @@ find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
-find_package(gRPC REQUIRED NO_CMAKE_PATH)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET grpc++)
 
-include(GNUInstallDirs)
 include(CheckIncludeFile)
 check_include_file(spawn.h HAVE_SPAWN_H)
 check_include_file(unistd.h HAVE_UNISTD_H)
@@ -69,25 +69,3 @@ add_subdirectory(libsys)
 add_subdirectory(intercept)
 add_subdirectory(intercept-wrapper)
 add_subdirectory(intercept-library)
-
-install(FILES ../COPYING ../README.md ../ChangeLog.md
-        DESTINATION ${CMAKE_INSTALL_DOCDIR})
-
-set(CPACK_PACKAGE_NAME "bear")
-set(CPACK_PACKAGE_CONTACT "László Nagy")
-set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})
-set(CPACK_PACKAGE_VERSION ${CMAKE_PROJECT_VERSION})
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "BuildEAR")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/../COPYING")
-set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/../README.md")
-set(CPACK_PACKAGING_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
-set(CPACK_RPM_PACKAGE_RELEASE "1%{?dist}")
-set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
-set(CPACK_RPM_PACKAGE_GROUP "Development/Tools")
-set(CPACK_RPM_PACKAGE_URL "http://github.com/rizsotto/Bear")
-set(CPACK_RPM_PACKAGE_DESCRIPTION "Bear is a tool to generate compilation database for clang tooling.")
-set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
-        "${CMAKE_INSTALL_MANDIR}"
-        "${CMAKE_INSTALL_MANDIR}/man1")
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-include(CPack)
