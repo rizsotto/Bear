@@ -15,8 +15,9 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
             "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif ()
 
-project(Bear-SuperBuild
+project(Bear
         VERSION 3.0.0
+        DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
         LANGUAGES C CXX
         )
 
@@ -27,27 +28,33 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Superbuild variables for sub projects
+include(ExternalProject)
 set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
 set(DEPENDENCIES_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/subprojects/Install)
 
+# Verify or install dependencies
 add_subdirectory(third_party)
 
-include(ExternalProject)
-ExternalProject_Add(Bear
+# Build the project itself
+ExternalProject_Add(BearSource
         SOURCE_DIR
             "${CMAKE_CURRENT_SOURCE_DIR}/source"
         DEPENDS
             # TODO: googletest_dependency shall be not here if ENABLE_UNIT_TESTS is OFF
             nlohmann_json_dependency fmt_dependency spdlog_dependency grpc_dependency googletest_dependency
         CMAKE_ARGS
+            -DCMAKE_PROJECT_VERSION=${CMAKE_PROJECT_VERSION}
             -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
             -DCMAKE_CXX_STANDARD_REQUIRED=${CMAKE_CXX_STANDARD_REQUIRED}
             -DCMAKE_CXX_EXTENSIONS=${CMAKE_CXX_EXTENSIONS}
-            -DCMAKE_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
-        CMAKE_CACHE_ARGS
             -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
+        CMAKE_CACHE_ARGS
             -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
+            -DCMAKE_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
+            -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+            -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
         BUILD_ALWAYS
             1
@@ -57,18 +64,15 @@ ExternalProject_Add(Bear
             ctest # or `ctest -T memcheck`
         )
 
+# Run the functional tests
 if (ENABLE_FUNC_TESTS)
-    include(GNUInstallDirs)
     ExternalProject_Add(BearTest
             SOURCE_DIR
                 "${CMAKE_CURRENT_SOURCE_DIR}/test"
             DEPENDS
-                Bear
+                BearSource
             CMAKE_CACHE_ARGS
-                # TODO: pass the prefix only
-                -D_BEAR_BIN_DIR:PATH=${STAGED_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}
-                -D_BEAR_LIB_DIR:PATH=${STAGED_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
-                -D_BEAR_LIBEXEC_DIR:PATH=${STAGED_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}
+                -DSTAGED_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
             TEST_BEFORE_INSTALL
                 1
             INSTALL_COMMAND
@@ -76,7 +80,7 @@ if (ENABLE_FUNC_TESTS)
             )
 endif ()
 
-include(GNUInstallDirs)
+# Install the project artifacts from the staged directory
 install(
         DIRECTORY
             ${STAGED_INSTALL_PREFIX}/
@@ -84,9 +88,11 @@ install(
             .
         USE_SOURCE_PERMISSIONS
 )
+include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
+# Set up package from this project
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
 set(CPACK_PACKAGE_VENDOR ${CPACK_PACKAGE_CONTACT})

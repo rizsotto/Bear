@@ -77,7 +77,7 @@ endif ()
 
 message(STATUS "Looking for gRPC::grpc++ dependency")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC grpc++>=1.26)
+pkg_check_modules(gRPC grpc++>=1.26) # make it bigger the upstream has a bug
 if (gRPC_FOUND)
     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
 

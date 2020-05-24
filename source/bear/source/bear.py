@@ -533,25 +533,25 @@ def create_intercept_parser():
     advanced.add_argument(
         '--libexec', '-l',
         dest='libexec',
-        default="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@",
+        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@",
         action='store',
         help="""specify libexec file location.""")
     advanced.add_argument(
         '--interceptor',
         dest='interceptor',
-        default="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept",
+        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept",
         action='store',
         help="""specify the intercept binary location.""")
     advanced.add_argument(
         '--wrapper',
         dest='intercept_wrapper',
-        default="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper",
+        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper",
         action='store',
         help="""specify the compiler wrapper location.""")
     advanced.add_argument(
         '--executor',
         dest='executor',
-        default="@CMAKE_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/er",
+        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/er",
         action='store',
         help="""specify the execution supervisor location.""")
 

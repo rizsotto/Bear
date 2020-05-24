@@ -5,7 +5,7 @@ else ()
     cmake_policy(VERSION 3.12)
 endif ()
 
-project(Bear-FunctionalTest LANGUAGES C)
+project(BearTest LANGUAGES C)
 
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
 set(CMAKE_REQUIRED_FLAGS -D_GNU_SOURCE)
@@ -50,10 +50,11 @@ find_program(LIT_EXECUTABLE
 if (LIT_EXECUTABLE)
     message(STATUS "Looking for lit -- ${LIT_EXECUTABLE}")
 
+    include(GNUInstallDirs)
     add_test(NAME bear::func_test
             COMMAND ${LIT_EXECUTABLE}
             -D_TEST_EXEC_ROOT=${CMAKE_CURRENT_BINARY_DIR}
-            -D_BEAR_BIN_DIR=${_BEAR_BIN_DIR}
+            -D_BEAR_BIN_DIR=${STAGED_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}
             -v
             ${CMAKE_CURRENT_BINARY_DIR})
 

@@ -5,9 +5,8 @@ else ()
     cmake_policy(VERSION 3.12)
 endif ()
 
-project(bear
-        VERSION 3.0.0
-        DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
+project(BearSource
+        VERSION ${CMAKE_PROJECT_VERSION}
         LANGUAGES C CXX
         )
 
@@ -58,6 +57,7 @@ check_symbol_exists(_CS_PATH "unistd.h" HAVE_CS_PATH)
 check_symbol_exists(_CS_GNU_LIBC_VERSION "unistd.h" HAVE_CS_GNU_LIBC_VERSION)
 check_symbol_exists(_CS_GNU_LIBPTHREAD_VERSION "unistd.h" HAVE_CS_GNU_LIBPTHREAD_VERSION)
 
+include(GNUInstallDirs) # The directory names are used in the config file
 configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
