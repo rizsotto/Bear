@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 if (${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 else ()
@@ -42,8 +42,8 @@ ExternalProject_Add(BearSource
         SOURCE_DIR
             "${CMAKE_CURRENT_SOURCE_DIR}/source"
         DEPENDS
-            # TODO: googletest_dependency shall be not here if ENABLE_UNIT_TESTS is OFF
-            nlohmann_json_dependency fmt_dependency spdlog_dependency grpc_dependency googletest_dependency
+            nlohmann_json_dependency fmt_dependency spdlog_dependency grpc_dependency
+            googletest_dependency
         CMAKE_ARGS
             -DCMAKE_PROJECT_VERSION=${CMAKE_PROJECT_VERSION}
             -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
@@ -56,6 +56,8 @@ ExternalProject_Add(BearSource
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+            -Dfmt_DIR:PATH=${fmt_DIR}
+            -Dspdlog_DIR:PATH=${spdlog_DIR}
         BUILD_ALWAYS
             1
         TEST_BEFORE_INSTALL

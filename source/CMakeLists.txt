@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 if (${CMAKE_VERSION} VERSION_LESS 3.12)
     cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
 else ()
@@ -26,8 +26,8 @@ endif ()
 
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(fmt REQUIRED)
-find_package(spdlog REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET grpc++)
 
