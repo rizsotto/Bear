@@ -1,6 +1,6 @@
 message(STATUS "Looking for gRPC::grpc++ dependency")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC grpc++>=1.26)
+pkg_check_modules(gRPC grpc++>=1.28)
 if (gRPC_FOUND)
     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
 
@@ -26,12 +26,11 @@ else ()
 
     include(ExternalProject)
     ExternalProject_Add(grpc_dependency
-            URL
-                https://github.com/grpc/grpc/archive/v1.29.1.tar.gz
-            URL_HASH
-                MD5=5bd3155249be19372e236f9a3b4bfdbd
-            DOWNLOAD_NO_PROGRESS
-                1
+            GIT_REPOSITORY
+                https://github.com/grpc/grpc
+            GIT_TAG
+                v1.29.1
+            GIT_SUBMODULES
             UPDATE_COMMAND
                 ""
             LOG_CONFIGURE
@@ -44,7 +43,7 @@ else ()
                 -DgRPC_INSTALL:BOOL=ON
                 -DgRPC_BUILD_TESTS:BOOL=OFF
                 -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
-                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency
             )
     #    set(protobuf_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
     #    set(grpc_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/lib/cmake/grpc/")
