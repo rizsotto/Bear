@@ -32,8 +32,8 @@ else ()
             )
 
     include(GNUInstallDirs)
-    set(fmt_DIR "${DEPENDENCIES_INSTALL_PREFIX}/fmt_dependency/${CMAKE_INSTALL_LIBDIR}/cmake/fmt/"
-            CACHE PATH "Path to internally built fmtConfig.cmake"
-            FORCE
-            )
+    list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/fmt_dependency")
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+            CACHE PATH "append fmt library into the search path"
+            FORCE)
 endif ()

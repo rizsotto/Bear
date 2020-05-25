@@ -27,17 +27,17 @@ else ()
                 fmt_dependency
             CMAKE_CACHE_ARGS
                 -DSPDLOG_FMT_EXTERNAL:BOOL=ON
-                -Dfmt_DIR:PATH=${fmt_DIR}
                 -DSPDLOG_INSTALL:BOOL=ON
                 -DSPDLOG_NO_EXCEPTIONS:BOOL=ON
                 -DSPDLOG_BUILD_TESTS:BOOL=OFF
                 -DSPDLOG_BUILD_EXAMPLE:BOOL=OFF
+                -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
                 -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/spdlog_dependency
             )
 
     include(GNUInstallDirs)
-    set(spdlog_DIR "${DEPENDENCIES_INSTALL_PREFIX}/spdlog_dependency/${CMAKE_INSTALL_LIBDIR}/cmake/spdlog/"
-            CACHE PATH "Path to internally built spdlogConfig.cmake"
-            FORCE
-            )
+    list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/spdlog_dependency")
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+            CACHE PATH "append spdlog library into the search path"
+            FORCE)
 endif ()

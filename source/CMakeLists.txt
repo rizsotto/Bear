@@ -21,7 +21,8 @@ if (ENABLE_UNIT_TESTS)
     include(CTest)
     enable_testing()
 
-    find_package(GTest REQUIRED NO_CMAKE_PATH)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTest REQUIRED IMPORTED_TARGET gtest gtest_main gmock)
 endif ()
 
 find_package(Threads REQUIRED)

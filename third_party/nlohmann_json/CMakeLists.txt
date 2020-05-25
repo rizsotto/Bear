@@ -29,8 +29,8 @@ else ()
             )
 
     include(GNUInstallDirs)
-    set(nlohmann_json_DIR "${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json_dependency/${CMAKE_INSTALL_LIBDIR}/cmake/nlohmann_json/"
-            CACHE PATH "Path to internally built nlohmann_jsonConfig.cmake"
-            FORCE
-            )
+    list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json_dependency")
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+            CACHE PATH "append JSON library into the search path"
+            FORCE)
 endif ()

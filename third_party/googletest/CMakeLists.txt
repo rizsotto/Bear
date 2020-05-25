@@ -31,8 +31,8 @@ else ()
             )
 
     include(GNUInstallDirs)
-    set(GTest_DIR "${DEPENDENCIES_INSTALL_PREFIX}/googletest_dependency/${CMAKE_INSTALL_LIBDIR}/cmake/GTest/"
-            CACHE PATH "Path to internally built GTestConfig.cmake"
-            FORCE
-            )
+    list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/googletest_dependency")
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+            CACHE PATH "append googletest library into the search path"
+            FORCE)
 endif ()

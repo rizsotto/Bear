@@ -9,8 +9,7 @@ if (ENABLE_UNIT_TESTS)
             )
 
     target_link_libraries(result_unit_test result_a)
-    target_link_libraries(result_unit_test GTest::gtest GTest::gtest_main ${CMAKE_THREAD_LIBS_INIT})
-    target_link_libraries(result_unit_test GTest::gmock)
+    target_link_libraries(result_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::result_unit_test COMMAND $<TARGET_FILE:result_unit_test>)
 endif ()
