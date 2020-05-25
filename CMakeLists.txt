@@ -58,6 +58,7 @@ ExternalProject_Add(BearSource
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
             -Dfmt_DIR:PATH=${fmt_DIR}
             -Dspdlog_DIR:PATH=${spdlog_DIR}
+            -Dnlohmann_json_DIR:PATH=${nlohmann_json_DIR}
         BUILD_ALWAYS
             1
         TEST_BEFORE_INSTALL

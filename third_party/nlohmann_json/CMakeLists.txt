@@ -8,12 +8,29 @@ else ()
 
     include(ExternalProject)
     ExternalProject_Add(nlohmann_json_dependency
-            SOURCE_DIR
-            "${CMAKE_CURRENT_SOURCE_DIR}/nlohmann_json"
-            CMAKE_CACHE_ARGS
-            -DJSON_Install:BOOL=ON
-            -DJSON_BuildTests:BOOL=OFF
-            -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json
+            URL
+            https://github.com/nlohmann/json/archive/v3.7.3.tar.gz
+            URL_HASH
+                MD5=846bbc611ce9ecd7d45d6554679245e1
+            DOWNLOAD_NO_PROGRESS
+                1
+            UPDATE_COMMAND
+                ""
+            LOG_CONFIGURE
+                1
+            LOG_BUILD
+                1
+            LOG_INSTALL
+                1
+            CMAKE_ARGS
+                -DJSON_Install:BOOL=ON
+                -DJSON_BuildTests:BOOL=OFF
+                -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json_dependency
             )
-    #    set(json_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json/${LIBRARY_DIRECTORY_NAME}/cmake/nlohmann_json/")
+
+    include(GNUInstallDirs)
+    set(nlohmann_json_DIR "${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json_dependency/${CMAKE_INSTALL_LIBDIR}/cmake/nlohmann_json/"
+            CACHE PATH "Path to internally built nlohmann_jsonConfig.cmake"
+            FORCE
+            )
 endif ()
