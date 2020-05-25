@@ -59,6 +59,7 @@ ExternalProject_Add(BearSource
             -Dfmt_DIR:PATH=${fmt_DIR}
             -Dspdlog_DIR:PATH=${spdlog_DIR}
             -Dnlohmann_json_DIR:PATH=${nlohmann_json_DIR}
+            -DGTest_DIR:PATH=${GTest_DIR}
         BUILD_ALWAYS
             1
         TEST_BEFORE_INSTALL

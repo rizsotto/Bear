@@ -26,8 +26,8 @@ endif ()
 
 find_package(Threads REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(fmt CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
+find_package(fmt REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET grpc++)
 
