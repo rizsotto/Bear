@@ -29,7 +29,7 @@ find_package(nlohmann_json REQUIRED)
 find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET grpc++)
+pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET protobuf grpc++)
 
 include(CheckIncludeFile)
 check_include_file(spawn.h HAVE_SPAWN_H)

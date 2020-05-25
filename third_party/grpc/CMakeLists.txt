@@ -1,6 +1,6 @@
 message(STATUS "Looking for gRPC::grpc++ dependency")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC grpc++>=1.28)
+pkg_check_modules(gRPC protobuf>=3.11 grpc++>=1.28)
 if (gRPC_FOUND)
     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
 
@@ -45,7 +45,10 @@ else ()
                 -DgRPC_BUILD_CSHARP_EXT:BOOL=OFF
                 -DCMAKE_INSTALL_PREFIX:PATH=${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency
             )
-    #    set(protobuf_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/${LIBRARY_DIRECTORY_NAME}/cmake/protobuf/")
-    #    set(grpc_CMAKE_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/lib/cmake/grpc/")
-    #    set(grpc_BIN_DIR "${DEPENDENCIES_INSTALL_PREFIX}/grpc/bin/")
+
+    include(GNUInstallDirs)
+    list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency")
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+            CACHE PATH ""
+            FORCE)
 endif ()
