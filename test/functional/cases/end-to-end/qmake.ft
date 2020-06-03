@@ -1,4 +1,5 @@
 # REQUIRES: make,qmake,preload
+# RUN: rm -rf %T/qmake_build
 # RUN: mkdir -p %T/qmake_build
 # RUN: cd %T/qmake_build; %{qmake} ../../Input/qmake.pro
 # RUN: cd %T/qmake_build; %{intercept-build} --cdb qmake.json %{make}
