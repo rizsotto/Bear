@@ -98,7 +98,7 @@ message Event {
     // Required.
     oneof event {
         Started started = 11;
-        Terminated stopped = 12;
+        Terminated terminated = 12;
         Signalled signalled = 13;
     }
 

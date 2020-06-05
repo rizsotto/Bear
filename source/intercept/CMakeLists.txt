@@ -1,9 +1,9 @@
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/Application.cc
-        source/Interceptor.cc
         source/Report.cc
         source/Reporter.cc
+        source/Services.cc
         source/Session.cc
         )
 

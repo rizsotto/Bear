@@ -25,12 +25,6 @@
 
 namespace {
 
-    std::unique_ptr<supervise::Interceptor::Stub> create_stub(const std::string_view& address)
-    {
-        return supervise::Interceptor::NewStub(
-            grpc::CreateChannel(address.data(), grpc::InsecureChannelCredentials()));
-    }
-
     std::runtime_error create_error(const grpc::Status& status)
     {
         return std::runtime_error(fmt::format("gRPC call failed: {}", status.error_message().data()));
@@ -40,7 +34,9 @@ namespace {
 namespace rpc {
 
     InterceptClient::InterceptClient(const std::string_view& address)
-            : stub_(create_stub(address))
+            : channel_(grpc::CreateChannel(address.data(), grpc::InsecureChannelCredentials()))
+            , supervisor_(supervise::Supervisor::NewStub(channel_))
+            , interceptor_(supervise::Interceptor::NewStub(channel_))
     {
     }
 
@@ -49,12 +45,12 @@ namespace rpc {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetWrappedCommand");
 
         grpc::ClientContext context;
-        supervise::WrapperRequest request;
-        supervise::WrapperResponse response;
+        supervise::ResolveRequest request;
+        supervise::ResolveResponse response;
 
-        request.set_name(name);
+        request.set_path(name);
 
-        const grpc::Status status = stub_->GetWrappedCommand(&context, request, &response);
+        const grpc::Status status = supervisor_->ResolveProgram(&context, request, &response);
         spdlog::debug("gRPC call finished: {}", status.ok());
         return status.ok()
             ? rust::Result<std::string>(rust::Ok(response.path()))
@@ -66,15 +62,15 @@ namespace rpc {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetEnvironmentUpdate");
 
         grpc::ClientContext context;
-        supervise::EnvironmentRequest request;
-        supervise::EnvironmentResponse response;
+        supervise::Environment request;
+        supervise::Environment response;
 
-        request.mutable_environment()->insert(input.begin(), input.end());
+        request.mutable_values()->insert(input.begin(), input.end());
 
-        const grpc::Status status = stub_->GetEnvironmentUpdate(&context, request, &response);
+        const grpc::Status status = supervisor_->Update(&context, request, &response);
         spdlog::debug("gRPC call finished: {}", status.ok());
         if (status.ok()) {
-            std::map<std::string, std::string> copy(response.environment().begin(), response.environment().end());
+            std::map<std::string, std::string> copy(response.values().begin(), response.values().end());
             return rust::Ok(copy);
         }
         return rust::Err(create_error(status));
@@ -85,20 +81,15 @@ namespace rpc {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Report");
 
         grpc::ClientContext context;
-        supervise::Empty stats;
-
-        std::unique_ptr<grpc::ClientWriter<supervise::Event> > writer(stub_->Report(&context, &stats));
         for (const auto& event : events) {
-            if (!writer->Write(event)) {
-                break;
+            supervise::Empty response;
+
+            const grpc::Status status = interceptor_->Register(&context, event, &response);
+            if (!status.ok()) {
+                spdlog::warn("gRPC call finished: {}", status.ok());
+                return rust::Result<int>(rust::Err(create_error(status)));
             }
         }
-        writer->WritesDone();
-
-        const grpc::Status status = writer->Finish();
-        spdlog::debug("gRPC call finished: {}", status.ok());
-        return status.ok()
-               ? rust::Result<int>(rust::Ok(0))
-               : rust::Result<int>(rust::Err(create_error(status)));
+        return rust::Result<int>(rust::Ok(0));
     }
 }

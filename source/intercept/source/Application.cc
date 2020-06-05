@@ -19,8 +19,8 @@
 
 #include "Application.h"
 
-#include "Interceptor.h"
 #include "Reporter.h"
+#include "Services.h"
 #include "Session.h"
 #include "libsys/Context.h"
 
@@ -61,8 +61,11 @@ namespace ic {
     ::rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& context)
     {
         auto command = Command::from(args);
-        auto reporter = Reporter::from(args);
         auto session = Session::from(args, context);
+        auto reporter = session
+                            .and_then<Reporter::SharedPtr>([&args, &context](const auto& session) {
+                                return Reporter::from(args, context, *session);
+                            });
 
         return rust::merge(command, reporter, session)
                    .map<Application::State*>([](auto tuple) {
@@ -78,9 +81,11 @@ namespace ic {
     {
         // Create and start the gRPC server
         int port = 0;
-        ic::InterceptorImpl service(*(impl_->reporter_), *(impl_->session_));
+        ic::SupervisorImpl supervisor(*(impl_->session_));
+        ic::InterceptorImpl interceptor(*(impl_->reporter_));
         auto server = grpc::ServerBuilder()
-                          .RegisterService(&service)
+                          .RegisterService(&supervisor)
+                          .RegisterService(&interceptor)
                           .AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
@@ -88,8 +93,6 @@ namespace ic {
         spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
         // Configure the session and the reporter objects
         impl_->session_->set_server_address(server_address);
-        impl_->reporter_->set_host_info(impl_->session_->get_host_info());
-        impl_->reporter_->set_session_type(impl_->session_->get_session_type());
         // Execute the build command
         spdlog::debug("Running command.");
         auto result = impl_->session_->supervise(impl_->command)

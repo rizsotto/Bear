@@ -45,9 +45,6 @@ namespace ic {
     public:
         virtual void set_server_address(const std::string&) = 0;
 
-        using HostInfo = std::map<std::string, std::string>;
-        [[nodiscard]] virtual const HostInfo& get_host_info() const = 0;
-
         [[nodiscard]] virtual std::string get_session_type() const = 0;
     };
 }

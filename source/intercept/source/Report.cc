@@ -49,13 +49,11 @@ namespace ic {
 
     void to_json(json& j, const Execution::Run& rhs)
     {
-        if (rhs.pid) {
-            j["pid"] = rhs.pid.value();
-        }
+        j["pid"] = rhs.pid;
+        j["events"] = json(rhs.events);
         if (rhs.ppid) {
             j["ppid"] = rhs.ppid.value();
         }
-        j["events"] = json(rhs.events);
     }
 
     void to_json(json& j, const Execution& rhs)

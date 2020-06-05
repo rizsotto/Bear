@@ -20,43 +20,27 @@
 #pragma once
 
 #include "Report.h"
+#include "Session.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
+#include "libsys/Context.h"
 #include "librpc/supervise.pb.h"
 
 namespace ic {
-
-    // A helper to build an execution object. Takes the raw process execution
-    // events and builds the execution object defined above.
-    class Execution::Builder {
-    public:
-        Builder();
-        ~Builder() = default;
-
-        Builder& add(supervise::Event const& event);
-
-        Execution::UniquePtr build();
-
-    private:
-        Execution::UniquePtr execution_;
-    };
 
     // Responsible to collect executions and persist them into an output file.
     class Reporter {
     public:
         using SharedPtr = std::shared_ptr<Reporter>;
-        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&);
-
-        void set_host_info(const std::map<std::string, std::string>&);
-        void set_session_type(const std::string& name);
+        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const sys::Context&, const ic::Session&);
 
         // add a new execution and persist into the output file.
-        void report(const Execution::UniquePtr& execution);
+        void report(const ::supervise::Event& request);
         void flush();
+        void flush(std::ostream&);
 
     public:
-        Reporter() = delete;
-        ~Reporter();
+        ~Reporter() noexcept = default;
 
         Reporter(const Reporter&) = delete;
         Reporter(Reporter&&) noexcept = delete;
@@ -65,10 +49,12 @@ namespace ic {
         Reporter& operator=(Reporter&&) noexcept = delete;
 
     private:
-        struct State;
-        explicit Reporter(State*);
+        Reporter() = default;
+        Reporter(const std::string_view& view, ic::Context&& context);
 
     private:
-        State* impl_;
+        std::string output_;
+        ic::Context context_;
+        std::map<pid_t, Execution> executions_;
     };
 }

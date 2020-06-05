@@ -32,10 +32,6 @@ namespace ic {
     // events. The events are representing a process execution event, like
     // the program is started or the program stopped.
     struct Execution {
-        class Builder;
-
-        using UniquePtr = std::unique_ptr<Execution>;
-
         // This represents the executed command itself. Describes all the
         // context that the caller was given. And these are the those parameters
         // which are essential for re-run the command.
@@ -66,7 +62,7 @@ namespace ic {
         // This represents a single run and holds the attributes which are
         // the history of the execution.
         struct Run {
-            std::optional<int> pid;
+            int pid;
             std::optional<int> ppid;
             std::list<Event> events;
         } run;

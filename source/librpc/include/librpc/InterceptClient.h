@@ -21,6 +21,7 @@
 
 #include "libresult/Result.h"
 
+#include <grpcpp/channel.h>
 #include "librpc/supervise.grpc.pb.h"
 
 #include <list>
@@ -44,6 +45,8 @@ namespace rpc {
         rust::Result<int> report(const std::list<supervise::Event>&);
 
     private:
-        std::unique_ptr<supervise::Interceptor::Stub> stub_;
+        std::shared_ptr<::grpc::Channel> channel_;
+        std::unique_ptr<supervise::Supervisor::Stub> supervisor_;
+        std::unique_ptr<supervise::Interceptor::Stub> interceptor_;
     };
 }

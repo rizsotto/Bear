@@ -81,10 +81,10 @@ namespace {
     {
         std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
         result->set_timestamp(now_as_string());
+        result->set_pid(pid);
+        result->set_ppid(ppid);
 
         std::unique_ptr<supervise::Event_Started> event = std::make_unique<supervise::Event_Started>();
-        event->set_pid(pid);
-        event->set_ppid(ppid);
         event->set_executable(execution.path.data());
         for (const auto& arg : execution.command) {
             event->add_arguments(arg.data());
@@ -96,21 +96,23 @@ namespace {
         return result;
     }
 
-    std::shared_ptr<supervise::Event> make_status_event(sys::ExitStatus status)
+    std::shared_ptr<supervise::Event> make_status_event(pid_t pid, sys::ExitStatus status)
     {
         std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
         result->set_timestamp(now_as_string());
+        result->set_pid(pid);
 
         if (status.is_signaled()) {
+            // TODO: this shall return a termination event too
             std::unique_ptr<supervise::Event_Signalled> event = std::make_unique<supervise::Event_Signalled>();
             event->set_number(status.signal().value());
 
             result->set_allocated_signalled(event.release());
         } else {
-            std::unique_ptr<supervise::Event_Stopped> event = std::make_unique<supervise::Event_Stopped>();
+            std::unique_ptr<supervise::Event_Terminated> event = std::make_unique<supervise::Event_Terminated>();
             event->set_status(status.code().value());
 
-            result->set_allocated_stopped(event.release());
+            result->set_allocated_terminated(event.release());
         }
         return result;
     }
@@ -136,7 +138,6 @@ namespace er {
     rust::Result<int> Application::operator()() const
     {
         rpc::InterceptClient client(impl_->session.destination);
-        std::list<supervise::Event> events;
 
         auto result = client.get_environment_update(impl_->execution.environment)
             .map<Execution>([this](auto environment) {
@@ -147,23 +148,25 @@ namespace er {
                     environment
                 };
             })
-            .and_then<sys::Process>([&events](auto execution) {
+            .and_then<sys::Process>([&client](auto execution) {
                 return sys::Process::Builder(execution.path)
                     .add_arguments(execution.command.begin(), execution.command.end())
                     .set_environment(execution.environment)
                     .spawn(true)
-                    .on_success([&events, &execution](auto& child) {
+                    .on_success([&client, &execution](auto& child) {
                         auto event_ptr = make_start_event(child.get_pid(), getppid(), execution);
-                        events.push_back(*event_ptr);
+                        std::list<supervise::Event> events = {*event_ptr};
+                        client.report(events);
                     });
             })
-            .and_then<sys::ExitStatus>([&events](auto child) {
+            .and_then<sys::ExitStatus>([&client](auto child) {
                 while (true) {
                     auto status = child.wait(true);
-                    status.on_success([&events](auto exit) {
+                    status.on_success([&client, &child](auto exit) {
                         // gRPC event update
-                        auto event_ptr = make_status_event(exit);
-                        events.push_back(*event_ptr);
+                        auto event_ptr = make_status_event(child.get_pid(), exit);
+                        std::list<supervise::Event> events = {*event_ptr};
+                        client.report(events);
                     });
                     if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
                         return status;
@@ -173,10 +176,6 @@ namespace er {
             .map<int>([](auto status) {
                 return status.code().value_or(EXIT_FAILURE);
             });
-
-        if (!events.empty()) {
-            client.report(events);
-        }
 
         return result;
     }

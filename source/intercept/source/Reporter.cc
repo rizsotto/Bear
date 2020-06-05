@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "Reporter.h"
 #include "Application.h"
 
@@ -26,14 +27,57 @@
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <utility>
+#include <functional>
+#include <unistd.h>
 
 namespace {
+
+    using HostInfo = std::map<std::string, std::string>;
+
+    rust::Result<HostInfo> create_host_info(const sys::Context& context)
+    {
+        return context.get_uname()
+#ifdef HAVE_CS_PATH
+            .map<HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_PATH)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "_CS_PATH", value });
+                        return 0;
+                    });
+                return result;
+            })
+#endif
+#ifdef HAVE_CS_GNU_LIBC_VERSION
+            .map<HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_GNU_LIBC_VERSION)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "_CS_GNU_LIBC_VERSION", value });
+                        return 0;
+                    });
+                return result;
+            })
+#endif
+#ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
+            .map<HostInfo>([&context](auto result) {
+                context.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
+                    .map<int>([&result](auto value) {
+                        result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
+                        return 0;
+                    });
+                return result;
+            })
+#endif
+            .map_err<std::runtime_error>([](auto error) {
+                return std::runtime_error("failed to get host info.");
+            });
+    }
 
     void update_run_with_started(ic::Execution::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [start]");
         ic::Execution::Event event = ic::Execution::Event {
-            "start",
+            "started",
             source.timestamp(),
             std::nullopt,
             std::nullopt
@@ -45,7 +89,7 @@ namespace {
     {
         spdlog::debug("Received event is merged into execution report. [signal]");
         ic::Execution::Event event = ic::Execution::Event {
-            "signal",
+            "signaled",
             source.timestamp(),
             std::nullopt,
             { source.signalled().number() }
@@ -53,13 +97,13 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_stopped(ic::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_terminated(ic::Execution::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [stop]");
         ic::Execution::Event event = ic::Execution::Event {
-            "stop",
+            "terminated",
             source.timestamp(),
-            { source.stopped().status() },
+            { source.terminated().status() },
             std::nullopt
         };
         target.events.emplace_back(event);
@@ -80,7 +124,7 @@ namespace {
         return (value == 0 ? std::nullopt : std::make_optional(value));
     }
 
-    ic::Execution::UniquePtr init_execution(const supervise::Event& source)
+    ic::Execution init_execution(const supervise::Event& source)
     {
         const auto& started = source.started();
 
@@ -91,98 +135,78 @@ namespace {
             to_map(started.environment())
         };
         auto run = ic::Execution::Run {
-            to_optional(started.pid()),
-            to_optional(started.ppid()),
+            to_optional(source.pid()).value_or(0),
+            to_optional(source.ppid()),
             std::list<ic::Execution::Event>()
         };
         update_run_with_started(run, source);
 
-        return std::make_unique<ic::Execution>(ic::Execution { command, run });
+        return ic::Execution { command, run };
     }
 }
 
 namespace ic {
 
-    Execution::Builder::Builder()
-            : execution_(nullptr)
+    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const sys::Context& ctx, const ic::Session& session)
     {
-    }
+        auto host_info = create_host_info(ctx);
+        auto output = flags.as_string(Application::OUTPUT);
 
-    Execution::Builder& Execution::Builder::add(supervise::Event const& event)
-    {
-        if (!execution_ && event.has_started()) {
-            execution_ = init_execution(event);
-            return *this;
-        }
-        if (execution_ && event.has_stopped()) {
-            update_run_with_stopped(execution_->run, event);
-            return *this;
-        }
-        if (execution_ && event.has_signalled()) {
-            update_run_with_signaled(execution_->run, event);
-            return *this;
-        }
-        spdlog::info("Received event could not be merged into execution report. Ignored.");
-        return *this;
-    }
-
-    Execution::UniquePtr Execution::Builder::build()
-    {
-        return std::move(execution_);
-    }
-}
-
-namespace ic {
-
-    struct Reporter::State {
-        std::string output;
-        Report content;
-    };
-
-    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags)
-    {
-        return flags.as_string(Application::OUTPUT)
-            .map<Reporter::State*>([](auto output) {
-                auto content = ic::Report { ic::Context { "unknown", {} }, {} };
-                return new Reporter::State { std::string(output), content };
-            })
-            .map<Reporter::SharedPtr>([](auto state) {
-                return Reporter::SharedPtr(new Reporter(state)); // NOLINT
+        return merge(host_info, output)
+            .map<Reporter::SharedPtr>([&session](auto pair) {
+                const auto& [host_info, output] = pair;
+                auto context = ic::Context { session.get_session_type(), host_info };
+                return Reporter::SharedPtr(new Reporter(output, std::move(context)));
             });
     }
 
-    Reporter::Reporter(Reporter::State* impl)
-            : impl_(impl)
+    Reporter::Reporter(const std::string_view& output, ic::Context&& context)
+            : output_(output)
+            , context_(context)
+            , executions_()
     {
     }
 
-    Reporter::~Reporter()
+    void Reporter::report(const ::supervise::Event& event)
     {
-        delete impl_;
-        impl_ = nullptr;
-    }
-
-    void Reporter::set_host_info(const std::map<std::string, std::string>& value)
-    {
-        impl_->content.context.host_info = value;
-    }
-
-    void Reporter::set_session_type(const std::string& value)
-    {
-        impl_->content.context.session_type = value;
-    }
-
-    void Reporter::report(const Execution::UniquePtr& ptr)
-    {
-        impl_->content.executions.push_back(*ptr);
+        const pid_t pid = event.pid();
+        if (auto it = executions_.find(pid); it != executions_.end()) {
+            // the process entry exits
+            if (event.has_terminated()) {
+                update_run_with_terminated(it->second.run, event);
+            } else if (event.has_signalled()) {
+                update_run_with_signaled(it->second.run, event);
+            } else {
+                spdlog::info("Received start event could not be merged into execution report. Ignored.");
+            }
+        } else {
+            // the process entry not exists
+            if (event.has_started()) {
+                auto entry = init_execution(event);
+                executions_.emplace(std::make_pair(pid, std::move(entry)));
+            } else {
+                spdlog::info("Received event could not be merged into execution report. Ignored.");
+            }
+        }
     }
 
     void Reporter::flush()
     {
-        const Report& content = impl_->content;
-        nlohmann::json j = content;
+        std::ofstream targetFile(output_);
+        targetFile << std::setw(4);
 
-        std::ofstream targetFile(impl_->output);
-        targetFile << std::setw(4) << j << std::endl;
+        flush(targetFile);
+    }
+
+    void Reporter::flush(std::ostream& stream)
+    {
+        ic::Report report = ic::Report { context_, { } };
+        std::transform(executions_.begin(), executions_.end(),
+                       std::back_inserter(report.executions),
+                       [](auto pid_execution_pair) { return pid_execution_pair.second; });
+
+        nlohmann::json j = report;
+
+        stream << j << std::endl;
     }
 }

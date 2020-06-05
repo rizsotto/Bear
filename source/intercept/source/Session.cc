@@ -17,8 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
-
 #include "Application.h"
 #include "Session.h"
 #include "er/Flags.h"
@@ -28,51 +26,9 @@
 
 #include <functional>
 #include <numeric>
-#include <unistd.h>
 
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/spdlog.h>
-
-namespace {
-
-    rust::Result<ic::Session::HostInfo> create_host_info(const sys::Context& context)
-    {
-        return context.get_uname()
-#ifdef HAVE_CS_PATH
-            .map<ic::Session::HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_PATH)
-                    .map<int>([&result](auto value) {
-                        result.insert({ "_CS_PATH", value });
-                        return 0;
-                    });
-                return result;
-            })
-#endif
-#ifdef HAVE_CS_GNU_LIBC_VERSION
-            .map<ic::Session::HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_GNU_LIBC_VERSION)
-                    .map<int>([&result](auto value) {
-                        result.insert({ "_CS_GNU_LIBC_VERSION", value });
-                        return 0;
-                    });
-                return result;
-            })
-#endif
-#ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
-            .map<ic::Session::HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
-                    .map<int>([&result](auto value) {
-                        result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
-                        return 0;
-                    });
-                return result;
-            })
-#endif
-            .map_err<std::runtime_error>([](auto error) {
-                return std::runtime_error("failed to get host info.");
-            });
-    }
-}
 
 namespace env {
 
@@ -127,7 +83,7 @@ namespace {
 
     class LibraryPreloadSession : public ic::Session {
     public:
-        LibraryPreloadSession(HostInfo&& host_info, const std::string_view& library, const std::string_view& executor, const sys::Context& context);
+        LibraryPreloadSession(const std::string_view& library, const std::string_view& executor, env::env_t&& environment);
 
     public:
         [[nodiscard]] rust::Result<std::string_view> resolve(const std::string& name) const override;
@@ -136,23 +92,20 @@ namespace {
 
         void set_server_address(const std::string&) override;
 
-        [[nodiscard]] const HostInfo& get_host_info() const override;
         [[nodiscard]] std::string get_session_type() const override;
 
     private:
-        HostInfo host_info_;
         std::string server_address_;
         std::string library_;
         std::string executor_;
-        const sys::Context& context_;
+        env::env_t environment_;
     };
 
-    LibraryPreloadSession::LibraryPreloadSession(ic::Session::HostInfo&& host_info, const std::string_view& library, const std::string_view& executor, const sys::Context& context)
-            : host_info_(host_info)
-            , server_address_()
+    LibraryPreloadSession::LibraryPreloadSession(const std::string_view& library, const std::string_view& executor, env::env_t&& environment)
+            : server_address_()
             , library_(library)
             , executor_(executor)
-            , context_(context)
+            , environment_(environment)
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
@@ -174,7 +127,7 @@ namespace {
 
     rust::Result<int> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
-        auto environment = update(context_.get_environment());
+        auto environment = update(environment_);
         auto program = sys::Process::Builder(command.front()).resolve_executable();
 
         return rust::merge(program, environment)
@@ -208,11 +161,6 @@ namespace {
         server_address_ = value;
     }
 
-    const ic::Session::HostInfo& LibraryPreloadSession::get_host_info() const
-    {
-        return host_info_;
-    }
-
     std::string LibraryPreloadSession::get_session_type() const
     {
         return std::string("library preload");
@@ -223,19 +171,14 @@ namespace ic {
 
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        auto host_info = create_host_info(ctx)
-                             .unwrap_or_else([](auto error) {
-                                 spdlog::info(error.what());
-                                 return std::map<std::string, std::string>();
-                             });
-
         auto library = args.as_string(ic::Application::LIBRARY);
         auto executor = args.as_string(ic::Application::EXECUTOR);
 
         return merge(library, executor)
-            .map<Session::SharedPtr>([&host_info, &ctx](auto pair) {
+            .map<Session::SharedPtr>([&ctx](auto pair) {
                 const auto& [library, executor] = pair;
-                auto result = new LibraryPreloadSession(std::move(host_info), library, executor, ctx);
+                auto environment = ctx.get_environment();
+                auto result = new LibraryPreloadSession(library, executor, std::move(environment));
                 return std::shared_ptr<Session>(result);
             });
     }

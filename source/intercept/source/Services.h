@@ -20,6 +20,7 @@
 #pragma once
 
 #include <mutex>
+
 #include "librpc/supervise.grpc.pb.h"
 
 namespace ic {
@@ -27,18 +28,27 @@ namespace ic {
     class Reporter;
     class Session;
 
+    class SupervisorImpl final : public ::supervise::Supervisor::Service {
+    public:
+        explicit SupervisorImpl(const Session&);
+        ~SupervisorImpl() override = default;
+
+        ::grpc::Status ResolveProgram(::grpc::ServerContext* context, const ::supervise::ResolveRequest* request, ::supervise::ResolveResponse* response) override;
+        ::grpc::Status Update(::grpc::ServerContext* context, const ::supervise::Environment* request, ::supervise::Environment* response) override;
+
+    private:
+        const Session& session_;
+    };
+
     class InterceptorImpl final : public ::supervise::Interceptor::Service {
     public:
-        InterceptorImpl(Reporter&, const Session&);
+        explicit InterceptorImpl(Reporter&);
         ~InterceptorImpl() override = default;
 
-        ::grpc::Status GetWrappedCommand(::grpc::ServerContext* context, const ::supervise::WrapperRequest* request, ::supervise::WrapperResponse* response) override;
-        ::grpc::Status GetEnvironmentUpdate(::grpc::ServerContext* context, const ::supervise::EnvironmentRequest* request, ::supervise::EnvironmentResponse* response) override;
-        ::grpc::Status Report(::grpc::ServerContext* context, ::grpc::ServerReader<::supervise::Event>* reader, ::supervise::Empty* response) override;
+        ::grpc::Status Register(::grpc::ServerContext* context, const ::supervise::Event* request, ::supervise::Empty* response) override;
 
     private:
         Reporter& reporter_;
-        const Session& session_;
-        std::mutex lock;
+        std::mutex lock_;
     };
 }
