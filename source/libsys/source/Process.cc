@@ -202,11 +202,11 @@ namespace {
                         }
                     }
                     return rust::Result<std::string>(rust::Err(std::runtime_error(
-                        fmt::format("Could not find executable: {}", sys::error_string(ENOENT)))));
+                        fmt::format("Could not find executable: {} ({})", name, sys::error_string(ENOENT)))));
                 });
         }
         return rust::Err(std::runtime_error(
-            fmt::format("Could not find executable: {}", sys::error_string(error))));
+            fmt::format("Could not find executable: {} ({})", name, sys::error_string(error))));
     }
 }
 

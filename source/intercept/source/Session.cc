@@ -88,7 +88,7 @@ namespace {
     public:
         [[nodiscard]] rust::Result<std::string_view> resolve(const std::string& name) const override;
         [[nodiscard]] rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const override;
-        [[nodiscard]] rust::Result<int> supervise(const std::vector<std::string_view>& command) const override;
+        [[nodiscard]] rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const override;
 
         void set_server_address(const std::string&) override;
 
@@ -125,13 +125,13 @@ namespace {
         return rust::Ok(copy);
     }
 
-    rust::Result<int> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
+    rust::Result<sys::Process::Builder> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
         auto environment = update(environment_);
         auto program = sys::Process::Builder(command.front()).resolve_executable();
 
         return rust::merge(program, environment)
-            .and_then<sys::Process>([&command, this](auto pair) {
+            .map<sys::Process::Builder>([&command, this](auto pair) {
                 const auto& [program, environment] = pair;
                 return sys::Process::Builder(executor_)
                     .add_argument(executor_)
@@ -141,18 +141,7 @@ namespace {
                     .add_argument(program)
                     .add_argument(er::flags::COMMAND)
                     .add_arguments(command.begin(), command.end())
-                    .set_environment(environment)
-                    .spawn(false);
-            })
-            .and_then<sys::ExitStatus>([](auto child) {
-                return child.wait();
-            })
-            .map<int>([](auto status) {
-                return status.code().value_or(EXIT_FAILURE);
-            })
-            .map_err<std::runtime_error>([](auto error) {
-                spdlog::warn("command execution failed: {}", error.what());
-                return error;
+                    .set_environment(environment);
             });
     }
 

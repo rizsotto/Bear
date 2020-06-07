@@ -110,11 +110,11 @@ namespace sys {
         //rust::Result<int> status();
 
     public:
-        Builder(const Builder&) = delete;
-        Builder(Builder&&) noexcept = delete;
+        Builder(const Builder&) = default;
+        Builder(Builder&&) noexcept = default;
 
-        Builder& operator=(const Builder&) = delete;
-        Builder& operator=(Builder&&) noexcept = delete;
+        Builder& operator=(const Builder&) = default;
+        Builder& operator=(Builder&&) noexcept = default;
 
     private:
         std::string program_;

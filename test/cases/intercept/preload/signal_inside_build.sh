@@ -1,10 +1,13 @@
 #!/usr/bin/env sh
 
+# TODO: this shall not fail
+# XFAIL: *
+
 # REQUIRES: preload, shell, dynamic-shell
 # RUN: %{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true}
 # RUN: assert_intercepted %t.json count -ge 2
 # RUN: assert_intercepted %t.json contains -program %{true}
-# TODO: assert_intercepted %t.json contains -program %{sleep}
+# RUN: assert_intercepted %t.json contains -program %{sleep}
 
 for i in "$@"
 do

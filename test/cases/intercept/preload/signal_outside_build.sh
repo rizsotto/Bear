@@ -1,13 +1,17 @@
 #!/usr/bin/env sh
 
+# TODO: this shall not fail
+# XFAIL: *
+
 # REQUIRES: preload, shell, dynamic-shell
-# RUN: %{shell} -c "%{intercept} --verbose --output %t.json -- %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill %1; wait;"
-# TODO: assert_intercepted %t.json count -ge 2
-# TODO: assert_intercepted %t.json contains -program %{true}
-# TODO: assert_intercepted %t.json contains -program %{sleep}
+# RUN: %{shell} -c "%{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -s 15 %1; wait;"
+# RUN: assert_intercepted %t.json count -ge 2
+# RUN: assert_intercepted %t.json contains -program %{true}
+# RUN: assert_intercepted %t.json contains -program %{sleep}
 
 for i in "$@"
 do
+  case $i in
     --sleep)
       SLEEP=$2
       shift
@@ -39,7 +43,4 @@ fi
 
 # do the test
 $TRUE
-
-$SLEEP 5 &
-kill %1;
-wait;
+$SLEEP 5

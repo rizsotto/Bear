@@ -27,6 +27,7 @@
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Context.h"
+#include "libsys/Process.h"
 
 namespace ic {
 
@@ -40,7 +41,7 @@ namespace ic {
 
         [[nodiscard]] virtual rust::Result<std::string_view> resolve(const std::string& name) const = 0;
         [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
-        [[nodiscard]] virtual rust::Result<int> supervise(const std::vector<std::string_view>& command) const = 0;
+        [[nodiscard]] virtual rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const = 0;
 
     public:
         virtual void set_server_address(const std::string&) = 0;

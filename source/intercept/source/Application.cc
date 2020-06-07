@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "Application.h"
-
 #include "Reporter.h"
 #include "Services.h"
 #include "Session.h"
@@ -32,10 +32,83 @@
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 
-#include <map>
 #include <vector>
+#ifdef HAVE_SIGNAL_H
+#include <signal.h>
+#endif
 
 namespace {
+
+#ifdef HAVE_SIGNAL
+    int SIGNALS_TO_FORWARD[] = {
+        SIGABRT,
+        SIGALRM,
+        SIGBUS,
+        SIGCONT,
+        SIGFPE,
+        SIGHUP,
+        SIGINT,
+        SIGPIPE,
+        SIGPOLL,
+        SIGPROF,
+        SIGQUIT,
+        SIGSEGV,
+        SIGSTOP,
+        SIGSYS,
+        SIGTERM,
+        SIGTRAP,
+        SIGTSTP,
+        SIGTTIN,
+        SIGTTOU,
+        SIGUSR1,
+        SIGUSR2,
+        SIGURG,
+        SIGVTALRM,
+        SIGXCPU,
+        SIGXFSZ
+    };
+#endif
+
+    sys::Process* CHILD_PROCESS = nullptr;
+
+    void handler(int signum) {
+        if (CHILD_PROCESS != nullptr) {
+            CHILD_PROCESS->kill(signum)
+                .on_error([](auto error) {
+                    spdlog::warn("sending signal to child failed: {}", error.what());
+                });
+        }
+    }
+
+    rust::Result<int> execute_command(const ic::Session& session, const std::vector<std::string_view>& command) {
+#ifdef HAVE_SIGNAL
+        for (auto signum : SIGNALS_TO_FORWARD) {
+            signal(signum, &handler);
+        }
+#endif
+        return session.supervise(command)
+            .and_then<sys::Process>([](auto builder) {
+                return builder.spawn(false);
+            })
+            .and_then<sys::ExitStatus>([](auto child) {
+                CHILD_PROCESS = &child;
+
+                auto result = child.wait();
+
+                CHILD_PROCESS = nullptr;
+                return result;
+            })
+            .map<int>([](auto status) {
+                return status.code().value_or(EXIT_FAILURE);
+            })
+            .map_err<std::runtime_error>([](auto error) {
+                spdlog::warn("Command execution failed: {}", error.what());
+                return error;
+            })
+            .on_success([](auto status) {
+                spdlog::debug("Running command. [Exited with {0}]", status);
+            });
+    }
 
     struct Command {
         static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
@@ -95,10 +168,7 @@ namespace ic {
         impl_->session_->set_server_address(server_address);
         // Execute the build command
         spdlog::debug("Running command.");
-        auto result = impl_->session_->supervise(impl_->command)
-            .on_success([](auto status) {
-                spdlog::debug("Running command. [Exited with {0}]", status);
-            });
+        auto result = execute_command(*impl_->session_, impl_->command);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();
