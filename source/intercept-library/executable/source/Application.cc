@@ -76,15 +76,15 @@ namespace {
             micros.count() % 1000000);
     }
 
-    std::shared_ptr<supervise::Event> make_start_event(
+    supervise::Event make_start_event(
         pid_t pid,
         pid_t ppid,
         const Execution& execution)
     {
-        std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
-        result->set_timestamp(now_as_string());
-        result->set_pid(pid);
-        result->set_ppid(ppid);
+        supervise::Event result;
+        result.set_timestamp(now_as_string());
+        result.set_pid(pid);
+        result.set_ppid(ppid);
 
         std::unique_ptr<supervise::Event_Started> event = std::make_unique<supervise::Event_Started>();
         event->set_executable(execution.path.data());
@@ -94,27 +94,27 @@ namespace {
         event->set_working_dir(execution.working_directory);
         event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
 
-        result->set_allocated_started(event.release());
+        result.set_allocated_started(event.release());
         return result;
     }
 
-    std::shared_ptr<supervise::Event> make_status_event(pid_t pid, sys::ExitStatus status)
+    supervise::Event make_status_event(pid_t pid, sys::ExitStatus status)
     {
-        std::shared_ptr<supervise::Event> result = std::make_shared<supervise::Event>();
-        result->set_timestamp(now_as_string());
-        result->set_pid(pid);
+        supervise::Event result;
+        result.set_timestamp(now_as_string());
+        result.set_pid(pid);
 
         if (status.is_signaled()) {
             // TODO: this shall return a termination event too
             std::unique_ptr<supervise::Event_Signalled> event = std::make_unique<supervise::Event_Signalled>();
             event->set_number(status.signal().value());
 
-            result->set_allocated_signalled(event.release());
+            result.set_allocated_signalled(event.release());
         } else {
             std::unique_ptr<supervise::Event_Terminated> event = std::make_unique<supervise::Event_Terminated>();
             event->set_status(status.code().value());
 
-            result->set_allocated_terminated(event.release());
+            result.set_allocated_terminated(event.release());
         }
         return result;
     }
@@ -157,10 +157,7 @@ namespace er {
                     .spawn(true)
                     .on_success([&client, &execution](auto& child) {
                         spdlog::debug("Executed command [pid: {}]", child.get_pid());
-
-                        auto event_ptr = make_start_event(child.get_pid(), getppid(), execution);
-                        std::list<supervise::Event> events = {*event_ptr};
-                        client.report(events);
+                        client.report(make_start_event(child.get_pid(), getppid(), execution));
                     });
             })
             .and_then<sys::ExitStatus>([&client](auto child) {
@@ -168,10 +165,7 @@ namespace er {
                 while (true) {
                     auto status = child.wait(true);
                     status.on_success([&client, &child](auto exit) {
-                        // gRPC event update
-                        auto event_ptr = make_status_event(child.get_pid(), exit);
-                        std::list<supervise::Event> events = {*event_ptr};
-                        client.report(events);
+                        client.report(make_status_event(child.get_pid(), exit));
                     });
                     if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
                         return status;

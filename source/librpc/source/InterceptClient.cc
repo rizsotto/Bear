@@ -76,19 +76,17 @@ namespace rpc {
         return rust::Err(create_error(status));
     }
 
-    rust::Result<int> InterceptClient::report(const std::list<supervise::Event>& events)
+    rust::Result<int> InterceptClient::report(supervise::Event&& event)
     {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Report");
 
         grpc::ClientContext context;
-        for (const auto& event : events) {
-            supervise::Empty response;
+        supervise::Empty response;
 
-            const grpc::Status status = interceptor_->Register(&context, event, &response);
-            spdlog::debug("gRPC call [Register] finished: {}", status.ok());
-            if (!status.ok()) {
-                return rust::Result<int>(rust::Err(create_error(status)));
-            }
+        const grpc::Status status = interceptor_->Register(&context, event, &response);
+        spdlog::debug("gRPC call [Register] finished: {}", status.ok());
+        if (!status.ok()) {
+            return rust::Result<int>(rust::Err(create_error(status)));
         }
         return rust::Result<int>(rust::Ok(0));
     }

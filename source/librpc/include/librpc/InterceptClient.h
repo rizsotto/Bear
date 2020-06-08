@@ -42,7 +42,7 @@ namespace rpc {
     public:
         rust::Result<std::string> get_wrapped_command(const std::string&);
         rust::Result<std::map<std::string, std::string>> get_environment_update(const std::map<std::string, std::string>&);
-        rust::Result<int> report(const std::list<supervise::Event>&);
+        rust::Result<int> report(supervise::Event&&);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;
