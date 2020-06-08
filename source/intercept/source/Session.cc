@@ -83,7 +83,11 @@ namespace {
 
     class LibraryPreloadSession : public ic::Session {
     public:
-        LibraryPreloadSession(const std::string_view& library, const std::string_view& executor, env::env_t&& environment);
+        LibraryPreloadSession(
+            const std::string_view& library,
+            const std::string_view& executor,
+            const bool verbose,
+            env::env_t&& environment);
 
     public:
         [[nodiscard]] rust::Result<std::string_view> resolve(const std::string& name) const override;
@@ -98,13 +102,19 @@ namespace {
         std::string server_address_;
         std::string library_;
         std::string executor_;
+        bool verbose_;
         env::env_t environment_;
     };
 
-    LibraryPreloadSession::LibraryPreloadSession(const std::string_view& library, const std::string_view& executor, env::env_t&& environment)
+    LibraryPreloadSession::LibraryPreloadSession(
+        const std::string_view& library,
+        const std::string_view& executor,
+        bool verbose,
+        env::env_t&& environment)
             : server_address_()
             , library_(library)
             , executor_(executor)
+            , verbose_(verbose)
             , environment_(environment)
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
@@ -118,7 +128,9 @@ namespace {
     rust::Result<std::map<std::string, std::string>> LibraryPreloadSession::update(const std::map<std::string, std::string>& env) const
     {
         std::map<std::string, std::string> copy(env);
-        // TODO: fix the verbose thing
+        if (verbose_) {
+            env::insert_or_assign(copy, el::env::KEY_VERBOSE, "true");
+        }
         env::insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
         env::insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
         env::insert_or_merge(copy, env::GLIBC_PRELOAD_KEY, library_, env::merge_into_paths);
@@ -163,12 +175,13 @@ namespace ic {
     {
         auto library = args.as_string(ic::Application::LIBRARY);
         auto executor = args.as_string(ic::Application::EXECUTOR);
+        auto verbose = args.as_bool(ic::Application::VERBOSE);
 
-        return merge(library, executor)
-            .map<Session::SharedPtr>([&ctx](auto pair) {
-                const auto& [library, executor] = pair;
+        return merge(library, executor, verbose)
+            .map<Session::SharedPtr>([&ctx](auto tuple) {
+                const auto& [library, executor, verbose] = tuple;
                 auto environment = ctx.get_environment();
-                auto result = new LibraryPreloadSession(library, executor, std::move(environment));
+                auto result = new LibraryPreloadSession(library, executor, verbose, std::move(environment));
                 return std::shared_ptr<Session>(result);
             });
     }
