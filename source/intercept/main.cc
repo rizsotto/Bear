@@ -35,6 +35,7 @@
 #include "libsys/Context.h"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_sinks.h>
 
 #include <optional>
 #include <string_view>
@@ -50,6 +51,7 @@ int main(int argc, char* argv[], char* envp[])
 
     spdlog::set_pattern("intercept [pid: %P, level: %l] %v");
     spdlog::set_level(spdlog::level::info);
+    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
     const flags::Parser parser("intercept", VERSION,
         { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },

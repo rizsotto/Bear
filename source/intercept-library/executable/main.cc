@@ -57,6 +57,7 @@ int main(int argc, char* argv[], char* envp[])
 
     spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", ctx.get_pid(), ctx.get_ppid()));
     spdlog::set_level(spdlog::level::info);
+    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
     const flags::Parser parser("er", VERSION,
         { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },

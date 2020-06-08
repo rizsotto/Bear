@@ -75,7 +75,7 @@ namespace {
 
     void update_run_with_started(ic::Execution::Run& target, const supervise::Event& source)
     {
-        spdlog::debug("Received event is merged into execution report. [start]");
+        spdlog::debug("Received event is merged into execution report. [pid: {}, even: start]", source.pid());
         ic::Execution::Event event = ic::Execution::Event {
             "started",
             source.timestamp(),
@@ -87,7 +87,7 @@ namespace {
 
     void update_run_with_signaled(ic::Execution::Run& target, const supervise::Event& source)
     {
-        spdlog::debug("Received event is merged into execution report. [signal]");
+        spdlog::debug("Received event is merged into execution report. [pid: {}, event: signal]", source.pid());
         ic::Execution::Event event = ic::Execution::Event {
             "signaled",
             source.timestamp(),
@@ -99,7 +99,7 @@ namespace {
 
     void update_run_with_terminated(ic::Execution::Run& target, const supervise::Event& source)
     {
-        spdlog::debug("Received event is merged into execution report. [stop]");
+        spdlog::debug("Received event is merged into execution report. [pid: {}, event: stop]", source.pid());
         ic::Execution::Event event = ic::Execution::Event {
             "terminated",
             source.timestamp(),

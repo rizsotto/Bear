@@ -1,13 +1,11 @@
 #!/usr/bin/env sh
 
-# TODO: this shall not fail
-# XFAIL: *
-
 # REQUIRES: preload, shell, dynamic-shell
 # RUN: %{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true}
-# RUN: assert_intercepted %t.json count -ge 2
-# RUN: assert_intercepted %t.json contains -program %{true}
-# RUN: assert_intercepted %t.json contains -program %{sleep}
+# RUN: assert_intercepted %t.json count -ge 3
+# RUN: assert_intercepted %t.json contains -program %{true} -arguments %{true}
+# RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 1
+# RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 5
 
 for i in "$@"
 do
@@ -43,7 +41,8 @@ fi
 
 # do the test
 $SLEEP 5 &
-kill %1;
+$SLEEP 1
+kill -s SIGTERM %1;
 wait;
 
 $TRUE

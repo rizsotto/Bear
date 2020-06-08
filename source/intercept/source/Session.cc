@@ -118,6 +118,7 @@ namespace {
     rust::Result<std::map<std::string, std::string>> LibraryPreloadSession::update(const std::map<std::string, std::string>& env) const
     {
         std::map<std::string, std::string> copy(env);
+        // TODO: fix the verbose thing
         env::insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
         env::insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
         env::insert_or_merge(copy, env::GLIBC_PRELOAD_KEY, library_, env::merge_into_paths);

@@ -51,7 +51,7 @@ namespace rpc {
         request.set_path(name);
 
         const grpc::Status status = supervisor_->ResolveProgram(&context, request, &response);
-        spdlog::debug("gRPC call finished: {}", status.ok());
+        spdlog::debug("gRPC call [ResolveProgram] finished: {}", status.ok());
         return status.ok()
             ? rust::Result<std::string>(rust::Ok(response.path()))
             : rust::Result<std::string>(rust::Err(create_error(status)));
@@ -68,7 +68,7 @@ namespace rpc {
         request.mutable_values()->insert(input.begin(), input.end());
 
         const grpc::Status status = supervisor_->Update(&context, request, &response);
-        spdlog::debug("gRPC call finished: {}", status.ok());
+        spdlog::debug("gRPC call [Update] finished: {}", status.ok());
         if (status.ok()) {
             std::map<std::string, std::string> copy(response.values().begin(), response.values().end());
             return rust::Ok(copy);
@@ -85,8 +85,8 @@ namespace rpc {
             supervise::Empty response;
 
             const grpc::Status status = interceptor_->Register(&context, event, &response);
+            spdlog::debug("gRPC call [Register] finished: {}", status.ok());
             if (!status.ok()) {
-                spdlog::warn("gRPC call finished: {}", status.ok());
                 return rust::Result<int>(rust::Err(create_error(status)));
             }
         }

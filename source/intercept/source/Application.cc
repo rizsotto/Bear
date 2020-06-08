@@ -72,11 +72,14 @@ namespace {
     sys::Process* CHILD_PROCESS = nullptr;
 
     void handler(int signum) {
+        spdlog::debug("Signal received: {}", signum);
         if (CHILD_PROCESS != nullptr) {
             CHILD_PROCESS->kill(signum)
                 .on_error([](auto error) {
                     spdlog::warn("sending signal to child failed: {}", error.what());
                 });
+        } else {
+            spdlog::warn("received signal, but no child to forward to.");
         }
     }
 
@@ -92,6 +95,7 @@ namespace {
             })
             .and_then<sys::ExitStatus>([](auto child) {
                 CHILD_PROCESS = &child;
+                spdlog::debug("Executed command [pid: {}]", child.get_pid());
 
                 auto result = child.wait();
 
