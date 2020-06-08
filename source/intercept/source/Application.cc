@@ -17,12 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "Application.h"
 #include "Reporter.h"
 #include "Services.h"
 #include "Session.h"
 #include "libsys/Context.h"
+#include "libsys/Signal.h"
 
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
@@ -33,74 +33,19 @@
 #include <fmt/format.h>
 
 #include <vector>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
 
 namespace {
 
-#ifdef HAVE_SIGNAL
-    int SIGNALS_TO_FORWARD[] = {
-        SIGABRT,
-        SIGALRM,
-        SIGBUS,
-        SIGCONT,
-        SIGFPE,
-        SIGHUP,
-        SIGINT,
-        SIGPIPE,
-        SIGPOLL,
-        SIGPROF,
-        SIGQUIT,
-        SIGSEGV,
-        SIGSTOP,
-        SIGSYS,
-        SIGTERM,
-        SIGTRAP,
-        SIGTSTP,
-        SIGTTIN,
-        SIGTTOU,
-        SIGUSR1,
-        SIGUSR2,
-        SIGURG,
-        SIGVTALRM,
-        SIGXCPU,
-        SIGXFSZ
-    };
-#endif
-
-    sys::Process* CHILD_PROCESS = nullptr;
-
-    void handler(int signum) {
-        spdlog::debug("Signal received: {}", signum);
-        if (CHILD_PROCESS != nullptr) {
-            CHILD_PROCESS->kill(signum)
-                .on_error([](auto error) {
-                    spdlog::warn("sending signal to child failed: {}", error.what());
-                });
-        } else {
-            spdlog::warn("received signal, but no child to forward to.");
-        }
-    }
-
     rust::Result<int> execute_command(const ic::Session& session, const std::vector<std::string_view>& command) {
-#ifdef HAVE_SIGNAL
-        for (auto signum : SIGNALS_TO_FORWARD) {
-            signal(signum, &handler);
-        }
-#endif
         return session.supervise(command)
             .and_then<sys::Process>([](auto builder) {
                 return builder.spawn(false);
             })
             .and_then<sys::ExitStatus>([](auto child) {
-                CHILD_PROCESS = &child;
+                sys::SignalForwarder guard(&child);
                 spdlog::debug("Executed command [pid: {}]", child.get_pid());
 
-                auto result = child.wait();
-
-                CHILD_PROCESS = nullptr;
-                return result;
+                return child.wait();
             })
             .map<int>([](auto status) {
                 return status.code().value_or(EXIT_FAILURE);

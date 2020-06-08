@@ -17,12 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "Application.h"
 #include "librpc/InterceptClient.h"
 #include "librpc/supervise.grpc.pb.h"
 #include "er/Flags.h"
 #include "libsys/Process.h"
+#include "libsys/Signal.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -30,55 +30,8 @@
 
 #include <chrono>
 #include <memory>
-#ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
 
 namespace {
-
-#ifdef HAVE_SIGNAL
-    int SIGNALS_TO_FORWARD[] = {
-        SIGABRT,
-        SIGALRM,
-        SIGBUS,
-        SIGCONT,
-        SIGFPE,
-        SIGHUP,
-        SIGINT,
-        SIGPIPE,
-        SIGPOLL,
-        SIGPROF,
-        SIGQUIT,
-        SIGSEGV,
-        SIGSTOP,
-        SIGSYS,
-        SIGTERM,
-        SIGTRAP,
-        SIGTSTP,
-        SIGTTIN,
-        SIGTTOU,
-        SIGUSR1,
-        SIGUSR2,
-        SIGURG,
-        SIGVTALRM,
-        SIGXCPU,
-        SIGXFSZ
-    };
-#endif
-
-    sys::Process* CHILD_PROCESS = nullptr;
-
-    void handler(int signum) {
-        spdlog::debug("Signal received: {}", signum);
-        if (CHILD_PROCESS != nullptr) {
-            CHILD_PROCESS->kill(signum)
-                .on_error([](auto error) {
-                    spdlog::warn("sending signal to child failed: {}", error.what());
-                });
-        } else {
-            spdlog::warn("received signal, but no child to forward to.");
-        }
-    }
 
     struct Execution {
         const std::string_view path;
@@ -186,11 +139,6 @@ namespace er {
 
     rust::Result<int> Application::operator()() const
     {
-#ifdef HAVE_SIGNAL
-        for (auto signum : SIGNALS_TO_FORWARD) {
-            signal(signum, &handler);
-        }
-#endif
         rpc::InterceptClient client(impl_->session.destination);
 
         auto result = client.get_environment_update(impl_->execution.environment)
@@ -216,7 +164,7 @@ namespace er {
                     });
             })
             .and_then<sys::ExitStatus>([&client](auto child) {
-                CHILD_PROCESS = &child;
+                sys::SignalForwarder guard(&child);
                 while (true) {
                     auto status = child.wait(true);
                     status.on_success([&client, &child](auto exit) {
@@ -226,7 +174,6 @@ namespace er {
                         client.report(events);
                     });
                     if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
-                        CHILD_PROCESS = nullptr;
                         return status;
                     }
                 }
