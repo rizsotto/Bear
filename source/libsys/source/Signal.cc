@@ -17,37 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "libsys/Signal.h"
-
- #ifdef HAVE_SIGNAL_H
-#include <signal.h>
-#endif
+#include "libsys/Process.h"
 
 namespace {
-
-    int SIGNALS_TO_FORWARD[] = {
-#ifdef HAVE_SIGNAL
-        SIGCONT,
-        SIGHUP,
-        SIGINFO,
-        SIGINT,
-        SIGPIPE,
-        SIGPOLL,
-        SIGQUIT,
-        SIGSTOP,
-        SIGTERM,
-        SIGTSTP,
-        SIGTTIN,
-        SIGTTOU,
-        SIGUSR1,
-        SIGUSR2,
-        SIGVTALRM,
-        SIGWINCH,
-        SIGXCPU,
-        SIGXFSZ
-#endif
-    };
 
     sys::Process* CHILD_PROCESS = nullptr;
 
@@ -56,23 +29,24 @@ namespace {
             CHILD_PROCESS->kill(signum);
         }
     }
-
 }
 
 namespace sys {
 
-    [[maybe_unused]] [[maybe_unused]] SignalForwarder::SignalForwarder(Process* child)
+    SignalForwarder::SignalForwarder(Process* child)
+            : handlers_()
     {
         CHILD_PROCESS = child;
-#ifdef HAVE_SIGNAL
-        for (auto signum : SIGNALS_TO_FORWARD) {
-            signal(signum, &handler);
+        for (int signum = 1; signum < NSIG; ++signum) {
+            handlers_[signum] = signal(signum, &handler);
         }
-#endif
     }
 
     SignalForwarder::~SignalForwarder()
     {
         CHILD_PROCESS = nullptr;
+        for (int signum = 1; signum < NSIG; ++signum) {
+            signal(signum, handlers_[signum]);
+        }
     }
 }

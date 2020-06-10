@@ -19,13 +19,15 @@
 
 #pragma once
 
-#include "libsys/Process.h"
+#include <csignal>
 
 namespace sys {
 
+    class Process;
+
     class SignalForwarder {
     public:
-        [[maybe_unused]] explicit SignalForwarder(Process* child);
+        explicit SignalForwarder(Process* child);
         ~SignalForwarder();
 
     public:
@@ -35,5 +37,8 @@ namespace sys {
 
         SignalForwarder& operator=(const SignalForwarder&) = delete;
         SignalForwarder& operator=(SignalForwarder&&) noexcept = delete;
+
+    private:
+        sighandler_t handlers_[NSIG];
     };
 }

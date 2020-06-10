@@ -42,7 +42,7 @@ fi
 # do the test
 $SLEEP 5 &
 $SLEEP 1
-kill -s SIGTERM %1;
+kill -15 %1;
 wait;
 
 $TRUE

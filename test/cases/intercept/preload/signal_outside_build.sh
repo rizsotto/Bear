@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload, shell, dynamic-shell
-# RUN: %{shell} -c "%{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -s SIGTERM %1; wait;"
+# RUN: %{shell} -c "%{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -15 %1; wait;"
 # RUN: assert_intercepted %t.json count -ge 2
 # RUN: assert_intercepted %t.json contains -program %{true}
 # RUN: assert_intercepted %t.json contains -program %{sleep}
