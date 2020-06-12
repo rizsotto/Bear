@@ -71,38 +71,57 @@ Developer dependencies:
 - [googletest](https://github.com/google/googletest) >= 1.10
 - [lit](https://pypi.org/project/lit/0.7.1/) >= 0.7
 
-Install from packages on Fedora 32
+Install dependencies from packages on Fedora 32
 
     dnf install json-devel spdlog-devel fmt-devel grpc-devel grpc-plugins
+    dnf install gtest-devel gmock-devel # optional for running the tests
+    
+Install dependencies from packages on Arch
+
+    pacman -S grpc spdlog fmt nlohmann-json
+    pacman -S gtest gmock # optional for running the tests
 
 ### Build commands
 
 Ideally, you should build Bear in a separate build directory.
 
-    cmake $BEAR_SOURCE_DIR
+    cmake -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF $BEAR_SOURCE_DIR
     make all
-    make install # to install
-    make check   # to run tests
-    make package # to make packages
+    make install
 
 You can configure the build process with passing arguments to cmake.
+
+To run test during the build process, you will need to install the
+test frameworks and re-configure the build. For unit testing Bear
+uses googletest, which will be built from source if you not install
+it before.
+
+    # install `lit` the functional test framework into a python virtualenv
+    mkvirtualenv bear
+    pip install lit
+    # it's important to re-run the configure step again
+    cmake $BEAR_SOURCE_DIR
+    make all
+    make check
 
 How to use
 ----------
 
 After installation the usage is like this:
 
-    bear <your-build-command>
+    bear -- <your-build-command>
 
 The output file called `compile_commands.json` is saved in the current directory.
 
-For more options you can check the man page or pass `--help` parameter.
+For more options you can check the man page or pass `--help` parameter. Note
+that if you want to pass parameter to Bear, pass those _before_ the `--` sign,
+everything after that will be the build command. 
 
-Side note: Since `bear` is executing the build command only those commands
-will be recorded which were actually executed. Which means if you have already
-built your project and you re-run the build command with Bear you probably end
-up to have an empty output. (Practically it means you need to run `make clean`
-before you run `bear make`.)
+Side note: Since Bear is executing the build command, only those commands will
+be recorded which were actually executed during the current build. Which means
+if you have already built your project and you re-run the build command with
+Bear you probably end up to have an empty output. (Practically it means you
+need to run `make clean` before you run `bear make`.)
 
 Known issues
 ------------
