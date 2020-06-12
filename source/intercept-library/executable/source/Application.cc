@@ -26,7 +26,6 @@
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <memory>
@@ -156,7 +155,6 @@ namespace er {
                     .set_environment(execution.environment)
                     .spawn(true)
                     .on_success([&client, &execution](auto& child) {
-                        spdlog::debug("Executed command [pid: {}]", child.get_pid());
                         client.report(make_start_event(child.get_pid(), getppid(), execution));
                     });
             })

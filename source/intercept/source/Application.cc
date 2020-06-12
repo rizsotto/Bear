@@ -24,11 +24,8 @@
 #include "libsys/Context.h"
 #include "libsys/Signal.h"
 
-#include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
-#include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
-#include <grpcpp/server_context.h>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 
@@ -43,8 +40,6 @@ namespace {
             })
             .and_then<sys::ExitStatus>([](auto child) {
                 sys::SignalForwarder guard(&child);
-                spdlog::debug("Executed command [pid: {}]", child.get_pid());
-
                 return child.wait();
             })
             .map<int>([](auto status) {
@@ -116,7 +111,6 @@ namespace ic {
         // Configure the session and the reporter objects
         impl_->session_->set_server_address(server_address);
         // Execute the build command
-        spdlog::debug("Running command.");
         auto result = execute_command(*impl_->session_, impl_->command);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");

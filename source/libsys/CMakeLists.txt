@@ -10,6 +10,7 @@ target_include_directories(sys_a PUBLIC include/)
 target_link_libraries(sys_a PUBLIC ${CMAKE_DL_LIBS})
 target_link_libraries(sys_a PUBLIC result_a)
 target_link_libraries(sys_a PRIVATE fmt::fmt)
+target_link_libraries(sys_a PRIVATE spdlog::spdlog)
 
 if (ENABLE_UNIT_TESTS)
     add_executable(sys_unit_test

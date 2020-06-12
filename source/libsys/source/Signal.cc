@@ -22,10 +22,23 @@
 
 namespace {
 
+    int SIGNALS_TO_NOT_FWD[] = {
+        SIGKILL,
+        SIGCHLD
+    };
+
+    bool shall_forward(int signum) {
+        for (auto blocked : SIGNALS_TO_NOT_FWD) {
+            if (blocked == signum)
+                return false;
+        }
+        return true;
+    }
+
     sys::Process* CHILD_PROCESS = nullptr;
 
     void handler(int signum) {
-        if (CHILD_PROCESS != nullptr) {
+        if (CHILD_PROCESS != nullptr && shall_forward(signum)) {
             CHILD_PROCESS->kill(signum);
         }
     }

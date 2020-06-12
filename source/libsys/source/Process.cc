@@ -25,10 +25,9 @@
 #include "Environment.h"
 
 #include <cerrno>
-#include <climits>
-#include <csignal>
 #include <cstdlib>
 #include <utility>
+#include <iostream>
 
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
@@ -44,6 +43,9 @@
 #endif
 
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
+#include "spdlog/fmt/ostr.h"
+#include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
 
@@ -208,6 +210,48 @@ namespace {
         return rust::Err(std::runtime_error(
             fmt::format("Could not find executable: {} ({})", name, sys::error_string(error))));
     }
+
+    rust::Result<sys::ExitStatus> wait_for(pid_t pid, bool request_for_signals)
+    {
+        errno = 0;
+        const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
+        if (int status; - 1 != waitpid(pid, &status, mask)) {
+            if (WIFEXITED(status)) {
+                return rust::Ok(sys::ExitStatus(true, WEXITSTATUS(status)));
+            } else if (WIFSIGNALED(status)) {
+                return rust::Ok(sys::ExitStatus(false, WTERMSIG(status)));
+            } else if (WIFSTOPPED(status)) {
+                return rust::Ok(sys::ExitStatus(false, WSTOPSIG(status)));
+            } else if (WIFCONTINUED(status)) {
+                return rust::Ok(sys::ExitStatus(false, SIGCONT));
+            } else {
+                return rust::Err(std::runtime_error("System call \"waitpid\" result is broken."));
+            }
+        } else {
+            auto message = fmt::format("System call \"waitpid\" failed: {}", sys::error_string(errno));
+            return rust::Err(std::runtime_error(message));
+        }
+    }
+
+    rust::Result<int> send_signal(pid_t pid, int num)
+    {
+        errno = 0;
+        if (const int result = ::kill(pid, num); 0 == result) {
+            return rust::Ok(result);
+        } else {
+            auto message = fmt::format("System call \"kill\" failed: {}", sys::error_string(errno));
+            return rust::Err(std::runtime_error(message));
+        }
+    }
+
+    std::ostream& operator<<(std::ostream& os, const std::list<std::string>& arguments)
+    {
+        os << '[';
+        std::copy(arguments.begin(), arguments.end(), std::ostream_iterator<std::string>(os, ", "));
+        os << ']';
+
+        return os;
+    }
 }
 
 namespace sys {
@@ -250,36 +294,26 @@ namespace sys {
 
     rust::Result<ExitStatus> Process::wait(bool request_for_signals)
     {
-        errno = 0;
-        const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
-        if (int status; - 1 != waitpid(pid_, &status, mask)) {
-            if (WIFEXITED(status)) {
-                return rust::Ok(ExitStatus(true, WEXITSTATUS(status)));
-            } else if (WIFSIGNALED(status)) {
-                return rust::Ok(ExitStatus(false, WTERMSIG(status)));
-            } else if (WIFSTOPPED(status)) {
-                return rust::Ok(ExitStatus(false, WSTOPSIG(status)));
-            } else if (WIFCONTINUED(status)) {
-                return rust::Ok(ExitStatus(false, SIGCONT));
-            } else {
-                return rust::Err(std::runtime_error("System call \"waitpid\" result is broken."));
-            }
-        } else {
-            auto message = fmt::format("System call \"waitpid\" failed: {}", error_string(errno));
-            return rust::Err(std::runtime_error(message));
-        }
+        spdlog::debug("Process wait requested. [pid: {}]", pid_);
+        return wait_for(pid_, request_for_signals)
+            .on_success([*this](const auto& result) {
+                spdlog::debug("Process wait request: done. [pid: {}]", pid_);
+            })
+            .on_error([*this](const auto& error) {
+                spdlog::debug("Process wait request: failed. [pid: {}] {}", pid_, error.what());
+            });
     }
 
-    // TODO: make this to return Result<void>
     rust::Result<int> Process::kill(int num)
     {
-        errno = 0;
-        if (const int result = ::kill(pid_, num); 0 == result) {
-            return rust::Ok(result);
-        } else {
-            auto message = fmt::format("System call \"kill\" failed: {}", error_string(errno));
-            return rust::Err(std::runtime_error(message));
-        }
+        spdlog::debug("Process kill requested. [pid: {}, signum: {}]", pid_, num);
+        return send_signal(pid_, num)
+            .on_success([*this](const auto& result) {
+                spdlog::debug("Process kill request: done. [pid: {}]", pid_);
+            })
+            .on_error([*this](const auto& error) {
+                spdlog::debug("Process kill request: failed. [pid: {}] {}", pid_, error.what());
+            });
     }
 
     Process::Builder::Builder(std::string program)
@@ -348,12 +382,16 @@ namespace sys {
                 // convert the environment into a c-style array
                 sys::env::Guard env(environment_);
 
-                // TODO: check if child process is writing the stdout
-                // TODO: check if child process is reading the stdin
-                return spawn_ptr(path.c_str(), nullptr, nullptr, const_cast<char**>(args.data()), const_cast<char**>(env.data()));
+                return spawn_ptr(path.c_str(), nullptr, nullptr, args.data(), const_cast<char**>(env.data()));
             })
             .map<Process>([](const auto& pid) {
                 return Process(pid);
+            })
+            .on_success([*this](const auto& process) {
+                spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), parameters_);
+            })
+            .on_error([](const auto& error) {
+                spdlog::debug("Process spawn failed. {}", error.what());
             });
     }
 }
