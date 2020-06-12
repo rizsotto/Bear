@@ -37,7 +37,7 @@ namespace {
     constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
-    const el::log::Logger LOGGER("Executor.cc");
+    constexpr el::log::Logger LOGGER("Executor.cc");
 
     constexpr el::Executor::Result failure(int const error_code) noexcept
     {

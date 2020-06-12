@@ -33,7 +33,7 @@ namespace el {
 
         class Logger {
         public:
-            explicit Logger(const char *name) noexcept;
+            constexpr explicit Logger(const char *name) noexcept;
 
             ~Logger() noexcept = default;
 
@@ -46,5 +46,11 @@ namespace el {
         private:
             const char* name_;
         };
+
+        inline constexpr
+        Logger::Logger(const char* name) noexcept
+                : name_(name)
+        {
+        }
     }
 }

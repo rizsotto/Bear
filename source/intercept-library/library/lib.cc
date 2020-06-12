@@ -58,7 +58,7 @@ namespace {
     el::Session SESSION = el::session::init();
     el::Resolver RESOLVER;
 
-    const el::log::Logger LOGGER("lib.cc");
+    constexpr el::log::Logger LOGGER("lib.cc");
 }
 
 /**

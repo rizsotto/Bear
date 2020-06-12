@@ -39,11 +39,6 @@ namespace el {
             LEVEL = level;
         }
 
-        Logger::Logger(const char* name) noexcept
-                : name_(name)
-        {
-        }
-
         void Logger::debug(char const* message) const noexcept
         {
             if (el::log::VERBOSE == LEVEL) {
