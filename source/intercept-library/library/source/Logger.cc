@@ -31,11 +31,11 @@ namespace {
 
     void verbose_message(char const* name, char const* message, char const* variable)
     {
-        std::timespec ts { 0, 0 };
+        struct timespec ts { 0, 0 };
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
             // ignore failure, default values will be good
         }
-        std::tm local_time {};
+        struct tm local_time {};
         localtime_r(&ts.tv_sec, &local_time);
         const unsigned long micros = ts.tv_nsec / 1000;
         const pid_t pid = getpid();
