@@ -41,7 +41,6 @@ namespace el {
             void debug(char const* message, char const* variable) const noexcept;
 
             void warning(char const* message) const noexcept;
-            void warning(char const* message, char const* variable) const noexcept;
 
         private:
             const char* name_;

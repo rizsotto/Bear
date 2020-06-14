@@ -49,7 +49,7 @@ int main(int argc, char* argv[], char* envp[])
 {
     const sys::Context ctx;
 
-    spdlog::set_pattern("intercept [pid: %P, level: %l] %v");
+    spdlog::set_pattern("intercept: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
     spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
@@ -64,6 +64,7 @@ int main(int argc, char* argv[], char* envp[])
         // change the log verbosity if requested.
         .on_success([](const auto& args) {
             if (args.as_bool(ic::Application::VERBOSE).unwrap_or(false)) {
+                spdlog::set_pattern("[%H:%M:%S.%f, ic, %P] %v");
                 spdlog::set_level(spdlog::level::debug);
             }
             spdlog::debug("arguments parsed: {}", args);

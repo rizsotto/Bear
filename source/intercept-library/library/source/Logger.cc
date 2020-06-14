@@ -19,52 +19,57 @@
 
 #include "Logger.h"
 
-#include "Resolver.h"
-#include "Session.h"
-
+#include <ctime>
 #include <cstdio>
 #include <unistd.h>
 
 namespace {
 
+    constexpr std::time_t SECS_IN_DAY = 24 * 60 * 60;
+
     el::log::Level LEVEL = el::log::SILENT;
 
+    void verbose_message(char const* name, char const* message, char const* variable)
+    {
+        std::timespec ts { 0, 0 };
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+            // ignore failure, default values will be good
+        }
+        std::tm local_time {};
+        localtime_r(&ts.tv_sec, &local_time);
+        const unsigned long micros = ts.tv_nsec / 1000;
+        const pid_t pid = getpid();
+        dprintf(STDERR_FILENO, "[%02d:%02d:%02d.%06ld, el, %d] %s; %s%s\n",
+            local_time.tm_hour, local_time.tm_min, local_time.tm_sec, micros, pid, name, message, variable);
+    }
 }
 
-namespace el {
-    namespace log {
+namespace el::log {
 
-        void set(Level level)
-        {
-            LEVEL = level;
+    void set(Level level)
+    {
+        LEVEL = level;
+        fdatasync(STDERR_FILENO);
+    }
+
+    void Logger::debug(char const* message) const noexcept
+    {
+        this->debug(message, "");
+    }
+
+    void Logger::debug(char const* message, char const* variable) const noexcept
+    {
+        if (el::log::VERBOSE == LEVEL) {
+            verbose_message(name_, message, variable);
         }
+    }
 
-        void Logger::debug(char const* message) const noexcept
-        {
-            if (el::log::VERBOSE == LEVEL) {
-                auto pid = getpid();
-                dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s\n", pid, name_, message);
-            }
-        }
-
-        void Logger::debug(char const* message, char const* variable) const noexcept
-        {
-            if (el::log::VERBOSE == LEVEL) {
-                auto pid = getpid();
-                dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s%s\n", pid, name_, message, variable);
-            }
-        }
-
-        void Logger::warning(char const* message) const noexcept
-        {
-            auto pid = getpid();
-            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s\n", pid, name_, message);
-        }
-
-        void Logger::warning(char const* message, char const* variable) const noexcept
-        {
-            auto pid = getpid();
-            dprintf(STDERR_FILENO, "libexec.so: [pid: %d] %s; %s%s\n", pid, name_, message, variable);
+    void Logger::warning(char const* message) const noexcept
+    {
+        if (el::log::VERBOSE == LEVEL) {
+            verbose_message(name_, message, "");
+        } else {
+            dprintf(STDERR_FILENO, "libexec.so: %s; %s\n", name_, message);
         }
     }
 }

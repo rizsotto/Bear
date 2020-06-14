@@ -22,25 +22,23 @@
 #include "Environment.h"
 #include "Array.h"
 
-namespace el {
-    namespace env {
+namespace el::env {
 
-        const char* get_env_value(const char** envp, const char* key) noexcept
-        {
-            const size_t key_size = el::array::length(key);
+    const char* get_env_value(const char** envp, const char* key) noexcept
+    {
+        const size_t key_size = el::array::length(key);
 
-            for (const char** it = envp; *it != nullptr; ++it) {
-                const char* const current = *it;
-                // Is the key a prefix of the pointed string?
-                if (!el::array::equal_n(key, current, key_size))
-                    continue;
-                // Is the next character is the equal sign?
-                if (current[key_size] != '=')
-                    continue;
-                // It must be the one! Calculate the address of the value.
-                return current + key_size + 1;
-            }
-            return nullptr;
+        for (const char** it = envp; *it != nullptr; ++it) {
+            const char* const current = *it;
+            // Is the key a prefix of the pointed string?
+            if (!el::array::equal_n(key, current, key_size))
+                continue;
+            // Is the next character is the equal sign?
+            if (current[key_size] != '=')
+                continue;
+            // It must be the one! Calculate the address of the value.
+            return current + key_size + 1;
         }
+        return nullptr;
     }
 }

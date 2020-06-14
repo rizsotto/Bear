@@ -99,7 +99,7 @@ extern "C" void on_unload()
 
 extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 {
-    LOGGER.debug("execve path=", path);
+    LOGGER.debug("execve path: ", path);
 
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
@@ -108,7 +108,7 @@ extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 
 extern "C" int execv(const char* path, char* const argv[])
 {
-    LOGGER.debug("execv path=", path);
+    LOGGER.debug("execv path: ", path);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
@@ -118,7 +118,7 @@ extern "C" int execv(const char* path, char* const argv[])
 
 extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 {
-    LOGGER.debug("execvpe file=", file);
+    LOGGER.debug("execvpe file: ", file);
 
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
     errno = result.error_code;
@@ -127,7 +127,7 @@ extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 
 extern "C" int execvp(const char* file, char* const argv[])
 {
-    LOGGER.debug("execvp file=", file);
+    LOGGER.debug("execvp file: ", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
@@ -137,7 +137,7 @@ extern "C" int execvp(const char* file, char* const argv[])
 
 extern "C" int execvP(const char* file, const char* search_path, char* const argv[])
 {
-    LOGGER.debug("execvP file=", file);
+    LOGGER.debug("execvP file: ", file);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
@@ -147,7 +147,7 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 
 extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 {
-    LOGGER.debug("exect path=", path);
+    LOGGER.debug("exect path: ", path);
 
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
     errno = result.error_code;
@@ -156,7 +156,7 @@ extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 
 extern "C" int execl(const char* path, const char* arg, ...)
 {
-    LOGGER.debug("execl path=", path);
+    LOGGER.debug("execl path: ", path);
 
     // Count the number of arguments.
     va_list ap;
@@ -178,7 +178,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
 
 extern "C" int execlp(const char* file, const char* arg, ...)
 {
-    LOGGER.debug("execlp file=", file);
+    LOGGER.debug("execlp file: ", file);
 
     // Count the number of arguments.
     va_list ap;
@@ -201,7 +201,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
 extern "C" int execle(const char* path, const char* arg, ...)
 {
-    LOGGER.debug("execle path=", path);
+    LOGGER.debug("execle path: ", path);
 
     // Count the number of arguments.
     va_list ap;
@@ -226,7 +226,7 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
     const posix_spawnattr_t* attrp,
     char* const argv[], char* const envp[])
 {
-    LOGGER.debug("posix_spawn path=", path);
+    LOGGER.debug("posix_spawn path:", path);
 
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
     errno = result.error_code;
@@ -238,7 +238,7 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
     const posix_spawnattr_t* attrp,
     char* const argv[], char* const envp[])
 {
-    LOGGER.debug("posix_spawnp file=", file);
+    LOGGER.debug("posix_spawnp file:", file);
 
     const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
     errno = result.error_code;

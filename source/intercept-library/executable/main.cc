@@ -55,7 +55,7 @@ int main(int argc, char* argv[], char* envp[])
 {
     const sys::Context ctx;
 
-    spdlog::set_pattern(fmt::format("er: [pid: {0}, ppid: {1}] %v", ctx.get_pid(), ctx.get_ppid()));
+    spdlog::set_pattern(fmt::format("er: %v [pid: %P]"));
     spdlog::set_level(spdlog::level::info);
     spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
@@ -66,8 +66,9 @@ int main(int argc, char* argv[], char* envp[])
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // log the original command line as it was received.
-        .on_success([&argv](const auto& args) {
+        .on_success([&ctx, &argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
+                spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", ctx.get_pid(), ctx.get_ppid()));
                 spdlog::set_level(spdlog::level::debug);
             }
             spdlog::debug("arguments raw: {}", Arguments { argv });

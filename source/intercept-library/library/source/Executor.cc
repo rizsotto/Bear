@@ -182,14 +182,11 @@ namespace {
     int is_executable(const el::Resolver& resolver, const char* path)
     {
         if (0 == resolver.access(path, X_OK)) {
-            LOGGER.debug("is executable check [passed]: path=", path);
             return 0;
         }
         if (0 == resolver.access(path, F_OK)) {
-            LOGGER.debug("is executable check [file exists]): path=", path);
             return EACCES;
         }
-        LOGGER.debug("is executable check [failed]: path=", path);
         return ENOENT;
     }
 

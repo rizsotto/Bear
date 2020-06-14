@@ -247,7 +247,12 @@ namespace {
     std::ostream& operator<<(std::ostream& os, const std::list<std::string>& arguments)
     {
         os << '[';
-        std::copy(arguments.begin(), arguments.end(), std::ostream_iterator<std::string>(os, ", "));
+        for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+            if (it != arguments.begin()) {
+                os << ", ";
+            }
+            os << *it;
+        }
         os << ']';
 
         return os;

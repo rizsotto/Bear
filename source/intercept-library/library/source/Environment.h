@@ -19,19 +19,17 @@
 
 #pragma once
 
-namespace el {
-    namespace env {
+namespace el::env {
 
-        /**
-         * Returns the value for the given environment name, from the given
-         * environment array.
-         *
-         * It's a re-implementation of the standard library function..
-         *
-         * @param envp the environment array.
-         * @param key the name of the environment.
-         * @return the value of the environment.
-         */
-        const char* get_env_value(const char** envp, const char* key) noexcept;
-    }
+    /**
+     * Returns the value for the given environment name, from the given
+     * environment array.
+     *
+     * It's a re-implementation of the standard library function..
+     *
+     * @param envp the environment array.
+     * @param key the name of the environment.
+     * @return the value of the environment.
+     */
+    const char* get_env_value(const char** envp, const char* key) noexcept;
 }
