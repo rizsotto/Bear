@@ -301,10 +301,10 @@ namespace sys {
     {
         spdlog::debug("Process wait requested. [pid: {}]", pid_);
         return wait_for(pid_, request_for_signals)
-            .on_success([*this](const auto& result) {
+            .on_success([this](const auto& result) {
                 spdlog::debug("Process wait request: done. [pid: {}]", pid_);
             })
-            .on_error([*this](const auto& error) {
+            .on_error([this](const auto& error) {
                 spdlog::debug("Process wait request: failed. [pid: {}] {}", pid_, error.what());
             });
     }
@@ -313,10 +313,10 @@ namespace sys {
     {
         spdlog::debug("Process kill requested. [pid: {}, signum: {}]", pid_, num);
         return send_signal(pid_, num)
-            .on_success([*this](const auto& result) {
+            .on_success([this](const auto& result) {
                 spdlog::debug("Process kill request: done. [pid: {}]", pid_);
             })
-            .on_error([*this](const auto& error) {
+            .on_error([this](const auto& error) {
                 spdlog::debug("Process kill request: failed. [pid: {}] {}", pid_, error.what());
             });
     }
@@ -392,7 +392,7 @@ namespace sys {
             .map<Process>([](const auto& pid) {
                 return Process(pid);
             })
-            .on_success([*this](const auto& process) {
+            .on_success([this](const auto& process) {
                 spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), parameters_);
             })
             .on_error([](const auto& error) {
