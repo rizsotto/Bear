@@ -34,13 +34,12 @@ namespace ic {
         using SharedPtr = std::shared_ptr<Reporter>;
         static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const sys::Context&, const ic::Session&);
 
-        // add a new execution and persist into the output file.
         void report(const ::supervise::Event& request);
         void flush();
-        void flush(std::ostream&);
 
     public:
-        ~Reporter() noexcept = default;
+        Reporter() = delete;
+        virtual ~Reporter() noexcept = default;
 
         Reporter(const Reporter&) = delete;
         Reporter(Reporter&&) noexcept = delete;
@@ -48,9 +47,12 @@ namespace ic {
         Reporter& operator=(const Reporter&) = delete;
         Reporter& operator=(Reporter&&) noexcept = delete;
 
-    private:
-        Reporter() = default;
+    protected:
+        // These methods are visible for testing...
         Reporter(const std::string_view& view, ic::Context&& context);
+
+        void flush(std::ostream&) const;
+        [[nodiscard]] ic::Report makeReport() const;
 
     private:
         std::string output_;

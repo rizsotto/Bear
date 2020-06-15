@@ -198,15 +198,18 @@ namespace ic {
         flush(targetFile);
     }
 
-    void Reporter::flush(std::ostream& stream)
+    void Reporter::flush(std::ostream& stream) const
     {
-        ic::Report report = ic::Report { context_, { } };
+        nlohmann::json j = makeReport();
+        stream << j << std::endl;
+    }
+
+    Report Reporter::makeReport() const
+    {
+        Report report = Report { context_, { } };
         std::transform(executions_.begin(), executions_.end(),
                        std::back_inserter(report.executions),
                        [](auto pid_execution_pair) { return pid_execution_pair.second; });
-
-        nlohmann::json j = report;
-
-        stream << j << std::endl;
+        return report;
     }
 }
