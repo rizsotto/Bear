@@ -1,6 +1,6 @@
 
 message(STATUS "Looking for fmt dependency")
-find_package(fmt 6.2.1 QUIET CONFIG)
+find_package(fmt 6.1 QUIET CONFIG)
 if (fmt_FOUND)
     message(STATUS "Looking for fmt dependency -- found")
     add_custom_target(fmt_dependency)
