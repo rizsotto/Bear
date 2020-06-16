@@ -10,7 +10,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-20.04]
 
     steps:
       - name: Checkout code
@@ -20,7 +20,10 @@ jobs:
         run: |
           sudo apt-get update -y
           #sudo apt-get upgrade -y
-          sudo apt-get install -y libc6-dev virtualenv gfortran nvidia-cuda-toolkit valgrind
+          sudo apt-get install -y virtualenv gfortran nvidia-cuda-toolkit valgrind \
+                                  libfmt-dev libspdlog-dev nlohmann-json3-dev \
+                                  libgrpc++-dev protobuf-compiler-grpc
+
       - name: Install python test dependencies
         run: |
           virtualenv -p python3 "$HOME/venv"
