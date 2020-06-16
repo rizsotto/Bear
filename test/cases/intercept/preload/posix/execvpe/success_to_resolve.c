@@ -3,9 +3,11 @@
 // RUN: %{intercept} --verbose --output %t.json -- %t
 // RUN: assert_intercepted %t.json count -eq 2
 // RUN: assert_intercepted %t.json contains -program %t -arguments %t
-// RUN: assert_intercepted %t.json contains -program %{echo} -arguments echo "hi there"
+// RUN: assert_intercepted %t.json contains -arguments echo "hi there"
 
 #include "config.h"
+
+#define _GNU_SOURCE
 
 #if defined HAVE_UNISTD_H
 #include <unistd.h>
