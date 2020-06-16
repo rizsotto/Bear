@@ -1,6 +1,7 @@
 add_library(sys_a OBJECT
         source/Context.cc
         source/Environment.cc
+        source/Errors.cc
         source/Path.cc
         source/Process.cc
         source/Signal.cc

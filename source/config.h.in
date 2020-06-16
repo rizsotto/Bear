@@ -48,6 +48,12 @@
 #cmakedefine HAVE_ENOENT
 #cmakedefine HAVE_UNAME
 
+// string.h function
+#cmakedefine HAVE_STRERROR_R
+
+// unistd.h might declare the environ symbol
+#cmakedefine HAVE_ENVIRON
+
 // confstr and macros
 #cmakedefine HAVE_CONFSTR
 #cmakedefine HAVE_CS_PATH

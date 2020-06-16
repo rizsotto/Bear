@@ -30,6 +30,9 @@
 #ifdef HAVE_SYS_UTSNAME_H
 #include <sys/utsname.h>
 #endif
+#ifndef HAVE_ENVIRON
+extern char **environ;
+#endif
 
 #include <fmt/format.h>
 
