@@ -34,13 +34,13 @@ namespace {
         while (va_arg(args, const char*) != nullptr)
             ++arg_count;
         return arg_count;
-    };
+    }
 
     void va_copy_n(va_list& args, char* argv[], size_t const argc)
     {
         for (size_t idx = 0; idx <= argc; ++idx)
             argv[idx] = va_arg(args, char*);
-    };
+    }
 }
 
 /**

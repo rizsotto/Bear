@@ -5,4 +5,3 @@ Cargo.lock
 target/
 .DS_Store
 cmake-build-debug/
-Output/

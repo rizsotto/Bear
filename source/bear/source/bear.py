@@ -757,7 +757,8 @@ class CompilationDatabase:
         """ Saves compilations to given file.
 
         :param filename: the destination file name
-        :param iterator: iterator of Compilation objects. """
+        :param iterator: iterator of Compilation objects.
+        :param field_output: request to emit "output" field. """
 
         entries = [entry.as_db_entry(field_output) for entry in iterator]
         with open(filename, 'w') as handle:
