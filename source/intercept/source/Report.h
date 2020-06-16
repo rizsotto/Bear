@@ -53,8 +53,8 @@ namespace ic {
         // - The `signal` is present for a signal event, and holds the value
         // of the signal number that the process received.
         struct Event {
-            std::string type; // TODO: maybe use enum for this?
-            std::string at; // TODO: maybe use std::chrono::time_point?
+            std::string type;
+            std::string at;
             std::optional<int> status;
             std::optional<int> signal;
         };

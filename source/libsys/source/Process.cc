@@ -179,8 +179,9 @@ namespace {
                   });
             auto candidate = path.and_then<std::string>([](const auto& path) { return real_path(path); });
             auto executable = candidate
-                                  .map<bool>([](auto real) {
-                                      return (0 == is_executable(real));
+                                  .map<bool>([&error](auto real) {
+                                      error = is_executable(real);
+                                      return (0 == error);
                                   })
                                   .unwrap_or(false);
             if (executable) {
@@ -188,15 +189,13 @@ namespace {
             }
         } else {
             return ctx.get_path()
-                .and_then<std::string>([&name](const auto& directories) {
+                .and_then<std::string>([&name, &error](const auto& directories) {
                     for (const auto& directory : directories) {
                         auto candidate = real_path(fmt::format("{0}{1}{2}", directory, sys::path::OS_SEPARATOR, name));
-                        // TODO: check if this is the right thing to do. Shall we look for the
-                        //       next executable entry, or shall we fail if we found one with the
-                        //       correct name, but has not access rights?
                         auto executable = candidate
-                                              .template map<bool>([](auto real) {
-                                                  return (0 == is_executable(real));
+                                              .template map<bool>([&error](auto real) {
+                                                  error = is_executable(real);
+                                                  return (0 == error);
                                               })
                                               .unwrap_or(false);
                         if (executable) {
