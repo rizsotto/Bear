@@ -153,7 +153,7 @@ namespace er {
                 return sys::Process::Builder(execution.path)
                     .add_arguments(execution.command.begin(), execution.command.end())
                     .set_environment(execution.environment)
-                    .spawn(true)
+                    .spawn_with_preload()
                     .on_success([&client, &execution](auto& child) {
                         client.report(make_start_event(child.get_pid(), getppid(), execution));
                     });

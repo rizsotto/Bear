@@ -36,7 +36,7 @@ namespace {
     rust::Result<int> execute_command(const ic::Session& session, const std::vector<std::string_view>& command) {
         return session.supervise(command)
             .and_then<sys::Process>([](auto builder) {
-                return builder.spawn(false);
+                return builder.spawn();
             })
             .and_then<sys::ExitStatus>([](auto child) {
                 sys::SignalForwarder guard(&child);

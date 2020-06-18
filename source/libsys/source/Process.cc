@@ -57,21 +57,13 @@ namespace {
         char* const argv[],
         char* const envp[]);
 
-    using spawn_function_t = std::function<
-        rust::Result<pid_t>(
-            const char* path,
-            const posix_spawn_file_actions_t* file_actions_ptr,
-            const posix_spawnattr_t* attr_ptr,
-            char* const argv[],
-            char* const envp[])>;
+    using spawn_function_t = sys::Process::Builder::spawn_function_t;
 
     rust::Result<spawn_function_t> reference_spawn_function()
     {
         spawn_function_t result = [](const char* path,
-                                        const posix_spawn_file_actions_t* file_actions_ptr,
-                                        const posix_spawnattr_t* attr_ptr,
-                                        char* const argv[],
-                                        char* const envp[]) -> rust::Result<pid_t> {
+                                     char* const argv[],
+                                     char* const envp[]) -> rust::Result<pid_t> {
             errno = 0;
             pid_t child;
             if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
@@ -93,8 +85,6 @@ namespace {
     rust::Result<spawn_function_t> resolve_spawn_function()
     {
         spawn_function_t fp = [](const char* path,
-                                 const posix_spawn_file_actions_t* file_actions_ptr,
-                                 const posix_spawnattr_t* attr_ptr,
                                  char* const argv[],
                                  char* const envp[]) -> rust::Result<pid_t> {
 
@@ -235,7 +225,7 @@ namespace {
     rust::Result<int> send_signal(pid_t pid, int num)
     {
         errno = 0;
-        if (const int result = ::kill(pid, num); 0 == result) {
+        if (const int result = kill(pid, num); 0 == result) {
             return rust::Ok(result);
         } else {
             auto message = fmt::format("System call \"kill\" failed: {}", sys::error_string(errno));
@@ -369,26 +359,38 @@ namespace sys {
         return ::resolve_executable(program_);
     }
 
-    rust::Result<Process> Process::Builder::spawn(const bool with_preload)
+    rust::Result<Process> Process::Builder::spawn()
     {
-        auto program = ::resolve_executable(program_);
-        auto fp = (with_preload) ? resolve_spawn_function() : reference_spawn_function();
+        return reference_spawn_function()
+            .and_then<Process>([this](auto fp) {
+                return spawn_process(fp);
+            });
+    }
 
-        return rust::merge(program, fp)
-            .and_then<pid_t>([this](const auto& pair) {
-                const auto& [path, spawn_ptr] = pair;
+    rust::Result<Process> Process::Builder::spawn_with_preload()
+    {
+        return resolve_spawn_function()
+            .and_then<Process>([this](auto fp) {
+                return spawn_process(fp);
+            });
+    }
+
+    rust::Result<sys::Process> Process::Builder::spawn_process(spawn_function_t fp)
+    {
+        return ::resolve_executable(program_)
+            .and_then<pid_t>([this, &fp](const auto& path) {
                 // convert the arguments into a c-style array
                 std::vector<char*> args;
                 std::transform(parameters_.begin(), parameters_.end(),
-                    std::back_insert_iterator(args),
-                    [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
+                               std::back_insert_iterator(args),
+                               [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
                 args.push_back(nullptr);
                 // convert the environment into a c-style array
                 sys::env::Guard env(environment_);
 
-                return spawn_ptr(path.c_str(), nullptr, nullptr, args.data(), const_cast<char**>(env.data()));
+                return fp(path.c_str(), args.data(), const_cast<char**>(env.data()));
             })
-            .map<Process>([](const auto& pid) {
+            .map<sys::Process>([](const auto& pid) {
                 return Process(pid);
             })
             .on_success([this](const auto& process) {
@@ -398,4 +400,5 @@ namespace sys {
                 spdlog::debug("Process spawn failed. {}", error.what());
             });
     }
+
 }

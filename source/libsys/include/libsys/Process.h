@@ -104,10 +104,23 @@ namespace sys {
         //Builder& set_std_err(int fd);
 
         rust::Result<std::string> resolve_executable();
-        rust::Result<Process> spawn(bool with_preload);
+
+        rust::Result<Process> spawn();
+        rust::Result<Process> spawn_with_preload();
+
         // This is hard to implement and not used in this project.
         //rust::Result<std::string> output();
         //rust::Result<int> status();
+
+    public:
+        using spawn_function_t = std::function<
+            rust::Result<pid_t>(
+                const char* path,
+                char* const argv[],
+                char* const envp[])>;
+
+    private:
+        rust::Result<Process> spawn_process(spawn_function_t fp);
 
     public:
         Builder(const Builder&) = default;
