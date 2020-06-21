@@ -20,7 +20,7 @@
 #pragma once
 
 // specific platform indicator, should not using like this. ()needs to be deprecated)
-#cmakedefine APPLE
+#cmakedefine SUPPORT_PRELOAD
 
 // header checks
 #cmakedefine HAVE_SPAWN_H

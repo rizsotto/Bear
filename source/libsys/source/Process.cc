@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "libsys/Process.h"
 #include "libsys/Context.h"
 #include "libsys/Path.h"
@@ -76,12 +75,7 @@ namespace {
         return rust::Ok(result);
     }
 
-    // This is just a workaround to not call the preloaded execution methods.
-    //
-    // With static linking the `er` target would deprecate this solution. But
-    // The gRPC library brings in a dynamic library. See reported bug:
-    //
-    //   https://github.com/grpc/grpc/issues/22646
+#ifdef HAVE_GNU_LIB_NAMES_H
     rust::Result<spawn_function_t> resolve_spawn_function()
     {
         spawn_function_t fp = [](const char* path,
@@ -115,6 +109,7 @@ namespace {
         };
         return rust::Ok(fp);
     }
+#endif
 
     int is_executable(const std::string& path)
     {
@@ -367,6 +362,7 @@ namespace sys {
             });
     }
 
+#ifdef SUPPORT_PRELOAD
     rust::Result<Process> Process::Builder::spawn_with_preload()
     {
         return resolve_spawn_function()
@@ -374,6 +370,7 @@ namespace sys {
                 return spawn_process(fp);
             });
     }
+#endif
 
     rust::Result<sys::Process> Process::Builder::spawn_process(spawn_function_t fp)
     {
@@ -400,5 +397,4 @@ namespace sys {
                 spdlog::debug("Process spawn failed. {}", error.what());
             });
     }
-
 }

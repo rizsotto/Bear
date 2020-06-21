@@ -8,14 +8,16 @@ add_library(intercept_a OBJECT
         )
 
 target_include_directories(intercept_a PUBLIC source/)
-target_link_libraries(intercept_a PUBLIC er_api)
-target_link_libraries(intercept_a PUBLIC exec_api)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC rpc_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+if (SUPPORT_PRELOAD)
+    target_link_libraries(intercept_a PUBLIC er_api)
+    target_link_libraries(intercept_a PUBLIC exec_api)
+endif()
 
 # Create an executable from the sub projects.
 add_executable(intercept

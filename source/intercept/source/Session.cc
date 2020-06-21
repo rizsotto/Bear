@@ -19,10 +19,12 @@
 
 #include "Application.h"
 #include "Session.h"
-#include "er/Flags.h"
-#include "libexec/Environment.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
+#ifdef SUPPORT_PRELOAD
+#include "er/Flags.h"
+#include "libexec/Environment.h"
+#endif
 
 #include <functional>
 #include <numeric>
@@ -79,6 +81,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<T>& v)
     return os;
 }
 
+#ifdef SUPPORT_PRELOAD
 namespace {
 
     class LibraryPreloadSession : public ic::Session {
@@ -168,9 +171,11 @@ namespace {
         return std::string("library preload");
     }
 }
+#endif
 
 namespace ic {
 
+#ifdef SUPPORT_PRELOAD
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
         auto library = args.as_string(ic::Application::LIBRARY);
@@ -185,4 +190,10 @@ namespace ic {
                 return std::shared_ptr<Session>(result);
             });
     }
+#else
+    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
+    {
+        return rust::Err(std::runtime_error("Not implemented."));
+    }
+#endif
 }

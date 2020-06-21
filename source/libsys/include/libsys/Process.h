@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libresult/Result.h"
 
 #include <list>
@@ -106,7 +107,10 @@ namespace sys {
         rust::Result<std::string> resolve_executable();
 
         rust::Result<Process> spawn();
+
+#ifdef SUPPORT_PRELOAD
         rust::Result<Process> spawn_with_preload();
+#endif
 
         // This is hard to implement and not used in this project.
         //rust::Result<std::string> output();
