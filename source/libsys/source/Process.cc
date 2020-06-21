@@ -42,9 +42,8 @@
 #include <gnu/lib-names.h>
 #endif
 
-#include <fmt/format.h>
 #include <spdlog/spdlog.h>
-#include "spdlog/fmt/ostr.h"
+#include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
@@ -229,11 +228,15 @@ namespace {
         }
     }
 
-    std::ostream& operator<<(std::ostream& os, const std::list<std::string>& arguments)
+    struct Arguments {
+        const std::list<std::string>& value;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
     {
         os << '[';
-        for (auto it = arguments.begin(); it != arguments.end(); ++it) {
-            if (it != arguments.begin()) {
+        for (auto it = arguments.value.begin(); it != arguments.value.end(); ++it) {
+            if (it != arguments.value.begin()) {
                 os << ", ";
             }
             os << *it;
@@ -392,7 +395,7 @@ namespace sys {
                 return Process(pid);
             })
             .on_success([this](const auto& process) {
-                spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), parameters_);
+                spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), Arguments { parameters_ });
             })
             .on_error([](const auto& error) {
                 spdlog::debug("Process spawn failed. {}", error.what());
