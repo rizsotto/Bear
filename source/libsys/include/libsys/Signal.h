@@ -39,6 +39,7 @@ namespace sys {
         SignalForwarder& operator=(SignalForwarder&&) noexcept = delete;
 
     private:
-        sighandler_t handlers_[NSIG];
+        using handler_t = void (*)(int);
+        handler_t handlers_[NSIG];
     };
 }
