@@ -54,7 +54,7 @@
 
 #if defined HAVE_NSGETENVIRON
 # include <crt_externs.h>
-static char **environ;
+#define environ (*_NSGetEnviron())
 #else
 extern char **environ;
 #endif
@@ -183,11 +183,6 @@ static void on_unload(void) {
 }
 
 static int mt_safe_on_load(void) {
-#ifdef HAVE_NSGETENVIRON
-    environ = *_NSGetEnviron();
-    if (0 == environ)
-        return 0;
-#endif
     // Capture current relevant environment variables
     return capture_env_t(&initial_env);
 }
@@ -531,7 +526,7 @@ static int write_report(int fd, char const *const argv[]) {
     return 0;
 }
 
-/* update environment assure that chilren processes will copy the desired
+/* updating the environment assures that child processes will copy the desired
  * behaviour */
 
 static int capture_env_t(bear_env_t *env) {
