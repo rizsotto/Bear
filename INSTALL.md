@@ -51,6 +51,10 @@ Install dependencies from packages on Ubuntu 20.04
     apt-get install libfmt-dev libspdlog-dev nlohmann-json3-dev
     apt-get install libgrpc++-dev protobuf-compiler-grpc
 
+Install dependencies from packages from Brew
+
+    brew install fmt spdlog nlohmann-json grpc pkg-config
+
 ## Build commands
 
 Ideally, you should build Bear in a separate build directory.

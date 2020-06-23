@@ -28,14 +28,22 @@ jobs:
         run: |
           brew install fmt spdlog nlohmann-json grpc pkg-config
 
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
       - name: Install python test dependencies
         run: |
-          pip3 install lit pex pycodestyle
-          echo "::add-path::$HOME/.local/bin"
+          python -m pip install --upgrade pip
+          pip install lit pex pycodestyle
 
       - name: Configure
+        env:
+          RUNNER: ${{ runner.os }}
         run: |
-          cmake -B "$HOME" -S "$GITHUB_WORKSPACE"
+          RUN_FUNC_TEST=$(if [ $RUNNER = "Linux" ]; then echo "ON"; else echo "OFF"; fi)
+          cmake -B "$HOME" -S "$GITHUB_WORKSPACE" -DENABLE_FUNC_TESTS=$RUN_FUNC_TEST
 
       - name: Build
         env:
