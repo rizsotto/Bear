@@ -25,13 +25,6 @@
 
 namespace {
 
-    TEST(errors, success)
-    {
-        auto result = sys::error_string(0);
-
-        EXPECT_STREQ("Success", result.data());
-    }
-
     TEST(errors, ENOENT)
     {
         auto result = sys::error_string(ENOENT);
