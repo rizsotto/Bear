@@ -17,8 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Application.h"
 #include "config.h"
+
+#include "Application.h"
+
 #include "er/Flags.h"
 #include "libflags/Flags.h"
 #include "libsys/Context.h"
@@ -53,12 +55,11 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    const sys::Context ctx;
-
+    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
     spdlog::set_pattern(fmt::format("er: %v [pid: %P]"));
     spdlog::set_level(spdlog::level::info);
-    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
+    const sys::Context ctx;
     const flags::Parser parser("er", VERSION,
         { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },

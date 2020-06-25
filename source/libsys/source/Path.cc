@@ -19,7 +19,11 @@
 
 #include "libsys/Path.h"
 
+#include <libgen.h>
+
 #include <numeric>
+#include <cstring>
+#include <cstdlib>
 
 namespace {
 
@@ -66,5 +70,13 @@ namespace sys::path {
     std::string join(const std::list<std::string>& input)
     {
         return join_with(input, sys::path::OS_PATH_SEPARATOR);
+    }
+
+    std::string program_name(const std::string& input)
+    {
+        auto temp = strdup(input.data());
+        auto result = std::string(basename(temp));
+        free(temp);
+        return result;
     }
 }

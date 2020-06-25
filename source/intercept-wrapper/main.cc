@@ -17,22 +17,67 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// How it should works?
-//
-// - The `wrapper` shall be a single executable with soft links created to it
-//   with the name of the wrapped command. (`cc`, `c++`, `ar`, `ld`, `as`, etc...)
-//
-// - When it's executed: it figures out what commands it wraps.
-//   (The name comes from the argument, get the `basename` of it, and that's it)
-// - Look up what is the real executable for that command (full path)
-//   (This can be a file what the the `intercept` plants for the session.
-//   The location of that file might come from an environment variable.
-//   The `wrapper` needs to read that file and find the path to the wrapped command.)
-// - Calls `er`, pass the real executable and the arguments itself received.
-//   (calls mean `execve`)  `er` will report the call and supervise the process.
+#include "config.h"
 
+#include "Application.h"
+
+#include "libwrapper/Environment.h"
+#include "libsys/Context.h"
+
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/sinks/stdout_sinks.h>
+
+#include <iostream>
+
+namespace {
+
+    struct Arguments {
+        char *const * values;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    {
+        os << '[';
+        for (char* const* it = arguments.values; *it != nullptr; ++it) {
+            if (it != arguments.values) {
+                os << ", ";
+            }
+            os << '"' << *it << '"';
+        }
+        os << ']';
+
+        return os;
+    }
+
+    bool is_verbose()
+    {
+        return (nullptr != getenv(wr::env::KEY_VERBOSE));
+    }
+}
 
 int main(int argc, char* argv[], char* envp[])
 {
-    return 0;
+    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
+    spdlog::set_pattern(is_verbose() ? "[%H:%M:%S.%f, wr, %P] %v" : "wrapper: %v [pid: %P]");
+    spdlog::set_level(is_verbose() ? spdlog::level::debug : spdlog::level::info);
+
+    spdlog::debug("arguments raw: {}", Arguments { argv });
+
+    const sys::Context ctx;
+    return wr::Application::create(const_cast<const char**>(argv), ctx)
+        .and_then<int>([&envp](const auto& command) {
+            return command();
+        })
+        // print out the result of the run
+        .on_error([](auto error) {
+            spdlog::error(fmt::format("failed with: {}", error.what()));
+        })
+        .on_success([](auto status_code) {
+            spdlog::debug(fmt::format("succeeded with: {}", status_code));
+        })
+        // set the return code from error
+        .unwrap_or_else([](auto error) {
+            return EXIT_FAILURE;
+        });
 }

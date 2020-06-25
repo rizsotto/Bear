@@ -19,16 +19,8 @@
 
 #pragma once
 
-#include <list>
-#include <string>
+namespace wr::env {
 
-namespace sys::path {
-
-    static constexpr char OS_SEPARATOR = '/';
-    static constexpr char OS_PATH_SEPARATOR = ':';
-
-    std::list<std::string> split(const std::string& input);
-    std::string join(const std::list<std::string>& input);
-
-    std::string program_name(const std::string& input);
+    constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
+    constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";
 }

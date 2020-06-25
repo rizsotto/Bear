@@ -21,12 +21,11 @@ set_target_properties(er_a PROPERTIES
         LINKER_LANGUAGE "C"
         )
 
-# Create a static executable from the sub projects.
+# Create an executable from the sub projects.
 add_executable(er
         main.cc
         )
 
-#target_link_libraries(er -static)
 target_link_libraries(er er_a)
 target_link_libraries(er flags_a)
 target_link_libraries(er sys_a)

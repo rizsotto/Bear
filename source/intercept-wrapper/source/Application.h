@@ -19,16 +19,33 @@
 
 #pragma once
 
-#include <list>
-#include <string>
+#include "libresult/Result.h"
+#include "libsys/Context.h"
 
-namespace sys::path {
+namespace wr {
 
-    static constexpr char OS_SEPARATOR = '/';
-    static constexpr char OS_PATH_SEPARATOR = ':';
+    class Application {
+    public:
+        static ::rust::Result<Application> create(const char** args, const sys::Context&);
 
-    std::list<std::string> split(const std::string& input);
-    std::string join(const std::list<std::string>& input);
+        ::rust::Result<int> operator()() const;
 
-    std::string program_name(const std::string& input);
+    public:
+        Application() = delete;
+        ~Application();
+
+        Application(const Application&) = delete;
+        Application(Application&&) noexcept;
+
+        Application& operator=(const Application&) = delete;
+        Application& operator=(Application&&) noexcept;
+
+    private:
+        struct State;
+
+        explicit Application(State*);
+
+    private:
+        State const* impl_;
+    };
 }

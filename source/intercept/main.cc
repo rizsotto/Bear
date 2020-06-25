@@ -47,12 +47,11 @@ namespace {
 
 int main(int argc, char* argv[], char* envp[])
 {
-    const sys::Context ctx;
-
+    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
     spdlog::set_pattern("intercept: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
-    spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
 
+    const sys::Context ctx;
     const flags::Parser parser("intercept", VERSION,
         { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
