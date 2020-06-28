@@ -7,6 +7,10 @@ add_library(intercept_a OBJECT
         source/Session.cc
         )
 
+if (SUPPORT_PRELOAD)
+    target_sources(intercept_a PRIVATE source/SessionLibrary.cc)
+endif()
+
 target_include_directories(intercept_a PUBLIC source/)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
