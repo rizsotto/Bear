@@ -19,33 +19,60 @@
 
 #include "Session.h"
 
-#include "Application.h"
-
+#include "SessionWrapper.h"
 #ifdef SUPPORT_PRELOAD
 #include "SessionLibrary.h"
 #endif
+
+#include "libsys/Path.h"
 
 namespace ic {
 
 #ifdef SUPPORT_PRELOAD
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        auto library = args.as_string(ic::Application::LIBRARY);
-        auto executor = args.as_string(ic::Application::EXECUTOR);
-        auto verbose = args.as_bool(ic::Application::VERBOSE);
+        return ctx.get_uname()
+            .and_then<Session::SharedPtr>([&args, &ctx](auto uname) {
+                const bool preload = (uname["sysname"] == "Linux");
 
-        return merge(library, executor, verbose)
-            .map<Session::SharedPtr>([&ctx](auto tuple) {
-                const auto& [library, executor, verbose] = tuple;
-                auto environment = ctx.get_environment();
-                auto result = new LibraryPreloadSession(library, executor, verbose, std::move(environment));
-                return std::shared_ptr<Session>(result);
+                return (preload)
+                    ? LibraryPreloadSession::from(args, ctx)
+                    : WrapperSession::from(args, ctx);
             });
     }
 #else
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        return rust::Err(std::runtime_error("Not implemented."));
+        return WrapperSession::from(args, ctx);
     }
 #endif
+
+    void Session::set_server_address(const std::string& value)
+    {
+        server_address_ = value;
+    }
+
+    std::string Session::keep_front_in_path(const std::string& path, const std::string& paths)
+    {
+        std::list<std::string> result = { path };
+
+        auto existing = sys::path::split(paths);
+        std::copy_if(existing.begin(), existing.end(), std::back_inserter(result), [&path](auto current) {
+            return current != path;
+        });
+
+        return sys::path::join(result);
+    }
+
+    std::string Session::remove_from_path(const std::string& path, const std::string& paths)
+    {
+        std::list<std::string> result = { };
+
+        auto existing = sys::path::split(paths);
+        std::copy_if(existing.begin(), existing.end(), std::back_inserter(result), [&path](auto current) {
+            return current != path;
+        });
+
+        return sys::path::join(result);
+    }
 }

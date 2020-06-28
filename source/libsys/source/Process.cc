@@ -111,30 +111,6 @@ namespace {
     }
 #endif
 
-    int is_executable(const std::string& path)
-    {
-        if (0 == access(path.data(), X_OK)) {
-            return 0;
-        }
-        if (0 == access(path.data(), F_OK)) {
-            return EACCES;
-        }
-        return ENOENT;
-    }
-
-    rust::Result<std::string> real_path(const std::string& path)
-    {
-        errno = 0;
-        if (char* result_ptr = realpath(path.data(), nullptr); result_ptr != nullptr) {
-            std::string result(result_ptr);
-            free(result_ptr);
-            return rust::Ok(result);
-        } else {
-            return rust::Err(std::runtime_error(
-                fmt::format("Could not create absolute path for \"{}\": ", path, sys::error_string(errno))));
-        }
-    }
-
     bool contains_separator(const std::string& path)
     {
         return (std::find(path.begin(), path.end(), sys::path::OS_SEPARATOR) != path.end());
@@ -160,12 +136,12 @@ namespace {
             auto path = starts_with_separator(name)
                 ? rust::Ok(name)
                 : ctx.get_cwd().map<std::string>([&name](const auto& cwd) {
-                      return fmt::format("{0}{1}{2}", cwd, sys::path::OS_SEPARATOR, name);
+                      return sys::path::concat(cwd, name);
                   });
-            auto candidate = path.and_then<std::string>([](const auto& path) { return real_path(path); });
+            auto candidate = path.and_then<std::string>([&ctx](const auto& path) { return ctx.real_path(path); });
             auto executable = candidate
-                                  .map<bool>([&error](auto real) {
-                                      error = is_executable(real);
+                                  .map<bool>([&ctx, &error](auto real) {
+                                      error = ctx.is_executable(real);
                                       return (0 == error);
                                   })
                                   .unwrap_or(false);
@@ -174,12 +150,12 @@ namespace {
             }
         } else {
             return ctx.get_path()
-                .and_then<std::string>([&name, &error](const auto& directories) {
+                .and_then<std::string>([&name, &ctx, &error](const auto& directories) {
                     for (const auto& directory : directories) {
-                        auto candidate = real_path(fmt::format("{0}{1}{2}", directory, sys::path::OS_SEPARATOR, name));
+                        auto candidate = ctx.real_path(fmt::format("{0}{1}{2}", directory, sys::path::OS_SEPARATOR, name));
                         auto executable = candidate
-                                              .template map<bool>([&error](auto real) {
-                                                  error = is_executable(real);
+                                              .template map<bool>([&ctx, &error](auto real) {
+                                                  error = ctx.is_executable(real);
                                                   return (0 == error);
                                               })
                                               .unwrap_or(false);

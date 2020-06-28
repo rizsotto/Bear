@@ -25,6 +25,9 @@
 
 #include <cerrno>
 #include <climits>
+#include <cstdio>
+#include <sys/types.h>
+#include <dirent.h>
 #include <unistd.h>
 
 #ifdef HAVE_SYS_UTSNAME_H
@@ -108,6 +111,22 @@ namespace sys {
 #endif
     }
 
+    rust::Result<std::list<std::string>> Context::list_dir(const std::string_view& path) const
+    {
+        DIR *dp = opendir(path.data());
+        if (dp == nullptr)
+            return rust::Err(std::runtime_error(
+                fmt::format("Could not open directory: {}", path)));
+
+        std::list<std::string> result;
+        while (dirent *ep = readdir(dp)) {
+            result.push_back(sys::path::concat(std::string(path), ep->d_name));
+        }
+        closedir(dp);
+
+        return rust::Ok(result);
+    }
+
     rust::Result<std::string> Context::get_cwd() const
     {
         constexpr static const size_t buffer_size = PATH_MAX;
@@ -119,6 +138,30 @@ namespace sys {
                 fmt::format("System call \"getcwd\" failed: {}", error_string(errno))));
         } else {
             return rust::Ok(std::string(buffer));
+        }
+    }
+
+    int Context::is_executable(const std::string& path) const
+    {
+        if (0 == access(path.data(), X_OK)) {
+            return 0;
+        }
+        if (0 == access(path.data(), F_OK)) {
+            return EACCES;
+        }
+        return ENOENT;
+    }
+
+    rust::Result<std::string> Context::real_path(const std::string& path) const
+    {
+        errno = 0;
+        if (char* result_ptr = realpath(path.data(), nullptr); result_ptr != nullptr) {
+            std::string result(result_ptr);
+            free(result_ptr);
+            return rust::Ok(result);
+        } else {
+            return rust::Err(std::runtime_error(
+                fmt::format("Could not create absolute path for \"{}\": ", path, sys::error_string(errno))));
         }
     }
 }

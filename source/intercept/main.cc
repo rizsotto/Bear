@@ -57,7 +57,7 @@ int main(int argc, char* argv[], char* envp[])
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
             { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::WRAPPER, { 1, false, "path to the wrapper executable", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::Application::WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // change the log verbosity if requested.

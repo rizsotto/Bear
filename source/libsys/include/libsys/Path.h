@@ -30,5 +30,6 @@ namespace sys::path {
     std::list<std::string> split(const std::string& input);
     std::string join(const std::list<std::string>& input);
 
-    std::string program_name(const std::string& input);
+    std::string basename(const std::string& input);
+    std::string concat(const std::string& dir, const std::string& file);
 }

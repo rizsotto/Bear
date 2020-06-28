@@ -19,6 +19,7 @@
 
 #include "SessionLibrary.h"
 
+#include "Application.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libexec/Environment.h"
@@ -29,33 +30,12 @@
 #include <functional>
 #include <numeric>
 
-namespace env {
+namespace {
 
     constexpr char GLIBC_PRELOAD_KEY[] = "LD_PRELOAD";
 
     using env_t = std::map<std::string, std::string>;
     using mapper_t = std::function<std::string(const std::string&, const std::string&)>;
-
-    std::string
-    merge_into_paths(const std::string& current, const std::string& value) noexcept
-    {
-        auto paths = sys::path::split(current);
-        if (std::find(paths.begin(), paths.end(), value) == paths.end()) {
-            paths.emplace_front(value);
-            return sys::path::join(paths);
-        } else {
-            return current;
-        }
-    }
-
-    void insert_or_assign(env_t& target, const char* key, const std::string& value) noexcept
-    {
-        if (auto it = target.find(key); it != target.end()) {
-            it->second = value;
-        } else {
-            target.emplace(key, value);
-        }
-    }
 
     void insert_or_merge(
         env_t& target,
@@ -64,7 +44,7 @@ namespace env {
         const mapper_t& merger) noexcept
     {
         if (auto it = target.find(key); it != target.end()) {
-            it->second = merger(it->second, value);
+            it->second = merger(value, it->second);
         } else {
             target.emplace(key, value);
         }
@@ -73,12 +53,27 @@ namespace env {
 
 namespace ic {
 
+    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const sys::Context& ctx)
+    {
+        auto library = args.as_string(ic::Application::LIBRARY);
+        auto executor = args.as_string(ic::Application::EXECUTOR);
+        auto verbose = args.as_bool(ic::Application::VERBOSE);
+
+        return merge(library, executor, verbose)
+            .map<Session::SharedPtr>([&ctx](auto tuple) {
+                const auto& [library, executor, verbose] = tuple;
+                auto environment = ctx.get_environment();
+                auto result = new LibraryPreloadSession(library, executor, verbose, std::move(environment));
+                return std::shared_ptr<Session>(result);
+            });
+    }
+
     LibraryPreloadSession::LibraryPreloadSession(
         const std::string_view& library,
         const std::string_view& executor,
         bool verbose,
         std::map<std::string, std::string>&& environment)
-            : server_address_()
+            : Session()
             , library_(library)
             , executor_(executor)
             , verbose_(verbose)
@@ -87,7 +82,7 @@ namespace ic {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
 
-    rust::Result<std::string_view> LibraryPreloadSession::resolve(const std::string& name) const
+    rust::Result<std::string> LibraryPreloadSession::resolve(const std::string& name) const
     {
         return rust::Err(std::runtime_error("The session does not support resolve."));
     }
@@ -96,11 +91,11 @@ namespace ic {
     {
         std::map<std::string, std::string> copy(env);
         if (verbose_) {
-            env::insert_or_assign(copy, el::env::KEY_VERBOSE, "true");
+            copy[el::env::KEY_VERBOSE] = "true";
         }
-        env::insert_or_assign(copy, el::env::KEY_REPORTER, executor_);
-        env::insert_or_assign(copy, el::env::KEY_DESTINATION, server_address_);
-        env::insert_or_merge(copy, env::GLIBC_PRELOAD_KEY, library_, env::merge_into_paths);
+        copy[el::env::KEY_DESTINATION] = server_address_;
+        copy[el::env::KEY_REPORTER] = executor_;
+        insert_or_merge(copy, GLIBC_PRELOAD_KEY, library_, Session::keep_front_in_path);
 
         return rust::Ok(copy);
     }
@@ -123,11 +118,6 @@ namespace ic {
                     .add_arguments(command.begin(), command.end())
                     .set_environment(environment);
             });
-    }
-
-    void LibraryPreloadSession::set_server_address(const std::string& value)
-    {
-        server_address_ = value;
     }
 
     std::string LibraryPreloadSession::get_session_type() const

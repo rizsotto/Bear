@@ -74,4 +74,16 @@ namespace {
         const std::string expected = "/path/to:/path/to/another";
         EXPECT_EQ(expected, result);
     }
+
+    TEST(path, basename)
+    {
+        EXPECT_EQ("cc", sys::path::basename("cc"));
+        EXPECT_EQ("cc", sys::path::basename("./cc"));
+        EXPECT_EQ("cc", sys::path::basename("/usr/bin/cc"));
+    }
+
+    TEST(path, concat)
+    {
+        EXPECT_EQ("/usr/bin/cc", sys::path::concat("/usr/bin", "cc"));
+    }
 }

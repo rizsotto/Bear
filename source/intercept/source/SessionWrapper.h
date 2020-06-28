@@ -23,12 +23,13 @@
 
 namespace ic {
 
-    class LibraryPreloadSession : public ic::Session {
+    class WrapperSession : public ic::Session {
     public:
-        LibraryPreloadSession(
-            const std::string_view& library,
-            const std::string_view& executor,
+        WrapperSession(
             bool verbose,
+            std::string&& wrapper_dir,
+            std::map<std::string, std::string>&& mapping,
+            std::map<std::string, std::string>&& override,
             std::map<std::string, std::string>&& environment);
 
         static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const sys::Context&);
@@ -41,9 +42,13 @@ namespace ic {
         [[nodiscard]] std::string get_session_type() const override;
 
     private:
-        std::string library_;
-        std::string executor_;
+        [[nodiscard]] std::map<std::string, std::string> set_up_environment() const;
+
+    private:
         bool verbose_;
+        std::string wrapper_dir_;
+        std::map<std::string, std::string> mapping_;
+        std::map<std::string, std::string> override_;
         std::map<std::string, std::string> environment_;
     };
 }

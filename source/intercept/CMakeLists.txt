@@ -5,6 +5,7 @@ add_library(intercept_a OBJECT
         source/Reporter.cc
         source/Services.cc
         source/Session.cc
+        source/SessionWrapper.cc
         )
 
 if (SUPPORT_PRELOAD)
@@ -18,6 +19,7 @@ target_link_libraries(intercept_a PUBLIC rpc_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+target_link_libraries(intercept_a PUBLIC wrapper_api)
 if (SUPPORT_PRELOAD)
     target_link_libraries(intercept_a PUBLIC er_api)
     target_link_libraries(intercept_a PUBLIC exec_api)
@@ -41,6 +43,7 @@ install(TARGETS intercept
 if (ENABLE_UNIT_TESTS)
     add_executable(intercept_unit_test
             test/ReporterTest.cc
+            test/SessionTest.cc
             )
 
     target_link_libraries(intercept_unit_test intercept_a)

@@ -39,13 +39,19 @@ namespace ic {
     public:
         virtual ~Session() = default;
 
-        [[nodiscard]] virtual rust::Result<std::string_view> resolve(const std::string& name) const = 0;
+        [[nodiscard]] virtual rust::Result<std::string> resolve(const std::string& name) const = 0;
         [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
         [[nodiscard]] virtual rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const = 0;
 
-    public:
-        virtual void set_server_address(const std::string&) = 0;
-
         [[nodiscard]] virtual std::string get_session_type() const = 0;
+
+        void set_server_address(const std::string&);
+
+    protected:
+        static std::string keep_front_in_path(const std::string& path, const std::string& paths);
+        static std::string remove_from_path(const std::string& path, const std::string& paths);
+
+    protected:
+        std::string server_address_;
     };
 }

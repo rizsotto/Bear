@@ -45,5 +45,10 @@ namespace sys {
 
         // Filesystem related operations
         [[nodiscard]] virtual rust::Result<std::string> get_cwd() const;
+
+        [[nodiscard]] virtual rust::Result<std::list<std::string>> list_dir(const std::string_view& path) const;
+
+        [[nodiscard]] virtual int is_executable(const std::string& path) const;
+        [[nodiscard]] virtual rust::Result<std::string> real_path(const std::string& path) const;
     };
 }

@@ -63,7 +63,7 @@ namespace {
 
     rust::Result<Execution> make_execution(const char** args, const sys::Context& context) noexcept
     {
-        auto path = sys::path::program_name(args[0]);
+        auto path = sys::path::basename(args[0]);
         auto command = from(args);
         auto working_dir = context.get_cwd();
         auto environment = context.get_environment();
