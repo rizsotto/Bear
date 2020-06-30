@@ -125,8 +125,6 @@ COMPILER_PATTERNS_FORTRAN = (
     re.compile(r'^(pg)(f77|f90|f95|fortran)$')
 )
 
-TRACE_FILE_SUFFIX = '.process_start.json'  # same as in ear.c
-
 C_LANG, CPLUSPLUS_LANG, FORTRAN_LANG, OTHER = range(4)
 
 Execution = collections.namedtuple('Execution', ['pid', 'cwd', 'cmd'])
