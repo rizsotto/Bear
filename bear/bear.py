@@ -341,7 +341,8 @@ def capture(args, tools):
         # read the intercepted exec calls
         calls = (parse_exec_trace(file) for file in exec_trace_files(tmp_dir))
         safe_calls = (x for x in calls if x is not None)
-        current = compilations(safe_calls, tools)
+        flags_filter = make_flags_filter(args.remove_flags_pattern)
+        current = compilations(safe_calls, tools, flags_filter)
         # filter out not desired entries
         include_filter = include(args.include, args.exclude)
         filtered = set(entry for entry in current if include_filter(entry))
@@ -390,7 +391,27 @@ def include(includes, excludes):
     return include_filter
 
 
-def compilations(exec_calls, tools):
+def make_flags_filter(pattern):
+    # type: str -> str -> bool
+    """Make a predicate to test if a flag should be removed"""
+
+    if pattern is None:
+        regs = []
+    else:
+        regs = map(lambda p: re.compile(p), pattern.split(':'))
+
+    def flags_filter(arg):
+        # type: str -> bool
+        """Returns True if arg should be removed"""
+
+        for reg in regs:
+            if reg.match(arg):
+                return True
+        return False
+    return flags_filter
+
+
+def compilations(exec_calls, tools, flags_filter):
     # type: (Iterable[Execution], Tools) -> Iterable[Compilation]
     """ Needs to filter out commands which are not compiler calls. And those
     compiler calls shall be compilation (not pre-processing or linking) calls.
@@ -398,10 +419,13 @@ def compilations(exec_calls, tools):
 
     :param exec_calls:  iterator of executions
     :param tools:       helper object to detect compiler
+    :param flags_filter: a predicate that returns True for unwanted flags
     :return: stream of formatted compilation database entries """
 
     for call in exec_calls:
-        for compilation in Compilation.iter_from_execution(call, tools):
+        for compilation in Compilation.iter_from_execution(call,
+                                                           tools,
+                                                           flags_filter):
             yield compilation
 
 
@@ -571,6 +595,14 @@ def create_intercept_parser():
         (Absolute or relative to current working directory.)
         The --include will not enable entries from these directories.""")
 
+    parser.add_argument(
+        '--remove-flags',
+        dest='remove_flags_pattern',
+        action='store',
+        help="""colon separated regex pattern; flags matching these patterns
+        will be removed. This form is needed:
+        --remove-flags=<pattern1>:<pattern2>:...""")
+
     advanced = parser.add_argument_group('advanced options')
     advanced.add_argument(
         '--append', '-a',
@@ -666,19 +698,21 @@ class Compilation:
         command = shell_split(entry['command']) if 'command' in entry else \
             entry['arguments']
         execution = Execution(cmd=command, cwd=entry['directory'])
-        return cls.iter_from_execution(execution, tools)
+        flags_filter = make_flags_filter(None)
+        return cls.iter_from_execution(execution, tools, flags_filter)
 
     @classmethod
-    def iter_from_execution(cls, execution, tools):
+    def iter_from_execution(cls, execution, tools, flags_filter):
         """ Generator method for compilation entries.
 
         From a single compiler call it can generate zero or more entries.
 
         :param execution:   executed command and working directory
         :param tools:       helper object to detect compiler
+        :param flags_filter: a predicate that returns True for unwanted flags
         :return: stream of CompilationDbEntry objects """
 
-        candidate = cls._split_command(execution.cmd, tools)
+        candidate = cls._split_command(execution.cmd, tools, flags_filter)
         for source in candidate.files if candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
@@ -727,11 +761,12 @@ class Compilation:
         return None
 
     @classmethod
-    def _split_command(cls, command, tools):
+    def _split_command(cls, command, tools, flags_filter):
         """ Returns a value when the command is a compilation, None otherwise.
 
         :param command: the command to classify
         :param tools:   helper object to detect compiler
+        :param flags_filter: a predicate that returns True for unwanted flags
         :return: stream of CompilationCommand objects """
 
         logging.debug('input was: %s', command)
@@ -761,6 +796,8 @@ class Compilation:
                 for _ in range(count):
                     next(args)
             elif re.match(r'^-(l|L|Wl,).+', arg):
+                pass
+            elif flags_filter(arg):
                 pass
             # some parameters look like a filename, take those explicitly
             elif arg in {'-D', '-U', '-I', '-include'}:
