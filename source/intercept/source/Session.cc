@@ -20,6 +20,7 @@
 #include "Session.h"
 
 #include "SessionWrapper.h"
+#include "Application.h"
 #ifdef SUPPORT_PRELOAD
 #include "SessionLibrary.h"
 #endif
@@ -31,6 +32,11 @@ namespace ic {
 #ifdef SUPPORT_PRELOAD
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
+        if (args.as_bool(ic::Application::FORCE_WRAPPER).unwrap_or(false))
+            return WrapperSession::from(args, ctx);
+        if (args.as_bool(ic::Application::FORCE_PRELOAD).unwrap_or(false))
+            return LibraryPreloadSession::from(args, ctx);
+
         return ctx.get_uname()
             .and_then<Session::SharedPtr>([&args, &ctx](auto uname) {
                 const bool preload = (uname["sysname"] == "Linux");

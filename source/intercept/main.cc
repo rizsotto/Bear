@@ -55,6 +55,8 @@ int main(int argc, char* argv[], char* envp[])
     const flags::Parser parser("intercept", VERSION,
         { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
+            { ic::Application::FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, DEVELOPER_GROUP } },
+            { ic::Application::FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, DEVELOPER_GROUP } },
             { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
