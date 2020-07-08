@@ -120,7 +120,10 @@ namespace sys {
 
         std::list<std::string> result;
         while (dirent *ep = readdir(dp)) {
-            result.push_back(sys::path::concat(std::string(path), ep->d_name));
+            const std::string file(ep->d_name);
+            if (file != "." && file != "..") {
+                result.push_back(sys::path::concat(std::string(path), file));
+            }
         }
         closedir(dp);
 

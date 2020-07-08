@@ -24,6 +24,10 @@
 #include "libsys/Context.h"
 #include "libsys/Path.h"
 
+#include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
+#include <spdlog/sinks/stdout_sinks.h>
+
 #include <algorithm>
 #include <iterator>
 
@@ -63,6 +67,25 @@ namespace {
         { "TANGLE", "tangle" },
         { "CTANGLE", "ctangle" }
     };
+
+    struct MapHolder {
+        const std::map<std::string, std::string>& values;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const MapHolder& arguments)
+    {
+        os << '[';
+        for (auto it = arguments.values.begin(); it != arguments.values.end(); ++it) {
+            if (it != arguments.values.begin()) {
+                os << ", ";
+            }
+            os << "{ \"" << it->first << "\": \"" << it->second << "\" }";
+        }
+        os << ']';
+
+        return os;
+    }
+
 }
 
 namespace ic {
@@ -97,7 +120,7 @@ namespace ic {
                                              })
                                              .unwrap_or(false);
                         if (executable) {
-                            result[wrapper] = candidate;
+                            result[basename] = candidate;
                             break;
                         }
                     }
@@ -111,11 +134,8 @@ namespace ic {
                     // find any of the implicit defined in environment.
                     if (auto env_it = environment.find(implicit.env); env_it != environment.end()) {
                         // find the current mapping for the program the user wants to run.
-                        auto mapping_it = std::find_if(mapping.begin(), mapping.end(), [&implicit](auto value) {
-                            return sys::path::basename(value.first) == implicit.wrapper;
-                        });
-                        // replace the program what the wrapper will call.
-                        if (mapping_it != mapping.end()) {
+                        // and replace the program what the wrapper will call.
+                        if (auto mapping_it = mapping.find(implicit.wrapper); mapping_it != mapping.end()) {
                             auto program = env_it->second;
                             auto argument = nullptr;
                             // FIXME: it would be more correct if we shell-split the `env_it->second`
@@ -158,10 +178,14 @@ namespace ic {
             , override_(override)
             , environment_(environment)
     {
+        spdlog::debug("session initialized with: wrapper_dir: {}", wrapper_dir_);
+        spdlog::debug("session initialized with: mapping: {}", MapHolder { mapping_ });
+        spdlog::debug("session initialized with: override: {}", MapHolder { override_ });
     }
 
     rust::Result<std::string> WrapperSession::resolve(const std::string& name) const
     {
+        spdlog::debug("trying to resolve for wrapper: {}", name);
         auto candidate = mapping_.find(name);
         return (candidate != mapping_.end())
                 ? rust::Result<std::string>(rust::Ok(candidate->second))

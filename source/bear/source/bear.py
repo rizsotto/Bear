@@ -543,7 +543,7 @@ def create_intercept_parser():
     advanced.add_argument(
         '--wrapper',
         dest='intercept_wrapper',
-        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper",
+        default="@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d",
         action='store',
         help="""specify the compiler wrapper location.""")
     advanced.add_argument(
