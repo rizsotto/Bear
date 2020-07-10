@@ -407,11 +407,12 @@ def build_command(args, output):
     verbose = ['--verbose'] if args.verbose else []
     library = ['--library', args.libexec]
     executor = ['--executor', args.executor]
+    wrapper = ['--wrapper', args.intercept_wrapper]
     command = ['--'] + args.build
     return [
                args.interceptor,
                '--output', output
-           ] + library + executor + verbose + command
+           ] + library + executor + wrapper + verbose + command
 
 
 def parse_intercept_report(filename):
