@@ -120,7 +120,7 @@ COMPILER_PATTERNS_CXX = (
 # Gfortran, Intel Fortran Compilers, PGI compilers
 COMPILER_PATTERNS_FORTRAN = (
     re.compile(r'^(f95)$'),
-    re.compile(r'^(gfortran)$'),
+    re.compile(r'^([^-]*-)*(gfortran)(-?\d+)$'),
     re.compile(r'^(ifort)$'),
     re.compile(r'^(pg)(f77|f90|f95|fortran)$')
 )
