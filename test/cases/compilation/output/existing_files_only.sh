@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s -build
-# RUN: assert_compilation %t.json count -eq 2
+# RUN: assert_compilation %t.json count -ge 2
 # RUN: assert_compilation %t.json contains -file exists/src/source_1.c -directory %T -arguments %{c_compiler} -c -o exists/src/source_1.o exists/src/source_1.c
 # RUN: assert_compilation %t.json contains -file exists/src/source_2.c -directory %T -arguments %{c_compiler} -c -o exists/src/source_2.o exists/src/source_2.c
 

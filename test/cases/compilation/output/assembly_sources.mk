@@ -1,6 +1,6 @@
 #!/usr/bin/env make
 
-# REQUIRES: make, dynamic-make
+# REQUIRES: make
 # RUN: %{make} -C %T -f %s clean
 # RUN: %{bear} -vvvv --cdb %t.json -- %{make} -C %T -f %s
 # RUN: assert_compilation %t.json count -eq 2

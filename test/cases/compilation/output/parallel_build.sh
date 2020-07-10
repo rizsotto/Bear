@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: preload, shell, dynamic-shell
+# REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 4
 # RUN: assert_compilation %t.json contains -file parallel_build_1.c -directory %T -arguments %{c_compiler} -c -o parallel_build_1.o parallel_build_1.c

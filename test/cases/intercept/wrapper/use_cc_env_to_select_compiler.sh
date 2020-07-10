@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 # RUN: echo "#!/usr/bin/env sh\n%{c_compiler} $@" > %t.wrapper
 # RUN: chmod +x %t.wrapper
 # RUN: cd %T; env CC=%t.wrapper %{intercept} --force-wrapper --verbose --output %t.json -- %{shell} %s || true

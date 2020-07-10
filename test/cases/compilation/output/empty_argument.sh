@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: preload, shell, dynamic-shell
+# REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -ge 2
 # RUN: assert_compilation %t.json contains -file empty_argument_1.c -directory %T

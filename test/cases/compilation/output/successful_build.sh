@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 4
 # RUN: assert_compilation %t.json contains -file successful_build_1.c -directory %T -arguments %{c_compiler} -c -o successful_build_1.o successful_build_1.c

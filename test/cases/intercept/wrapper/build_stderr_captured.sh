@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 # RUN: %{shell} %s 2> %t.orig.stderr
 # RUN: %{intercept} --force-wrapper --output %t.json -- %{shell} %s 2> %t.fwd.stderr
 # RUN: diff %t.orig.stderr %t.fwd.stderr
