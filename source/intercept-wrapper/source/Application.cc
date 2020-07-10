@@ -149,15 +149,17 @@ namespace wr {
     rust::Result<int> Application::operator()() const
     {
         rpc::InterceptClient client(impl_->session.destination);
-        auto program = client.get_wrapped_command(impl_->execution.command);
+        auto command = client.get_wrapped_command(impl_->execution.command);
         auto environment = client.get_environment_update(impl_->execution.environment);
 
-        auto result = rust::merge(program, environment)
+        auto result = rust::merge(command, environment)
             .map<Execution>([this](auto tuple) {
-                const auto& [program, environment] = tuple;
+                const auto& [command, environment] = tuple;
+                auto arguments = impl_->execution.arguments;
+                arguments.front() = command;
                 return Execution {
-                    program,
-                    impl_->execution.arguments,
+                    command,
+                    arguments,
                     impl_->execution.working_directory,
                     environment
                 };
