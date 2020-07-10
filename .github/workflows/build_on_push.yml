@@ -3,9 +3,7 @@ name: continuous integration
 on: [push, pull_request]
 
 jobs:
-
   build:
-
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -39,11 +37,8 @@ jobs:
           pip install lit pex pycodestyle
 
       - name: Configure
-        env:
-          RUNNER: ${{ runner.os }}
         run: |
-          RUN_FUNC_TEST=$(if [ $RUNNER = "Linux" ]; then echo "ON"; else echo "OFF"; fi)
-          cmake -B "$HOME" -S "$GITHUB_WORKSPACE" -DENABLE_FUNC_TESTS=$RUN_FUNC_TEST
+          cmake -B "$HOME" -S "$GITHUB_WORKSPACE"
 
       - name: Build
         env:

@@ -77,6 +77,8 @@ if (ENABLE_FUNC_TESTS)
                 1
             INSTALL_COMMAND
                 ""
+            TEST_COMMAND
+                ctest --verbose
             )
 endif ()
 
