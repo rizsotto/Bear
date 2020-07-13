@@ -33,6 +33,14 @@ namespace report {
         };
     }
 
+    void from_json(const json& j, Execution::Command& rhs)
+    {
+        j.at("program").get_to(rhs.program);
+        j.at("arguments").get_to(rhs.arguments);
+        j.at("working_dir").get_to(rhs.working_dir);
+        j.at("environment").get_to(rhs.environment);
+    }
+
     void to_json(json& j, const Execution::Event& rhs)
     {
         j = json {
@@ -47,6 +55,24 @@ namespace report {
         }
     }
 
+    void from_json(const json& j, Execution::Event& rhs)
+    {
+        j.at("at").get_to(rhs.at);
+        j.at("type").get_to(rhs.type);
+
+        if (j.contains("status")) {
+            int value;
+            j.at("status").get_to(value);
+            rhs.status.emplace(value);
+        }
+
+        if (j.contains("signal")) {
+            int value;
+            j.at("signal").get_to(value);
+            rhs.signal.emplace(value);
+        }
+    }
+
     void to_json(json& j, const Execution::Run& rhs)
     {
         j["pid"] = rhs.pid;
@@ -56,9 +82,27 @@ namespace report {
         }
     }
 
+    void from_json(const json& j, Execution::Run& rhs)
+    {
+        j.at("pid").get_to(rhs.pid);
+        j.at("events").get_to(rhs.events);
+
+        if (j.contains("ppid")) {
+            int value;
+            j.at("ppid").get_to(value);
+            rhs.ppid.emplace(value);
+        }
+    }
+
     void to_json(json& j, const Execution& rhs)
     {
         j = json { { "command", rhs.command }, { "run", rhs.run } };
+    }
+
+    void from_json(const json& j, Execution& rhs)
+    {
+        j.at("command").get_to(rhs.command);
+        j.at("run").get_to(rhs.run);
     }
 
     void to_json(json& j, const Context& rhs)
@@ -69,9 +113,21 @@ namespace report {
         };
     }
 
+    void from_json(const json& j, Context& rhs)
+    {
+        j.at("intercept").get_to(rhs.session_type);
+        j.at("host_info").get_to(rhs.host_info);
+    }
+
     void to_json(json& j, const Report& rhs)
     {
         j = json { { "executions", rhs.executions }, { "context", rhs.context } };
+    }
+
+    void from_json(const json& j, Report& rhs)
+    {
+        j.at("executions").get_to(rhs.executions);
+        j.at("context").get_to(rhs.context);
     }
 
     bool operator==(const Execution::Command& lhs, const Execution::Command& rhs)

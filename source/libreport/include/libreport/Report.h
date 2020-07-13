@@ -87,6 +87,7 @@ namespace report {
     };
 
     void to_json(nlohmann::json& j, const Report& rhs);
+    void from_json(const nlohmann::json& j, Report& rhs);
 
     bool operator==(const Execution::Command& lhs, const Execution::Command& rhs);
     bool operator==(const Execution::Event& lhs, const Execution::Event& rhs);
