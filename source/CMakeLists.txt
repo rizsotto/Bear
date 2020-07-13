@@ -69,6 +69,7 @@ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_subdirectory(bear)
+add_subdirectory(citnames)
 add_subdirectory(libresult)
 add_subdirectory(libflags)
 add_subdirectory(librpc)
