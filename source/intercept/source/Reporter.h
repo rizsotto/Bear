@@ -19,9 +19,9 @@
 
 #pragma once
 
-#include "Report.h"
 #include "Session.h"
 #include "libflags/Flags.h"
+#include "libreport/Report.h"
 #include "libresult/Result.h"
 #include "libsys/Context.h"
 #include "librpc/supervise.pb.h"
@@ -49,14 +49,14 @@ namespace ic {
 
     protected:
         // These methods are visible for testing...
-        Reporter(const std::string_view& view, ic::Context&& context);
+        Reporter(const std::string_view& view, report::Context&& context);
 
         void flush(std::ostream&) const;
-        [[nodiscard]] ic::Report makeReport() const;
+        [[nodiscard]] report::Report makeReport() const;
 
     private:
         std::string output_;
-        ic::Context context_;
-        std::map<pid_t, Execution> executions_;
+        report::Context context_;
+        std::map<pid_t, report::Execution> executions_;
     };
 }

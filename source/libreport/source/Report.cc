@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Report.h"
+#include "libreport/Report.h"
 
 using json = nlohmann::json;
 
-namespace ic {
+namespace report {
 
     void to_json(json& j, const Execution::Command& rhs)
     {
@@ -72,5 +72,46 @@ namespace ic {
     void to_json(json& j, const Report& rhs)
     {
         j = json { { "executions", rhs.executions }, { "context", rhs.context } };
+    }
+
+    bool operator==(const Execution::Command& lhs, const Execution::Command& rhs)
+    {
+        return (lhs.program == rhs.program)
+               && (lhs.arguments == rhs.arguments)
+               && (lhs.working_dir == rhs.working_dir)
+               && (lhs.environment == rhs.environment);
+    }
+
+    bool operator==(const Execution::Event& lhs, const Execution::Event& rhs)
+    {
+        return (lhs.at == rhs.at)
+               && (lhs.type == rhs.type)
+               && (lhs.status == rhs.status)
+               && (lhs.signal == rhs.signal);
+    }
+
+    bool operator==(const Execution::Run& lhs, const Execution::Run& rhs)
+    {
+        return (lhs.pid == rhs.pid)
+               && (lhs.ppid == rhs.ppid)
+               && (lhs.events == rhs.events);
+    }
+
+    bool operator==(const Execution& lhs, const Execution& rhs)
+    {
+        return (lhs.command == rhs.command)
+               && (lhs.run == rhs.run);
+    }
+
+    bool operator==(const Context& lhs, const Context& rhs)
+    {
+        return (lhs.session_type == rhs.session_type)
+               && (lhs.host_info == rhs.host_info);
+    }
+
+    bool operator==(const Report& lhs, const Report& rhs)
+    {
+        return (lhs.context == rhs.context)
+               && (lhs.executions == rhs.executions);
     }
 }

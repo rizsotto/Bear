@@ -73,10 +73,10 @@ namespace {
             });
     }
 
-    void update_run_with_started(ic::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_started(report::Execution::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, even: start]", source.pid());
-        ic::Execution::Event event = ic::Execution::Event {
+        report::Execution::Event event = report::Execution::Event {
             "started",
             source.timestamp(),
             std::nullopt,
@@ -85,10 +85,10 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_signaled(ic::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_signaled(report::Execution::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: signal]", source.pid());
-        ic::Execution::Event event = ic::Execution::Event {
+        report::Execution::Event event = report::Execution::Event {
             "signaled",
             source.timestamp(),
             std::nullopt,
@@ -97,10 +97,10 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_terminated(ic::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_terminated(report::Execution::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: stop]", source.pid());
-        ic::Execution::Event event = ic::Execution::Event {
+        report::Execution::Event event = report::Execution::Event {
             "terminated",
             source.timestamp(),
             { source.terminated().status() },
@@ -124,24 +124,24 @@ namespace {
         return (value == 0 ? std::nullopt : std::make_optional(value));
     }
 
-    ic::Execution init_execution(const supervise::Event& source)
+    report::Execution init_execution(const supervise::Event& source)
     {
         const auto& started = source.started();
 
-        auto command = ic::Execution::Command {
+        auto command = report::Execution::Command {
             started.executable(),
             to_list(started.arguments()),
             started.working_dir(),
             to_map(started.environment())
         };
-        auto run = ic::Execution::Run {
+        auto run = report::Execution::Run {
             to_optional(source.pid()).value_or(0),
             to_optional(source.ppid()),
-            std::list<ic::Execution::Event>()
+            std::list<report::Execution::Event>()
         };
         update_run_with_started(run, source);
 
-        return ic::Execution { command, run };
+        return report::Execution { command, run };
     }
 }
 
@@ -155,12 +155,12 @@ namespace ic {
         return merge(host_info, output)
             .map<Reporter::SharedPtr>([&session](auto pair) {
                 const auto& [host_info, output] = pair;
-                auto context = ic::Context { session.get_session_type(), host_info };
+                auto context = report::Context { session.get_session_type(), host_info };
                 return Reporter::SharedPtr(new Reporter(output, std::move(context)));
             });
     }
 
-    Reporter::Reporter(const std::string_view& output, ic::Context&& context)
+    Reporter::Reporter(const std::string_view& output, report::Context&& context)
             : output_(output)
             , context_(context)
             , executions_()
@@ -204,9 +204,9 @@ namespace ic {
         stream << j << std::endl;
     }
 
-    Report Reporter::makeReport() const
+    report::Report Reporter::makeReport() const
     {
-        Report report = Report { context_, { } };
+        report::Report report = report::Report { context_, { } };
         std::transform(executions_.begin(), executions_.end(),
                        std::back_inserter(report.executions),
                        [](auto pid_execution_pair) { return pid_execution_pair.second; });

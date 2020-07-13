@@ -26,7 +26,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace ic {
+namespace report {
 
     // This represents a program execution, which is assembled from multiple
     // events. The events are representing a process execution event, like
@@ -87,4 +87,11 @@ namespace ic {
     };
 
     void to_json(nlohmann::json& j, const Report& rhs);
+
+    bool operator==(const Execution::Command& lhs, const Execution::Command& rhs);
+    bool operator==(const Execution::Event& lhs, const Execution::Event& rhs);
+    bool operator==(const Execution::Run& lhs, const Execution::Run& rhs);
+    bool operator==(const Execution& lhs, const Execution& rhs);
+    bool operator==(const Context& lhs, const Context& rhs);
+    bool operator==(const Report& lhs, const Report& rhs);
 }

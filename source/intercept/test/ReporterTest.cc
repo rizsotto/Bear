@@ -21,50 +21,6 @@
 
 #include "Reporter.h"
 
-namespace ic {
-
-    bool operator==(const Execution::Command& lhs, const Execution::Command& rhs)
-    {
-        return (lhs.program == rhs.program)
-            && (lhs.arguments == rhs.arguments)
-            && (lhs.working_dir == rhs.working_dir)
-            && (lhs.environment == rhs.environment);
-    }
-
-    bool operator==(const Execution::Event& lhs, const Execution::Event& rhs)
-    {
-        return (lhs.at == rhs.at)
-            && (lhs.type == rhs.type)
-            && (lhs.status == rhs.status)
-            && (lhs.signal == rhs.signal);
-    }
-
-    bool operator==(const Execution::Run& lhs, const Execution::Run& rhs)
-    {
-        return (lhs.pid == rhs.pid)
-            && (lhs.ppid == rhs.ppid)
-            && (lhs.events == rhs.events);
-    }
-
-    bool operator==(const Execution& lhs, const Execution& rhs)
-    {
-        return (lhs.command == rhs.command)
-            && (lhs.run == rhs.run);
-    }
-
-    bool operator==(const Context& lhs, const Context& rhs)
-    {
-        return (lhs.session_type == rhs.session_type)
-            && (lhs.host_info == rhs.host_info);
-    }
-
-    bool operator==(const Report& lhs, const Report& rhs)
-    {
-        return (lhs.context == rhs.context)
-            && (lhs.executions == rhs.executions);
-    }
-}
-
 namespace {
 
     supervise::Event start_event()
@@ -114,7 +70,7 @@ namespace {
 
     struct ReporterFixture : ic::Reporter {
     public:
-        ReporterFixture(const std::string_view& view, ic::Context&& context)
+        ReporterFixture(const std::string_view& view, report::Context&& context)
                 : Reporter(view, std::move(context))
         {
         }
@@ -125,52 +81,52 @@ namespace {
 
     TEST(reporter, builder_makes_empty_execution_object)
     {
-        ic::Report expected = ic::Report {
-            ic::Context { "session", { { "key", "value" } } },
+        report::Report expected = report::Report {
+            report::Context { "session", { { "key", "value" } } },
             {}
         };
         ReporterFixture sut(
             "ignore",
-            ic::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } });
 
-        ic::Report result = sut.makeReport();
+        report::Report result = sut.makeReport();
         EXPECT_EQ(result, expected);
     }
 
     TEST(reporter, builder_makes_empty_object_without_start_event)
     {
-        ic::Report expected = ic::Report {
-            ic::Context { "session", { { "key", "value" } } },
+        report::Report expected = report::Report {
+            report::Context { "session", { { "key", "value" } } },
             {}
         };
         ReporterFixture sut(
             "ignore",
-            ic::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } });
         sut.report(signal_event());
         sut.report(stop_event());
 
-        ic::Report result = sut.makeReport();
+        report::Report result = sut.makeReport();
         EXPECT_EQ(result, expected);
     }
 
     TEST(reporter, builder_makes_execution_object_from_events)
     {
-        ic::Report expected = ic::Report {
-            ic::Context { "session", { { "key", "value" } } },
+        report::Report expected = report::Report {
+            report::Context { "session", { { "key", "value" } } },
             {
-                ic::Execution {
-                    ic::Execution::Command {
+                report::Execution {
+                    report::Execution::Command {
                         "/usr/bin/ls",
                         { "ls", "-l" },
                         "/home/user",
                         { { "HOME", "/home/user" }, { "PATH", "/usr/bin:/usr/local/bin" } } },
-                    ic::Execution::Run {
+                    report::Execution::Run {
                         42 ,
                         { 12 },
                         {
-                            ic::Execution::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
-                            ic::Execution::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 15 } },
-                            ic::Execution::Event {"terminated", "2020-04-04T07:13:47.074Z", { 0 }, std::nullopt }
+                            report::Execution::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
+                            report::Execution::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 15 } },
+                            report::Execution::Event {"terminated", "2020-04-04T07:13:47.074Z", { 0 }, std::nullopt }
                         }
                     }
                 }
@@ -178,12 +134,12 @@ namespace {
         };
         ReporterFixture sut(
             "ignore",
-            ic::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } });
         sut.report(start_event());
         sut.report(signal_event());
         sut.report(stop_event());
 
-        ic::Report result = sut.makeReport();
+        report::Report result = sut.makeReport();
         EXPECT_EQ(result, expected);
     }
 }
