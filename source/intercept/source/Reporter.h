@@ -51,7 +51,6 @@ namespace ic {
         // These methods are visible for testing...
         Reporter(const std::string_view& view, report::Context&& context);
 
-        void flush(std::ostream&) const;
         [[nodiscard]] report::Report makeReport() const;
 
     private:

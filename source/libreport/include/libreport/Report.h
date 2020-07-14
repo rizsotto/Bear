@@ -19,12 +19,14 @@
 
 #pragma once
 
+#include "libresult/Result.h"
+
 #include <list>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
-
-#include <nlohmann/json.hpp>
+#include <iostream>
 
 namespace report {
 
@@ -86,9 +88,14 @@ namespace report {
         std::list<Execution> executions;
     };
 
-    void to_json(nlohmann::json& j, const Report& rhs);
-    void from_json(const nlohmann::json& j, Report& rhs);
+    // Serialization methods with error mapping.
+    rust::Result<int> to_json(const char* file, const Report& rhs);
+    rust::Result<int> to_json(std::ostream& ostream, const Report& rhs);
 
+    rust::Result<Report> from_json(const char* file);
+    rust::Result<Report> from_json(std::istream& istream);
+
+    // Methods used in tests.
     bool operator==(const Execution::Command& lhs, const Execution::Command& rhs);
     bool operator==(const Execution::Event& lhs, const Execution::Event& rhs);
     bool operator==(const Execution::Run& lhs, const Execution::Run& rhs);

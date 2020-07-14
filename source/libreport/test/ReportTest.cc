@@ -68,15 +68,23 @@ namespace {
 
         std::stringstream buffer;
 
-        nlohmann::json out = expected;
-        buffer << std::setw(4) << out << std::endl;
+        auto serialized = report::to_json(buffer, expected);
+        EXPECT_TRUE(serialized.is_ok());
 
-        nlohmann::json in;
-        buffer >> in;
+        auto deserialized = report::from_json(buffer);
+        EXPECT_TRUE(deserialized.is_ok());
+        deserialized.on_success([&expected](auto result) {
+            EXPECT_EQ(expected, result);
+        });
+    }
 
-        report::Report result;
-        report::from_json(in, result);
+    TEST(report, parse_failure_handled)
+    {
+        std::stringstream buffer;
 
-        EXPECT_EQ(expected, result);
+        buffer << "this { is } wrong" << std::endl;
+
+        auto deserialized = report::from_json(buffer);
+        EXPECT_FALSE(deserialized.is_ok());
     }
 }

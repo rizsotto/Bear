@@ -25,7 +25,6 @@
 #include <spdlog/spdlog.h>
 
 #include <fstream>
-#include <iomanip>
 #include <memory>
 #include <utility>
 #include <functional>
@@ -192,16 +191,10 @@ namespace ic {
 
     void Reporter::flush()
     {
-        std::ofstream targetFile(output_);
-        targetFile << std::setw(4);
-
-        flush(targetFile);
-    }
-
-    void Reporter::flush(std::ostream& stream) const
-    {
-        nlohmann::json j = makeReport();
-        stream << j << std::endl;
+        report::to_json(output_.c_str(), makeReport())
+            .on_error([this](auto error) {
+                spdlog::warn("Writing output file \"{}\" failed with: {}", output_, error.what());
+            });
     }
 
     report::Report Reporter::makeReport() const
