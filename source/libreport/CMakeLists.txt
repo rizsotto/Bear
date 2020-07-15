@@ -6,9 +6,6 @@ target_include_directories(report_a PUBLIC include/)
 target_link_libraries(report_a PUBLIC result_a)
 target_link_libraries(report_a PRIVATE nlohmann_json::nlohmann_json)
 target_compile_options(report_a PRIVATE -fexceptions)
-#target_compile_features(report_a PROPERTIES
-#        LOCAL_CPP_FEATURES "-fexceptions"
-#        )
 
 if (ENABLE_UNIT_TESTS)
     add_executable(report_unit_test
