@@ -1,6 +1,7 @@
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT
         source/Application.cc
+        source/Config.cc
         )
 
 target_include_directories(citnames_a PUBLIC source/)
