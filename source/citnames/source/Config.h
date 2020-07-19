@@ -25,59 +25,56 @@
 #include <string>
 #include <optional>
 
-namespace cs {
+namespace cs::cfg {
 
-    namespace cfg {
+    struct Format {
+        bool command_as_array;
+        bool drop_output_field;
+    };
 
-        struct Format {
-            bool command_as_array;
-            bool drop_output_field;
-        };
+    struct Content {
+        std::optional<std::string> relative_to;
+        bool include_only_existing_source;
+        std::list<std::string> paths_to_include;
+        std::list<std::string> paths_to_exclude;
+    };
 
-        struct Content {
-            std::optional<std::string> relative_to;
-            bool include_only_existing_source;
-            std::list<std::string> paths_to_include;
-            std::list<std::string> paths_to_exclude;
-        };
+    struct ExpandWrappers {
+        bool mpi;
+        bool cuda;
+        bool ccache;
+        bool distcc;
+    };
 
-        struct ExpandWrappers {
-            bool mpi;
-            bool cuda;
-            bool ccache;
-            bool distcc;
-        };
+    struct Compilers {
+        std::list<std::string> mpi;
+        std::list<std::string> cuda;
+        std::list<std::string> distcc;
+        std::list<std::string> ccache;
+        std::list<std::string> cc;
+        std::list<std::string> cxx;
+        std::list<std::string> fortran;
+    };
 
-        struct Compilers {
-            std::list<std::string> mpi;
-            std::list<std::string> cuda;
-            std::list<std::string> distcc;
-            std::list<std::string> ccache;
-            std::list<std::string> cc;
-            std::list<std::string> cxx;
-            std::list<std::string> fortran;
-        };
+    struct Sources {
+        std::list<std::string> extensions_to_exclude;
+        std::list<std::string> extensions_to_include;
+    };
 
-        struct Sources {
-            std::list<std::string> extensions_to_exclude;
-            std::list<std::string> extensions_to_include;
-        };
+    struct Flag {
+        std::string flag;
+        std::string pattern;
+        std::string clazz;
+        bool split;
+        int count;
+    };
 
-        struct Flag {
-            std::string flag;
-            std::string pattern;
-            std::string clazz;
-            bool split;
-            int count;
-        };
-
-        struct Compilation {
-            cfg::ExpandWrappers expand_wrappers;
-            cfg::Compilers compilers;
-            cfg::Sources sources;
-            std::list<Flag> flags_to_filter;
-        };
-    }
+    struct Compilation {
+        cfg::ExpandWrappers expand_wrappers;
+        cfg::Compilers compilers;
+        cfg::Sources sources;
+        std::list<Flag> flags_to_filter;
+    };
 
     struct Configuration {
         cfg::Format format;

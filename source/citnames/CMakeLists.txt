@@ -2,6 +2,7 @@
 add_library(citnames_a OBJECT
         source/Application.cc
         source/Config.cc
+        source/CompilationDatabase.cc
         )
 
 target_include_directories(citnames_a PUBLIC source/)
