@@ -35,6 +35,7 @@ namespace cs::cfg {
     struct Content {
         std::optional<std::string> relative_to;
         bool include_only_existing_source;
+        bool include_only_successful_commands;
         std::list<std::string> paths_to_include;
         std::list<std::string> paths_to_exclude;
     };
@@ -81,14 +82,6 @@ namespace cs::cfg {
         cfg::Content content;
         cfg::Compilation compilation;
     };
-
-//    struct Arguments {
-//        std::string input;
-//        std::string output;
-//        std::optional<std::string> config;
-//        bool append;
-//        bool check_is_allowed;
-//    };
 
     // Create a default value.
     Configuration default_value();

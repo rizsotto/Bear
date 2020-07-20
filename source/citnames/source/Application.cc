@@ -18,19 +18,53 @@
  */
 
 #include "Application.h"
+#include "Config.h"
+#include "CompilationDatabase.h"
+
+namespace {
+
+    rust::Result<cs::Arguments> from(const flags::Arguments& args)
+    {
+        auto input = args.as_string(cs::Application::INPUT);
+        auto output = args.as_string(cs::Application::OUTPUT);
+        auto append = args.as_bool(cs::Application::APPEND).unwrap_or(false);
+        auto run_check = args.as_bool(cs::Application::RUN_CHECKS).unwrap_or(false);
+
+        return rust::merge(input, output)
+                .map<cs::Arguments>([&append, &run_check](auto tuple) {
+                    const auto& [input, output] = tuple;
+                    return cs::Arguments {
+                        std::string(input),
+                        std::string(output),
+                        append,
+                        run_check
+                    };
+                });
+    }
+}
 
 namespace cs {
 
     struct Application::State {
+        cs::Arguments arguments;
+        cs::cfg::Configuration configuration;
     };
 
-    rust::Result<Application> Application::create(const char** args, const sys::Context& ctx)
+    rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        return rust::Err(std::runtime_error("TODO"));
+        return ::from(args)
+                .map<Application::State*>([](auto arguments) {
+                    return new Application::State { arguments, cfg::default_value() };
+                })
+                .map<Application>([](auto impl) {
+                    return Application { impl };
+                });
     }
 
     rust::Result<int> Application::operator()() const
     {
+        auto commands = output::from_json(impl_->arguments.input.c_str());
+
         return rust::Err(std::runtime_error("TODO"));
     }
 

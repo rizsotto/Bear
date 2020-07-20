@@ -19,20 +19,29 @@
 
 #pragma once
 
+#include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Context.h"
 
 namespace cs {
 
+    struct Arguments {
+        std::string input;
+        std::string output;
+        bool append;
+        bool run_check;
+    };
+
     class Application {
     public:
         static constexpr char VERBOSE[] = "--verbose";
-        static constexpr char CONFIG[] = "--config";
+        // static constexpr char CONFIG[] = "--config";
         static constexpr char INPUT[] = "--input";
         static constexpr char OUTPUT[] = "--output";
         static constexpr char APPEND[] = "--append";
+        static constexpr char RUN_CHECKS[] = "--run-checks";
 
-        static ::rust::Result<Application> create(const char** args, const sys::Context&);
+        static ::rust::Result<Application> from(const flags::Arguments& args, const sys::Context& ctx);
 
         ::rust::Result<int> operator()() const;
 

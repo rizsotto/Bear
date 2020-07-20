@@ -31,8 +31,10 @@ namespace cs::cfg {
                 },
                 cfg::Content {
                     // relative to
-                    {},
+                    std::nullopt,
                     // include only existing source
+                    true,
+                    // include only successful commands
                     true,
                     // paths to include
                     {},
