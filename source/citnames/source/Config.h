@@ -82,10 +82,34 @@ namespace cs::cfg {
         cfg::Compilation compilation;
     };
 
+//    struct Arguments {
+//        std::string input;
+//        std::string output;
+//        std::optional<std::string> config;
+//        bool append;
+//        bool check_is_allowed;
+//    };
+
+    // Create a default value.
+    Configuration default_value();
+
+    // Returns list of violations of semantic.
+    std::list<std::string> validate(const cfg::Configuration& value);
+
     // Serialization methods with error mapping.
     rust::Result<int> to_json(const char* file, const Configuration& rhs);
     rust::Result<int> to_json(std::ostream& ostream, const Configuration& rhs);
 
     rust::Result<Configuration> from_json(const char* file);
     rust::Result<Configuration> from_json(std::istream& istream);
+
+    // Methods used in tests.
+    bool operator==(const Configuration& lhs, const Configuration& rhs);
+    bool operator==(const Compilation& lhs, const Compilation& rhs);
+    bool operator==(const Flag& lhs, const Flag& rhs);
+    bool operator==(const Sources& lhs, const Sources& rhs);
+    bool operator==(const Compilers& lhs, const Compilers& rhs);
+    bool operator==(const ExpandWrappers& lhs, const ExpandWrappers& rhs);
+    bool operator==(const Content& lhs, const Content& rhs);
+    bool operator==(const Format& lhs, const Format& rhs);
 }
