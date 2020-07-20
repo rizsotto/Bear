@@ -39,9 +39,12 @@ namespace cs::output {
     using CompilationDatabase = std::list<Entry>;
 
     // Serialization methods with error mapping.
-    rust::Result<int> to_json(const char *file, const CompilationDatabase &rhs, const cs::cfg::Format& format);
-    rust::Result<int> to_json(std::ostream &ostream, const CompilationDatabase &rhs, const cs::cfg::Format& format);
+    rust::Result<int> to_json(const char *file, const CompilationDatabase &entries, const cs::cfg::Format& format);
+    rust::Result<int> to_json(std::ostream &ostream, const CompilationDatabase &entries, const cs::cfg::Format& format);
 
     rust::Result<CompilationDatabase> from_json(const char *file);
     rust::Result<CompilationDatabase> from_json(std::istream &istream);
+
+    // Methods used in tests.
+    bool operator==(const Entry& lhs, const Entry& rhs);
 }

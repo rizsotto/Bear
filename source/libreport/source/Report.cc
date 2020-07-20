@@ -20,8 +20,8 @@
 #include "libreport/Report.h"
 
 #include <iomanip>
-
 #include <fstream>
+
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
