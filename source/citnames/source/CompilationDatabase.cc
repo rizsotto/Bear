@@ -64,9 +64,9 @@ namespace cs::output {
                 json.emplace_back(std::move(json_entry));
             }
 
-            ostream << std::setw(4) << json << std::endl;
+            ostream << std::setw(2) << json << std::endl;
 
-            return rust::Ok(1);
+            return rust::Ok(0);
         } catch (const std::exception& error) {
             return rust::Err(std::runtime_error(error.what()));
         }
@@ -151,6 +151,17 @@ namespace cs::output {
         } catch (const std::exception& error) {
             return rust::Err(std::runtime_error(error.what()));
         }
+    }
+
+    CompilationDatabase merge(const CompilationDatabase& lhs, const CompilationDatabase& rhs)
+    {
+        auto result = lhs;
+        for (const auto& candidate : rhs) {
+            if (auto it = std::find(result.begin(), result.end(), candidate); it == result.end()) {
+                result.push_back(candidate);
+            }
+        }
+        return result;
     }
 
     bool operator==(const Entry& lhs, const Entry& rhs)

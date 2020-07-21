@@ -21,6 +21,8 @@
 
 #include "CompilationDatabase.h"
 
+#include <iterator>
+
 namespace {
 
     void simple_value_serialized_and_read_back(
@@ -121,5 +123,30 @@ namespace {
 
         auto deserialized = cs::output::from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
+    }
+
+    TEST(compilation_database, merge)
+    {
+        cs::output::CompilationDatabase input_one = {
+                { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
+        };
+        cs::output::CompilationDatabase input_two = {
+                { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
+        };
+        cs::output::CompilationDatabase input_three = {
+                *std::next(input_one.begin(), 0),
+                *std::next(input_two.begin(), 0),
+        };
+        cs::output::CompilationDatabase expected = {
+                *std::next(input_one.begin(), 0),
+                *std::next(input_one.begin(), 1),
+                *std::next(input_two.begin(), 0),
+        };
+
+        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one));
+        EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
+        EXPECT_EQ(expected, cs::output::merge(input_one, input_two));
+        EXPECT_EQ(expected, cs::output::merge(input_one, input_three));
     }
 }

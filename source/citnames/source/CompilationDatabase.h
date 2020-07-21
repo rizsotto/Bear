@@ -45,6 +45,9 @@ namespace cs::output {
     rust::Result<CompilationDatabase> from_json(const char *file);
     rust::Result<CompilationDatabase> from_json(std::istream &istream);
 
+    // Merge two compilation database without duplicate elements.
+    CompilationDatabase merge(const CompilationDatabase& lhs, const CompilationDatabase& rhs);
+
     // Methods used in tests.
     bool operator==(const Entry& lhs, const Entry& rhs);
 }

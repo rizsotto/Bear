@@ -26,7 +26,6 @@
 #include <spdlog/sinks/stdout_sinks.h>
 
 #include <optional>
-#include <string_view>
 
 
 int main(int argc, char* argv[], char* envp[])

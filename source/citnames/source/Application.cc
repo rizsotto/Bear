@@ -20,10 +20,15 @@
 #include "Application.h"
 #include "Config.h"
 #include "CompilationDatabase.h"
+#include "Semantic.h"
+
+#include "libreport/Report.h"
+
+#include <fmt/format.h>
 
 namespace {
 
-    rust::Result<cs::Arguments> from(const flags::Arguments& args)
+    rust::Result<cs::Arguments> into_arguments(const flags::Arguments& args)
     {
         auto input = args.as_string(cs::Application::INPUT);
         auto output = args.as_string(cs::Application::OUTPUT);
@@ -48,13 +53,27 @@ namespace cs {
     struct Application::State {
         cs::Arguments arguments;
         cs::cfg::Configuration configuration;
+        cs::Semantic semantic;
     };
 
     rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        return ::from(args)
-                .map<Application::State*>([](auto arguments) {
-                    return new Application::State { arguments, cfg::default_value() };
+        return into_arguments(args)
+                .and_then<Application::State*>([&ctx](auto arguments) {
+                    // modify the arguments till we have context for IO
+                    arguments.append &= (ctx.is_exists(arguments.output) == 0);
+                    if (ctx.is_exists(arguments.input) == 0) {
+                        return rust::Result<Application::State*>(rust::Err(
+                                std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
+                    }
+                    // read the configuration
+                    auto configuration = cfg::default_value();
+                    auto semantic = (arguments.run_check)
+                            ? Semantic::from(configuration, ctx)
+                            : Semantic::from(configuration);
+                    return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
+                        return new Application::State { arguments, configuration, semantic };
+                    });
                 })
                 .map<Application>([](auto impl) {
                     return Application { impl };
@@ -63,9 +82,28 @@ namespace cs {
 
     rust::Result<int> Application::operator()() const
     {
-        auto commands = output::from_json(impl_->arguments.input.c_str());
-
-        return rust::Err(std::runtime_error("TODO"));
+        // get current compilations from the input.
+        return report::from_json(impl_->arguments.input.c_str())
+            .map<output::CompilationDatabase>([this](auto commands) {
+                return impl_->semantic.run(commands);
+            })
+            // read back the current content and extend with the new elements.
+            .and_then<output::CompilationDatabase>([this](auto compilations) {
+                return (impl_->arguments.append)
+                    ? output::from_json(impl_->arguments.output.c_str())
+                            .template map<output::CompilationDatabase>([&compilations](auto old_entries) {
+                                return output::merge(old_entries, compilations);
+                            })
+                    : rust::Result<output::CompilationDatabase>(rust::Ok(compilations));
+            })
+            // write the entries into the output file.
+            .and_then<int>([this](auto compilations) {
+                return output::to_json(impl_->arguments.output.c_str(), compilations, impl_->configuration.format);
+            })
+            // just map to success exit code if it was successful.
+            .map<int>([](auto ignore) {
+                return EXIT_SUCCESS;
+            });
     }
 
     Application::Application(Application::State* const impl)

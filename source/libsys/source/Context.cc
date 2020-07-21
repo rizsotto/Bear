@@ -144,6 +144,14 @@ namespace sys {
         }
     }
 
+    int Context::is_exists(const std::string& path) const
+    {
+        if (0 == access(path.data(), F_OK)) {
+            return 0;
+        }
+        return ENOENT;
+    }
+
     int Context::is_executable(const std::string& path) const
     {
         if (0 == access(path.data(), X_OK)) {
