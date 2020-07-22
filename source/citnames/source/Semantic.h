@@ -32,7 +32,7 @@ namespace cs {
         static rust::Result<Semantic> from(const cfg::Configuration& cfg);
         static rust::Result<Semantic> from(const cfg::Configuration& cfg, const sys::Context& ctx);
 
-        [[nodiscard]] output::CompilationDatabase run(const report::Report& report) const;
+        [[nodiscard]] output::Entries run(const report::Report& report) const;
 
     public:
         Semantic() = default;

@@ -26,15 +26,16 @@
 namespace {
 
     void simple_value_serialized_and_read_back(
-            const cs::output::CompilationDatabase& expected,
+            const cs::output::Entries& expected,
             const cs::cfg::Format& format)
     {
+        cs::output::CompilationDatabase output;
         std::stringstream buffer;
 
-        auto serialized = cs::output::to_json(buffer, expected, format);
+        auto serialized = output.to_json(buffer, expected, format);
         EXPECT_TRUE(serialized.is_ok());
 
-        auto deserialized = cs::output::from_json(buffer);
+        auto deserialized = output.from_json(buffer);
         EXPECT_TRUE(deserialized.is_ok());
         deserialized.on_success([&expected](auto result) {
             EXPECT_EQ(expected, result);
@@ -43,7 +44,7 @@ namespace {
 
     TEST(compilation_database, empty_value_serialized_and_read_back)
     {
-        cs::output::CompilationDatabase expected = {};
+        cs::output::Entries expected = {};
 
         simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {true, false});
         simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {false, false});
@@ -51,7 +52,7 @@ namespace {
 
     TEST(compilation_database, simple_value_serialized_and_read_back)
     {
-        cs::output::CompilationDatabase expected = {
+        cs::output::Entries expected = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
@@ -62,18 +63,19 @@ namespace {
     }
 
     void value_serialized_and_read_back_without_output(
-            const cs::output::CompilationDatabase& input,
-            const cs::output::CompilationDatabase& expected,
+            const cs::output::Entries& input,
+            const cs::output::Entries& expected,
             cs::cfg::Format format)
     {
         format.drop_output_field = true;
 
+        cs::output::CompilationDatabase output;
         std::stringstream buffer;
 
-        auto serialized = cs::output::to_json(buffer, input, format);
+        auto serialized = output.to_json(buffer, input, format);
         EXPECT_TRUE(serialized.is_ok());
 
-        auto deserialized = cs::output::from_json(buffer);
+        auto deserialized = output.from_json(buffer);
         EXPECT_TRUE(deserialized.is_ok());
         deserialized.on_success([&expected](auto result) {
             EXPECT_EQ(expected, result);
@@ -82,12 +84,12 @@ namespace {
 
     TEST(compilation_database, value_serialized_and_read_back_without_output)
     {
-        cs::output::CompilationDatabase input = {
+        cs::output::Entries input = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
-        cs::output::CompilationDatabase expected = {
+        cs::output::Entries expected = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
@@ -99,46 +101,49 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
+        cs::output::CompilationDatabase output;
         std::stringstream buffer;
 
-        auto deserialized = cs::output::from_json(buffer);
+        auto deserialized = output.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
+        cs::output::CompilationDatabase output;
         std::stringstream buffer;
 
         buffer << "[ { } ]";
 
-        auto deserialized = cs::output::from_json(buffer);
+        auto deserialized = output.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
+        cs::output::CompilationDatabase output;
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";
 
-        auto deserialized = cs::output::from_json(buffer);
+        auto deserialized = output.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 
     TEST(compilation_database, merge)
     {
-        cs::output::CompilationDatabase input_one = {
+        cs::output::Entries input_one = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
         };
-        cs::output::CompilationDatabase input_two = {
+        cs::output::Entries input_two = {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
-        cs::output::CompilationDatabase input_three = {
+        cs::output::Entries input_three = {
                 *std::next(input_one.begin(), 0),
                 *std::next(input_two.begin(), 0),
         };
-        cs::output::CompilationDatabase expected = {
+        cs::output::Entries expected = {
                 *std::next(input_one.begin(), 0),
                 *std::next(input_one.begin(), 1),
                 *std::next(input_two.begin(), 0),

@@ -36,17 +36,21 @@ namespace cs::output {
         std::list<std::string> arguments;
     };
 
-    using CompilationDatabase = std::list<Entry>;
+    using Entries = std::list<Entry>;
 
-    // Serialization methods with error mapping.
-    rust::Result<int> to_json(const char *file, const CompilationDatabase &entries, const cs::cfg::Format& format);
-    rust::Result<int> to_json(std::ostream &ostream, const CompilationDatabase &entries, const cs::cfg::Format& format);
+    struct CompilationDatabase {
+        virtual ~CompilationDatabase() noexcept = default;
 
-    rust::Result<CompilationDatabase> from_json(const char *file);
-    rust::Result<CompilationDatabase> from_json(std::istream &istream);
+        // Serialization methods with error mapping.
+        virtual rust::Result<int> to_json(const char *file, const Entries &entries, const cs::cfg::Format& format) const;
+        virtual rust::Result<int> to_json(std::ostream &ostream, const Entries &entries, const cs::cfg::Format& format) const;
+
+        virtual rust::Result<Entries> from_json(const char *file) const;
+        virtual rust::Result<Entries> from_json(std::istream &istream) const;
+    };
 
     // Merge two compilation database without duplicate elements.
-    CompilationDatabase merge(const CompilationDatabase& lhs, const CompilationDatabase& rhs);
+    Entries merge(const Entries& lhs, const Entries& rhs);
 
     // Methods used in tests.
     bool operator==(const Entry& lhs, const Entry& rhs);

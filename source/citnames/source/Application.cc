@@ -54,6 +54,7 @@ namespace cs {
         cs::Arguments arguments;
         cs::cfg::Configuration configuration;
         cs::Semantic semantic;
+        cs::output::CompilationDatabase output;
     };
 
     rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& ctx)
@@ -71,8 +72,9 @@ namespace cs {
                     auto semantic = (arguments.run_check)
                             ? Semantic::from(configuration, ctx)
                             : Semantic::from(configuration);
-                    return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
-                        return new Application::State { arguments, configuration, semantic };
+                    cs::output::CompilationDatabase output;
+                    return semantic.template map<Application::State*>([&arguments, &configuration, &output](auto semantic) {
+                        return new Application::State { arguments, configuration, semantic, output };
                     });
                 })
                 .map<Application>([](auto impl) {
@@ -84,21 +86,21 @@ namespace cs {
     {
         // get current compilations from the input.
         return report::from_json(impl_->arguments.input.c_str())
-            .map<output::CompilationDatabase>([this](auto commands) {
+            .map<output::Entries>([this](auto commands) {
                 return impl_->semantic.run(commands);
             })
             // read back the current content and extend with the new elements.
-            .and_then<output::CompilationDatabase>([this](auto compilations) {
+            .and_then<output::Entries>([this](auto compilations) {
                 return (impl_->arguments.append)
-                    ? output::from_json(impl_->arguments.output.c_str())
-                            .template map<output::CompilationDatabase>([&compilations](auto old_entries) {
+                    ? impl_->output.from_json(impl_->arguments.output.c_str())
+                            .template map<output::Entries>([&compilations](auto old_entries) {
                                 return output::merge(old_entries, compilations);
                             })
-                    : rust::Result<output::CompilationDatabase>(rust::Ok(compilations));
+                    : rust::Result<output::Entries>(rust::Ok(compilations));
             })
             // write the entries into the output file.
             .and_then<int>([this](auto compilations) {
-                return output::to_json(impl_->arguments.output.c_str(), compilations, impl_->configuration.format);
+                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations, impl_->configuration.format);
             })
             // just map to success exit code if it was successful.
             .map<int>([](auto ignore) {

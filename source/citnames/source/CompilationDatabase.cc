@@ -45,7 +45,7 @@ namespace cs::output {
         return json;
     }
 
-    rust::Result<int> to_json(const char *file, const CompilationDatabase &entries, const cs::cfg::Format& format)
+    rust::Result<int> CompilationDatabase::to_json(const char *file, const Entries &entries, const cs::cfg::Format& format) const
     {
         try {
             std::ofstream target(file);
@@ -55,12 +55,12 @@ namespace cs::output {
         }
     }
 
-    rust::Result<int> to_json(std::ostream &ostream, const CompilationDatabase &entries, const cs::cfg::Format& format)
+    rust::Result<int> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries, const cs::cfg::Format& format) const
     {
         try {
             nlohmann::json json = nlohmann::json::array();
             for (const auto & entry : entries) {
-                auto json_entry = to_json(entry, format);
+                auto json_entry = cs::output::to_json(entry, format);
                 json.emplace_back(std::move(json_entry));
             }
 
@@ -119,7 +119,7 @@ namespace cs::output {
         validate(entry);
     }
 
-    void from_json(const nlohmann::json &array, CompilationDatabase &entries)
+    void from_json(const nlohmann::json &array, Entries &entries)
     {
         for (const auto& e : array) {
             Entry entry;
@@ -128,7 +128,7 @@ namespace cs::output {
         }
     }
 
-    rust::Result<CompilationDatabase> from_json(const char *file)
+    rust::Result<Entries> CompilationDatabase::from_json(const char *file) const
     {
         try {
             std::ifstream source(file);
@@ -138,14 +138,14 @@ namespace cs::output {
         }
     }
 
-    rust::Result<CompilationDatabase> from_json(std::istream &istream)
+    rust::Result<Entries> CompilationDatabase::from_json(std::istream &istream) const
     {
         try {
             nlohmann::json in;
             istream >> in;
 
-            CompilationDatabase result;
-            from_json(in, result);
+            Entries result;
+            cs::output::from_json(in, result);
 
             return rust::Ok(result);
         } catch (const std::exception& error) {
@@ -153,7 +153,7 @@ namespace cs::output {
         }
     }
 
-    CompilationDatabase merge(const CompilationDatabase& lhs, const CompilationDatabase& rhs)
+    Entries merge(const Entries& lhs, const Entries& rhs)
     {
         auto result = lhs;
         for (const auto& candidate : rhs) {

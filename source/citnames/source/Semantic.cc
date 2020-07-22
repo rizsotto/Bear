@@ -33,9 +33,16 @@ namespace cs {
         return rust::Ok(Semantic());
     }
 
-    output::CompilationDatabase Semantic::run(const report::Report& report) const
+    output::Entries Semantic::run(const report::Report& report) const
     {
-        // TODO
-        return output::CompilationDatabase();
+        // TODO:
+        //  - filter for successful executions
+        //    - shall reconstruct process call chain
+        //  - filter for recognized compilers
+        //  - split command and arguments
+        //  - parse arguments
+        //  - create an entry
+        //  - filter out non existing source files
+        return output::Entries();
     }
 }
