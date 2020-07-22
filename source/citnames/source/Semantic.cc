@@ -21,13 +21,13 @@
 
 namespace cs {
 
-    rust::Result<Semantic> Semantic::from(const cfg::Configuration& cfg)
+    rust::Result<Semantic> Semantic::from(const cfg::Value& cfg)
     {
         // TODO
         return rust::Ok(Semantic());
     }
 
-    rust::Result<Semantic> Semantic::from(const cfg::Configuration& cfg, const sys::Context& ctx)
+    rust::Result<Semantic> Semantic::from(const cfg::Value& cfg, const sys::Context& ctx)
     {
         // TODO
         return rust::Ok(Semantic());

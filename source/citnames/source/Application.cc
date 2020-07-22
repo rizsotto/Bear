@@ -52,7 +52,7 @@ namespace cs {
 
     struct Application::State {
         cs::Arguments arguments;
-        cs::cfg::Configuration configuration;
+        cs::cfg::Value configuration;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };

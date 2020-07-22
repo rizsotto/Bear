@@ -29,8 +29,8 @@ namespace cs {
 
     class Semantic {
     public:
-        static rust::Result<Semantic> from(const cfg::Configuration& cfg);
-        static rust::Result<Semantic> from(const cfg::Configuration& cfg, const sys::Context& ctx);
+        static rust::Result<Semantic> from(const cfg::Value& cfg);
+        static rust::Result<Semantic> from(const cfg::Value& cfg, const sys::Context& ctx);
 
         [[nodiscard]] output::Entries run(const report::Report& report) const;
 

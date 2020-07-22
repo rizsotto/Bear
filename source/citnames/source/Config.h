@@ -77,27 +77,31 @@ namespace cs::cfg {
         std::list<Flag> flags_to_filter;
     };
 
-    struct Configuration {
+    struct Value {
         cfg::Format format;
         cfg::Content content;
         cfg::Compilation compilation;
     };
 
+    struct Config {
+        virtual ~Config() noexcept = default;
+
+        // Serialization methods with error mapping.
+        virtual rust::Result<int> to_json(const char *file, const Value &rhs) const;
+        virtual rust::Result<int> to_json(std::ostream &ostream, const Value &rhs) const;
+
+        virtual rust::Result<Value> from_json(const char *file) const;
+        virtual rust::Result<Value> from_json(std::istream &istream) const;
+    };
+
     // Create a default value.
-    Configuration default_value();
+    Value default_value();
 
     // Returns list of violations of semantic.
-    std::list<std::string> validate(const cfg::Configuration& value);
-
-    // Serialization methods with error mapping.
-    rust::Result<int> to_json(const char* file, const Configuration& rhs);
-    rust::Result<int> to_json(std::ostream& ostream, const Configuration& rhs);
-
-    rust::Result<Configuration> from_json(const char* file);
-    rust::Result<Configuration> from_json(std::istream& istream);
+    std::list<std::string> validate(const cfg::Value& value);
 
     // Methods used in tests.
-    bool operator==(const Configuration& lhs, const Configuration& rhs);
+    bool operator==(const Value& lhs, const Value& rhs);
     bool operator==(const Compilation& lhs, const Compilation& rhs);
     bool operator==(const Flag& lhs, const Flag& rhs);
     bool operator==(const Sources& lhs, const Sources& rhs);

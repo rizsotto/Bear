@@ -21,8 +21,8 @@
 
 namespace cs::cfg {
 
-    Configuration default_value() {
-        return Configuration{
+    Value default_value() {
+        return Value{
                 cfg::Format {
                     // command as array
                     true,
