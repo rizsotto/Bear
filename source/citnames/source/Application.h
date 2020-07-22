@@ -25,13 +25,6 @@
 
 namespace cs {
 
-    struct Arguments {
-        std::string input;
-        std::string output;
-        bool append;
-        bool run_check;
-    };
-
     class Application {
     public:
         static constexpr char VERBOSE[] = "--verbose";

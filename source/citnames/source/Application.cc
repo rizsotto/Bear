@@ -18,7 +18,7 @@
  */
 
 #include "Application.h"
-#include "Config.h"
+#include "Configuration.h"
 #include "CompilationDatabase.h"
 #include "Semantic.h"
 
@@ -28,7 +28,14 @@
 
 namespace {
 
-    rust::Result<cs::Arguments> into_arguments(const flags::Arguments& args)
+    struct Arguments {
+        std::string input;
+        std::string output;
+        bool append;
+        bool run_check;
+    };
+
+    rust::Result<Arguments> into_arguments(const flags::Arguments& args)
     {
         auto input = args.as_string(cs::Application::INPUT);
         auto output = args.as_string(cs::Application::OUTPUT);
@@ -36,9 +43,9 @@ namespace {
         auto run_check = args.as_bool(cs::Application::RUN_CHECKS).unwrap_or(false);
 
         return rust::merge(input, output)
-                .map<cs::Arguments>([&append, &run_check](auto tuple) {
+                .map<Arguments>([&append, &run_check](auto tuple) {
                     const auto& [input, output] = tuple;
-                    return cs::Arguments {
+                    return Arguments {
                         std::string(input),
                         std::string(output),
                         append,
@@ -51,9 +58,9 @@ namespace {
 namespace cs {
 
     struct Application::State {
-        cs::Arguments arguments;
+        Arguments arguments;
         cs::cfg::Value configuration;
-        cs::Semantic semantic;
+        cs::Expert expert;
         cs::output::CompilationDatabase output;
     };
 
@@ -70,8 +77,8 @@ namespace cs {
                     // read the configuration
                     auto configuration = cfg::default_value();
                     auto semantic = (arguments.run_check)
-                            ? Semantic::from(configuration, ctx)
-                            : Semantic::from(configuration);
+                            ? Expert::from(configuration, ctx)
+                            : Expert::from(configuration);
                     cs::output::CompilationDatabase output;
                     return semantic.template map<Application::State*>([&arguments, &configuration, &output](auto semantic) {
                         return new Application::State { arguments, configuration, semantic, output };
@@ -87,7 +94,7 @@ namespace cs {
         // get current compilations from the input.
         return report::from_json(impl_->arguments.input.c_str())
             .map<output::Entries>([this](auto commands) {
-                return impl_->semantic.run(commands);
+                return impl_->expert.transform(commands);
             })
             // read back the current content and extend with the new elements.
             .and_then<output::Entries>([this](auto compilations) {

@@ -83,8 +83,8 @@ namespace cs::cfg {
         cfg::Compilation compilation;
     };
 
-    struct Config {
-        virtual ~Config() noexcept = default;
+    struct Configuration {
+        virtual ~Configuration() noexcept = default;
 
         // Serialization methods with error mapping.
         virtual rust::Result<int> to_json(const char *file, const Value &rhs) const;

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Config.h"
+#include "Configuration.h"
 #include "CompilationDatabase.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
@@ -27,15 +27,37 @@
 
 namespace cs {
 
-    class Semantic {
-    public:
-        static rust::Result<Semantic> from(const cfg::Value& cfg);
-        static rust::Result<Semantic> from(const cfg::Value& cfg, const sys::Context& ctx);
+    struct Semantic {
+        virtual ~Semantic() noexcept = default;
+        [[nodiscard]] virtual std::list<output::Entry> into_compilation(const cfg::Content&) const = 0;
+    };
 
-        [[nodiscard]] output::Entries run(const report::Report& report) const;
+    using SemanticPtr = std::shared_ptr<Semantic>;
+
+    struct Tool {
+        virtual ~Tool() noexcept = default;
+        [[nodiscard]] virtual SemanticPtr is_a(const report::Execution::Command&) const = 0;
+    };
+
+    using ToolPtr = std::shared_ptr<Tool>;
+    using Tools = std::list<ToolPtr>;
+
+    class Expert {
+    public:
+        static rust::Result<Expert> from(const cfg::Value& cfg);
+        static rust::Result<Expert> from(const cfg::Value& cfg, const sys::Context& ctx);
+
+        [[nodiscard]] output::Entries transform(const report::Report& report) const;
+        [[nodiscard]] SemanticPtr recognize(const report::Execution::Command&) const;
 
     public:
-        Semantic() = default;
-        ~Semantic() = default;
+        Expert() = delete;
+        ~Expert() = default;
+
+        explicit Expert(const cfg::Value&, Tools &&) noexcept;
+
+    private:
+        const cfg::Value& config_;
+        Tools tools_;
     };
 }

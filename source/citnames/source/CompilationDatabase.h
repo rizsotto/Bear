@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Config.h"
+#include "Configuration.h"
 #include "libresult/Result.h"
 
 #include <iosfwd>
