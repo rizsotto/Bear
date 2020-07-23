@@ -42,7 +42,22 @@ namespace {
         };
     }
 
-    enum CompilerFlagType {
+    enum class Relevance {
+        NOOP, // --help, --version
+        ASK_PREPROCESSING_ONLY, // -E
+        ASK_COMPILING_ONLY, // -c
+        ASK_ASSEMBLY_ONLY, // -S
+        CLANG_INTERNAL, // -cc1, -cc1as
+        NOT_APPLICABLE,
+    };
+
+    bool shall_record(Relevance relevance) {
+        return (relevance != Relevance::NOOP)
+            && (relevance != Relevance::ASK_PREPROCESSING_ONLY)
+            && (relevance != Relevance::CLANG_INTERNAL);
+    }
+
+    enum class CompilerFlagType {
         // https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
         KIND_OF_OUTPUT,
         LANGUAGE_DIALECT,
@@ -64,9 +79,50 @@ namespace {
 
     struct CompilerFlag {
         virtual ~CompilerFlag() noexcept = default;
-        [[nodiscard]] virtual std::list<std::string> to_arguments(const path_fixer& path) const = 0;
-        [[nodiscard]] virtual bool is_source() = 0;
-        [[nodiscard]] virtual bool is_output() = 0;
+        [[nodiscard]] virtual std::list<std::string> to_arguments(const path_fixer& fixer) const = 0;
+        [[nodiscard]] virtual bool is_source() { return false; }
+        [[nodiscard]] virtual bool is_output() { return false; }
+    };
+
+    struct CompilerFlagWithPath : public CompilerFlag {
+        std::string flag;
+        std::string path;
+
+        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
+            return { flag, fixer(path) };
+        }
+    };
+
+    struct CompilerFlagWithOutput : public CompilerFlag {
+        std::string path;
+
+        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
+            return { "-o", fixer(path) };
+        }
+
+        [[nodiscard]] bool is_output() override {
+            return true;
+        }
+    };
+
+    struct CompilerFlagWithSource : public CompilerFlag {
+        std::string path;
+
+        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
+            return { fixer(path) };
+        }
+
+        [[nodiscard]] bool is_source() override {
+            return true;
+        }
+    };
+
+    struct CompilerFlagContainer : public CompilerFlag {
+        std::list<std::string> arguments;
+
+        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
+            return arguments;
+        }
     };
 
     using CompilerFlagPtr = std::shared_ptr<CompilerFlag>;
@@ -78,6 +134,12 @@ namespace {
     {
         // TODO:
         return CompilerFlags();
+    }
+
+    bool shall_record(const CompilerFlags& flags)
+    {
+        // TODO
+        return false;
     }
 
     std::list<std::string> to_source_files(const path_fixer& path, const CompilerFlags& flags)
@@ -116,19 +178,22 @@ namespace {
     struct CompilerCall : public cs::Semantic {
 
         [[nodiscard]] std::list<cs::output::Entry> into_compilation(const cs::cfg::Content &content) const override {
-            auto relative_to = make_path_fixer(directory, content.relative_to);
-
-            auto sources = to_source_files(relative_to, flags);
-            if (sources.empty()) {
-                return std::list<cs::output::Entry>();
-            }
             std::list<cs::output::Entry> result;
-            auto output = to_output_file(relative_to, flags);
+            if (!shall_record(flags)) {
+                return result;
+            }
+
+            auto fixer = make_path_fixer(directory, content.relative_to);
+            auto sources = to_source_files(fixer, flags);
+            if (sources.empty()) {
+                return result;
+            }
+            auto output = to_output_file(fixer, flags);
             for (const auto& source : sources) {
                 if (shall_include(source, content)) {
-                    auto arguments = to_arguments(relative_to, flags);
+                    auto arguments = to_arguments(fixer, flags);
                     arguments.push_front(program);
-                    cs::output::Entry entry = { source, relative_to(directory), output, arguments };
+                    cs::output::Entry entry = {source, fixer(directory), output, arguments };
                     result.emplace_back(std::move(entry));
                 }
             }
