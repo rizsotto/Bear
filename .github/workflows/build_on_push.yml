@@ -24,7 +24,7 @@ jobs:
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'macos' )
         run: |
-          brew install fmt spdlog nlohmann-json grpc pkg-config
+          brew install nlohmann-json grpc pkg-config
 
       - name: Set up Python
         uses: actions/setup-python@v2

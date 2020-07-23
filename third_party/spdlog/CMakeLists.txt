@@ -10,9 +10,9 @@ else ()
     include(ExternalProject)
     ExternalProject_Add(spdlog_dependency
             URL
-                https://github.com/gabime/spdlog/archive/v1.6.0.tar.gz
+                https://github.com/gabime/spdlog/archive/v1.7.0.tar.gz
             URL_HASH
-                MD5=34f148435461c4747d5d93bacff3dabc
+                MD5=2e1c0c45920a3536366d2232963bc24a
             DOWNLOAD_NO_PROGRESS
                 1
             UPDATE_COMMAND

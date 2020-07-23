@@ -21,7 +21,6 @@
 #include "Reporter.h"
 #include "Application.h"
 
-#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 #include <fstream>

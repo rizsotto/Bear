@@ -84,10 +84,10 @@ int main(int argc, char* argv[], char* envp[])
         })
         // print out the result of the run
         .on_error([](auto error) {
-            spdlog::error(fmt::format("failed with: {}", error.what()));
+            spdlog::error("failed with: {}", error.what());
         })
         .on_success([](auto status_code) {
-            spdlog::debug(fmt::format("succeeded with: {}", status_code));
+            spdlog::debug("succeeded with: {}", status_code);
         })
         // set the return code from error
         .unwrap_or_else([](auto error) {
