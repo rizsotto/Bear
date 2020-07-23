@@ -75,7 +75,7 @@ namespace cs {
                                 std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
                     }
                     // read the configuration
-                    auto configuration = cfg::default_value();
+                    auto configuration = cfg::default_value(ctx.get_environment());
                     auto semantic = (arguments.run_check)
                             ? Expert::from(configuration, ctx)
                             : Expert::from(configuration);

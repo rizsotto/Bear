@@ -21,8 +21,8 @@
 
 namespace cs::cfg {
 
-    Value default_value() {
-        return Value{
+    Value default_value(const std::map<std::string, std::string>& environment) {
+        Value value {
                 cfg::Format {
                     // command as array
                     true,
@@ -52,7 +52,7 @@ namespace cs::cfg {
                             // distcc
                             true
                         },
-                        cfg::Compilers{
+                        cfg::Compilers {
                             // mpi
                             { R"(^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$)" },
                             // cuda
@@ -144,5 +144,17 @@ namespace cs::cfg {
                         }
                 }
         };
+
+        if (auto it = environment.find("CC"); it != environment.end()) {
+            value.compilation.compilers.cc.push_front(it->second);
+        }
+        if (auto it = environment.find("CXX"); it != environment.end()) {
+            value.compilation.compilers.cxx.push_front(it->second);
+        }
+        if (auto it = environment.find("FC"); it != environment.end()) {
+            value.compilation.compilers.fortran.push_front(it->second);
+        }
+
+        return value;
     }
 }

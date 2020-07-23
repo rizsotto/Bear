@@ -26,7 +26,13 @@ namespace {
 
     TEST(semantic, default_config_parses)
     {
-        auto cfg = cs::cfg::default_value();
+        std::map<std::string, std::string> env = {
+                { "FC", "/path/to/your-fc" },
+                { "CC", "/path/to/your-cc" },
+                { "CXX", "/path/to/your-cxx" },
+        };
+
+        auto cfg = cs::cfg::default_value(env);
         auto expert = cs::Expert::from(cfg);
         EXPECT_TRUE(expert.is_ok());
     }

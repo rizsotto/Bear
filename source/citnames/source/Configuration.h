@@ -22,6 +22,7 @@
 #include <libresult/Result.h>
 
 #include <list>
+#include <map>
 #include <string>
 #include <optional>
 
@@ -95,7 +96,7 @@ namespace cs::cfg {
     };
 
     // Create a default value.
-    Value default_value();
+    Value default_value(const std::map<std::string, std::string>& environment);
 
     // Returns list of violations of semantic.
     std::list<std::string> validate(const cfg::Value& value);

@@ -174,8 +174,6 @@ namespace cs {
 
     rust::Result<Expert> Expert::from(const cfg::Value& cfg)
     {
-        // TODO: consider environment variables as hint for compiler
-        //       CC, CXX and FC (maybe CPP too?)
         // TODO: use the other filters from cfg::Compilation
         try {
             auto compilers = cfg.compilation.compilers;
