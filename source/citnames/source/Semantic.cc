@@ -63,11 +63,14 @@ namespace {
     };
 
     struct CompilerFlag {
-        std::list<std::string> values;
-        CompilerFlagType type;
+        virtual ~CompilerFlag() noexcept = default;
+        [[nodiscard]] virtual std::list<std::string> to_arguments(const path_fixer& path) const = 0;
+        [[nodiscard]] virtual bool is_source() = 0;
+        [[nodiscard]] virtual bool is_output() = 0;
     };
 
-    using CompilerFlags = std::list<CompilerFlag>;
+    using CompilerFlagPtr = std::shared_ptr<CompilerFlag>;
+    using CompilerFlags = std::list<CompilerFlagPtr>;
 
     CompilerFlags parse_flags(const std::list<std::string> &arguments,
                               const std::string& working_directory,
@@ -77,22 +80,37 @@ namespace {
         return CompilerFlags();
     }
 
-    std::list<std::string> to_source_files(path_fixer path, const CompilerFlags& flags)
+    std::list<std::string> to_source_files(const path_fixer& path, const CompilerFlags& flags)
     {
-        // TODO:
-        return std::list<std::string>();
+        std::list<std::string> result;
+        for (const auto& flag : flags) {
+            if (flag->is_source()) {
+                const auto arguments = flag->to_arguments(path);
+                std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
+            }
+        }
+        return result;
     }
 
-    std::optional<std::string> to_output_file(path_fixer path, const CompilerFlags& flags)
+    std::optional<std::string> to_output_file(const path_fixer& path, const CompilerFlags& flags)
     {
-        // TODO:
+        for (const auto& flag : flags) {
+            if (flag->is_output()) {
+                const auto arguments = flag->to_arguments(path);
+                return std::optional<std::string>(arguments.back());
+            }
+        }
         return std::optional<std::string>();
     }
 
-    std::list<std::string> to_arguments(path_fixer path, const CompilerFlags& flags)
+    std::list<std::string> to_arguments(const path_fixer& path, const CompilerFlags& flags)
     {
-        // TODO:
-        return std::list<std::string>();
+        std::list<std::string> result;
+        for (const auto& flag : flags) {
+            const auto arguments = flag->to_arguments(path);
+            std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
+        }
+        return result;
     }
 
     struct CompilerCall : public cs::Semantic {
