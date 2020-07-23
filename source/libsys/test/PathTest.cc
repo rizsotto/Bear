@@ -75,6 +75,42 @@ namespace {
         EXPECT_EQ(expected, result);
     }
 
+    TEST(path, is_absolute)
+    {
+        EXPECT_TRUE(sys::path::is_absolute("/path/to/file"));
+        EXPECT_FALSE(sys::path::is_relative("/path/to/file"));
+
+        EXPECT_FALSE(sys::path::is_absolute("./path/to/file"));
+        EXPECT_TRUE(sys::path::is_relative("./path/to/file"));
+
+        EXPECT_FALSE(sys::path::is_absolute("file"));
+        EXPECT_TRUE(sys::path::is_relative("file"));
+    }
+
+    TEST(path, relative_with_some_common_path)
+    {
+        auto path = "/path/to/file";
+        auto start = "/path/of/something/else";
+
+        EXPECT_EQ("../../../to/file", sys::path::relative(path, start));
+    }
+
+    TEST(path, relative_with_no_common_path)
+    {
+        auto path = "/path/to/file";
+        auto start = "/something/else";
+
+        EXPECT_EQ("../../path/to/file", sys::path::relative(path, start));
+    }
+
+    TEST(path, relative_with_tricks)
+    {
+        auto path = "/path/./to/file";
+        auto start = "/something/./else";
+
+        EXPECT_EQ("../../path/to/file", sys::path::relative(path, start));
+    }
+
     TEST(path, basename)
     {
         EXPECT_EQ("cc", sys::path::basename("cc"));

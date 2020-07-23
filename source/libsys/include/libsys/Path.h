@@ -30,6 +30,11 @@ namespace sys::path {
     std::list<std::string> split(const std::string& input);
     std::string join(const std::list<std::string>& input);
 
-    std::string basename(const std::string& input);
+    bool is_absolute(const std::string& path);
+    bool is_relative(const std::string& path);
+
+    std::string relative(const std::string& path, const std::string &start);
+
+    std::string basename(const std::string& path);
     std::string concat(const std::string& dir, const std::string& file);
 }

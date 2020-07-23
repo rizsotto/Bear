@@ -31,8 +31,15 @@ namespace {
 
     path_fixer make_path_fixer(const std::string& working_directory, const std::optional<std::string>& requested)
     {
-        // TODO: implement it
-        return [](const auto& path) { return path; };
+        return [&working_directory, &requested](const auto& path) {
+            auto candidate = sys::path::is_relative(path)
+                ? sys::path::concat(working_directory, path)
+                : path;
+
+            return (requested.has_value())
+                ? sys::path::relative(candidate, requested.value())
+                : path;
+        };
     }
 
     enum CompilerFlagType {
@@ -156,8 +163,7 @@ namespace {
 
         [[nodiscard]] bool program_matches(const std::string& program) const {
             std::cmatch m;
-            auto basename = sys::path::basename(program);
-            return std::regex_match(basename.c_str(), m, regex);
+            return std::regex_match(program.c_str(), m, regex);
         }
 
     private:

@@ -69,12 +69,46 @@ namespace sys::path {
         return join_with(input, sys::path::OS_PATH_SEPARATOR);
     }
 
-    std::string basename(const std::string& input)
+    bool is_absolute(const std::string& path) {
+        return (!path.empty()) && (path[0] == OS_SEPARATOR);
+    }
+
+    bool is_relative(const std::string& path) {
+        return !is_absolute(path);
+    }
+
+    std::string relative(const std::string& path, const std::string &start)
     {
-        if (auto pos = input.rfind(OS_SEPARATOR); pos != std::string::npos) {
-            return input.substr(pos + 1);
+        auto path_elements = split_by(path, OS_SEPARATOR);
+        path_elements.remove(".");
+
+        auto start_elements = split_by(start, OS_SEPARATOR);
+        start_elements.remove(".");
+        // remove the common root directories.
+        const size_t common = std::min(path_elements.size(), start_elements.size());
+        for (size_t idx = 0; idx < common; ++idx) {
+            if (path_elements.front() == start_elements.front()) {
+                path_elements.pop_front();
+                start_elements.pop_front();
+                continue;
+            }
+            break;
         }
-        return input;
+        // insert as many `..` as the length of the start has now.
+        std::fill_n(
+                std::front_inserter(path_elements),
+                start_elements.size(),
+                std::string(".."));
+
+        return join_with(path_elements, OS_SEPARATOR);
+    }
+
+    std::string basename(const std::string& path)
+    {
+        if (auto pos = path.rfind(OS_SEPARATOR); pos != std::string::npos) {
+            return path.substr(pos + 1);
+        }
+        return path;
     }
 
     std::string concat(const std::string& dir, const std::string& file) {
