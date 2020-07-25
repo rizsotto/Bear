@@ -27,21 +27,6 @@
 
 namespace {
 
-    using path_fixer = std::function<std::string(const std::string&)>;
-
-    path_fixer make_path_fixer(const std::string& working_directory, const std::optional<std::string>& requested)
-    {
-        return [&working_directory, &requested](const auto& path) {
-            auto candidate = sys::path::is_relative(path)
-                ? sys::path::concat(working_directory, path)
-                : path;
-
-            return (requested.has_value())
-                ? sys::path::relative(candidate, requested.value())
-                : path;
-        };
-    }
-
     enum class Relevance {
         NOOP, // --help, --version
         ASK_PREPROCESSING_ONLY, // -E
@@ -79,25 +64,16 @@ namespace {
 
     struct CompilerFlag {
         virtual ~CompilerFlag() noexcept = default;
-        [[nodiscard]] virtual std::list<std::string> to_arguments(const path_fixer& fixer) const = 0;
+        [[nodiscard]] virtual std::list<std::string> to_arguments() const = 0;
         [[nodiscard]] virtual bool is_source() { return false; }
         [[nodiscard]] virtual bool is_output() { return false; }
-    };
-
-    struct CompilerFlagWithPath : public CompilerFlag {
-        std::string flag;
-        std::string path;
-
-        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
-            return { flag, fixer(path) };
-        }
     };
 
     struct CompilerFlagWithOutput : public CompilerFlag {
         std::string path;
 
-        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
-            return { "-o", fixer(path) };
+        [[nodiscard]] std::list<std::string> to_arguments() const override {
+            return { "-o", path };
         }
 
         [[nodiscard]] bool is_output() override {
@@ -108,8 +84,8 @@ namespace {
     struct CompilerFlagWithSource : public CompilerFlag {
         std::string path;
 
-        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
-            return { fixer(path) };
+        [[nodiscard]] std::list<std::string> to_arguments() const override {
+            return { path };
         }
 
         [[nodiscard]] bool is_source() override {
@@ -120,7 +96,7 @@ namespace {
     struct CompilerFlagContainer : public CompilerFlag {
         std::list<std::string> arguments;
 
-        [[nodiscard]] std::list<std::string> to_arguments(const path_fixer &fixer) const override {
+        [[nodiscard]] std::list<std::string> to_arguments() const override {
             return arguments;
         }
     };
@@ -128,83 +104,77 @@ namespace {
     using CompilerFlagPtr = std::shared_ptr<CompilerFlag>;
     using CompilerFlags = std::list<CompilerFlagPtr>;
 
-    CompilerFlags parse_flags(const std::list<std::string> &arguments,
-                              const std::string& working_directory,
-                              const std::map<std::string, std::string> environment)
-    {
-        // TODO:
-        return CompilerFlags();
-    }
-
-    bool shall_record(const CompilerFlags& flags)
-    {
-        // TODO
-        return false;
-    }
-
-    std::list<std::string> to_source_files(const path_fixer& path, const CompilerFlags& flags)
-    {
-        std::list<std::string> result;
-        for (const auto& flag : flags) {
-            if (flag->is_source()) {
-                const auto arguments = flag->to_arguments(path);
-                std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
-            }
-        }
-        return result;
-    }
-
-    std::optional<std::string> to_output_file(const path_fixer& path, const CompilerFlags& flags)
-    {
-        for (const auto& flag : flags) {
-            if (flag->is_output()) {
-                const auto arguments = flag->to_arguments(path);
-                return std::optional<std::string>(arguments.back());
-            }
-        }
-        return std::optional<std::string>();
-    }
-
-    std::list<std::string> to_arguments(const path_fixer& path, const CompilerFlags& flags)
-    {
-        std::list<std::string> result;
-        for (const auto& flag : flags) {
-            const auto arguments = flag->to_arguments(path);
-            std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
-        }
-        return result;
-    }
-
     struct CompilerCall : public cs::Semantic {
 
-        [[nodiscard]] std::list<cs::output::Entry> into_compilation(const cs::cfg::Content &content) const override {
+        [[nodiscard]] std::list<cs::output::Entry> into_compilation(const cs::cfg::Content &content) const override
+        {
             std::list<cs::output::Entry> result;
             if (!shall_record(flags)) {
                 return result;
             }
 
-            auto fixer = make_path_fixer(directory, content.relative_to);
-            auto sources = to_source_files(fixer, flags);
+            auto output = to_output_file(flags);
+            auto sources = to_source_files(flags);
             if (sources.empty()) {
                 return result;
             }
-            auto output = to_output_file(fixer, flags);
             for (const auto& source : sources) {
                 if (shall_include(source, content)) {
-                    auto arguments = to_arguments(fixer, flags);
+                    auto arguments = to_arguments(flags);
                     arguments.push_front(program);
-                    cs::output::Entry entry = {source, fixer(directory), output, arguments };
+                    cs::output::Entry entry = { source, directory, output, arguments };
                     result.emplace_back(std::move(entry));
                 }
             }
             return result;
         }
 
-        [[nodiscard]] bool shall_include(const std::string& source, const cs::cfg::Content &content) const {
+    private:
+        [[nodiscard]] bool shall_include(const std::string& source, const cs::cfg::Content &content) const
+        {
             // source file might have relative dir, while the content filter is absolute!!!
 
             // TODO: use Content to filter/modify the entry
             return true;
+        }
+
+        [[nodiscard]] static bool shall_record(const CompilerFlags& flags)
+        {
+            // TODO
+            return true;
+        }
+
+        [[nodiscard]] static std::list<std::string> to_source_files(const CompilerFlags& flags)
+        {
+            std::list<std::string> result;
+            for (const auto& flag : flags) {
+                if (flag->is_source()) {
+                    const auto arguments = flag->to_arguments();
+                    std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
+                }
+            }
+            return result;
+        }
+
+        [[nodiscard]] static std::optional<std::string> to_output_file(const CompilerFlags& flags)
+        {
+            for (const auto& flag : flags) {
+                if (flag->is_output()) {
+                    const auto arguments = flag->to_arguments();
+                    return std::optional<std::string>(arguments.back());
+                }
+            }
+            return std::optional<std::string>();
+        }
+
+        [[nodiscard]] static std::list<std::string> to_arguments(const CompilerFlags& flags)
+        {
+            std::list<std::string> result;
+            for (const auto& flag : flags) {
+                const auto arguments = flag->to_arguments();
+                std::copy(arguments.begin(), arguments.end(), std::back_inserter(result));
+            }
+            return result;
         }
 
     public:
@@ -238,6 +208,15 @@ namespace {
         }
 
     private:
+
+        static CompilerFlags parse_flags(const std::list<std::string> &arguments,
+                                  const std::string& working_directory,
+                                  const std::map<std::string, std::string>& environment)
+        {
+            // TODO:
+            return CompilerFlags();
+        }
+
         static std::regex into_regex(const std::list<std::string>& patterns)
         {
             auto pattern = fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|"));
