@@ -53,62 +53,45 @@ namespace cs::cfg {
                             true
                         },
                         cfg::Compilers {
-                            // mpi
-                            { R"(^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$)" },
-                            // cuda
-                            { "nvcc" },
-                            // distcc
-                            { "distcc" },
-                            // ccache
-                            { "ccache" },
-                            // cc
-                            {
-                                // gcc
-                                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
-                                // clang
-                                R"(^([^-]*-)*clang(-\d+(\.\d+){0,2})?$)",
-                                // intel compiler
-                                R"(^(|i)cc$)",
-                                // ibm compiler
-                                R"(^(g|)xlc$)"
-                            },
-                            // cxx
-                            {
-                                // generic
-                                R"(^(c\+\+|cxx|CC)$)",
-                                // gcc
-                                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
-                                // clang
-                                R"(^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$)",
-                                // intel compiler
-                                R"(^icpc$)",
-                                // ibm compiler
-                                R"(^(g|)xl(C|c\+\+)$)"
-                            },
-                            // fortran
-                            {
-                                R"(^([^-]*-)*(gfortran)(-?\d+)$)",
-                                R"(^(ifort)$)",
-                                R"(^(pg|)(f77|f90|f95|fortran)$)"
-                            }
-                        },
-                        cfg::Sources{
-                                {
-                                        // object
-                                        ".o", ".obj"
-                                },
-                                {
-                                        // C
-                                        ".c", ".C",
-                                        // C++
-                                        ".cc", ".CC", ".c++", ".C++", ".cxx", ".cpp", ".cp",
-                                        // ObjectiveC
-                                        ".m", ".mi", ".mm", ".mii",
-                                        // Assembly
-                                        ".s", ".S", ".sx", ".asm",
-                                        // Fortran
-                                        ".f95", ".F95", ".f90", ".F90", ".f", ".F", ".FOR", ".f77", ".fc", ".for", ".ftn", ".fpp"
-                                }
+                                std::nullopt, std::nullopt, std::nullopt
+//                            // mpi
+//                            { R"(^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$)" },
+//                            // cuda
+//                            { "nvcc" },
+//                            // distcc
+//                            { "distcc" },
+//                            // ccache
+//                            { "ccache" },
+//                            // cc
+//                            {
+//                                // gcc
+//                                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
+//                                // clang
+//                                R"(^([^-]*-)*clang(-\d+(\.\d+){0,2})?$)",
+//                                // intel compiler
+//                                R"(^(|i)cc$)",
+//                                // ibm compiler
+//                                R"(^(g|)xlc$)"
+//                            },
+//                            // cxx
+//                            {
+//                                // generic
+//                                R"(^(c\+\+|cxx|CC)$)",
+//                                // gcc
+//                                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
+//                                // clang
+//                                R"(^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$)",
+//                                // intel compiler
+//                                R"(^icpc$)",
+//                                // ibm compiler
+//                                R"(^(g|)xl(C|c\+\+)$)"
+//                            },
+//                            // fortran
+//                            {
+//                                R"(^([^-]*-)*(gfortran)(-?\d+)$)",
+//                                R"(^(ifort)$)",
+//                                R"(^(pg|)(f77|f90|f95|fortran)$)"
+//                            }
                         },
                         {
                             // preprocessor macros, ignored because would cause duplicate entries in
@@ -146,13 +129,13 @@ namespace cs::cfg {
         };
 
         if (auto it = environment.find("CC"); it != environment.end()) {
-            value.compilation.compilers.cc.push_front(it->second);
+            value.compilation.compilers.cc = it->second;
         }
         if (auto it = environment.find("CXX"); it != environment.end()) {
-            value.compilation.compilers.cxx.push_front(it->second);
+            value.compilation.compilers.cxx = it->second;
         }
         if (auto it = environment.find("FC"); it != environment.end()) {
-            value.compilation.compilers.fortran.push_front(it->second);
+            value.compilation.compilers.fortran = it->second;
         }
 
         return value;

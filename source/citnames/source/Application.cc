@@ -60,7 +60,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         cs::cfg::Value configuration;
-        cs::Expert expert;
+        cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
 
@@ -76,9 +76,7 @@ namespace cs {
                     }
                     // read the configuration
                     auto configuration = cfg::default_value(ctx.get_environment());
-                    auto semantic = (arguments.run_check)
-                            ? Expert::from(configuration, ctx)
-                            : Expert::from(configuration);
+                    auto semantic = Semantic::from(configuration, ctx);
                     cs::output::CompilationDatabase output;
                     return semantic.template map<Application::State*>([&arguments, &configuration, &output](auto semantic) {
                         return new Application::State { arguments, configuration, semantic, output };
@@ -94,7 +92,7 @@ namespace cs {
         // get current compilations from the input.
         return report::from_json(impl_->arguments.input.c_str())
             .map<output::Entries>([this](auto commands) {
-                return impl_->expert.transform(commands);
+                return impl_->semantic.transform(commands);
             })
             // read back the current content and extend with the new elements.
             .and_then<output::Entries>([this](auto compilations) {

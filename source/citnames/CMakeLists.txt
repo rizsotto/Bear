@@ -2,7 +2,6 @@
 add_library(citnames_json_a OBJECT
         source/Configuration.cc
         source/CompilationDatabase.cc
-        source/Semantic.cc
         )
 
 target_link_libraries(citnames_json_a PUBLIC result_a)
@@ -17,6 +16,8 @@ target_compile_options(citnames_json_a PRIVATE -fexceptions)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT
         source/Application.cc
+        source/Semantic.cc
+        source/Tool.cc
         )
 
 target_include_directories(citnames_a PUBLIC source/)
@@ -51,6 +52,7 @@ if (ENABLE_UNIT_TESTS)
     add_executable(citnames_unit_test
             test/CompilationDatabaseTest.cc
             test/SemanticTest.cc
+            test/ToolTest.cc
             )
 
     target_link_libraries(citnames_unit_test citnames_a)

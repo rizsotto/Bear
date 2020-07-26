@@ -38,6 +38,16 @@ namespace cs::output {
 
     using Entries = std::list<Entry>;
 
+    // Merge two compilation database without duplicate elements.
+    Entries merge(const Entries& lhs, const Entries& rhs);
+
+    // Convenient methods for these types.
+    bool operator==(const Entry& lhs, const Entry& rhs);
+
+    std::ostream& operator<<(std::ostream&, const Entry&);
+    std::ostream& operator<<(std::ostream&, const Entries&);
+
+    // Utility class to persists entries.
     struct CompilationDatabase {
         virtual ~CompilationDatabase() noexcept = default;
 
@@ -48,10 +58,4 @@ namespace cs::output {
         virtual rust::Result<Entries> from_json(const char *file) const;
         virtual rust::Result<Entries> from_json(std::istream &istream) const;
     };
-
-    // Merge two compilation database without duplicate elements.
-    Entries merge(const Entries& lhs, const Entries& rhs);
-
-    // Methods used in tests.
-    bool operator==(const Entry& lhs, const Entry& rhs);
 }

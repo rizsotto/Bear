@@ -95,11 +95,14 @@ namespace sys::path {
             break;
         }
         // insert as many `..` as the length of the start has now.
-        std::fill_n(
-                std::front_inserter(path_elements),
-                start_elements.size(),
-                std::string(".."));
-
+        if (start_elements.empty()) {
+            path_elements.push_front(".");
+        } else {
+            std::fill_n(
+                    std::front_inserter(path_elements),
+                    start_elements.size(),
+                    std::string(".."));
+        }
         return join_with(path_elements, OS_SEPARATOR);
     }
 
@@ -111,7 +114,33 @@ namespace sys::path {
         return path;
     }
 
-    std::string concat(const std::string& dir, const std::string& file) {
+    std::string concat(const std::string& dir, const std::string& file)
+    {
         return dir + OS_SEPARATOR + file;
+    }
+
+    bool contains(const std::string& directory, const std::string& file)
+    {
+        if (directory.empty() || file.empty()) {
+            return false;
+        }
+
+        auto file_elements = split_by(file, OS_SEPARATOR);
+        file_elements.remove(".");
+
+        auto directory_elements = split_by(directory, OS_SEPARATOR);
+        directory_elements.remove(".");
+        // remove the common root directories.
+        const size_t common = std::min(file_elements.size(), directory_elements.size());
+        for (size_t idx = 0; idx < common; ++idx) {
+            if (file_elements.front() == directory_elements.front()) {
+                file_elements.pop_front();
+                directory_elements.pop_front();
+                continue;
+            }
+            break;
+        }
+        // if the directory elements are empty, then it contains
+        return directory_elements.empty();
     }
 }

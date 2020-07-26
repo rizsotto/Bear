@@ -171,4 +171,24 @@ namespace cs::output {
                && (lhs.output == rhs.output)
                && (lhs.arguments == rhs.arguments);
     }
+
+    std::ostream& operator<<(std::ostream& os, const Entry& entry)
+    {
+        cfg::Format format = { false, false };
+        nlohmann::json json = to_json(entry, format);
+        os << json;
+
+        return os;
+    }
+
+    std::ostream& operator<<(std::ostream& os, const Entries& entries)
+    {
+        for (auto it = entries.begin(); it != entries.end(); ++it) {
+            if (it != entries.begin()) {
+                os << ", ";
+            }
+            os << *it;
+        }
+        return os;
+    }
 }

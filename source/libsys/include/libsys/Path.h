@@ -37,4 +37,6 @@ namespace sys::path {
 
     std::string basename(const std::string& path);
     std::string concat(const std::string& dir, const std::string& file);
+
+    bool contains(const std::string& directory, const std::string& file);
 }

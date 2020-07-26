@@ -111,6 +111,14 @@ namespace {
         EXPECT_EQ("../../path/to/file", sys::path::relative(path, start));
     }
 
+    TEST(path, relative_to_parent)
+    {
+        auto path = "/path/to/file";
+        auto start = "/path";
+
+        EXPECT_EQ("./to/file", sys::path::relative(path, start));
+    }
+
     TEST(path, basename)
     {
         EXPECT_EQ("cc", sys::path::basename("cc"));
@@ -121,5 +129,15 @@ namespace {
     TEST(path, concat)
     {
         EXPECT_EQ("/usr/bin/cc", sys::path::concat("/usr/bin", "cc"));
+    }
+
+
+    TEST(path, contains)
+    {
+        EXPECT_TRUE(sys::path::contains("/path", "/path/to/file"));
+        EXPECT_TRUE(sys::path::contains("/path/to", "/path/to/file"));
+
+        EXPECT_FALSE(sys::path::contains("/some/place/else", "/path/to/file"));
+        EXPECT_FALSE(sys::path::contains("/path/from", "/path/to/file"));
     }
 }

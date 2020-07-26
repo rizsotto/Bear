@@ -49,13 +49,9 @@ namespace cs::cfg {
     };
 
     struct Compilers {
-        std::list<std::string> mpi;
-        std::list<std::string> cuda;
-        std::list<std::string> distcc;
-        std::list<std::string> ccache;
-        std::list<std::string> cc;
-        std::list<std::string> cxx;
-        std::list<std::string> fortran;
+        std::optional<std::string> cc;
+        std::optional<std::string> cxx;
+        std::optional<std::string> fortran;
     };
 
     struct Sources {
@@ -74,7 +70,6 @@ namespace cs::cfg {
     struct Compilation {
         cfg::ExpandWrappers expand_wrappers;
         cfg::Compilers compilers;
-        cfg::Sources sources;
         std::list<Flag> flags_to_filter;
     };
 

@@ -20,6 +20,7 @@
 #pragma once
 
 #include "Configuration.h"
+#include "Tool.h"
 #include "CompilationDatabase.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
@@ -27,37 +28,34 @@
 
 namespace cs {
 
-    struct Semantic {
-        virtual ~Semantic() noexcept = default;
-        [[nodiscard]] virtual std::list<output::Entry> into_compilation(const cfg::Content&) const = 0;
-    };
-
-    using SemanticPtr = std::shared_ptr<Semantic>;
-
-    struct Tool {
-        virtual ~Tool() noexcept = default;
-        [[nodiscard]] virtual SemanticPtr is_a(const report::Execution::Command&) const = 0;
-    };
-
-    using ToolPtr = std::shared_ptr<Tool>;
-    using Tools = std::list<ToolPtr>;
-
-    class Expert {
+    // Represents an expert system which can recognize compilation entries from
+    // command executions. It covers multiple tools and consider omit results
+    // based on configuration.
+    class Semantic {
     public:
-        static rust::Result<Expert> from(const cfg::Value& cfg);
-        static rust::Result<Expert> from(const cfg::Value& cfg, const sys::Context& ctx);
+        static rust::Result<Semantic> from(const cfg::Value& cfg, const sys::Context& ctx);
 
-        [[nodiscard]] output::Entries transform(const report::Report& report) const;
-        [[nodiscard]] SemanticPtr recognize(const report::Execution::Command&) const;
+        [[nodiscard]]
+        output::Entries transform(const report::Report& report) const;
+
+        [[nodiscard]]
+        rust::Result<output::Entries> recognize(const report::Execution::Command& command) const;
+
+        [[nodiscard]]
+        bool filter(const output::Entry&) const;
 
     public:
-        Expert() = delete;
-        ~Expert() = default;
+        using ToolPtr = std::shared_ptr<Tool>;
+        using Tools = std::list<ToolPtr>;
 
-        explicit Expert(const cfg::Value&, Tools &&) noexcept;
+        Semantic() = delete;
+        ~Semantic() noexcept = default;
+
+        Semantic(const cfg::Value&, const sys::Context& , Tools &&) noexcept;
 
     private:
         const cfg::Value& config_;
+        const sys::Context& ctx_;
         Tools tools_;
     };
 }

@@ -32,8 +32,9 @@ namespace {
                 { "CXX", "/path/to/your-cxx" },
         };
 
+        auto ctx = sys::Context();
         auto cfg = cs::cfg::default_value(env);
-        auto expert = cs::Expert::from(cfg);
+        auto expert = cs::Semantic::from(cfg, ctx);
         EXPECT_TRUE(expert.is_ok());
     }
 }
