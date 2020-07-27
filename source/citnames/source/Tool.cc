@@ -23,6 +23,7 @@
 
 #include <iterator>
 #include <regex>
+#include <set>
 #include <utility>
 
 #include <fmt/format.h>
@@ -32,24 +33,16 @@
 namespace {
 
     enum class CompilerFlagType {
-        // https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
         KIND_OF_OUTPUT,
-        LANGUAGE_DIALECT,
-        DIAGNOSTIC,
-        WARNING,
-        ANALYZER,
-        OPTIMIZATION,
-        INSTRUMENTATION,
+        KIND_OF_OUTPUT_INFO,
+        KIND_OF_OUTPUT_OUTPUT,
         PREPROCESSOR,
-        ASSEMBLER,
+        PREPROCESSOR_MAKE,
         LINKER,
+        LINKER_OBJECT_FILE,
         DIRECTORY_SEARCH,
-        CODE_GENERATION,
-        DEVELOPER,
-        MACHINE_DEPENDENT,
-        // for other types
         SOURCE,
-        UNKNOWN,
+        OTHER,
     };
 
     struct CompilerFlag {
@@ -102,50 +95,192 @@ namespace {
             }
         };
 
-        struct FlagMatcher {
+        // Represents compiler flag definition.
+        //
+        // Can match by exact name definition, or by regex like pattern matching.
+        // Polymorphic behaviour achieved not by inheritance (because that would
+        // stop us using static array of these object).
+        class FlagDefinition {
+        private:
+            const char* name_;
+            const char* pattern_;
+            size_t count_;
+            CompilerFlagType type_;
 
-            struct FlagDefinition {
-                const char* name;
-                size_t count;
-                CompilerFlagType type;
-            };
+            constexpr FlagDefinition(const char* const name, const char* const pattern, const size_t count, const CompilerFlagType type)
+                    : name_(name)
+                    , pattern_(pattern)
+                    , count_(count)
+                    , type_(type)
+            { }
 
-            constexpr static const FlagDefinition FLAGS[] = {
-                    { "-x", 1, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-c", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-S", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-E", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-o", 1, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-dumpbase", 1, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-dumpbase-ext", 1, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-dumpdir", 1, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-v", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-###", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "--help", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "--target-help", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "--version", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-pass-exit-codes", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-pipe", 0, CompilerFlagType::KIND_OF_OUTPUT },
-                    { "-wrapper", 1, CompilerFlagType::KIND_OF_OUTPUT },
-            };
+            [[nodiscard]]
+            std::optional<std::tuple<size_t, CompilerFlagType>> match_by_name(const std::string& arg) const {
+                return (arg == name_) ? std::make_optional(std::make_pair(count_, type_)) : std::nullopt;
+            }
 
+            [[nodiscard]]
+            std::optional<std::tuple<size_t, CompilerFlagType>> match_by_pattern(const std::string& arg) const {
+                std::regex re(pattern_);
+                std::cmatch m;
+                return (std::regex_match(arg.c_str(), m, re)) ? std::make_optional(std::make_pair(count_, type_)) : std::nullopt;
+            }
+
+        public:
+            constexpr static FlagDefinition by_name(const char* const name, const size_t count, const CompilerFlagType type) {
+                return FlagDefinition { name, nullptr, count, type };
+            }
+
+            constexpr static FlagDefinition by_pattern(const char* const pattern, const size_t count, const CompilerFlagType type) {
+                return FlagDefinition { nullptr, pattern, count, type };
+            }
+
+            [[nodiscard]]
+            std::optional<std::tuple<size_t, CompilerFlagType>> match(const std::string& arg) const {
+                return (name_ != nullptr) ? match_by_name(arg) : match_by_pattern(arg);
+            }
+        };
+
+        // Generic flag matcher, which takes a list of flag definition and tries to match it.
+        class FlagMatcher {
+        protected:
+            FlagMatcher(const FlagDefinition *const begin, const FlagDefinition *const end)
+                    : begin_(begin)
+                    , end_(end)
+            { }
+
+        public:
             [[nodiscard]]
             rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
             {
                 const std::string front = *input.begin;
-                for (auto flag : FLAGS) {
-                    if (front == flag.name) {
+                for (auto it = begin_; it != end_; ++it) {
+                    if (auto match = it->match(front); match) {
+                        const auto& [count, type] = match.value();
 
                         auto begin = input.begin;
-                        auto end = std::next(begin, flag.count + 1);
+                        auto end = std::next(begin, count + 1);
 
-                        CompilerFlag compiler_flag = { std::list(begin, end), flag.type };
+                        CompilerFlag compiler_flag = { std::list(begin, end), type };
                         Input remainder = { end, input.end };
                         return rust::Ok(std::make_pair(compiler_flag, remainder));
                     }
                 }
                 return rust::Err(input);
             }
+
+        private:
+            const FlagDefinition *const begin_;
+            const FlagDefinition *const end_;
+        };
+
+        class KindOfOutputFlagMatcher : public FlagMatcher {
+            constexpr static const FlagDefinition FLAGS[] = {
+                    FlagDefinition::by_name("-x", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-c", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-S", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-E", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-o", 1, CompilerFlagType::KIND_OF_OUTPUT_OUTPUT),
+                    FlagDefinition::by_name("-dumpbase", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-dumpbase-ext", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-dumpdir", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-v", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-###", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("--help", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
+                    FlagDefinition::by_name("--target-help", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
+                    FlagDefinition::by_pattern("--help=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
+                    FlagDefinition::by_name("--version", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
+                    FlagDefinition::by_name("-pass-exit-codes", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-pipe", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-specs=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-wrapper", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-ffile-prefix-map=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-fplugin", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-fplugin=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_name("-fplugin-arg-name-key", 1, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-fplugin-arg-name-key=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-fdump-ada-spec(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-fada-spec-parent=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("-fdump-go-sepc=(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+                    FlagDefinition::by_pattern("@(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+            };
+
+        public:
+            KindOfOutputFlagMatcher()
+                    : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
+            { }
+        };
+
+        class PreprocessorFlagMatcher : public FlagMatcher {
+            constexpr static const FlagDefinition FLAGS[] = {
+                    FlagDefinition::by_name("-A", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-A(.*)", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-D", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-D(.*)", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-U", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-U(.*)", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-include", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-imacros", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-undef", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-pthread", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-M(|M|G|P|D|MD)", 0, CompilerFlagType::PREPROCESSOR_MAKE),
+                    FlagDefinition::by_pattern("-M(F|T|Q)", 1, CompilerFlagType::PREPROCESSOR_MAKE),
+                    FlagDefinition::by_pattern("-(C|CC|P|traditional|traditional-cpp|trigraphs|remap|H)", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-d[MDNIU]", 0, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_name("-Xpreprocessor", 1, CompilerFlagType::PREPROCESSOR),
+                    FlagDefinition::by_pattern("-Wp,(.*)", 0, CompilerFlagType::PREPROCESSOR),
+            };
+
+        public:
+            PreprocessorFlagMatcher()
+                    : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
+            { }
+        };
+
+        class DirectorySearchFlagMatcher : public FlagMatcher {
+            constexpr static const FlagDefinition FLAGS[] = {
+                    FlagDefinition::by_name("-I", 1, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_name("-I(.*)", 0, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_name("-iplugindir", 1, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern("-iplugindir=(.*)", 0, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern("-i(.*)", 1, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern(R"(-no(stdinc|stdinc\+\+|-canonical-prefixes|-sysroot-suffix))", 0, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern("-L(.*)", 0, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern("-B(.*)", 0, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_name("--sysroot", 1, CompilerFlagType::DIRECTORY_SEARCH),
+                    FlagDefinition::by_pattern("--sysroot=(.*)", 0, CompilerFlagType::DIRECTORY_SEARCH),
+            };
+
+        public:
+            DirectorySearchFlagMatcher()
+                    : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
+            { }
+        };
+
+        class LinkerFlagMatcher : public FlagMatcher {
+            constexpr static const FlagDefinition FLAGS[] = {
+                    FlagDefinition::by_pattern("-flinker-output=(.*)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-fuse-ld=(.*)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-l(.*)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-l", 1, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-no(startfiles|defaultlibs|libc|stdlib)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-e", 1, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-entry=(.*)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-(pie|no-pie|static-pie)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-(r|rdynamic|s|symbolic)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-(static|shared)(|-libgcc)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern(R"(-static-lib(asan|tsan|lsan|ubsan|stdc\+\+))", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-T", 1, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-Xlinker", 1, CompilerFlagType::LINKER),
+                    FlagDefinition::by_pattern("-Wl,(.*)", 0, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-u", 1, CompilerFlagType::LINKER),
+                    FlagDefinition::by_name("-z", 1, CompilerFlagType::LINKER),
+            };
+
+        public:
+            LinkerFlagMatcher()
+                    : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
+            { }
         };
 
         struct SourceMatcher {
@@ -199,11 +334,59 @@ namespace {
                 return (pos == std::string::npos) ? file : file.substr(pos);
             }
         };
+
+        class EverythingElseFlagMatcher : public FlagMatcher {
+            constexpr static const FlagDefinition FLAGS[] = {
+                    FlagDefinition::by_name("-Xassembler", 1, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-Wa,(.*)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_name("-ansi", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_name("-aux-info", 1, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-std=(.*)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-[Og](.*)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-[fmpW](.+)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-(no|tno|save|d|Wa,)(.+)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("-[EQXY](.+)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern("--(.+)", 0, CompilerFlagType::OTHER),
+                    FlagDefinition::by_pattern(".+", 0, CompilerFlagType::LINKER_OBJECT_FILE)
+            };
+
+        public:
+            EverythingElseFlagMatcher()
+                    : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
+            { }
+        };
+    }
+
+    CompilerFlags flags_from_environment(const std::map<std::string, std::string> &environment) {
+        CompilerFlags flags;
+        for (auto env : { "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH" }) {
+            if (auto it = environment.find(env); it != environment.end()) {
+                for (const auto& path : sys::path::split(it->second)) {
+                    auto directory = (path.empty()) ? "." : path;
+                    CompilerFlag flag = { {"-I", directory }, CompilerFlagType::DIRECTORY_SEARCH };
+                    flags.emplace_back(flag);
+                }
+            }
+        }
+        if (auto it = environment.find("OBJC_INCLUDE_PATH"); it != environment.end()) {
+            for (const auto& path : sys::path::split(it->second)) {
+                auto directory = (path.empty()) ? "." : path;
+                CompilerFlag flag = { {"-isystem", directory }, CompilerFlagType::DIRECTORY_SEARCH };
+                flags.emplace_back(flag);
+            }
+        }
+        return flags;
     }
 
     rust::Result<CompilerFlags> parse(const report::Execution::Command &command)
     {
-        auto parser = parser::Any(parser::FlagMatcher(), parser::SourceMatcher());
+        auto parser = parser::Any(
+                parser::KindOfOutputFlagMatcher(),
+                parser::PreprocessorFlagMatcher(),
+                parser::DirectorySearchFlagMatcher(),
+                parser::LinkerFlagMatcher(),
+                parser::SourceMatcher(),
+                parser::EverythingElseFlagMatcher());
 
         CompilerFlags flags;
         for (parser::Input input { std::next(command.arguments.begin()), command.arguments.end() };
@@ -228,44 +411,33 @@ namespace {
                 });
             }
         }
-        for (auto env : { "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH" }) {
-            if (auto it = command.environment.find(env); it != command.environment.end()) {
-                for (const auto& path : sys::path::split(it->second)) {
-                    auto directory = (path.empty()) ? "." : path;
-                    CompilerFlag flag = { {"-I", directory }, CompilerFlagType::DIRECTORY_SEARCH };
-                    flags.emplace_back(flag);
-                }
-            }
-        }
-        if (auto it = command.environment.find("OBJC_INCLUDE_PATH"); it != command.environment.end()) {
-            for (const auto& path : sys::path::split(it->second)) {
-                auto directory = (path.empty()) ? "." : path;
-                CompilerFlag flag = { {"-isystem", directory }, CompilerFlagType::DIRECTORY_SEARCH };
-                flags.emplace_back(flag);
-            }
+        if (auto extra = flags_from_environment(command.environment); !extra.empty()) {
+            std::copy(extra.begin(), extra.end(), std::back_inserter(flags));
         }
         return rust::Ok(flags);
     }
 
     bool runs_compilation_pass(const CompilerFlags& flags)
     {
-        constexpr static const char* NO_COMPILATION_FLAG[] {
-            "--help",
-            "--version",
-            "-cc1",
-            "-cc1as"
-        };
-        constexpr static size_t NO_COMPILATION_FLAG_SIZE = sizeof(NO_COMPILATION_FLAG) / sizeof(const char*);
+//        // for Clang
+//        constexpr static const char* NO_COMPILATION_FLAG[] {
+//            "-cc1",
+//            "-cc1as"
+//        };
+//        constexpr static size_t NO_COMPILATION_FLAG_SIZE = sizeof(NO_COMPILATION_FLAG) / sizeof(const char*);
 
-        for (const auto& flag : flags) {
-            if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT) && (flag.arguments.size() == 1)) {
-                std::string candidate = flag.arguments.front();
-
-                const auto begin = NO_COMPILATION_FLAG;
-                const auto end = NO_COMPILATION_FLAG + NO_COMPILATION_FLAG_SIZE;
-                return std::find_if(begin, end, [&candidate](const char *it) { return candidate == it; }) == end;
-            }
+        if (flags.empty() || std::find_if(flags.begin(), flags.end(), [](auto flag) { return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_INFO); }) != flags.end()) {
+            return false;
         }
+//        for (const auto& flag : flags) {
+//            if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT) && (flag.arguments.size() == 1)) {
+//                std::string candidate = flag.arguments.front();
+//
+//                const auto begin = NO_COMPILATION_FLAG;
+//                const auto end = NO_COMPILATION_FLAG + NO_COMPILATION_FLAG_SIZE;
+//                return std::find_if(begin, end, [&candidate](const char *it) { return candidate == it; }) == end;
+//            }
+//        }
         return true;
     }
 
@@ -292,7 +464,7 @@ namespace {
 
     std::optional<std::string> output_file(const CompilerFlag& flag, const std::string& working_dir)
     {
-        if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT) && (flag.arguments.size() == 2) && (flag.arguments.front() == "-o")) {
+        if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) && (flag.arguments.size() == 2)) {
             auto output = flag.arguments.back();
             return (sys::path::is_absolute(output))
                    ? std::make_optional(output)
@@ -316,7 +488,7 @@ namespace {
     {
         std::list<std::string> result;
         for (const auto& flag : flags) {
-            if (flag.type != CompilerFlagType::LINKER) {
+            if (flag.type != CompilerFlagType::LINKER || flag.type == CompilerFlagType::PREPROCESSOR_MAKE) {
                 std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(result));
             }
         }
