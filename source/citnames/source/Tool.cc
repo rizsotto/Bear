@@ -45,8 +45,10 @@ namespace {
         OTHER,
     };
 
+    using Arguemnts = std::list<std::string>;
+
     struct CompilerFlag {
-        std::list<std::string> arguments;
+        Arguemnts arguments;
         CompilerFlagType type;
     };
 
@@ -54,19 +56,9 @@ namespace {
 
     namespace parser {
 
-        using Arguemnts = std::list<std::string>;
-
         struct Input {
             Arguemnts::const_iterator begin;
             Arguemnts::const_iterator end;
-        };
-
-        struct Parser {
-            [[nodiscard]]
-            rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
-            {
-                return rust::Err(input);
-            }
         };
 
         template <typename ... Parsers>
@@ -161,7 +153,7 @@ namespace {
                         auto begin = input.begin;
                         auto end = std::next(begin, count + 1);
 
-                        CompilerFlag compiler_flag = { std::list(begin, end), type };
+                        CompilerFlag compiler_flag = { Arguemnts(begin, end), type };
                         Input remainder = { end, input.end };
                         return rust::Ok(std::make_pair(compiler_flag, remainder));
                     }
@@ -320,7 +312,7 @@ namespace {
                         auto begin = input.begin;
                         auto end = std::next(begin, 1);
 
-                        CompilerFlag compiler_flag = { std::list(begin, end), CompilerFlagType::SOURCE };
+                        CompilerFlag compiler_flag = { Arguemnts(begin, end), CompilerFlagType::SOURCE };
                         Input remainder = { end, input.end };
                         return rust::Ok(std::make_pair(compiler_flag, remainder));
                     }
@@ -484,9 +476,9 @@ namespace {
         return std::optional<std::string>();
     }
 
-    std::list<std::string> filter_arguments(const CompilerFlags& flags)
+    Arguemnts filter_arguments(const CompilerFlags& flags)
     {
-        std::list<std::string> result;
+        Arguemnts result;
         for (const auto& flag : flags) {
             if (flag.type != CompilerFlagType::LINKER || flag.type == CompilerFlagType::PREPROCESSOR_MAKE) {
                 std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(result));
