@@ -26,7 +26,7 @@ namespace {
     TEST(GnuCompilerCollection, fails_on_empty) {
         report::Execution::Command input = {};
 
-        cs::GnuCompilerCollection sut(std::nullopt);
+        cs::GnuCompilerCollection sut({});
 
         EXPECT_FALSE(sut.recognize(input).is_ok());
     }
@@ -46,7 +46,7 @@ namespace {
                         {"/usr/bin/cc", "-c", "-o", "source.o", "source.c"}},
         };
 
-        cs::GnuCompilerCollection sut(std::nullopt);
+        cs::GnuCompilerCollection sut({});
 
         auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
@@ -62,7 +62,7 @@ namespace {
         };
         cs::output::Entries expected = {};
 
-        cs::GnuCompilerCollection sut(std::nullopt);
+        cs::GnuCompilerCollection sut({});
 
         auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
@@ -93,7 +93,7 @@ namespace {
                 },
         };
 
-        cs::GnuCompilerCollection sut(std::nullopt);
+        cs::GnuCompilerCollection sut({});
 
         auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
@@ -115,7 +115,7 @@ namespace {
                         {"/usr/bin/wrapper", "-c", "source.c"}},
         };
 
-        cs::GnuCompilerCollection sut(std::optional("/usr/bin/wrapper"));
+        cs::GnuCompilerCollection sut({"/usr/bin/wrapper"});
 
         auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());

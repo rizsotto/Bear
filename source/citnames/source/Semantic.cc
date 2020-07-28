@@ -32,11 +32,8 @@ namespace cs {
 
     rust::Result<Semantic> Semantic::from(const cfg::Value& cfg, const sys::Context& ctx)
     {
-        auto compilers = cfg.compilation.compilers;
         Tools tools = {
-                std::make_shared<GnuCompilerCollection>(cfg.compilation.compilers.cc),
-                std::make_shared<GnuCompilerCollection>(cfg.compilation.compilers.cxx),
-                std::make_shared<GnuCompilerCollection>(cfg.compilation.compilers.fortran),
+                std::make_shared<GnuCompilerCollection>(cfg.compilation.compilers),
         };
         return rust::Ok(Semantic(cfg, ctx, std::move(tools)));
     }

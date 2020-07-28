@@ -52,8 +52,7 @@ namespace cs::cfg {
                             // distcc
                             true
                         },
-                        cfg::Compilers {
-                                std::nullopt, std::nullopt, std::nullopt
+                        {}
 //                            // mpi
 //                            { R"(^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$)" },
 //                            // cuda
@@ -92,50 +91,17 @@ namespace cs::cfg {
 //                                R"(^(ifort)$)",
 //                                R"(^(pg|)(f77|f90|f95|fortran)$)"
 //                            }
-                        },
-                        {
-                            // preprocessor macros, ignored because would cause duplicate entries in
-                            // the output (the only difference would be these flags). this is actual
-                            // finding from users, who suffered longer execution time caused by the
-                            // duplicates.
-                            { "-MD", "", "", false, 0 },
-                            { "-MMD", "", "", false, 0 },
-                            { "-MG", "", "", false, 0 },
-                            { "-MP", "", "", false, 0 },
-                            { "-MF", "", "", false, 1 },
-                            { "-MT", "", "", false, 1 },
-                            { "-MQ", "", "", false, 1 },
-                            // linker options, ignored because for compilation database will contain
-                            // compilation commands only. so, the compiler would ignore these flags
-                            // anyway. the benefit to get rid of them is to make the output more
-                            // readable.
-                            { "-static", "", "", false, 0 },
-                            { "-shared", "", "", false, 0 },
-                            { "-s", "", "", false, 0 },
-                            { "-rdynamic", "", "", false, 0 },
-                            { "-static", "", "", false, 1 },
-                            { "", "^-(l|L|Wl,).+", "", true, 1 },
-                            { "-u", "", "", false, 1 },
-                            { "-z", "", "", false, 1 },
-                            { "-T", "", "", false, 1 },
-                            { "-Xlinker", "", "", false, 1 },
-                            // clang-cl / msvc cl specific flags
-                            // consider moving visual studio specific warning flags also in.
-                            { "-nologo", "", "", false, 0 },
-                            { "-EHsc", "", "", false, 0 },
-                            { "-EHa", "", "", false, 0 },
-                        }
                 }
         };
 
         if (auto it = environment.find("CC"); it != environment.end()) {
-            value.compilation.compilers.cc = it->second;
+            value.compilation.compilers.push_back(it->second);
         }
         if (auto it = environment.find("CXX"); it != environment.end()) {
-            value.compilation.compilers.cxx = it->second;
+            value.compilation.compilers.push_back(it->second);
         }
         if (auto it = environment.find("FC"); it != environment.end()) {
-            value.compilation.compilers.fortran = it->second;
+            value.compilation.compilers.push_back(it->second);
         }
 
         return value;

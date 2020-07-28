@@ -44,12 +44,12 @@ namespace cs {
     };
 
     struct GnuCompilerCollection : public Tool {
-        explicit GnuCompilerCollection(std::optional<std::string> exact_name);
+        explicit GnuCompilerCollection(std::list<std::string> paths);
 
         [[nodiscard]]
         rust::Result<output::Entries> recognize(const report::Execution::Command &command) const override;
 
     protected:
-        std::optional<std::string> exact_name;
+        std::list<std::string> paths;
     };
 }

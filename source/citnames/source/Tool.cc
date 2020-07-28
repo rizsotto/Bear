@@ -493,6 +493,7 @@ namespace {
                 R"(^(cc|c\+\+|cxx|CC)$)",
                 R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
                 R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
+                R"(^([^-]*-)*[g]?fortran(-?\d+(\.\d+){0,2})?$)",
         };
         auto pattern =
                 fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|"));
@@ -504,14 +505,15 @@ namespace {
 
 namespace cs {
 
-    GnuCompilerCollection::GnuCompilerCollection(std::optional<std::string> exact_name)
+    GnuCompilerCollection::GnuCompilerCollection(std::list<std::string> paths)
             : Tool()
-            , exact_name(std::move(exact_name))
+            , paths(std::move(paths))
     { }
 
     rust::Result<output::Entries> GnuCompilerCollection::recognize(const report::Execution::Command &command) const {
         const bool match_compiler_name =
-                (exact_name && (exact_name.value() == command.program)) || match_gcc_name(command.program);
+                (std::find(paths.begin(), paths.end(), command.program) != paths.end())
+                || match_gcc_name(command.program);
 
         if (!match_compiler_name) {
             return rust::Err(std::runtime_error("Not recognized program name."));

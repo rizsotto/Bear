@@ -48,12 +48,6 @@ namespace cs::cfg {
         bool distcc;
     };
 
-    struct Compilers {
-        std::optional<std::string> cc;
-        std::optional<std::string> cxx;
-        std::optional<std::string> fortran;
-    };
-
     struct Sources {
         std::list<std::string> extensions_to_exclude;
         std::list<std::string> extensions_to_include;
@@ -69,8 +63,7 @@ namespace cs::cfg {
 
     struct Compilation {
         cfg::ExpandWrappers expand_wrappers;
-        cfg::Compilers compilers;
-        std::list<Flag> flags_to_filter;
+        std::list<std::string> compilers;
     };
 
     struct Value {
@@ -101,7 +94,6 @@ namespace cs::cfg {
     bool operator==(const Compilation& lhs, const Compilation& rhs);
     bool operator==(const Flag& lhs, const Flag& rhs);
     bool operator==(const Sources& lhs, const Sources& rhs);
-    bool operator==(const Compilers& lhs, const Compilers& rhs);
     bool operator==(const ExpandWrappers& lhs, const ExpandWrappers& rhs);
     bool operator==(const Content& lhs, const Content& rhs);
     bool operator==(const Format& lhs, const Format& rhs);
