@@ -20,6 +20,7 @@
 #include "gtest/gtest.h"
 
 #include "Configuration.h"
+#include "CompilationDatabase.h"
 #include "Semantic.h"
 
 namespace {
@@ -31,10 +32,100 @@ namespace {
                 { "CC", "/path/to/your-cc" },
                 { "CXX", "/path/to/your-cxx" },
         };
-
         auto ctx = sys::Context();
         auto cfg = cs::cfg::default_value(env);
-        auto expert = cs::Semantic::from(cfg, ctx);
-        EXPECT_TRUE(expert.is_ok());
+
+        auto sut = cs::Semantic::from(cfg, ctx);
+        EXPECT_TRUE(sut.is_ok());
+    }
+
+    TEST(semantic, parses_empty_command_list)
+    {
+        auto ctx = sys::Context();
+        auto cfg = cs::cfg::default_value({});
+
+        auto sut = cs::Semantic::from(cfg, ctx);
+        EXPECT_TRUE(sut.is_ok());
+
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {}
+        };
+        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
+    }
+
+    TEST(semantic, parses_command_list)
+    {
+        auto ctx = sys::Context();
+        auto cfg = cs::cfg::default_value({});
+
+        auto sut = cs::Semantic::from(cfg, ctx);
+        EXPECT_TRUE(sut.is_ok());
+
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {
+                        report::Execution {
+                                report::Execution::Command {
+                                        "/usr/bin/cc",
+                                        { "cc", "--version" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Execution::Run { 1, std::nullopt, {} }
+                        },
+                        report::Execution {
+                                report::Execution::Command {
+                                        "/usr/bin/ls",
+                                        { "ls", "-la" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Execution::Run { 1, std::nullopt, {} }
+                        },
+                        report::Execution {
+                                report::Execution::Command {
+                                        "/usr/bin/cc",
+                                        { "cc", "-c", "-Wall", "source.c" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Execution::Run { 1, std::nullopt, {} }
+                        },
+                        report::Execution {
+                                report::Execution::Command {
+                                        "/usr/bin/c++",
+                                        { "c++", "-c", "-Wall", "source.cc" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Execution::Run { 1, std::nullopt, {} }
+                        },
+                }
+        };
+        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
+
+        cs::output::Entries expected = {
+                cs::output::Entry{
+                        "/home/user/project/source.c",
+                        "/home/user/project",
+                        {},
+                        {"/usr/bin/cc", "-c", "-Wall", "source.c"}
+                },
+                cs::output::Entry{
+                        "/home/user/project/source.cc",
+                        "/home/user/project",
+                        {},
+                        {"/usr/bin/c++", "-c", "-Wall", "source.cc"}
+                }
+        };
+        auto compilations = result.unwrap_or({});
+        EXPECT_EQ(expected, compilations);
     }
 }
