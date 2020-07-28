@@ -33,7 +33,7 @@ namespace cs {
     // based on configuration.
     class Semantic {
     public:
-        static rust::Result<Semantic> from(const cfg::Value& cfg, const sys::Context& ctx);
+        static rust::Result<Semantic> from(cfg::Value cfg, const sys::Context& ctx);
 
         [[nodiscard]]
         output::Entries transform(const report::Report& report) const;
@@ -51,10 +51,10 @@ namespace cs {
         Semantic() = delete;
         ~Semantic() noexcept = default;
 
-        Semantic(const cfg::Value&, const sys::Context& , Tools &&) noexcept;
+        Semantic(cfg::Value&&, const sys::Context& , Tools &&) noexcept;
 
     private:
-        const cfg::Value& config_;
+        cfg::Value config_;
         const sys::Context& ctx_;
         Tools tools_;
     };

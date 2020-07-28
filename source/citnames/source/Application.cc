@@ -25,6 +25,7 @@
 #include "libreport/Report.h"
 
 #include <fmt/format.h>
+#include <spdlog/spdlog.h>
 
 namespace {
 
@@ -59,7 +60,7 @@ namespace cs {
 
     struct Application::State {
         Arguments arguments;
-        cs::cfg::Value configuration;
+        cfg::Format format;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
@@ -70,7 +71,7 @@ namespace cs {
                 .and_then<Application::State*>([&ctx](auto arguments) {
                     // modify the arguments till we have context for IO
                     arguments.append &= (ctx.is_exists(arguments.output) == 0);
-                    if (ctx.is_exists(arguments.input) == 0) {
+                    if (ctx.is_exists(arguments.input) != 0) {
                         return rust::Result<Application::State*>(rust::Err(
                                 std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
                     }
@@ -79,10 +80,11 @@ namespace cs {
                     auto semantic = Semantic::from(configuration, ctx);
                     cs::output::CompilationDatabase output;
                     return semantic.template map<Application::State*>([&arguments, &configuration, &output](auto semantic) {
-                        return new Application::State { arguments, configuration, semantic, output };
+                        return new Application::State { arguments, configuration.format, semantic, output };
                     });
                 })
                 .map<Application>([](auto impl) {
+                    spdlog::debug("application object initialized.");
                     return Application { impl };
                 });
     }
@@ -92,20 +94,24 @@ namespace cs {
         // get current compilations from the input.
         return report::from_json(impl_->arguments.input.c_str())
             .map<output::Entries>([this](auto commands) {
+                spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 return impl_->semantic.transform(commands);
             })
             // read back the current content and extend with the new elements.
             .and_then<output::Entries>([this](auto compilations) {
+                spdlog::debug("compilation entries created. [size: {}]", compilations.size());
                 return (impl_->arguments.append)
                     ? impl_->output.from_json(impl_->arguments.output.c_str())
                             .template map<output::Entries>([&compilations](auto old_entries) {
+                                spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
                                 return output::merge(old_entries, compilations);
                             })
                     : rust::Result<output::Entries>(rust::Ok(compilations));
             })
             // write the entries into the output file.
             .and_then<int>([this](auto compilations) {
-                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations, impl_->configuration.format);
+                spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
+                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations, impl_->format);
             })
             // just map to success exit code if it was successful.
             .map<int>([](auto ignore) {
