@@ -29,13 +29,13 @@ namespace {
             const cs::output::Entries& expected,
             const cs::cfg::Format& format)
     {
-        cs::output::CompilationDatabase output;
+        cs::output::CompilationDatabase sut(format);
         std::stringstream buffer;
 
-        auto serialized = output.to_json(buffer, expected, format);
+        auto serialized = sut.to_json(buffer, expected);
         EXPECT_TRUE(serialized.is_ok());
 
-        auto deserialized = output.from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_TRUE(deserialized.is_ok());
         deserialized.on_success([&expected](auto result) {
             EXPECT_EQ(expected, result);
@@ -69,13 +69,13 @@ namespace {
     {
         format.drop_output_field = true;
 
-        cs::output::CompilationDatabase output;
+        cs::output::CompilationDatabase sut(format);
         std::stringstream buffer;
 
-        auto serialized = output.to_json(buffer, input, format);
+        auto serialized = sut.to_json(buffer, input);
         EXPECT_TRUE(serialized.is_ok());
 
-        auto deserialized = output.from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_TRUE(deserialized.is_ok());
         deserialized.on_success([&expected](auto result) {
             EXPECT_EQ(expected, result);
@@ -101,32 +101,32 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::output::CompilationDatabase output;
+        cs::output::CompilationDatabase sut({ false, false });
         std::stringstream buffer;
 
-        auto deserialized = output.from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::output::CompilationDatabase output;
+        cs::output::CompilationDatabase sut({ false, false });
         std::stringstream buffer;
 
         buffer << "[ { } ]";
 
-        auto deserialized = output.from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::output::CompilationDatabase output;
+        cs::output::CompilationDatabase sut({ false, false });
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";
 
-        auto deserialized = output.from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 

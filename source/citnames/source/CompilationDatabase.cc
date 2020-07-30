@@ -27,6 +27,11 @@
 
 namespace cs::output {
 
+
+    CompilationDatabase::CompilationDatabase(const cs::cfg::Format &_fromat)
+            : format(_fromat)
+    { }
+
     nlohmann::json to_json(const Entry &rhs, const cs::cfg::Format& format)
     {
         nlohmann::json json;
@@ -45,17 +50,17 @@ namespace cs::output {
         return json;
     }
 
-    rust::Result<int> CompilationDatabase::to_json(const char *file, const Entries &entries, const cs::cfg::Format& format) const
+    rust::Result<int> CompilationDatabase::to_json(const char *file, const Entries &entries) const
     {
         try {
             std::ofstream target(file);
-            return to_json(target, entries, format);
+            return to_json(target, entries);
         } catch (const std::exception& error) {
             return rust::Err(std::runtime_error(error.what()));
         }
     }
 
-    rust::Result<int> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries, const cs::cfg::Format& format) const
+    rust::Result<int> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const
     {
         try {
             nlohmann::json json = nlohmann::json::array();

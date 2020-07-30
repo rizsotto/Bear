@@ -60,7 +60,6 @@ namespace cs {
 
     struct Application::State {
         Arguments arguments;
-        cfg::Format format;
         report::ReportSerializer report_serializer;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
@@ -80,9 +79,9 @@ namespace cs {
                     auto configuration = cfg::default_value(ctx.get_environment());
                     auto semantic = Semantic::from(configuration, ctx);
                     return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
-                        cs::output::CompilationDatabase output;
+                        cs::output::CompilationDatabase output(configuration.format);
                         report::ReportSerializer report_serializer;
-                        return new Application::State { arguments, configuration.format, report_serializer, semantic, output };
+                        return new Application::State { arguments, report_serializer, semantic, output };
                     });
                 })
                 .map<Application>([](auto impl) {
@@ -113,7 +112,7 @@ namespace cs {
             // write the entries into the output file.
             .and_then<int>([this](auto compilations) {
                 spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
-                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations, impl_->format);
+                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations);
             })
             // just map to success exit code if it was successful.
             .map<int>([](auto ignore) {

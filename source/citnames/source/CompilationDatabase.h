@@ -49,13 +49,17 @@ namespace cs::output {
 
     // Utility class to persists entries.
     struct CompilationDatabase {
+        explicit CompilationDatabase(const cs::cfg::Format&);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const char *file, const Entries &entries, const cs::cfg::Format& format) const;
-        virtual rust::Result<int> to_json(std::ostream &ostream, const Entries &entries, const cs::cfg::Format& format) const;
+        virtual rust::Result<int> to_json(const char *file, const Entries &entries) const;
+        virtual rust::Result<int> to_json(std::ostream &ostream, const Entries &entries) const;
 
         virtual rust::Result<Entries> from_json(const char *file) const;
         virtual rust::Result<Entries> from_json(std::istream &istream) const;
+
+    private:
+        cs::cfg::Format format;
     };
 }
