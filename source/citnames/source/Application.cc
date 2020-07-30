@@ -61,6 +61,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         cfg::Format format;
+        report::ReportSerializer report_serializer;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
@@ -78,9 +79,10 @@ namespace cs {
                     // read the configuration
                     auto configuration = cfg::default_value(ctx.get_environment());
                     auto semantic = Semantic::from(configuration, ctx);
-                    cs::output::CompilationDatabase output;
-                    return semantic.template map<Application::State*>([&arguments, &configuration, &output](auto semantic) {
-                        return new Application::State { arguments, configuration.format, semantic, output };
+                    return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
+                        cs::output::CompilationDatabase output;
+                        report::ReportSerializer report_serializer;
+                        return new Application::State { arguments, configuration.format, report_serializer, semantic, output };
                     });
                 })
                 .map<Application>([](auto impl) {
@@ -92,7 +94,7 @@ namespace cs {
     rust::Result<int> Application::operator()() const
     {
         // get current compilations from the input.
-        return report::from_json(impl_->arguments.input.c_str())
+        return impl_->report_serializer.from_json(impl_->arguments.input.c_str())
             .map<output::Entries>([this](auto commands) {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 return impl_->semantic.transform(commands);

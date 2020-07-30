@@ -91,13 +91,6 @@ namespace report {
         std::list<Execution> executions;
     };
 
-    // Serialization methods with error mapping.
-    rust::Result<int> to_json(const char* file, const Report& rhs);
-    rust::Result<int> to_json(std::ostream& ostream, const Report& rhs);
-
-    rust::Result<Report> from_json(const char* file);
-    rust::Result<Report> from_json(std::istream& istream);
-
     // Methods used in tests.
     bool operator==(const Command& lhs, const Command& rhs);
     bool operator==(const Event& lhs, const Event& rhs);
@@ -105,4 +98,16 @@ namespace report {
     bool operator==(const Execution& lhs, const Execution& rhs);
     bool operator==(const Context& lhs, const Context& rhs);
     bool operator==(const Report& lhs, const Report& rhs);
+
+    // Utility class to persists entries.
+    struct ReportSerializer {
+        virtual ~ReportSerializer() noexcept = default;
+
+        // Serialization methods with error mapping.
+        virtual rust::Result<int> to_json(const char* file, const Report& rhs) const;
+        virtual rust::Result<int> to_json(std::ostream& ostream, const Report& rhs) const;
+
+        virtual rust::Result<Report> from_json(const char* file) const;
+        virtual rust::Result<Report> from_json(std::istream& istream) const;
+    };
 }

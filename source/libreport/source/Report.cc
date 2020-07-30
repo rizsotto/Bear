@@ -135,53 +135,6 @@ namespace report {
         j.at("context").get_to(rhs.context);
     }
 
-    rust::Result<int> to_json(const char* file, const Report& rhs)
-    {
-        try {
-            std::ofstream target(file);
-            return to_json(target, rhs);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
-    }
-
-    rust::Result<int> to_json(std::ostream& ostream, const Report& rhs)
-    {
-        try {
-            nlohmann::json out = rhs;
-            ostream << std::setw(4) << out << std::endl;
-
-            return rust::Ok(1);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
-    }
-
-    rust::Result<Report> from_json(const char* file)
-    {
-        try {
-            std::ifstream source(file);
-            return from_json(source);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
-    }
-
-    rust::Result<Report> from_json(std::istream& istream)
-    {
-        try {
-            nlohmann::json in;
-            istream >> in;
-
-            report::Report result;
-            report::from_json(in, result);
-
-            return rust::Ok(result);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
-    }
-
     bool operator==(const Command& lhs, const Command& rhs)
     {
         return (lhs.program == rhs.program)
@@ -221,5 +174,53 @@ namespace report {
     {
         return (lhs.context == rhs.context)
                && (lhs.executions == rhs.executions);
+    }
+
+
+    rust::Result<int> ReportSerializer::to_json(const char* file, const Report& rhs) const
+    {
+        try {
+            std::ofstream target(file);
+            return to_json(target, rhs);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<int> ReportSerializer::to_json(std::ostream& ostream, const Report& rhs) const
+    {
+        try {
+            nlohmann::json out = rhs;
+            ostream << std::setw(4) << out << std::endl;
+
+            return rust::Ok(1);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<Report> ReportSerializer::from_json(const char* file) const
+    {
+        try {
+            std::ifstream source(file);
+            return from_json(source);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<Report> ReportSerializer::from_json(std::istream& istream) const
+    {
+        try {
+            nlohmann::json in;
+            istream >> in;
+
+            report::Report result;
+            report::from_json(in, result);
+
+            return rust::Ok(result);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
     }
 }

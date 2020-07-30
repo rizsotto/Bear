@@ -66,12 +66,13 @@ namespace {
             }
         };
 
+        report::ReportSerializer sut;
         std::stringstream buffer;
 
-        auto serialized = report::to_json(buffer, expected);
+        auto serialized = sut.to_json(buffer, expected);
         EXPECT_TRUE(serialized.is_ok());
 
-        auto deserialized = report::from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_TRUE(deserialized.is_ok());
         deserialized.on_success([&expected](auto result) {
             EXPECT_EQ(expected, result);
@@ -80,11 +81,12 @@ namespace {
 
     TEST(report, parse_failure_handled)
     {
+        report::ReportSerializer sut;
         std::stringstream buffer;
 
         buffer << "this { is } wrong" << std::endl;
 
-        auto deserialized = report::from_json(buffer);
+        auto deserialized = sut.from_json(buffer);
         EXPECT_FALSE(deserialized.is_ok());
     }
 }
