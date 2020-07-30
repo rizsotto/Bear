@@ -26,6 +26,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <csignal>
+#include <filesystem>
 #include <utility>
 #include <iostream>
 
@@ -113,12 +114,41 @@ namespace {
 
     bool contains_separator(const std::string& path)
     {
-        return (std::find(path.begin(), path.end(), sys::path::OS_SEPARATOR) != path.end());
+        return (std::find(path.begin(), path.end(), fs::path::preferred_separator) != path.end());
     }
 
     bool starts_with_separator(const std::string& path)
     {
-        return (!path.empty()) && (path.at(0) == sys::path::OS_SEPARATOR);
+        return (!path.empty()) && (path.at(0) == fs::path::preferred_separator);
+    }
+
+    rust::Result<fs::path> get_cwd()
+    {
+        std::error_code error_code;
+        auto result = fs::current_path(error_code);
+        return (error_code)
+               ? rust::Result<fs::path>(rust::Err(std::runtime_error(error_code.message())))
+               : rust::Result<fs::path>(rust::Ok(result));
+    }
+
+    std::runtime_error could_not_find(const std::string& name, const int error)
+    {
+        return std::runtime_error(
+                fmt::format("Could not find executable: {} ({})", name, sys::error_string(error)));
+    }
+
+    rust::Result<std::string> check_executable(const fs::path& path)
+    {
+        // Check if we can get the relpath of this file
+        std::error_code error_code;
+        auto result = fs::canonical(path, error_code);
+        if (error_code) {
+            return rust::Err(std::runtime_error(error_code.message()));
+        }
+        // Check if the file is executable.
+        return (0 == access(result.c_str(), X_OK))
+                ? rust::Result<std::string>(rust::Ok(result.string()))
+                : rust::Result<std::string>(rust::Err(could_not_find(result.string(), EACCES)));
     }
 
     rust::Result<std::string> resolve_executable(const std::string& name)
@@ -126,7 +156,6 @@ namespace {
         // TODO: inject this!
         sys::Context ctx;
 
-        int error = ENOENT;
         // If the requested program name contains a separator, then we need to use
         // that as is. Otherwise we need to search the paths given.
         if (contains_separator(name)) {
@@ -134,41 +163,21 @@ namespace {
             // absolute and will be used as is. Otherwise we need to create it from
             // the current working directory.
             auto path = starts_with_separator(name)
-                ? rust::Ok(name)
-                : ctx.get_cwd().map<std::string>([&name](const auto& cwd) {
-                      return sys::path::concat(cwd, name);
-                  });
-            auto candidate = path.and_then<std::string>([&ctx](const auto& path) { return ctx.real_path(path); });
-            auto executable = candidate
-                                  .map<bool>([&ctx, &error](auto real) {
-                                      error = ctx.is_executable(real);
-                                      return (0 == error);
-                                  })
-                                  .unwrap_or(false);
-            if (executable) {
-                return candidate;
-            }
+                ? rust::Ok(fs::path(name))
+                : get_cwd().map<fs::path>([&name](auto cwd) { return cwd  / name; });
+
+            return path.and_then<std::string>([](auto path) { return check_executable(path); });
         } else {
             return ctx.get_path()
-                .and_then<std::string>([&name, &ctx, &error](const auto& directories) {
+                .and_then<std::string>([&name](const auto& directories) {
                     for (const auto& directory : directories) {
-                        auto candidate = ctx.real_path(fmt::format("{0}{1}{2}", directory, sys::path::OS_SEPARATOR, name));
-                        auto executable = candidate
-                                              .template map<bool>([&ctx, &error](auto real) {
-                                                  error = ctx.is_executable(real);
-                                                  return (0 == error);
-                                              })
-                                              .unwrap_or(false);
-                        if (executable) {
-                            return candidate;
+                        if (auto result = check_executable(directory / name); result.is_ok()) {
+                            return result;
                         }
                     }
-                    return rust::Result<std::string>(rust::Err(std::runtime_error(
-                        fmt::format("Could not find executable: {} ({})", name, sys::error_string(ENOENT)))));
+                    return rust::Result<std::string>(rust::Err(could_not_find(name, ENOENT)));
                 });
         }
-        return rust::Err(std::runtime_error(
-            fmt::format("Could not find executable: {} ({})", name, sys::error_string(error))));
     }
 
     rust::Result<sys::ExitStatus> wait_for(pid_t pid, bool request_for_signals)

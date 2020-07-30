@@ -20,7 +20,6 @@
 #include "Application.h"
 #include "librpc/InterceptClient.h"
 #include "librpc/supervise.grpc.pb.h"
-#include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 #include "libwrapper/Environment.h"
@@ -29,6 +28,7 @@
 #include <fmt/format.h>
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -61,11 +61,20 @@ namespace {
         return std::vector<std::string>(args, end);
     }
 
+    rust::Result<std::string> get_cwd()
+    {
+        std::error_code error_code;
+        auto result = fs::current_path(error_code);
+        return (error_code)
+               ? rust::Result<std::string>(rust::Err(std::runtime_error(error_code.message())))
+               : rust::Result<std::string>(rust::Ok(result.string()));
+    }
+
     rust::Result<Execution> make_execution(const char** args, const sys::Context& context) noexcept
     {
-        auto path = sys::path::basename(args[0]);
+        auto path = fs::path(args[0]).string();
         auto command = from(args);
-        auto working_dir = context.get_cwd();
+        auto working_dir = get_cwd();
         auto environment = context.get_environment();
 
         return working_dir

@@ -24,6 +24,8 @@
 
 #include "libreport/Report.h"
 
+#include <filesystem>
+
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
@@ -54,6 +56,12 @@ namespace {
                     };
                 });
     }
+
+    bool is_exists(const std::string& path)
+    {
+        std::error_code error_code;
+        return fs::exists(fs::path(path), error_code);
+    }
 }
 
 namespace cs {
@@ -70,8 +78,8 @@ namespace cs {
         return into_arguments(args)
                 .and_then<Application::State*>([&ctx](auto arguments) {
                     // modify the arguments till we have context for IO
-                    arguments.append &= (ctx.is_exists(arguments.output) == 0);
-                    if (ctx.is_exists(arguments.input) != 0) {
+                    arguments.append &= (is_exists(arguments.output) == 0);
+                    if (is_exists(arguments.input) != 0) {
                         return rust::Result<Application::State*>(rust::Err(
                                 std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
                     }

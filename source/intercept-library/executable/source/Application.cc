@@ -28,6 +28,7 @@
 #include <fmt/format.h>
 
 #include <chrono>
+#include <filesystem>
 #include <memory>
 
 namespace {
@@ -43,11 +44,20 @@ namespace {
         const std::string_view destination;
     };
 
+    rust::Result<std::string> get_cwd()
+    {
+        std::error_code error_code;
+        auto result = fs::current_path(error_code);
+        return (error_code)
+                ? rust::Result<std::string>(rust::Err(std::runtime_error(error_code.message())))
+                : rust::Result<std::string>(rust::Ok(result.string()));
+    }
+
     rust::Result<Execution> make_execution(const ::flags::Arguments& args, const sys::Context& context) noexcept
     {
         auto path = args.as_string(::er::flags::EXECUTE);
         auto command = args.as_string_list(::er::flags::COMMAND);
-        auto working_dir = context.get_cwd();
+        auto working_dir = get_cwd();
         auto environment = context.get_environment();
 
         return merge(path, command, working_dir)

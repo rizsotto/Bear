@@ -438,9 +438,9 @@ namespace {
         // TODO: check if source file is exists
         return (flag.type != CompilerFlagType::SOURCE)
                ? std::optional<std::string>()
-               : (sys::path::is_absolute(flag.arguments.front()))
+               : (fs::path(flag.arguments.front()).is_absolute())
                        ? std::make_optional(flag.arguments.front())
-                       : std::make_optional(sys::path::concat(working_dir, flag.arguments.front()));
+                       : std::make_optional((fs::path(working_dir) / flag.arguments.front()).string());
     }
 
     std::list<std::string> source_files(const CompilerFlags& flags, const std::string& working_dir)
@@ -458,9 +458,9 @@ namespace {
     {
         if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) && (flag.arguments.size() == 2)) {
             auto output = flag.arguments.back();
-            return (sys::path::is_absolute(output))
+            return (fs::path(output).is_absolute())
                    ? std::make_optional(output)
-                   : std::make_optional(sys::path::concat(working_dir, output));
+                   : std::make_optional((fs::path(working_dir) / output).string());
         }
         return std::optional<std::string>();
     }
@@ -498,8 +498,9 @@ namespace {
         auto pattern =
                 fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|"));
 
+        auto basename = fs::path(program).filename();
         std::cmatch m;
-        return std::regex_match(sys::path::basename(program).c_str(), m, std::regex(pattern));
+        return std::regex_match(basename.c_str(), m, std::regex(pattern));
     }
 }
 

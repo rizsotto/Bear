@@ -19,24 +19,17 @@
 
 #pragma once
 
+#include <filesystem>
 #include <list>
 #include <string>
 
+namespace fs = std::filesystem;
+
 namespace sys::path {
 
-    static constexpr char OS_SEPARATOR = '/';
-    static constexpr char OS_PATH_SEPARATOR = ':';
-
-    std::list<std::string> split(const std::string& input);
-    std::string join(const std::list<std::string>& input);
-
-    bool is_absolute(const std::string& path);
-    bool is_relative(const std::string& path);
-
-    std::string relative(const std::string& path, const std::string &start);
-
-    std::string basename(const std::string& path);
-    std::string concat(const std::string& dir, const std::string& file);
-
-    bool contains(const std::string& directory, const std::string& file);
+    // PATH variable manipulation functions
+    //
+    // https://en.wikipedia.org/wiki/PATH_(variable)
+    std::list<fs::path> split(const std::string &input);
+    std::string join(const std::list<fs::path> &input);
 }

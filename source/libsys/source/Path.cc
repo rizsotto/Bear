@@ -24,9 +24,11 @@
 
 namespace {
 
-    std::list<std::string> split_by(const std::string& input, const char sep)
+    constexpr char OS_PATH_SEPARATOR = ':';
+
+    std::list<fs::path> split_by(const std::string &input, const char sep)
     {
-        std::list<std::string> result;
+        std::list<fs::path> result;
         // make an early return if there is no chance to have something.
         if (input.empty()) {
             return result;
@@ -42,7 +44,7 @@ namespace {
         return result;
     }
 
-    std::string join_with(const std::list<std::string>& input, const char sep)
+    std::string join_with(const std::list<fs::path> &input, const char sep)
     {
         // make an early return if there is no chance to have something.
         if (input.empty()) {
@@ -50,97 +52,22 @@ namespace {
         }
         // otherwise start to collect the elements into result.
         return std::accumulate(std::next(input.begin()), input.end(),
-            *input.begin(),
-            [&sep](std::string acc, const std::string& item) {
-                return std::move(acc) + sep + item;
-            });
+                               *input.begin(),
+                               [&sep](std::string acc, const fs::path &item) {
+                                   return std::move(acc) + sep + item.string();
+                               });
     }
 }
 
 namespace sys::path {
 
-    std::list<std::string> split(const std::string& input)
+    std::list<fs::path> split(const std::string &input)
     {
-        return split_by(input, sys::path::OS_PATH_SEPARATOR);
+        return split_by(input, OS_PATH_SEPARATOR);
     }
 
-    std::string join(const std::list<std::string>& input)
+    std::string join(const std::list<fs::path> &input)
     {
-        return join_with(input, sys::path::OS_PATH_SEPARATOR);
-    }
-
-    bool is_absolute(const std::string& path) {
-        return (!path.empty()) && (path[0] == OS_SEPARATOR);
-    }
-
-    bool is_relative(const std::string& path) {
-        return !is_absolute(path);
-    }
-
-    std::string relative(const std::string& path, const std::string &start)
-    {
-        auto path_elements = split_by(path, OS_SEPARATOR);
-        path_elements.remove(".");
-
-        auto start_elements = split_by(start, OS_SEPARATOR);
-        start_elements.remove(".");
-        // remove the common root directories.
-        const size_t common = std::min(path_elements.size(), start_elements.size());
-        for (size_t idx = 0; idx < common; ++idx) {
-            if (path_elements.front() == start_elements.front()) {
-                path_elements.pop_front();
-                start_elements.pop_front();
-                continue;
-            }
-            break;
-        }
-        // insert as many `..` as the length of the start has now.
-        if (start_elements.empty()) {
-            path_elements.push_front(".");
-        } else {
-            std::fill_n(
-                    std::front_inserter(path_elements),
-                    start_elements.size(),
-                    std::string(".."));
-        }
-        return join_with(path_elements, OS_SEPARATOR);
-    }
-
-    std::string basename(const std::string& path)
-    {
-        if (auto pos = path.rfind(OS_SEPARATOR); pos != std::string::npos) {
-            return path.substr(pos + 1);
-        }
-        return path;
-    }
-
-    std::string concat(const std::string& dir, const std::string& file)
-    {
-        return dir + OS_SEPARATOR + file;
-    }
-
-    bool contains(const std::string& directory, const std::string& file)
-    {
-        if (directory.empty() || file.empty()) {
-            return false;
-        }
-
-        auto file_elements = split_by(file, OS_SEPARATOR);
-        file_elements.remove(".");
-
-        auto directory_elements = split_by(directory, OS_SEPARATOR);
-        directory_elements.remove(".");
-        // remove the common root directories.
-        const size_t common = std::min(file_elements.size(), directory_elements.size());
-        for (size_t idx = 0; idx < common; ++idx) {
-            if (file_elements.front() == directory_elements.front()) {
-                file_elements.pop_front();
-                directory_elements.pop_front();
-                continue;
-            }
-            break;
-        }
-        // if the directory elements are empty, then it contains
-        return directory_elements.empty();
+        return join_with(input, OS_PATH_SEPARATOR);
     }
 }

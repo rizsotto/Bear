@@ -51,13 +51,8 @@ public:
         (),
         (const, override));
     MOCK_METHOD(
-        rust::Result<std::list<std::string>>,
-        get_path,
-        (),
-        (const, override));
-    MOCK_METHOD(
-        rust::Result<std::string>,
-        get_cwd,
-        (),
+        rust::Result<std::list<fs::path>>,
+        list_dir,
+        (const fs::path& path),
         (const, override));
 };

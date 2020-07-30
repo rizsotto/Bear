@@ -86,6 +86,30 @@ namespace {
         return os;
     }
 
+    rust::Result<fs::path> is_executable(const fs::path& path)
+    {
+        // Check if we can get the relpath of this file
+        std::error_code error_code;
+        auto result = fs::canonical(path, error_code);
+        if (error_code) {
+            return rust::Err(std::runtime_error(error_code.message()));
+        }
+        // Check if the file is executable.
+        return (0 == access(result.c_str(), X_OK))
+               ? rust::Result<fs::path>(rust::Ok(result))
+               : rust::Result<fs::path>(rust::Err(std::runtime_error("Not executable")));
+    }
+
+    rust::Result<fs::path> find_from_path(const std::list<fs::path>& paths, const fs::path& file)
+    {
+        for (const auto& path : paths) {
+            auto executable = is_executable(path / file);
+            if (executable.is_ok()) {
+                return executable;
+            }
+        }
+        return rust::Err(std::runtime_error("Not found"));
+    }
 }
 
 namespace ic {
@@ -101,7 +125,7 @@ namespace ic {
         auto wrapper_dir = args.as_string(ic::Application::WRAPPER);
 
         auto wrappers = args.as_string(ic::Application::WRAPPER)
-                            .and_then<std::list<std::string>>([&ctx](auto wrapper_dir) {
+                            .and_then<std::list<fs::path>>([&ctx](auto wrapper_dir) {
                                 return ctx.list_dir(wrapper_dir);
                             });
 
@@ -111,19 +135,11 @@ namespace ic {
                 // Find the executables with the same name from the path.
                 std::map<std::string, std::string> result = {};
                 for (const auto& wrapper : wrappers) {
-                    auto basename = sys::path::basename(wrapper);
-                    for (const auto& path : paths) {
-                        auto candidate = sys::path::concat(path, basename);
-                        bool executable = ctx.real_path(candidate)
-                                             .template map<bool>([&ctx](auto path) {
-                                                 return 0 == ctx.is_executable(path);
-                                             })
-                                             .unwrap_or(false);
-                        if (executable) {
-                            result[basename] = candidate;
-                            break;
-                        }
-                    }
+                    auto basename = wrapper.filename();
+                    auto candidate = find_from_path(paths, basename);
+                    candidate.on_success([&result, &basename](auto candidate) {
+                        result[basename] = candidate.string();
+                    });
                 }
                 return result;
             })

@@ -24,8 +24,6 @@
 #include "config.h"
 
 #include <cerrno>
-#include <climits>
-#include <cstdio>
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -59,7 +57,7 @@ namespace sys {
 
     rust::Result<std::string> Context::get_confstr(const int key) const
     {
-#ifdef HAVE_UNAME
+#ifdef HAVE_CONFSTR
         errno = 0;
         if (const size_t buffer_size = confstr(key, nullptr, 0); buffer_size != 0) {
             char buffer[buffer_size];
@@ -91,7 +89,7 @@ namespace sys {
         return rust::Ok(result);
     }
 
-    rust::Result<std::list<std::string>> Context::get_path() const
+    rust::Result<std::list<fs::path>> Context::get_path() const
     {
         const auto environment = get_environment();
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
@@ -99,7 +97,7 @@ namespace sys {
         }
 #ifdef HAVE_CS_PATH
         return get_confstr(_CS_PATH)
-            .map<std::list<std::string>>([](const auto& paths) {
+            .map<std::list<fs::path>>([](const auto& paths) {
                 return sys::path::split(paths);
             })
             .map_err<std::runtime_error>([](auto error) {
@@ -111,68 +109,22 @@ namespace sys {
 #endif
     }
 
-    rust::Result<std::list<std::string>> Context::list_dir(const std::string_view& path) const
+    rust::Result<std::list<fs::path>> Context::list_dir(const fs::path& path) const
     {
-        DIR *dp = opendir(path.data());
+        DIR *dp = opendir(path.c_str());
         if (dp == nullptr)
             return rust::Err(std::runtime_error(
-                fmt::format("Could not open directory: {}", path)));
+                fmt::format("Could not open directory: {}", path.string())));
 
-        std::list<std::string> result;
+        std::list<fs::path> result;
         while (dirent *ep = readdir(dp)) {
             const std::string file(ep->d_name);
             if (file != "." && file != "..") {
-                result.push_back(sys::path::concat(std::string(path), file));
+                result.push_back(fs::path(path) / file);
             }
         }
         closedir(dp);
 
         return rust::Ok(result);
-    }
-
-    rust::Result<std::string> Context::get_cwd() const
-    {
-        constexpr static const size_t buffer_size = PATH_MAX;
-        errno = 0;
-
-        char buffer[buffer_size];
-        if (nullptr == getcwd(buffer, buffer_size)) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"getcwd\" failed: {}", error_string(errno))));
-        } else {
-            return rust::Ok(std::string(buffer));
-        }
-    }
-
-    int Context::is_exists(const std::string& path) const
-    {
-        if (0 == access(path.data(), F_OK)) {
-            return 0;
-        }
-        return ENOENT;
-    }
-
-    int Context::is_executable(const std::string& path) const
-    {
-        if (0 == access(path.data(), X_OK)) {
-            return 0;
-        }
-        if (0 == access(path.data(), F_OK)) {
-            return EACCES;
-        }
-        return ENOENT;
-    }
-
-    rust::Result<std::string> Context::real_path(const std::string& path) const
-    {
-        errno = 0;
-        if (char* result_ptr = realpath(path.data(), nullptr); result_ptr != nullptr) {
-            std::string result(result_ptr);
-            free(result_ptr);
-            return rust::Ok(result);
-        } else {
-            return rust::Err(std::runtime_error(
-                fmt::format("Could not create absolute path for \"{}\": ", path, sys::error_string(errno))));
-        }
     }
 }

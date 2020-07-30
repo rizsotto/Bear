@@ -56,8 +56,8 @@ namespace {
         ContextMock ctx;
         EXPECT_CALL(ctx, get_environment)
             .WillOnce(Return(std::map<std::string, std::string>()));
-        EXPECT_CALL(ctx, get_cwd)
-            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
+//        EXPECT_CALL(ctx, get_cwd)
+//            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
 
         auto result = er::Application::create(arguments, ctx);
 
@@ -78,8 +78,8 @@ namespace {
         ContextMock ctx;
         EXPECT_CALL(ctx, get_environment)
             .WillOnce(Return(std::map<std::string, std::string>()));
-        EXPECT_CALL(ctx, get_cwd)
-            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
+//        EXPECT_CALL(ctx, get_cwd)
+//            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
 
         auto result = er::Application::create(arguments, ctx);
 
