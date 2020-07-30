@@ -71,10 +71,10 @@ namespace {
             });
     }
 
-    void update_run_with_started(report::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_started(report::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, even: start]", source.pid());
-        report::Execution::Event event = report::Execution::Event {
+        auto event = report::Event {
             "started",
             source.timestamp(),
             std::nullopt,
@@ -83,10 +83,10 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_signaled(report::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_signaled(report::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: signal]", source.pid());
-        report::Execution::Event event = report::Execution::Event {
+        auto event = report::Event {
             "signaled",
             source.timestamp(),
             std::nullopt,
@@ -95,10 +95,10 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_terminated(report::Execution::Run& target, const supervise::Event& source)
+    void update_run_with_terminated(report::Run& target, const supervise::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: stop]", source.pid());
-        report::Execution::Event event = report::Execution::Event {
+        auto event = report::Event {
             "terminated",
             source.timestamp(),
             { source.terminated().status() },
@@ -126,16 +126,16 @@ namespace {
     {
         const auto& started = source.started();
 
-        auto command = report::Execution::Command {
+        auto command = report::Command {
             started.executable(),
             to_list(started.arguments()),
             started.working_dir(),
             to_map(started.environment())
         };
-        auto run = report::Execution::Run {
+        auto run = report::Run {
             to_optional(source.pid()).value_or(0),
             to_optional(source.ppid()),
-            std::list<report::Execution::Event>()
+            std::list<report::Event>()
         };
         update_run_with_started(run, source);
 

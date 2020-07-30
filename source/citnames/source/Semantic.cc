@@ -55,7 +55,7 @@ namespace cs {
         return result;
     }
 
-    rust::Result<output::Entries> Semantic::recognize(const report::Execution::Command& command) const
+    rust::Result<output::Entries> Semantic::recognize(const report::Command& command) const
     {
         // check if any tool can recognize the command.
         for (const auto& tool : tools_) {

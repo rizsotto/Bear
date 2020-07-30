@@ -370,7 +370,7 @@ namespace {
         return flags;
     }
 
-    rust::Result<CompilerFlags> parse(const report::Execution::Command &command)
+    rust::Result<CompilerFlags> parse(const report::Command &command)
     {
         auto parser = parser::Any(
                 parser::KindOfOutputFlagMatcher(),
@@ -510,7 +510,7 @@ namespace cs {
             , paths(std::move(paths))
     { }
 
-    rust::Result<output::Entries> GnuCompilerCollection::recognize(const report::Execution::Command &command) const {
+    rust::Result<output::Entries> GnuCompilerCollection::recognize(const report::Command &command) const {
         const bool match_compiler_name =
                 (std::find(paths.begin(), paths.end(), command.program) != paths.end())
                 || match_gcc_name(command.program);

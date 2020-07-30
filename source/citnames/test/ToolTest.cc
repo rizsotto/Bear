@@ -24,7 +24,7 @@
 namespace {
 
     TEST(GnuCompilerCollection, fails_on_empty) {
-        report::Execution::Command input = {};
+        report::Command input = {};
 
         cs::GnuCompilerCollection sut({});
 
@@ -32,7 +32,7 @@ namespace {
     }
 
     TEST(GnuCompilerCollection, simple) {
-        report::Execution::Command input = {
+        report::Command input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "-o", "source.o", "source.c"},
                 "/home/user/project",
@@ -54,7 +54,7 @@ namespace {
     }
 
     TEST(GnuCompilerCollection, pass_on_help) {
-        report::Execution::Command input = {
+        report::Command input = {
                 "/usr/bin/gcc",
                 {"gcc", "--version"},
                 "/home/user/project",
@@ -70,7 +70,7 @@ namespace {
     }
 
     TEST(GnuCompilerCollection, simple_with_C_PATH) {
-        report::Execution::Command input = {
+        report::Command input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "source.c"},
                 "/home/user/project",
@@ -101,7 +101,7 @@ namespace {
     }
 
     TEST(GnuCompilerCollection, simple_where_compiler_from_env) {
-        report::Execution::Command input = {
+        report::Command input = {
                 "/usr/bin/wrapper",
                 {"wrapper", "-c", "source.c"},
                 "/home/user/project",

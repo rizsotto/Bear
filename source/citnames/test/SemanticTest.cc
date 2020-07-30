@@ -69,40 +69,40 @@ namespace {
                 report::Context { "session", {} },
                 {
                         report::Execution {
-                                report::Execution::Command {
+                                report::Command {
                                         "/usr/bin/cc",
                                         { "cc", "--version" },
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Execution::Run { 1, std::nullopt, {} }
+                                report::Run { 1, std::nullopt, {} }
                         },
                         report::Execution {
-                                report::Execution::Command {
+                                report::Command {
                                         "/usr/bin/ls",
                                         { "ls", "-la" },
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Execution::Run { 1, std::nullopt, {} }
+                                report::Run { 1, std::nullopt, {} }
                         },
                         report::Execution {
-                                report::Execution::Command {
+                                report::Command {
                                         "/usr/bin/cc",
                                         { "cc", "-c", "-Wall", "source.c" },
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Execution::Run { 1, std::nullopt, {} }
+                                report::Run { 1, std::nullopt, {} }
                         },
                         report::Execution {
-                                report::Execution::Command {
+                                report::Command {
                                         "/usr/bin/c++",
                                         { "c++", "-c", "-Wall", "source.cc" },
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Execution::Run { 1, std::nullopt, {} }
+                                report::Run { 1, std::nullopt, {} }
                         },
                 }
         };

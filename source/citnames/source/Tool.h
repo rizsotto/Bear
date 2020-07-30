@@ -40,14 +40,14 @@ namespace cs {
         // Can return an optional with an empty list, which says that it was
         // recognized the tool execution, but the execution was not a compilation.
         [[nodiscard]]
-        virtual rust::Result<output::Entries> recognize(const report::Execution::Command &) const = 0;
+        virtual rust::Result<output::Entries> recognize(const report::Command &) const = 0;
     };
 
     struct GnuCompilerCollection : public Tool {
         explicit GnuCompilerCollection(std::list<std::string> paths);
 
         [[nodiscard]]
-        rust::Result<output::Entries> recognize(const report::Execution::Command &command) const override;
+        rust::Result<output::Entries> recognize(const report::Command &command) const override;
 
     protected:
         std::list<std::string> paths;

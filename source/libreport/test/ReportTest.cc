@@ -32,34 +32,34 @@ namespace {
             report::Context { "session", { { "key", "value" } } },
             {
                 report::Execution {
-                    report::Execution::Command {
+                    report::Command {
                         "/usr/bin/ls",
                         { "ls" },
                         "/home/user",
                         { { "HOME", "/home/user" }, { "PATH", "/usr/bin:/usr/local/bin" } } },
-                    report::Execution::Run {
+                    report::Run {
                         42 ,
                         { 12 },
                         {
-                            report::Execution::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
-                            report::Execution::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 15 } },
-                            report::Execution::Event {"terminated", "2020-04-04T07:13:47.074Z", { 0 }, std::nullopt }
+                            report::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
+                            report::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 15 } },
+                            report::Event {"terminated", "2020-04-04T07:13:47.074Z", { 0 }, std::nullopt }
                         }
                     }
                 },
                 report::Execution {
-                    report::Execution::Command {
+                    report::Command {
                         "/usr/bin/ls",
                         { "ls", "-l" },
                         "/home/user",
                         { { "HOME", "/home/user" }, { "PATH", "/usr/bin:/usr/local/bin" } } },
-                    report::Execution::Run {
+                    report::Run {
                         43 ,
                         { },
                         {
-                            report::Execution::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
-                            report::Execution::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 17 } },
-                            report::Execution::Event {"terminated", "2020-04-04T07:13:47.074Z", { 8 }, std::nullopt }
+                            report::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
+                            report::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 17 } },
+                            report::Event {"terminated", "2020-04-04T07:13:47.074Z", { 8 }, std::nullopt }
                         }
                     }
                 }

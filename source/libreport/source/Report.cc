@@ -28,7 +28,7 @@ using json = nlohmann::json;
 
 namespace report {
 
-    void to_json(json& j, const Execution::Command& rhs)
+    void to_json(json& j, const Command& rhs)
     {
         j = json {
             { "program", rhs.program },
@@ -38,7 +38,7 @@ namespace report {
         };
     }
 
-    void from_json(const json& j, Execution::Command& rhs)
+    void from_json(const json& j, Command& rhs)
     {
         j.at("program").get_to(rhs.program);
         j.at("arguments").get_to(rhs.arguments);
@@ -46,7 +46,7 @@ namespace report {
         j.at("environment").get_to(rhs.environment);
     }
 
-    void to_json(json& j, const Execution::Event& rhs)
+    void to_json(json& j, const Event& rhs)
     {
         j = json {
             { "at", rhs.at },
@@ -60,7 +60,7 @@ namespace report {
         }
     }
 
-    void from_json(const json& j, Execution::Event& rhs)
+    void from_json(const json& j, Event& rhs)
     {
         j.at("at").get_to(rhs.at);
         j.at("type").get_to(rhs.type);
@@ -78,7 +78,7 @@ namespace report {
         }
     }
 
-    void to_json(json& j, const Execution::Run& rhs)
+    void to_json(json& j, const Run& rhs)
     {
         j["pid"] = rhs.pid;
         j["events"] = json(rhs.events);
@@ -87,7 +87,7 @@ namespace report {
         }
     }
 
-    void from_json(const json& j, Execution::Run& rhs)
+    void from_json(const json& j, Run& rhs)
     {
         j.at("pid").get_to(rhs.pid);
         j.at("events").get_to(rhs.events);
@@ -182,7 +182,7 @@ namespace report {
         }
     }
 
-    bool operator==(const Execution::Command& lhs, const Execution::Command& rhs)
+    bool operator==(const Command& lhs, const Command& rhs)
     {
         return (lhs.program == rhs.program)
                && (lhs.arguments == rhs.arguments)
@@ -190,7 +190,7 @@ namespace report {
                && (lhs.environment == rhs.environment);
     }
 
-    bool operator==(const Execution::Event& lhs, const Execution::Event& rhs)
+    bool operator==(const Event& lhs, const Event& rhs)
     {
         return (lhs.at == rhs.at)
                && (lhs.type == rhs.type)
@@ -198,7 +198,7 @@ namespace report {
                && (lhs.signal == rhs.signal);
     }
 
-    bool operator==(const Execution::Run& lhs, const Execution::Run& rhs)
+    bool operator==(const Run& lhs, const Run& rhs)
     {
         return (lhs.pid == rhs.pid)
                && (lhs.ppid == rhs.ppid)

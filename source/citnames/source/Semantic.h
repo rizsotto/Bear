@@ -39,7 +39,7 @@ namespace cs {
         output::Entries transform(const report::Report& report) const;
 
         [[nodiscard]]
-        rust::Result<output::Entries> recognize(const report::Execution::Command& command) const;
+        rust::Result<output::Entries> recognize(const report::Command& command) const;
 
         [[nodiscard]]
         bool filter(const output::Entry&) const;
