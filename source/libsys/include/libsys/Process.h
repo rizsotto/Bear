@@ -22,12 +22,15 @@
 #include "config.h"
 #include "libresult/Result.h"
 
+#include <filesystem>
 #include <list>
 #include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unistd.h>
+
+namespace fs = std::filesystem;
 
 namespace sys {
 
@@ -38,10 +41,14 @@ namespace sys {
         ExitStatus() = delete ;
         ~ExitStatus() noexcept = default;
 
+        [[nodiscard]]
         std::optional<int> code() const;
+        [[nodiscard]]
         std::optional<int> signal() const;
 
+        [[nodiscard]]
         bool is_signaled() const;
+        [[nodiscard]]
         bool is_exited() const;
 
     private:
@@ -53,12 +60,15 @@ namespace sys {
     public:
         class Builder;
 
-        [[nodiscard]] pid_t get_pid() const;
+        [[nodiscard]]
+        pid_t get_pid() const;
 
         rust::Result<ExitStatus> wait(bool request_for_signals = false);
         rust::Result<int> kill(int num);
 
     public:
+        explicit Process(pid_t pid);
+
         Process() = delete;
         ~Process() = default;
 
@@ -69,16 +79,12 @@ namespace sys {
         Process& operator=(Process&&) noexcept = default;
 
     private:
-        friend Builder;
-        explicit Process(pid_t pid);
-
         pid_t pid_;
     };
 
     class Process::Builder {
     public:
-        explicit Builder(std::string program);
-        explicit Builder(const std::string_view& program);
+        explicit Builder(fs::path program);
         ~Builder() = default;
 
         Builder& add_argument(const char* param);
@@ -97,34 +103,20 @@ namespace sys {
         Builder& set_environment(std::map<std::string, std::string>&&);
         Builder& set_environment(const std::map<std::string, std::string>&);
 
-        // This is hard to implement and not used in this project.
+        // These are not used in this project.
         //Builder& set_working_dir(const std::string&);
 
         //Builder& set_std_in(int fd);
         //Builder& set_std_out(int fd);
         //Builder& set_std_err(int fd);
 
-        rust::Result<std::string> resolve_executable();
+        rust::Result<fs::path> resolve_executable();
 
         rust::Result<Process> spawn();
 
 #ifdef SUPPORT_PRELOAD
         rust::Result<Process> spawn_with_preload();
 #endif
-
-        // This is hard to implement and not used in this project.
-        //rust::Result<std::string> output();
-        //rust::Result<int> status();
-
-    public:
-        using spawn_function_t = std::function<
-            rust::Result<pid_t>(
-                const char* path,
-                char* const argv[],
-                char* const envp[])>;
-
-    private:
-        rust::Result<Process> spawn_process(spawn_function_t fp);
 
     public:
         Builder(const Builder&) = default;
@@ -134,7 +126,7 @@ namespace sys {
         Builder& operator=(Builder&&) noexcept = default;
 
     private:
-        std::string program_;
+        fs::path program_;
         std::list<std::string> parameters_;
         std::map<std::string, std::string> environment_;
     };

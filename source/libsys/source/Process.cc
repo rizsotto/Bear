@@ -49,6 +49,24 @@
 
 namespace {
 
+    struct Arguments {
+        const std::list<std::string>& value;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    {
+        os << '[';
+        for (auto it = arguments.value.begin(); it != arguments.value.end(); ++it) {
+            if (it != arguments.value.begin()) {
+                os << ", ";
+            }
+            os << *it;
+        }
+        os << ']';
+
+        return os;
+    }
+
     using posix_spawn_t = int (*)(
         pid_t * pid,
         const char* path,
@@ -57,7 +75,11 @@ namespace {
         char* const argv[],
         char* const envp[]);
 
-    using spawn_function_t = sys::Process::Builder::spawn_function_t;
+    using spawn_function_t = std::function<
+        rust::Result<pid_t>(
+            const char* path,
+            char* const argv[],
+            char* const envp[])>;
 
     rust::Result<spawn_function_t> reference_spawn_function()
     {
@@ -131,13 +153,13 @@ namespace {
                : rust::Result<fs::path>(rust::Ok(result));
     }
 
-    std::runtime_error could_not_find(const std::string& name, const int error)
+    std::runtime_error could_not_find(const fs::path& name, const int error)
     {
         return std::runtime_error(
-                fmt::format("Could not find executable: {} ({})", name, sys::error_string(error)));
+                fmt::format("Could not find executable: {} ({})", name.c_str(), sys::error_string(error)));
     }
 
-    rust::Result<std::string> check_executable(const fs::path& path)
+    rust::Result<fs::path> check_executable(const fs::path& path)
     {
         // Check if we can get the relpath of this file
         std::error_code error_code;
@@ -147,15 +169,12 @@ namespace {
         }
         // Check if the file is executable.
         return (0 == access(result.c_str(), X_OK))
-                ? rust::Result<std::string>(rust::Ok(result.string()))
-                : rust::Result<std::string>(rust::Err(could_not_find(result.string(), EACCES)));
+                ? rust::Result<fs::path>(rust::Ok(result))
+                : rust::Result<fs::path>(rust::Err(could_not_find(result, EACCES)));
     }
 
-    rust::Result<std::string> resolve_executable(const std::string& name)
+    rust::Result<fs::path> resolve_executable(const fs::path& name)
     {
-        // TODO: inject this!
-        sys::Context ctx;
-
         // If the requested program name contains a separator, then we need to use
         // that as is. Otherwise we need to search the paths given.
         if (contains_separator(name)) {
@@ -166,18 +185,49 @@ namespace {
                 ? rust::Ok(fs::path(name))
                 : get_cwd().map<fs::path>([&name](auto cwd) { return cwd  / name; });
 
-            return path.and_then<std::string>([](auto path) { return check_executable(path); });
+            return path.and_then<fs::path>([](auto path) { return check_executable(path); });
         } else {
+            sys::Context ctx;
             return ctx.get_path()
-                .and_then<std::string>([&name](const auto& directories) {
+                .and_then<fs::path>([&name](const auto& directories) {
                     for (const auto& directory : directories) {
                         if (auto result = check_executable(directory / name); result.is_ok()) {
                             return result;
                         }
                     }
-                    return rust::Result<std::string>(rust::Err(could_not_find(name, ENOENT)));
+                    return rust::Result<fs::path>(rust::Err(could_not_find(name, ENOENT)));
                 });
         }
+    }
+
+    rust::Result<sys::Process> spawn_process(
+            spawn_function_t fp,
+            const fs::path& program,
+            const std::list<std::string>& parameters,
+            const std::map<std::string, std::string>& environment)
+    {
+        return resolve_executable(program)
+                .and_then<pid_t>([&parameters, &environment, &fp](const auto& path) {
+                    // convert the arguments into a c-style array
+                    std::vector<char*> args;
+                    std::transform(parameters.begin(), parameters.end(),
+                                   std::back_insert_iterator(args),
+                                   [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
+                    args.push_back(nullptr);
+                    // convert the environment into a c-style array
+                    sys::env::Guard env(environment);
+
+                    return fp(path.c_str(), args.data(), const_cast<char**>(env.data()));
+                })
+                .map<sys::Process>([](const auto& pid) {
+                    return sys::Process(pid);
+                })
+                .on_success([&parameters](const auto& process) {
+                    spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), Arguments { parameters });
+                })
+                .on_error([](const auto& error) {
+                    spdlog::debug("Process spawn failed. {}", error.what());
+                });
     }
 
     rust::Result<sys::ExitStatus> wait_for(pid_t pid, bool request_for_signals)
@@ -211,24 +261,6 @@ namespace {
             auto message = fmt::format("System call \"kill\" failed: {}", sys::error_string(errno));
             return rust::Err(std::runtime_error(message));
         }
-    }
-
-    struct Arguments {
-        const std::list<std::string>& value;
-    };
-
-    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
-    {
-        os << '[';
-        for (auto it = arguments.value.begin(); it != arguments.value.end(); ++it) {
-            if (it != arguments.value.begin()) {
-                os << ", ";
-            }
-            os << *it;
-        }
-        os << ']';
-
-        return os;
     }
 }
 
@@ -294,15 +326,8 @@ namespace sys {
             });
     }
 
-    Process::Builder::Builder(std::string program)
+    Process::Builder::Builder(fs::path program)
         : program_(std::move(program))
-        , parameters_()
-        , environment_()
-    {
-    }
-
-    Process::Builder::Builder(const std::string_view& program)
-        : program_(std::string(program))
         , parameters_()
         , environment_()
     {
@@ -338,7 +363,7 @@ namespace sys {
         return *this;
     }
 
-    rust::Result<std::string> Process::Builder::resolve_executable()
+    rust::Result<fs::path> Process::Builder::resolve_executable()
     {
         return ::resolve_executable(program_);
     }
@@ -347,7 +372,7 @@ namespace sys {
     {
         return reference_spawn_function()
             .and_then<Process>([this](auto fp) {
-                return spawn_process(fp);
+                return spawn_process(fp, program_, parameters_, environment_);
             });
     }
 
@@ -356,34 +381,8 @@ namespace sys {
     {
         return resolve_spawn_function()
             .and_then<Process>([this](auto fp) {
-                return spawn_process(fp);
+                return spawn_process(fp, program_, parameters_, environment_);
             });
     }
 #endif
-
-    rust::Result<sys::Process> Process::Builder::spawn_process(spawn_function_t fp)
-    {
-        return ::resolve_executable(program_)
-            .and_then<pid_t>([this, &fp](const auto& path) {
-                // convert the arguments into a c-style array
-                std::vector<char*> args;
-                std::transform(parameters_.begin(), parameters_.end(),
-                               std::back_insert_iterator(args),
-                               [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
-                args.push_back(nullptr);
-                // convert the environment into a c-style array
-                sys::env::Guard env(environment_);
-
-                return fp(path.c_str(), args.data(), const_cast<char**>(env.data()));
-            })
-            .map<sys::Process>([](const auto& pid) {
-                return Process(pid);
-            })
-            .on_success([this](const auto& process) {
-                spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), Arguments { parameters_ });
-            })
-            .on_error([](const auto& error) {
-                spdlog::debug("Process spawn failed. {}", error.what());
-            });
-    }
 }
