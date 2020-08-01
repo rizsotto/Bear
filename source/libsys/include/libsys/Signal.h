@@ -27,8 +27,8 @@ namespace sys {
 
     class SignalForwarder {
     public:
-        explicit SignalForwarder(Process* child);
-        ~SignalForwarder();
+        explicit SignalForwarder(Process& child);
+        ~SignalForwarder() noexcept;
 
     public:
         SignalForwarder() = delete;

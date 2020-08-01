@@ -46,16 +46,16 @@ namespace {
 
 namespace sys {
 
-    SignalForwarder::SignalForwarder(Process* child)
+    SignalForwarder::SignalForwarder(Process& child)
             : handlers_()
     {
-        CHILD_PROCESS = child;
+        CHILD_PROCESS = &child;
         for (int signum = 1; signum < NSIG; ++signum) {
             handlers_[signum] = signal(signum, &handler);
         }
     }
 
-    SignalForwarder::~SignalForwarder()
+    SignalForwarder::~SignalForwarder() noexcept
     {
         CHILD_PROCESS = nullptr;
         for (int signum = 1; signum < NSIG; ++signum) {

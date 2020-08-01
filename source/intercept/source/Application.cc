@@ -39,7 +39,7 @@ namespace {
                 return builder.spawn();
             })
             .and_then<sys::ExitStatus>([](auto child) {
-                sys::SignalForwarder guard(&child);
+                sys::SignalForwarder guard(child);
                 return child.wait();
             })
             .map<int>([](auto status) {

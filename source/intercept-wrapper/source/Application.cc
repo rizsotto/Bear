@@ -183,7 +183,7 @@ namespace wr {
                     });
             })
             .and_then<sys::ExitStatus>([&client](auto child) {
-                sys::SignalForwarder guard(&child);
+                sys::SignalForwarder guard(child);
                 while (true) {
                     auto status = child.wait(true);
                     status.on_success([&client, &child](auto exit) {
