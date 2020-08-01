@@ -26,6 +26,11 @@
 #include "libsys/Context.h"
 #include "librpc/supervise.pb.h"
 
+#include <filesystem>
+#include <memory>
+
+namespace fs = std::filesystem;
+
 namespace ic {
 
     // Responsible to collect executions and persist them into an output file.
@@ -54,7 +59,7 @@ namespace ic {
         [[nodiscard]] report::Report makeReport() const;
 
     private:
-        std::string output_;
+        fs::path output_;
         report::Context context_;
         std::map<pid_t, report::Execution> executions_;
     };

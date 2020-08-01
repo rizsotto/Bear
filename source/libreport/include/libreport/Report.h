@@ -21,6 +21,7 @@
 
 #include "libresult/Result.h"
 
+#include <filesystem>
 #include <list>
 #include <map>
 #include <memory>
@@ -28,15 +29,17 @@
 #include <string>
 #include <iostream>
 
+namespace fs = std::filesystem;
+
 namespace report {
 
     // This represents the executed command itself. Describes all the
     // context that the caller was given. And these are the those parameters
     // which are essential for re-run the command.
     struct Command {
-        std::string program;
+        fs::path program;
         std::list<std::string> arguments;
-        std::string working_dir;
+        fs::path working_dir;
         std::map<std::string, std::string> environment;
     };
 
@@ -104,10 +107,10 @@ namespace report {
         virtual ~ReportSerializer() noexcept = default;
 
         // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const char* file, const Report& rhs) const;
+        virtual rust::Result<int> to_json(const fs::path&, const Report& rhs) const;
         virtual rust::Result<int> to_json(std::ostream& ostream, const Report& rhs) const;
 
-        virtual rust::Result<Report> from_json(const char* file) const;
+        virtual rust::Result<Report> from_json(const fs::path&) const;
         virtual rust::Result<Report> from_json(std::istream& istream) const;
     };
 }

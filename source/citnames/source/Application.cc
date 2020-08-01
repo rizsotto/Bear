@@ -29,11 +29,13 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+namespace fs = std::filesystem;
+
 namespace {
 
     struct Arguments {
-        std::string input;
-        std::string output;
+        fs::path input;
+        fs::path output;
         bool append;
         bool run_check;
     };
@@ -49,8 +51,8 @@ namespace {
                 .map<Arguments>([&append, &run_check](auto tuple) {
                     const auto& [input, output] = tuple;
                     return Arguments {
-                        std::string(input),
-                        std::string(output),
+                        fs::path(input),
+                        fs::path(output),
                         append,
                         run_check
                     };
@@ -101,7 +103,7 @@ namespace cs {
     rust::Result<int> Application::operator()() const
     {
         // get current compilations from the input.
-        return impl_->report_serializer.from_json(impl_->arguments.input.c_str())
+        return impl_->report_serializer.from_json(impl_->arguments.input)
             .map<output::Entries>([this](auto commands) {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 return impl_->semantic.transform(commands);

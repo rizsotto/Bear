@@ -177,7 +177,7 @@ namespace report {
     }
 
 
-    rust::Result<int> ReportSerializer::to_json(const char* file, const Report& rhs) const
+    rust::Result<int> ReportSerializer::to_json(const fs::path& file, const Report& rhs) const
     {
         try {
             std::ofstream target(file);
@@ -199,7 +199,7 @@ namespace report {
         }
     }
 
-    rust::Result<Report> ReportSerializer::from_json(const char* file) const
+    rust::Result<Report> ReportSerializer::from_json(const fs::path& file) const
     {
         try {
             std::ifstream source(file);

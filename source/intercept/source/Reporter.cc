@@ -191,7 +191,7 @@ namespace ic {
     void Reporter::flush()
     {
         report::ReportSerializer serializer;
-        serializer.to_json(output_.c_str(), makeReport())
+        serializer.to_json(output_, makeReport())
             .on_error([this](auto error) {
                 spdlog::warn("Writing output file \"{}\" failed with: {}", output_, error.what());
             });

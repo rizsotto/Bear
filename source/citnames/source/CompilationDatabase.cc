@@ -50,7 +50,7 @@ namespace cs::output {
         return json;
     }
 
-    rust::Result<int> CompilationDatabase::to_json(const char *file, const Entries &entries) const
+    rust::Result<int> CompilationDatabase::to_json(const fs::path& file, const Entries &entries) const
     {
         try {
             std::ofstream target(file);
@@ -133,7 +133,7 @@ namespace cs::output {
         }
     }
 
-    rust::Result<Entries> CompilationDatabase::from_json(const char *file) const
+    rust::Result<Entries> CompilationDatabase::from_json(const fs::path& file) const
     {
         try {
             std::ifstream source(file);

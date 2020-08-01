@@ -21,6 +21,7 @@
 #include "libresult/Result.h"
 #include "libsys/Path.h"
 
+#include <filesystem>
 #include <iterator>
 #include <regex>
 #include <set>
@@ -29,6 +30,7 @@
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
 
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -433,19 +435,21 @@ namespace {
         return true;
     }
 
-    std::optional<std::string> source_file(const CompilerFlag& flag, const std::string& working_dir)
+    std::optional<fs::path> source_file(const CompilerFlag& flag, const fs::path& working_dir)
     {
-        // TODO: check if source file is exists
-        return (flag.type != CompilerFlagType::SOURCE)
-               ? std::optional<std::string>()
-               : (fs::path(flag.arguments.front()).is_absolute())
-                       ? std::make_optional(flag.arguments.front())
-                       : std::make_optional((fs::path(working_dir) / flag.arguments.front()).string());
+        if (flag.type == CompilerFlagType::SOURCE) {
+            auto source = fs::path(flag.arguments.front());
+            // TODO: check if source file is exists
+            return (source.is_absolute())
+                    ? std::make_optional(source)
+                    : std::make_optional(working_dir / source);
+        }
+        return std::optional<fs::path>();
     }
 
-    std::list<std::string> source_files(const CompilerFlags& flags, const std::string& working_dir)
+    std::list<fs::path> source_files(const CompilerFlags& flags, const fs::path& working_dir)
     {
-        std::list<std::string> result;
+        std::list<fs::path> result;
         for (const auto& flag : flags) {
             if (auto source = source_file(flag, working_dir); source) {
                 result.push_back(source.value());
@@ -454,26 +458,26 @@ namespace {
         return result;
     }
 
-    std::optional<std::string> output_file(const CompilerFlag& flag, const std::string& working_dir)
+    std::optional<fs::path> output_file(const CompilerFlag& flag, const fs::path& working_dir)
     {
         if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) && (flag.arguments.size() == 2)) {
-            auto output = flag.arguments.back();
-            return (fs::path(output).is_absolute())
+            auto output = fs::path(flag.arguments.back());
+            return (output.is_absolute())
                    ? std::make_optional(output)
-                   : std::make_optional((fs::path(working_dir) / output).string());
+                   : std::make_optional(working_dir / output);
         }
-        return std::optional<std::string>();
+        return std::optional<fs::path>();
     }
 
-    std::optional<std::string> output_files(const CompilerFlags& flags, const std::string& working_dir)
+    std::optional<fs::path> output_files(const CompilerFlags& flags, const fs::path& working_dir)
     {
-        std::list<std::string> result;
+        std::list<fs::path> result;
         for (const auto& flag : flags) {
             if (auto output = output_file(flag, working_dir); output) {
                 return output;
             }
         }
-        return std::optional<std::string>();
+        return std::optional<fs::path>();
     }
 
     Arguemnts filter_arguments(const CompilerFlags& flags)

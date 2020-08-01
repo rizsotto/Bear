@@ -22,17 +22,20 @@
 #include "Configuration.h"
 #include "libresult/Result.h"
 
+#include <filesystem>
 #include <iosfwd>
 #include <list>
 #include <optional>
 #include <string>
 
+namespace fs = std::filesystem;
+
 namespace cs::output {
 
     struct Entry {
-        std::string file;
-        std::string directory;
-        std::optional<std::string> output;
+        fs::path file;
+        fs::path directory;
+        std::optional<fs::path> output;
         std::list<std::string> arguments;
     };
 
@@ -53,10 +56,10 @@ namespace cs::output {
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const char *file, const Entries &entries) const;
+        virtual rust::Result<int> to_json(const fs::path& file, const Entries &entries) const;
         virtual rust::Result<int> to_json(std::ostream &ostream, const Entries &entries) const;
 
-        virtual rust::Result<Entries> from_json(const char *file) const;
+        virtual rust::Result<Entries> from_json(const fs::path& file) const;
         virtual rust::Result<Entries> from_json(std::istream &istream) const;
 
     private:
