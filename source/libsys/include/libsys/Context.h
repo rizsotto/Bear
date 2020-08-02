@@ -36,9 +36,6 @@ namespace sys {
         // Query methods about the process.
         [[nodiscard]] virtual std::map<std::string, std::string> get_environment() const;
 
-        [[nodiscard]] virtual pid_t get_pid() const;
-        [[nodiscard]] virtual pid_t get_ppid() const;
-
         // Query methods about the system.
         [[nodiscard]] virtual rust::Result<std::string> get_confstr(int key) const;
         [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> get_uname() const;

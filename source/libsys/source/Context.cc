@@ -45,16 +45,6 @@ namespace sys {
         return sys::env::from(const_cast<const char**>(environ));
     }
 
-    pid_t Context::get_pid() const
-    {
-        return getpid();
-    }
-
-    pid_t Context::get_ppid() const
-    {
-        return getppid();
-    }
-
     rust::Result<std::string> Context::get_confstr(const int key) const
     {
 #ifdef HAVE_CONFSTR

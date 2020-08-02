@@ -31,16 +31,6 @@ public:
         (),
         (const, override));
     MOCK_METHOD(
-        pid_t,
-        get_pid,
-        (),
-        (const, override));
-    MOCK_METHOD(
-        pid_t,
-        get_ppid,
-        (),
-        (const, override));
-    MOCK_METHOD(
         rust::Result<std::string>,
         get_confstr,
         (int key),

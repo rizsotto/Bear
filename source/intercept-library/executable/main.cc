@@ -31,6 +31,7 @@
 
 #include <iostream>
 #include <optional>
+#include <unistd.h>
 
 namespace {
 
@@ -69,7 +70,7 @@ int main(int argc, char* argv[], char* envp[])
         // log the original command line as it was received.
         .on_success([&ctx, &argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
-                spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", ctx.get_pid(), ctx.get_ppid()));
+                spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
                 spdlog::set_level(spdlog::level::debug);
             }
             spdlog::debug("arguments raw: {}", Arguments { argv });
