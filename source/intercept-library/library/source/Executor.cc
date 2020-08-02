@@ -32,6 +32,9 @@
 #include <functional>
 #include <unistd.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
 namespace {
 
     constexpr char PATH_SEPARATOR = ':';
@@ -441,3 +444,5 @@ namespace el {
         return execute_from_search_path(resolver_, search_path, file, fp);
     }
 }
+
+#pragma GCC diagnostic pop

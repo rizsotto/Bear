@@ -88,7 +88,7 @@ namespace el {
         template <typename T>
         constexpr bool equal_n(T* const lhs, T* const rhs, const size_t length) noexcept
         {
-            for (int idx = 0; idx < length; ++idx) {
+            for (size_t idx = 0; idx < length; ++idx) {
                 if (lhs[idx] != rhs[idx])
                     return false;
             }

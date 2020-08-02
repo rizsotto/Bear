@@ -67,7 +67,7 @@ namespace {
             })
 #endif
             .map_err<std::runtime_error>([](auto error) {
-                return std::runtime_error("failed to get host info.");
+                return std::runtime_error(fmt::format("failed to get host info: {}", error.what()));
             });
     }
 

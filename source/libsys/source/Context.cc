@@ -45,6 +45,9 @@ namespace sys {
         return sys::env::from(const_cast<const char**>(environ));
     }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
     rust::Result<std::string> Context::get_confstr(const int key) const
     {
 #ifdef HAVE_CONFSTR
@@ -61,6 +64,8 @@ namespace sys {
 #error confstr is not found
 #endif
     }
+
+#pragma GCC diagnostic pop
 
     rust::Result<std::map<std::string, std::string>> Context::get_uname() const
     {

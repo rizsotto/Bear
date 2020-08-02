@@ -67,7 +67,7 @@ namespace {
                 EXPECT_EQ(expected_separator, separator.unwrap_or({}));
                 return 0;
             })
-            .map_err<int>([](auto error) {
+            .map_err<int>([](auto) {
                 EXPECT_FALSE(true);
                 return 0;
             });
@@ -98,7 +98,7 @@ namespace {
 
                 return 0;
             })
-            .map_err<int>([](auto error) {
+            .map_err<int>([](auto) {
                 EXPECT_FALSE(true);
                 return 0;
             });
@@ -113,7 +113,7 @@ namespace {
             { { HELP, { 0, false, "this message", std::nullopt, std::nullopt } },
                 { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
-            .map<int>([](auto params) {
+            .map<int>([](auto) {
                 EXPECT_FALSE(true);
                 return 0;
             })
@@ -134,7 +134,7 @@ namespace {
                 { FLAG, { 0, false, "a single flag", std::nullopt, std::nullopt } },
                 { OPTIONS, { 3, false, "a flag with 3 values", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
-            .map<int>([](auto params) {
+            .map<int>([](auto) {
                 EXPECT_FALSE(true);
                 return 0;
             })
@@ -155,7 +155,7 @@ namespace {
                 { OPTION, { 1, true, "a flag with 1 value", std::nullopt, std::nullopt } },
                 { OPTIONS, { 2, false, "a flag with 2 values", std::nullopt, std::nullopt } } });
         parser.parse(argc, const_cast<const char**>(argv))
-            .map<int>([](auto params) {
+            .map<int>([](auto) {
                 EXPECT_FALSE(true);
                 return 0;
             })

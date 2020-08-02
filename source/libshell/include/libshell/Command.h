@@ -47,7 +47,7 @@ namespace sh {
     // * $
     // * `
     // * "
-    // * \
+    // * backslash
     // * newline
     //
     // The pipe character has no special meaning.

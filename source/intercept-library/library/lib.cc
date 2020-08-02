@@ -154,6 +154,9 @@ extern "C" int exect(const char* path, char* const argv[], char* const envp[])
     return result.return_value;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
 extern "C" int execl(const char* path, const char* arg, ...)
 {
     LOGGER.debug("execl path: ", path);
@@ -220,6 +223,8 @@ extern "C" int execle(const char* path, const char* arg, ...)
     errno = result.error_code;
     return result.return_value;
 }
+
+#pragma GCC diagnostic pop
 
 extern "C" int posix_spawn(pid_t* pid, const char* path,
     const posix_spawn_file_actions_t* file_actions,

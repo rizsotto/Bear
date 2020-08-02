@@ -29,7 +29,7 @@ namespace ic {
     {
     }
 
-    ::grpc::Status SupervisorImpl::Update(::grpc::ServerContext* context, const ::supervise::Environment* request, ::supervise::Environment* response)
+    ::grpc::Status SupervisorImpl::Update(::grpc::ServerContext*, const ::supervise::Environment* request, ::supervise::Environment* response)
     {
         const std::map<std::string, std::string> copy(request->values().begin(), request->values().end());
         return session_.update(copy)
@@ -40,7 +40,7 @@ namespace ic {
             .unwrap_or(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "environment update failed"));
     }
 
-    ::grpc::Status SupervisorImpl::ResolveProgram(::grpc::ServerContext* context, const ::supervise::ResolveRequest* request, ::supervise::ResolveResponse* response)
+    ::grpc::Status SupervisorImpl::ResolveProgram(::grpc::ServerContext*, const ::supervise::ResolveRequest* request, ::supervise::ResolveResponse* response)
     {
         return session_.resolve(request->path())
             .map<grpc::Status>([&response](auto path) {
@@ -57,7 +57,7 @@ namespace ic {
     {
     }
 
-    ::grpc::Status InterceptorImpl::Register(::grpc::ServerContext* context, const ::supervise::Event* request, ::supervise::Empty* response)
+    ::grpc::Status InterceptorImpl::Register(::grpc::ServerContext*, const ::supervise::Event* request, ::supervise::Empty*)
     {
         std::lock_guard<std::mutex> guard(lock_);
 

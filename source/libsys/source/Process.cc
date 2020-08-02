@@ -306,7 +306,7 @@ namespace sys {
     {
         spdlog::debug("Process wait requested. [pid: {}]", pid_);
         return wait_for(pid_, request_for_signals)
-            .on_success([this](const auto& result) {
+            .on_success([this](const auto&) {
                 spdlog::debug("Process wait request: done. [pid: {}]", pid_);
             })
             .on_error([this](const auto& error) {
@@ -318,7 +318,7 @@ namespace sys {
     {
         spdlog::debug("Process kill requested. [pid: {}, signum: {}]", pid_, num);
         return send_signal(pid_, num)
-            .on_success([this](const auto& result) {
+            .on_success([this](const auto&) {
                 spdlog::debug("Process kill request: done. [pid: {}]", pid_);
             })
             .on_error([this](const auto& error) {

@@ -45,17 +45,23 @@ namespace {
     TEST(result, unwrap_or_else_on_success)
     {
         EXPECT_EQ(2,
-            (Result<int, Error>(Ok(2)).unwrap_or_else([](auto error) { return 8; })));
+            (Result<int, Error>(Ok(2)).unwrap_or_else([](Error) { return 8; })));
         EXPECT_EQ('c',
-            (Result<char, Error>(Ok('c')).unwrap_or_else([](auto error) { return '+'; })));
+            (Result<char, Error>(Ok('c')).unwrap_or_else([](Error) { return '+'; })));
     }
 
     TEST(result, unwrap_or_else_on_failure)
     {
         EXPECT_EQ(8,
-            (Result<int, Error>(Err("problem")).unwrap_or_else([](auto error) { return 8; })));
+            (Result<int, Error>(Err("problem")).unwrap_or_else([](auto error) {
+                EXPECT_STREQ("problem", error);
+                return 8;
+            })));
         EXPECT_EQ('+',
-            (Result<char, Error>(Err("problem")).unwrap_or_else([](auto error) { return '+'; })));
+            (Result<char, Error>(Err("problem")).unwrap_or_else([](auto error) {
+                EXPECT_STREQ("problem", error);
+                return '+';
+            })));
     }
 
     TEST(result, map_on_success)
@@ -118,15 +124,15 @@ namespace {
     {
         EXPECT_EQ(4,
             (Result<int, Error>(Ok(2))
-                    .map_or_else<int>([](auto error) { return 9; }, [](auto& in) { return in * 2; })
+                    .map_or_else<int>([](Error) { return 9; }, [](auto& in) { return in * 2; })
                     .unwrap_or(8)));
         EXPECT_EQ(2.5f,
             (Result<int, Error>(Ok(2))
-                    .map_or_else<float>([](auto error) { return 7.8; }, [](auto& in) { return in + 0.5f; })
+                    .map_or_else<float>([](Error) { return 7.8; }, [](auto& in) { return in + 0.5f; })
                     .unwrap_or(8.0f)));
         EXPECT_EQ('d',
             (Result<char, Error>(Ok('c'))
-                    .map_or_else<int>([](auto error) { return 13; }, [](auto& in) { return in + 1; })
+                    .map_or_else<int>([](Error) { return 13; }, [](auto& in) { return in + 1; })
                     .unwrap_or(42)));
     }
 
@@ -134,11 +140,11 @@ namespace {
     {
         EXPECT_EQ(9,
             (Result<int, Error>(Err("problem"))
-                    .map_or_else<int>([](auto error) { return 9; }, [](auto& in) { return in * 2; })
+                    .map_or_else<int>([](Error) { return 9; }, [](auto& in) { return in * 2; })
                     .unwrap_or(8)));
         EXPECT_EQ('#',
             (Result<char, Error>(Err("problem"))
-                    .map_or_else<char>([](auto error) { return '#'; }, [](const char& in) { return char(in + 1); })
+                    .map_or_else<char>([](Error) { return '#'; }, [](const char& in) { return char(in + 1); })
                     .unwrap_or('+')));
     }
 
@@ -146,11 +152,11 @@ namespace {
     {
         EXPECT_EQ(2,
             (Result<int, Error>(Ok(2))
-                    .map_err<int>([](auto error) { return 9; })
+                    .map_err<int>([](Error) { return 9; })
                     .unwrap_or(8)));
         EXPECT_EQ(2.5f,
             (Result<float, Error>(Ok(2.5f))
-                    .map_err<char>([](auto error) { return '+'; })
+                    .map_err<char>([](Error) { return '+'; })
                     .unwrap_or(8.0f)));
     }
 
@@ -158,11 +164,17 @@ namespace {
     {
         EXPECT_EQ(8,
             (Result<int, Error>(Err("problem"))
-                    .map_err<int>([](auto error) { return 9; })
+                    .map_err<int>([](auto error) {
+                        EXPECT_STREQ("problem", error);
+                        return 9;
+                    })
                     .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
-                    .map_err<char>([](auto error) { return '#'; })
+                    .map_err<char>([](auto error) {
+                        EXPECT_STREQ("problem", error);
+                        return '#';
+                    })
                     .unwrap_or('+')));
     }
 
@@ -218,11 +230,17 @@ namespace {
                     .unwrap_or('+')));
         EXPECT_EQ(8,
             (Result<int, Error>(Ok(1))
-                    .and_then<int>([](auto& in) { return Err("problem"); })
+                    .and_then<int>([](auto& in) {
+                        EXPECT_EQ(1, in);
+                        return Err("problem");
+                    })
                     .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Ok('c'))
-                    .and_then<char>([](auto& in) { return Err("problem"); })
+                    .and_then<char>([](auto& in) {
+                        EXPECT_EQ('c', in);
+                        return Err("problem");
+                    })
                     .unwrap_or('+')));
     }
 
@@ -238,11 +256,11 @@ namespace {
                     .unwrap_or('+')));
         EXPECT_EQ(8,
             (Result<int, Error>(Err("problem"))
-                    .and_then<int>([](auto& in) { return Err("another problem"); })
+                    .and_then<int>([](int) { return Err("another problem"); })
                     .unwrap_or(8)));
         EXPECT_EQ('+',
             (Result<char, Error>(Err("problem"))
-                    .and_then<char>([](auto& in) { return Err("another problem"); })
+                    .and_then<char>([](char) { return Err("another problem"); })
                     .unwrap_or('+')));
     }
 
@@ -290,19 +308,21 @@ namespace {
     {
         EXPECT_EQ(1,
                   (Result<int, Error>(Ok(1))
-                      .or_else([](auto& error) { return Ok(2); })
+                      .or_else([](Error) { return Ok(2); })
                       .unwrap_or(8)));
         EXPECT_EQ('c',
                   (Result<char, Error>(Ok('c'))
-                      .or_else([](auto& error) { return Ok('x'); })
+                      .or_else([](Error) { return Ok('x'); })
                       .unwrap_or('+')));
         EXPECT_EQ(1,
                   (Result<int, Error>(Ok(1))
-                      .or_else([](auto& error) { return Err("problem"); })
+                      .or_else([](Error) { return Err("problem"); })
                       .unwrap_or(8)));
         EXPECT_EQ('c',
                   (Result<char, Error>(Ok('c'))
-                      .or_else([](auto& error) { return Err("problem"); })
+                      .or_else([](Error) {
+                          return Err("problem");
+                      })
                       .unwrap_or('+')));
     }
 
@@ -310,19 +330,31 @@ namespace {
     {
         EXPECT_EQ(2,
                   (Result<int, Error>(Err("problem"))
-                      .or_else([](auto& error) { return Ok(2); })
+                      .or_else([](auto& error) {
+                          EXPECT_STREQ("problem", error);
+                          return Ok(2);
+                      })
                       .unwrap_or(8)));
         EXPECT_EQ('x',
                   (Result<char, Error>(Err("problem"))
-                      .or_else([](auto& error) { return Ok('x'); })
+                      .or_else([](auto& error) {
+                          EXPECT_STREQ("problem", error);
+                          return Ok('x');
+                      })
                       .unwrap_or('+')));
         EXPECT_EQ(8,
                   (Result<int, Error>(Err("problem"))
-                      .or_else([](auto& error) { return Err("another problem"); })
+                      .or_else([](auto& error) {
+                          EXPECT_STREQ("problem", error);
+                          return Err("another problem");
+                      })
                       .unwrap_or(8)));
         EXPECT_EQ('+',
                   (Result<char, Error>(Err("problem"))
-                      .or_else([](auto& error) { return Err("another problem"); })
+                      .or_else([](auto& error) {
+                          EXPECT_STREQ("problem", error);
+                          return Err("another problem");
+                      })
                       .unwrap_or('+')));
     }
 }

@@ -125,7 +125,7 @@ namespace cs {
                 return impl_->output.to_json(impl_->arguments.output.c_str(), compilations);
             })
             // just map to success exit code if it was successful.
-            .map<int>([](auto ignore) {
+            .map<int>([](auto) {
                 return EXIT_SUCCESS;
             });
     }

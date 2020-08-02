@@ -389,7 +389,7 @@ namespace {
             auto result = parser.parse(input);
             if (result.is_err()) {
                 return result
-                        .map<CompilerFlags>([](auto ignore) {
+                        .map<CompilerFlags>([](auto) {
                             return CompilerFlags();
                         })
                         .map_err<std::runtime_error>([](auto remainder) {
