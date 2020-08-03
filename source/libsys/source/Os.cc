@@ -17,15 +17,13 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libsys/Context.h"
+#include "libsys/Os.h"
 #include "libsys/Path.h"
 #include "Errors.h"
 #include "Guard.h"
 #include "config.h"
 
 #include <cerrno>
-#include <sys/types.h>
-#include <dirent.h>
 #include <unistd.h>
 
 #ifdef HAVE_SYS_UTSNAME_H
@@ -35,12 +33,12 @@
 #include <fmt/format.h>
 
 
-namespace sys {
+namespace sys::os {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wvla"
 
-    rust::Result<std::string> Context::get_confstr(const int key) const
+    rust::Result<std::string> get_confstr(const int key)
     {
 #ifdef HAVE_CONFSTR
         errno = 0;
@@ -53,13 +51,13 @@ namespace sys {
         return rust::Err(std::runtime_error(
             fmt::format("System call \"confstr\" failed.: {}", error_string(errno))));
 #else
-#error confstr is not found
+        return rust::Err(std::runtime_error("System call \"confstr\" not exists."));
 #endif
     }
 
 #pragma GCC diagnostic pop
 
-    rust::Result<std::map<std::string, std::string>> Context::get_uname() const
+    rust::Result<std::map<std::string, std::string>> get_uname()
     {
         std::map<std::string, std::string> result;
 #ifdef HAVE_UNAME
@@ -76,7 +74,7 @@ namespace sys {
         return rust::Ok(result);
     }
 
-    rust::Result<std::list<fs::path>> Context::get_path(const sys::env::Vars& environment) const
+    rust::Result<std::list<fs::path>> get_path(const sys::env::Vars& environment)
     {
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
             return rust::Ok(sys::path::split(candidate->second));
@@ -93,24 +91,5 @@ namespace sys {
 #else
         return rust::Err(std::runtime_error("Could not find PATH in environment."));
 #endif
-    }
-
-    rust::Result<std::list<fs::path>> Context::list_dir(const fs::path& path) const
-    {
-        DIR *dp = opendir(path.c_str());
-        if (dp == nullptr)
-            return rust::Err(std::runtime_error(
-                fmt::format("Could not open directory: {}", path.string())));
-
-        std::list<fs::path> result;
-        while (dirent *ep = readdir(dp)) {
-            const std::string file(ep->d_name);
-            if (file != "." && file != "..") {
-                result.push_back(fs::path(path) / file);
-            }
-        }
-        closedir(dp);
-
-        return rust::Ok(result);
     }
 }

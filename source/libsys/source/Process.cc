@@ -18,7 +18,7 @@
  */
 
 #include "libsys/Process.h"
-#include "libsys/Context.h"
+#include "libsys/Os.h"
 #include "libsys/Path.h"
 #include "Errors.h"
 #include "Guard.h"
@@ -187,8 +187,7 @@ namespace {
 
             return path.and_then<fs::path>([](auto path) { return check_executable(path); });
         } else {
-            sys::Context ctx;
-            return ctx.get_path(environment)
+            return sys::os::get_path(environment)
                 .and_then<fs::path>([&name](const auto& directories) {
                     for (const auto& directory : directories) {
                         if (auto result = check_executable(directory / name); result.is_ok()) {

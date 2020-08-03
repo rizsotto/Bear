@@ -21,7 +21,6 @@
 #include "gtest/gtest.h"
 
 #include "Application.h"
-#include "ContextMock.h"
 #include "er/Flags.h"
 #include "libflags/Flags.h"
 

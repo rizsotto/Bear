@@ -33,12 +33,12 @@ namespace {
 
     using HostInfo = std::map<std::string, std::string>;
 
-    rust::Result<HostInfo> create_host_info(const sys::Context& context)
+    rust::Result<HostInfo> create_host_info()
     {
-        return context.get_uname()
+        return sys::os::get_uname()
 #ifdef HAVE_CS_PATH
-            .map<HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_PATH)
+            .map<HostInfo>([](auto result) {
+                sys::os::get_confstr(_CS_PATH)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_PATH", value });
                         return 0;
@@ -47,8 +47,8 @@ namespace {
             })
 #endif
 #ifdef HAVE_CS_GNU_LIBC_VERSION
-            .map<HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_GNU_LIBC_VERSION)
+            .map<HostInfo>([](auto result) {
+                sys::os::get_confstr(_CS_GNU_LIBC_VERSION)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_GNU_LIBC_VERSION", value });
                         return 0;
@@ -57,8 +57,8 @@ namespace {
             })
 #endif
 #ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
-            .map<HostInfo>([&context](auto result) {
-                context.get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
+            .map<HostInfo>([](auto result) {
+                sys::os::get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
                     .map<int>([&result](auto value) {
                         result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
                         return 0;
@@ -147,8 +147,7 @@ namespace ic {
 
     rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const ic::Session& session)
     {
-        sys::Context ctx;
-        auto host_info = create_host_info(ctx);
+        auto host_info = create_host_info();
         auto output = flags.as_string(Application::OUTPUT);
 
         return merge(host_info, output)

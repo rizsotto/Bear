@@ -21,7 +21,7 @@
 
 #include "Application.h"
 #include "libwrapper/Environment.h"
-#include "libsys/Context.h"
+#include "libsys/Os.h"
 #include "libsys/Path.h"
 
 #include <spdlog/spdlog.h>
@@ -110,23 +110,35 @@ namespace {
         }
         return rust::Err(std::runtime_error("Not found"));
     }
+
+
+    rust::Result<std::list<fs::path>> list_dir(const fs::path& path)
+    {
+        std::list<fs::path> result;
+
+        std::error_code error_code;
+        for (auto& candidate : fs::directory_iterator(path, error_code)) {
+            if (error_code) {
+                return rust::Err(std::runtime_error(error_code.message()));
+            }
+            if (candidate.is_regular_file()) {
+                result.push_back(candidate.path());
+            }
+        }
+        return rust::Ok(result);
+    }
 }
 
 namespace ic {
 
     rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
-        sys::Context ctx;
-        auto path = ctx.get_path(environment);
-
-        auto verbose = args.as_bool(ic::Application::VERBOSE)
-                           .unwrap_or(false);
-
+        const bool verbose = args.as_bool(ic::Application::VERBOSE).unwrap_or(false);
+        auto path = sys::os::get_path(environment);
         auto wrapper_dir = args.as_string(ic::Application::WRAPPER);
-
-        auto wrappers = args.as_string(ic::Application::WRAPPER)
-                            .and_then<std::list<fs::path>>([&ctx](auto wrapper_dir) {
-                                return ctx.list_dir(wrapper_dir);
+        auto wrappers = wrapper_dir
+                            .and_then<std::list<fs::path>>([](auto wrapper_dir) {
+                                return list_dir(wrapper_dir);
                             });
 
         auto mapping_and_override = rust::merge(path, wrappers)

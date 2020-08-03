@@ -20,7 +20,7 @@
 #pragma once
 
 #include "libresult/Result.h"
-#include "Environment.h"
+#include "libsys/Environment.h"
 
 #include <filesystem>
 #include <list>
@@ -29,18 +29,12 @@
 
 namespace fs = std::filesystem;
 
-namespace sys {
+namespace sys::os {
 
-    struct Context {
-        virtual ~Context() noexcept = default;
+    // Query methods about the system.
+    [[nodiscard]] rust::Result<std::string> get_confstr(int key);
+    [[nodiscard]] rust::Result<std::map<std::string, std::string>> get_uname();
 
-        // Query methods about the system.
-        [[nodiscard]] virtual rust::Result<std::string> get_confstr(int key) const;
-        [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> get_uname() const;
-
-        // Return PATH from environment and fall back to confstr default one.
-        [[nodiscard]] virtual rust::Result<std::list<fs::path>> get_path(const sys::env::Vars& env) const;
-
-        [[nodiscard]] virtual rust::Result<std::list<fs::path>> list_dir(const fs::path& path) const;
-    };
+    // Return PATH from environment and fall back to confstr default one.
+    [[nodiscard]] rust::Result<std::list<fs::path>> get_path(const sys::env::Vars& env);
 }
