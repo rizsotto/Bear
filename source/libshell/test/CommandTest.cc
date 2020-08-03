@@ -23,6 +23,24 @@
 
 namespace {
 
+    TEST(command, empty) {
+        std::list<std::string> expected = {};
+
+        EXPECT_EQ(expected,sh::split("").unwrap_or({"fake"}));
+    }
+
+    TEST(command, whitespace) {
+        std::list<std::string> expected = {};
+
+        EXPECT_EQ(expected,sh::split("  ").unwrap_or({"fake"}));
+    }
+
+    TEST(command, single_word) {
+        std::list<std::string> expected = {"abcd"};
+
+        EXPECT_EQ(expected,sh::split("abcd").unwrap_or({}));
+    }
+
     TEST(command, nothing_special) {
         std::list<std::string> expected = {"a", "b", "c", "d"};
 
@@ -115,7 +133,7 @@ namespace {
             empty
         };
 
-        for (auto token : tokens) {
+        for (const auto& token : tokens) {
             const std::list<std::string> expected = { token };
             EXPECT_EQ(expected, sh::split(sh::escape(token)).unwrap_or({}));
         }

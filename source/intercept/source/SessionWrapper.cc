@@ -111,7 +111,6 @@ namespace {
         return rust::Err(std::runtime_error("Not found"));
     }
 
-
     rust::Result<std::list<fs::path>> list_dir(const fs::path& path)
     {
         std::list<fs::path> result;
@@ -161,26 +160,24 @@ namespace ic {
                 for (auto implicit : IMPLICITS) {
                     // find any of the implicit defined in environment.
                     if (auto env_it = environment.find(implicit.env); env_it != environment.end()) {
-                        auto program = env_it->second;
+                        // FIXME: it would be more correct if we shell-split the `env_it->second`
+                        //        and use only the program name, but not the argument. But then how
+                        //        to deal with the errors?
+                        auto program = sys::Process::Builder(env_it->second)
+                                .set_environment(environment)
+                                .resolve_executable();
+
                         // find the current mapping for the program the user wants to run.
                         // and replace the program what the wrapper will call.
                         if (auto mapping_it = mapping.find(implicit.wrapper); mapping_it != mapping.end()) {
-                            // FIXME: it would be more correct if we shell-split the `env_it->second`
-                            //        and use only the program name, but not the argument.
-                            sys::Process::Builder(program)
-                                .set_environment(environment)
-                                .resolve_executable()
-                                .on_success([&mapping_it](auto path) {
-                                    mapping_it->second = path;
-                                });
+                            program.on_success([&mapping_it](auto path) {
+                                mapping_it->second = path;
+                            });
                             override[implicit.env] = mapping_it->first;
                         } else {
-                            sys::Process::Builder(program)
-                                .set_environment(environment)
-                                .resolve_executable()
-                                .on_success([&mapping, &implicit](auto path) {
-                                    mapping[implicit.wrapper] = path;
-                                });
+                            program.on_success([&mapping, &implicit](auto path) {
+                                mapping[implicit.wrapper] = path;
+                            });
                             override[implicit.env] = implicit.wrapper;
                         }
                     }
