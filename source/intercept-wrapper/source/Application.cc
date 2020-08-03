@@ -38,12 +38,12 @@ namespace {
         const std::string destination;
     };
 
-    rust::Result<Session> make_session() noexcept
+    rust::Result<Session> make_session(const sys::env::Vars& environment) noexcept
     {
-        const char* destination = getenv(wr::env::KEY_DESTINATION);
-        return (destination == nullptr)
+        auto destination = environment.find(wr::env::KEY_DESTINATION);
+        return (destination == environment.end())
                ? rust::Result<Session>(rust::Err(std::runtime_error("Unknown destination.")))
-               : rust::Result<Session>(rust::Ok(Session { destination }));
+               : rust::Result<Session>(rust::Ok(Session { destination->second }));
     }
 
     struct Execution {
@@ -70,12 +70,11 @@ namespace {
                : rust::Result<std::string>(rust::Ok(result.string()));
     }
 
-    rust::Result<Execution> make_execution(const char** args, const sys::Context& context) noexcept
+    rust::Result<Execution> make_execution(const char** args, sys::env::Vars&& environment) noexcept
     {
         auto path = fs::path(args[0]).string();
         auto command = from(args);
         auto working_dir = get_cwd();
-        auto environment = context.get_environment();
 
         return working_dir
             .map<Execution>([&path, &command, &environment](auto cwd) {
@@ -142,10 +141,10 @@ namespace wr {
         Execution execution;
     };
 
-    ::rust::Result<Application> Application::create(const char** args, const sys::Context& ctx)
+    rust::Result<Application> Application::create(const char** args, sys::env::Vars&& environment)
     {
-        auto session = make_session();
-        auto execution = make_execution(args, ctx);
+        auto session = make_session(environment);
+        auto execution = make_execution(args, std::move(environment));
 
         return rust::merge(session, execution)
             .map<Application>([](auto in) {

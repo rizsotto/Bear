@@ -56,7 +56,7 @@ namespace {
     }
 }
 
-int main(int argc, char* argv[], char* envp[])
+int main(int, char* argv[], char* envp[])
 {
     spdlog::set_default_logger(spdlog::stderr_logger_mt("stderr"));
     spdlog::set_pattern(is_verbose() ? "[%H:%M:%S.%f, wr, %P] %v" : "wrapper: %v [pid: %P]");
@@ -64,9 +64,9 @@ int main(int argc, char* argv[], char* envp[])
 
     spdlog::debug("arguments raw: {}", Arguments { argv });
 
-    const sys::Context ctx;
-    return wr::Application::create(const_cast<const char**>(argv), ctx)
-        .and_then<int>([&envp](const auto& command) {
+    auto environment = sys::env::from(const_cast<const char **>(envp));
+    return wr::Application::create(const_cast<const char**>(argv), std::move(environment))
+        .and_then<int>([](const auto& command) {
             return command();
         })
         // print out the result of the run

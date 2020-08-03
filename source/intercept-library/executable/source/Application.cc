@@ -34,10 +34,10 @@
 namespace {
 
     struct Execution {
-        const std::string_view command;
-        const std::vector<std::string_view> arguments;
-        const std::string working_directory;
-        const std::map<std::string, std::string> environment;
+        std::string_view command;
+        std::vector<std::string_view> arguments;
+        std::string working_directory;
+        sys::env::Vars environment;
     };
 
     struct Session {
@@ -53,17 +53,16 @@ namespace {
                 : rust::Result<std::string>(rust::Ok(result.string()));
     }
 
-    rust::Result<Execution> make_execution(const ::flags::Arguments& args, const sys::Context& context) noexcept
+    rust::Result<Execution> make_execution(const ::flags::Arguments& args, sys::env::Vars&& environment) noexcept
     {
         auto path = args.as_string(::er::flags::EXECUTE);
         auto command = args.as_string_list(::er::flags::COMMAND);
         auto working_dir = get_cwd();
-        auto environment = context.get_environment();
 
         return merge(path, command, working_dir)
             .map<Execution>([&environment](auto tuple) {
                 const auto& [_path, _command, _working_dir] = tuple;
-                return Execution { _path, _command, _working_dir, environment };
+                return Execution { _path, _command, _working_dir, std::move(environment) };
             });
     }
 
@@ -136,10 +135,10 @@ namespace er {
         Execution execution;
     };
 
-    rust::Result<Application> Application::create(const ::flags::Arguments& args, const sys::Context& context)
+    rust::Result<Application> Application::create(const ::flags::Arguments& args, sys::env::Vars &&environment)
     {
-        return rust::merge(make_session(args), make_execution(args, context))
-            .map<Application>([&args, &context](auto in) {
+        return rust::merge(make_session(args), make_execution(args, std::move(environment)))
+            .map<Application>([](auto in) {
                 const auto& [session, execution] = in;
                 auto state = new Application::State { session, execution };
                 return Application(state);

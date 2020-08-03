@@ -17,7 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Environment.h"
+#include "Guard.h"
+#include "libsys/Environment.h"
 
 #include <cstring>
 #include <functional>
@@ -71,9 +72,9 @@ namespace sys::env {
         return data_;
     }
 
-    std::map<std::string, std::string> from(const char** const input)
+    Vars from(const char** const input)
     {
-        std::map<std::string, std::string> result;
+        Vars result;
         if (input == nullptr)
             return result;
 

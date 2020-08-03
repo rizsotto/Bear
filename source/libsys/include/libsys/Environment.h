@@ -19,34 +19,13 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
-#include "libresult/Result.h"
-#include "libsys/Environment.h"
+#include <map>
+#include <string>
 
-namespace er {
+namespace sys::env {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> create(const flags::Arguments &args, sys::env::Vars &&);
+    using Vars = std::map<std::string, std::string>;
 
-        ::rust::Result<int> operator()() const;
-
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
-
-    private:
-        struct State;
-
-        explicit Application(State*);
-
-    private:
-        State const* impl_;
-    };
+    // Convert an environment array into a map.
+    Vars from(const char** value);
 }

@@ -26,11 +26,6 @@
 class ContextMock : public sys::Context {
 public:
     MOCK_METHOD(
-        (std::map<std::string, std::string>),
-        get_environment,
-        (),
-        (const, override));
-    MOCK_METHOD(
         rust::Result<std::string>,
         get_confstr,
         (int key),

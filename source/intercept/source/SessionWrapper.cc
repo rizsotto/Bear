@@ -114,10 +114,10 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, const sys::Context& ctx)
+    rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
-        auto environment = ctx.get_environment();
-        auto path = ctx.get_path();
+        sys::Context ctx;
+        auto path = ctx.get_path(environment);
 
         auto verbose = args.as_bool(ic::Application::VERBOSE)
                            .unwrap_or(false);
@@ -130,7 +130,7 @@ namespace ic {
                             });
 
         auto mapping_and_override = rust::merge(path, wrappers)
-            .map<std::map<std::string, std::string>>([&ctx](auto tuple) {
+            .map<std::map<std::string, std::string>>([](auto tuple) {
                 const auto& [paths, wrappers] = tuple;
                 // Find the executables with the same name from the path.
                 std::map<std::string, std::string> result = {};
@@ -156,6 +156,7 @@ namespace ic {
                             // FIXME: it would be more correct if we shell-split the `env_it->second`
                             //        and use only the program name, but not the argument.
                             sys::Process::Builder(program)
+                                .set_environment(environment)
                                 .resolve_executable()
                                 .on_success([&mapping_it](auto path) {
                                     mapping_it->second = path;
@@ -163,6 +164,7 @@ namespace ic {
                             override[implicit.env] = mapping_it->first;
                         } else {
                             sys::Process::Builder(program)
+                                .set_environment(environment)
                                 .resolve_executable()
                                 .on_success([&mapping, &implicit](auto path) {
                                     mapping[implicit.wrapper] = path;
@@ -181,7 +183,7 @@ namespace ic {
                 std::string wrapper_dir(const_wrapper_dir);
                 std::map<std::string, std::string> mapping(const_mapping);
                 std::map<std::string, std::string> override(const_override);
-                return std::make_shared<WrapperSession>(verbose, std::move(wrapper_dir), std::move(mapping), std::move(override), std::move(environment));
+                return std::make_shared<WrapperSession>(verbose, std::move(wrapper_dir), std::move(mapping), std::move(override), environment);
             });
     }
 
@@ -190,7 +192,7 @@ namespace ic {
         std::string&& wrapper_dir,
         std::map<std::string, std::string>&& mapping,
         std::map<std::string, std::string>&& override,
-        std::map<std::string, std::string>&& environment)
+        const sys::env::Vars& environment)
             : Session()
             , verbose_(verbose)
             , wrapper_dir_(wrapper_dir)

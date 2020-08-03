@@ -19,8 +19,6 @@
 
 #include "config.h"
 #include "Application.h"
-#include "libflags/Flags.h"
-#include "libsys/Context.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -35,7 +33,6 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("citnames: %v");
     spdlog::set_level(spdlog::level::info);
 
-    const sys::Context ctx;
     const flags::Parser parser("citnames", VERSION,
                                { { cs::Application::VERBOSE, { 0, false, "run the application verbose", std::nullopt, std::nullopt } },
                                  { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
@@ -53,8 +50,9 @@ int main(int argc, char* argv[], char* envp[])
                 spdlog::debug("arguments parsed: {}", args);
             })
             // if parsing success, we create the main command and execute it.
-            .and_then<cs::Application>([&ctx](auto args) {
-                return cs::Application::from(args, ctx);
+            .and_then<cs::Application>([&envp](auto args) {
+                auto environment = sys::env::from(const_cast<const char **>(envp));
+                return cs::Application::from(args, std::move(environment));
             })
             .and_then<int>([](const auto& command) {
                 return command();

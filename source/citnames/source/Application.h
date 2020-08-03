@@ -21,7 +21,7 @@
 
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
-#include "libsys/Context.h"
+#include "libsys/Environment.h"
 
 namespace cs {
 
@@ -34,7 +34,7 @@ namespace cs {
         static constexpr char APPEND[] = "--append";
         static constexpr char RUN_CHECKS[] = "--run-checks";
 
-        static ::rust::Result<Application> from(const flags::Arguments& args, const sys::Context& ctx);
+        static ::rust::Result<Application> from(const flags::Arguments&, sys::env::Vars&&);
 
         ::rust::Result<int> operator()() const;
 

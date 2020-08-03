@@ -32,19 +32,17 @@ namespace {
                 { "CC", "/path/to/your-cc" },
                 { "CXX", "/path/to/your-cxx" },
         };
-        auto ctx = sys::Context();
         auto cfg = cs::cfg::default_value(env);
 
-        auto sut = cs::Semantic::from(cfg, ctx);
+        auto sut = cs::Semantic::from(cfg);
         EXPECT_TRUE(sut.is_ok());
     }
 
     TEST(semantic, parses_empty_command_list)
     {
-        auto ctx = sys::Context();
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Semantic::from(cfg, ctx);
+        auto sut = cs::Semantic::from(cfg);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {
@@ -59,10 +57,9 @@ namespace {
 
     TEST(semantic, parses_command_list)
     {
-        auto ctx = sys::Context();
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Semantic::from(cfg, ctx);
+        auto sut = cs::Semantic::from(cfg);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {

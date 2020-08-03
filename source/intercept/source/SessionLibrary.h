@@ -29,9 +29,9 @@ namespace ic {
             const std::string_view& library,
             const std::string_view& executor,
             bool verbose,
-            std::map<std::string, std::string>&& environment);
+            sys::env::Vars&& environment);
 
-        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const sys::Context&);
+        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, sys::env::Vars&&);
 
     public:
         [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const override;
@@ -44,6 +44,6 @@ namespace ic {
         std::string library_;
         std::string executor_;
         bool verbose_;
-        std::map<std::string, std::string> environment_;
+        sys::env::Vars environment_;
     };
 }

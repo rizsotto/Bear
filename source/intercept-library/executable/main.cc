@@ -18,12 +18,9 @@
  */
 
 #include "config.h"
-
 #include "Application.h"
 
 #include "er/Flags.h"
-#include "libflags/Flags.h"
-#include "libsys/Context.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -60,7 +57,6 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern(fmt::format("er: %v [pid: %P]"));
     spdlog::set_level(spdlog::level::info);
 
-    const sys::Context ctx;
     const flags::Parser parser("er", VERSION,
         { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
@@ -68,7 +64,7 @@ int main(int argc, char* argv[], char* envp[])
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // log the original command line as it was received.
-        .on_success([&ctx, &argv](const auto& args) {
+        .on_success([&argv](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
                 spdlog::set_level(spdlog::level::debug);
@@ -77,8 +73,9 @@ int main(int argc, char* argv[], char* envp[])
             spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<er::Application>([&ctx](auto args) {
-            return er::Application::create(args, ctx);
+        .and_then<er::Application>([&envp](auto args) {
+            auto environment = sys::env::from(const_cast<const char **>(envp));
+            return er::Application::create(args, std::move(environment));
         })
         .and_then<int>([&envp](const auto& command) {
             return command();

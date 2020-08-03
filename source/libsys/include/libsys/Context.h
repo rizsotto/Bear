@@ -20,6 +20,7 @@
 #pragma once
 
 #include "libresult/Result.h"
+#include "Environment.h"
 
 #include <filesystem>
 #include <list>
@@ -33,15 +34,12 @@ namespace sys {
     struct Context {
         virtual ~Context() noexcept = default;
 
-        // Query methods about the process.
-        [[nodiscard]] virtual std::map<std::string, std::string> get_environment() const;
-
         // Query methods about the system.
         [[nodiscard]] virtual rust::Result<std::string> get_confstr(int key) const;
         [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> get_uname() const;
 
         // Return PATH from environment and fall back to confstr default one.
-        [[nodiscard]] virtual rust::Result<std::list<fs::path>> get_path() const;
+        [[nodiscard]] virtual rust::Result<std::list<fs::path>> get_path(const sys::env::Vars& env) const;
 
         [[nodiscard]] virtual rust::Result<std::list<fs::path>> list_dir(const fs::path& path) const;
     };

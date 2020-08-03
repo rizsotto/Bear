@@ -53,13 +53,7 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("")))));
 
-        ContextMock ctx;
-        EXPECT_CALL(ctx, get_environment)
-            .WillOnce(Return(std::map<std::string, std::string>()));
-//        EXPECT_CALL(ctx, get_cwd)
-//            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
-
-        auto result = er::Application::create(arguments, ctx);
+        auto result = er::Application::create(arguments, {});
 
         ASSERT_FALSE(result.is_ok());
     }
@@ -75,13 +69,7 @@ namespace {
         EXPECT_CALL(arguments, as_string_list(std::string_view(::er::flags::COMMAND)))
             .WillOnce(Return(rust::Result<std::vector<std::string_view>>(rust::Ok(command))));
 
-        ContextMock ctx;
-        EXPECT_CALL(ctx, get_environment)
-            .WillOnce(Return(std::map<std::string, std::string>()));
-//        EXPECT_CALL(ctx, get_cwd)
-//            .WillOnce(Return(rust::Result<std::string>(rust::Ok(std::string("/path")))));
-
-        auto result = er::Application::create(arguments, ctx);
+        auto result = er::Application::create(arguments, {});
 
         ASSERT_TRUE(result.is_ok());
     }

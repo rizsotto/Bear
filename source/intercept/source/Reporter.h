@@ -37,7 +37,7 @@ namespace ic {
     class Reporter {
     public:
         using SharedPtr = std::shared_ptr<Reporter>;
-        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const sys::Context&, const ic::Session&);
+        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const ic::Session&);
 
         void report(const ::supervise::Event& request);
         void flush();

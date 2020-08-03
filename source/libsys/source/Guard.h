@@ -49,7 +49,4 @@ namespace sys::env {
     private:
         const char** data_;
     };
-
-    // Convert an environment array into a map.
-    std::map<std::string, std::string> from(const char** value);
 }

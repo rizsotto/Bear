@@ -145,8 +145,9 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const sys::Context& ctx, const ic::Session& session)
+    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const ic::Session& session)
     {
+        sys::Context ctx;
         auto host_info = create_host_info(ctx);
         auto output = flags.as_string(Application::OUTPUT);
 

@@ -30,9 +30,9 @@ namespace ic {
             std::string&& wrapper_dir,
             std::map<std::string, std::string>&& mapping,
             std::map<std::string, std::string>&& override,
-            std::map<std::string, std::string>&& environment);
+            const sys::env::Vars& environment);
 
-        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const sys::Context&);
+        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, sys::env::Vars &&);
 
     public:
         [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const override;
@@ -49,6 +49,6 @@ namespace ic {
         std::string wrapper_dir_;
         std::map<std::string, std::string> mapping_;
         std::map<std::string, std::string> override_;
-        std::map<std::string, std::string> environment_;
+        sys::env::Vars environment_;
     };
 }

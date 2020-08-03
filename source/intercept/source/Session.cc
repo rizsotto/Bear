@@ -29,27 +29,19 @@
 
 namespace ic {
 
+    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, sys::env::Vars&& environment)
 #ifdef SUPPORT_PRELOAD
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
         if (args.as_bool(ic::Application::FORCE_WRAPPER).unwrap_or(false))
-            return WrapperSession::from(args, ctx);
+            return WrapperSession::from(args, std::move(environment));
         if (args.as_bool(ic::Application::FORCE_PRELOAD).unwrap_or(false))
-            return LibraryPreloadSession::from(args, ctx);
+            return LibraryPreloadSession::from(args, std::move(environment));
 
-        return ctx.get_uname()
-            .and_then<Session::SharedPtr>([&args, &ctx](auto uname) {
-                const bool preload = (uname["sysname"] == "Linux");
-
-                return (preload)
-                    ? LibraryPreloadSession::from(args, ctx)
-                    : WrapperSession::from(args, ctx);
-            });
+        return LibraryPreloadSession::from(args, std::move(environment));
     }
 #else
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const sys::Context& ctx)
     {
-        return WrapperSession::from(args, ctx);
+        return WrapperSession::from(args, std::move(environment));
     }
 #endif
 

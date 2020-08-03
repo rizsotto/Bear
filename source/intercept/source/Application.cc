@@ -75,13 +75,13 @@ namespace ic {
         Session::SharedPtr session_;
     };
 
-    ::rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& context)
+    rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
         auto command = Command::from(args);
-        auto session = Session::from(args, context);
+        auto session = Session::from(args, std::move(environment));
         auto reporter = session
-                            .and_then<Reporter::SharedPtr>([&args, &context](const auto& session) {
-                                return Reporter::from(args, context, *session);
+                            .and_then<Reporter::SharedPtr>([&args](const auto& session) {
+                                return Reporter::from(args, *session);
                             });
 
         return rust::merge(command, reporter, session)

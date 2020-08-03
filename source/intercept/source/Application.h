@@ -21,7 +21,7 @@
 
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
-#include "libsys/Context.h"
+#include "libsys/Environment.h"
 
 #include <memory>
 
@@ -38,7 +38,7 @@ namespace ic {
         static constexpr char FORCE_WRAPPER[] = "--force-wrapper";
         static constexpr char FORCE_PRELOAD[] = "--force-preload";
 
-        static ::rust::Result<Application> from(const flags::Arguments& args, const sys::Context& ctx);
+        static ::rust::Result<Application> from(const flags::Arguments& args, sys::env::Vars &&environment);
 
         ::rust::Result<int> operator()() const;
 

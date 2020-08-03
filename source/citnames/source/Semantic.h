@@ -24,7 +24,6 @@
 #include "CompilationDatabase.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
-#include "libsys/Context.h"
 
 namespace cs {
 
@@ -33,7 +32,7 @@ namespace cs {
     // based on configuration.
     class Semantic {
     public:
-        static rust::Result<Semantic> from(cfg::Value cfg, const sys::Context& ctx);
+        static rust::Result<Semantic> from(cfg::Value cfg);
 
         [[nodiscard]]
         output::Entries transform(const report::Report& report) const;
@@ -51,11 +50,10 @@ namespace cs {
         Semantic() = delete;
         ~Semantic() noexcept = default;
 
-        Semantic(cfg::Value&&, const sys::Context& , Tools &&) noexcept;
+        Semantic(cfg::Value&&, Tools &&) noexcept;
 
     private:
         cfg::Value config_;
-        const sys::Context& ctx_;
         Tools tools_;
     };
 }

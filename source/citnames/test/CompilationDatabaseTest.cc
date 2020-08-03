@@ -46,8 +46,8 @@ namespace {
     {
         cs::output::Entries expected = {};
 
-        simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {true, false});
-        simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {false, false});
+        simple_value_serialized_and_read_back(expected, cs::cfg::Format {true, false});
+        simple_value_serialized_and_read_back(expected, cs::cfg::Format {false, false});
     }
 
     TEST(compilation_database, simple_value_serialized_and_read_back)
@@ -58,8 +58,8 @@ namespace {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {true, false});
-        simple_value_serialized_and_read_back(expected, (cs::cfg::Format) {false, false});
+        simple_value_serialized_and_read_back(expected, cs::cfg::Format {true, false});
+        simple_value_serialized_and_read_back(expected, cs::cfg::Format {false, false});
     }
 
     void value_serialized_and_read_back_without_output(
@@ -95,8 +95,8 @@ namespace {
                 { "entries.c", "/path/to", { }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        value_serialized_and_read_back_without_output(input, expected, (cs::cfg::Format) {true, false});
-        value_serialized_and_read_back_without_output(input, expected, (cs::cfg::Format) {false, false});
+        value_serialized_and_read_back_without_output(input, expected, cs::cfg::Format {true, false});
+        value_serialized_and_read_back_without_output(input, expected, cs::cfg::Format {false, false});
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)

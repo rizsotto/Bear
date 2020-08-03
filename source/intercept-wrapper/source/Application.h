@@ -20,13 +20,13 @@
 #pragma once
 
 #include "libresult/Result.h"
-#include "libsys/Context.h"
+#include "libsys/Environment.h"
 
 namespace wr {
 
     class Application {
     public:
-        static ::rust::Result<Application> create(const char** args, const sys::Context&);
+        static ::rust::Result<Application> create(const char** args, sys::env::Vars&&);
 
         ::rust::Result<int> operator()() const;
 

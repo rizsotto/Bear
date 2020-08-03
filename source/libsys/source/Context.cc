@@ -19,8 +19,8 @@
 
 #include "libsys/Context.h"
 #include "libsys/Path.h"
-#include "Environment.h"
 #include "Errors.h"
+#include "Guard.h"
 #include "config.h"
 
 #include <cerrno>
@@ -31,19 +31,11 @@
 #ifdef HAVE_SYS_UTSNAME_H
 #include <sys/utsname.h>
 #endif
-#ifndef HAVE_ENVIRON
-extern char **environ;
-#endif
 
 #include <fmt/format.h>
 
 
 namespace sys {
-
-    std::map<std::string, std::string> Context::get_environment() const
-    {
-        return sys::env::from(const_cast<const char**>(environ));
-    }
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wvla"
@@ -84,9 +76,8 @@ namespace sys {
         return rust::Ok(result);
     }
 
-    rust::Result<std::list<fs::path>> Context::get_path() const
+    rust::Result<std::list<fs::path>> Context::get_path(const sys::env::Vars& environment) const
     {
-        const auto environment = get_environment();
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
             return rust::Ok(sys::path::split(candidate->second));
         }

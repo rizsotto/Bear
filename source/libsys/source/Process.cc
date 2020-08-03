@@ -21,7 +21,7 @@
 #include "libsys/Context.h"
 #include "libsys/Path.h"
 #include "Errors.h"
-#include "Environment.h"
+#include "Guard.h"
 
 #include <cerrno>
 #include <cstdlib>
@@ -173,7 +173,7 @@ namespace {
                 : rust::Result<fs::path>(rust::Err(could_not_find(result, EACCES)));
     }
 
-    rust::Result<fs::path> resolve_executable(const fs::path& name)
+    rust::Result<fs::path> resolve_executable(const fs::path& name, const sys::env::Vars& environment)
     {
         // If the requested program name contains a separator, then we need to use
         // that as is. Otherwise we need to search the paths given.
@@ -188,7 +188,7 @@ namespace {
             return path.and_then<fs::path>([](auto path) { return check_executable(path); });
         } else {
             sys::Context ctx;
-            return ctx.get_path()
+            return ctx.get_path(environment)
                 .and_then<fs::path>([&name](const auto& directories) {
                     for (const auto& directory : directories) {
                         if (auto result = check_executable(directory / name); result.is_ok()) {
@@ -206,7 +206,7 @@ namespace {
             const std::list<std::string>& parameters,
             const std::map<std::string, std::string>& environment)
     {
-        return resolve_executable(program)
+        return resolve_executable(program, environment)
                 .and_then<pid_t>([&parameters, &environment, &fp](const auto& path) {
                     // convert the arguments into a c-style array
                     std::vector<char*> args;
@@ -365,7 +365,7 @@ namespace sys {
 
     rust::Result<fs::path> Process::Builder::resolve_executable()
     {
-        return ::resolve_executable(program_);
+        return ::resolve_executable(program_, environment_);
     }
 
     rust::Result<Process> Process::Builder::spawn()

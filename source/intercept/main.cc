@@ -29,10 +29,8 @@
 // - Writes output.
 // - Return child exit code.
 
-#include "Application.h"
 #include "config.h"
-#include "libflags/Flags.h"
-#include "libsys/Context.h"
+#include "Application.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -52,7 +50,6 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("intercept: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
 
-    const sys::Context ctx;
     const flags::Parser parser("intercept", VERSION,
         { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
@@ -72,8 +69,9 @@ int main(int argc, char* argv[], char* envp[])
             spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.
-        .and_then<ic::Application>([&ctx](auto args) {
-            return ic::Application::from(args, ctx);
+        .and_then<ic::Application>([&envp](auto args) {
+            auto environment = sys::env::from(const_cast<const char **>(envp));
+            return ic::Application::from(args, std::move(environment));
         })
         .and_then<int>([](const auto& command) {
             return command();

@@ -75,10 +75,10 @@ namespace cs {
         cs::output::CompilationDatabase output;
     };
 
-    rust::Result<Application> Application::from(const flags::Arguments& args, const sys::Context& ctx)
+    rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
         return into_arguments(args)
-                .and_then<Application::State*>([&ctx](auto arguments) {
+                .and_then<Application::State*>([&environment](auto arguments) {
                     // modify the arguments till we have context for IO
                     arguments.append &= (is_exists(arguments.output) == 0);
                     if (is_exists(arguments.input) != 0) {
@@ -86,8 +86,8 @@ namespace cs {
                                 std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
                     }
                     // read the configuration
-                    auto configuration = cfg::default_value(ctx.get_environment());
-                    auto semantic = Semantic::from(configuration, ctx);
+                    auto configuration = cfg::default_value(environment);
+                    auto semantic = Semantic::from(configuration);
                     return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
                         cs::output::CompilationDatabase output(configuration.format);
                         report::ReportSerializer report_serializer;

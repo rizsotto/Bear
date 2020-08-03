@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <numeric>
+#include <utility>
 
 namespace {
 
@@ -53,16 +54,15 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const sys::Context& ctx)
+    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
         auto library = args.as_string(ic::Application::LIBRARY);
         auto executor = args.as_string(ic::Application::EXECUTOR);
         auto verbose = args.as_bool(ic::Application::VERBOSE);
 
         return merge(library, executor, verbose)
-            .map<Session::SharedPtr>([&ctx](auto tuple) {
+            .map<Session::SharedPtr>([&environment](auto tuple) {
                 const auto& [library, executor, verbose] = tuple;
-                auto environment = ctx.get_environment();
                 auto result = new LibraryPreloadSession(library, executor, verbose, std::move(environment));
                 return std::shared_ptr<Session>(result);
             });
@@ -72,17 +72,17 @@ namespace ic {
         const std::string_view& library,
         const std::string_view& executor,
         bool verbose,
-        std::map<std::string, std::string>&& environment)
+        sys::env::Vars&& environment)
             : Session()
             , library_(library)
             , executor_(executor)
             , verbose_(verbose)
-            , environment_(environment)
+            , environment_(std::move(environment))
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
 
-    rust::Result<std::string> LibraryPreloadSession::resolve(const std::string& name) const
+    rust::Result<std::string> LibraryPreloadSession::resolve(const std::string&) const
     {
         return rust::Err(std::runtime_error("The session does not support resolve."));
     }
@@ -103,7 +103,9 @@ namespace ic {
     rust::Result<sys::Process::Builder> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
         auto environment = update(environment_);
-        auto program = sys::Process::Builder(command.front()).resolve_executable();
+        auto program = sys::Process::Builder(command.front())
+                .set_environment(environment_)
+                .resolve_executable();
 
         return rust::merge(program, environment)
             .map<sys::Process::Builder>([&command, this](auto pair) {
