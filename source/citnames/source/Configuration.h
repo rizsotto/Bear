@@ -21,10 +21,13 @@
 
 #include <libresult/Result.h>
 
+#include <filesystem>
 #include <list>
 #include <map>
 #include <string>
 #include <optional>
+
+namespace fs = std::filesystem;
 
 namespace cs::cfg {
 
@@ -63,24 +66,13 @@ namespace cs::cfg {
 
     struct Compilation {
         cfg::ExpandWrappers expand_wrappers;
-        std::list<std::string> compilers;
+        std::list<fs::path> compilers;
     };
 
     struct Value {
         cfg::Format format;
         cfg::Content content;
         cfg::Compilation compilation;
-    };
-
-    struct Configuration {
-        virtual ~Configuration() noexcept = default;
-
-        // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const char *file, const Value &rhs) const;
-        virtual rust::Result<int> to_json(std::ostream &ostream, const Value &rhs) const;
-
-        virtual rust::Result<Value> from_json(const char *file) const;
-        virtual rust::Result<Value> from_json(std::istream &istream) const;
     };
 
     // Create a default value.

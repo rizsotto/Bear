@@ -27,21 +27,27 @@
 
 namespace cs {
 
+    // Represents predicate which decides if the entry shall be placed into the output.
+    struct Filter {
+        virtual ~Filter() noexcept = default;
+        virtual bool operator()(const report::Command&, const output::Entry&) noexcept = 0;
+    };
+    using FilterPtr = std::shared_ptr<Filter>;
+
+    FilterPtr make_filter(const cs::cfg::Content& cfg, bool use_io);
+
     // Represents an expert system which can recognize compilation entries from
     // command executions. It covers multiple tools and consider omit results
     // based on configuration.
     class Semantic {
     public:
-        static rust::Result<Semantic> from(cfg::Value cfg);
+        static rust::Result<Semantic> from(const cfg::Compilation&, FilterPtr filter);
 
         [[nodiscard]]
         output::Entries transform(const report::Report& report) const;
 
         [[nodiscard]]
         rust::Result<output::Entries> recognize(const report::Command& command) const;
-
-        [[nodiscard]]
-        bool filter(const output::Entry&) const;
 
     public:
         using ToolPtr = std::shared_ptr<Tool>;
@@ -50,10 +56,10 @@ namespace cs {
         Semantic() = delete;
         ~Semantic() noexcept = default;
 
-        Semantic(cfg::Value&&, Tools &&) noexcept;
+        Semantic(FilterPtr&&, Tools&&) noexcept;
 
     private:
-        cfg::Value config_;
+        FilterPtr filter_;
         Tools tools_;
     };
 }

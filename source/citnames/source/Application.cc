@@ -33,6 +33,12 @@ namespace fs = std::filesystem;
 
 namespace {
 
+    bool is_exists(const fs::path& path)
+    {
+        std::error_code error_code;
+        return fs::exists(path, error_code);
+    }
+
     struct Arguments {
         fs::path input;
         fs::path output;
@@ -59,10 +65,18 @@ namespace {
                 });
     }
 
-    bool is_exists(const std::string& path)
+    rust::Result<Arguments> validate(const Arguments& arguments)
     {
-        std::error_code error_code;
-        return fs::exists(fs::path(path), error_code);
+        if (!is_exists(arguments.input)) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Missing input file: {}", arguments.input)));
+        }
+        return rust::Ok(Arguments {
+            arguments.input,
+            arguments.output,
+            (arguments.append && is_exists(arguments.output)),
+            arguments.run_check
+        });
     }
 }
 
@@ -77,22 +91,23 @@ namespace cs {
 
     rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
-        return into_arguments(args)
-                .and_then<Application::State*>([&environment](auto arguments) {
-                    // modify the arguments till we have context for IO
-                    arguments.append &= (is_exists(arguments.output) == 0);
-                    if (is_exists(arguments.input) != 0) {
-                        return rust::Result<Application::State*>(rust::Err(
-                                std::runtime_error(fmt::format("Missing input file: {}", arguments.input))));
-                    }
+        auto configuration = cfg::default_value(environment);
+
+        auto arguments = into_arguments(args).and_then<Arguments>(&validate);
+        auto filter = arguments.map<FilterPtr>([&configuration](auto arguments) {
+           return make_filter(configuration.content, arguments.run_check);
+        });
+        auto semantic = filter.and_then<Semantic>([&configuration](auto filter) {
+            return Semantic::from(configuration.compilation, filter);
+        });
+
+        return rust::merge(arguments, semantic)
+                .map<Application::State*>([&configuration](auto tuples) {
+                    const auto& [arguments, semantic] = tuples;
                     // read the configuration
-                    auto configuration = cfg::default_value(environment);
-                    auto semantic = Semantic::from(configuration);
-                    return semantic.template map<Application::State*>([&arguments, &configuration](auto semantic) {
-                        cs::output::CompilationDatabase output(configuration.format);
-                        report::ReportSerializer report_serializer;
-                        return new Application::State { arguments, report_serializer, semantic, output };
-                    });
+                    cs::output::CompilationDatabase output(configuration.format);
+                    report::ReportSerializer report_serializer;
+                    return new Application::State { arguments, report_serializer, semantic, output };
                 })
                 .map<Application>([](auto impl) {
                     spdlog::debug("application object initialized.");

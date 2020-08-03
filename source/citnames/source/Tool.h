@@ -23,9 +23,12 @@
 #include "libresult/Result.h"
 #include "libreport/Report.h"
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <regex>
+
+namespace fs = std::filesystem;
 
 namespace cs {
 
@@ -44,12 +47,12 @@ namespace cs {
     };
 
     struct GnuCompilerCollection : public Tool {
-        explicit GnuCompilerCollection(std::list<std::string> paths);
+        explicit GnuCompilerCollection(std::list<fs::path> paths);
 
         [[nodiscard]]
         rust::Result<output::Entries> recognize(const report::Command &command) const override;
 
     protected:
-        std::list<std::string> paths;
+        std::list<fs::path> paths;
     };
 }

@@ -491,26 +491,26 @@ namespace {
         return result;
     }
 
-    bool match_gcc_name(const std::string& program)
+    bool match_gcc_name(const fs::path& program)
     {
-        std::list<std::string> patterns = {
+        static const std::list<std::string> patterns = {
                 R"(^(cc|c\+\+|cxx|CC)$)",
                 R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
                 R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
                 R"(^([^-]*-)*[g]?fortran(-?\d+(\.\d+){0,2})?$)",
         };
-        auto pattern =
-                fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|"));
+        static const auto pattern = std::regex(
+                fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|")));
 
-        auto basename = fs::path(program).filename();
+        auto basename = program.filename();
         std::cmatch m;
-        return std::regex_match(basename.c_str(), m, std::regex(pattern));
+        return std::regex_match(basename.c_str(), m, pattern);
     }
 }
 
 namespace cs {
 
-    GnuCompilerCollection::GnuCompilerCollection(std::list<std::string> paths)
+    GnuCompilerCollection::GnuCompilerCollection(std::list<fs::path> paths)
             : Tool()
             , paths(std::move(paths))
     { }

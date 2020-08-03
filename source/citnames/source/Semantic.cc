@@ -22,19 +22,68 @@
 
 #include <spdlog/spdlog.h>
 
+namespace {
+
+    struct NoFilter : public cs::Filter {
+        bool operator()(const report::Command &, const cs::output::Entry &) noexcept override {
+            return true;
+        }
+    };
+
+    bool is_exists(const fs::path& path)
+    {
+        std::error_code error_code;
+        return fs::exists(path, error_code);
+    }
+
+    bool contains(const fs::path& root, const fs::path& file)
+    {
+        auto [root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
+        return (root_end == root.end());
+    }
+
+    struct StrictFilter : public cs::Filter {
+
+        explicit StrictFilter(cs::cfg::Content config)
+                : config_(std::move(config))
+        { }
+
+        bool operator()(const report::Command &, const cs::output::Entry &entry) noexcept override {
+            const auto &exclude = config_.paths_to_exclude;
+            const bool to_exclude = (std::find_if(exclude.begin(), exclude.end(),
+                                                  [&entry](auto directory) {
+                                                      return contains(directory, entry.file);
+                                                  }) !=
+                                     exclude.end());
+            const bool exists = is_exists(entry.file);
+
+            return exists && !to_exclude;
+        }
+
+        cs::cfg::Content config_;
+    };
+}
+
 namespace cs {
 
-    Semantic::Semantic(cfg::Value&& config, Tools && tools) noexcept
-            : config_(config)
+    FilterPtr make_filter(const cs::cfg::Content& cfg, bool use_io)
+    {
+        return (use_io)
+                ? FilterPtr(new StrictFilter(cfg))
+                : FilterPtr(new NoFilter());
+    }
+
+    Semantic::Semantic(FilterPtr&& filter, Tools&& tools) noexcept
+            : filter_(filter)
             , tools_(tools)
     { }
 
-    rust::Result<Semantic> Semantic::from(cfg::Value cfg)
+    rust::Result<Semantic> Semantic::from(const cfg::Compilation& cfg, FilterPtr filter)
     {
         Tools tools = {
-                std::make_shared<GnuCompilerCollection>(cfg.compilation.compilers),
+                std::make_shared<GnuCompilerCollection>(cfg.compilers),
         };
-        return rust::Ok(Semantic(std::move(cfg), std::move(tools)));
+        return rust::Ok(Semantic(std::move(filter), std::move(tools)));
     }
 
     output::Entries Semantic::transform(const report::Report& report) const
@@ -43,11 +92,11 @@ namespace cs {
         for (const auto& execution : report.executions) {
             //spdlog::debug("checking: {}", execution.command.arguments);
             if (auto entries = recognize(execution.command); entries.is_ok()) {
-                entries.on_success([this, &result](auto items) {
+                entries.on_success([this, &execution, &result](auto items) {
                     // copy to results if the config allows it
                     std::copy_if(items.begin(), items.end(),
                             std::back_inserter(result),
-                            [this](auto entry) { return filter(entry); });
+                            [this, &execution](auto entry) { return filter_->operator()(execution.command, entry); });
                 });
             }
         }
@@ -64,21 +113,5 @@ namespace cs {
             }
         }
         return rust::Err(std::runtime_error("No tools recognize this command."));
-    }
-
-    [[nodiscard]]
-    bool Semantic::filter(const output::Entry &) const
-    {
-        // TODO: commented out because of unit test breaks
-//        const auto &exclude = config_.content.paths_to_exclude;
-//        const bool to_exclude = (std::find_if(exclude.begin(), exclude.end(),
-//                                              [&entry](auto directory) {
-//                                                  return sys::path::contains(directory, entry.file);
-//                                              }) !=
-//                                 exclude.end());
-//        const bool exists = (ctx_.is_exists(entry.file) == 0);
-//
-//        return exists && !to_exclude;
-        return true;
     }
 }
