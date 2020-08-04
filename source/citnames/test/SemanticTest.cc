@@ -33,18 +33,16 @@ namespace {
                 { "CXX", "/path/to/your-cxx" },
         };
         auto cfg = cs::cfg::default_value(env);
-        auto filter = cs::make_filter(cfg.content, false);
 
-        auto sut = cs::Semantic::from(cfg.compilation, filter);
+        auto sut = cs::Semantic::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
     }
 
     TEST(semantic, parses_empty_command_list)
     {
         auto cfg = cs::cfg::default_value({});
-        auto filter = cs::make_filter(cfg.content, false);
 
-        auto sut = cs::Semantic::from(cfg.compilation, filter);
+        auto sut = cs::Semantic::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {
@@ -60,9 +58,8 @@ namespace {
     TEST(semantic, parses_command_list)
     {
         auto cfg = cs::cfg::default_value({});
-        auto filter = cs::make_filter(cfg.content, false);
 
-        auto sut = cs::Semantic::from(cfg.compilation, filter);
+        auto sut = cs::Semantic::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {

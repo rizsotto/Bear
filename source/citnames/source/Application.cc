@@ -85,6 +85,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         report::ReportSerializer report_serializer;
+        cs::FilterPtr filter;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
@@ -97,17 +98,15 @@ namespace cs {
         auto filter = arguments.map<FilterPtr>([&configuration](auto arguments) {
            return make_filter(configuration.content, arguments.run_check);
         });
-        auto semantic = filter.and_then<Semantic>([&configuration](auto filter) {
-            return Semantic::from(configuration.compilation, filter);
-        });
+        auto semantic = Semantic::from(configuration.compilation);
 
-        return rust::merge(arguments, semantic)
+        return rust::merge(arguments, filter, semantic)
                 .map<Application::State*>([&configuration](auto tuples) {
-                    const auto& [arguments, semantic] = tuples;
+                    const auto& [arguments, filter, semantic] = tuples;
                     // read the configuration
                     cs::output::CompilationDatabase output(configuration.format);
                     report::ReportSerializer report_serializer;
-                    return new Application::State { arguments, report_serializer, semantic, output };
+                    return new Application::State { arguments, report_serializer, filter, semantic, output };
                 })
                 .map<Application>([](auto impl) {
                     spdlog::debug("application object initialized.");
@@ -133,6 +132,14 @@ namespace cs {
                                 return output::merge(old_entries, compilations);
                             })
                     : rust::Result<output::Entries>(rust::Ok(compilations));
+            })
+            // filter out entries
+            .map<output::Entries>([this](auto entries) {
+                output::Entries result;
+                std::copy_if(entries.begin(), entries.end(),
+                             std::back_inserter(result),
+                             [this](auto entry) { return impl_->filter->operator()(entry); });
+                return result;
             })
             // write the entries into the output file.
             .and_then<int>([this](auto compilations) {

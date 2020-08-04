@@ -25,7 +25,7 @@
 namespace {
 
     struct NoFilter : public cs::Filter {
-        bool operator()(const report::Command &, const cs::output::Entry &) noexcept override {
+        bool operator()(const cs::output::Entry &) noexcept override {
             return true;
         }
     };
@@ -48,7 +48,7 @@ namespace {
                 : config_(std::move(config))
         { }
 
-        bool operator()(const report::Command &, const cs::output::Entry &entry) noexcept override {
+        bool operator()(const cs::output::Entry &entry) noexcept override {
             const auto &exclude = config_.paths_to_exclude;
             const bool to_exclude = (std::find_if(exclude.begin(), exclude.end(),
                                                   [&entry](auto directory) {
@@ -73,17 +73,16 @@ namespace cs {
                 : FilterPtr(new NoFilter());
     }
 
-    Semantic::Semantic(FilterPtr&& filter, Tools&& tools) noexcept
-            : filter_(filter)
-            , tools_(tools)
+    Semantic::Semantic(Tools&& tools) noexcept
+            : tools_(tools)
     { }
 
-    rust::Result<Semantic> Semantic::from(const cfg::Compilation& cfg, FilterPtr filter)
+    rust::Result<Semantic> Semantic::from(const cfg::Compilation& cfg)
     {
         Tools tools = {
                 std::make_shared<GnuCompilerCollection>(cfg.compilers),
         };
-        return rust::Ok(Semantic(std::move(filter), std::move(tools)));
+        return rust::Ok(Semantic(std::move(tools)));
     }
 
     output::Entries Semantic::transform(const report::Report& report) const
@@ -92,11 +91,9 @@ namespace cs {
         for (const auto& execution : report.executions) {
             //spdlog::debug("checking: {}", execution.command.arguments);
             if (auto entries = recognize(execution.command); entries.is_ok()) {
-                entries.on_success([this, &execution, &result](auto items) {
+                entries.on_success([this, &result](auto items) {
                     // copy to results if the config allows it
-                    std::copy_if(items.begin(), items.end(),
-                            std::back_inserter(result),
-                            [this, &execution](auto entry) { return filter_->operator()(execution.command, entry); });
+                    std::copy(items.begin(), items.end(),std::back_inserter(result));
                 });
             }
         }

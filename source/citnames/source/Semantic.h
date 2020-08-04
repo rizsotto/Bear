@@ -30,7 +30,7 @@ namespace cs {
     // Represents predicate which decides if the entry shall be placed into the output.
     struct Filter {
         virtual ~Filter() noexcept = default;
-        virtual bool operator()(const report::Command&, const output::Entry&) noexcept = 0;
+        virtual bool operator()(const output::Entry&) noexcept = 0;
     };
     using FilterPtr = std::shared_ptr<Filter>;
 
@@ -41,7 +41,7 @@ namespace cs {
     // based on configuration.
     class Semantic {
     public:
-        static rust::Result<Semantic> from(const cfg::Compilation&, FilterPtr filter);
+        static rust::Result<Semantic> from(const cfg::Compilation&);
 
         [[nodiscard]]
         output::Entries transform(const report::Report& report) const;
@@ -56,10 +56,9 @@ namespace cs {
         Semantic() = delete;
         ~Semantic() noexcept = default;
 
-        Semantic(FilterPtr&&, Tools&&) noexcept;
+        Semantic(Tools&&) noexcept;
 
     private:
-        FilterPtr filter_;
         Tools tools_;
     };
 }

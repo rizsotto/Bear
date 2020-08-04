@@ -4,15 +4,15 @@
 
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s -build
 # RUN: assert_compilation %t.json count -eq 2
-# RUN: assert_compilation %t.json contains -file append/src/source_1.c -directory %T -arguments %{c_compiler} -c -o append/src/source_1.o append/src/source_1.c
-# RUN: assert_compilation %t.json contains -file append/src/source_2.c -directory %T -arguments %{c_compiler} -c -o append/src/source_2.o append/src/source_2.c
+# RUN: assert_compilation %t.json contains -file %T/append/src/source_1.c -directory %T -arguments %{c_compiler} -c -o append/src/source_1.o append/src/source_1.c
+# RUN: assert_compilation %t.json contains -file %T/append/src/source_2.c -directory %T -arguments %{c_compiler} -c -o append/src/source_2.o append/src/source_2.c
 
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json --append -- %{shell} %s -test
 # RUN: assert_compilation %t.json count -eq 4
-# RUN: assert_compilation %t.json contains -file append/src/source_1.c -directory %T -arguments %{c_compiler} -c -o append/src/source_1.o append/src/source_1.c
-# RUN: assert_compilation %t.json contains -file append/src/source_2.c -directory %T -arguments %{c_compiler} -c -o append/src/source_2.o append/src/source_2.c
-# RUN: assert_compilation %t.json contains -file append/test/source_1.c -directory %T -arguments %{c_compiler} -c -o append/test/source_1.o append/test/source_1.c
-# RUN: assert_compilation %t.json contains -file append/test/source_2.c -directory %T -arguments %{c_compiler} -c -o append/test/source_2.o append/test/source_2.c
+# RUN: assert_compilation %t.json contains -file %T/append/src/source_1.c -directory %T -arguments %{c_compiler} -c -o append/src/source_1.o append/src/source_1.c
+# RUN: assert_compilation %t.json contains -file %T/append/src/source_2.c -directory %T -arguments %{c_compiler} -c -o append/src/source_2.o append/src/source_2.c
+# RUN: assert_compilation %t.json contains -file %T/append/test/source_1.c -directory %T -arguments %{c_compiler} -c -o append/test/source_1.o append/test/source_1.c
+# RUN: assert_compilation %t.json contains -file %T/append/test/source_2.c -directory %T -arguments %{c_compiler} -c -o append/test/source_2.o append/test/source_2.c
 
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json --append -- %{shell} %s -clean
 # RUN: assert_compilation %t.json count -eq 0
