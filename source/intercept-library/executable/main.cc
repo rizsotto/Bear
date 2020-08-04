@@ -88,7 +88,5 @@ int main(int argc, char* argv[], char* envp[])
             spdlog::debug("succeeded with: {}", status_code);
         })
         // set the return code from error
-        .unwrap_or_else([](auto) {
-            return EXIT_FAILURE;
-        });
+        .unwrap_or(EXIT_FAILURE);
 }
