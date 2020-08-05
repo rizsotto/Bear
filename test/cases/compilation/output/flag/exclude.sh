@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 
 # RUN: cd %T; %{bear} -vvvv --cdb %t.all.json -- %{shell} %s
 # RUN: assert_compilation %t.all.json count -eq 4

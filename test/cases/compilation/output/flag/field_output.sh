@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# REQUIRES: shell, dynamic-shell
+# REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %T/field_output_1.c -output %T/field_output_1.o -directory %T -arguments %{c_compiler} -c -o field_output_1.o field_output_1.c
