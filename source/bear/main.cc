@@ -50,6 +50,24 @@ namespace {
     constexpr char FORCE_WRAPPER[] = "--force-wrapper";
     constexpr char FORCE_PRELOAD[] = "--force-preload";
 
+    struct Arguments {
+        char *const * values;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    {
+        os << '[';
+        for (char* const* it = arguments.values; *it != nullptr; ++it) {
+            if (it != arguments.values) {
+                os << ", ";
+            }
+            os << '"' << *it << '"';
+        }
+        os << ']';
+
+        return os;
+    }
+
     rust::Result<int> execute(sys::Process::Builder builder, const std::string_view& name)
     {
         return builder.spawn()
@@ -133,7 +151,12 @@ namespace {
 
     rust::Result<int> run(const flags::Arguments& arguments, const sys::env::Vars& environment)
     {
-        auto commands = fs::path("commands.json"); // TODO: derive the location from OUTPUT flag
+        auto commands = arguments.as_string(OUTPUT)
+            .map<fs::path>([](const auto& output) {
+                return fs::path(output).replace_extension(".commands.json");
+            })
+            .unwrap_or(fs::path("commands.json"));
+
         auto intercept = prepare_intercept(arguments, environment, commands);
         auto citnames = prepare_citnames(arguments, environment, commands);
 
@@ -167,11 +190,13 @@ int main(int argc, char* argv[], char* envp[])
                                  { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
-            .on_success([](const auto& args) {
+            .on_success([&argv](const auto& args) {
                 if (args.as_bool(VERBOSE).unwrap_or(false)) {
                     spdlog::set_pattern("[%H:%M:%S.%f, br, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }
+                spdlog::debug("bear: {}", VERSION);
+                spdlog::debug("arguments raw: {}", Arguments { argv });
                 spdlog::debug("arguments parsed: {}", args);
             })
             // if parsing success, we create the main command and execute it.

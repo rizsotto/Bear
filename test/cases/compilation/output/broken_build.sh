@@ -3,7 +3,7 @@
 # REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -ge 1
-# RUN: assert_compilation %t.json contains -file broken_build.c -directory %T -arguments %{c_compiler} -c -o broken_build.o broken_build.c
+# RUN: assert_compilation %t.json contains -file %T/broken_build.c -directory %T -arguments %{c_compiler} -c -o broken_build.o broken_build.c
 
 echo "int test() { ;" > broken_build.c
 

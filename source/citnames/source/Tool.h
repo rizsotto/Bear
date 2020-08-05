@@ -52,6 +52,9 @@ namespace cs {
         [[nodiscard]]
         rust::Result<output::Entries> recognize(const report::Command &command) const override;
 
+        [[nodiscard]]
+        bool recognize(const fs::path& program) const;
+
     protected:
         std::list<fs::path> paths;
     };

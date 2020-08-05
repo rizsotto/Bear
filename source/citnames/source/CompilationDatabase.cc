@@ -160,7 +160,12 @@ namespace cs::output {
 
     Entries merge(const Entries& lhs, const Entries& rhs)
     {
-        auto result = lhs;
+        Entries result;
+        for (const auto& candidate : lhs) {
+            if (auto it = std::find(result.begin(), result.end(), candidate); it == result.end()) {
+                result.push_back(candidate);
+            }
+        }
         for (const auto& candidate : rhs) {
             if (auto it = std::find(result.begin(), result.end(), candidate); it == result.end()) {
                 result.push_back(candidate);

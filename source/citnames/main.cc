@@ -37,7 +37,7 @@ int main(int argc, char* argv[], char* envp[])
                                { { cs::Application::VERBOSE, { 0, false, "run the application verbose", std::nullopt, std::nullopt } },
                                  { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
                                  { cs::Application::INPUT, { 1, false, "path of the input file", { "commands.json" }, std::nullopt } },
-                                 { cs::Application::APPEND, { 0, false, "append to output, instead of overwrite it", { "false" }, std::nullopt } },
+                                 { cs::Application::APPEND, { 0, false, "append to output, instead of overwrite it", std::nullopt, std::nullopt } },
                                  { cs::Application::RUN_CHECKS, { 0, false, "can run checks on the current host", { "true" }, std::nullopt } }
                                });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
@@ -47,6 +47,7 @@ int main(int argc, char* argv[], char* envp[])
                     spdlog::set_pattern("[%H:%M:%S.%f, cs, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }
+                spdlog::debug("citnames: {}", VERSION);
                 spdlog::debug("arguments parsed: {}", args);
             })
             // if parsing success, we create the main command and execute it.

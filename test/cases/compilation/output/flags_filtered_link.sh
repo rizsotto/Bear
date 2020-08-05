@@ -3,10 +3,10 @@
 # REQUIRES: shell
 # RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 4
-# RUN: assert_compilation %t.json contains -file flags_filtered_link_1.c -directory %T -arguments %{c_compiler} -c -fpic -o flags_filtered_link_1.o flags_filtered_link_1.c
-# RUN: assert_compilation %t.json contains -file flags_filtered_link_2.c -directory %T -arguments %{c_compiler} -c -fpic -o flags_filtered_link_2.o flags_filtered_link_2.c
-# RUN: assert_compilation %t.json contains -file flags_filtered_link_3.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_3 flags_filtered_link_3.c
-# RUN: assert_compilation %t.json contains -file flags_filtered_link_4.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_4 flags_filtered_link_4.c
+# RUN: assert_compilation %t.json contains -file %T/flags_filtered_link_1.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_1.o -fpic flags_filtered_link_1.c
+# RUN: assert_compilation %t.json contains -file %T/flags_filtered_link_2.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_2.o -fpic flags_filtered_link_2.c
+# RUN: assert_compilation %t.json contains -file %T/flags_filtered_link_3.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_3 flags_filtered_link_3.c
+# RUN: assert_compilation %t.json contains -file %T/flags_filtered_link_4.c -directory %T -arguments %{c_compiler} -c -o flags_filtered_link_4 flags_filtered_link_4.c
 
 # set up platform specific linker options
 PREFIX="foobar";

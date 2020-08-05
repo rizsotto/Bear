@@ -53,6 +53,28 @@ namespace {
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
 
+    TEST(GnuCompilerCollection, linker_flag_filtered) {
+        report::Command input = {
+                "/usr/bin/cc",
+                {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
+                "/home/user/project",
+                {},
+        };
+        cs::output::Entries expected = {
+                {
+                        "/home/user/project/source.c",
+                        "/home/user/project",
+                        { "/home/user/project/exe" },
+                        {"/usr/bin/cc", "-c", "-o", "exe", "source.c"}},
+        };
+
+        cs::GnuCompilerCollection sut({});
+
+        auto result = sut.recognize(input);
+        EXPECT_TRUE(result.is_ok());
+        EXPECT_EQ(expected, result.unwrap_or({}));
+    }
+
     TEST(GnuCompilerCollection, pass_on_help) {
         report::Command input = {
                 "/usr/bin/gcc",
@@ -112,7 +134,8 @@ namespace {
                         "/home/user/project/source.c",
                         "/home/user/project",
                         std::nullopt,
-                        {"/usr/bin/wrapper", "-c", "source.c"}},
+                        {"/usr/bin/wrapper", "-c", "source.c"}
+                },
         };
 
         cs::GnuCompilerCollection sut({"/usr/bin/wrapper"});

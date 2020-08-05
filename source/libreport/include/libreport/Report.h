@@ -102,6 +102,8 @@ namespace report {
     bool operator==(const Context& lhs, const Context& rhs);
     bool operator==(const Report& lhs, const Report& rhs);
 
+    std::ostream& operator<<(std::ostream&, const Command&);
+
     // Utility class to persists entries.
     struct ReportSerializer {
         virtual ~ReportSerializer() noexcept = default;

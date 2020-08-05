@@ -122,6 +122,10 @@ namespace cs {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 return impl_->semantic.transform(commands);
             })
+            // remove duplicates
+            .map<output::Entries>([](auto compilations) {
+                return output::merge({}, compilations);
+            })
             // read back the current content and extend with the new elements.
             .and_then<output::Entries>([this](auto compilations) {
                 spdlog::debug("compilation entries created. [size: {}]", compilations.size());

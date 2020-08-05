@@ -24,21 +24,19 @@
 
 #include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
-
 namespace report {
 
-    void to_json(json& j, const Command& rhs)
+    void to_json(nlohmann::json& j, const Command& rhs)
     {
-        j = json {
+        j = nlohmann::json {
             { "program", rhs.program },
-            { "arguments", json(rhs.arguments) },
+            { "arguments", nlohmann::json(rhs.arguments) },
             { "working_dir", rhs.working_dir },
-            { "environment", json(rhs.environment) }
+            { "environment", nlohmann::json(rhs.environment) }
         };
     }
 
-    void from_json(const json& j, Command& rhs)
+    void from_json(const nlohmann::json& j, Command& rhs)
     {
         j.at("program").get_to(rhs.program);
         j.at("arguments").get_to(rhs.arguments);
@@ -46,9 +44,9 @@ namespace report {
         j.at("environment").get_to(rhs.environment);
     }
 
-    void to_json(json& j, const Event& rhs)
+    void to_json(nlohmann::json& j, const Event& rhs)
     {
-        j = json {
+        j = nlohmann::json {
             { "at", rhs.at },
             { "type", rhs.type }
         };
@@ -60,7 +58,7 @@ namespace report {
         }
     }
 
-    void from_json(const json& j, Event& rhs)
+    void from_json(const nlohmann::json& j, Event& rhs)
     {
         j.at("at").get_to(rhs.at);
         j.at("type").get_to(rhs.type);
@@ -78,16 +76,16 @@ namespace report {
         }
     }
 
-    void to_json(json& j, const Run& rhs)
+    void to_json(nlohmann::json& j, const Run& rhs)
     {
         j["pid"] = rhs.pid;
-        j["events"] = json(rhs.events);
+        j["events"] = nlohmann::json(rhs.events);
         if (rhs.ppid) {
             j["ppid"] = rhs.ppid.value();
         }
     }
 
-    void from_json(const json& j, Run& rhs)
+    void from_json(const nlohmann::json& j, Run& rhs)
     {
         j.at("pid").get_to(rhs.pid);
         j.at("events").get_to(rhs.events);
@@ -99,37 +97,37 @@ namespace report {
         }
     }
 
-    void to_json(json& j, const Execution& rhs)
+    void to_json(nlohmann::json& j, const Execution& rhs)
     {
-        j = json { { "command", rhs.command }, { "run", rhs.run } };
+        j = nlohmann::json { { "command", rhs.command }, { "run", rhs.run } };
     }
 
-    void from_json(const json& j, Execution& rhs)
+    void from_json(const nlohmann::json& j, Execution& rhs)
     {
         j.at("command").get_to(rhs.command);
         j.at("run").get_to(rhs.run);
     }
 
-    void to_json(json& j, const Context& rhs)
+    void to_json(nlohmann::json& j, const Context& rhs)
     {
-        j = json {
+        j = nlohmann::json {
             { "intercept", rhs.session_type },
-            { "host_info", json(rhs.host_info) }
+            { "host_info", nlohmann::json(rhs.host_info) }
         };
     }
 
-    void from_json(const json& j, Context& rhs)
+    void from_json(const nlohmann::json& j, Context& rhs)
     {
         j.at("intercept").get_to(rhs.session_type);
         j.at("host_info").get_to(rhs.host_info);
     }
 
-    void to_json(json& j, const Report& rhs)
+    void to_json(nlohmann::json& j, const Report& rhs)
     {
-        j = json { { "executions", rhs.executions }, { "context", rhs.context } };
+        j = nlohmann::json { { "executions", rhs.executions }, { "context", rhs.context } };
     }
 
-    void from_json(const json& j, Report& rhs)
+    void from_json(const nlohmann::json& j, Report& rhs)
     {
         j.at("executions").get_to(rhs.executions);
         j.at("context").get_to(rhs.context);
@@ -176,6 +174,16 @@ namespace report {
                && (lhs.executions == rhs.executions);
     }
 
+    std::ostream& operator<<(std::ostream& os, const Command& rhs)
+    {
+        nlohmann::json payload = nlohmann::json {
+                { "program", rhs.program },
+                { "arguments", nlohmann::json(rhs.arguments) },
+                { "working_dir", rhs.working_dir },
+        };
+        os << payload;
+        return os;
+    }
 
     rust::Result<int> ReportSerializer::to_json(const fs::path& file, const Report& rhs) const
     {

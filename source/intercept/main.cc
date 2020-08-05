@@ -66,6 +66,7 @@ int main(int argc, char* argv[], char* envp[])
                 spdlog::set_pattern("[%H:%M:%S.%f, ic, %P] %v");
                 spdlog::set_level(spdlog::level::debug);
             }
+            spdlog::debug("intercept: {}", VERSION);
             spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.

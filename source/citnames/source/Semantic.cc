@@ -21,6 +21,7 @@
 #include "libsys/Path.h"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 
 namespace {
 
@@ -89,13 +90,16 @@ namespace cs {
     {
         output::Entries result;
         for (const auto& execution : report.executions) {
-            //spdlog::debug("checking: {}", execution.command.arguments);
-            if (auto entries = recognize(execution.command); entries.is_ok()) {
-                entries.on_success([this, &result](auto items) {
-                    // copy to results if the config allows it
-                    std::copy(items.begin(), items.end(),std::back_inserter(result));
-                });
-            }
+            spdlog::debug("Checking [pid: {}], command: {}", execution.run.pid, execution.command);
+            recognize(execution.command)
+                    .on_success([&execution, &result](auto items) {
+                        // copy to results if the config allows it
+                        std::copy(items.begin(), items.end(), std::back_inserter(result));
+                        spdlog::debug("Checking [pid: {}], Recognized as: [{}]", execution.run.pid, items);
+                    })
+                    .on_error([&execution](const auto& error) {
+                        spdlog::debug("Checking [pid: {}], {}", execution.run.pid, error.what());
+                    });
         }
         return result;
     }

@@ -69,6 +69,7 @@ int main(int argc, char* argv[], char* envp[])
                 spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
                 spdlog::set_level(spdlog::level::debug);
             }
+            spdlog::debug("er: {}", VERSION);
             spdlog::debug("arguments raw: {}", Arguments { argv });
             spdlog::debug("arguments parsed: {}", args);
         })

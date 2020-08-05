@@ -62,6 +62,7 @@ int main(int, char* argv[], char* envp[])
     spdlog::set_pattern(is_verbose() ? "[%H:%M:%S.%f, wr, %P] %v" : "wrapper: %v [pid: %P]");
     spdlog::set_level(is_verbose() ? spdlog::level::debug : spdlog::level::info);
 
+    spdlog::debug("wrapper: {}", VERSION);
     spdlog::debug("arguments raw: {}", Arguments { argv });
 
     auto environment = sys::env::from(const_cast<const char **>(envp));
