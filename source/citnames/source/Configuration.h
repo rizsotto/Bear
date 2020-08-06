@@ -37,11 +37,9 @@ namespace cs::cfg {
     };
 
     struct Content {
-        std::optional<std::string> relative_to;
         bool include_only_existing_source;
-        bool include_only_successful_commands;
-        std::list<std::string> paths_to_include;
-        std::list<std::string> paths_to_exclude;
+        std::list<fs::path> paths_to_include;
+        std::list<fs::path> paths_to_exclude;
     };
 
     struct ExpandWrappers {

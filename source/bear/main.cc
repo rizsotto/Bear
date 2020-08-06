@@ -36,6 +36,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
+    constexpr std::optional<std::string_view> ADVANCED_GROUP = { "advanced options" };
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 
     constexpr char VERBOSE[] = "-vvvv";
@@ -46,9 +47,11 @@ namespace {
     constexpr char LIBRARY[] = "--libexec";
     constexpr char EXECUTOR[] = "--executor";
     constexpr char WRAPPER[] = "--wrapper";
-    constexpr char COMMAND[] = "--";
+    constexpr char INCLUDE[] = "--include";
+    constexpr char EXCLUDE[] = "--exclude";
     constexpr char FORCE_WRAPPER[] = "--force-wrapper";
     constexpr char FORCE_PRELOAD[] = "--force-preload";
+    constexpr char COMMAND[] = "--";
 
     struct Arguments {
         char *const * values;
@@ -95,9 +98,11 @@ namespace {
         auto executor = arguments.as_string(EXECUTOR);
         auto wrapper = arguments.as_string(WRAPPER);
         auto verbose = arguments.as_bool(VERBOSE).unwrap_or(false);
+        auto force_wrapper = arguments.as_bool(FORCE_WRAPPER).unwrap_or(false);
+        auto force_preload = arguments.as_bool(FORCE_PRELOAD).unwrap_or(false);
 
         return rust::merge(program, command, rust::merge(library, executor, wrapper))
-                .map<sys::Process::Builder>([&environment, &output, &verbose](auto tuple) {
+                .map<sys::Process::Builder>([&environment, &output, &verbose, &force_wrapper, &force_preload](auto tuple) {
                     const auto& [program, command, pack] = tuple;
                     const auto& [library, executor, wrapper] = pack;
 
@@ -112,6 +117,12 @@ namespace {
                             .add_argument(wrapper);
                     builder.add_argument("--output")
                             .add_argument(output);
+                    if (force_wrapper) {
+                        builder.add_argument("--force-wrapper");
+                    }
+                    if (force_preload) {
+                        builder.add_argument("--force-preload");
+                    }
                     if (verbose) {
                         builder.add_argument("--verbose");
                     }
@@ -127,9 +138,11 @@ namespace {
         auto output = arguments.as_string(OUTPUT);
         auto append = arguments.as_bool(APPEND).unwrap_or(false);
         auto verbose = arguments.as_bool(VERBOSE).unwrap_or(false);
+        auto include = arguments.as_string_list(INCLUDE).unwrap_or({});
+        auto exclude = arguments.as_string_list(EXCLUDE).unwrap_or({});
 
         return rust::merge(program, output)
-                .map<sys::Process::Builder>([&environment, &input, &append, &verbose](auto tuple) {
+                .map<sys::Process::Builder>([&environment, &input, &append, &verbose, &include, &exclude](auto tuple) {
                     const auto& [program, output] = tuple;
 
                     auto builder = sys::Process::Builder(program)
@@ -138,12 +151,21 @@ namespace {
                             .add_argument("--input")
                             .add_argument(input)
                             .add_argument("--output")
-                            .add_argument(output);
+                            .add_argument(output)
+                            .add_argument("--run-checks");
                     if (append) {
                         builder.add_argument("--append");
                     }
                     if (verbose) {
                         builder.add_argument("--verbose");
+                    }
+                    for (auto entry : include) {
+                        builder.add_argument("--include");
+                        builder.add_argument(entry);
+                    }
+                    for (auto entry : exclude) {
+                        builder.add_argument("--exclude");
+                        builder.add_argument(entry);
                     }
                     return builder;
                 });
@@ -177,11 +199,13 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_level(spdlog::level::info);
 
     const flags::Parser parser("bear", VERSION,
-                               { { VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
-                                 { APPEND, { 0, false, "append result to an existing output file", std::nullopt, std::nullopt } },
+                               { { VERBOSE, { 0, false,"run the interception verbose", std::nullopt, std::nullopt } },
                                  { OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
-                                 { FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, std::nullopt } },
-                                 { FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, std::nullopt } },
+                                 { APPEND, { 0, false, "append result to an existing output file", std::nullopt, ADVANCED_GROUP } },
+                                 { INCLUDE, { 1, false, "directory where from source file shall be in the output", std::nullopt, ADVANCED_GROUP } },
+                                 { EXCLUDE, { 1, false, "directory where from source file shall not be in the output", std::nullopt, ADVANCED_GROUP } },
+                                 { FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, ADVANCED_GROUP } },
+                                 { FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, ADVANCED_GROUP } },
                                  { LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
                                  { EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
                                  { WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },

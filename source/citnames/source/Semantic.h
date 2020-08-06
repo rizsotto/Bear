@@ -34,7 +34,7 @@ namespace cs {
     };
     using FilterPtr = std::shared_ptr<Filter>;
 
-    FilterPtr make_filter(const cs::cfg::Content& cfg, bool use_io);
+    FilterPtr make_filter(const cs::cfg::Content &cfg);
 
     // Represents an expert system which can recognize compilation entries from
     // command executions. It covers multiple tools and consider omit results

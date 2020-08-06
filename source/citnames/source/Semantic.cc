@@ -43,6 +43,12 @@ namespace {
         return (root_end == root.end());
     }
 
+    bool contains(const std::list<fs::path>& root, const fs::path& file)
+    {
+        return root.end() != std::find_if(root.begin(), root.end(),
+                                          [&file](auto directory) { return contains(directory, file); });
+    }
+
     struct StrictFilter : public cs::Filter {
 
         explicit StrictFilter(cs::cfg::Content config)
@@ -50,15 +56,14 @@ namespace {
         { }
 
         bool operator()(const cs::output::Entry &entry) noexcept override {
-            const auto &exclude = config_.paths_to_exclude;
-            const bool to_exclude = (std::find_if(exclude.begin(), exclude.end(),
-                                                  [&entry](auto directory) {
-                                                      return contains(directory, entry.file);
-                                                  }) !=
-                                     exclude.end());
             const bool exists = is_exists(entry.file);
 
-            return exists && !to_exclude;
+            const auto &include = config_.paths_to_include;
+            const bool to_include = include.empty() || contains(include, entry.file);
+            const auto &exclude = config_.paths_to_exclude;
+            const bool to_exclude = !exclude.empty() && contains(exclude, entry.file);
+
+            return exists && to_include && !to_exclude;
         }
 
         cs::cfg::Content config_;
@@ -67,9 +72,9 @@ namespace {
 
 namespace cs {
 
-    FilterPtr make_filter(const cs::cfg::Content& cfg, bool use_io)
+    FilterPtr make_filter(const cs::cfg::Content &cfg)
     {
-        return (use_io)
+        return (cfg.include_only_existing_source)
                 ? FilterPtr(new StrictFilter(cfg))
                 : FilterPtr(new NoFilter());
     }

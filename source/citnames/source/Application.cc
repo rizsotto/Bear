@@ -43,8 +43,30 @@ namespace {
         fs::path input;
         fs::path output;
         bool append;
-        bool run_check;
+        cs::cfg::Content content;
     };
+
+    std::list<fs::path> to_path_list(const std::vector<std::string_view>& strings)
+    {
+        // best effort, try to make these string as path (absolute or relative).
+        std::error_code error_code;
+        auto cwd = fs::current_path(error_code);
+        if (error_code) {
+            spdlog::info("Getting current directory failed. (ignored)");
+            return std::list<fs::path>(strings.begin(), strings.end());
+        } else {
+            std::list<fs::path> result;
+            for (auto string : strings) {
+                auto path = fs::path(string);
+                if (path.is_absolute()) {
+                    result.emplace_back(path);
+                } else {
+                    result.emplace_back(cwd / path);
+                }
+            }
+            return result;
+        }
+    }
 
     rust::Result<Arguments> into_arguments(const flags::Arguments& args)
     {
@@ -52,15 +74,21 @@ namespace {
         auto output = args.as_string(cs::Application::OUTPUT);
         auto append = args.as_bool(cs::Application::APPEND).unwrap_or(false);
         auto run_check = args.as_bool(cs::Application::RUN_CHECKS).unwrap_or(false);
+        auto include = args.as_string_list(cs::Application::INCLUDE).map<std::list<fs::path>>(&to_path_list).unwrap_or({});
+        auto exclude = args.as_string_list(cs::Application::EXCLUDE).map<std::list<fs::path>>(&to_path_list).unwrap_or({});
 
         return rust::merge(input, output)
-                .map<Arguments>([&append, &run_check](auto tuple) {
+                .map<Arguments>([&append, &run_check, &include, &exclude](auto tuple) {
                     const auto& [input, output] = tuple;
                     return Arguments {
                         fs::path(input),
                         fs::path(output),
                         append,
-                        run_check
+                        cs::cfg::Content{
+                            run_check,
+                            include,
+                            exclude,
+                        },
                     };
                 });
     }
@@ -75,7 +103,7 @@ namespace {
             arguments.input,
             arguments.output,
             (arguments.append && is_exists(arguments.output)),
-            arguments.run_check
+            arguments.content
         });
     }
 }
@@ -92,11 +120,11 @@ namespace cs {
 
     rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
-        auto configuration = cfg::default_value(environment);
+        const auto configuration = cfg::default_value(environment);
 
         auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto filter = arguments.map<FilterPtr>([&configuration](auto arguments) {
-           return make_filter(configuration.content, arguments.run_check);
+        auto filter = arguments.map<FilterPtr>([](auto arguments) {
+           return make_filter(arguments.content);
         });
         auto semantic = Semantic::from(configuration.compilation);
 
@@ -118,16 +146,16 @@ namespace cs {
     {
         // get current compilations from the input.
         return impl_->report_serializer.from_json(impl_->arguments.input)
-            .map<output::Entries>([this](auto commands) {
+            .map<output::Entries>([this](const auto& commands) {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 return impl_->semantic.transform(commands);
             })
             // remove duplicates
-            .map<output::Entries>([](auto compilations) {
+            .map<output::Entries>([](const auto& compilations) {
                 return output::merge({}, compilations);
             })
             // read back the current content and extend with the new elements.
-            .and_then<output::Entries>([this](auto compilations) {
+            .and_then<output::Entries>([this](const auto& compilations) {
                 spdlog::debug("compilation entries created. [size: {}]", compilations.size());
                 return (impl_->arguments.append)
                     ? impl_->output.from_json(impl_->arguments.output.c_str())
@@ -139,14 +167,14 @@ namespace cs {
             })
             // filter out entries
             .map<output::Entries>([this](auto entries) {
-                output::Entries result;
-                std::copy_if(entries.begin(), entries.end(),
-                             std::back_inserter(result),
-                             [this](auto entry) { return impl_->filter->operator()(entry); });
-                return result;
+                entries.remove_if([this](const auto& entry) {
+                    const bool keep = impl_->filter->operator()(entry);
+                    return !keep;
+                });
+                return entries;
             })
             // write the entries into the output file.
-            .and_then<int>([this](auto compilations) {
+            .and_then<int>([this](const auto& compilations) {
                 spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
                 return impl_->output.to_json(impl_->arguments.output.c_str(), compilations);
             })

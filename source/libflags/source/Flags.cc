@@ -225,7 +225,12 @@ namespace flags {
                 if (const auto params = take(option->second, args_it + 1, args_end); params) {
                     const auto& [begin, end] = params.value();
                     auto args = std::vector<std::string_view>(begin, end);
-                    parameters.emplace(option->first, args);
+
+                    if (auto it = parameters.find(option->first); parameters.end() != it) {
+                        std::copy(args.begin(), args.end(), std::back_inserter(it->second));
+                    } else {
+                        parameters.emplace(option->first, args);
+                    }
 
                     args_it = end;
                 } else {
