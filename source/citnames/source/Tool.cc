@@ -68,12 +68,15 @@ namespace {
     using CompilerFlags = std::list<CompilerFlag>;
     using Input = ArgumentsSegment;
 
+    // A parser combinator, which takes multiple parsers and executes them
+    // util one returns successfully and returns that as result. If none of
+    // the parser returns success, it fails.
     template <typename ... Parsers>
-    struct Any {
+    struct OneOf {
         using container_type = typename std::tuple<Parsers...>;
         container_type const parsers;
 
-        explicit constexpr Any(Parsers const& ...p)
+        explicit constexpr OneOf(Parsers const& ...p)
                 : parsers(p...)
         { }
 
@@ -83,44 +86,57 @@ namespace {
             rust::Result<std::pair<CompilerFlag, Input>, Input> result = rust::Err(input);
             const bool valid =
                     std::apply([&input, &result](auto &&... parser) {
-                        bool success = ((
-                                result = parser.parse(input),
-                                        result.is_ok())
-                                || ...);
-                        return success;
+                        return ((result = parser.parse(input), result.is_ok()) || ... );
                     }, parsers);
 
             return (valid) ? result : rust::Err(input);
         }
     };
 
-    template <typename ... Parsers>
-    rust::Result<CompilerFlags> parse(const report::Command &command, const Any<Parsers...>& parser)
-    {
-        CompilerFlags flags;
-        for (Input input { std::next(command.arguments.begin()), command.arguments.end() };
-             input.begin != input.end;) {
+    // A parser combinator, which takes single parser and executes it util
+    // returns successfully or consumes all input. If the parser fails before
+    // the input is all consumed, it fails.
+    template <typename Parser>
+    struct Repeat {
+        using result_type = rust::Result<CompilerFlags, Input>;
+        Parser const parser;
 
-            auto result = parser.parse(input);
-            if (result.is_err()) {
-                return result
-                        .template map<CompilerFlags>([](auto) {
-                            return CompilerFlags();
-                        })
-                        .template map_err<std::runtime_error>([](auto remainder) {
-                            return std::runtime_error(
-                                    fmt::format("Failed to recognize: {}",
-                                                fmt::join(remainder.begin, remainder.end, ", ")));
+        explicit constexpr Repeat(Parser  p)
+                : parser(std::move(p))
+        { }
+
+        [[nodiscard]]
+        result_type parse(const Input& input) const
+        {
+            CompilerFlags flags;
+            auto it = Input { input.begin, input.end };
+            for (; it.begin != it.end;) {
+                auto result = parser.parse(it)
+                        .on_success([&flags, &it](const auto& tuple) {
+                            const auto& [flag, remainder] = tuple;
+                            flags.push_back(flag);
+                            it = remainder;
                         });
-            } else {
-                result.on_success([&flags, &input](auto tuple) {
-                    const auto& [flag, remainder] = tuple;
-                    flags.push_back(flag);
-                    input = remainder;
-                });
+                if (result.is_err()) {
+                    break;
+                }
             }
+            return (it.begin == it.end)
+                    ? result_type(rust::Ok(flags))
+                    : result_type(rust::Err(it));
         }
-        return rust::Ok(flags);
+    };
+
+    template <typename Parser>
+    rust::Result<CompilerFlags> parse(const Parser &parser, const report::Command &command)
+    {
+        auto input = Input { std::next(command.arguments.begin()), command.arguments.end() };
+        return parser.parse(input)
+                .template map_err<std::runtime_error>([](auto remainder) {
+                    return std::runtime_error(
+                            fmt::format("Failed to recognize: {}",
+                                        fmt::join(remainder.begin, remainder.end, ", ")));
+                });
     }
 }
 
@@ -132,12 +148,27 @@ namespace gcc {
     // Polymorphic behaviour achieved not by inheritance (because that would
     // stop us using static array of these object).
     class FlagDefinition {
-    private:
-        const char* name_;
-        const char* pattern_;
-        size_t count_;
-        CompilerFlagType type_;
+    public:
+        constexpr static FlagDefinition by_name(const char* const name, const size_t count, const CompilerFlagType type) {
+            return FlagDefinition { name, nullptr, count, type };
+        }
 
+        constexpr static FlagDefinition by_pattern(const char* const pattern, const size_t count, const CompilerFlagType type) {
+            return FlagDefinition { nullptr, pattern, count, type };
+        }
+
+        [[nodiscard]]
+        std::optional<std::tuple<size_t, CompilerFlagType>> match(const std::string& arg) const {
+            if (name_ != nullptr) {
+                return match_by_name(arg);
+            }
+            if (pattern_ != nullptr) {
+                return match_by_pattern(arg);
+            }
+            return std::nullopt;
+        }
+
+    private:
         constexpr FlagDefinition(const char* const name, const char* const pattern, const size_t count, const CompilerFlagType type)
                 : name_(name)
                 , pattern_(pattern)
@@ -157,19 +188,11 @@ namespace gcc {
             return (std::regex_match(arg.c_str(), m, re)) ? std::make_optional(std::make_pair(count_, type_)) : std::nullopt;
         }
 
-    public:
-        constexpr static FlagDefinition by_name(const char* const name, const size_t count, const CompilerFlagType type) {
-            return FlagDefinition { name, nullptr, count, type };
-        }
-
-        constexpr static FlagDefinition by_pattern(const char* const pattern, const size_t count, const CompilerFlagType type) {
-            return FlagDefinition { nullptr, pattern, count, type };
-        }
-
-        [[nodiscard]]
-        std::optional<std::tuple<size_t, CompilerFlagType>> match(const std::string& arg) const {
-            return (name_ != nullptr) ? match_by_name(arg) : match_by_pattern(arg);
-        }
+    private:
+        const char* name_;
+        const char* pattern_;
+        size_t count_;
+        CompilerFlagType type_;
     };
 
     // Generic flag matcher, which takes a list of flag definition and tries to match it.
@@ -412,15 +435,19 @@ namespace gcc {
 
     rust::Result<CompilerFlags> parse(const report::Command &command)
     {
-        auto parser = Any(
-                gcc::KindOfOutputFlagMatcher(),
-                gcc::PreprocessorFlagMatcher(),
-                gcc::DirectorySearchFlagMatcher(),
-                gcc::LinkerFlagMatcher(),
-                gcc::SourceMatcher(),
-                gcc::EverythingElseFlagMatcher());
+        auto const parser =
+                Repeat(
+                        OneOf(
+                                gcc::KindOfOutputFlagMatcher(),
+                                gcc::PreprocessorFlagMatcher(),
+                                gcc::DirectorySearchFlagMatcher(),
+                                gcc::LinkerFlagMatcher(),
+                                gcc::SourceMatcher(),
+                                gcc::EverythingElseFlagMatcher()
+                        )
+                );
 
-        return parse(command, parser)
+        return parse(parser, command)
                 .map<CompilerFlags>([&command](auto flags) {
                     if (auto extra = flags_from_environment(command.environment); !extra.empty()) {
                         std::copy(extra.begin(), extra.end(), std::back_inserter(flags));
