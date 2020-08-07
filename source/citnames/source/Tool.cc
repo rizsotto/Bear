@@ -463,67 +463,60 @@ namespace gcc {
         return true;
     }
 
-    std::optional<fs::path> source_file(const CompilerFlag& flag, const fs::path& working_dir)
+    std::optional<fs::path> source_file(const CompilerFlag& flag)
     {
         if (flag.type == CompilerFlagType::SOURCE) {
             auto source = fs::path(flag.arguments.front());
-            return (source.is_absolute())
-                    ? std::make_optional(source)
-                    : std::make_optional(working_dir / source);
+            return std::make_optional(std::move(source));
         }
         return std::optional<fs::path>();
     }
 
-    std::list<fs::path> source_files(const CompilerFlags& flags, const fs::path& working_dir)
+    std::list<fs::path> source_files(const CompilerFlags& flags)
     {
         std::list<fs::path> result;
         for (const auto& flag : flags) {
-            if (auto source = source_file(flag, working_dir); source) {
+            if (auto source = source_file(flag); source) {
                 result.push_back(source.value());
             }
         }
         return result;
     }
 
-    std::optional<fs::path> output_file(const CompilerFlag& flag, const fs::path& working_dir)
+    std::optional<fs::path> output_file(const CompilerFlag& flag)
     {
-        if ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) && (flag.arguments.size() == 2)) {
+        if (flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) {
             auto output = fs::path(flag.arguments.back());
-            return (output.is_absolute())
-                   ? std::make_optional(output)
-                   : std::make_optional(working_dir / output);
+            return std::make_optional(std::move(output));
         }
         return std::optional<fs::path>();
     }
 
-    std::optional<fs::path> output_files(const CompilerFlags& flags, const fs::path& working_dir)
+    std::optional<fs::path> output_files(const CompilerFlags& flags)
     {
         std::list<fs::path> result;
         for (const auto& flag : flags) {
-            if (auto output = output_file(flag, working_dir); output) {
+            if (auto output = output_file(flag); output) {
                 return output;
             }
         }
         return std::optional<fs::path>();
     }
 
-    Arguments filter_arguments(const CompilerFlags& flags, const fs::path& working_dir, const fs::path source)
+    Arguments filter_arguments(const CompilerFlags& flags, const fs::path source)
     {
-        static const auto type_filter_out = [](CompilerFlagType type) {
+        static const auto type_filter_out = [](CompilerFlagType type) -> bool {
             return (type == CompilerFlagType::LINKER)
                 || (type == CompilerFlagType::PREPROCESSOR_MAKE)
                 || (type == CompilerFlagType::DIRECTORY_SEARCH_LINKER);
         };
 
-        const auto source_filter = [&working_dir, &source](const CompilerFlag& flag) {
-            if (flag.type != CompilerFlagType::SOURCE) {
-                return true;
-            }
-            auto candidate = source_file(flag, working_dir);
-            return candidate && (candidate.value() == source);
+        const auto source_filter = [&source](const CompilerFlag& flag) -> bool {
+            auto candidate = source_file(flag);
+            return (!candidate) || (candidate && (candidate.value() == source));
         };
 
-        const auto no_linking =
+        const bool no_linking =
                 flags.end() != std::find_if(flags.begin(), flags.end(), [](auto flag) {
                     return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING);
                 });
@@ -559,6 +552,19 @@ namespace gcc {
 
 namespace cs {
 
+    cs::output::Entry make_absolute(cs::output::Entry&& entry)
+    {
+        const auto transform = [&entry](const fs::path& path) {
+            return (path.is_absolute()) ? path : entry.directory / path;
+        };
+
+        entry.file = transform(entry.file);
+        if (entry.output) {
+            entry.output.value() = transform(entry.output.value());
+        }
+        return std::move(entry);
+    }
+
     GnuCompilerCollection::GnuCompilerCollection(std::list<fs::path> paths)
             : Tool()
             , paths(std::move(paths))
@@ -576,8 +582,8 @@ namespace cs {
                         spdlog::debug("Compiler call does not run compilation pass.");
                         return output::Entries();
                     }
-                    auto output = gcc::output_files(flags, command.working_dir);
-                    auto sources = gcc::source_files(flags, command.working_dir);
+                    auto output = gcc::output_files(flags);
+                    auto sources = gcc::source_files(flags);
                     if (sources.empty()) {
                         spdlog::debug("Source files not found for compilation.");
                         return output::Entries();
@@ -585,10 +591,10 @@ namespace cs {
 
                     output::Entries result;
                     for (const auto &source : sources) {
-                        auto arguments = gcc::filter_arguments(flags, command.working_dir, source);
+                        auto arguments = gcc::filter_arguments(flags, source);
                         arguments.push_front(command.program);
                         cs::output::Entry entry = {source, command.working_dir, output, arguments};
-                        result.emplace_back(std::move(entry));
+                        result.emplace_back(make_absolute(std::move(entry)));
                     }
                     return result;
                 });
