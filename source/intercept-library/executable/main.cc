@@ -32,11 +32,11 @@
 
 namespace {
 
-    struct Arguments {
+    struct PointerArray {
         char *const * values;
     };
 
-    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    std::ostream& operator<<(std::ostream& os, const PointerArray& arguments)
     {
         os << '[';
         for (char* const* it = arguments.values; *it != nullptr; ++it) {
@@ -64,13 +64,14 @@ int main(int argc, char* argv[], char* envp[])
             { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // log the original command line as it was received.
-        .on_success([&argv](const auto& args) {
+        .on_success([&argv, &envp](const auto& args) {
             if (args.as_bool(::er::flags::VERBOSE).unwrap_or(false)) {
                 spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
                 spdlog::set_level(spdlog::level::debug);
             }
             spdlog::debug("er: {}", VERSION);
-            spdlog::debug("arguments raw: {}", Arguments { argv });
+            spdlog::debug("arguments: {}", PointerArray { argv });
+            spdlog::debug("environment: {}", PointerArray { envp });
             spdlog::debug("arguments parsed: {}", args);
         })
         // if parsing success, we create the main command and execute it.

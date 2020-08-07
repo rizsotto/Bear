@@ -53,11 +53,11 @@ namespace {
     constexpr char FORCE_PRELOAD[] = "--force-preload";
     constexpr char COMMAND[] = "--";
 
-    struct Arguments {
+    struct PointerArray {
         char *const * values;
     };
 
-    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    std::ostream& operator<<(std::ostream& os, const PointerArray& arguments)
     {
         os << '[';
         for (char* const* it = arguments.values; *it != nullptr; ++it) {
@@ -214,13 +214,14 @@ int main(int argc, char* argv[], char* envp[])
                                  { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
-            .on_success([&argv](const auto& args) {
+            .on_success([&argv, &envp](const auto& args) {
                 if (args.as_bool(VERBOSE).unwrap_or(false)) {
                     spdlog::set_pattern("[%H:%M:%S.%f, br, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }
                 spdlog::debug("bear: {}", VERSION);
-                spdlog::debug("arguments raw: {}", Arguments { argv });
+                spdlog::debug("arguments: {}", PointerArray { argv });
+                spdlog::debug("environment: {}", PointerArray { envp });
                 spdlog::debug("arguments parsed: {}", args);
             })
             // if parsing success, we create the main command and execute it.

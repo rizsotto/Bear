@@ -26,6 +26,26 @@
 
 #include <optional>
 
+namespace {
+
+    struct PointerArray {
+        char *const * values;
+    };
+
+    std::ostream& operator<<(std::ostream& os, const PointerArray& arguments)
+    {
+        os << '[';
+        for (char* const* it = arguments.values; *it != nullptr; ++it) {
+            if (it != arguments.values) {
+                os << ", ";
+            }
+            os << '"' << *it << '"';
+        }
+        os << ']';
+
+        return os;
+    }
+}
 
 int main(int argc, char* argv[], char* envp[])
 {
@@ -44,12 +64,14 @@ int main(int argc, char* argv[], char* envp[])
                                });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
-            .on_success([](const auto& args) {
+            .on_success([&argv, &envp](const auto& args) {
                 if (args.as_bool(cs::Application::VERBOSE).unwrap_or(false)) {
                     spdlog::set_pattern("[%H:%M:%S.%f, cs, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }
                 spdlog::debug("citnames: {}", VERSION);
+                spdlog::debug("arguments: {}", PointerArray { argv });
+                spdlog::debug("environment: {}", PointerArray { envp });
                 spdlog::debug("arguments parsed: {}", args);
             })
             // if parsing success, we create the main command and execute it.

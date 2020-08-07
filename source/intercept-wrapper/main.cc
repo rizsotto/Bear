@@ -32,11 +32,11 @@
 
 namespace {
 
-    struct Arguments {
+    struct PointerArray {
         char *const * values;
     };
 
-    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
+    std::ostream& operator<<(std::ostream& os, const PointerArray& arguments)
     {
         os << '[';
         for (char* const* it = arguments.values; *it != nullptr; ++it) {
@@ -63,7 +63,8 @@ int main(int, char* argv[], char* envp[])
     spdlog::set_level(is_verbose() ? spdlog::level::debug : spdlog::level::info);
 
     spdlog::debug("wrapper: {}", VERSION);
-    spdlog::debug("arguments raw: {}", Arguments { argv });
+    spdlog::debug("arguments: {}", PointerArray { argv });
+    spdlog::debug("environment: {}", PointerArray { envp });
 
     auto environment = sys::env::from(const_cast<const char **>(envp));
     return wr::Application::create(const_cast<const char**>(argv), std::move(environment))
