@@ -412,24 +412,31 @@ namespace gcc {
         { }
     };
 
-    CompilerFlags flags_from_environment(const std::map<std::string, std::string> &environment) {
-        CompilerFlags flags;
+    // https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
+    Arguments flags_from_environment(const std::map<std::string, std::string> &environment) {
+        Arguments flags;
+        // define util function to append the content of a defined variable
+        const auto inserter = [&flags](const std::string& value, const std::string& flag) {
+            // the variable value is a colon separated directory list
+            for (const auto& path : sys::path::split(value)) {
+                // If the expression was ":/opt/thing", that will split into two
+                // entries. One which is an empty string and the path. Empty string
+                // refers the current working directory.
+                auto directory = (path.empty()) ? "." : path.string();
+                flags.push_back(flag);
+                flags.push_back(directory);
+            }
+        };
+        // check the environment for preprocessor influencing variables
         for (auto env : { "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH" }) {
             if (auto it = environment.find(env); it != environment.end()) {
-                for (const auto& path : sys::path::split(it->second)) {
-                    auto directory = (path.empty()) ? "." : path;
-                    CompilerFlag flag = { {"-I", directory }, CompilerFlagType::DIRECTORY_SEARCH };
-                    flags.emplace_back(flag);
-                }
+                inserter(it->second, "-I");
             }
         }
         if (auto it = environment.find("OBJC_INCLUDE_PATH"); it != environment.end()) {
-            for (const auto& path : sys::path::split(it->second)) {
-                auto directory = (path.empty()) ? "." : path;
-                CompilerFlag flag = { {"-isystem", directory }, CompilerFlagType::DIRECTORY_SEARCH };
-                flags.emplace_back(flag);
-            }
+            inserter(it->second, "-isystem");
         }
+
         return flags;
     }
 
@@ -447,13 +454,7 @@ namespace gcc {
                         )
                 );
 
-        return parse(parser, command)
-                .map<CompilerFlags>([&command](auto flags) {
-                    if (auto extra = flags_from_environment(command.environment); !extra.empty()) {
-                        std::copy(extra.begin(), extra.end(), std::back_inserter(flags));
-                    }
-                    return flags;
-                });
+        return parse(parser, command);
     }
 
     bool runs_compilation_pass(const CompilerFlags& flags)
@@ -620,6 +621,8 @@ namespace cs {
                     for (const auto &source : sources) {
                         auto arguments = gcc::filter_arguments(flags, source);
                         arguments.push_front(command.program);
+                        auto extra = gcc::flags_from_environment(command.environment);
+                        arguments.insert(arguments.end(), extra.begin(), extra.end());
                         cs::output::Entry entry = {source, command.working_dir, output, arguments};
                         result.emplace_back(make_absolute(std::move(entry)));
                     }
