@@ -27,7 +27,6 @@
 
 namespace cs::output {
 
-
     CompilationDatabase::CompilationDatabase(const cs::cfg::Format &_fromat)
             : format(_fromat)
     { }

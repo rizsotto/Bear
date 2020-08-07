@@ -31,24 +31,6 @@ namespace {
         }
     };
 
-    bool is_exists(const fs::path& path)
-    {
-        std::error_code error_code;
-        return fs::exists(path, error_code);
-    }
-
-    bool contains(const fs::path& root, const fs::path& file)
-    {
-        auto [root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
-        return (root_end == root.end());
-    }
-
-    bool contains(const std::list<fs::path>& root, const fs::path& file)
-    {
-        return root.end() != std::find_if(root.begin(), root.end(),
-                                          [&file](auto directory) { return contains(directory, file); });
-    }
-
     struct StrictFilter : public cs::Filter {
 
         explicit StrictFilter(cs::cfg::Content config)
@@ -66,6 +48,25 @@ namespace {
             return exists && to_include && !to_exclude;
         }
 
+        static bool is_exists(const fs::path& path)
+        {
+            std::error_code error_code;
+            return fs::exists(path, error_code);
+        }
+
+        static bool contains(const fs::path& root, const fs::path& file)
+        {
+            auto [root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
+            return (root_end == root.end());
+        }
+
+        static bool contains(const std::list<fs::path>& root, const fs::path& file)
+        {
+            return root.end() != std::find_if(root.begin(), root.end(),
+                                              [&file](auto directory) { return contains(directory, file); });
+        }
+
+    private:
         cs::cfg::Content config_;
     };
 }
