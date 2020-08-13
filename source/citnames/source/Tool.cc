@@ -26,6 +26,7 @@
 #include <regex>
 #include <set>
 #include <utility>
+#include <functional>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -142,74 +143,180 @@ namespace {
 
 namespace gcc {
 
-    // Represents compiler flag definition.
-    //
-    // Can match by exact name definition, or by regex like pattern matching.
-    // Polymorphic behaviour achieved not by inheritance (because that would
-    // stop us using static array of these object).
-    class FlagDefinition {
-    public:
-        constexpr static FlagDefinition by_name(const char* const name, const size_t count, const CompilerFlagType type) {
-            return FlagDefinition { name, nullptr, count, type };
-        }
+    namespace flag {
 
-        constexpr static FlagDefinition by_pattern(const char* const pattern, const size_t count, const CompilerFlagType type) {
-            return FlagDefinition { nullptr, pattern, count, type };
-        }
+        enum class Consumption {
+            NONE,                                   // expect exact match; no next
+            NONE_OR_CAN_STICK,                      // expect exact match or followed by something; no next
+            NONE_OR_CAN_STICK_WITH_EQUAL,           // expect exact match or followed by equal sign; no next
+            NONE_STICK,                             // expect followed by something; no next
+            NONE_STICK_WITH_EQUAL,                  // expect followed by equal sign; no next
+            ONE_SEPARATE,                           // expect exact match; take 1 next
+            ONE_SEPARATE_OR_CAN_STICK,              // expect exact match or followed by something; take 1 next or nothing if stick
+            ONE_SEPARATE_OR_CAN_STICK_WITH_EQUAL,   // expect exact match or followed by equal sign; take 1 next or nothing if stick
+        };
 
-        [[nodiscard]]
-        std::optional<std::tuple<size_t, CompilerFlagType>> match(const std::string& arg) const {
-            if (name_ != nullptr) {
-                return match_by_name(arg);
+        size_t count(Consumption consumption, bool is_exact_match) {
+            switch (consumption) {
+                case Consumption::ONE_SEPARATE:
+                    return 1;
+                case Consumption::ONE_SEPARATE_OR_CAN_STICK:
+                case Consumption::ONE_SEPARATE_OR_CAN_STICK_WITH_EQUAL:
+                    return is_exact_match ? 1 : 0;
+                default:
+                    return 0;
             }
-            if (pattern_ != nullptr) {
-                return match_by_pattern(arg);
+        }
+
+        bool exact_match_allowed(Consumption consumption) {
+            switch (consumption) {
+                case Consumption::NONE_STICK:
+                case Consumption::NONE_STICK_WITH_EQUAL:
+                    return false;
+                default:
+                    return true;
             }
-            return std::nullopt;
         }
 
-    private:
-        constexpr FlagDefinition(const char* const name, const char* const pattern, const size_t count, const CompilerFlagType type)
-                : name_(name)
-                , pattern_(pattern)
-                , count_(count)
-                , type_(type)
-        { }
-
-        [[nodiscard]]
-        std::optional<std::tuple<size_t, CompilerFlagType>> match_by_name(const std::string& arg) const {
-            return (arg == name_) ? std::make_optional(std::make_pair(count_, type_)) : std::nullopt;
+        bool partial_match_allowed(Consumption consumption) {
+            switch (consumption) {
+                case Consumption::NONE:
+                case Consumption::ONE_SEPARATE:
+                    return false;
+                default:
+                    return true;
+            }
         }
 
-        [[nodiscard]]
-        std::optional<std::tuple<size_t, CompilerFlagType>> match_by_pattern(const std::string& arg) const {
-            std::regex re(pattern_);
-            std::cmatch m;
-            return (std::regex_match(arg.c_str(), m, re)) ? std::make_optional(std::make_pair(count_, type_)) : std::nullopt;
-        }
+        struct FlagDefinition {
+            CompilerFlagType type;
+            Consumption consumption;
+        };
 
-    private:
-        const char* name_;
-        const char* pattern_;
-        size_t count_;
-        CompilerFlagType type_;
-    };
+        using FlagsByName = std::map<std::string_view, FlagDefinition>;
 
-    // Generic flag matcher, which takes a list of flag definition and tries to match it.
-    class FlagMatcher {
-    protected:
-        FlagMatcher(const FlagDefinition *const begin, const FlagDefinition *const end)
-                : begin_(begin)
-                , end_(end)
-        { }
+        static const FlagsByName FLAG_DEFINITION = {
+                {"-x",                 {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::ONE_SEPARATE}},
+                {"-c",                 {CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING, Consumption::NONE}},
+                {"-S",                 {CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING, Consumption::NONE}},
+                {"-E",                 {CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING, Consumption::NONE}},
+                {"-o",                 {CompilerFlagType::KIND_OF_OUTPUT_OUTPUT,     Consumption::ONE_SEPARATE}},
+                {"-dumpbase",          {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::ONE_SEPARATE}},
+                {"-dumpbase-ext",      {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::ONE_SEPARATE}},
+                {"-dumpdir",           {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::ONE_SEPARATE}},
+                {"-v",                 {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE}},
+                {"-###",               {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE}},
+                {"--help",             {CompilerFlagType::KIND_OF_OUTPUT_INFO,       Consumption::NONE_OR_CAN_STICK_WITH_EQUAL}},
+                {"--target-help",      {CompilerFlagType::KIND_OF_OUTPUT_INFO,       Consumption::NONE}},
+                {"--version",          {CompilerFlagType::KIND_OF_OUTPUT_INFO,       Consumption::NONE}},
+                {"-pass-exit-codes",   {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE}},
+                {"-pipe",              {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE}},
+                {"-specs",             {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-wrapper",           {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::ONE_SEPARATE}},
+                {"-ffile-prefix-map",  {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-fplugin",           {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE_STICK_WITH_EQUAL}},
+                {"@",                  {CompilerFlagType::KIND_OF_OUTPUT,            Consumption::NONE_STICK}},
+                {"-A",                 {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-D",                 {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-U",                 {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-include",           {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE}},
+                {"-imacros",           {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE}},
+                {"-undef",             {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-pthread",           {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-M",                 {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MM",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MG",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MP",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MD",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MMD",               {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::NONE}},
+                {"-MF",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::ONE_SEPARATE}},
+                {"-MT",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::ONE_SEPARATE}},
+                {"-MQ",                {CompilerFlagType::PREPROCESSOR_MAKE,         Consumption::ONE_SEPARATE}},
+                {"-C",                 {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-CC",                {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-P",                 {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-traditional",       {CompilerFlagType::PREPROCESSOR,              Consumption::NONE_OR_CAN_STICK}},
+                {"-trigraphs",         {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-remap",             {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-H",                 {CompilerFlagType::PREPROCESSOR,              Consumption::NONE}},
+                {"-Xpreprocessor",     {CompilerFlagType::PREPROCESSOR,              Consumption::ONE_SEPARATE}},
+                {"-Wp,",               {CompilerFlagType::PREPROCESSOR,              Consumption::NONE_STICK}},
+                {"-I",                 {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-iplugindir",        {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-iquote",            {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-isystem",           {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-idirafter",         {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-iprefix",           {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-iwithprefix",       {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-iwithprefixbefore", {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-isysroot",          {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-imultilib",         {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE}},
+                {"-L",                 {CompilerFlagType::DIRECTORY_SEARCH_LINKER,   Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-B",                 {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"--sysroot",          {CompilerFlagType::DIRECTORY_SEARCH,          Consumption::ONE_SEPARATE_OR_CAN_STICK_WITH_EQUAL}},
+                {"-flinker-output",    {CompilerFlagType::LINKER,                    Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-fuse-ld",           {CompilerFlagType::LINKER,                    Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-l",                 {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE_OR_CAN_STICK}},
+                {"-nostartfiles",      {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-nodefaultlibs",     {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-nolibc",            {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-nostdlib",          {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-e",                 {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE}},
+                {"-entry",             {CompilerFlagType::LINKER,                    Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-pie",               {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-no-pie",            {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-static-pie",        {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-r",                 {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-rdynamic",          {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-s",                 {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-symbolic",          {CompilerFlagType::LINKER,                    Consumption::NONE}},
+                {"-static",            {CompilerFlagType::LINKER,                    Consumption::NONE_OR_CAN_STICK}},
+                {"-shared",            {CompilerFlagType::LINKER,                    Consumption::NONE_OR_CAN_STICK}},
+                {"-T",                 {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE}},
+                {"-Xlinker",           {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE}},
+                {"-Wl,",               {CompilerFlagType::LINKER,                    Consumption::NONE_STICK}},
+                {"-u",                 {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE}},
+                {"-z",                 {CompilerFlagType::LINKER,                    Consumption::ONE_SEPARATE}},
+                {"-Xassembler",        {CompilerFlagType::OTHER,                     Consumption::ONE_SEPARATE}},
+                {"-Wa,",               {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-ansi",              {CompilerFlagType::OTHER,                     Consumption::NONE}},
+                {"-aux-info",          {CompilerFlagType::OTHER,                     Consumption::ONE_SEPARATE}},
+                {"-std",               {CompilerFlagType::OTHER,                     Consumption::NONE_STICK_WITH_EQUAL}},
+                {"-O",                 {CompilerFlagType::OTHER,                     Consumption::NONE_OR_CAN_STICK}},
+                {"-g",                 {CompilerFlagType::OTHER,                     Consumption::NONE_OR_CAN_STICK}},
+                {"-f",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-m",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-p",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-W",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-no",                {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-tno",               {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-save",              {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-d",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-E",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-Q",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-X",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"-Y",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+                {"--",                 {CompilerFlagType::OTHER,                     Consumption::NONE_STICK}},
+        };
 
-    public:
-        [[nodiscard]]
-        rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
-        {
-            const std::string front = *input.begin;
-            for (auto it = begin_; it != end_; ++it) {
-                if (auto match = it->match(front); match) {
+        // Parser combinator which takes a list of flag definition and tries to apply
+        // for the the received input stream. It can recognize only a single compiler
+        // flag at the time.
+        struct FlagParser {
+            using Match = std::tuple<size_t, CompilerFlagType>;
+
+            FlagParser()
+                    : flags(FLAG_DEFINITION)
+            { }
+
+            [[nodiscard]]
+            rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
+            {
+                if (input.begin == input.end) {
+                    return rust::Err(input);
+                }
+                const std::string_view key(*input.begin);
+                if (auto match = lookup(key); match) {
                     const auto& [count, type] = match.value();
 
                     auto begin = input.begin;
@@ -219,125 +326,65 @@ namespace gcc {
                     Input remainder = { end, input.end };
                     return rust::Ok(std::make_pair(compiler_flag, remainder));
                 }
+                return rust::Err(input);
             }
-            return rust::Err(input);
-        }
 
-    private:
-        const FlagDefinition *const begin_;
-        const FlagDefinition *const end_;
-    };
+            [[nodiscard]]
+            std::optional<Match> lookup(const std::string_view &key) const
+            {
+                // try to find if the key has an associated instruction
+                if (const auto candidate = flags.lower_bound(key); flags.end() != candidate) {
+                    // exact matches are preferred in all cases.
+                    if (auto result = check_equal(key, candidate); result) {
+                        return result;
+                    }
+                    // check if the argument is allowed to stick to the flag
+                    if (auto result = check_partial(key, candidate); result) {
+                        return result;
+                    }
+                    // check if this is the first element or not.
+                    if (flags.begin() != candidate) {
+                        const auto previous = std::prev(candidate);
+                        if (auto result = check_partial(key, previous); result) {
+                            return result;
+                        }
+                    }
+                }
+                // check if the last element is not the one we are looking for.
+                // (this is a limitation of `lower_bound` method.)
+                const auto candidate = std::prev(flags.end());
+                if (auto result = check_partial(key, candidate); result) {
+                    return result;
+                }
+                return std::nullopt;
+            }
 
-    class KindOfOutputFlagMatcher : public FlagMatcher {
-        constexpr static const FlagDefinition FLAGS[] = {
-                FlagDefinition::by_name("-x", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-c", 0, CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING),
-                FlagDefinition::by_name("-S", 0, CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING),
-                FlagDefinition::by_name("-E", 0, CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING),
-                FlagDefinition::by_name("-o", 1, CompilerFlagType::KIND_OF_OUTPUT_OUTPUT),
-                FlagDefinition::by_name("-dumpbase", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-dumpbase-ext", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-dumpdir", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-v", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-###", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("--help", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
-                FlagDefinition::by_name("--target-help", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
-                FlagDefinition::by_pattern("--help=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
-                FlagDefinition::by_name("--version", 0, CompilerFlagType::KIND_OF_OUTPUT_INFO),
-                FlagDefinition::by_name("-pass-exit-codes", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-pipe", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-specs=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-wrapper", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-ffile-prefix-map=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-fplugin", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-fplugin=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_name("-fplugin-arg-name-key", 1, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-fplugin-arg-name-key=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-fdump-ada-spec(.*)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-fada-spec-parent=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("-fdump-go-sepc=(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
-                FlagDefinition::by_pattern("@(.+)", 0, CompilerFlagType::KIND_OF_OUTPUT),
+            [[nodiscard]]
+            static std::optional<Match> check_equal(const std::string_view& key, FlagsByName::const_iterator candidate) {
+                if (!key.empty() && candidate->first == key && exact_match_allowed(candidate->second.consumption)) {
+                    const auto& instruction = candidate->second;
+                    return std::make_optional(std::make_tuple(count(instruction.consumption, true), instruction.type));
+                }
+                return std::nullopt;
+            }
+
+            [[nodiscard]]
+            static std::optional<Match> check_partial(const std::string_view& key, FlagsByName::const_iterator candidate) {
+                if (!key.empty() && partial_match_allowed(candidate->second.consumption)) {
+                    const auto length = std::min(key.size(), candidate->first.size());
+                    // TODO: make extra check on equal sign
+                    // TODO: make extra check on mandatory following characters
+                    if (key.substr(0, length) == candidate->first.substr(0, length)) {
+                        const auto &instruction = candidate->second;
+                        return std::make_optional(std::make_tuple(count(instruction.consumption, false), instruction.type));
+                    }
+                }
+                return std::nullopt;
+            }
+
+            FlagsByName const& flags;
         };
-
-    public:
-        KindOfOutputFlagMatcher()
-                : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
-        { }
-    };
-
-    class PreprocessorFlagMatcher : public FlagMatcher {
-        constexpr static const FlagDefinition FLAGS[] = {
-                FlagDefinition::by_name("-A", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-A(.+)", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-D", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-D(.+)", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-U", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-U(.+)", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-include", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-imacros", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-undef", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-pthread", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-M(|M|G|P|D|MD)", 0, CompilerFlagType::PREPROCESSOR_MAKE),
-                FlagDefinition::by_pattern("-M(F|T|Q)", 1, CompilerFlagType::PREPROCESSOR_MAKE),
-                FlagDefinition::by_pattern("-(C|CC|P|traditional|traditional-cpp|trigraphs|remap|H)", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-d[MDNIU]", 0, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_name("-Xpreprocessor", 1, CompilerFlagType::PREPROCESSOR),
-                FlagDefinition::by_pattern("-Wp,(.+)", 0, CompilerFlagType::PREPROCESSOR),
-        };
-
-    public:
-        PreprocessorFlagMatcher()
-                : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
-        { }
-    };
-
-    class DirectorySearchFlagMatcher : public FlagMatcher {
-        constexpr static const FlagDefinition FLAGS[] = {
-                FlagDefinition::by_name("-I", 1, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_name("-I(.+)", 0, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_name("-iplugindir", 1, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_pattern("-iplugindir=(.+)", 0, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_pattern("-i(.*)", 1, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_pattern(R"(-no(stdinc|stdinc\+\+|-canonical-prefixes|-sysroot-suffix))", 0, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_name("-L", 1, CompilerFlagType::DIRECTORY_SEARCH_LINKER),
-                FlagDefinition::by_pattern("-L(.+)", 0, CompilerFlagType::DIRECTORY_SEARCH_LINKER),
-                FlagDefinition::by_name("-B", 1, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_pattern("-B(.+)", 0, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_name("--sysroot", 1, CompilerFlagType::DIRECTORY_SEARCH),
-                FlagDefinition::by_pattern("--sysroot=(.+)", 0, CompilerFlagType::DIRECTORY_SEARCH),
-        };
-
-    public:
-        DirectorySearchFlagMatcher()
-                : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
-        { }
-    };
-
-    class LinkerFlagMatcher : public FlagMatcher {
-        constexpr static const FlagDefinition FLAGS[] = {
-                FlagDefinition::by_pattern("-flinker-output=(.+)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-fuse-ld=(.+)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-l", 1, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-l(.+)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-no(startfiles|defaultlibs|libc|stdlib)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-e", 1, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-entry=(.+)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-(pie|no-pie|static-pie)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-(r|rdynamic|s|symbolic)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-(static|shared)(|-libgcc)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern(R"(-static-lib(asan|tsan|lsan|ubsan|stdc\+\+))", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-T", 1, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-Xlinker", 1, CompilerFlagType::LINKER),
-                FlagDefinition::by_pattern("-Wl,(.+)", 0, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-u", 1, CompilerFlagType::LINKER),
-                FlagDefinition::by_name("-z", 1, CompilerFlagType::LINKER),
-        };
-
-    public:
-        LinkerFlagMatcher()
-                : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
-        { }
-    };
+    }
 
     struct SourceMatcher {
         constexpr static const char* EXTENSIONS[] {
@@ -391,25 +438,21 @@ namespace gcc {
         }
     };
 
-    class EverythingElseFlagMatcher : public FlagMatcher {
-        constexpr static const FlagDefinition FLAGS[] = {
-                FlagDefinition::by_name("-Xassembler", 1, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-Wa,(.*)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_name("-ansi", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_name("-aux-info", 1, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-std=(.*)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-[Og](.*)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-[fmpW](.+)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-(no|tno|save|d|Wa,)(.+)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("-[EQXY](.+)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern("--(.+)", 0, CompilerFlagType::OTHER),
-                FlagDefinition::by_pattern(".+", 0, CompilerFlagType::LINKER_OBJECT_FILE)
-        };
+    struct EverythingElseFlagMatcher {
 
-    public:
-        EverythingElseFlagMatcher()
-                : FlagMatcher(FLAGS, FLAGS + (sizeof(FLAGS) / sizeof(FlagDefinition)))
-        { }
+        [[nodiscard]]
+        rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
+        {
+            if (const std::string& front = *input.begin; !front.empty()) {
+                auto begin = input.begin;
+                auto end = std::next(begin);
+
+                CompilerFlag compiler_flag = {Arguments(begin, end), CompilerFlagType::LINKER_OBJECT_FILE};
+                Input remainder = {end, input.end};
+                return rust::Ok(std::make_pair(compiler_flag, remainder));
+            }
+            return rust::Err(input);
+        }
     };
 
     // https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
@@ -442,13 +485,10 @@ namespace gcc {
 
     rust::Result<CompilerFlags> parse(const report::Command &command)
     {
-        auto const parser =
+        static auto const parser =
                 Repeat(
                         OneOf(
-                                gcc::KindOfOutputFlagMatcher(),
-                                gcc::PreprocessorFlagMatcher(),
-                                gcc::DirectorySearchFlagMatcher(),
-                                gcc::LinkerFlagMatcher(),
+                                gcc::flag::FlagParser(),
                                 gcc::SourceMatcher(),
                                 gcc::EverythingElseFlagMatcher()
                         )
