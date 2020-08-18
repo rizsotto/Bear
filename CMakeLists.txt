@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 2.8)
 project(bear C)
 set(BEAR_VERSION "2.4.3")
 
+option(USE_SHELL_COMPLETION "Optionally add shell completion" ON)
+
 include(GNUInstallDirs)
 install(FILES COPYING README.md ChangeLog.md
   DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -30,7 +32,10 @@ add_subdirectory(libear)
 add_subdirectory(bear)
 add_subdirectory(test)
 add_subdirectory(man)
-add_subdirectory(shell-completion)
+
+if (USE_SHELL_COMPLETION)
+  add_subdirectory(shell-completion)
+endif ()
 
 set(CPACK_PACKAGE_NAME "bear")
 set(CPACK_PACKAGE_CONTACT "László Nagy")
