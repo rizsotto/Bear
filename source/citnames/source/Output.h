@@ -31,11 +31,20 @@ namespace fs = std::filesystem;
 
 namespace cs::output {
 
+    // Output format definition
     struct Format {
         bool command_as_array;
         bool drop_output_field;
     };
 
+    // Output content definition
+    struct Content {
+        bool include_only_existing_source;
+        std::list<fs::path> paths_to_include;
+        std::list<fs::path> paths_to_exclude;
+    };
+
+    // Content definition
     struct Entry {
         fs::path file;
         fs::path directory;
@@ -54,9 +63,13 @@ namespace cs::output {
     std::ostream& operator<<(std::ostream&, const Entry&);
     std::ostream& operator<<(std::ostream&, const Entries&);
 
+    // Represents predicate which decides if the entry shall be placed into the output.
+    using Filter = std::function<bool(const Entry&)>;
+
     // Utility class to persists entries.
     struct CompilationDatabase {
-        explicit CompilationDatabase(const Format&);
+        CompilationDatabase(const Format&, const Content&);
+        CompilationDatabase(const Format&, Filter&&);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
@@ -68,5 +81,6 @@ namespace cs::output {
 
     private:
         Format format;
+        Filter filter;
     };
 }

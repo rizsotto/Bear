@@ -19,17 +19,21 @@
 
 #include "gtest/gtest.h"
 
-#include "CompilationDatabase.h"
+#include "Output.h"
 
 #include <iterator>
 
 namespace {
 
+    cs::output::Filter no_filter() {
+        return [](auto) { return true; };
+    }
+
     void simple_value_serialized_and_read_back(
             const cs::output::Entries& expected,
             const cs::output::Format& format)
     {
-        cs::output::CompilationDatabase sut(format);
+        cs::output::CompilationDatabase sut(format, no_filter());
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, expected);
@@ -69,7 +73,7 @@ namespace {
     {
         format.drop_output_field = true;
 
-        cs::output::CompilationDatabase sut(format);
+        cs::output::CompilationDatabase sut(format, no_filter());
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, input);
@@ -101,7 +105,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::output::CompilationDatabase sut({ false, false });
+        cs::output::CompilationDatabase sut({ false, false }, no_filter());
         std::stringstream buffer;
 
         auto deserialized = sut.from_json(buffer);
@@ -110,7 +114,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false });
+        cs::output::CompilationDatabase sut({ false, false }, no_filter());
         std::stringstream buffer;
 
         buffer << "[ { } ]";
@@ -121,7 +125,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false });
+        cs::output::CompilationDatabase sut({ false, false }, no_filter());
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";

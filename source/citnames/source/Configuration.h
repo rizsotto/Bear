@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Filter.h"
+#include "Output.h"
 #include <libresult/Result.h>
 
 #include <filesystem>

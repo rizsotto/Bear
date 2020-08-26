@@ -19,8 +19,7 @@
 
 #include "Application.h"
 #include "Configuration.h"
-#include "CompilationDatabase.h"
-#include "Filter.h"
+#include "Output.h"
 #include "Semantic.h"
 
 #include "libreport/Report.h"
@@ -114,7 +113,6 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         report::ReportSerializer report_serializer;
-        cs::output::FilterPtr filter;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
@@ -124,18 +122,15 @@ namespace cs {
         const auto configuration = cfg::default_value(environment);
 
         auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto filter = arguments.map<output::FilterPtr>([](auto arguments) {
-           return make_filter(arguments.content);
-        });
         auto semantic = Semantic::from(configuration.compilation);
 
-        return rust::merge(arguments, filter, semantic)
+        return rust::merge(arguments, semantic)
                 .map<Application::State*>([&configuration](auto tuples) {
-                    const auto& [arguments, filter, semantic] = tuples;
+                    const auto& [arguments, semantic] = tuples;
                     // read the configuration
-                    cs::output::CompilationDatabase output(configuration.format);
+                    cs::output::CompilationDatabase output(configuration.format, arguments.content);
                     report::ReportSerializer report_serializer;
-                    return new Application::State { arguments, report_serializer, filter, semantic, output };
+                    return new Application::State { arguments, report_serializer, semantic, output };
                 })
                 .map<Application>([](auto impl) {
                     spdlog::debug("application object initialized.");
@@ -149,10 +144,8 @@ namespace cs {
         return impl_->report_serializer.from_json(impl_->arguments.input)
             .map<output::Entries>([this](const auto& commands) {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
-                return impl_->semantic.transform(commands);
-            })
-            // remove duplicates
-            .map<output::Entries>([](const auto& compilations) {
+                auto compilations = impl_->semantic.transform(commands);
+                // remove duplicates
                 return output::merge({}, compilations);
             })
             // read back the current content and extend with the new elements.
@@ -165,14 +158,6 @@ namespace cs {
                                 return output::merge(old_entries, compilations);
                             })
                     : rust::Result<output::Entries>(rust::Ok(compilations));
-            })
-            // filter out entries
-            .map<output::Entries>([this](auto entries) {
-                entries.remove_if([this](const auto& entry) {
-                    const bool keep = impl_->filter->operator()(entry);
-                    return !keep;
-                });
-                return entries;
             })
             // write the entries into the output file.
             .and_then<int>([this](const auto& compilations) {

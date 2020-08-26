@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "CompilationDatabase.h"
+#include "Output.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
 

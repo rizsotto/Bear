@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "CompilationDatabase.h"
+#include "Output.h"
 #include "libshell/Command.h"
 
 #include <iomanip>
@@ -25,10 +25,55 @@
 
 #include <nlohmann/json.hpp>
 
+namespace {
+
+    bool is_exists(const fs::path& path)
+    {
+        std::error_code error_code;
+        return fs::exists(path, error_code);
+    }
+
+    bool contains(const fs::path& root, const fs::path& file)
+    {
+        auto [root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
+        return (root_end == root.end());
+    }
+
+    bool contains(const std::list<fs::path>& root, const fs::path& file)
+    {
+        return root.end() != std::find_if(root.begin(), root.end(),
+                                          [&file](auto directory) { return contains(directory, file); });
+    }
+
+    cs::output::Filter make_filter(const cs::output::Content &config)
+    {
+        return [config](const auto& entry) -> bool {
+            if (config.include_only_existing_source) {
+                const auto exists = is_exists(entry.file);
+
+                const auto &include = config.paths_to_include;
+                const bool to_include = include.empty() || contains(include, entry.file);
+                const auto &exclude = config.paths_to_exclude;
+                const bool to_exclude = !exclude.empty() && contains(exclude, entry.file);
+
+                return exists && to_include && !to_exclude;
+            }
+            // if no check required, accept every entry.
+            return true;
+        };
+    }
+}
+
 namespace cs::output {
 
-    CompilationDatabase::CompilationDatabase(const Format &_fromat)
+    CompilationDatabase::CompilationDatabase(const Format &_fromat, const Content &_content)
             : format(_fromat)
+            , filter(make_filter(_content))
+    { }
+
+    CompilationDatabase::CompilationDatabase(const Format &_fromat, Filter&& _filter)
+            : format(_fromat)
+            , filter(_filter)
     { }
 
     nlohmann::json to_json(const Entry &rhs, const Format& format)
@@ -64,8 +109,10 @@ namespace cs::output {
         try {
             nlohmann::json json = nlohmann::json::array();
             for (const auto & entry : entries) {
-                auto json_entry = cs::output::to_json(entry, format);
-                json.emplace_back(std::move(json_entry));
+                if (std::invoke(filter, entry)) {
+                    auto json_entry = cs::output::to_json(entry, format);
+                    json.emplace_back(std::move(json_entry));
+                }
             }
 
             ostream << std::setw(2) << json << std::endl;

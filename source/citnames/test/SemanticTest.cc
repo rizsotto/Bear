@@ -20,7 +20,7 @@
 #include "gtest/gtest.h"
 
 #include "Configuration.h"
-#include "CompilationDatabase.h"
+#include "Output.h"
 #include "Semantic.h"
 
 namespace {
