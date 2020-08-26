@@ -23,13 +23,13 @@ namespace cs::cfg {
 
     Value default_value(const std::map<std::string, std::string>& environment) {
         Value value {
-                cfg::Format {
+                output::Format {
                     // command as array
                     true,
                     // drop output field
                     false
                 },
-                cfg::Content {
+                output::Content {
                     // include only existing source
                     true,
                     // paths to include

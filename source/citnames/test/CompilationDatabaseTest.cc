@@ -27,7 +27,7 @@ namespace {
 
     void simple_value_serialized_and_read_back(
             const cs::output::Entries& expected,
-            const cs::cfg::Format& format)
+            const cs::output::Format& format)
     {
         cs::output::CompilationDatabase sut(format);
         std::stringstream buffer;
@@ -46,8 +46,8 @@ namespace {
     {
         cs::output::Entries expected = {};
 
-        simple_value_serialized_and_read_back(expected, cs::cfg::Format {true, false});
-        simple_value_serialized_and_read_back(expected, cs::cfg::Format {false, false});
+        simple_value_serialized_and_read_back(expected, cs::output::Format {true, false});
+        simple_value_serialized_and_read_back(expected, cs::output::Format {false, false});
     }
 
     TEST(compilation_database, simple_value_serialized_and_read_back)
@@ -58,14 +58,14 @@ namespace {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        simple_value_serialized_and_read_back(expected, cs::cfg::Format {true, false});
-        simple_value_serialized_and_read_back(expected, cs::cfg::Format {false, false});
+        simple_value_serialized_and_read_back(expected, cs::output::Format {true, false});
+        simple_value_serialized_and_read_back(expected, cs::output::Format {false, false});
     }
 
     void value_serialized_and_read_back_without_output(
             const cs::output::Entries& input,
             const cs::output::Entries& expected,
-            cs::cfg::Format format)
+            cs::output::Format format)
     {
         format.drop_output_field = true;
 
@@ -95,8 +95,8 @@ namespace {
                 { "entries.c", "/path/to", { }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        value_serialized_and_read_back_without_output(input, expected, cs::cfg::Format {true, false});
-        value_serialized_and_read_back_without_output(input, expected, cs::cfg::Format {false, false});
+        value_serialized_and_read_back_without_output(input, expected, cs::output::Format {true, false});
+        value_serialized_and_read_back_without_output(input, expected, cs::output::Format {false, false});
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)

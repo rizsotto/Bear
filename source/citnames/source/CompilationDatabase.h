@@ -19,7 +19,6 @@
 
 #pragma once
 
-#include "Configuration.h"
 #include "libresult/Result.h"
 
 #include <filesystem>
@@ -31,6 +30,11 @@
 namespace fs = std::filesystem;
 
 namespace cs::output {
+
+    struct Format {
+        bool command_as_array;
+        bool drop_output_field;
+    };
 
     struct Entry {
         fs::path file;
@@ -52,7 +56,7 @@ namespace cs::output {
 
     // Utility class to persists entries.
     struct CompilationDatabase {
-        explicit CompilationDatabase(const cs::cfg::Format&);
+        explicit CompilationDatabase(const Format&);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
@@ -63,6 +67,6 @@ namespace cs::output {
         virtual rust::Result<Entries> from_json(std::istream &istream) const;
 
     private:
-        cs::cfg::Format format;
+        Format format;
     };
 }

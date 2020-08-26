@@ -19,37 +19,26 @@
 
 #pragma once
 
-#include "Filter.h"
-#include <libresult/Result.h>
+#include "CompilationDatabase.h"
 
-#include <filesystem>
-#include <list>
-#include <map>
-#include <string>
-#include <optional>
+#include <memory>
 
-namespace fs = std::filesystem;
+namespace cs::output {
 
-namespace cs::cfg {
-
-    struct ExpandWrappers {
-        bool mpi;
-        bool cuda;
-        bool ccache;
-        bool distcc;
+    struct Content {
+        bool include_only_existing_source;
+        std::list<fs::path> paths_to_include;
+        std::list<fs::path> paths_to_exclude;
     };
 
-    struct Compilation {
-        cfg::ExpandWrappers expand_wrappers;
-        std::list<fs::path> compilers;
+    // Represents predicate which decides if the entry shall be placed into the output.
+    struct Filter {
+        virtual ~Filter() noexcept = default;
+
+        virtual bool operator()(const output::Entry &) noexcept = 0;
     };
 
-    struct Value {
-        output::Format format;
-        output::Content content;
-        cfg::Compilation compilation;
-    };
+    using FilterPtr = std::shared_ptr<Filter>;
 
-    // Create a default value.
-    Value default_value(const std::map<std::string, std::string>& environment);
+    FilterPtr make_filter(const Content &cfg);
 }

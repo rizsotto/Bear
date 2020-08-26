@@ -20,6 +20,7 @@
 #include "Application.h"
 #include "Configuration.h"
 #include "CompilationDatabase.h"
+#include "Filter.h"
 #include "Semantic.h"
 
 #include "libreport/Report.h"
@@ -43,7 +44,7 @@ namespace {
         fs::path input;
         fs::path output;
         bool append;
-        cs::cfg::Content content;
+        cs::output::Content content;
     };
 
     std::list<fs::path> to_path_list(const std::vector<std::string_view>& strings)
@@ -84,7 +85,7 @@ namespace {
                         fs::path(input),
                         fs::path(output),
                         append,
-                        cs::cfg::Content{
+                        cs::output::Content{
                             run_check,
                             include,
                             exclude,
@@ -113,7 +114,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         report::ReportSerializer report_serializer;
-        cs::FilterPtr filter;
+        cs::output::FilterPtr filter;
         cs::Semantic semantic;
         cs::output::CompilationDatabase output;
     };
@@ -123,7 +124,7 @@ namespace cs {
         const auto configuration = cfg::default_value(environment);
 
         auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto filter = arguments.map<FilterPtr>([](auto arguments) {
+        auto filter = arguments.map<output::FilterPtr>([](auto arguments) {
            return make_filter(arguments.content);
         });
         auto semantic = Semantic::from(configuration.compilation);

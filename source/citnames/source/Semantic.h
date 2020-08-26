@@ -27,15 +27,6 @@
 
 namespace cs {
 
-    // Represents predicate which decides if the entry shall be placed into the output.
-    struct Filter {
-        virtual ~Filter() noexcept = default;
-        virtual bool operator()(const output::Entry&) noexcept = 0;
-    };
-    using FilterPtr = std::shared_ptr<Filter>;
-
-    FilterPtr make_filter(const cs::cfg::Content &cfg);
-
     // Represents an expert system which can recognize compilation entries from
     // command executions. It covers multiple tools and consider omit results
     // based on configuration.
@@ -56,7 +47,7 @@ namespace cs {
         Semantic() = delete;
         ~Semantic() noexcept = default;
 
-        Semantic(Tools&&) noexcept;
+        explicit Semantic(Tools&&) noexcept;
 
     private:
         Tools tools_;

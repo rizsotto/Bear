@@ -23,62 +23,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
-namespace {
-
-    struct NoFilter : public cs::Filter {
-        bool operator()(const cs::output::Entry &) noexcept override {
-            return true;
-        }
-    };
-
-    struct StrictFilter : public cs::Filter {
-
-        explicit StrictFilter(cs::cfg::Content config)
-                : config_(std::move(config))
-        { }
-
-        bool operator()(const cs::output::Entry &entry) noexcept override {
-            const bool exists = is_exists(entry.file);
-
-            const auto &include = config_.paths_to_include;
-            const bool to_include = include.empty() || contains(include, entry.file);
-            const auto &exclude = config_.paths_to_exclude;
-            const bool to_exclude = !exclude.empty() && contains(exclude, entry.file);
-
-            return exists && to_include && !to_exclude;
-        }
-
-        static bool is_exists(const fs::path& path)
-        {
-            std::error_code error_code;
-            return fs::exists(path, error_code);
-        }
-
-        static bool contains(const fs::path& root, const fs::path& file)
-        {
-            auto [root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
-            return (root_end == root.end());
-        }
-
-        static bool contains(const std::list<fs::path>& root, const fs::path& file)
-        {
-            return root.end() != std::find_if(root.begin(), root.end(),
-                                              [&file](auto directory) { return contains(directory, file); });
-        }
-
-    private:
-        cs::cfg::Content config_;
-    };
-}
-
 namespace cs {
-
-    FilterPtr make_filter(const cs::cfg::Content &cfg)
-    {
-        return (cfg.include_only_existing_source)
-                ? FilterPtr(new StrictFilter(cfg))
-                : FilterPtr(new NoFilter());
-    }
 
     Semantic::Semantic(Tools&& tools) noexcept
             : tools_(tools)

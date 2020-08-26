@@ -27,11 +27,11 @@
 
 namespace cs::output {
 
-    CompilationDatabase::CompilationDatabase(const cs::cfg::Format &_fromat)
+    CompilationDatabase::CompilationDatabase(const Format &_fromat)
             : format(_fromat)
     { }
 
-    nlohmann::json to_json(const Entry &rhs, const cs::cfg::Format& format)
+    nlohmann::json to_json(const Entry &rhs, const Format& format)
     {
         nlohmann::json json;
 
@@ -183,7 +183,7 @@ namespace cs::output {
 
     std::ostream& operator<<(std::ostream& os, const Entry& entry)
     {
-        cfg::Format format = { false, false };
+        Format format = { false, false };
         nlohmann::json json = to_json(entry, format);
         os << json;
 
