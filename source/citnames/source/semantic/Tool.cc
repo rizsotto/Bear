@@ -29,8 +29,8 @@
 #include <utility>
 #include <functional>
 
-#include <fmt/format.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 
 namespace fs = std::filesystem;
 
@@ -641,6 +641,48 @@ namespace gcc {
 }
 
 namespace cs {
+
+    Tools::Tools(ToolPtrs&& tools) noexcept
+            : tools_(tools)
+    { }
+
+    rust::Result<Tools> Tools::from(const cfg::Compilation& cfg)
+    {
+        ToolPtrs tools = {
+                std::make_shared<GnuCompilerCollection>(cfg.compilers),
+        };
+        return rust::Ok(Tools(std::move(tools)));
+    }
+
+    output::Entries Tools::transform(const report::Report& report) const
+    {
+        output::Entries result;
+        for (const auto& execution : report.executions) {
+            spdlog::debug("Checking [pid: {}], command: {}", execution.run.pid, execution.command);
+            recognize(execution.command)
+                    .on_success([&execution, &result](auto items) {
+                        // copy to results if the config allows it
+                        std::copy(items.begin(), items.end(), std::back_inserter(result));
+                        spdlog::debug("Checking [pid: {}], Recognized as: [{}]", execution.run.pid, items);
+                    })
+                    .on_error([&execution](const auto& error) {
+                        spdlog::debug("Checking [pid: {}], {}", execution.run.pid, error.what());
+                    });
+        }
+        return result;
+    }
+
+    rust::Result<output::Entries> Tools::recognize(const report::Command& command) const
+    {
+        // check if any tool can recognize the command.
+        for (const auto& tool : tools_) {
+            // the first it recognize it won't seek for more.
+            if (auto semantic = tool->recognize(command); semantic.is_ok()) {
+                return semantic;
+            }
+        }
+        return rust::Err(std::runtime_error("No tools recognize this command."));
+    }
 
     cs::output::Entry make_absolute(cs::output::Entry&& entry)
     {

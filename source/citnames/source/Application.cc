@@ -20,7 +20,7 @@
 #include "Application.h"
 #include "Configuration.h"
 #include "Output.h"
-#include "Semantic.h"
+#include "semantic/Tool.h"
 
 #include "libreport/Report.h"
 
@@ -113,7 +113,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         report::ReportSerializer report_serializer;
-        cs::Semantic semantic;
+        cs::Tools semantic;
         cs::output::CompilationDatabase output;
     };
 
@@ -122,7 +122,7 @@ namespace cs {
         const auto configuration = cfg::default_value(environment);
 
         auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto semantic = Semantic::from(configuration.compilation);
+        auto semantic = Tools::from(configuration.compilation);
 
         return rust::merge(arguments, semantic)
                 .map<Application::State*>([&configuration](auto tuples) {

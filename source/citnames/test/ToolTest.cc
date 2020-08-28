@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Tool.h"
+#include "semantic/Tool.h"
 
 namespace {
 

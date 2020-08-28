@@ -21,7 +21,7 @@
 
 #include "Configuration.h"
 #include "Output.h"
-#include "Semantic.h"
+#include "semantic/Tool.h"
 
 namespace {
 
@@ -34,7 +34,7 @@ namespace {
         };
         auto cfg = cs::cfg::default_value(env);
 
-        auto sut = cs::Semantic::from(cfg.compilation);
+        auto sut = cs::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
     }
 
@@ -42,7 +42,7 @@ namespace {
     {
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Semantic::from(cfg.compilation);
+        auto sut = cs::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {
@@ -59,7 +59,7 @@ namespace {
     {
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Semantic::from(cfg.compilation);
+        auto sut = cs::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {

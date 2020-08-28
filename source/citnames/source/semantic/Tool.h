@@ -20,19 +20,38 @@
 #pragma once
 
 #include "Configuration.h"
-#include "Tool.h"
 #include "Output.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
 
+#include <filesystem>
+#include <optional>
+#include <string>
+
+namespace fs = std::filesystem;
+
 namespace cs {
+
+    // Represents a compiler or an executable which produce relevant entries
+    // to the compilation database. It can recognize the tool execution from
+    // a command line invocation and its context.
+    struct Tool {
+        virtual ~Tool() noexcept = default;
+
+        // Returns the compilation entries if those were recognised.
+        //
+        // Can return an optional with an empty list, which says that it was
+        // recognized the tool execution, but the execution was not a compilation.
+        [[nodiscard]]
+        virtual rust::Result<output::Entries> recognize(const report::Command &) const = 0;
+    };
 
     // Represents an expert system which can recognize compilation entries from
     // command executions. It covers multiple tools and consider omit results
     // based on configuration.
-    class Semantic {
+    class Tools {
     public:
-        static rust::Result<Semantic> from(const cfg::Compilation&);
+        static rust::Result<Tools> from(const cfg::Compilation&);
 
         [[nodiscard]]
         output::Entries transform(const report::Report& report) const;
@@ -42,14 +61,27 @@ namespace cs {
 
     public:
         using ToolPtr = std::shared_ptr<Tool>;
-        using Tools = std::list<ToolPtr>;
+        using ToolPtrs = std::list<ToolPtr>;
 
-        Semantic() = delete;
-        ~Semantic() noexcept = default;
+        Tools() = delete;
+        ~Tools() noexcept = default;
 
-        explicit Semantic(Tools&&) noexcept;
+        explicit Tools(ToolPtrs&&) noexcept;
 
     private:
-        Tools tools_;
+        ToolPtrs tools_;
+    };
+
+    struct GnuCompilerCollection : public Tool {
+        explicit GnuCompilerCollection(std::list<fs::path> paths);
+
+        [[nodiscard]]
+        rust::Result<output::Entries> recognize(const report::Command &command) const override;
+
+        [[nodiscard]]
+        bool recognize(const fs::path& program) const;
+
+    protected:
+        std::list<fs::path> paths;
     };
 }
