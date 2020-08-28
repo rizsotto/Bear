@@ -25,15 +25,18 @@
 
 namespace {
 
-    cs::output::Filter no_filter() {
-        return [](auto) { return true; };
-    }
+    using Format = cs::output::Format;
+    using Content = cs::output::Content;
+
+    Content NO_FILTER {
+        false, {}, {}
+    };
 
     void simple_value_serialized_and_read_back(
             const cs::output::Entries& expected,
-            const cs::output::Format& format)
+            const Format& format)
     {
-        cs::output::CompilationDatabase sut(format, no_filter());
+        cs::output::CompilationDatabase sut(format, NO_FILTER);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, expected);
@@ -50,8 +53,8 @@ namespace {
     {
         cs::output::Entries expected = {};
 
-        simple_value_serialized_and_read_back(expected, cs::output::Format {true, false});
-        simple_value_serialized_and_read_back(expected, cs::output::Format {false, false});
+        simple_value_serialized_and_read_back(expected, Format {true, false});
+        simple_value_serialized_and_read_back(expected, Format {false, false});
     }
 
     TEST(compilation_database, simple_value_serialized_and_read_back)
@@ -62,18 +65,18 @@ namespace {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        simple_value_serialized_and_read_back(expected, cs::output::Format {true, false});
-        simple_value_serialized_and_read_back(expected, cs::output::Format {false, false});
+        simple_value_serialized_and_read_back(expected, Format {true, false});
+        simple_value_serialized_and_read_back(expected, Format {false, false});
     }
 
     void value_serialized_and_read_back_without_output(
             const cs::output::Entries& input,
             const cs::output::Entries& expected,
-            cs::output::Format format)
+            Format format)
     {
         format.drop_output_field = true;
 
-        cs::output::CompilationDatabase sut(format, no_filter());
+        cs::output::CompilationDatabase sut(format, NO_FILTER);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, input);
@@ -99,13 +102,13 @@ namespace {
                 { "entries.c", "/path/to", { }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        value_serialized_and_read_back_without_output(input, expected, cs::output::Format {true, false});
-        value_serialized_and_read_back_without_output(input, expected, cs::output::Format {false, false});
+        value_serialized_and_read_back_without_output(input, expected, Format {true, false});
+        value_serialized_and_read_back_without_output(input, expected, Format {false, false});
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::output::CompilationDatabase sut({ false, false }, no_filter());
+        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
         std::stringstream buffer;
 
         auto deserialized = sut.from_json(buffer);
@@ -114,7 +117,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false }, no_filter());
+        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
         std::stringstream buffer;
 
         buffer << "[ { } ]";
@@ -125,7 +128,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false }, no_filter());
+        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";

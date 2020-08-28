@@ -31,20 +31,18 @@ namespace fs = std::filesystem;
 
 namespace cs::output {
 
-    // Output format definition
-    struct Format {
-        bool command_as_array;
-        bool drop_output_field;
-    };
-
-    // Output content definition
-    struct Content {
-        bool include_only_existing_source;
-        std::list<fs::path> paths_to_include;
-        std::list<fs::path> paths_to_exclude;
-    };
-
-    // Content definition
+    // The definition of the JSON compilation database format can be
+    // found here:
+    //   https://clang.llvm.org/docs/JSONCompilationDatabase.html
+    //
+    // The entry represents one element of the database. While the
+    // database might contains multiple entries (even for the same
+    // source file). A list of entries represents a whole compilation
+    // database. (No other metadata is provided.)
+    //
+    // The only unique field in the database the output field can be,
+    // but that is an optional field. So, in this sense this is not
+    // really a database with keys.
     struct Entry {
         fs::path file;
         fs::path directory;
@@ -54,22 +52,41 @@ namespace cs::output {
 
     using Entries = std::list<Entry>;
 
-    // Merge two compilation database without duplicate elements.
-    Entries merge(const Entries& lhs, const Entries& rhs);
-
     // Convenient methods for these types.
     bool operator==(const Entry& lhs, const Entry& rhs);
 
     std::ostream& operator<<(std::ostream&, const Entry&);
     std::ostream& operator<<(std::ostream&, const Entries&);
 
-    // Represents predicate which decides if the entry shall be placed into the output.
-    using Filter = std::function<bool(const Entry&)>;
+    // Merge two compilation database without duplicate elements.
+    //
+    // Duplicate detection is based on the equal operator defined
+    // above. (More advanced duplicate detection can be done by
+    // checking the output field. This might only work if all entries
+    // have this field.)
+    Entries merge(const Entries& lhs, const Entries& rhs);
 
-    // Utility class to persists entries.
+    struct Format {
+        bool command_as_array;
+        bool drop_output_field;
+    };
+
+    struct Content {
+        bool include_only_existing_source;
+        std::list<fs::path> paths_to_include;
+        std::list<fs::path> paths_to_exclude;
+    };
+
+    // Utility class to persists JSON compilation database.
+    //
+    // While the JSON compilation database might have different format
+    // (have either "command" or "arguments" fields), this util class
+    // provides a simple interface to read any format of the file.
+    //
+    // It also supports to write different format with configuration
+    // parameters. And basic content filtering is also available.
     struct CompilationDatabase {
         CompilationDatabase(const Format&, const Content&);
-        CompilationDatabase(const Format&, Filter&&);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
@@ -81,6 +98,6 @@ namespace cs::output {
 
     private:
         Format format;
-        Filter filter;
+        Content content;
     };
 }

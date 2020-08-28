@@ -27,6 +27,10 @@
 
 namespace {
 
+    using Filter = std::function<bool(const cs::output::Entry&)>;
+    using Format = cs::output::Format;
+    using Content = cs::output::Content;
+
     bool is_exists(const fs::path& path)
     {
         std::error_code error_code;
@@ -45,7 +49,7 @@ namespace {
                                           [&file](auto directory) { return contains(directory, file); });
     }
 
-    cs::output::Filter make_filter(const cs::output::Content &config)
+    Filter make_filter(const Content &config)
     {
         return [config](const auto& entry) -> bool {
             if (config.include_only_existing_source) {
@@ -66,14 +70,9 @@ namespace {
 
 namespace cs::output {
 
-    CompilationDatabase::CompilationDatabase(const Format &_fromat, const Content &_content)
-            : format(_fromat)
-            , filter(make_filter(_content))
-    { }
-
-    CompilationDatabase::CompilationDatabase(const Format &_fromat, Filter&& _filter)
-            : format(_fromat)
-            , filter(_filter)
+    CompilationDatabase::CompilationDatabase(const Format &_format, const Content &_content)
+            : format(_format)
+            , content(_content)
     { }
 
     nlohmann::json to_json(const Entry &rhs, const Format& format)
@@ -107,6 +106,7 @@ namespace cs::output {
     rust::Result<int> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const
     {
         try {
+            auto filter = make_filter(content);
             nlohmann::json json = nlohmann::json::array();
             for (const auto & entry : entries) {
                 if (std::invoke(filter, entry)) {
