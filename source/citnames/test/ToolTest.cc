@@ -20,18 +20,19 @@
 #include "gtest/gtest.h"
 
 #include "semantic/Tool.h"
+#include "semantic/ToolGcc.h"
 
 namespace {
 
-    TEST(GnuCompilerCollection, fails_on_empty) {
+    TEST(ToolGcc, fails_on_empty) {
         report::Command input = {};
 
-        cs::GnuCompilerCollection sut({});
+        cs::ToolGcc sut({});
 
-        EXPECT_FALSE(sut.recognize(input).is_ok());
+        EXPECT_FALSE(sut.compilations(input).is_ok());
     }
 
-    TEST(GnuCompilerCollection, simple) {
+    TEST(ToolGcc, simple) {
         report::Command input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "-o", "source.o", "source.c"},
@@ -46,14 +47,14 @@ namespace {
                         {"/usr/bin/cc", "-c", "-o", "source.o", "source.c"}},
         };
 
-        cs::GnuCompilerCollection sut({});
+        cs::ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.compilations(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
 
-    TEST(GnuCompilerCollection, linker_flag_filtered) {
+    TEST(ToolGcc, linker_flag_filtered) {
         report::Command input = {
                 "/usr/bin/cc",
                 {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
@@ -68,14 +69,14 @@ namespace {
                         {"/usr/bin/cc", "-c", "-o", "exe", "source.c"}},
         };
 
-        cs::GnuCompilerCollection sut({});
+        cs::ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.compilations(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
 
-    TEST(GnuCompilerCollection, pass_on_help) {
+    TEST(ToolGcc, pass_on_help) {
         report::Command input = {
                 "/usr/bin/gcc",
                 {"gcc", "--version"},
@@ -84,14 +85,14 @@ namespace {
         };
         cs::output::Entries expected = {};
 
-        cs::GnuCompilerCollection sut({});
+        cs::ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.compilations(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
 
-    TEST(GnuCompilerCollection, simple_with_C_PATH) {
+    TEST(ToolGcc, simple_with_C_PATH) {
         report::Command input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "source.c"},
@@ -115,14 +116,14 @@ namespace {
                 },
         };
 
-        cs::GnuCompilerCollection sut({});
+        cs::ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.compilations(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
 
-    TEST(GnuCompilerCollection, simple_where_compiler_from_env) {
+    TEST(ToolGcc, simple_where_compiler_from_env) {
         report::Command input = {
                 "/usr/bin/wrapper",
                 {"wrapper", "-c", "source.c"},
@@ -138,9 +139,9 @@ namespace {
                 },
         };
 
-        cs::GnuCompilerCollection sut({"/usr/bin/wrapper"});
+        cs::ToolGcc sut({"/usr/bin/wrapper"});
 
-        auto result = sut.recognize(input);
+        auto result = sut.compilations(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }

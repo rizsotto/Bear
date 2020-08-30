@@ -25,8 +25,8 @@
 #include "libreport/Report.h"
 
 #include <filesystem>
-#include <optional>
-#include <string>
+#include <list>
+#include <memory>
 
 namespace fs = std::filesystem;
 
@@ -38,12 +38,16 @@ namespace cs {
     struct Tool {
         virtual ~Tool() noexcept = default;
 
+        // Returns true if the tool is identified from the executable name or path.
+        [[nodiscard]]
+        virtual bool recognize(const fs::path& program) const = 0;
+
         // Returns the compilation entries if those were recognised.
         //
         // Can return an optional with an empty list, which says that it was
         // recognized the tool execution, but the execution was not a compilation.
         [[nodiscard]]
-        virtual rust::Result<output::Entries> recognize(const report::Command &) const = 0;
+        virtual rust::Result<output::Entries> compilations(const report::Command &) const = 0;
     };
 
     // Represents an expert system which can recognize compilation entries from
@@ -70,18 +74,5 @@ namespace cs {
 
     private:
         ToolPtrs tools_;
-    };
-
-    struct GnuCompilerCollection : public Tool {
-        explicit GnuCompilerCollection(std::list<fs::path> paths);
-
-        [[nodiscard]]
-        rust::Result<output::Entries> recognize(const report::Command &command) const override;
-
-        [[nodiscard]]
-        bool recognize(const fs::path& program) const;
-
-    protected:
-        std::list<fs::path> paths;
     };
 }
