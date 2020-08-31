@@ -5,8 +5,8 @@
 [![Contributors](https://img.shields.io/github/contributors/rizsotto/Bear)](https://github.com/rizsotto/Bear/graphs/contributors)
 [![Gitter](https://img.shields.io/gitter/room/rizsotto/Bear)](https://gitter.im/rizsotto/Bear)
 
-Build EAR (BEAR)
-================
+ʕ·ᴥ·ʔ Build EAR  
+===============
 
 Bear is a tool that generates a compilation database for clang tooling.
 
@@ -89,3 +89,8 @@ Please follow the [contribution guide][GUIDE] when you do these.
   [WIKI]: https://github.com/rizsotto/Bear/wiki
   [CHAT]: https://gitter.im/rizsotto/Bear
   [GUIDE]: https://github.com/rizsotto/Bear/blob/master/.github/CONTRIBUTING.md
+
+---
+
+Thanks to [JetBrains](https://www.jetbrains.com/?from=Bear)
+for donating product licenses to help develop Bear
