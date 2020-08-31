@@ -325,10 +325,6 @@ namespace cs {
     }
 
     rust::Result<output::Entries> ToolGcc::compilations(const report::Command &command) const {
-        if (!recognize(command.program)) {
-            return rust::Err(std::runtime_error("Not recognized program name."));
-        }
-
         spdlog::debug("Recognized as a GnuCompiler execution.");
         return parse(command)
                 .map<output::Entries>([&command](auto flags) {

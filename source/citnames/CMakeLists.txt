@@ -18,6 +18,7 @@ add_library(citnames_a OBJECT
         source/Application.cc
         source/semantic/Parsers.cc
         source/semantic/Tool.cc
+        source/semantic/ToolCuda.cc
         source/semantic/ToolGcc.cc
         )
 

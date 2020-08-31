@@ -19,6 +19,7 @@
 
 #include "Tool.h"
 #include "ToolGcc.h"
+#include "ToolCuda.h"
 
 #include <filesystem>
 #include <functional>
@@ -39,6 +40,7 @@ namespace cs {
     {
         ToolPtrs tools = {
                 std::make_shared<ToolGcc>(cfg.compilers),
+                std::make_shared<ToolCuda>(),
         };
         return rust::Ok(Tools(std::move(tools)));
     }

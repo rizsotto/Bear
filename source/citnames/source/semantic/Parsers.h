@@ -172,6 +172,8 @@ namespace cs::parser {
                 ".c", ".C",
                 // C++
                 ".cc", ".CC", ".c++", ".C++", ".cxx", ".cpp", ".cp",
+                // CUDA
+                ".cu",
                 // ObjectiveC
                 ".m", ".mi", ".mm", ".M", ".mii",
                 // Preprocessed
@@ -285,6 +287,9 @@ namespace cs::parser {
     rust::Result<CompilerFlags> parse(const Parser &parser, const report::Command &command)
     {
         auto input = Input { std::next(command.arguments.begin()), command.arguments.end() };
+        if (input.begin == input.end) {
+            return rust::Err(std::runtime_error("Failed to recognize: no arguments found."));
+        }
         return parser.parse(input)
                 .template map_err<std::runtime_error>([](auto remainder) {
                     return std::runtime_error(
