@@ -143,6 +143,10 @@ namespace {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
         };
+        cs::output::Entries input_one_exec = {
+                { "entry_one.c", "/path/to", { }, { "cc1", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { }, { "cc1", "-c", "entry_two.c" } },
+        };
         cs::output::Entries input_two = {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
@@ -157,6 +161,7 @@ namespace {
         };
 
         EXPECT_EQ(input_one, cs::output::merge(input_one, input_one));
+        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one_exec));
         EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
         EXPECT_EQ(expected, cs::output::merge(input_one, input_two));
         EXPECT_EQ(expected, cs::output::merge(input_one, input_three));

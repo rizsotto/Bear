@@ -183,7 +183,8 @@ namespace {
     {
         constexpr static const char* NO_COMPILATION_FLAG[] {
                 "-M",
-                "-MM"
+                "-MM",
+                "-E"
         };
         constexpr static size_t NO_COMPILATION_FLAG_SIZE = sizeof(NO_COMPILATION_FLAG) / sizeof(const char*);
 

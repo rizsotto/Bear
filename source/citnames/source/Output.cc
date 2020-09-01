@@ -225,7 +225,10 @@ namespace cs::output {
         return (lhs.file == rhs.file)
                && (lhs.directory == rhs.directory)
                && (lhs.output == rhs.output)
-               && (lhs.arguments == rhs.arguments);
+               && std::equal(
+                       std::next(lhs.arguments.begin()),
+                       lhs.arguments.end(),
+                       std::next(rhs.arguments.begin()));
     }
 
     std::ostream& operator<<(std::ostream& os, const Entry& entry)
