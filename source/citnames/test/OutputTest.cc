@@ -140,12 +140,12 @@ namespace {
     TEST(compilation_database, merge)
     {
         cs::output::Entries input_one = {
-                { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
-                { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
+                { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
         };
         cs::output::Entries input_one_exec = {
-                { "entry_one.c", "/path/to", { }, { "cc1", "-c", "entry_one.c" } },
-                { "entry_two.c", "/path/to", { }, { "cc1", "-c", "entry_two.c" } },
+                { "entry_one.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_two.c" } },
         };
         cs::output::Entries input_two = {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
@@ -165,5 +165,22 @@ namespace {
         EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
         EXPECT_EQ(expected, cs::output::merge(input_one, input_two));
         EXPECT_EQ(expected, cs::output::merge(input_one, input_three));
+    }
+
+    TEST(compilation_database, merge_with_output)
+    {
+        cs::output::Entries input_one = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+        };
+        cs::output::Entries input_two = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c", "-flag" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c", "-flag" } },
+        };
+
+        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one));
+        EXPECT_EQ(input_one, cs::output::merge(input_one, input_two));
+        EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
+        EXPECT_EQ(input_two, cs::output::merge(input_two, input_one));
     }
 }

@@ -64,7 +64,7 @@ namespace cs::output {
     // above. (More advanced duplicate detection can be done by
     // checking the output field. This might only work if all entries
     // have this field.)
-    Entries merge(const Entries& lhs, const Entries& rhs);
+    Entries merge(const Entries& already_in, const Entries& rhs);
 
     struct Format {
         bool command_as_array;

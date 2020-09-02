@@ -155,7 +155,7 @@ namespace cs {
                     ? impl_->output.from_json(impl_->arguments.output.c_str())
                             .template map<output::Entries>([&compilations](auto old_entries) {
                                 spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
-                                return output::merge(old_entries, compilations);
+                                return output::merge(compilations, old_entries);
                             })
                     : rust::Result<output::Entries>(rust::Ok(compilations));
             })
