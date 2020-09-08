@@ -34,7 +34,7 @@ namespace {
         };
         auto cfg = cs::cfg::default_value(env);
 
-        auto sut = cs::Tools::from(cfg.compilation);
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
     }
 
@@ -42,7 +42,7 @@ namespace {
     {
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Tools::from(cfg.compilation);
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {
@@ -59,7 +59,7 @@ namespace {
     {
         auto cfg = cs::cfg::default_value({});
 
-        auto sut = cs::Tools::from(cfg.compilation);
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
 
         auto input = report::Report {
@@ -72,7 +72,7 @@ namespace {
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Run { 1, std::nullopt, {} }
+                                report::Run { 1, 0, {} }
                         },
                         report::Execution {
                                 report::Command {
@@ -81,7 +81,7 @@ namespace {
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Run { 1, std::nullopt, {} }
+                                report::Run { 2, 0, {} }
                         },
                         report::Execution {
                                 report::Command {
@@ -90,7 +90,7 @@ namespace {
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Run { 1, std::nullopt, {} }
+                                report::Run { 3, 0, {} }
                         },
                         report::Execution {
                                 report::Command {
@@ -99,7 +99,7 @@ namespace {
                                         "/home/user/project",
                                         {}
                                 },
-                                report::Run { 1, std::nullopt, {} }
+                                report::Run { 4, 0, {} }
                         },
                 }
         };
@@ -112,15 +112,15 @@ namespace {
                 cs::output::Entry{
                         "/home/user/project/source.c",
                         "/home/user/project",
-                        {},
+                        {"/home/user/project/source.c.o"},
                         {"/usr/bin/cc", "-c", "-Wall", "source.c"}
                 },
                 cs::output::Entry{
                         "/home/user/project/source.cc",
                         "/home/user/project",
-                        {},
+                        {"/home/user/project/source.cc.o"},
                         {"/usr/bin/c++", "-c", "-Wall", "source.cc"}
-                }
+                },
         };
         auto compilations = result.unwrap_or({});
         EXPECT_EQ(expected, compilations);

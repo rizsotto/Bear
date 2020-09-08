@@ -21,15 +21,18 @@
 
 #include "Tool.h"
 
-namespace cs {
+namespace cs::semantic {
 
     struct ToolCuda : public Tool {
-        explicit ToolCuda();
+        ToolCuda();
+
+        [[nodiscard]]
+        const char* name() const override;
 
         [[nodiscard]]
         bool recognize(const fs::path& program) const override;
 
         [[nodiscard]]
-        rust::Result<output::Entries> compilations(const report::Command &command) const override;
+        rust::Result<SemanticPtrs> compilations(const report::Command &command) const override;
     };
 }

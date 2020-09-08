@@ -90,8 +90,8 @@ namespace cs::output {
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const fs::path& file, const Entries &entries) const;
-        virtual rust::Result<int> to_json(std::ostream &ostream, const Entries &entries) const;
+        virtual rust::Result<size_t> to_json(const fs::path& file, const Entries &entries) const;
+        virtual rust::Result<size_t> to_json(std::ostream &ostream, const Entries &entries) const;
 
         virtual rust::Result<Entries> from_json(const fs::path& file) const;
         virtual rust::Result<Entries> from_json(std::istream &istream) const;

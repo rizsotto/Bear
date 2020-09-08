@@ -113,7 +113,7 @@ namespace cs {
     struct Application::State {
         Arguments arguments;
         report::ReportSerializer report_serializer;
-        cs::Tools semantic;
+        cs::semantic::Tools semantic;
         cs::output::CompilationDatabase output;
     };
 
@@ -122,7 +122,7 @@ namespace cs {
         const auto configuration = cfg::default_value(environment);
 
         auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto semantic = Tools::from(configuration.compilation);
+        auto semantic = semantic::Tools::from(configuration.compilation);
 
         return rust::merge(arguments, semantic)
                 .map<Application::State*>([&configuration](auto tuples) {
@@ -160,12 +160,13 @@ namespace cs {
                     : rust::Result<output::Entries>(rust::Ok(compilations));
             })
             // write the entries into the output file.
-            .and_then<int>([this](const auto& compilations) {
+            .and_then<size_t>([this](const auto& compilations) {
                 spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
                 return impl_->output.to_json(impl_->arguments.output.c_str(), compilations);
             })
             // just map to success exit code if it was successful.
-            .map<int>([](auto) {
+            .map<int>([](auto size) {
+                spdlog::debug("compilation entries written. [size: {}]", size);
                 return EXIT_SUCCESS;
             });
     }

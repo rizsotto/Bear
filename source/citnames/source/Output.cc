@@ -37,14 +37,14 @@ namespace {
         return fs::exists(path, error_code);
     }
 
-    bool contains(const fs::path &root, const fs::path &file) {
-        auto[root_end, nothing] = std::mismatch(root.begin(), root.end(), file.begin());
-        return (root_end == root.end());
-    }
-
     bool contains(const std::list<fs::path> &root, const fs::path &file) {
-        return root.end() != std::find_if(root.begin(), root.end(),
-                                          [&file](auto directory) { return contains(directory, file); });
+        return std::any_of(root.begin(), root.end(), [&file](auto directory) {
+            // check if the path elements (list of directory names) are the same.
+            auto[end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
+            // the file is contained in the directory if all path elements are
+            // in the file paths too.
+            return (end == directory.end());
+        });
     }
 
     Filter make_filter(const Content &config) {
@@ -112,7 +112,7 @@ namespace cs::output {
         return json;
     }
 
-    rust::Result<int> CompilationDatabase::to_json(const fs::path &file, const Entries &entries) const {
+    rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &entries) const {
         try {
             std::ofstream target(file);
             return to_json(target, entries);
@@ -121,20 +121,22 @@ namespace cs::output {
         }
     }
 
-    rust::Result<int> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
+    rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
+            size_t count = 0;
             auto filter = make_filter(content);
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
                 if (std::invoke(filter, entry)) {
                     auto json_entry = cs::output::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
+                    ++count;
                 }
             }
 
             ostream << std::setw(2) << json << std::endl;
 
-            return rust::Ok(0);
+            return rust::Ok(count);
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }

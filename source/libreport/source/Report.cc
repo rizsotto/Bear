@@ -80,8 +80,8 @@ namespace report {
     {
         j["pid"] = rhs.pid;
         j["events"] = nlohmann::json(rhs.events);
-        if (rhs.ppid) {
-            j["ppid"] = rhs.ppid.value();
+        if (rhs.ppid != 0) {
+            j["ppid"] = rhs.ppid;
         }
     }
 
@@ -91,9 +91,7 @@ namespace report {
         j.at("events").get_to(rhs.events);
 
         if (j.contains("ppid")) {
-            int value;
-            j.at("ppid").get_to(value);
-            rhs.ppid.emplace(value);
+            j.at("ppid").get_to(rhs.ppid);
         }
     }
 

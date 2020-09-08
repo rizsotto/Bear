@@ -117,7 +117,7 @@ namespace {
         return std::map<std::string, std::string>(map.begin(), map.end());
     }
 
-    inline std::optional<int> to_optional(google::protobuf::int64 value)
+    inline std::optional<uint32_t> to_optional(google::protobuf::int64 value)
     {
         return (value == 0 ? std::nullopt : std::make_optional(value));
     }
@@ -133,8 +133,8 @@ namespace {
             to_map(started.environment())
         };
         auto run = report::Run {
-            to_optional(source.pid()).value_or(0),
-            to_optional(source.ppid()),
+            to_optional(source.pid()).value_or(0u),
+            to_optional(source.ppid()).value_or(0u),
             std::list<report::Event>()
         };
         update_run_with_started(run, source);

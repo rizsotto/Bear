@@ -19,7 +19,7 @@
 
 #include "Parsers.h"
 
-namespace cs::parser {
+namespace cs::semantic {
 
     rust::Result<std::pair<CompilerFlag, Input>, Input> FlagParser::parse(const Input &input) const {
         if (input.begin == input.end) {

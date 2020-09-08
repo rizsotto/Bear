@@ -17,6 +17,7 @@ target_compile_options(citnames_json_a PRIVATE -fexceptions)
 add_library(citnames_a OBJECT
         source/Application.cc
         source/semantic/Parsers.cc
+        source/semantic/Semantic.cc
         source/semantic/Tool.cc
         source/semantic/ToolCuda.cc
         source/semantic/ToolGcc.cc

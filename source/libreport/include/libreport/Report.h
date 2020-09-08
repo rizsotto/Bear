@@ -21,6 +21,7 @@
 
 #include "libresult/Result.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <list>
 #include <map>
@@ -60,11 +61,13 @@ namespace report {
         std::optional<int> signal;
     };
 
+    using Pid = uint32_t;
+
     // This represents a single run and holds the attributes which are
     // the history of the execution.
     struct Run {
-        int pid;
-        std::optional<int> ppid;
+        Pid pid;
+        Pid ppid;
         std::list<Event> events;
     };
 

@@ -30,7 +30,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
-namespace cs::parser {
+namespace cs::semantic {
 
     // Represents command line arguments.
     using Arguments = std::list<std::string>;

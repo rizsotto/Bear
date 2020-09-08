@@ -21,6 +21,7 @@
 
 #include "Configuration.h"
 #include "Output.h"
+#include "semantic/Semantic.h"
 #include "libresult/Result.h"
 #include "libreport/Report.h"
 
@@ -30,13 +31,17 @@
 
 namespace fs = std::filesystem;
 
-namespace cs {
+namespace cs::semantic {
 
     // Represents a compiler or an executable which produce relevant entries
     // to the compilation database. It can recognize the tool execution from
     // a command line invocation and its context.
     struct Tool {
         virtual ~Tool() noexcept = default;
+
+        // Returns the tool name.
+        [[nodiscard]]
+        virtual const char* name() const = 0;
 
         // Returns true if the tool is identified from the executable name or path.
         [[nodiscard]]
@@ -47,7 +52,7 @@ namespace cs {
         // Can return an optional with an empty list, which says that it was
         // recognized the tool execution, but the execution was not a compilation.
         [[nodiscard]]
-        virtual rust::Result<output::Entries> compilations(const report::Command &) const = 0;
+        virtual rust::Result<SemanticPtrs> compilations(const report::Command &) const = 0;
     };
 
     // Represents an expert system which can recognize compilation entries from
@@ -55,24 +60,28 @@ namespace cs {
     // based on configuration.
     class Tools {
     public:
-        static rust::Result<Tools> from(const cfg::Compilation&);
-
-        [[nodiscard]]
-        output::Entries transform(const report::Report& report) const;
-
-        [[nodiscard]]
-        rust::Result<output::Entries> recognize(const report::Command& command) const;
-
-    public:
-        using ToolPtr = std::shared_ptr<Tool>;
-        using ToolPtrs = std::list<ToolPtr>;
-
         Tools() = delete;
         ~Tools() noexcept = default;
 
-        explicit Tools(ToolPtrs&&) noexcept;
+        static rust::Result<Tools> from(const cfg::Compilation&);
+
+        [[nodiscard]]
+        output::Entries transform(const report::Report& command) const;
+
+    private:
+        using ToolPtr = std::shared_ptr<Tool>;
+        using ToolPtrs = std::list<ToolPtr>;
+
+        Tools(ToolPtrs&&, std::list<fs::path>) noexcept;
+
+        [[nodiscard]]
+        rust::Result<SemanticPtrs> recognize(const report::Execution& execution) const;
+
+        [[nodiscard]]
+        rust::Result<ToolPtr> select(const report::Command& command) const;
 
     private:
         ToolPtrs tools_;
+        std::list<fs::path> compilers_;
     };
 }

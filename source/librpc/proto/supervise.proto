@@ -84,10 +84,10 @@ service Interceptor {
 message Event {
 
     // Required.
-    int64 pid = 1;
+    uint32 pid = 1;
 
     // Optional.
-    int64 ppid = 2;
+    uint32 ppid = 2;
 
     // Required.
     // (ISO-8601 date-tie format with microsecond precision in UTC timezone)

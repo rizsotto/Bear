@@ -19,45 +19,29 @@
 
 #include "ToolCuda.h"
 #include "ToolGcc.h"
-#include "Parsers.h"
 
 #include "libsys/Path.h"
 
 #include <regex>
-#include <utility>
-#include <functional>
 
-#include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
-
-using namespace cs::parser;
-
-namespace {
-
-    bool match_executable_name(const fs::path& program)
-    {
-        static const auto pattern = std::regex(R"(^(nvcc)$)");
-
-        auto basename = program.filename();
-        std::cmatch m;
-        return std::regex_match(basename.c_str(), m, pattern);
-    }
-}
-
-namespace cs {
+namespace cs::semantic {
 
     ToolCuda::ToolCuda()
             : Tool()
     { }
 
-    bool ToolCuda::recognize(const fs::path& program) const {
-        return match_executable_name(program);
+    const char* ToolCuda::name() const {
+        return "CUDA";
     }
 
-    rust::Result<output::Entries> ToolCuda::compilations(const report::Command &command) const {
-        spdlog::debug("Recognized as a CudaCompiler execution.");
-        std::list<fs::path> paths;
-        auto tool = std::make_unique<ToolGcc>(paths);
-        return tool->compilations(command);
+    bool ToolCuda::recognize(const fs::path& program) const {
+        static const auto pattern = std::regex(R"(^(nvcc)$)");
+
+        std::cmatch m;
+        return std::regex_match(program.filename().c_str(), m, pattern);
+    }
+
+    rust::Result<SemanticPtrs> ToolCuda::compilations(const report::Command &command) const {
+        return ToolGcc().compilations(command);
     }
 }

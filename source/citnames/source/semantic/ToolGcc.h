@@ -21,18 +21,18 @@
 
 #include "Tool.h"
 
-namespace cs {
+namespace cs::semantic {
 
     struct ToolGcc : public Tool {
-        explicit ToolGcc(std::list<fs::path> paths);
+        ToolGcc();
+
+        [[nodiscard]]
+        const char* name() const override;
 
         [[nodiscard]]
         bool recognize(const fs::path& program) const override;
 
         [[nodiscard]]
-        rust::Result<output::Entries> compilations(const report::Command &command) const override;
-
-    protected:
-        std::list<fs::path> paths;
+        rust::Result<SemanticPtrs> compilations(const report::Command &command) const override;
     };
 }
