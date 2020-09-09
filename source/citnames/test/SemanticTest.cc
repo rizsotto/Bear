@@ -86,7 +86,7 @@ namespace {
                         report::Execution {
                                 report::Command {
                                         "/usr/bin/cc",
-                                        { "cc", "-c", "-Wall", "source.c" },
+                                        { "cc", "-c", "-Wall", "source.1.c" },
                                         "/home/user/project",
                                         {}
                                 },
@@ -95,7 +95,7 @@ namespace {
                         report::Execution {
                                 report::Command {
                                         "/usr/bin/c++",
-                                        { "c++", "-c", "-Wall", "source.cc" },
+                                        { "c++", "-c", "-Wall", "source.2.cc" },
                                         "/home/user/project",
                                         {}
                                 },
@@ -110,16 +110,72 @@ namespace {
 
         cs::output::Entries expected = {
                 cs::output::Entry{
-                        "/home/user/project/source.c",
+                        "/home/user/project/source.1.c",
                         "/home/user/project",
-                        {"/home/user/project/source.c.o"},
-                        {"/usr/bin/cc", "-c", "-Wall", "source.c"}
+                        {"/home/user/project/source.1.o"},
+                        {"/usr/bin/cc", "-c", "-Wall", "source.1.c"}
                 },
                 cs::output::Entry{
-                        "/home/user/project/source.cc",
+                        "/home/user/project/source.2.cc",
                         "/home/user/project",
-                        {"/home/user/project/source.cc.o"},
-                        {"/usr/bin/c++", "-c", "-Wall", "source.cc"}
+                        {"/home/user/project/source.2.o"},
+                        {"/usr/bin/c++", "-c", "-Wall", "source.2.cc"}
+                },
+        };
+        auto compilations = result.unwrap_or({});
+        EXPECT_EQ(expected, compilations);
+    }
+
+    TEST(semantic, child_commands_are_ignored)
+    {
+        auto cfg = cs::cfg::default_value({});
+
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
+        EXPECT_TRUE(sut.is_ok());
+
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/nvcc",
+                                        { "cc", "-c", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 1, 0, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/gcc",
+                                        { "cc", "-E", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 2, 1, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/gcc",
+                                        { "cc", "-c", "-Dthing", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 3, 1, {} }
+                        },
+                }
+        };
+        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
+
+        cs::output::Entries expected = {
+                cs::output::Entry{
+                        "/home/user/project/source.cu",
+                        "/home/user/project",
+                        {"/home/user/project/source.o"},
+                        {"/usr/bin/nvcc", "-c", "source.cu"}
                 },
         };
         auto compilations = result.unwrap_or({});

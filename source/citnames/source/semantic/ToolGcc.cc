@@ -210,6 +210,14 @@ namespace {
         });
     }
 
+    bool is_prerpocessor(const CompilerFlags& flags)
+    {
+        return std::any_of(flags.begin(), flags.end(), [](const auto &flag) {
+            return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING) &&
+                   (flag.arguments.front() == "-E");
+        });
+    }
+
     std::optional<fs::path> source_file(const CompilerFlag& flag)
     {
         if (flag.type == CompilerFlagType::SOURCE) {
@@ -314,6 +322,7 @@ namespace cs::semantic {
                     if (!is_prerpocessor_only(flags)) {
                         return rust::Err(std::runtime_error("Compiler call does not run compilation pass."));
                     }
+                    const bool preprocess = is_prerpocessor(flags);
 
                     auto output_opt = output_files(flags);
                     auto sources = source_files(flags);
@@ -334,9 +343,12 @@ namespace cs::semantic {
                         std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
 
                         auto output = ((!output_opt.has_value()) || linking(flags))
-                                      ? fs::path(fmt::format("{}.o", source.string()))
+                                      ? fs::path(source).replace_extension(preprocess ? ".i" : ".o")
                                       : output_opt.value();
-                        result.emplace_back(SemanticPtr(new Compile(command, source, output, arguments)));
+                        result.emplace_back(
+                                preprocess
+                                ? SemanticPtr(new Preprocess(command, source, output, arguments))
+                                : SemanticPtr(new Compile(command, source, output, arguments)));
                     }
                     return rust::Ok(result);
                 });
