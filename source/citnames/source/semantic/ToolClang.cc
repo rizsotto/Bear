@@ -17,20 +17,27 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "ToolClang.h"
+#include "ToolGcc.h"
 
-#include "Tool.h"
+#include "libsys/Path.h"
+
+#include <regex>
 
 namespace cs::semantic {
 
-    struct ToolGcc : public Tool {
-        [[nodiscard]]
-        const char* name() const override;
+    const char* ToolClang::name() const {
+        return "Clang";
+    }
 
-        [[nodiscard]]
-        bool recognize(const fs::path& program) const override;
+    bool ToolClang::recognize(const fs::path& program) const {
+        static const auto pattern = std::regex(R"(^([^-]*-)*clang(|\+\+)(-?\d+(\.\d+){0,2})?$)");
 
-        [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const report::Command &command) const override;
-    };
+        std::cmatch m;
+        return std::regex_match(program.filename().c_str(), m, pattern);
+    }
+
+    rust::Result<SemanticPtrs> ToolClang::compilations(const report::Command &command) const {
+        return ToolGcc().compilations(command);
+    }
 }

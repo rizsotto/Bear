@@ -19,8 +19,10 @@ add_library(citnames_a OBJECT
         source/semantic/Parsers.cc
         source/semantic/Semantic.cc
         source/semantic/Tool.cc
+        source/semantic/ToolClang.cc
         source/semantic/ToolCuda.cc
         source/semantic/ToolGcc.cc
+        source/semantic/ToolWrapper.cc
         )
 
 target_include_directories(citnames_a PUBLIC source/)

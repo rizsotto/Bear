@@ -19,7 +19,9 @@
 
 #include "Tool.h"
 #include "ToolGcc.h"
+#include "ToolClang.h"
 #include "ToolCuda.h"
+#include "ToolWrapper.h"
 
 #include <filesystem>
 #include <functional>
@@ -139,6 +141,8 @@ namespace cs::semantic {
     rust::Result<Tools> Tools::from(const cfg::Compilation &cfg) {
         ToolPtrs tools = {
                 std::make_shared<ToolGcc>(),
+                std::make_shared<ToolClang>(),
+                std::make_shared<ToolWrapper>(),
                 std::make_shared<ToolCuda>(),
         };
         return rust::Ok(Tools(std::move(tools), cfg.compilers));

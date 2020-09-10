@@ -290,10 +290,6 @@ namespace {
 
 namespace cs::semantic {
 
-    ToolGcc::ToolGcc()
-            : Tool()
-    { }
-
     const char* ToolGcc::name() const {
         return "GCC";
     }

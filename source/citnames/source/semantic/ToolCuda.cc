@@ -26,10 +26,6 @@
 
 namespace cs::semantic {
 
-    ToolCuda::ToolCuda()
-            : Tool()
-    { }
-
     const char* ToolCuda::name() const {
         return "CUDA";
     }

@@ -24,8 +24,6 @@
 namespace cs::semantic {
 
     struct ToolCuda : public Tool {
-        ToolCuda();
-
         [[nodiscard]]
         const char* name() const override;
 

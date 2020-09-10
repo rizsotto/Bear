@@ -23,7 +23,7 @@
 
 namespace cs::semantic {
 
-    struct ToolGcc : public Tool {
+    struct ToolWrapper : public Tool {
         [[nodiscard]]
         const char* name() const override;
 
