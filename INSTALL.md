@@ -4,13 +4,9 @@ How to build
 Bear should be quite portable on UNIX operating systems. It has been
 tested on FreeBSD, GNU/Linux and OS X.
 
-## Runtime dependencies
-
-1. **python** the command `bear` is a python script at this moment.
-
 ## Build dependencies
 
-1. a **C++ compiler**, to compile the sources. (Shall support C++17 dialect.)
+1. **C++ compiler**, to compile the sources. (Shall support C++17 dialect.)
 2. **CMake**, to configure the build. (Minimum version is 3.2) And a
    build tool [supported](https://cmake.org/cmake/help/v3.5/manual/cmake-generators.7.html)
    by CMake.
@@ -22,7 +18,6 @@ tested on FreeBSD, GNU/Linux and OS X.
 The dependencies can come from OS packages or the build will fetch the sources
 and build locally.
 
-- [python](https://www.python.org/) >= 3.5
 - [gRPC](https://github.com/grpc/grpc) >= 1.26
 - [fmt](https://github.com/fmtlib/fmt) >= 6.2
 - [spdlog](https://github.com/gabime/spdlog) >= 1.5
@@ -30,6 +25,7 @@ and build locally.
 
 Developer dependencies:
 
+- [python](https://www.python.org/) >= 3.5
 - [googletest](https://github.com/google/googletest) >= 1.10
 - [lit](https://pypi.org/project/lit/0.7.1/) >= 0.7
 

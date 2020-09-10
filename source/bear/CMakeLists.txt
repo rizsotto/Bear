@@ -1,6 +1,4 @@
-add_subdirectory(source)
 add_subdirectory(man)
-add_subdirectory(shell-completion)
 
 # Create an executable from the sub projects.
 add_executable(bear

@@ -26,10 +26,12 @@ How it works
 ------------
 
 The concept behind Bear is: to execute the original build command and
-intercept the `exec` calls issued by the build tool. To achieve that,
-Bear uses the `LD_PRELOAD` or `DYLD_INSERT_LIBRARIES` mechanisms provided
-by the dynamic linker.
-
+intercept the command executions issued by the build tool. From the
+log of command executions it tries to identify the compiler calls and
+creates the final compilation database.  
+ 
+For intercepting the compiler executions, Bear uses the `LD_PRELOAD`
+or `DYLD_INSERT_LIBRARIES` mechanisms provided by the dynamic linker.
 When the dynamic linker is not working (because the executable is not a
 dynamically linked executable or security protection disables the linker)
 then Bear uses compiler wrappers to record the compiler calls. The wrapper
