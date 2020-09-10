@@ -1,3 +1,10 @@
+## 2.4.4 (2020-10-10)
+
+Bugfixes:
+  - Don't cache the value of `_NSGetEnviron` on macOS (@saagarjha, #290)
+  - Add `--remove-flags` argument (@wangnangg, #288)
+  - Use bash-completions conditionally in CMake (@Ergus, #292)
+
 ## 2.4.3 (2020-01-26)
 
 Features:

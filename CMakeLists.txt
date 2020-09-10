@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 project(bear C)
-set(BEAR_VERSION "2.4.3")
+set(BEAR_VERSION "2.4.4")
 
 option(USE_SHELL_COMPLETION "Optionally add shell completion" ON)
 
