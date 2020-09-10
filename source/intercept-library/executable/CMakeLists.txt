@@ -64,6 +64,5 @@ endif ()
 # distributions and packaging would require to install those. Which might be
 # too much effort to generate a single text file.
 
-include(GNUInstallDirs)
 install(FILES man/er.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
