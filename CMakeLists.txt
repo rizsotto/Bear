@@ -91,7 +91,7 @@ install(
         USE_SOURCE_PERMISSIONS
 )
 include(GNUInstallDirs)
-install(FILES COPYING README.md ChangeLog.md
+install(FILES COPYING README.md INSTALL.md CONTRIBUTING.md CODE_OF_CONDUCT.md
         DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 # Set up package from this project
