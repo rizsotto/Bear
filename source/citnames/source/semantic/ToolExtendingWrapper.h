@@ -17,25 +17,26 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "ToolCuda.h"
-#include "ToolGcc.h"
+#pragma once
 
-#include <regex>
+#include "Tool.h"
 
 namespace cs::semantic {
 
-    const char* ToolCuda::name() const {
-        return "CUDA";
-    }
+    struct ToolExtendingWrapper : public Tool {
 
-    bool ToolCuda::recognize(const fs::path& program) const {
-        static const auto pattern = std::regex(R"(^(nvcc)$)");
+        explicit ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept;
 
-        std::cmatch m;
-        return std::regex_match(program.filename().c_str(), m, pattern);
-    }
+        [[nodiscard]]
+        const char* name() const override;
 
-    rust::Result<SemanticPtrs> ToolCuda::compilations(const report::Command &command) const {
-        return ToolGcc().compilations(command);
-    }
+        [[nodiscard]]
+        bool recognize(const fs::path& program) const override;
+
+        [[nodiscard]]
+        rust::Result<SemanticPtrs> compilations(const report::Command &command) const override;
+
+    private:
+        CompilerWrapper compilers_to_recognize_;
+    };
 }

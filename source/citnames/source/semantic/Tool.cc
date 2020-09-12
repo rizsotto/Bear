@@ -22,6 +22,7 @@
 #include "ToolClang.h"
 #include "ToolCuda.h"
 #include "ToolWrapper.h"
+#include "ToolExtendingWrapper.h"
 
 #include <filesystem>
 #include <functional>
@@ -37,6 +38,23 @@ namespace fs = std::filesystem;
 
 namespace {
 
+    // Represent a process tree.
+    //
+    // Processes have parent process (which started). If all process execution
+    // could have been captured this is a single process tree. But because some
+    // execution might escape (static executables are not visible for dynamic
+    // loader) the tree falls apart into a forest.
+    //
+    // Why create the process forest?
+    //
+    // The idea helps to filter out such executions which are not relevant to the
+    // user. If a compiler executes itself (with different set of arguments) it
+    // will cause duplicate entries, which is not desirable. (CUDA compiler is
+    // is a good example to call GCC multiple times.)
+    //
+    // First we build up the forest, then starting on a single process tree, we
+    // do a breadth first search. If a process can be identified (recognized as
+    // compilation) we don't inspect the children processes.
     template<typename Entry, typename Id>
     struct Forest {
         Forest(std::list<Entry> const &input,
@@ -135,20 +153,27 @@ namespace {
 
 namespace cs::semantic {
 
-    Tools::Tools(ToolPtrs &&tools, std::list<fs::path> compilers) noexcept
-            : tools_(tools), compilers_(std::move(compilers)) {}
+    Tools::Tools(ToolPtrs &&tools, std::list<fs::path>&& compilers) noexcept
+            : tools_(tools)
+            , to_exclude_(compilers)
+    {}
 
-    rust::Result<Tools> Tools::from(const cfg::Compilation &cfg) {
+    rust::Result<Tools> Tools::from(Compilation cfg) {
+        // TODO: use `cfg.flags_to_remove`
         ToolPtrs tools = {
                 std::make_shared<ToolGcc>(),
                 std::make_shared<ToolClang>(),
                 std::make_shared<ToolWrapper>(),
                 std::make_shared<ToolCuda>(),
         };
-        return rust::Ok(Tools(std::move(tools), cfg.compilers));
+        for (auto && compiler : cfg.compilers_to_recognize) {
+            tools.emplace_back(std::make_shared<ToolExtendingWrapper>(std::move(compiler)));
+        }
+
+        return rust::Ok(Tools(std::move(tools), std::move(cfg.compilers_to_exclude)));
     }
 
-    output::Entries Tools::transform(const report::Report &report) const {
+    Entries Tools::transform(const report::Report &report) const {
         auto semantics =
                 Forest<report::Execution, report::Pid>(
                         report.executions,
@@ -158,7 +183,7 @@ namespace cs::semantic {
                     return this->recognize(command);
                 });
 
-        output::Entries result;
+        Entries result;
         for (const auto &semantic : semantics) {
             if (auto candidate = semantic->into_entry(); candidate) {
                 result.emplace_back(candidate.value());
@@ -188,17 +213,8 @@ namespace cs::semantic {
     [[nodiscard]]
     rust::Result<Tools::ToolPtr> Tools::select(const report::Command &command) const {
         // do different things if the command is matching one of the nominated compilers.
-        if (compilers_.end() != std::find(compilers_.begin(), compilers_.end(), command.program)) {
-            // TODO: if interaction with the system is allowed, then it would be more
-            //       precise if it cann call the command with `--version` to get which
-            //       tool shall it call, instead of call all of them.
-
-            // check if any tools can get the semantic
-            for (const auto &tool : tools_) {
-                if (auto candidate = tool->compilations(command); candidate.is_ok()) {
-                    return rust::Ok(tool);
-                }
-            }
+        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.program)) {
+            return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
         } else {
             // check if any tool can recognize the command.
             for (const auto &tool : tools_) {

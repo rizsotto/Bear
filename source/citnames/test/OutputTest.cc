@@ -25,18 +25,18 @@
 
 namespace {
 
-    using Format = cs::output::Format;
-    using Content = cs::output::Content;
+    constexpr cs::Format AS_ARGUMENTS( true, false);
+    constexpr cs::Format AS_COMMAND(false, false);
 
-    Content NO_FILTER {
+    cs::Content NO_FILTER {
         false, {}, {}
     };
 
     void simple_value_serialized_and_read_back(
-            const cs::output::Entries& expected,
-            const Format& format)
+            const cs::Entries& expected,
+            const cs::Format& format)
     {
-        cs::output::CompilationDatabase sut(format, NO_FILTER);
+        cs::CompilationDatabase sut(format, NO_FILTER);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, expected);
@@ -51,32 +51,32 @@ namespace {
 
     TEST(compilation_database, empty_value_serialized_and_read_back)
     {
-        cs::output::Entries expected = {};
+        cs::Entries expected = {};
 
-        simple_value_serialized_and_read_back(expected, Format {true, false});
-        simple_value_serialized_and_read_back(expected, Format {false, false});
+        simple_value_serialized_and_read_back(expected, AS_ARGUMENTS);
+        simple_value_serialized_and_read_back(expected, AS_COMMAND);
     }
 
     TEST(compilation_database, simple_value_serialized_and_read_back)
     {
-        cs::output::Entries expected = {
+        cs::Entries expected = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        simple_value_serialized_and_read_back(expected, Format {true, false});
-        simple_value_serialized_and_read_back(expected, Format {false, false});
+        simple_value_serialized_and_read_back(expected, AS_ARGUMENTS);
+        simple_value_serialized_and_read_back(expected, AS_COMMAND);
     }
 
     void value_serialized_and_read_back_without_output(
-            const cs::output::Entries& input,
-            const cs::output::Entries& expected,
-            Format format)
+            const cs::Entries& input,
+            const cs::Entries& expected,
+            cs::Format format)
     {
         format.drop_output_field = true;
 
-        cs::output::CompilationDatabase sut(format, NO_FILTER);
+        cs::CompilationDatabase sut(format, NO_FILTER);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, input);
@@ -91,24 +91,24 @@ namespace {
 
     TEST(compilation_database, value_serialized_and_read_back_without_output)
     {
-        cs::output::Entries input = {
+        cs::Entries input = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
-        cs::output::Entries expected = {
+        cs::Entries expected = {
                 { "entry_one.c", "/path/to", { }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { }, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
 
-        value_serialized_and_read_back_without_output(input, expected, Format {true, false});
-        value_serialized_and_read_back_without_output(input, expected, Format {false, false});
+        value_serialized_and_read_back_without_output(input, expected, AS_ARGUMENTS);
+        value_serialized_and_read_back_without_output(input, expected, AS_COMMAND);
     }
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         auto deserialized = sut.from_json(buffer);
@@ -117,7 +117,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         buffer << "[ { } ]";
@@ -128,7 +128,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::output::CompilationDatabase sut({ false, false }, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";
@@ -139,48 +139,48 @@ namespace {
 
     TEST(compilation_database, merge)
     {
-        cs::output::Entries input_one = {
+        cs::Entries input_one = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
         };
-        cs::output::Entries input_one_exec = {
+        cs::Entries input_one_exec = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_two.c" } },
         };
-        cs::output::Entries input_two = {
+        cs::Entries input_two = {
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
-        cs::output::Entries input_three = {
+        cs::Entries input_three = {
                 *std::next(input_one.begin(), 0),
                 *std::next(input_two.begin(), 0),
         };
-        cs::output::Entries expected = {
+        cs::Entries expected = {
                 *std::next(input_one.begin(), 0),
                 *std::next(input_one.begin(), 1),
                 *std::next(input_two.begin(), 0),
         };
 
-        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one));
-        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one_exec));
-        EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
-        EXPECT_EQ(expected, cs::output::merge(input_one, input_two));
-        EXPECT_EQ(expected, cs::output::merge(input_one, input_three));
+        EXPECT_EQ(input_one, cs::merge(input_one, input_one));
+        EXPECT_EQ(input_one, cs::merge(input_one, input_one_exec));
+        EXPECT_EQ(input_two, cs::merge(input_two, input_two));
+        EXPECT_EQ(expected, cs::merge(input_one, input_two));
+        EXPECT_EQ(expected, cs::merge(input_one, input_three));
     }
 
     TEST(compilation_database, merge_with_output)
     {
-        cs::output::Entries input_one = {
+        cs::Entries input_one = {
                 { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
         };
-        cs::output::Entries input_two = {
+        cs::Entries input_two = {
                 { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c", "-flag" } },
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c", "-flag" } },
         };
 
-        EXPECT_EQ(input_one, cs::output::merge(input_one, input_one));
-        EXPECT_EQ(input_one, cs::output::merge(input_one, input_two));
-        EXPECT_EQ(input_two, cs::output::merge(input_two, input_two));
-        EXPECT_EQ(input_two, cs::output::merge(input_two, input_one));
+        EXPECT_EQ(input_one, cs::merge(input_one, input_one));
+        EXPECT_EQ(input_one, cs::merge(input_one, input_two));
+        EXPECT_EQ(input_two, cs::merge(input_two, input_two));
+        EXPECT_EQ(input_two, cs::merge(input_two, input_one));
     }
 }

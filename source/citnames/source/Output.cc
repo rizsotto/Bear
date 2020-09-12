@@ -28,9 +28,7 @@
 
 namespace {
 
-    using Filter = std::function<bool(const cs::output::Entry &)>;
-    using Format = cs::output::Format;
-    using Content = cs::output::Content;
+    using Filter = std::function<bool(const cs::Entry &)>;
 
     bool is_exists(const fs::path &path) {
         std::error_code error_code;
@@ -47,7 +45,7 @@ namespace {
         });
     }
 
-    Filter make_filter(const Content &config) {
+    Filter make_filter(const cs::Content &config) {
         return [config](const auto &entry) -> bool {
             if (config.include_only_existing_source) {
                 const auto exists = is_exists(entry.file);
@@ -64,14 +62,14 @@ namespace {
         };
     }
 
-    using Comparator = std::function<bool(const cs::output::Entry &lhs, const cs::output::Entry &rhs)>;
+    using Comparator = std::function<bool(const cs::Entry &lhs, const cs::Entry &rhs)>;
 
-    bool compare_by_output(const cs::output::Entry &lhs, const cs::output::Entry &rhs) {
+    bool compare_by_output(const cs::Entry &lhs, const cs::Entry &rhs) {
         // compare entries by the source and the output attribute only.
         return (lhs.file == rhs.file) && (lhs.output == rhs.output);
     }
 
-    bool compare_by_all(const cs::output::Entry &lhs, const cs::output::Entry &rhs) {
+    bool compare_by_all(const cs::Entry &lhs, const cs::Entry &rhs) {
         // compare entries by all possible attributes except the output field.
         return (lhs.file == rhs.file)
                && (lhs.directory == rhs.directory)
@@ -81,7 +79,7 @@ namespace {
                 std::next(rhs.arguments.begin())));
     }
 
-    Comparator select_comparator(const cs::output::Entries &lhs, const cs::output::Entries &rhs) {
+    Comparator select_comparator(const cs::Entries &lhs, const cs::Entries &rhs) {
         // Select comparator based on the input values.
         const bool lhs_outputs = std::all_of(lhs.begin(), lhs.end(), [](auto entry) { return entry.output; });
         const bool rhs_outputs = std::all_of(rhs.begin(), rhs.end(), [](auto entry) { return entry.output; });
@@ -90,7 +88,7 @@ namespace {
     }
 }
 
-namespace cs::output {
+namespace cs {
 
     CompilationDatabase::CompilationDatabase(const Format &_format, const Content &_content)
             : format(_format), content(_content) {}
@@ -128,7 +126,7 @@ namespace cs::output {
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
                 if (std::invoke(filter, entry)) {
-                    auto json_entry = cs::output::to_json(entry, format);
+                    auto json_entry = cs::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
                     ++count;
                 }
@@ -210,7 +208,7 @@ namespace cs::output {
             istream >> in;
 
             Entries result;
-            cs::output::from_json(in, result);
+            cs::from_json(in, result);
 
             return rust::Ok(result);
         } catch (const std::exception &error) {
@@ -240,7 +238,7 @@ namespace cs::output {
     }
 
     std::ostream &operator<<(std::ostream &os, const Entry &entry) {
-        Format format = {true, false};
+        Format format;
         nlohmann::json json = to_json(entry, format);
         os << json;
 

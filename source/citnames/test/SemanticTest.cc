@@ -25,22 +25,9 @@
 
 namespace {
 
-    TEST(semantic, default_config_parses)
-    {
-        std::map<std::string, std::string> env = {
-                { "FC", "/path/to/your-fc" },
-                { "CC", "/path/to/your-cc" },
-                { "CXX", "/path/to/your-cxx" },
-        };
-        auto cfg = cs::cfg::default_value(env);
-
-        auto sut = cs::semantic::Tools::from(cfg.compilation);
-        EXPECT_TRUE(sut.is_ok());
-    }
-
     TEST(semantic, parses_empty_command_list)
     {
-        auto cfg = cs::cfg::default_value({});
+        cs::Configuration cfg;
 
         auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
@@ -49,7 +36,7 @@ namespace {
                 report::Context { "session", {} },
                 {}
         };
-        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
             return semantic.transform(input);
         });
         EXPECT_TRUE(result.is_ok());
@@ -57,7 +44,7 @@ namespace {
 
     TEST(semantic, parses_command_list)
     {
-        auto cfg = cs::cfg::default_value({});
+        cs::Configuration cfg;
 
         auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
@@ -103,19 +90,19 @@ namespace {
                         },
                 }
         };
-        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
             return semantic.transform(input);
         });
         EXPECT_TRUE(result.is_ok());
 
-        cs::output::Entries expected = {
-                cs::output::Entry{
+        cs::Entries expected = {
+                cs::Entry{
                         "/home/user/project/source.1.c",
                         "/home/user/project",
                         {"/home/user/project/source.1.o"},
                         {"/usr/bin/cc", "-c", "-Wall", "source.1.c"}
                 },
-                cs::output::Entry{
+                cs::Entry{
                         "/home/user/project/source.2.cc",
                         "/home/user/project",
                         {"/home/user/project/source.2.o"},
@@ -128,7 +115,7 @@ namespace {
 
     TEST(semantic, child_commands_are_ignored)
     {
-        auto cfg = cs::cfg::default_value({});
+        cs::Configuration cfg;
 
         auto sut = cs::semantic::Tools::from(cfg.compilation);
         EXPECT_TRUE(sut.is_ok());
@@ -165,13 +152,13 @@ namespace {
                         },
                 }
         };
-        auto result = sut.map<cs::output::Entries>([&input](auto semantic) {
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
             return semantic.transform(input);
         });
         EXPECT_TRUE(result.is_ok());
 
-        cs::output::Entries expected = {
-                cs::output::Entry{
+        cs::Entries expected = {
+                cs::Entry{
                         "/home/user/project/source.cu",
                         "/home/user/project",
                         {"/home/user/project/source.o"},

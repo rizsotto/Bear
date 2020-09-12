@@ -55,8 +55,9 @@ int main(int argc, char* argv[], char* envp[])
 
     const flags::Parser parser("citnames", VERSION,
                                { { cs::Application::VERBOSE, { 0, false, "run the application verbose", std::nullopt, std::nullopt } },
-                                 { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
                                  { cs::Application::INPUT, { 1, false, "path of the input file", { "commands.json" }, std::nullopt } },
+                                 { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
+                                 { cs::Application::CONFIG, { 1, false, "path of the config file", std::nullopt, std::nullopt } },
                                  { cs::Application::INCLUDE, { 1, false, "directory where from source file shall be in the output", std::nullopt, std::nullopt } },
                                  { cs::Application::EXCLUDE, { 1, false, "directory where from source file shall not be in the output", std::nullopt, std::nullopt } },
                                  { cs::Application::APPEND, { 0, false, "append to output, instead of overwrite it", std::nullopt, std::nullopt } },

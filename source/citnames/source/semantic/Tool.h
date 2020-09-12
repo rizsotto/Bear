@@ -45,7 +45,7 @@ namespace cs::semantic {
 
         // Returns true if the tool is identified from the executable name or path.
         [[nodiscard]]
-        virtual bool recognize(const fs::path& program) const = 0;
+        virtual bool recognize(const fs::path &program) const = 0;
 
         // Returns the compilation entries if those were recognised.
         //
@@ -63,25 +63,25 @@ namespace cs::semantic {
         Tools() = delete;
         ~Tools() noexcept = default;
 
-        static rust::Result<Tools> from(const cfg::Compilation&);
+        static rust::Result<Tools> from(Compilation cfg);
 
         [[nodiscard]]
-        output::Entries transform(const report::Report& command) const;
+        Entries transform(const report::Report &command) const;
 
     private:
         using ToolPtr = std::shared_ptr<Tool>;
         using ToolPtrs = std::list<ToolPtr>;
 
-        Tools(ToolPtrs&&, std::list<fs::path>) noexcept;
+        Tools(ToolPtrs &&, std::list<fs::path>&&) noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const report::Execution& execution) const;
+        rust::Result<SemanticPtrs> recognize(const report::Execution &execution) const;
 
         [[nodiscard]]
-        rust::Result<ToolPtr> select(const report::Command& command) const;
+        rust::Result<ToolPtr> select(const report::Command &command) const;
 
     private:
         ToolPtrs tools_;
-        std::list<fs::path> compilers_;
+        std::list<fs::path> to_exclude_;
     };
 }

@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "Configuration.h"
 #include "libresult/Result.h"
 
 #include <filesystem>
@@ -29,7 +30,7 @@
 
 namespace fs = std::filesystem;
 
-namespace cs::output {
+namespace cs {
 
     // The definition of the JSON compilation database format can be
     // found here:
@@ -65,17 +66,6 @@ namespace cs::output {
     // checking the output field. This might only work if all entries
     // have this field.)
     Entries merge(const Entries& already_in, const Entries& rhs);
-
-    struct Format {
-        bool command_as_array;
-        bool drop_output_field;
-    };
-
-    struct Content {
-        bool include_only_existing_source;
-        std::list<fs::path> paths_to_include;
-        std::list<fs::path> paths_to_exclude;
-    };
 
     // Utility class to persists JSON compilation database.
     //

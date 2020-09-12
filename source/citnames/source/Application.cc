@@ -39,13 +39,6 @@ namespace {
         return fs::exists(path, error_code);
     }
 
-    struct Arguments {
-        fs::path input;
-        fs::path output;
-        bool append;
-        cs::output::Content content;
-    };
-
     std::list<fs::path> to_path_list(const std::vector<std::string_view>& strings)
     {
         // best effort, try to make these string as path (absolute or relative).
@@ -68,42 +61,96 @@ namespace {
         }
     }
 
+    struct Arguments {
+        fs::path input;
+        fs::path output;
+        bool append;
+    };
+
     rust::Result<Arguments> into_arguments(const flags::Arguments& args)
     {
         auto input = args.as_string(cs::Application::INPUT);
         auto output = args.as_string(cs::Application::OUTPUT);
-        auto append = args.as_bool(cs::Application::APPEND).unwrap_or(false);
-        auto run_check = args.as_bool(cs::Application::RUN_CHECKS).unwrap_or(false);
-        auto include = args.as_string_list(cs::Application::INCLUDE).map<std::list<fs::path>>(&to_path_list).unwrap_or({});
-        auto exclude = args.as_string_list(cs::Application::EXCLUDE).map<std::list<fs::path>>(&to_path_list).unwrap_or({});
+        auto append = args.as_bool(cs::Application::APPEND)
+                .unwrap_or(false);
 
         return rust::merge(input, output)
-                .map<Arguments>([&append, &run_check, &include, &exclude](auto tuple) {
+                .map<Arguments>([&append](auto tuple) {
                     const auto& [input, output] = tuple;
                     return Arguments {
-                        fs::path(input),
-                        fs::path(output),
-                        append,
-                        cs::output::Content{
-                            run_check,
-                            include,
-                            exclude,
-                        },
+                            fs::path(input),
+                            fs::path(output),
+                            append,
                     };
+                })
+                // validate
+                .and_then<Arguments>([](auto arguments) -> rust::Result<Arguments> {
+                    if (!is_exists(arguments.input)) {
+                        return rust::Err(std::runtime_error(
+                                fmt::format("Missing input file: {}", arguments.input)));
+                    }
+                    return rust::Ok(Arguments {
+                            arguments.input,
+                            arguments.output,
+                            (arguments.append && is_exists(arguments.output)),
+                    });
                 });
     }
 
-    rust::Result<Arguments> validate(const Arguments& arguments)
+    std::list<fs::path> compilers(const sys::env::Vars& environment)
     {
-        if (!is_exists(arguments.input)) {
-            return rust::Err(std::runtime_error(
-                    fmt::format("Missing input file: {}", arguments.input)));
+        std::list<fs::path> result;
+        if (auto it = environment.find("CC"); it != environment.end()) {
+            result.emplace_back(it->second);
         }
-        return rust::Ok(Arguments {
-            arguments.input,
-            arguments.output,
-            (arguments.append && is_exists(arguments.output)),
-            arguments.content
+        if (auto it = environment.find("CXX"); it != environment.end()) {
+            result.emplace_back(it->second);
+        }
+        if (auto it = environment.find("FC"); it != environment.end()) {
+            result.emplace_back(it->second);
+        }
+        return result;
+    }
+
+    rust::Result<cs::Configuration> into_configuration(const flags::Arguments& args, const sys::env::Vars& environment)
+    {
+        auto config_arg = args.as_string(cs::Application::CONFIG);
+        auto config = config_arg.is_ok()
+                ? config_arg
+                              .and_then<cs::Configuration>([](auto candidate) {
+                                  return cs::ConfigurationSerializer().from_json(fs::path(candidate));
+                              })
+                : rust::Ok(cs::Configuration());
+
+        // command line arguments overrides the default values or the configuration content.
+        return config.map<cs::Configuration>([&args](auto config) {
+            args.as_bool(cs::Application::RUN_CHECKS)
+                    .on_success([&config](auto run) {
+                        config.output.content.include_only_existing_source = run;
+                    });
+            args.as_string_list(cs::Application::INCLUDE)
+                    .map<std::list<fs::path>>(&to_path_list)
+                    .on_success([&config](auto includes) {
+                        config.output.content.paths_to_include = includes;
+                    });
+            args.as_string_list(cs::Application::EXCLUDE)
+                    .map<std::list<fs::path>>(&to_path_list)
+                    .on_success([&config](auto excludes) {
+                        config.output.content.paths_to_exclude = excludes;
+                    });
+
+            return config;
+        })
+        // recognize compilers from known environment variables.
+        .map<cs::Configuration>([&environment](auto config) {
+            for (const auto& compiler : compilers(environment)) {
+                auto wrapped = cs::CompilerWrapper { compiler, {} };
+                config.compilation.compilers_to_recognize.emplace_back(wrapped);
+            }
+            return config;
+        })
+        .on_success([](const auto& config) {
+            spdlog::debug("Configuration: {}", config);
         });
     }
 }
@@ -114,21 +161,22 @@ namespace cs {
         Arguments arguments;
         report::ReportSerializer report_serializer;
         cs::semantic::Tools semantic;
-        cs::output::CompilationDatabase output;
+        cs::CompilationDatabase output;
     };
 
     rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
     {
-        const auto configuration = cfg::default_value(environment);
+        auto arguments = into_arguments(args);
+        auto configuration = into_configuration(args, environment);
+        auto semantic = configuration.and_then<cs::semantic::Tools>([](auto config) {
+            return semantic::Tools::from(config.compilation);
+        });
 
-        auto arguments = into_arguments(args).and_then<Arguments>(&validate);
-        auto semantic = semantic::Tools::from(configuration.compilation);
-
-        return rust::merge(arguments, semantic)
-                .map<Application::State*>([&configuration](auto tuples) {
-                    const auto& [arguments, semantic] = tuples;
+        return rust::merge(arguments, configuration, semantic)
+                .map<Application::State*>([](auto tuples) {
+                    const auto& [arguments, configuration, semantic] = tuples;
                     // read the configuration
-                    cs::output::CompilationDatabase output(configuration.format, arguments.content);
+                    cs::CompilationDatabase output(configuration.output.format, configuration.output.content);
                     report::ReportSerializer report_serializer;
                     return new Application::State { arguments, report_serializer, semantic, output };
                 })
@@ -142,22 +190,22 @@ namespace cs {
     {
         // get current compilations from the input.
         return impl_->report_serializer.from_json(impl_->arguments.input)
-            .map<output::Entries>([this](const auto& commands) {
+            .map<Entries>([this](const auto& commands) {
                 spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                 auto compilations = impl_->semantic.transform(commands);
                 // remove duplicates
-                return output::merge({}, compilations);
+                return merge({}, compilations);
             })
             // read back the current content and extend with the new elements.
-            .and_then<output::Entries>([this](const auto& compilations) {
+            .and_then<Entries>([this](const auto& compilations) {
                 spdlog::debug("compilation entries created. [size: {}]", compilations.size());
                 return (impl_->arguments.append)
                     ? impl_->output.from_json(impl_->arguments.output.c_str())
-                            .template map<output::Entries>([&compilations](auto old_entries) {
+                            .template map<Entries>([&compilations](auto old_entries) {
                                 spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
-                                return output::merge(compilations, old_entries);
+                                return merge(compilations, old_entries);
                             })
-                    : rust::Result<output::Entries>(rust::Ok(compilations));
+                    : rust::Result<Entries>(rust::Ok(compilations));
             })
             // write the entries into the output file.
             .and_then<size_t>([this](const auto& compilations) {

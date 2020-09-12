@@ -51,6 +51,21 @@ namespace cs::semantic {
             , flags(std::move(_flags))
     { }
 
+    void QueryCompiler::extend_flags(const std::list<std::string> &) {
+    }
+
+    void Preprocess::extend_flags(const std::list<std::string> &_flags) {
+        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
+    }
+
+    void Compile::extend_flags(const std::list<std::string> &_flags) {
+        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
+    }
+
+    void Link::extend_flags(const std::list<std::string> &_flags) {
+        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
+    }
+
     std::ostream &QueryCompiler::operator<<(std::ostream &os) const {
         os << "Query";
         return os;
@@ -71,17 +86,17 @@ namespace cs::semantic {
         return os;
     }
 
-    std::optional<cs::output::Entry> QueryCompiler::into_entry() const {
-        return std::optional<cs::output::Entry>();
+    std::optional<cs::Entry> QueryCompiler::into_entry() const {
+        return std::optional<cs::Entry>();
     }
 
-    std::optional<cs::output::Entry> Preprocess::into_entry() const {
+    std::optional<cs::Entry> Preprocess::into_entry() const {
         // TODO
-        return std::optional<cs::output::Entry>();
+        return std::optional<cs::Entry>();
     }
 
-    std::optional<cs::output::Entry> Compile::into_entry() const {
-        auto entry = cs::output::Entry {
+    std::optional<cs::Entry> Compile::into_entry() const {
+        auto entry = cs::Entry {
                 source,
                 command.working_dir,
                 std::make_optional(output),
@@ -90,8 +105,8 @@ namespace cs::semantic {
         return std::make_optional(std::move(entry));
     }
 
-    std::optional<cs::output::Entry> Link::into_entry() const {
+    std::optional<cs::Entry> Link::into_entry() const {
         // TODO
-        return std::optional<cs::output::Entry>();
+        return std::optional<cs::Entry>();
     }
 }

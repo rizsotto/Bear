@@ -23,6 +23,7 @@ add_library(citnames_a OBJECT
         source/semantic/ToolCuda.cc
         source/semantic/ToolGcc.cc
         source/semantic/ToolWrapper.cc
+        source/semantic/ToolExtendingWrapper.cc
         )
 
 target_include_directories(citnames_a PUBLIC source/)

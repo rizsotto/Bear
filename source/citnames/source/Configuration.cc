@@ -19,87 +19,211 @@
 
 #include "Configuration.h"
 
-namespace cs::cfg {
+#include <iomanip>
+#include <fstream>
 
-    Value default_value(const std::map<std::string, std::string>& environment) {
-        Value value {
-                output::Format {
-                    // command as array
-                    true,
-                    // drop output field
-                    false
-                },
-                output::Content {
-                    // include only existing source
-                    true,
-                    // paths to include
-                    {},
-                    // paths to exclude
-                    {}
-                },
-                cfg::Compilation{
-                        cfg::ExpandWrappers{
-                            // mpi
-                            true,
-                            // cuda
-                            false,
-                            // ccache
-                            true,
-                            // distcc
-                            true
-                        },
-                        {}
-//                            // mpi
-//                            { R"(^mpi(cc|cxx|CC|c\+\+|fort|f77|f90)$)" },
-//                            // cuda
-//                            { "nvcc" },
-//                            // distcc
-//                            { "distcc" },
-//                            // ccache
-//                            { "ccache" },
-//                            // cc
-//                            {
-//                                // gcc
-//                                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
-//                                // clang
-//                                R"(^([^-]*-)*clang(-\d+(\.\d+){0,2})?$)",
-//                                // intel compiler
-//                                R"(^(|i)cc$)",
-//                                // ibm compiler
-//                                R"(^(g|)xlc$)"
-//                            },
-//                            // cxx
-//                            {
-//                                // generic
-//                                R"(^(c\+\+|cxx|CC)$)",
-//                                // gcc
-//                                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
-//                                // clang
-//                                R"(^([^-]*-)*clang\+\+(-\d+(\.\d+){0,2})?$)",
-//                                // intel compiler
-//                                R"(^icpc$)",
-//                                // ibm compiler
-//                                R"(^(g|)xl(C|c\+\+)$)"
-//                            },
-//                            // fortran
-//                            {
-//                                R"(^([^-]*-)*(gfortran)(-?\d+)$)",
-//                                R"(^(ifort)$)",
-//                                R"(^(pg|)(f77|f90|f95|fortran)$)"
-//                            }
-                }
+#include <nlohmann/json.hpp>
+
+namespace cs {
+
+    void from_json(const nlohmann::json &j, Format &rhs) {
+        j.at("command_as_array").get_to(rhs.command_as_array);
+        j.at("drop_output_field").get_to(rhs.drop_output_field);
+    }
+
+    void to_json(nlohmann::json &j, const Format &rhs) {
+        j = nlohmann::json{
+                {"command_as_array",  rhs.command_as_array},
+                {"drop_output_field", rhs.drop_output_field},
         };
+    }
 
-        if (auto it = environment.find("CC"); it != environment.end()) {
-            value.compilation.compilers.push_back(it->second);
-        }
-        if (auto it = environment.find("CXX"); it != environment.end()) {
-            value.compilation.compilers.push_back(it->second);
-        }
-        if (auto it = environment.find("FC"); it != environment.end()) {
-            value.compilation.compilers.push_back(it->second);
-        }
+    void from_json(const nlohmann::json &j, Content &rhs) {
+        j.at("include_only_existing_source").get_to(rhs.include_only_existing_source);
 
-        return value;
+        if (j.contains("paths_to_include")) {
+            j.at("paths_to_include").get_to(rhs.paths_to_include);
+        }
+        if (j.contains("paths_to_exclude")) {
+            j.at("paths_to_exclude").get_to(rhs.paths_to_exclude);
+        }
+    }
+
+    void to_json(nlohmann::json &j, const Content &rhs) {
+        j = nlohmann::json{
+                {"include_only_existing_source",  rhs.include_only_existing_source},
+        };
+        if (!rhs.paths_to_include.empty()) {
+            j["paths_to_include"] = rhs.paths_to_include;
+        }
+        if (!rhs.paths_to_exclude.empty()) {
+            j["paths_to_exclude"] = rhs.paths_to_exclude;
+        }
+    }
+
+    void from_json(const nlohmann::json &j, Output &rhs) {
+        j.at("format").get_to(rhs.format);
+        j.at("content").get_to(rhs.content);
+    }
+
+    void to_json(nlohmann::json &j, const Output &rhs) {
+        j = nlohmann::json{
+                {"format",  rhs.format},
+                {"content", rhs.content},
+        };
+    }
+
+    void from_json(const nlohmann::json &j, CompilerWrapper &rhs) {
+        j.at("executable").get_to(rhs.executable);
+
+        if (j.contains("additional_flags")) {
+            j.at("additional_flags").get_to(rhs.additional_flags);
+        }
+    }
+
+    void to_json(nlohmann::json &j, const CompilerWrapper &rhs) {
+        j = nlohmann::json{
+                {"executable",  rhs.executable},
+        };
+        if (!rhs.additional_flags.empty()) {
+            j["additional_flags"] = rhs.additional_flags;
+        }
+    }
+
+    void from_json(const nlohmann::json &j, Compilation &rhs) {
+        if (j.contains("compilers_to_recognize")) {
+            j.at("compilers_to_recognize").get_to(rhs.compilers_to_recognize);
+        }
+        if (j.contains("compilers_to_exclude")) {
+            j.at("compilers_to_exclude").get_to(rhs.compilers_to_exclude);
+        }
+        if (j.contains("flags_to_remove")) {
+            j.at("flags_to_remove").get_to(rhs.flags_to_remove);
+        }
+    }
+
+    void to_json(nlohmann::json &j, const Compilation &rhs) {
+        if (!rhs.compilers_to_recognize.empty()) {
+            j["compilers_to_recognize"] = rhs.compilers_to_recognize;
+        }
+        if (!rhs.compilers_to_exclude.empty()) {
+            j["compilers_to_exclude"] = rhs.compilers_to_exclude;
+        }
+        if (!rhs.flags_to_remove.empty()) {
+            j["additional_flags"] = rhs.flags_to_remove;
+        }
+    }
+
+    void from_json(const nlohmann::json &j, Configuration &rhs) {
+        j.at("output").get_to(rhs.output);
+        j.at("compilation").get_to(rhs.compilation);
+    }
+
+    void to_json(nlohmann::json &j, const Configuration &rhs) {
+        j = nlohmann::json{
+                {"output",  rhs.output},
+                {"compilation", rhs.compilation},
+        };
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Format &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Content &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Output &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const CompilerWrapper &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Compilation &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Configuration &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    rust::Result<size_t> ConfigurationSerializer::to_json(const fs::path &file, const Configuration &rhs) const
+    {
+        try {
+            std::ofstream target(file);
+            return to_json(target, rhs);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<size_t> ConfigurationSerializer::to_json(std::ostream &os, const Configuration &rhs) const
+    {
+        try {
+            nlohmann::json out = rhs;
+            os << std::setw(4) << out << std::endl;
+
+            return rust::Ok(1ul);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<Configuration> ConfigurationSerializer::from_json(const fs::path &file) const
+    {
+        try {
+            std::ifstream source(file);
+            return from_json(source);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<Configuration> ConfigurationSerializer::from_json(std::istream &is) const
+    {
+        try {
+            nlohmann::json in;
+            is >> in;
+
+            Configuration result;
+            ::cs::from_json(in, result);
+
+            return rust::Ok(result);
+        } catch (const std::exception& error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
     }
 }

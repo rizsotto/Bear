@@ -34,6 +34,7 @@ namespace cs {
         static constexpr char EXCLUDE[] = "--exclude";
         static constexpr char APPEND[] = "--append";
         static constexpr char RUN_CHECKS[] = "--run-checks";
+        static constexpr char CONFIG[] = "--config";
 
         static ::rust::Result<Application> from(const flags::Arguments&, sys::env::Vars&&);
 

@@ -36,10 +36,12 @@ namespace cs::semantic {
     // that command. And therefore we know the semantic of it.
     struct Semantic {
         explicit Semantic(report::Command);
-
         virtual ~Semantic() noexcept = default;
+
+        virtual void extend_flags(std::list<std::string> const&) = 0;
+
         virtual std::ostream& operator<<(std::ostream&) const = 0;
-        [[nodiscard]] virtual std::optional<cs::output::Entry> into_entry() const = 0;
+        [[nodiscard]] virtual std::optional<cs::Entry> into_entry() const = 0;
 
         report::Command command;
     };
@@ -52,16 +54,20 @@ namespace cs::semantic {
     struct QueryCompiler : public Semantic {
         explicit QueryCompiler(report::Command);
 
+        void extend_flags(std::list<std::string> const&) override;
+
         std::ostream& operator<<(std::ostream&) const override;
-        [[nodiscard]] std::optional<cs::output::Entry> into_entry() const override;
+        [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
     };
 
     // Represents a compiler call, which runs the preprocessor pass.
     struct Preprocess : public Semantic {
         Preprocess(report::Command, fs::path source, fs::path output, std::list<std::string>);
 
+        void extend_flags(std::list<std::string> const&) override;
+
         std::ostream& operator<<(std::ostream&) const override;
-        [[nodiscard]] std::optional<cs::output::Entry> into_entry() const override;
+        [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
         fs::path source;
         fs::path output;
@@ -72,8 +78,10 @@ namespace cs::semantic {
     struct Compile : public Semantic {
         Compile(report::Command, fs::path source, fs::path output, std::list<std::string>);
 
+        void extend_flags(std::list<std::string> const&) override;
+
         std::ostream& operator<<(std::ostream&) const override;
-        [[nodiscard]] std::optional<cs::output::Entry> into_entry() const override;
+        [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
         fs::path source;
         fs::path output;
@@ -82,6 +90,12 @@ namespace cs::semantic {
 
     // Represents a compiler call, which runs the linking pass.
     struct Link : public Semantic {
+
+        void extend_flags(std::list<std::string> const&) override;
+
+        std::ostream& operator<<(std::ostream&) const override;
+        [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
+
         enum Type {
             EXECUTABLE,
             LIBRARY
@@ -93,8 +107,6 @@ namespace cs::semantic {
         Type type;
         std::list<std::string> flags;
 
-        std::ostream& operator<<(std::ostream&) const override;
-        [[nodiscard]] std::optional<cs::output::Entry> into_entry() const override;
     };
 
     inline

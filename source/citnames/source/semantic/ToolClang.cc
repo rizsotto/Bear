@@ -20,8 +20,6 @@
 #include "ToolClang.h"
 #include "ToolGcc.h"
 
-#include "libsys/Path.h"
-
 #include <regex>
 
 namespace cs::semantic {
