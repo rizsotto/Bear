@@ -1,0 +1,18 @@
+{
+    global:
+        on_load;
+        on_unload;
+        execv;
+        execve;
+        execvp;
+        execvP;
+        exect;
+        execvpe;
+        execl;
+        execlp;
+        execle;
+        posix_spawn;
+        posix_spawnp;
+    local:
+        *;
+};

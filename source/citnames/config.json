@@ -1,0 +1,77 @@
+{
+  "format": {
+    "command_as_array": true,
+    "drop_output_field": false
+  },
+  "content": {
+    "relative_to": "/path/to",
+    "include_only_existing_source": true,
+    "paths_to_include": [],
+    "paths_to_exclude": []
+  },
+  "compilation": {
+    "expand_wrappers": {
+      "mpi": true,
+      "cuda": false,
+      "ccache": true,
+      "distcc": true
+    },
+    "compilers": {
+      "mpi": [
+        "mpiCC", "mpicc", "mpicxx", "mpic++"
+      ],
+      "cuda": [
+        "nvcc"
+      ],
+      "distcc": [
+        "distcc"
+      ],
+      "ccache": [
+        "ccache"
+      ],
+      "cc": [
+        "cc", "gcc", "c++", "g++"
+      ],
+      "cxx": [
+        "clang", "clang++", "clang-8", "clang++-8", "clang-9", "clang++-9", "clang-10", "clang++-10"
+      ],
+      "fortran": [
+        "f77", "f90", "f95",
+        "ifort",
+        "fortran", "gfortran",
+        "x86_64-linux-gnu-gfortran-9"
+      ]
+    },
+    "sources": {
+      "extensions_to_exclude": [
+        ".o"
+      ],
+      "extensions_to_include": [
+        ".c", ".C",
+        ".cc", ".CC", ".c++", ".C++", ".cxx", ".cpp", ".cp",
+        ".m", ".mi", ".mm", ".mii",
+        ".s", ".S", ".sx", ".asm",
+        ".f95", ".F95", ".f90", ".F90", ".f", ".F", ".FOR", ".f77", ".fc", ".for", ".ftn", ".fpp"
+      ]
+    },
+    "flags": {
+      "to_filter": [
+        {
+          "flag": "-MD",
+          "skip": 0
+        },
+        {
+          "flag": "-MMD",
+          "skip": 0
+        },
+        {
+          "class": "linking"
+        },
+        {
+          "pattern": "-Wl,.+",
+          "split": true
+        }
+      ]
+    }
+  }
+}

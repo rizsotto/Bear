@@ -1,0 +1,70 @@
+/*  Copyright (C) 2012-2020 by László Nagy
+    This file is part of Bear.
+
+    Bear is a tool to generate compilation database for clang tooling.
+
+    Bear is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Bear is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#pragma once
+
+// specific platform indicator, should not using like this. ()needs to be deprecated)
+#cmakedefine SUPPORT_PRELOAD
+
+// header checks
+#cmakedefine HAVE_SPAWN_H
+#cmakedefine HAVE_UNISTD_H
+#cmakedefine HAVE_SPAWN_H
+#cmakedefine HAVE_DLFCN_H
+#cmakedefine HAVE_ERRNO_H
+#cmakedefine HAVE_UNISTD_H
+#cmakedefine HAVE_SYS_UTSNAME_H
+#cmakedefine HAVE_SYS_WAIT_H
+#cmakedefine HAVE_GNU_LIB_NAMES_H
+
+// OSX specific (needs to be deprecated)
+#cmakedefine HAVE_NSGETENVIRON
+
+// dynamic linker
+#cmakedefine HAVE_DLOPEN
+#cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_DLERROR
+#cmakedefine HAVE_DLCLOSE
+#cmakedefine HAVE_RTLD_NEXT
+
+// errno values
+#cmakedefine HAVE_EACCES
+#cmakedefine HAVE_ENOENT
+#cmakedefine HAVE_UNAME
+
+// string.h function
+#cmakedefine HAVE_STRERROR_R
+
+// unistd.h might declare the environ symbol
+#cmakedefine HAVE_ENVIRON
+
+// confstr and macros
+#cmakedefine HAVE_CONFSTR
+#cmakedefine HAVE_CS_PATH
+#cmakedefine HAVE_CS_GNU_LIBC_VERSION
+#cmakedefine HAVE_CS_GNU_LIBPTHREAD_VERSION
+
+// const expression about this project
+constexpr char VERSION[] = "@CMAKE_PROJECT_VERSION@";
+
+constexpr char CITNAMES_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
+constexpr char INTERCEPT_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
+constexpr char LIBRARY_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
+constexpr char EXECUTOR_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/er";
+constexpr char WRAPPER_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d";

@@ -1,0 +1,73 @@
+name: continuous integration
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-10.15]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install package dependencies
+        if:  startsWith( matrix.os, 'ubuntu' )
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind \
+                                  libfmt-dev libspdlog-dev nlohmann-json3-dev
+
+      - name: Install package dependencies
+        if:  startsWith( matrix.os, 'macos' )
+        run: |
+          brew install fmt spdlog nlohmann-json grpc pkg-config
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install python test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install lit pex pycodestyle
+
+      - name: Prepare
+        run: |
+          mkdir "$HOME/work/bear_build"
+          echo "::set-env name=BUILD_DIR::$HOME/work/bear_build"
+          mkdir "$HOME/work/bear_install"
+          echo "::set-env name=INSTALL_DIR::$HOME/work/bear_install"
+          echo "::add-path::$HOME/work/bear_install/bin"
+
+      - name: Build
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        run: |
+          cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR"
+          cmake --build "$BUILD_DIR" --parallel 4 --target install
+
+      - name: Prepare [functional test]
+        run: |
+          echo "::set-env name=ZLIB_SRC_DIR::$HOME/work/zlib"
+          git clone https://github.com/madler/zlib.git $HOME/work/zlib -b v1.2.11
+
+      - name: Execute [functional test]
+        run: |
+          mkdir $HOME/work/zlib_compilations && cd $HOME/work/zlib_compilations
+          bear -- $ZLIB_SRC_DIR/configure
+          bear -- make
+          cat compile_commands.json
+          $GITHUB_WORKSPACE/test/bin/assert_compilation compile_commands.json count -gt 30
+
+      - name: Execute [functional test]
+        run: |
+          mkdir $HOME/work/zlib_intercept && cd $HOME/work/zlib_intercept
+          intercept --output ignore.json   -- $ZLIB_SRC_DIR/configure
+          intercept --output commands.json -- make
+          cat commands.json
+          $GITHUB_WORKSPACE/test/bin/assert_intercepted commands.json count -gt 30
