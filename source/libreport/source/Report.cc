@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <fstream>
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 namespace report {
@@ -183,39 +184,58 @@ namespace report {
         return os;
     }
 
-    rust::Result<int> ReportSerializer::to_json(const fs::path& file, const Report& rhs) const
+    rust::Result<int> ReportSerializer::to_json(const fs::path &file, const Report &rhs) const
     {
         try {
             std::ofstream target(file);
-            return to_json(target, rhs);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return to_json(target, rhs)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to write file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to write file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 
-    rust::Result<int> ReportSerializer::to_json(std::ostream& ostream, const Report& rhs) const
+    rust::Result<int> ReportSerializer::to_json(std::ostream &ostream, const Report &rhs) const
     {
         try {
             nlohmann::json out = rhs;
             ostream << std::setw(4) << out << std::endl;
 
             return rust::Ok(1);
-        } catch (const std::exception& error) {
+        } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
     }
 
-    rust::Result<Report> ReportSerializer::from_json(const fs::path& file) const
+    rust::Result<Report> ReportSerializer::from_json(const fs::path &file) const
     {
         try {
             std::ifstream source(file);
-            return from_json(source);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return from_json(source)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to read file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to read file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 
-    rust::Result<Report> ReportSerializer::from_json(std::istream& istream) const
+    rust::Result<Report> ReportSerializer::from_json(std::istream &istream) const
     {
         try {
             nlohmann::json in;
@@ -225,7 +245,7 @@ namespace report {
             report::from_json(in, result);
 
             return rust::Ok(result);
-        } catch (const std::exception& error) {
+        } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
     }

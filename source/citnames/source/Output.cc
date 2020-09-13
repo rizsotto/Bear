@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <fstream>
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 namespace {
@@ -110,12 +111,22 @@ namespace cs {
         return json;
     }
 
-    rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &entries) const {
+    rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &rhs) const {
         try {
             std::ofstream target(file);
-            return to_json(target, entries);
+            return to_json(target, rhs)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to write file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+
         } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to write file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 
@@ -196,9 +207,18 @@ namespace cs {
     rust::Result<Entries> CompilationDatabase::from_json(const fs::path &file) const {
         try {
             std::ifstream source(file);
-            return from_json(source);
+            return from_json(source)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to read file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
         } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to read file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 

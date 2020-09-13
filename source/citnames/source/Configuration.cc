@@ -22,6 +22,7 @@
 #include <iomanip>
 #include <fstream>
 
+#include <fmt/format.h>
 #include <nlohmann/json.hpp>
 
 namespace cs {
@@ -184,9 +185,19 @@ namespace cs {
     {
         try {
             std::ofstream target(file);
-            return to_json(target, rhs);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return to_json(target, rhs)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to write file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to write file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 
@@ -197,7 +208,7 @@ namespace cs {
             os << std::setw(4) << out << std::endl;
 
             return rust::Ok(1ul);
-        } catch (const std::exception& error) {
+        } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
     }
@@ -206,9 +217,18 @@ namespace cs {
     {
         try {
             std::ifstream source(file);
-            return from_json(source);
-        } catch (const std::exception& error) {
-            return rust::Err(std::runtime_error(error.what()));
+            return from_json(source)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to read file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to read file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
         }
     }
 
@@ -222,7 +242,7 @@ namespace cs {
             ::cs::from_json(in, result);
 
             return rust::Ok(result);
-        } catch (const std::exception& error) {
+        } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
     }
