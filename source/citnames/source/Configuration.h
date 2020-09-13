@@ -64,7 +64,7 @@ namespace cs {
         std::list<fs::path> paths_to_include;
         std::list<fs::path> paths_to_exclude;
 
-        Content()
+        Content() noexcept
                 : include_only_existing_source(false)
                 , paths_to_include()
                 , paths_to_exclude()
@@ -72,7 +72,7 @@ namespace cs {
 
         Content(bool _include_only_existing_source,
                 std::list<fs::path> _paths_to_include,
-                std::list<fs::path> _paths_to_exclude)
+                std::list<fs::path> _paths_to_exclude) noexcept
                 : include_only_existing_source(_include_only_existing_source)
                 , paths_to_include(std::move(_paths_to_include))
                 , paths_to_exclude(std::move(_paths_to_exclude))

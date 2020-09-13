@@ -29,22 +29,22 @@ namespace {
 
 namespace cs::semantic {
 
-    Semantic::Semantic(report::Command _command)
+    Semantic::Semantic(report::Command _command) noexcept
             : command(std::move(_command))
     { }
 
-    QueryCompiler::QueryCompiler(report::Command _command)
+    QueryCompiler::QueryCompiler(report::Command _command) noexcept
             : Semantic(std::move(_command))
     { }
 
-    Preprocess::Preprocess(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags)
+    Preprocess::Preprocess(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
             : Semantic(std::move(_command))
             , source(make_absolute(command, std::move(_source)))
             , output(make_absolute(command, std::move(_output)))
             , flags(std::move(_flags))
     { }
 
-    Compile::Compile(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags)
+    Compile::Compile(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
             : Semantic(std::move(_command))
             , source(make_absolute(command, std::move(_source)))
             , output(make_absolute(command, std::move(_output)))

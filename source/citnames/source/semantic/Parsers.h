@@ -94,7 +94,7 @@ namespace cs::semantic {
 
     struct Instruction {
 
-        constexpr Instruction(const uint8_t count, const Match match, const bool equal)
+        constexpr Instruction(const uint8_t count, const Match match, const bool equal) noexcept
                 : count_(count)
                 , match_exact_((match == Match::EXACT || match == Match::BOTH) ? 1u : 0u)
                 , match_partial_((match == Match::PARTIAL || match == Match::BOTH) ? 1u : 0u)
@@ -140,7 +140,7 @@ namespace cs::semantic {
     // flag at the time.
     class FlagParser {
     public:
-        explicit FlagParser(FlagsByName const& flags)
+        explicit FlagParser(FlagsByName const& flags) noexcept
                 : flags_(flags)
         { }
 
@@ -232,7 +232,7 @@ namespace cs::semantic {
         using container_type = typename std::tuple<Parsers...>;
         container_type const parsers;
 
-        explicit constexpr OneOf(Parsers const& ...p)
+        explicit constexpr OneOf(Parsers const& ...p) noexcept
                 : parsers(p...)
         { }
 
@@ -257,7 +257,7 @@ namespace cs::semantic {
         using result_type = rust::Result<CompilerFlags, Input>;
         Parser const parser;
 
-        explicit constexpr Repeat(Parser  p)
+        explicit constexpr Repeat(Parser  p) noexcept
                 : parser(std::move(p))
         { }
 
