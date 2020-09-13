@@ -1,4 +1,4 @@
 #!/usr/bin/env sh
 
 # XFAIL: *
-# RUN: %{bear} -vvvv --cdb %t.json -- %{false}
+# RUN: %{bear} --verbose --output %t.json -- %{false}

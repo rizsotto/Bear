@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell
-# RUN: cd %T; %{bear} -vvvv --cdb %t.json -- %{shell} %s
+# RUN: cd %T; %{bear} --verbose --output %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 4
 # RUN: assert_compilation %t.json contains -file %T/successful_build_1.c -directory %T -arguments %{c_compiler} -c -o successful_build_1.o successful_build_1.c
 # RUN: assert_compilation %t.json contains -file %T/successful_build_2.c -directory %T -arguments %{c_compiler} -c -o successful_build_2.o successful_build_2.c

@@ -25,7 +25,6 @@
 #include "libsys/Signal.h"
 
 #include <spdlog/spdlog.h>
-//#include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 #include <filesystem>
@@ -39,9 +38,9 @@ namespace {
     constexpr std::optional<std::string_view> ADVANCED_GROUP = { "advanced options" };
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 
-    constexpr char VERBOSE[] = "-vvvv";
+    constexpr char VERBOSE[] = "--verbose";
     constexpr char APPEND[] = "--append";
-    constexpr char OUTPUT[] = "--cdb";
+    constexpr char OUTPUT[] = "--output";
     constexpr char CITNAMES[] = "--citnames";
     constexpr char INTERCEPT[] = "--interceptor";
     constexpr char LIBRARY[] = "--libexec";
