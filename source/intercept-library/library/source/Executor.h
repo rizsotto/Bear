@@ -24,7 +24,7 @@
 namespace el {
 
     class Resolver;
-    class Session;
+    struct Session;
 
     /**
      * This class implements the process execution logic.
