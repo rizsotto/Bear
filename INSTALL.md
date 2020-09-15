@@ -8,7 +8,7 @@ tested on FreeBSD, GNU/Linux and OS X.
 
 1. **C++ compiler**, to compile the sources. (Shall support
    [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).)
-2. **CMake**, to configure the build. (Minimum version is 3.5) And a
+2. **CMake**, to configure the build. (Minimum version is 3.12) And a
    build tool [supported](https://cmake.org/cmake/help/v3.5/manual/cmake-generators.7.html)
    by CMake.
 3. **pkg-config** to look up for dependencies' compiler flags. 
