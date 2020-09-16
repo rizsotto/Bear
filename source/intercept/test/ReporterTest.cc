@@ -122,7 +122,7 @@ namespace {
                         { { "HOME", "/home/user" }, { "PATH", "/usr/bin:/usr/local/bin" } } },
                     report::Run {
                         42 ,
-                        { 12 },
+                        12,
                         {
                             report::Event {"started", "2020-04-04T07:13:47.027Z", std::nullopt, std::nullopt },
                             report::Event {"signaled", "2020-04-04T07:13:47.045Z", std::nullopt, { 15 } },

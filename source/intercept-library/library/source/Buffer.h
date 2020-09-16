@@ -57,15 +57,13 @@ namespace el {
         Buffer& operator=(Buffer&&) noexcept = delete;
 
     private:
-        char* const begin_;
-        char* const end_;
         char* top_;
+        char* const end_;
     };
 
     inline Buffer::Buffer(char* const begin, char* const end) noexcept
-            : begin_(begin)
+            : top_(begin)
             , end_(end)
-            , top_(begin)
     {
     }
 }
