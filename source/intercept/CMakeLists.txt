@@ -39,6 +39,18 @@ include(GNUInstallDirs)
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+# Markdown file is the source to the man file. Please modify that and generate
+# the man file from it with pandoc.
+#
+#   $ pandoc -s -t man intercept.1.md -o intercept.1
+#
+# This is not automated, because pandoc has big dependencies on different OS
+# distributions and packaging would require to install those. Which might be
+# too much effort to generate a single text file.
+
+install(FILES man/intercept.1
+        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
 # Create unit test
 if (ENABLE_UNIT_TESTS)
     add_executable(intercept_unit_test

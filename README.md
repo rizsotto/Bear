@@ -90,7 +90,7 @@ Please follow the [contribution guide][GUIDE] when you do these.
   [ISSUES]: https://github.com/rizsotto/Bear/issues
   [WIKI]: https://github.com/rizsotto/Bear/wiki
   [CHAT]: https://gitter.im/rizsotto/Bear
-  [GUIDE]: https://github.com/rizsotto/Bear/blob/master/.github/CONTRIBUTING.md
+  [GUIDE]: https://github.com/rizsotto/Bear/blob/master/CONTRIBUTING.md
 
 ---
 

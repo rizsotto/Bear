@@ -54,15 +54,3 @@ if (ENABLE_UNIT_TESTS)
 
     add_test(NAME bear::er_unit_test COMMAND $<TARGET_FILE:er_unit_test>)
 endif ()
-
-# Markdown file is the source to the man file. Please modify that and generate
-# the man file from it with pandoc.
-#
-#   $ pandoc -s -t man man/er.1.md -o man/er.1
-#
-# This is not automated, because pandoc has big dependencies on different OS
-# distributions and packaging would require to install those. Which might be
-# too much effort to generate a single text file.
-
-install(FILES man/er.1
-        DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
