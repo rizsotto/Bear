@@ -37,7 +37,7 @@ namespace cs {
     rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const report::Command &command) const {
         return ToolGcc().compilations(command)
                 .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
-                    for (auto semantic : semantics) {
+                    for (auto& semantic : semantics) {
                         semantic->extend_flags(compilers_to_recognize_.additional_flags);
                     }
                     return semantics;

@@ -49,7 +49,7 @@ namespace {
 
 #define CHECK_SESSION(SESSION_)                           \
     do {                                                  \
-        if (!el::session::is_valid(SESSION_)) {          \
+        if (!el::session::is_valid(SESSION_)) {           \
             LOGGER.warning("session is not initialized"); \
             return failure(EIO);                          \
         }                                                 \
@@ -57,7 +57,7 @@ namespace {
 
 #define CHECK_POINTER(PTR_)                        \
     do {                                           \
-        if (nullptr == PTR_) {                     \
+        if (nullptr == (PTR_)) {                   \
             LOGGER.debug("null pointer received"); \
             return failure(EFAULT);                \
         }                                          \

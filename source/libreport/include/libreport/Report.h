@@ -112,10 +112,10 @@ namespace report {
         virtual ~ReportSerializer() noexcept = default;
 
         // Serialization methods with error mapping.
-        virtual rust::Result<int> to_json(const fs::path&, const Report& rhs) const;
+        [[nodiscard]] virtual rust::Result<int> to_json(const fs::path&, const Report& rhs) const;
         virtual rust::Result<int> to_json(std::ostream& ostream, const Report& rhs) const;
 
-        virtual rust::Result<Report> from_json(const fs::path&) const;
+        [[nodiscard]] virtual rust::Result<Report> from_json(const fs::path&) const;
         virtual rust::Result<Report> from_json(std::istream& istream) const;
     };
 }

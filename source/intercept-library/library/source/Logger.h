@@ -19,37 +19,33 @@
 
 #pragma once
 
-namespace el {
+namespace el::log {
 
-    namespace log {
+    enum Level {
+        SILENT = 0,
+        VERBOSE = 1
+    };
 
-        enum Level {
-            SILENT = 0,
-            VERBOSE = 1
-        };
+    // Not MT safe
+    void set(Level);
 
-        // Not MT safe
-        void set(Level);
+    class Logger {
+    public:
+        constexpr explicit Logger(const char *name) noexcept;
 
-        class Logger {
-        public:
-            constexpr explicit Logger(const char *name) noexcept;
+        ~Logger() noexcept = default;
 
-            ~Logger() noexcept = default;
+        void debug(char const *message) const noexcept;
+        void debug(char const *message, char const *variable) const noexcept;
 
-            void debug(char const* message) const noexcept;
-            void debug(char const* message, char const* variable) const noexcept;
+        void warning(char const *message) const noexcept;
 
-            void warning(char const* message) const noexcept;
+    private:
+        const char *name_;
+    };
 
-        private:
-            const char* name_;
-        };
-
-        inline constexpr
-        Logger::Logger(const char* name) noexcept
-                : name_(name)
-        {
-        }
-    }
+    inline constexpr
+    Logger::Logger(const char *name) noexcept
+            : name_(name)
+    { }
 }

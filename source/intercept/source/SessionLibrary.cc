@@ -28,7 +28,6 @@
 #include <spdlog/spdlog.h>
 
 #include <functional>
-#include <numeric>
 #include <utility>
 
 namespace {

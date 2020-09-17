@@ -34,7 +34,7 @@ namespace sys::env {
     public:
         explicit Guard(const std::map<std::string, std::string>& environ);
 
-        const char** data() const;
+        [[nodiscard]] const char** data() const;
 
     public:
         Guard() = delete;

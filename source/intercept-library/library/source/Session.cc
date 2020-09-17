@@ -23,33 +23,30 @@
 #include "Environment.h"
 #include "libexec/Environment.h"
 
-namespace el {
+namespace el::session {
 
-    namespace session {
+    void from(Session &session, const char **environment) noexcept
+    {
+        if (nullptr == environment)
+            return;
 
-        void from(Session& session, const char** environment) noexcept
-        {
-            if (nullptr == environment)
-                return;
+        session.reporter = env::get_env_value(environment, env::KEY_REPORTER);
+        session.destination = env::get_env_value(environment, env::KEY_DESTINATION);
+        session.verbose = env::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
+    }
 
-            session.reporter = env::get_env_value(environment, env::KEY_REPORTER);
-            session.destination = env::get_env_value(environment, env::KEY_DESTINATION);
-            session.verbose = env::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
-        }
+    void persist(Session &session, char *begin, char *end) noexcept
+    {
+        if (!is_valid(session))
+            return;
 
-        void persist(Session& session, char* begin, char* end) noexcept
-        {
-            if (!is_valid(session))
-                return;
+        Buffer buffer(begin, end);
+        session.reporter = buffer.store(session.reporter);
+        session.destination = buffer.store(session.destination);
+    }
 
-            Buffer buffer(begin, end);
-            session.reporter = buffer.store(session.reporter);
-            session.destination = buffer.store(session.destination);
-        }
-
-        bool is_valid(Session const& session) noexcept
-        {
-            return (session.reporter != nullptr && session.destination != nullptr);
-        }
+    bool is_valid(Session const &session) noexcept
+    {
+        return (session.reporter != nullptr && session.destination != nullptr);
     }
 }

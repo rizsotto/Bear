@@ -65,13 +65,13 @@ namespace report {
         j.at("type").get_to(rhs.type);
 
         if (j.contains("status")) {
-            int value;
+            int value = 0;
             j.at("status").get_to(value);
             rhs.status.emplace(value);
         }
 
         if (j.contains("signal")) {
-            int value;
+            int value = 0;
             j.at("signal").get_to(value);
             rhs.signal.emplace(value);
         }
