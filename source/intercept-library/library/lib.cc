@@ -38,7 +38,7 @@ namespace {
 
     void va_copy_n(va_list& args, char* argv[], size_t const argc)
     {
-        for (size_t idx = 0; idx <= argc; ++idx)
+        for (size_t idx = 0; idx < argc; ++idx)
             argv[idx] = va_arg(args, char*);
     }
 }
@@ -170,7 +170,7 @@ extern "C" int execl(const char* path, const char* arg, ...)
     va_start(ap, arg);
     char* argv[argc + 2];
     argv[0] = const_cast<char*>(path);
-    va_copy_n(ap, &argv[1], argc);
+    va_copy_n(ap, &argv[1], argc + 1);
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
@@ -192,7 +192,7 @@ extern "C" int execlp(const char* file, const char* arg, ...)
     va_start(ap, arg);
     char* argv[argc + 2];
     argv[0] = const_cast<char*>(file);
-    va_copy_n(ap, &argv[1], argc);
+    va_copy_n(ap, &argv[1], argc + 1);
     va_end(ap);
 
     auto envp = const_cast<char* const*>(RESOLVER.environment());
@@ -215,7 +215,7 @@ extern "C" int execle(const char* path, const char* arg, ...)
     va_start(ap, arg);
     char* argv[argc + 2];
     argv[0] = const_cast<char*>(path);
-    va_copy_n(ap, &argv[1], argc);
+    va_copy_n(ap, &argv[1], argc + 1);
     char** envp = va_arg(ap, char**);
     va_end(ap);
 

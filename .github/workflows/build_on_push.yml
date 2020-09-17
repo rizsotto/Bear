@@ -47,6 +47,7 @@ jobs:
       - name: Build
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
+          PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig"
         run: |
           cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR"
           cmake --build "$BUILD_DIR" --parallel 4 --target install

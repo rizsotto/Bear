@@ -75,7 +75,7 @@ namespace {
         {
         }
 
-        constexpr size_t length() const noexcept
+        [[nodiscard]] constexpr size_t length() const noexcept
         {
             return (session.verbose ? 3 : 4) + el::array::length(argv) + 4;
         }
@@ -100,7 +100,7 @@ namespace {
             *it = nullptr;
         }
 
-        constexpr const char* file() const noexcept
+        [[nodiscard]] constexpr const char* file() const noexcept
         {
             return session.reporter;
         }
@@ -128,12 +128,12 @@ namespace {
         {
         }
 
-        constexpr size_t length() const noexcept
+        [[nodiscard]] constexpr size_t length() const noexcept
         {
             return (end - begin);
         }
 
-        constexpr bool empty() const noexcept
+        [[nodiscard]] constexpr bool empty() const noexcept
         {
             return 0 == length();
         }
@@ -153,7 +153,7 @@ namespace {
         {
         }
 
-        constexpr size_t length() const noexcept
+        [[nodiscard]] constexpr size_t length() const noexcept
         {
             return prefix.length() + file.length() + 2;
         }

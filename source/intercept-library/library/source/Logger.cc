@@ -25,8 +25,6 @@
 
 namespace {
 
-    constexpr std::time_t SECS_IN_DAY = 24 * 60 * 60;
-
     el::log::Level LEVEL = el::log::SILENT;
 
     void verbose_message(char const* name, char const* message, char const* variable)

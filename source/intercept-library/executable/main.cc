@@ -79,7 +79,7 @@ int main(int argc, char* argv[], char* envp[])
             auto environment = sys::env::from(const_cast<const char **>(envp));
             return er::Application::create(args, std::move(environment));
         })
-        .and_then<int>([&envp](const auto& command) {
+        .and_then<int>([](const auto& command) {
             return command();
         })
         // print out the result of the run
