@@ -19,130 +19,153 @@
 
 #include "gtest/gtest.h"
 
+#include "Configuration.h"
+#include "Output.h"
 #include "semantic/Tool.h"
-#include "semantic/ToolGcc.h"
 
 namespace {
 
-    TEST(ToolGcc, fails_on_empty) {
-        report::Command input = {};
+    TEST(Tools, parses_empty_command_list)
+    {
+        cs::Configuration cfg;
 
-        cs::semantic::ToolGcc sut({});
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
+        EXPECT_TRUE(sut.is_ok());
 
-        EXPECT_FALSE(sut.compilations(input).is_ok());
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {}
+        };
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
     }
 
-//    TEST(ToolGcc, simple) {
-//        report::Command input = {
-//                "/usr/bin/cc",
-//                {"cc", "-c", "-o", "source.o", "source.c"},
-//                "/home/user/project",
-//                {},
-//        };
-//        cs::output::Entries expected = {
-//                {
-//                        "/home/user/project/source.c",
-//                        "/home/user/project",
-//                        { "/home/user/project/source.o" },
-//                        {"/usr/bin/cc", "-c", "-o", "source.o", "source.c"}},
-//        };
-//
-//        cs::semantic::ToolGcc sut({});
-//
-//        auto result = sut.compilations(input);
-//        EXPECT_TRUE(result.is_ok());
-//        EXPECT_EQ(expected, result.unwrap_or({}));
-//    }
-//
-//    TEST(ToolGcc, linker_flag_filtered) {
-//        report::Command input = {
-//                "/usr/bin/cc",
-//                {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
-//                "/home/user/project",
-//                {},
-//        };
-//        cs::output::Entries expected = {
-//                {
-//                        "/home/user/project/source.c",
-//                        "/home/user/project",
-//                        { "/home/user/project/exe" },
-//                        {"/usr/bin/cc", "-c", "-o", "exe", "source.c"}},
-//        };
-//
-//        cs::semantic::ToolGcc sut({});
-//
-//        auto result = sut.compilations(input);
-//        EXPECT_TRUE(result.is_ok());
-//        EXPECT_EQ(expected, result.unwrap_or({}));
-//    }
-//
-//    TEST(ToolGcc, pass_on_help) {
-//        report::Command input = {
-//                "/usr/bin/gcc",
-//                {"gcc", "--version"},
-//                "/home/user/project",
-//                {},
-//        };
-//        cs::output::Entries expected = {};
-//
-//        cs::semantic::ToolGcc sut({});
-//
-//        auto result = sut.compilations(input);
-//        EXPECT_TRUE(result.is_ok());
-//        EXPECT_EQ(expected, result.unwrap_or({}));
-//    }
-//
-//    TEST(ToolGcc, simple_with_C_PATH) {
-//        report::Command input = {
-//                "/usr/bin/cc",
-//                {"cc", "-c", "source.c"},
-//                "/home/user/project",
-//                {{"CPATH", "/usr/include/path1:/usr/include/path2"},
-//                 {"C_INCLUDE_PATH", ":/usr/include/path3"}},
-//        };
-//        cs::output::Entries expected = {
-//                {
-//                        "/home/user/project/source.c",
-//                        "/home/user/project",
-//                        std::nullopt,
-//                        {
-//                                "/usr/bin/cc",
-//                                "-c", "source.c",
-//                                "-I", "/usr/include/path1",
-//                                "-I", "/usr/include/path2",
-//                                "-I", ".",
-//                                "-I", "/usr/include/path3",
-//                        }
-//                },
-//        };
-//
-//        cs::semantic::ToolGcc sut({});
-//
-//        auto result = sut.compilations(input);
-//        EXPECT_TRUE(result.is_ok());
-//        EXPECT_EQ(expected, result.unwrap_or({}));
-//    }
-//
-//    TEST(ToolGcc, simple_where_compiler_from_env) {
-//        report::Command input = {
-//                "/usr/bin/wrapper",
-//                {"wrapper", "-c", "source.c"},
-//                "/home/user/project",
-//                {},
-//        };
-//        cs::output::Entries expected = {
-//                {
-//                        "/home/user/project/source.c",
-//                        "/home/user/project",
-//                        std::nullopt,
-//                        {"/usr/bin/wrapper", "-c", "source.c"}
-//                },
-//        };
-//
-//        cs::semantic::ToolGcc sut({"/usr/bin/wrapper"});
-//
-//        auto result = sut.compilations(input);
-//        EXPECT_TRUE(result.is_ok());
-//        EXPECT_EQ(expected, result.unwrap_or({}));
-//    }
+    TEST(Tools, parses_command_list)
+    {
+        cs::Configuration cfg;
+
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
+        EXPECT_TRUE(sut.is_ok());
+
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/cc",
+                                        { "cc", "--version" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 1, 0, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/ls",
+                                        { "ls", "-la" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 2, 0, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/cc",
+                                        { "cc", "-c", "-Wall", "source.1.c" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 3, 0, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/c++",
+                                        { "c++", "-c", "-Wall", "source.2.cc" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 4, 0, {} }
+                        },
+                }
+        };
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
+
+        cs::Entries expected = {
+                cs::Entry{
+                        "/home/user/project/source.1.c",
+                        "/home/user/project",
+                        {"/home/user/project/source.1.o"},
+                        {"/usr/bin/cc", "-c", "-Wall", "source.1.c"}
+                },
+                cs::Entry{
+                        "/home/user/project/source.2.cc",
+                        "/home/user/project",
+                        {"/home/user/project/source.2.o"},
+                        {"/usr/bin/c++", "-c", "-Wall", "source.2.cc"}
+                },
+        };
+        auto compilations = result.unwrap_or({});
+        EXPECT_EQ(expected, compilations);
+    }
+
+    TEST(Tools, child_commands_are_ignored)
+    {
+        cs::Configuration cfg;
+
+        auto sut = cs::semantic::Tools::from(cfg.compilation);
+        EXPECT_TRUE(sut.is_ok());
+
+        auto input = report::Report {
+                report::Context { "session", {} },
+                {
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/nvcc",
+                                        { "cc", "-c", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 1, 0, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/gcc",
+                                        { "cc", "-E", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 2, 1, {} }
+                        },
+                        report::Execution {
+                                report::Command {
+                                        "/usr/bin/gcc",
+                                        { "cc", "-c", "-Dthing", "source.cu" },
+                                        "/home/user/project",
+                                        {}
+                                },
+                                report::Run { 3, 1, {} }
+                        },
+                }
+        };
+        auto result = sut.map<cs::Entries>([&input](auto semantic) {
+            return semantic.transform(input);
+        });
+        EXPECT_TRUE(result.is_ok());
+
+        cs::Entries expected = {
+                cs::Entry{
+                        "/home/user/project/source.cu",
+                        "/home/user/project",
+                        {"/home/user/project/source.o"},
+                        {"/usr/bin/nvcc", "-c", "source.cu"}
+                },
+        };
+        auto compilations = result.unwrap_or({});
+        EXPECT_EQ(expected, compilations);
+    }
 }

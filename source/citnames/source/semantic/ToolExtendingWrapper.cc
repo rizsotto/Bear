@@ -38,7 +38,16 @@ namespace cs {
         return ToolGcc().compilations(command)
                 .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
                     for (auto& semantic : semantics) {
-                        semantic->extend_flags(compilers_to_recognize_.additional_flags);
+                        if (auto* ptr = dynamic_cast<Preprocess*>(semantic.get()); ptr != nullptr) {
+                            std::copy(compilers_to_recognize_.additional_flags.begin(),
+                                      compilers_to_recognize_.additional_flags.end(),
+                                      std::back_inserter(ptr->flags));
+                        }
+                        if (auto* ptr = dynamic_cast<Compile*>(semantic.get()); ptr != nullptr) {
+                            std::copy(compilers_to_recognize_.additional_flags.begin(),
+                                      compilers_to_recognize_.additional_flags.end(),
+                                      std::back_inserter(ptr->flags));
+                        }
                     }
                     return semantics;
                 });

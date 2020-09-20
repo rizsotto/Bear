@@ -33,6 +33,7 @@ target_link_libraries(citnames_a PUBLIC report_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
+target_compile_options(citnames_a PRIVATE -frtti)
 
 # Create an executable from the sub projects.
 add_executable(citnames
@@ -69,8 +70,8 @@ install(FILES man/citnames.1
 if (ENABLE_UNIT_TESTS)
     add_executable(citnames_unit_test
             test/OutputTest.cc
-            test/SemanticTest.cc
             test/ToolTest.cc
+            test/ToolGccTest.cc
             )
 
     target_link_libraries(citnames_unit_test citnames_a)

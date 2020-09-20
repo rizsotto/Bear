@@ -19,6 +19,8 @@
 
 #include "semantic/Semantic.h"
 
+#include <fmt/format.h>
+
 namespace {
 
     inline
@@ -51,41 +53,6 @@ namespace cs::semantic {
             , flags(std::move(_flags))
     { }
 
-    void QueryCompiler::extend_flags(const std::list<std::string> &) {
-    }
-
-    void Preprocess::extend_flags(const std::list<std::string> &_flags) {
-        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
-    }
-
-    void Compile::extend_flags(const std::list<std::string> &_flags) {
-        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
-    }
-
-    void Link::extend_flags(const std::list<std::string> &_flags) {
-        std::copy(_flags.begin(), _flags.end(), std::back_inserter(flags));
-    }
-
-    std::ostream &QueryCompiler::operator<<(std::ostream &os) const {
-        os << "Query";
-        return os;
-    }
-
-    std::ostream &Preprocess::operator<<(std::ostream &os) const {
-        os << "Preprocess";
-        return os;
-    }
-
-    std::ostream &Compile::operator<<(std::ostream &os) const {
-        os << "Compile";
-        return os;
-    }
-
-    std::ostream &Link::operator<<(std::ostream &os) const {
-        os << "Link";
-        return os;
-    }
-
     std::optional<cs::Entry> QueryCompiler::into_entry() const {
         return std::optional<cs::Entry>();
     }
@@ -105,8 +72,60 @@ namespace cs::semantic {
         return std::make_optional(std::move(entry));
     }
 
-    std::optional<cs::Entry> Link::into_entry() const {
-        // TODO
-        return std::optional<cs::Entry>();
+    bool QueryCompiler::operator==(const Semantic &rhs) const {
+        if (this == &rhs)
+            return true;
+
+        if (const auto* ptr = dynamic_cast<QueryCompiler const*>(&rhs); ptr != nullptr) {
+            return (command == ptr->command);
+        }
+        return false;
+    }
+
+    bool Preprocess::operator==(const Semantic &rhs) const {
+        if (this == &rhs)
+            return true;
+
+        if (const auto* ptr = dynamic_cast<Preprocess const*>(&rhs); ptr != nullptr) {
+            return (command == ptr->command) &&
+                   (source == ptr->source) &&
+                   (output == ptr->output) &&
+                   (flags == ptr->flags);
+        }
+        return false;
+    }
+
+    bool Compile::operator==(const Semantic &rhs) const {
+        if (this == &rhs)
+            return true;
+
+        if (const auto* ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
+            return (command == ptr->command) &&
+                   (source == ptr->source) &&
+                   (output == ptr->output) &&
+                   (flags == ptr->flags);
+        }
+        return false;
+    }
+
+    std::ostream &QueryCompiler::operator<<(std::ostream &os) const {
+        os << "Query";
+        return os;
+    }
+
+    std::ostream &Preprocess::operator<<(std::ostream &os) const {
+        os  << "Preprocess { source: " << source
+            << ", output: " << output
+            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << " }";
+        return os;
+    }
+
+    std::ostream &Compile::operator<<(std::ostream &os) const {
+        os  << "Compile { source: " << source
+            << ", output: " << output
+            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << " }";
+        return os;
     }
 }

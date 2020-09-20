@@ -38,10 +38,10 @@ namespace cs::semantic {
         explicit Semantic(report::Command) noexcept;
         virtual ~Semantic() noexcept = default;
 
-        virtual void extend_flags(std::list<std::string> const&) = 0;
-
-        virtual std::ostream& operator<<(std::ostream&) const = 0;
         [[nodiscard]] virtual std::optional<cs::Entry> into_entry() const = 0;
+
+        virtual bool operator==(Semantic const&) const = 0;
+        virtual std::ostream& operator<<(std::ostream&) const = 0;
 
         report::Command command;
     };
@@ -54,20 +54,20 @@ namespace cs::semantic {
     struct QueryCompiler : public Semantic {
         explicit QueryCompiler(report::Command) noexcept;
 
-        void extend_flags(std::list<std::string> const&) override;
-
-        std::ostream& operator<<(std::ostream&) const override;
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
+
+        bool operator==(Semantic const&) const override;
+        std::ostream& operator<<(std::ostream&) const override;
     };
 
     // Represents a compiler call, which runs the preprocessor pass.
     struct Preprocess : public Semantic {
         Preprocess(report::Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
 
-        void extend_flags(std::list<std::string> const&) override;
-
-        std::ostream& operator<<(std::ostream&) const override;
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
+
+        bool operator==(Semantic const&) const override;
+        std::ostream& operator<<(std::ostream&) const override;
 
         fs::path source;
         fs::path output;
@@ -78,35 +78,14 @@ namespace cs::semantic {
     struct Compile : public Semantic {
         Compile(report::Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
 
-        void extend_flags(std::list<std::string> const&) override;
-
-        std::ostream& operator<<(std::ostream&) const override;
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
+
+        bool operator==(Semantic const&) const override;
+        std::ostream& operator<<(std::ostream&) const override;
 
         fs::path source;
         fs::path output;
         std::list<std::string> flags;
-    };
-
-    // Represents a compiler call, which runs the linking pass.
-    struct Link : public Semantic {
-
-        void extend_flags(std::list<std::string> const&) override;
-
-        std::ostream& operator<<(std::ostream&) const override;
-        [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
-
-        enum Type {
-            EXECUTABLE,
-            LIBRARY
-        };
-
-        std::list<fs::path> inputs;
-        std::list<fs::path> libraries;
-        fs::path output;
-        Type type;
-        std::list<std::string> flags;
-
     };
 
     inline
@@ -124,5 +103,23 @@ namespace cs::semantic {
             value->operator<<(os);
         }
         return os;
+    }
+
+    inline
+    bool operator==(Semantic const &lhs, Semantic const &rhs) {
+        return lhs.operator==(rhs);
+    }
+
+    inline
+    bool operator==(SemanticPtrs const &lhs, SemanticPtrs const &rhs) {
+        auto lhs_it = lhs.begin();
+        auto rhs_it = rhs.begin();
+        const auto lhs_end = lhs.end();
+        const auto rhs_end = rhs.end();
+        while (lhs_it != lhs_end && rhs_it != rhs_end && (*lhs_it)->operator==(**rhs_it)) {
+            ++lhs_it;
+            ++rhs_it;
+        }
+        return lhs_it == lhs_end && rhs_it == rhs_end;
     }
 }
