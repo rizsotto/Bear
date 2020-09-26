@@ -29,6 +29,8 @@
 
 #include <cerrno>
 #include <climits>
+#include <string_view>
+
 #include <unistd.h>
 
 #pragma GCC diagnostic push
@@ -110,43 +112,12 @@ namespace {
         char* const* const argv;
     };
 
-    // Represents a region which contains a string value. The content is
-    // not owned by the instance in any given time. It's just a util class
-    // for zero copy string handling.
-    class StringView {
-    public:
-        constexpr explicit StringView(const char* ptr) noexcept
-                : begin(ptr)
-                , end(el::array::end(ptr))
-        {
-        }
-
-        constexpr StringView(const char* begin, const char* end) noexcept
-                : begin(begin)
-                , end(end)
-        {
-        }
-
-        [[nodiscard]] constexpr size_t length() const noexcept
-        {
-            return (end - begin);
-        }
-
-        [[nodiscard]] constexpr bool empty() const noexcept
-        {
-            return 0 == length();
-        }
-
-        const char* begin;
-        const char* end;
-    };
-
     // Util class to concatenate directory and file.
     //
     // Use this class to allocate buffer and assemble the content of it.
     class PathBuilder {
     public:
-        constexpr PathBuilder(const StringView& prefix, const StringView& file)
+        constexpr PathBuilder(const std::string_view &prefix, const std::string_view &file)
                 : prefix(prefix)
                 , file(file)
         {
@@ -161,15 +132,15 @@ namespace {
         {
             char* end = it + length();
 
-            it = el::array::copy(prefix.begin, prefix.end, it, end);
+            it = el::array::copy(prefix.begin(), prefix.end(), it, end);
             *it++ = DIR_SEPARATOR;
-            it = el::array::copy(file.begin, file.end, it, end);
+            it = el::array::copy(file.begin(), file.end(), it, end);
             *it = 0;
         }
 
     private:
-        const StringView prefix;
-        const StringView file;
+        const std::string_view prefix;
+        const std::string_view file;
     };
 
     class PathResolver {
@@ -257,13 +228,13 @@ namespace {
              const char* current = search_path;
              do {
                  const char* next = next_path_separator(current);
-                 const StringView prefix(current, next);
+                 const std::string_view prefix(current, (next - current));
                  // ignore empty entries
                  if (prefix.empty()) {
                      continue;
                  }
                  // create a path
-                 const PathBuilder path_builder(prefix, StringView(file));
+                 const PathBuilder path_builder(prefix, std::string_view(file));
                  char path[path_builder.length()];
                  path_builder.assemble(path);
                  // check if it's okay to execute.
