@@ -37,6 +37,13 @@ namespace {
         EXPECT_EQ(&input[0], el::array::end(input));
     }
 
+    TEST(array_end, works_on_strings)
+    {
+        const char* input = "hello";
+
+        EXPECT_EQ(input + 5, el::array::end(input));
+    }
+
     TEST(array_end, finds_the_last_one)
     {
         const char* input0 = "this";
@@ -67,6 +74,13 @@ namespace {
         const char* input[] = { input0, input1, 0 };
 
         EXPECT_EQ(2, el::array::length(input));
+    }
+
+    TEST(array_length, works_on_strings)
+    {
+        const char* input = "hello";
+
+        EXPECT_EQ(5, el::array::length(input));
     }
 
     TEST(array_copy, works_with_zero_length_input)
@@ -108,5 +122,4 @@ namespace {
         auto result = el::array::copy(src, src + 5, dst, dst + 3);
         EXPECT_EQ(nullptr, result);
     }
-
 }

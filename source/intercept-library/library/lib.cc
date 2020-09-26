@@ -19,6 +19,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <climits>
 #include <cstdarg>
 
 #include "Executor.h"
@@ -50,7 +51,7 @@ namespace {
  */
 namespace {
     // This is the only non stack memory that this library is using.
-    constexpr size_t BUFFER_SIZE = 15 * 1024;
+    constexpr size_t BUFFER_SIZE = PATH_MAX * 2;
     char BUFFER[BUFFER_SIZE];
     // This is used for being multi thread safe (loading time only).
     std::atomic<bool> LOADED(false);

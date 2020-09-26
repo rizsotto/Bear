@@ -29,7 +29,6 @@
 
 #include <cerrno>
 #include <climits>
-#include <functional>
 #include <unistd.h>
 
 #pragma GCC diagnostic push
@@ -77,7 +76,7 @@ namespace {
 
         [[nodiscard]] constexpr size_t length() const noexcept
         {
-            return (session.verbose ? 3 : 4) + el::array::length(argv) + 4;
+            return (session.verbose ? 6 : 7) + el::array::length(argv) + 1;
         }
 
         constexpr void assemble(const char** it) const noexcept
@@ -173,8 +172,113 @@ namespace {
         const StringView file;
     };
 
-    constexpr const char* next_path_separator(const char* input)
-    {
+    class PathResolver {
+    public:
+        struct Result {
+            const char* return_value;
+            const int error_code;
+
+            constexpr explicit operator bool() const noexcept {
+                return (return_value != nullptr) && (error_code == 0);
+            }
+        };
+
+    public:
+        explicit PathResolver(el::Resolver const &resolver);
+
+        Result from_current_directory(const char *file);
+        Result from_path(const char *file, char* const* envp);
+        Result from_search_path(const char *file, const char *search_path);
+
+        PathResolver(PathResolver const &) = delete;
+        PathResolver(PathResolver &&) noexcept = delete;
+
+        PathResolver &operator=(PathResolver const &) = delete;
+        PathResolver &&operator=(PathResolver &&) noexcept = delete;
+
+    private:
+        static const char* next_path_separator(const char* input);
+        static bool contains_dir_separator(const char* candidate);
+
+    private:
+        el::Resolver const &resolver_;
+        char result_[PATH_MAX];
+    };
+
+    PathResolver::PathResolver(const el::Resolver &resolver)
+            : resolver_(resolver)
+            , result_()
+    { }
+
+    PathResolver::Result PathResolver::from_current_directory(const char *file) {
+        // create absolute path to the given file.
+        if (nullptr == resolver_.realpath(file, result_)) {
+            return PathResolver::Result {nullptr, ENOENT };
+        }
+        // check if it's okay to execute.
+        if (0 == resolver_.access(result_, X_OK)) {
+            return PathResolver::Result { result_, 0 };
+        }
+        // try to set a meaningful error value.
+        if (0 == resolver_.access(result_, F_OK)) {
+            return PathResolver::Result {nullptr, EACCES };
+        }
+        return PathResolver::Result {nullptr, ENOENT };
+    }
+
+    PathResolver::Result PathResolver::from_path(const char *file, char* const* envp) {
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return from_current_directory(file);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char *paths = el::env::get_env_value(const_cast<const char **>(envp), "PATH");
+            if (paths != nullptr) {
+                return from_search_path(file, paths);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
+            if (search_path_length != 0) {
+                char search_path[search_path_length];
+                if (resolver_.confstr(_CS_PATH, search_path, search_path_length) != 0) {
+                    return from_search_path(file, search_path);
+                }
+            }
+            return PathResolver::Result {nullptr, ENOENT };
+        }
+    }
+
+    PathResolver::Result PathResolver::from_search_path(const char *file, const char *search_path) {
+         if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return from_current_directory(file);
+        } else {
+            // otherwise use the given search path to locate the executable.
+             const char* current = search_path;
+             do {
+                 const char* next = next_path_separator(current);
+                 const StringView prefix(current, next);
+                 // ignore empty entries
+                 if (prefix.empty()) {
+                     continue;
+                 }
+                 // create a path
+                 const PathBuilder path_builder(prefix, StringView(file));
+                 char path[path_builder.length()];
+                 path_builder.assemble(path);
+                 // check if it's okay to execute.
+                 if (auto result = from_current_directory(path); result) {
+                     return result;
+                 }
+                 // try the next one
+                 current = ((*next == 0) ? nullptr : ++next);
+             } while (current != nullptr);
+             // if all attempt were failing, then quit with a failure.
+             return PathResolver::Result {nullptr, ENOENT };
+        }
+    }
+
+    const char *PathResolver::next_path_separator(const char *const input) {
         auto it = input;
         while ((*it != 0) && (*it != PATH_SEPARATOR)) {
             ++it;
@@ -182,70 +286,7 @@ namespace {
         return it;
     }
 
-    int is_executable(const el::Resolver& resolver, const char* path)
-    {
-        if (0 == resolver.access(path, X_OK)) {
-            return 0;
-        }
-        if (0 == resolver.access(path, F_OK)) {
-            return EACCES;
-        }
-        return ENOENT;
-    }
-
-    el::Executor::Result execute_from_search_path(
-        const el::Resolver& resolver,
-        const char* search_path,
-        const char* file,
-        std::function<int(const char*)> const& function) noexcept
-    {
-        const char* current = search_path;
-        do {
-            const char* next = next_path_separator(current);
-            const StringView prefix(current, next);
-            // ignore empty entries
-            if (prefix.empty()) {
-                continue;
-            }
-            // create a path
-            const PathBuilder path_builder(prefix, StringView(file));
-            char path[path_builder.length()];
-            path_builder.assemble(path);
-            // check if it's okay to execute.
-            if (0 == is_executable(resolver, path)) {
-                // execute if everything looks good.
-                const int return_value = function(path);
-                return { return_value, resolver.error_code() };
-            }
-            // try the next one
-            current = (*next == 0) ? nullptr : ++next;
-        } while (current != nullptr);
-        // if all attempt were failing, then quit with a failure.
-        return failure(ENOENT);
-    }
-
-    el::Executor::Result execute_from_current_directory(
-        const el::Resolver& resolver,
-        const char* file,
-        std::function<int(const char*)> const& function) noexcept
-    {
-        // create absolute path to the given file.
-        char path[PATH_MAX];
-        if (nullptr == resolver.realpath(file, path)) {
-            return failure(ENOENT);
-        }
-        // check if it's okay to execute.
-        const int error_code = is_executable(resolver, path);
-        if (0 != error_code) {
-            return failure(error_code);
-        }
-        // execute if everything looks good.
-        const int return_value = function(path);
-        return { return_value, resolver.error_code() };
-    }
-
-    bool contains_dir_separator(const char* const candidate)
-    {
+    bool PathResolver::contains_dir_separator(const char *const candidate) {
         for (auto it = candidate; *it != 0; ++it) {
             if (*it == DIR_SEPARATOR) {
                 return true;
@@ -260,45 +301,24 @@ namespace el {
     Executor::Executor(el::Resolver const& resolver, el::Session const& session) noexcept
             : resolver_(resolver)
             , session_(session)
-    {
-    }
+    { }
 
     Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        // To avoid heap allocations with std::function
-        //
-        // Are you familiar with the "small string optimization" for std::string? Basically,
-        // the data for a std::string is stored on the heap -- the size is unbounded, so heap
-        // allocation is obviously necessary. But in real programs, the vast majority of strings
-        // are actually pretty small, so the heap allocation can be avoided by storing the string
-        // inside the std::string object instance (re-purposing the memory used for the pointers,
-        // usually).
-        //
-        // The same thing is happening here with std::function. The size of the function object
-        // it might be storing is unbounded, so heap allocation is the default behavior. But most
-        // function objects are pretty small, so a similar "small function object optimization" is
-        // possible.
-        struct Context {
-            const Resolver& resolver;
-            const Session& session;
-            char* const* argv;
-            char* const* envp;
-        } ctx = {
-            resolver_, session_, argv, envp
-        };
-
-        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
-            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
+        PathResolver resolver(resolver_);
+        if (auto executable = resolver.from_current_directory(path); executable) {
+            const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            return (ctx.resolver).execve(cmd.file(), const_cast<char* const*>(dst), ctx.envp);
-        };
-
-        return execute_from_current_directory(resolver_, path, fp);
+            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result { return_value, resolver_.error_code() };
+        } else {
+            return Executor::Result { -1, executable.error_code };
+        }
     }
 
     Executor::Result Executor::execvpe(const char* file, char* const* argv, char* const* envp) const
@@ -306,36 +326,34 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return execve(file, argv, envp);
-        } else {
-            // otherwise use the PATH variable to locate the executable.
-            const char* paths = el::env::get_env_value(const_cast<const char**>(envp), "PATH");
-            if (paths != nullptr) {
-                return execve_from_search_path(paths, file, argv, envp);
-            }
-            // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
-            char search_path[search_path_length];
-            confstr(_CS_PATH, search_path, search_path_length);
+        PathResolver resolver(resolver_);
+        if (auto executable = resolver.from_path(file, envp); executable) {
+            const CommandBuilder cmd(session_, executable.return_value, argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
 
-            return execve_from_search_path(search_path, file, argv, envp);
+            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result { return_value, resolver_.error_code() };
+        } else {
+            return Executor::Result { -1, executable.error_code };
         }
     }
 
-    Executor::Result Executor::execvP(const char* file, const char* search_path, char* const* argv,
-        char* const* envp) const
+    Executor::Result Executor::execvP(const char* file, const char* search_path, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return execve(file, argv, envp);
+        PathResolver resolver(resolver_);
+        if (auto executable = resolver.from_search_path(file, search_path); executable) {
+            const CommandBuilder cmd(session_, executable.return_value, argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
+
+            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result { return_value, resolver_.error_code() };
         } else {
-            // otherwise use the given search path to locate the executable.
-            return execve_from_search_path(search_path, file, argv, envp);
+            return Executor::Result { -1, executable.error_code };
         }
     }
 
@@ -346,28 +364,17 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        // See comment in `Executor::execve` method.
-        struct Context {
-            const Resolver& resolver;
-            const Session& session;
-            pid_t* pid;
-            const posix_spawn_file_actions_t* file_actions;
-            const posix_spawnattr_t* attrp;
-            char* const* argv;
-            char* const* envp;
-        } ctx = {
-            resolver_, session_, pid, file_actions, attrp, argv, envp
-        };
-
-        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
-            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
+        PathResolver resolver(resolver_);
+        if (auto executable = resolver.from_current_directory(path); executable) {
+            const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            return (ctx.resolver).posix_spawn(ctx.pid, cmd.file(), ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
-        };
-
-        return execute_from_current_directory(resolver_, path, fp);
+            auto return_value = resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+            return Executor::Result { return_value, resolver_.error_code() };
+        } else {
+            return Executor::Result { -1, executable.error_code };
+        }
     }
 
     Executor::Result Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
@@ -377,71 +384,17 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return posix_spawn(pid, file, file_actions, attrp, argv, envp);
+        PathResolver resolver(resolver_);
+        if (auto executable = resolver.from_path(file, envp); executable) {
+            const CommandBuilder cmd(session_, executable.return_value, argv);
+            const char* dst[cmd.length()];
+            cmd.assemble(dst);
+
+            auto return_value = resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+            return Executor::Result { return_value, resolver_.error_code() };
         } else {
-            // otherwise use the PATH variable to locate the executable.
-            const char* paths = el::env::get_env_value(const_cast<const char**>(envp), "PATH");
-            if (paths != nullptr) {
-                return posix_spawn_from_search_path(paths, pid, file, file_actions, attrp, argv, envp);
-            }
-            // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
-            char search_path[search_path_length];
-            confstr(_CS_PATH, search_path, search_path_length);
-
-            return posix_spawn_from_search_path(search_path, pid, file, file_actions, attrp, argv, envp);
+            return Executor::Result { -1, executable.error_code };
         }
-    }
-
-    Executor::Result Executor::execve_from_search_path(const char* search_path, const char* file, char* const* argv, char* const* envp) const
-    {
-        // See comment in `Executor::execve` method.
-        struct Context {
-            const Resolver& resolver;
-            const Session& session;
-            char* const* argv;
-            char* const* envp;
-        } ctx = {
-            resolver_, session_, argv, envp
-        };
-        // Capture context variable by reference.
-        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
-            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
-            const char* dst[cmd.length()];
-            cmd.assemble(dst);
-
-            return (ctx.resolver).execve(cmd.file(), const_cast<char* const*>(dst), ctx.envp);
-        };
-
-        return execute_from_search_path(resolver_, search_path, file, fp);
-    }
-
-    Executor::Result Executor::posix_spawn_from_search_path(const char* search_path, pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions, const posix_spawnattr_t* attrp, char* const* argv, char* const* envp) const
-    {
-        // See comment in `Executor::execve` method.
-        struct Context {
-            const Resolver& resolver;
-            const Session& session;
-            pid_t* pid;
-            const posix_spawn_file_actions_t* file_actions;
-            const posix_spawnattr_t* attrp;
-            char* const* argv;
-            char* const* envp;
-        } ctx = {
-            resolver_, session_, pid, file_actions, attrp, argv, envp
-        };
-
-        const std::function<int(const char*)> fp = [&ctx](const char* executable) {
-            const CommandBuilder cmd(ctx.session, executable, ctx.argv);
-            const char* dst[cmd.length()];
-            cmd.assemble(dst);
-
-            return (ctx.resolver).posix_spawn(ctx.pid, cmd.file(), ctx.file_actions, ctx.attrp, const_cast<char* const*>(dst), ctx.envp);
-        };
-
-        return execute_from_search_path(resolver_, search_path, file, fp);
     }
 }
 

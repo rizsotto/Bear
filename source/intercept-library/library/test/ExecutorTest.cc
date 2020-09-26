@@ -87,7 +87,7 @@ namespace {
         return el::Executor::Result { -1, error_code };
     }
 
-    TEST(Executor, fails_without_env)
+    TEST(Executor, fails_without_session)
     {
         el::Session session = el::session::init();
 
@@ -108,7 +108,7 @@ namespace {
     TEST(Executo, execve_silent_library)
     {
         ResolverMock resolver;
-        EXPECT_CALL(resolver, realpath(LS_PATH, NotNull()))
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
             .Times(1)
             .WillOnce(
                 testing::DoAll(
@@ -198,6 +198,14 @@ namespace {
     TEST(Executor, execvpe_passes)
     {
         ResolverMock resolver;
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
+                .Times(1)
+                .WillOnce(
+                        testing::DoAll(
+                                testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                                testing::ReturnArg<1>()
+                        )
+                );
         EXPECT_CALL(resolver, access(_, _))
             .Times(1)
             .WillOnce(Return(0));
@@ -226,6 +234,14 @@ namespace {
     TEST(Executor, execvp2_passes)
     {
         ResolverMock resolver;
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
+                .Times(1)
+                .WillOnce(
+                        testing::DoAll(
+                                testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                                testing::ReturnArg<1>()
+                        )
+                );
         EXPECT_CALL(resolver, access(_, _))
             .Times(1)
             .WillOnce(Return(0));
@@ -258,7 +274,7 @@ namespace {
         pid_t pid;
 
         ResolverMock resolver;
-        EXPECT_CALL(resolver, realpath(LS_PATH, NotNull()))
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
             .Times(1)
             .WillOnce(
                 testing::DoAll(
@@ -296,7 +312,7 @@ namespace {
         pid_t pid;
 
         ResolverMock resolver;
-        EXPECT_CALL(resolver, realpath(LS_PATH, NotNull()))
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
             .Times(1)
             .WillOnce(
                 testing::DoAll(
@@ -317,6 +333,14 @@ namespace {
         pid_t pid;
 
         ResolverMock resolver;
+        EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
+                .Times(1)
+                .WillOnce(
+                        testing::DoAll(
+                                testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                                testing::ReturnArg<1>()
+                        )
+                );
         EXPECT_CALL(resolver, access(_, _))
             .Times(1)
             .WillOnce(Return(0));

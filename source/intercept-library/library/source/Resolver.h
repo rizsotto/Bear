@@ -35,11 +35,13 @@ namespace el {
 
         virtual ~Resolver() = default;
 
+        [[nodiscard]]
         virtual int execve(
             const char* path,
             char* const argv[],
             char* const envp[]) const noexcept;
 
+        [[nodiscard]]
         virtual int posix_spawn(
             pid_t* pid,
             const char* path,
@@ -48,16 +50,21 @@ namespace el {
             char* const argv[],
             char* const envp[]) const noexcept;
 
+        [[nodiscard]]
         virtual int access(
             const char* pathname,
             int mode) const noexcept;
 
+        [[nodiscard]]
         virtual char* realpath(const char* path, char* resolved_path) const noexcept;
 
+        [[nodiscard]]
         virtual size_t confstr(int name, char* buf, size_t len) const noexcept;
 
-        [[nodiscard]] virtual const char** environment() const noexcept;
+        [[nodiscard]]
+        virtual const char** environment() const noexcept;
 
-        [[nodiscard]] virtual int error_code() const noexcept;
+        [[nodiscard]]
+        virtual int error_code() const noexcept;
     };
 }
