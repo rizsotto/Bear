@@ -11,6 +11,7 @@ add_library(exec_a OBJECT
         source/Executor.cc
         source/Logger.cc
         source/Paths.cc
+        source/PathResolver.cc
         source/Resolver.cc
         source/Session.cc
         )

@@ -22,22 +22,15 @@
 #include "er/Flags.h"
 
 #include "Array.h"
-#include "Environment.h"
 #include "Logger.h"
-#include "Paths.h"
+#include "PathResolver.h"
 #include "Resolver.h"
 #include "Session.h"
 
 #include <algorithm>
 #include <cerrno>
-#include <climits>
-#include <string_view>
-
-#include <unistd.h>
 
 namespace {
-
-    constexpr char DIR_SEPARATOR = '/';
 
     constexpr el::log::Logger LOGGER("Executor.cc");
 
@@ -71,10 +64,10 @@ namespace {
                 : session(session)
                 , path(path)
                 , argv(argv)
-        {
-        }
+        { }
 
-        [[nodiscard]] constexpr size_t length() const noexcept
+        [[nodiscard]]
+        constexpr size_t length() const noexcept
         {
             return (session.verbose ? 6 : 7) + el::array::length(argv) + 1;
         }
@@ -99,7 +92,8 @@ namespace {
             *it = nullptr;
         }
 
-        [[nodiscard]] constexpr const char* file() const noexcept
+        [[nodiscard]]
+        constexpr const char* file() const noexcept
         {
             return session.reporter;
         }
@@ -109,114 +103,6 @@ namespace {
         const char* path;
         char* const* const argv;
     };
-
-    class PathResolver {
-    public:
-        struct Result {
-            const char* return_value;
-            const int error_code;
-
-            constexpr explicit operator bool() const noexcept {
-                return (return_value != nullptr) && (error_code == 0);
-            }
-        };
-
-    public:
-        explicit PathResolver(el::Resolver const &resolver);
-
-        Result from_current_directory(std::string_view const &file);
-        Result from_path(std::string_view const &file, char* const* envp);
-        Result from_search_path(std::string_view const &file, const char *search_path);
-
-        PathResolver(PathResolver const &) = delete;
-        PathResolver(PathResolver &&) noexcept = delete;
-
-        PathResolver &operator=(PathResolver const &) = delete;
-        PathResolver &&operator=(PathResolver &&) noexcept = delete;
-
-    private:
-        static bool contains_dir_separator(std::string_view const &candidate);
-
-    private:
-        el::Resolver const &resolver_;
-        char result_[PATH_MAX];
-    };
-
-    PathResolver::PathResolver(const el::Resolver &resolver)
-            : resolver_(resolver)
-            , result_()
-    { }
-
-    PathResolver::Result PathResolver::from_current_directory(std::string_view const &file) {
-        // create absolute path to the given file.
-        if (nullptr == resolver_.realpath(file.begin(), result_)) {
-            return PathResolver::Result {nullptr, ENOENT };
-        }
-        // check if it's okay to execute.
-        if (0 == resolver_.access(result_, X_OK)) {
-            return PathResolver::Result { result_, 0 };
-        }
-        // try to set a meaningful error value.
-        if (0 == resolver_.access(result_, F_OK)) {
-            return PathResolver::Result {nullptr, EACCES };
-        }
-        return PathResolver::Result {nullptr, ENOENT };
-    }
-
-    PathResolver::Result PathResolver::from_path(std::string_view const &file, char* const* envp) {
-        if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return from_current_directory(file);
-        } else {
-            // otherwise use the PATH variable to locate the executable.
-            const char *paths = el::env::get_env_value(const_cast<const char **>(envp), "PATH");
-            if (paths != nullptr) {
-                return from_search_path(file, paths);
-            }
-            // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = resolver_.confstr(_CS_PATH, nullptr, 0);
-            if (search_path_length != 0) {
-                char search_path[search_path_length];
-                if (resolver_.confstr(_CS_PATH, search_path, search_path_length) != 0) {
-                    return from_search_path(file, search_path);
-                }
-            }
-            return PathResolver::Result {nullptr, ENOENT };
-        }
-    }
-
-    PathResolver::Result PathResolver::from_search_path(std::string_view const &file, const char *search_path) {
-         if (contains_dir_separator(file)) {
-            // the file contains a dir separator, it is treated as path.
-            return from_current_directory(file);
-        } else {
-             // otherwise use the given search path to locate the executable.
-             for (auto path : el::Paths(search_path)) {
-                 // ignore empty entries
-                 if (path.empty()) {
-                     continue;
-                 }
-                 // create a path
-                 char candidate[PATH_MAX];
-                 {
-                     auto it = el::array::copy(path.begin(), path.end(), candidate, candidate + PATH_MAX);
-                     *it++ = DIR_SEPARATOR;
-                     it = el::array::copy(file.begin(), file.end(), it, candidate + PATH_MAX);
-                     *it = 0;
-                 }
-                 // check if it's okay to execute.
-                 if (auto result = from_current_directory(candidate); result) {
-                     return result;
-                 }
-             }
-             // if all attempt were failing, then quit with a failure.
-             return PathResolver::Result {nullptr, ENOENT };
-        }
-    }
-
-    bool PathResolver::contains_dir_separator(std::string_view const &candidate) {
-        return std::find(candidate.begin(), candidate.end(), DIR_SEPARATOR) != candidate.end();
-    }
 }
 
 #pragma GCC diagnostic push
