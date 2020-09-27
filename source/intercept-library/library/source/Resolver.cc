@@ -19,116 +19,95 @@
 
 #include "Resolver.h"
 
-#include <dlfcn.h>
-#include <cerrno>
+#include "Array.h"
+#include "Environment.h"
+#include "Paths.h"
 
-#if defined HAVE_NSGETENVIRON
-#include <crt_externs.h>
-#else
+#include <algorithm>
+#include <cerrno>
 #include <unistd.h>
-#endif
 
 namespace {
 
-    constexpr int FAILURE = -1;
+    constexpr char DIR_SEPARATOR = '/';
 
-    template <typename T>
-    T dynamic_linker(char const* const name)
-    {
-        return reinterpret_cast<T>(dlsym(RTLD_NEXT, name));
+    bool contains_dir_separator(std::string_view const &candidate) {
+        return std::find(candidate.begin(), candidate.end(), DIR_SEPARATOR) != candidate.end();
     }
 }
 
 namespace el {
 
-    int Resolver::execve(const char* path, char* const* argv, char* const* envp) const noexcept
+    Resolver::Resolver() noexcept
+            : result_()
     {
-        using type = int (*)(const char*, char* const[], char* const[]);
-
-        auto fp = dynamic_linker<type>("execve");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(path, argv, envp);
+        result_[0] = 0;
     }
 
-    int Resolver::posix_spawn(
-        pid_t* pid,
-        const char* path,
-        const posix_spawn_file_actions_t* file_actions,
-        const posix_spawnattr_t* attrp,
-        char* const* argv,
-        char* const* envp) const noexcept
-    {
-        using type = int (*)(
-            pid_t * pid,
-            const char* path,
-            const posix_spawn_file_actions_t* file_actions,
-            const posix_spawnattr_t* attrp,
-            char* const argv[],
-            char* const envp[]);
-
-        auto fp = dynamic_linker<type>("posix_spawn");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(pid, path, file_actions, attrp, argv, envp);
+    Resolver::Result Resolver::from_current_directory(std::string_view const &file) {
+        // create absolute path to the given file.
+        if (nullptr == realpath(file.begin(), result_)) {
+            return Resolver::Result {nullptr, ENOENT };
+        }
+        // check if it's okay to execute.
+        if (0 == access(result_, X_OK)) {
+            return Resolver::Result {result_, 0 };
+        }
+        // try to set a meaningful error value.
+        if (0 == access(result_, F_OK)) {
+            return Resolver::Result {nullptr, EACCES };
+        }
+        return Resolver::Result {nullptr, ENOENT };
     }
 
-    int Resolver::access(const char* pathname, int mode) const noexcept
-    {
-        using type = int (*)(const char*, int);
-
-        auto fp = dynamic_linker<type>("access");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(pathname, mode);
+    Resolver::Result Resolver::from_path(std::string_view const &file, char* const* envp) {
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return from_current_directory(file);
+        } else {
+            // otherwise use the PATH variable to locate the executable.
+            const char *paths = el::env::get_env_value(const_cast<const char **>(envp), "PATH");
+            if (paths != nullptr) {
+                return from_search_path(file, paths);
+            }
+            // fall back to `confstr` PATH value if the environment has no value.
+            const size_t search_path_length = confstr(_CS_PATH, nullptr, 0);
+            if (search_path_length != 0) {
+                char search_path[search_path_length];
+                if (confstr(_CS_PATH, search_path, search_path_length) != 0) {
+                    return from_search_path(file, search_path);
+                }
+            }
+            return Resolver::Result {nullptr, ENOENT };
+        }
     }
 
-    char* Resolver::realpath(const char* path, char* resolved_path) const noexcept
-    {
-        using type = char* (*)(const char*, char*);
-
-        auto fp = dynamic_linker<type>("realpath");
-        return (fp == nullptr)
-            ? nullptr
-            : fp(path, resolved_path);
-    }
-
-    size_t Resolver::confstr(int name, char* buf, size_t len) const noexcept
-    {
-        using type = size_t (*)(int, char*, size_t);
-
-        auto fp = dynamic_linker<type>("confstr");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(name, buf, len);
-    }
-
-    /**
-     * Abstraction to get the current environment.
-     *
-     * When the dynamic linker loads the library the `environ` variable
-     * might not be available. (This is the case for OSX.) This method
-     * makes it uniform to access the current environment on all platform.
-     *
-     * @return the current environment.
-     */
-    const char** Resolver::environment() const noexcept
-    {
-#ifdef HAVE_NSGETENVIRON
-        return const_cast<const char**>(*_NSGetEnviron());
-#else
-        // This should be implemented as:
-        //
-        //   return reinterpret_cast<const char**>(dlsym(RTLD_NEXT, "environ"));
-        //
-        // But the symbol `environ` is a weak symbol and the call would not
-        // resolve the real address of it and will return always null pointer.
-        return const_cast<const char**>(environ);
-#endif
-    }
-
-    int Resolver::error_code() const noexcept
-    {
-        return errno;
+    Resolver::Result Resolver::from_search_path(std::string_view const &file, const char *search_path) {
+        if (contains_dir_separator(file)) {
+            // the file contains a dir separator, it is treated as path.
+            return from_current_directory(file);
+        } else {
+            // otherwise use the given search path to locate the executable.
+            for (auto path : el::Paths(search_path)) {
+                // ignore empty entries
+                if (path.empty()) {
+                    continue;
+                }
+                // create a path
+                char candidate[PATH_MAX];
+                {
+                    auto it = el::array::copy(path.begin(), path.end(), candidate, candidate + PATH_MAX);
+                    *it++ = DIR_SEPARATOR;
+                    it = el::array::copy(file.begin(), file.end(), it, candidate + PATH_MAX);
+                    *it = 0;
+                }
+                // check if it's okay to execute.
+                if (auto result = from_current_directory(candidate); result) {
+                    return result;
+                }
+            }
+            // if all attempt were failing, then quit with a failure.
+            return Resolver::Result {nullptr, ENOENT };
+        }
     }
 }

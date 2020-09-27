@@ -9,9 +9,9 @@ add_library(exec_a OBJECT
         source/Buffer.cc
         source/Environment.cc
         source/Executor.cc
+        source/Linker.cc
         source/Logger.cc
         source/Paths.cc
-        source/PathResolver.cc
         source/Resolver.cc
         source/Session.cc
         )

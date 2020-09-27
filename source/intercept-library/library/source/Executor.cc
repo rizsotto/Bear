@@ -23,8 +23,8 @@
 
 #include "Array.h"
 #include "Logger.h"
-#include "PathResolver.h"
 #include "Resolver.h"
+#include "Linker.h"
 #include "Session.h"
 
 #include <algorithm>
@@ -105,9 +105,10 @@ namespace {
 
 namespace el {
 
-    Executor::Executor(el::Resolver const& resolver, el::Session const& session) noexcept
-            : resolver_(resolver)
+    Executor::Executor(el::Linker const& linker, el::Session const& session, el::Resolver &resolver) noexcept
+            : linker_(linker)
             , session_(session)
+            , resolver_(resolver)
     { }
 
     Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const
@@ -115,14 +116,13 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        PathResolver resolver(resolver_);
-        if (auto executable = resolver.from_current_directory(path); executable) {
+        if (auto executable = resolver_.from_current_directory(path); executable) {
             const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result { return_value, resolver_.error_code() };
+            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result {return_value, linker_.error_code() };
         } else {
             return Executor::Result { -1, executable.error_code };
         }
@@ -133,14 +133,13 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        PathResolver resolver(resolver_);
-        if (auto executable = resolver.from_path(file, envp); executable) {
+        if (auto executable = resolver_.from_path(file, envp); executable) {
             const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result { return_value, resolver_.error_code() };
+            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result {return_value, linker_.error_code() };
         } else {
             return Executor::Result { -1, executable.error_code };
         }
@@ -151,14 +150,13 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        PathResolver resolver(resolver_);
-        if (auto executable = resolver.from_search_path(file, search_path); executable) {
+        if (auto executable = resolver_.from_search_path(file, search_path); executable) {
             const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = resolver_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result { return_value, resolver_.error_code() };
+            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
+            return Executor::Result {return_value, linker_.error_code() };
         } else {
             return Executor::Result { -1, executable.error_code };
         }
@@ -171,14 +169,13 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        PathResolver resolver(resolver_);
-        if (auto executable = resolver.from_current_directory(path); executable) {
+        if (auto executable = resolver_.from_current_directory(path); executable) {
             const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
-            return Executor::Result { return_value, resolver_.error_code() };
+            auto return_value = linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+            return Executor::Result {return_value, linker_.error_code() };
         } else {
             return Executor::Result { -1, executable.error_code };
         }
@@ -191,14 +188,13 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        PathResolver resolver(resolver_);
-        if (auto executable = resolver.from_path(file, envp); executable) {
+        if (auto executable = resolver_.from_path(file, envp); executable) {
             const CommandBuilder cmd(session_, executable.return_value, argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = resolver_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
-            return Executor::Result { return_value, resolver_.error_code() };
+            auto return_value = linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
+            return Executor::Result {return_value, linker_.error_code() };
         } else {
             return Executor::Result { -1, executable.error_code };
         }
