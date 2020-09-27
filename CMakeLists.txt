@@ -1,16 +1,6 @@
 cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 cmake_policy(VERSION 3.12)
 
-set(default_build_type "Release")
-if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
-    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
-            STRING "Choose the type of build." FORCE)
-    # Set the possible values of build type for cmake-gui
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
-            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
-endif ()
-
 project(Bear
         VERSION 3.0.0
         DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
@@ -23,6 +13,16 @@ option(ENABLE_FUNC_TESTS "Build and run functional test for this project" ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(default_build_type "Release")
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+    set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+            STRING "Choose the type of build." FORCE)
+    # Set the possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+            "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif ()
 
 # Superbuild variables for sub projects
 include(ExternalProject)
@@ -47,7 +47,7 @@ ExternalProject_Add(BearSource
             -DCMAKE_CXX_STANDARD_REQUIRED=${CMAKE_CXX_STANDARD_REQUIRED}
             -DCMAKE_CXX_EXTENSIONS=${CMAKE_CXX_EXTENSIONS}
             -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
-	        -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
+            -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
         CMAKE_CACHE_ARGS
             -DCMAKE_PREFIX_PATH:PATH=${CMAKE_PREFIX_PATH}
             -DCMAKE_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
@@ -81,16 +81,18 @@ if (ENABLE_FUNC_TESTS)
 endif ()
 
 # Install the project artifacts from the staged directory
-install(
-        DIRECTORY
+include(GNUInstallDirs)
+install(DIRECTORY
             ${STAGED_INSTALL_PREFIX}/
         DESTINATION
             .
         USE_SOURCE_PERMISSIONS
 )
-include(GNUInstallDirs)
-install(FILES COPYING README.md INSTALL.md CONTRIBUTING.md CODE_OF_CONDUCT.md
-        DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES
+            COPYING README.md INSTALL.md CONTRIBUTING.md CODE_OF_CONDUCT.md
+        DESTINATION
+            ${CMAKE_INSTALL_DOCDIR}
+)
 
 # Set up package from this project
 set(CPACK_PACKAGE_NAME "bear")

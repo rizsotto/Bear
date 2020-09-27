@@ -19,12 +19,21 @@
 
 #include <atomic>
 #include <cerrno>
+#include <climits>
 #include <cstdarg>
 
 #include "Executor.h"
+#include "Linker.h"
 #include "Logger.h"
 #include "Resolver.h"
 #include "Session.h"
+
+#if defined HAVE_NSGETENVIRON
+#include <crt_externs.h>
+#else
+#include <unistd.h>
+
+#endif
 
 namespace {
 
@@ -41,6 +50,24 @@ namespace {
         for (size_t idx = 0; idx < argc; ++idx)
             argv[idx] = va_arg(args, char*);
     }
+
+    /**
+     * Abstraction to get the current environment.
+     *
+     * When the dynamic linker loads the library the `environ` variable
+     * might not be available. (This is the case for OSX.) This method
+     * makes it uniform to access the current environment on all platform.
+     *
+     * @return the current environment.
+     */
+    const char** environment() noexcept
+    {
+#ifdef HAVE_NSGETENVIRON
+        return const_cast<const char**>(*_NSGetEnviron());
+#else
+        return const_cast<const char**>(environ);
+#endif
+    }
 }
 
 /**
@@ -50,13 +77,13 @@ namespace {
  */
 namespace {
     // This is the only non stack memory that this library is using.
-    constexpr size_t BUFFER_SIZE = 15 * 1024;
+    constexpr size_t BUFFER_SIZE = PATH_MAX * 2;
     char BUFFER[BUFFER_SIZE];
     // This is used for being multi thread safe (loading time only).
     std::atomic<bool> LOADED(false);
     // These are related to the functionality of this library.
     el::Session SESSION = el::session::init();
-    el::Resolver RESOLVER;
+    el::Linker LINKER;
 
     constexpr el::log::Logger LOGGER("lib.cc");
 }
@@ -73,7 +100,7 @@ extern "C" void on_load()
     if (LOADED.exchange(true))
         return;
 
-    el::session::from(SESSION, RESOLVER.environment());
+    el::session::from(SESSION, environment());
     el::session::persist(SESSION, BUFFER, BUFFER + BUFFER_SIZE);
 
     el::log::Level level = SESSION.verbose ? el::log::VERBOSE : el::log::SILENT;
@@ -101,7 +128,8 @@ extern "C" int execve(const char* path, char* const argv[], char* const envp[])
 {
     LOGGER.debug("execve path: ", path);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -110,8 +138,9 @@ extern "C" int execv(const char* path, char* const argv[])
 {
     LOGGER.debug("execv path: ", path);
 
-    auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    auto envp = const_cast<char* const*>(environment());
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -120,7 +149,8 @@ extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
 {
     LOGGER.debug("execvpe file: ", file);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -129,8 +159,9 @@ extern "C" int execvp(const char* file, char* const argv[])
 {
     LOGGER.debug("execvp file: ", file);
 
-    auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    auto envp = const_cast<char* const*>(environment());
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -139,8 +170,9 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 {
     LOGGER.debug("execvP file: ", file);
 
-    auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvP(file, search_path, argv, envp);
+    auto envp = const_cast<char* const*>(environment());
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvP(file, search_path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -149,7 +181,8 @@ extern "C" int exect(const char* path, char* const argv[], char* const envp[])
 {
     LOGGER.debug("exect path: ", path);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -173,8 +206,9 @@ extern "C" int execl(const char* path, const char* arg, ...)
     va_copy_n(ap, &argv[1], argc + 1);
     va_end(ap);
 
-    auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    auto envp = const_cast<char* const*>(environment());
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -195,8 +229,9 @@ extern "C" int execlp(const char* file, const char* arg, ...)
     va_copy_n(ap, &argv[1], argc + 1);
     va_end(ap);
 
-    auto envp = const_cast<char* const*>(RESOLVER.environment());
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execvpe(file, argv, envp);
+    auto envp = const_cast<char* const*>(environment());
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -219,7 +254,8 @@ extern "C" int execle(const char* path, const char* arg, ...)
     char** envp = va_arg(ap, char**);
     va_end(ap);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).execve(path, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -233,7 +269,8 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
 {
     LOGGER.debug("posix_spawn path:", path);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).posix_spawn(pid, path, file_actions, attrp, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }
@@ -245,7 +282,8 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
 {
     LOGGER.debug("posix_spawnp file:", file);
 
-    const el::Executor::Result result = el::Executor(RESOLVER, SESSION).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    el::Resolver resolver;
+    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
     errno = result.error_code;
     return result.return_value;
 }

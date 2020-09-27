@@ -19,30 +19,35 @@
 
 #pragma once
 
-#include "Resolver.h"
+#include "Linker.h"
 
 #include "gmock/gmock.h"
 
-class ResolverMock : public el::Resolver {
+class LinkerMock : public el::Linker {
 public:
     MOCK_METHOD(
-            el::Resolver::Result,
-            from_current_directory,
-            (std::string_view const &),
-            (override)
+        int,
+        execve,
+        (const char* path, char* const argv[], char* const envp[]),
+        (const, noexcept, override)
     );
 
     MOCK_METHOD(
-            el::Resolver::Result,
-            from_path,
-            (std::string_view const &, char *const *),
-            (override)
+        int,
+        posix_spawn,
+        (   pid_t* pid,
+            const char* path,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]),
+        (const, noexcept, override)
     );
 
     MOCK_METHOD(
-            el::Resolver::Result,
-            from_search_path,
-            (std::string_view const &, const char *),
-            (override)
+        int,
+        error_code,
+        (),
+        (const, noexcept, override)
     );
 };

@@ -23,8 +23,9 @@
 
 namespace el {
 
-    class Resolver;
+    class Linker;
     struct Session;
+    class Resolver;
 
     /**
      * This class implements the process execution logic.
@@ -51,7 +52,7 @@ namespace el {
         };
 
     public:
-        Executor(el::Resolver const& resolver, el::Session const& session) noexcept;
+        Executor(el::Linker const& linker, el::Session const& session, el::Resolver &resolver) noexcept;
 
         ~Executor() noexcept = default;
 
@@ -75,21 +76,8 @@ namespace el {
             char* const envp[]) const;
 
     private:
-        Result execve_from_search_path(const char* search_path,
-            const char* file,
-            char* const* argv,
-            char* const* envp) const;
-
-        Result posix_spawn_from_search_path(const char* search_path,
-            pid_t* pid,
-            const char* file,
-            const posix_spawn_file_actions_t* file_actions,
-            const posix_spawnattr_t* attrp,
-            char* const* argv,
-            char* const* envp) const;
-
-    private:
-        el::Resolver const& resolver_;
-        el::Session const& session_;
+        el::Linker const &linker_;
+        el::Session const &session_;
+        el::Resolver &resolver_;
     };
 }

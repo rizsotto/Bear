@@ -49,11 +49,9 @@ namespace el {
 
     public:
         Buffer(Buffer const&) = delete;
-
         Buffer(Buffer&&) noexcept = delete;
 
         Buffer& operator=(Buffer const&) = delete;
-
         Buffer& operator=(Buffer&&) noexcept = delete;
 
     private:
@@ -61,7 +59,8 @@ namespace el {
         char* const end_;
     };
 
-    inline Buffer::Buffer(char* const begin, char* const end) noexcept
+    inline
+    Buffer::Buffer(char* const begin, char* const end) noexcept
             : top_(begin)
             , end_(end)
     {

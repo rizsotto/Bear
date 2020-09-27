@@ -19,45 +19,59 @@
 
 #pragma once
 
-#include <spawn.h>
+#include <climits>
+#include <string_view>
 
 namespace el {
 
     /**
-     * It is an abstraction of the symbol resolver.
+     * This class implements the logic how the program execution resolves the
+     * executable path from the system environment.
      *
-     * It uses the provided symbol resolver method and cast the result
-     * to a specific type.
+     * The resolution logic implemented as a class to be able to unit test
+     * the code and avoid memory allocation.
      */
     class Resolver {
     public:
-        Resolver() noexcept = default;
+        /**
+         * Represents the resolution result. The result can be accessed only
+         * when the Resolver is still available. When the value is NULL,
+         * then the error code shall be non zero.
+         */
+        struct Result {
+            const char *return_value;
+            const int error_code;
 
-        virtual ~Resolver() = default;
+            constexpr explicit operator bool() const noexcept {
+                return (return_value != nullptr) && (error_code == 0);
+            }
+        };
 
-        virtual int execve(
-            const char* path,
-            char* const argv[],
-            char* const envp[]) const noexcept;
+    public:
+        Resolver() noexcept;
+        virtual ~Resolver() noexcept = default;
 
-        virtual int posix_spawn(
-            pid_t* pid,
-            const char* path,
-            const posix_spawn_file_actions_t* file_actions,
-            const posix_spawnattr_t* attrp,
-            char* const argv[],
-            char* const envp[]) const noexcept;
+        /**
+         * Resolve the executable from system environments.
+         *
+         * @return resolved executable path as absolute path.
+         */
+        [[nodiscard]]
+        virtual Result from_current_directory(std::string_view const &file);
 
-        virtual int access(
-            const char* pathname,
-            int mode) const noexcept;
+        [[nodiscard]]
+        virtual Result from_path(std::string_view const &file, char *const *envp);
 
-        virtual char* realpath(const char* path, char* resolved_path) const noexcept;
+        [[nodiscard]]
+        virtual Result from_search_path(std::string_view const &file, const char *search_path);
 
-        virtual size_t confstr(int name, char* buf, size_t len) const noexcept;
+        Resolver(Resolver const &) = delete;
+        Resolver(Resolver &&) noexcept = delete;
 
-        [[nodiscard]] virtual const char** environment() const noexcept;
+        Resolver &operator=(Resolver const &) = delete;
+        Resolver &&operator=(Resolver &&) noexcept = delete;
 
-        [[nodiscard]] virtual int error_code() const noexcept;
+    private:
+        char result_[PATH_MAX];
     };
 }
