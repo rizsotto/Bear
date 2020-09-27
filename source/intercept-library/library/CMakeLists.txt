@@ -10,6 +10,7 @@ add_library(exec_a OBJECT
         source/Environment.cc
         source/Executor.cc
         source/Logger.cc
+        source/Paths.cc
         source/Resolver.cc
         source/Session.cc
         )
@@ -49,6 +50,7 @@ if (ENABLE_UNIT_TESTS)
             test/ArrayTest.cc
             test/BufferTest.cc
             test/ExecutorTest.cc
+            test/PathsTest.cc
             test/SessionTest.cc
             )
 

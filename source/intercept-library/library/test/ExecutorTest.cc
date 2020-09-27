@@ -105,20 +105,22 @@ namespace {
         EXPECT_EQ(failure(EIO), el::Executor(resolver, session).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP));
     }
 
-    TEST(Executo, execve_silent_library)
+    TEST(Executor, execve_silent_library)
     {
         ResolverMock resolver;
         EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
-            .Times(1)
-            .WillOnce(
-                testing::DoAll(
-                    testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
-                    testing::ReturnArg<1>()
-                )
-            );
+                .Times(1)
+                .WillOnce(
+                    testing::DoAll(
+                        testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                        testing::ReturnArg<1>()
+                    )
+                );
         EXPECT_CALL(resolver, access(testing::StrEq(LS_PATH), _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -133,8 +135,8 @@ namespace {
         //        nullptr
         //    };
         EXPECT_CALL(resolver, execve(SILENT_SESSION.reporter, NotNull(), LS_ENVP))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
 
         auto result = el::Executor(resolver, SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
@@ -144,16 +146,18 @@ namespace {
     {
         ResolverMock resolver;
         EXPECT_CALL(resolver, realpath(LS_PATH, NotNull()))
-            .Times(1)
-            .WillOnce(
-                testing::DoAll(
-                    testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
-                    testing::ReturnArg<1>()
-                )
-            );
+                .Times(1)
+                .WillOnce(
+                    testing::DoAll(
+                        testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                        testing::ReturnArg<1>()
+                    )
+                );
         EXPECT_CALL(resolver, access(testing::StrEq(LS_PATH), _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -169,8 +173,8 @@ namespace {
         //        nullptr
         //    };
         EXPECT_CALL(resolver, execve(VERBOSE_SESSION.reporter, NotNull(), LS_ENVP))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
 
         auto result = el::Executor(resolver, VERBOSE_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
@@ -180,16 +184,16 @@ namespace {
     {
         ResolverMock resolver;
         EXPECT_CALL(resolver, realpath(LS_PATH, NotNull()))
-            .Times(1)
-            .WillOnce(
-                testing::DoAll(
-                    testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
-                    testing::ReturnArg<1>()
-                )
-            );
+                .Times(1)
+                .WillOnce(
+                    testing::DoAll(
+                        testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                        testing::ReturnArg<1>()
+                    )
+                );
         EXPECT_CALL(resolver, access(testing::StrEq(LS_PATH), _))
-            .Times(testing::AtLeast(1))
-            .WillRepeatedly(Return(-1));
+                .Times(testing::AtLeast(1))
+                .WillRepeatedly(Return(-1));
 
         auto result = el::Executor(resolver, SILENT_SESSION).execve(LS_PATH, LS_ARGV, LS_ENVP);
         EXPECT_EQ(failure(ENOENT), result);
@@ -207,8 +211,10 @@ namespace {
                         )
                 );
         EXPECT_CALL(resolver, access(_, _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -224,8 +230,8 @@ namespace {
         //        nullptr
         //    };
         EXPECT_CALL(resolver, execve(VERBOSE_SESSION.reporter, NotNull(), LS_ENVP))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
 
         auto result = el::Executor(resolver, VERBOSE_SESSION).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
@@ -243,8 +249,10 @@ namespace {
                         )
                 );
         EXPECT_CALL(resolver, access(_, _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -275,16 +283,18 @@ namespace {
 
         ResolverMock resolver;
         EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
-            .Times(1)
-            .WillOnce(
-                testing::DoAll(
-                    testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
-                    testing::ReturnArg<1>()
-                )
-            );
+                .Times(1)
+                .WillOnce(
+                    testing::DoAll(
+                        testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                        testing::ReturnArg<1>()
+                    )
+                );
         EXPECT_CALL(resolver, access(testing::StrEq(LS_PATH), _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -300,8 +310,8 @@ namespace {
         //        nullptr
         //    };
         EXPECT_CALL(resolver, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr, NotNull(), LS_ENVP))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
 
         auto result = el::Executor(resolver, VERBOSE_SESSION).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
@@ -313,16 +323,16 @@ namespace {
 
         ResolverMock resolver;
         EXPECT_CALL(resolver, realpath(testing::StrEq(LS_PATH), NotNull()))
-            .Times(1)
-            .WillOnce(
-                testing::DoAll(
-                    testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
-                    testing::ReturnArg<1>()
-                )
-            );
+                .Times(1)
+                .WillOnce(
+                    testing::DoAll(
+                        testing::SetArrayArgument<1>(LS_PATH, LS_PATH + LS_PATH_SIZE + 1),
+                        testing::ReturnArg<1>()
+                    )
+                );
         EXPECT_CALL(resolver, access(testing::StrEq(LS_PATH), _))
-            .Times(testing::AtLeast(1))
-            .WillRepeatedly(Return(-1));
+                .Times(testing::AtLeast(1))
+                .WillRepeatedly(Return(-1));
 
         auto result = el::Executor(resolver, VERBOSE_SESSION).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(failure(ENOENT), result);
@@ -342,8 +352,10 @@ namespace {
                         )
                 );
         EXPECT_CALL(resolver, access(_, _))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
+        EXPECT_CALL(resolver, error_code())
+                .WillRepeatedly(Return(0));
 
         // TODO: verify the arguments
         //    const char* argv[] = {
@@ -359,8 +371,8 @@ namespace {
         //        nullptr
         //    };
         EXPECT_CALL(resolver, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr, NotNull(), LS_ENVP))
-            .Times(1)
-            .WillOnce(Return(0));
+                .Times(1)
+                .WillOnce(Return(0));
 
         auto result = el::Executor(resolver, VERBOSE_SESSION).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
         EXPECT_EQ(SUCCESS, result);
