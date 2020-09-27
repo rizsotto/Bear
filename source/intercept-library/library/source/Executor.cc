@@ -28,14 +28,12 @@
 #include "Resolver.h"
 #include "Session.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <climits>
 #include <string_view>
 
 #include <unistd.h>
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wvla"
 
 namespace {
 
@@ -112,37 +110,6 @@ namespace {
         char* const* const argv;
     };
 
-    // Util class to concatenate directory and file.
-    //
-    // Use this class to allocate buffer and assemble the content of it.
-    class PathBuilder {
-    public:
-        constexpr PathBuilder(const std::string_view &prefix, const std::string_view &file)
-                : prefix(prefix)
-                , file(file)
-        {
-        }
-
-        [[nodiscard]] constexpr size_t length() const noexcept
-        {
-            return prefix.length() + file.length() + 2;
-        }
-
-        constexpr void assemble(char* it) const noexcept
-        {
-            char* end = it + length();
-
-            it = el::array::copy(prefix.begin(), prefix.end(), it, end);
-            *it++ = DIR_SEPARATOR;
-            it = el::array::copy(file.begin(), file.end(), it, end);
-            *it = 0;
-        }
-
-    private:
-        const std::string_view prefix;
-        const std::string_view file;
-    };
-
     class PathResolver {
     public:
         struct Result {
@@ -157,9 +124,9 @@ namespace {
     public:
         explicit PathResolver(el::Resolver const &resolver);
 
-        Result from_current_directory(const char *file);
-        Result from_path(const char *file, char* const* envp);
-        Result from_search_path(const char *file, const char *search_path);
+        Result from_current_directory(std::string_view const &file);
+        Result from_path(std::string_view const &file, char* const* envp);
+        Result from_search_path(std::string_view const &file, const char *search_path);
 
         PathResolver(PathResolver const &) = delete;
         PathResolver(PathResolver &&) noexcept = delete;
@@ -168,7 +135,7 @@ namespace {
         PathResolver &&operator=(PathResolver &&) noexcept = delete;
 
     private:
-        static bool contains_dir_separator(const char* candidate);
+        static bool contains_dir_separator(std::string_view const &candidate);
 
     private:
         el::Resolver const &resolver_;
@@ -180,9 +147,9 @@ namespace {
             , result_()
     { }
 
-    PathResolver::Result PathResolver::from_current_directory(const char *file) {
+    PathResolver::Result PathResolver::from_current_directory(std::string_view const &file) {
         // create absolute path to the given file.
-        if (nullptr == resolver_.realpath(file, result_)) {
+        if (nullptr == resolver_.realpath(file.begin(), result_)) {
             return PathResolver::Result {nullptr, ENOENT };
         }
         // check if it's okay to execute.
@@ -196,7 +163,7 @@ namespace {
         return PathResolver::Result {nullptr, ENOENT };
     }
 
-    PathResolver::Result PathResolver::from_path(const char *file, char* const* envp) {
+    PathResolver::Result PathResolver::from_path(std::string_view const &file, char* const* envp) {
         if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
@@ -218,7 +185,7 @@ namespace {
         }
     }
 
-    PathResolver::Result PathResolver::from_search_path(const char *file, const char *search_path) {
+    PathResolver::Result PathResolver::from_search_path(std::string_view const &file, const char *search_path) {
          if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
@@ -230,11 +197,15 @@ namespace {
                      continue;
                  }
                  // create a path
-                 const PathBuilder path_builder(path, std::string_view(file));
-                 char buffer[path_builder.length()];
-                 path_builder.assemble(buffer);
+                 char candidate[PATH_MAX];
+                 {
+                     auto it = el::array::copy(path.begin(), path.end(), candidate, candidate + PATH_MAX);
+                     *it++ = DIR_SEPARATOR;
+                     it = el::array::copy(file.begin(), file.end(), it, candidate + PATH_MAX);
+                     *it = 0;
+                 }
                  // check if it's okay to execute.
-                 if (auto result = from_current_directory(buffer); result) {
+                 if (auto result = from_current_directory(candidate); result) {
                      return result;
                  }
              }
@@ -243,15 +214,13 @@ namespace {
         }
     }
 
-    bool PathResolver::contains_dir_separator(const char *const candidate) {
-        for (auto it = candidate; *it != 0; ++it) {
-            if (*it == DIR_SEPARATOR) {
-                return true;
-            }
-        }
-        return false;
+    bool PathResolver::contains_dir_separator(std::string_view const &candidate) {
+        return std::find(candidate.begin(), candidate.end(), DIR_SEPARATOR) != candidate.end();
     }
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
 
 namespace el {
 
