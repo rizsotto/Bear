@@ -34,25 +34,20 @@ namespace {
 
     constexpr el::log::Logger LOGGER("Executor.cc");
 
-    constexpr el::Executor::Result failure(int const error_code) noexcept
-    {
-        return el::Executor::Result { -1, error_code };
-    }
-
 #define CHECK_SESSION(SESSION_)                           \
     do {                                                  \
         if (!el::session::is_valid(SESSION_)) {           \
             LOGGER.warning("session is not initialized"); \
-            return failure(EIO);                          \
+            return el::Executor::Result { -1, EIO };      \
         }                                                 \
     } while (false)
 
-#define CHECK_POINTER(PTR_)                        \
-    do {                                           \
-        if (nullptr == (PTR_)) {                   \
-            LOGGER.debug("null pointer received"); \
-            return failure(EFAULT);                \
-        }                                          \
+#define CHECK_POINTER(PTR_)                             \
+    do {                                                \
+        if (nullptr == (PTR_)) {                        \
+            LOGGER.debug("null pointer received");      \
+            return el::Executor::Result { -1, EFAULT }; \
+        }                                               \
     } while (false)
 
     // Util class to create command arguments to execute the intercept process.
