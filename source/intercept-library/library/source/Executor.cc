@@ -24,6 +24,7 @@
 #include "Array.h"
 #include "Environment.h"
 #include "Logger.h"
+#include "Paths.h"
 #include "Resolver.h"
 #include "Session.h"
 
@@ -38,7 +39,6 @@
 
 namespace {
 
-    constexpr char PATH_SEPARATOR = ':';
     constexpr char DIR_SEPARATOR = '/';
 
     constexpr el::log::Logger LOGGER("Executor.cc");
@@ -168,7 +168,6 @@ namespace {
         PathResolver &&operator=(PathResolver &&) noexcept = delete;
 
     private:
-        static const char* next_path_separator(const char* input);
         static bool contains_dir_separator(const char* candidate);
 
     private:
@@ -224,37 +223,24 @@ namespace {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
         } else {
-            // otherwise use the given search path to locate the executable.
-             const char* current = search_path;
-             do {
-                 const char* next = next_path_separator(current);
-                 const std::string_view prefix(current, (next - current));
+             // otherwise use the given search path to locate the executable.
+             for (auto path : el::Paths(search_path)) {
                  // ignore empty entries
-                 if (prefix.empty()) {
+                 if (path.empty()) {
                      continue;
                  }
                  // create a path
-                 const PathBuilder path_builder(prefix, std::string_view(file));
-                 char path[path_builder.length()];
-                 path_builder.assemble(path);
+                 const PathBuilder path_builder(path, std::string_view(file));
+                 char buffer[path_builder.length()];
+                 path_builder.assemble(buffer);
                  // check if it's okay to execute.
-                 if (auto result = from_current_directory(path); result) {
+                 if (auto result = from_current_directory(buffer); result) {
                      return result;
                  }
-                 // try the next one
-                 current = ((*next == 0) ? nullptr : ++next);
-             } while (current != nullptr);
+             }
              // if all attempt were failing, then quit with a failure.
              return PathResolver::Result {nullptr, ENOENT };
         }
-    }
-
-    const char *PathResolver::next_path_separator(const char *const input) {
-        auto it = input;
-        while ((*it != 0) && (*it != PATH_SEPARATOR)) {
-            ++it;
-        }
-        return it;
     }
 
     bool PathResolver::contains_dir_separator(const char *const candidate) {
