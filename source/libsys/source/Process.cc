@@ -41,6 +41,8 @@
 #endif
 #ifdef HAVE_GNU_LIB_NAMES_H
 #include <gnu/lib-names.h>
+#else
+#define LIBC_SO "libc.so"
 #endif
 
 #include <spdlog/spdlog.h>
@@ -98,7 +100,6 @@ namespace {
         return rust::Ok(result);
     }
 
-#ifdef HAVE_GNU_LIB_NAMES_H
     rust::Result<spawn_function_t> resolve_spawn_function()
     {
         spawn_function_t fp = [](const char* path,
@@ -132,7 +133,6 @@ namespace {
         };
         return rust::Ok(fp);
     }
-#endif
 
     bool contains_separator(const std::string& path)
     {
