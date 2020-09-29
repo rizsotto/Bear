@@ -24,6 +24,7 @@
 #include "LinkerMock.h"
 #include "Session.h"
 #include "Array.h"
+#include "er/Flags.h"
 
 #include <cerrno>
 
@@ -86,6 +87,19 @@ namespace {
         return el::Executor::Result { -1, error_code };
     }
 
+    MATCHER_P(CStyleArrayEqual, expecteds, "")
+    {
+        size_t idx = 0;
+        for (const auto &expected: expecteds) {
+            if (std::string_view(arg[idx]) != std::string_view(expected)) {
+                *result_listener << "expected: " << expected << ", but got: " << arg[idx];
+                return false;
+            }
+            ++idx;
+        }
+        return true;
+    }
+
     TEST(Executor, fails_without_session)
     {
         el::Session session = el::session::init();
@@ -116,19 +130,18 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        session.reporter,
-        //        pear::flag::DESTINATION,
-        //        session.destination,
-        //        pear::flag::PATH,
-        //        LS_PATH,
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, execve(SILENT_SESSION.reporter, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker,execve(SILENT_SESSION.reporter,
+                                  CStyleArrayEqual(std::vector<const char *> {
+                                      SILENT_SESSION.reporter,
+                                      er::flags::DESTINATION,
+                                      SILENT_SESSION.destination,
+                                      er::flags::EXECUTE,
+                                      LS_PATH,
+                                      er::flags::COMMAND,
+                                      LS_ARGV[0],
+                                      LS_ARGV[1]
+                                  }),
+                                  LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
@@ -146,20 +159,19 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        session.reporter,
-        //        pear::flag::VERBOSE,
-        //        pear::flag::DESTINATION,
-        //        session.destination,
-        //        pear::flag::LIBRARY,
-        //        LS_PATH,
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
+                                   CStyleArrayEqual(std::vector<const char *> {
+                                           VERBOSE_SESSION.reporter,
+                                           er::flags::DESTINATION,
+                                           VERBOSE_SESSION.destination,
+                                           er::flags::VERBOSE,
+                                           er::flags::EXECUTE,
+                                           LS_PATH,
+                                           er::flags::COMMAND,
+                                           LS_ARGV[0],
+                                           LS_ARGV[1]
+                                   }),
+                                   LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
@@ -192,20 +204,19 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        SILENT_SESSION.reporter,
-        //        pear::flag::VERBOSE,
-        //        pear::flag::DESTINATION,
-        //        SILENT_SESSION.destination,
-        //        pear::flag::FILE,
-        //        LS_FILE,
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
+                                   CStyleArrayEqual(std::vector<const char *> {
+                                       VERBOSE_SESSION.reporter,
+                                       er::flags::DESTINATION,
+                                       VERBOSE_SESSION.destination,
+                                       er::flags::VERBOSE,
+                                       er::flags::EXECUTE,
+                                       LS_PATH,
+                                       er::flags::COMMAND,
+                                       LS_ARGV[0],
+                                       LS_ARGV[1]
+                                   }),
+                                   LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
@@ -223,22 +234,19 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        SILENT_SESSION.reporter,
-        //        pear::flag::VERBOSE,
-        //        pear::flag::DESTINATION,
-        //        SILENT_SESSION.destination,
-        //        pear::flag::FILE,
-        //        LS_FILE,
-        //        pear::flag::SEARCH_PATH
-        //        SEARCH_PATH
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
+                                   CStyleArrayEqual(std::vector<const char *> {
+                                           VERBOSE_SESSION.reporter,
+                                           er::flags::DESTINATION,
+                                           VERBOSE_SESSION.destination,
+                                           er::flags::VERBOSE,
+                                           er::flags::EXECUTE,
+                                           LS_PATH,
+                                           er::flags::COMMAND,
+                                           LS_ARGV[0],
+                                           LS_ARGV[1]
+                                   }),
+                                   LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
@@ -258,20 +266,19 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        VERBOSE_SESSION.reporter,
-        //        pear::flag::VERBOSE,
-        //        pear::flag::DESTINATION,
-        //        VERBOSE_SESSION.destination,
-        //        pear::flag::PATH,
-        //        LS_PATH,
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
+                                        CStyleArrayEqual(std::vector<const char *> {
+                                                VERBOSE_SESSION.reporter,
+                                                er::flags::DESTINATION,
+                                                VERBOSE_SESSION.destination,
+                                                er::flags::VERBOSE,
+                                                er::flags::EXECUTE,
+                                                LS_PATH,
+                                                er::flags::COMMAND,
+                                                LS_ARGV[0],
+                                                LS_ARGV[1]
+                                        }),
+                                        LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
@@ -308,20 +315,19 @@ namespace {
                 .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
 
         LinkerMock linker;
-        // TODO: verify the arguments
-        //    const char* argv[] = {
-        //        VERBOSE_SESSION.reporter,
-        //        pear::flag::VERBOSE,
-        //        pear::flag::DESTINATION,
-        //        VERBOSE_SESSION.destination,
-        //        pear::flag::FILE,
-        //        LS_FILE,
-        //        pear::flag::COMMAND,
-        //        LS_ARGV[0],
-        //        LS_ARGV[1],
-        //        nullptr
-        //    };
-        EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr, NotNull(), LS_ENVP))
+        EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
+                                        CStyleArrayEqual(std::vector<const char *> {
+                                                VERBOSE_SESSION.reporter,
+                                                er::flags::DESTINATION,
+                                                VERBOSE_SESSION.destination,
+                                                er::flags::VERBOSE,
+                                                er::flags::EXECUTE,
+                                                LS_PATH,
+                                                er::flags::COMMAND,
+                                                LS_ARGV[0],
+                                                LS_ARGV[1]
+                                        }),
+                                        LS_ENVP))
                 .Times(1)
                 .WillOnce(Return(0));
         EXPECT_CALL(linker, error_code())
