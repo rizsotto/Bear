@@ -31,8 +31,7 @@
 #if defined HAVE_NSGETENVIRON
 #include <crt_externs.h>
 #else
-#include <unistd.h>
-
+extern char **environ;
 #endif
 
 namespace {
