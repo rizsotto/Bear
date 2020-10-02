@@ -60,6 +60,6 @@ if (LIT_EXECUTABLE)
             ${CMAKE_CURRENT_BINARY_DIR})
 
     set_tests_properties(bear::func_test PROPERTIES
-            TIMEOUT 60
+            TIMEOUT 90
             )
 endif ()
