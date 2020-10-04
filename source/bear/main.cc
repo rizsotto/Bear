@@ -170,6 +170,14 @@ namespace {
                 });
     }
 
+    void remove_commands_file(const fs::path &commands) {
+        std::error_code error_code;
+        auto removed = fs::remove(commands, error_code);
+        if (!removed) {
+            spdlog::debug("remove command file failed: {}", commands.c_str());
+        }
+    }
+
     rust::Result<int> run(const flags::Arguments& arguments, const sys::env::Vars& environment)
     {
         auto commands = arguments.as_string(OUTPUT)
@@ -182,10 +190,11 @@ namespace {
         auto citnames = prepare_citnames(arguments, environment, commands);
 
         return rust::merge(intercept, citnames)
-                .and_then<int>([](auto tuple) {
+                .and_then<int>([&commands](auto tuple) {
                     const auto& [intercept, citnames] = tuple;
                     auto result = execute(intercept, "intercept");
                     execute(citnames, "citnames");
+                    remove_commands_file(commands);
                     return result;
                 });
     }
