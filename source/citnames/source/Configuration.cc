@@ -192,7 +192,6 @@ namespace cs {
                                             file.string(),
                                             error.what()));
                     });
-
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(
                     fmt::format("Failed to write file: {}, cause: {}",
@@ -207,7 +206,7 @@ namespace cs {
             nlohmann::json out = rhs;
             os << std::setw(4) << out << std::endl;
 
-            return rust::Ok(1ul);
+            return rust::Ok(size_t(1));
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
