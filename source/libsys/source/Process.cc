@@ -100,6 +100,7 @@ namespace {
         return rust::Ok(result);
     }
 
+#ifdef SUPPORT_PRELOAD
     rust::Result<spawn_function_t> resolve_spawn_function()
     {
         spawn_function_t fp = [](const char* path,
@@ -133,6 +134,7 @@ namespace {
         };
         return rust::Ok(fp);
     }
+#endif
 
     bool contains_separator(const std::string& path)
     {

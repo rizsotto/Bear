@@ -7,6 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-20.04, macos-10.15]
 
@@ -39,10 +40,10 @@ jobs:
       - name: Prepare
         run: |
           mkdir "$HOME/work/bear_build"
-          echo "::set-env name=BUILD_DIR::$HOME/work/bear_build"
           mkdir "$HOME/work/bear_install"
-          echo "::set-env name=INSTALL_DIR::$HOME/work/bear_install"
-          echo "::add-path::$HOME/work/bear_install/bin"
+          echo "BUILD_DIR=$HOME/work/bear_build" >> $GITHUB_ENV
+          echo "INSTALL_DIR=$HOME/work/bear_install" >> $GITHUB_ENV
+          echo "$HOME/work/bear_install/bin:$PATH" >> $GITHUB_PATH
 
       - name: Build
         env:
@@ -54,7 +55,7 @@ jobs:
 
       - name: Prepare [functional test]
         run: |
-          echo "::set-env name=ZLIB_SRC_DIR::$HOME/work/zlib"
+          echo "ZLIB_SRC_DIR=$HOME/work/zlib" >> $GITHUB_ENV
           git clone https://github.com/madler/zlib.git $HOME/work/zlib -b v1.2.11
 
       - name: Execute [functional test]
