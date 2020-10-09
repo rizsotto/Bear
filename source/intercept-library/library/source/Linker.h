@@ -29,19 +29,18 @@ namespace el {
      * It uses the provided symbol resolver method and cast the result
      * to a specific type.
      */
-    class Linker {
-    public:
-        Linker() noexcept = default;
-        virtual ~Linker() = default;
+    struct Linker {
+
+        ~Linker() noexcept = default;
 
         [[nodiscard]]
-        virtual int execve(
+        int execve(
             const char* path,
             char* const argv[],
             char* const envp[]) const noexcept;
 
         [[nodiscard]]
-        virtual int posix_spawn(
+        int posix_spawn(
             pid_t* pid,
             const char* path,
             const posix_spawn_file_actions_t* file_actions,
@@ -50,6 +49,6 @@ namespace el {
             char* const envp[]) const noexcept;
 
         [[nodiscard]]
-        virtual int error_code() const noexcept;
+        int error_code() const noexcept;
     };
 }

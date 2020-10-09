@@ -49,7 +49,7 @@ namespace el {
 
     public:
         Resolver() noexcept;
-        virtual ~Resolver() noexcept = default;
+        ~Resolver() noexcept = default;
 
         /**
          * Resolve the executable from system environments.
@@ -57,13 +57,13 @@ namespace el {
          * @return resolved executable path as absolute path.
          */
         [[nodiscard]]
-        virtual Result from_current_directory(std::string_view const &file);
+        Result from_current_directory(std::string_view const &file);
 
         [[nodiscard]]
-        virtual Result from_path(std::string_view const &file, char *const *envp);
+        Result from_path(std::string_view const &file, char *const *envp);
 
         [[nodiscard]]
-        virtual Result from_search_path(std::string_view const &file, const char *search_path);
+        Result from_search_path(std::string_view const &file, const char *search_path);
 
         Resolver(Resolver const &) = delete;
         Resolver(Resolver &&) noexcept = delete;

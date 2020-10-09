@@ -23,7 +23,7 @@
 
 namespace el {
 
-    class Linker;
+    struct Linker;
     struct Session;
     class Resolver;
 
