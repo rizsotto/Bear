@@ -52,6 +52,11 @@ Install dependencies from packages from Brew
 
     brew install fmt spdlog nlohmann-json grpc pkg-config
 
+Install dependencies from packages on Alpine edge
+
+    apk add git cmake pkgconf make g++
+    apk add protobuf-dev grpc-dev fmt-dev spdlog-dev nlohmann-json c-ares-dev
+
 ## Build commands
 
 Ideally, you should build Bear in a separate build directory.
