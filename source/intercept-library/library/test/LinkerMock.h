@@ -19,35 +19,35 @@
 
 #pragma once
 
-#include <spawn.h>
+#include "Linker.h"
 
-namespace el {
+#include "gmock/gmock.h"
 
-    /**
-     * It is an abstraction of the symbol resolver.
-     *
-     * It uses the provided symbol resolver method and cast the result
-     * to a specific type.
-     */
-    struct Linker {
-        virtual ~Linker() noexcept = default;
+class LinkerMock : public el::Linker {
+public:
+    MOCK_METHOD(
+        int,
+        execve,
+        (const char* path, char* const argv[], char* const envp[]),
+        (const, noexcept, override)
+    );
 
-        [[nodiscard]]
-        virtual int execve(
-            const char* path,
-            char* const argv[],
-            char* const envp[]) const noexcept;
-
-        [[nodiscard]]
-        virtual int posix_spawn(
-            pid_t* pid,
+    MOCK_METHOD(
+        int,
+        posix_spawn,
+        (   pid_t* pid,
             const char* path,
             const posix_spawn_file_actions_t* file_actions,
             const posix_spawnattr_t* attrp,
             char* const argv[],
-            char* const envp[]) const noexcept;
+            char* const envp[]),
+        (const, noexcept, override)
+    );
 
-        [[nodiscard]]
-        virtual int error_code() const noexcept;
-    };
-}
+    MOCK_METHOD(
+        int,
+        error_code,
+        (),
+        (const, noexcept, override)
+    );
+};
