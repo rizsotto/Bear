@@ -27,6 +27,7 @@ set_target_properties(exec_a PROPERTIES
 # Create a shared library from the sub projects.
 add_library(exec SHARED
         lib.cc
+        std.cc
         )
 
 target_link_libraries(exec exec_a)
@@ -50,6 +51,7 @@ if (ENABLE_UNIT_TESTS)
     add_executable(exec_unit_test
             test/ArrayTest.cc
             test/BufferTest.cc
+            test/ExecutorTest.cc
             test/PathsTest.cc
             test/SessionTest.cc
             )
