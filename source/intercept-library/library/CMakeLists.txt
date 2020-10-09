@@ -50,7 +50,6 @@ if (ENABLE_UNIT_TESTS)
     add_executable(exec_unit_test
             test/ArrayTest.cc
             test/BufferTest.cc
-            test/ExecutorTest.cc
             test/PathsTest.cc
             test/SessionTest.cc
             )
