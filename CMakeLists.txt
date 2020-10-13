@@ -29,6 +29,9 @@ include(ExternalProject)
 set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
 set(DEPENDENCIES_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/subprojects/Install)
+if (NOT CMAKE_INSTALL_LIBEXECDIR)
+    include(GNUInstallDirs)
+endif ()
 
 # Verify or install dependencies
 add_subdirectory(third_party)
