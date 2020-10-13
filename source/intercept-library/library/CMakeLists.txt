@@ -44,7 +44,7 @@ endif ()
 
 include(GNUInstallDirs)
 install(TARGETS exec
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 # Create unit test.
 if (ENABLE_UNIT_TESTS)
