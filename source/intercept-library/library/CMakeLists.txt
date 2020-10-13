@@ -42,9 +42,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
 endif ()
 
-include(GNUInstallDirs)
-install(TARGETS exec
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+if (SUPPORT_PRELOAD)
+    include(GNUInstallDirs)
+    install(TARGETS exec
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+endif ()
 
 # Create unit test.
 if (ENABLE_UNIT_TESTS)

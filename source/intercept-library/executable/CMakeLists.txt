@@ -35,9 +35,11 @@ set_target_properties(er PROPERTIES
         LINKER_LANGUAGE "C"
         )
 
-include(GNUInstallDirs)
-install(TARGETS er
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+if (SUPPORT_PRELOAD)
+    include(GNUInstallDirs)
+    install(TARGETS er
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+endif()
 
 # Create unit test
 if (ENABLE_UNIT_TESTS)
