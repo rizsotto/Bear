@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "libresult/Result.h"
+
 #include <climits>
 #include <string_view>
 
@@ -33,21 +35,6 @@ namespace el {
      */
     class Resolver {
     public:
-        /**
-         * Represents the resolution result. The result can be accessed only
-         * when the Resolver is still available. When the value is NULL,
-         * then the error code shall be non zero.
-         */
-        struct Result {
-            const char *return_value;
-            const int error_code;
-
-            constexpr explicit operator bool() const noexcept {
-                return (return_value != nullptr) && (error_code == 0);
-            }
-        };
-
-    public:
         Resolver() noexcept;
         virtual ~Resolver() noexcept = default;
 
@@ -57,13 +44,13 @@ namespace el {
          * @return resolved executable path as absolute path.
          */
         [[nodiscard]]
-        virtual Result from_current_directory(std::string_view const &file);
+        virtual rust::Result<const char*, int> from_current_directory(std::string_view const &file);
 
         [[nodiscard]]
-        virtual Result from_path(std::string_view const &file, char *const *envp);
+        virtual rust::Result<const char*, int> from_path(std::string_view const &file, char *const *envp);
 
         [[nodiscard]]
-        virtual Result from_search_path(std::string_view const &file, const char *search_path);
+        virtual rust::Result<const char*, int> from_search_path(std::string_view const &file, const char *search_path);
 
         Resolver(Resolver const &) = delete;
         Resolver(Resolver &&) noexcept = delete;

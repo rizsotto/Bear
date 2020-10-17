@@ -170,20 +170,16 @@ namespace rust {
     class Result {
     public:
         Result() = delete;
-
         ~Result();
 
         Result(Result&& other) noexcept;
-
         Result(const Result& other);
 
         Result& operator=(Result&& other) noexcept;
-
         Result& operator=(const Result& other);
 
-        Result(types::Ok<T>&& ok); // NOLINT
-
-        Result(types::Err<E>&& err); // NOLINT
+        Result(types::Ok<T>&& ok) noexcept;
+        Result(types::Err<E>&& err) noexcept;
 
     public:
         [[nodiscard]] bool is_ok() const;
@@ -211,6 +207,8 @@ namespace rust {
 
         Result<T, E> or_else(std::function<Result<T, E>(const E&)> const& f) const;
 
+        const T& unwrap() const;
+        const E& unwrap_err() const;
         const T& unwrap_or(const T& value) const;
 
         T unwrap_or_else(std::function<T(const E&)> const& provider) const;
@@ -222,6 +220,12 @@ namespace rust {
         bool ok_;
         internals::Storage<T, E> storage_;
     };
+
+    template <typename T, typename E>
+    bool operator==(Result<T, E> const &lhs, Result<T, E> const &rhs) {
+        return  (lhs.is_ok() && rhs.is_ok() && (lhs.unwrap() == rhs.unwrap())) ||
+                (lhs.is_err() && rhs.is_err() && (lhs.unwrap_err() == rhs.unwrap_err()));
+    }
 
     template <typename T1, typename T2>
     Result<std::tuple<T1, T2>> merge(const Result<T1>& t1, const Result<T2>& t2)
@@ -336,7 +340,7 @@ namespace rust {
     }
 
     template <typename T, typename E>
-    Result<T, E>::Result(types::Ok<T>&& ok)
+    Result<T, E>::Result(types::Ok<T>&& ok) noexcept
             : ok_(true)
             , storage_()
     {
@@ -344,7 +348,7 @@ namespace rust {
     }
 
     template <typename T, typename E>
-    Result<T, E>::Result(types::Err<E>&& err)
+    Result<T, E>::Result(types::Err<E>&& err) noexcept
             : ok_(false)
             , storage_()
     {
@@ -454,6 +458,18 @@ namespace rust {
         } else {
             return f(storage_.template get<E>());
         }
+    }
+
+    template <typename T, typename E>
+    const T& Result<T, E>::unwrap() const
+    {
+        return storage_.template get<T>();
+    }
+
+    template <typename T, typename E>
+    const E& Result<T, E>::unwrap_err() const
+    {
+        return storage_.template get<E>();
     }
 
     template <typename T, typename E>

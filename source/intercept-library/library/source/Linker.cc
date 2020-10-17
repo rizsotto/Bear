@@ -24,8 +24,6 @@
 
 namespace {
 
-    constexpr int FAILURE = -1;
-
     template <typename T>
     T dynamic_linker(char const* const name)
     {
@@ -35,17 +33,21 @@ namespace {
 
 namespace el {
 
-    int Linker::execve(const char* path, char* const* argv, char* const* envp) const noexcept
+    rust::Result<int, int> Linker::execve(const char* path, char* const* argv, char* const* envp) const noexcept
     {
         using type = int (*)(const char*, char* const[], char* const[]);
 
         auto fp = dynamic_linker<type>("execve");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(path, argv, envp);
+        if (fp == nullptr) {
+            return rust::Err(EINVAL);
+        }
+        auto result = fp(path, argv, envp);
+        return (result == -1)
+            ? rust::Result<int, int>(rust::Err(errno))
+            : rust::Result<int, int>(rust::Ok(result));
     }
 
-    int Linker::posix_spawn(
+    rust::Result<int, int> Linker::posix_spawn(
         pid_t* pid,
         const char* path,
         const posix_spawn_file_actions_t* file_actions,
@@ -62,13 +64,12 @@ namespace el {
             char* const envp[]);
 
         auto fp = dynamic_linker<type>("posix_spawn");
-        return (fp == nullptr)
-            ? FAILURE
-            : fp(pid, path, file_actions, attrp, argv, envp);
-    }
-
-    int Linker::error_code() const noexcept
-    {
-        return errno;
+        if (fp == nullptr) {
+            return rust::Err(EINVAL);
+        }
+        auto result = fp(pid, path, file_actions, attrp, argv, envp);
+        return (result == -1)
+            ? rust::Result<int, int>(rust::Err(errno))
+            : rust::Result<int, int>(rust::Ok(result));
     }
 }

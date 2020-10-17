@@ -128,9 +128,12 @@ extern "C" int execve(const char* path, char* const argv[], char* const envp[])
     LOGGER.debug("execve path: ", path);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execve failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int execv(const char* path, char* const argv[])
@@ -139,9 +142,12 @@ extern "C" int execv(const char* path, char* const argv[])
 
     auto envp = const_cast<char* const*>(environment());
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execv failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
@@ -149,9 +155,12 @@ extern "C" int execvpe(const char* file, char* const argv[], char* const envp[])
     LOGGER.debug("execvpe file: ", file);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execvpe failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int execvp(const char* file, char* const argv[])
@@ -160,9 +169,12 @@ extern "C" int execvp(const char* file, char* const argv[])
 
     auto envp = const_cast<char* const*>(environment());
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execvp failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int execvP(const char* file, const char* search_path, char* const argv[])
@@ -171,9 +183,12 @@ extern "C" int execvP(const char* file, const char* search_path, char* const arg
 
     auto envp = const_cast<char* const*>(environment());
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvP(file, search_path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execvP(file, search_path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execvP failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int exect(const char* path, char* const argv[], char* const envp[])
@@ -181,9 +196,12 @@ extern "C" int exect(const char* path, char* const argv[], char* const envp[])
     LOGGER.debug("exect path: ", path);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("exect failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 #pragma GCC diagnostic push
@@ -207,9 +225,12 @@ extern "C" int execl(const char* path, const char* arg, ...)
 
     auto envp = const_cast<char* const*>(environment());
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execl failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int execlp(const char* file, const char* arg, ...)
@@ -230,9 +251,12 @@ extern "C" int execlp(const char* file, const char* arg, ...)
 
     auto envp = const_cast<char* const*>(environment());
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execvpe(file, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execlp failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 // int execle(const char *path, const char *arg, ..., char * const envp[]);
@@ -254,9 +278,12 @@ extern "C" int execle(const char* path, const char* arg, ...)
     va_end(ap);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).execve(path, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("execle failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 #pragma GCC diagnostic pop
@@ -269,9 +296,12 @@ extern "C" int posix_spawn(pid_t* pid, const char* path,
     LOGGER.debug("posix_spawn path:", path);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).posix_spawn(pid, path, file_actions, attrp, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).posix_spawn(pid, path, file_actions, attrp, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("posix_spawn failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 extern "C" int posix_spawnp(pid_t* pid, const char* file,
@@ -282,9 +312,12 @@ extern "C" int posix_spawnp(pid_t* pid, const char* file,
     LOGGER.debug("posix_spawnp file:", file);
 
     el::Resolver resolver;
-    const el::Executor::Result result = el::Executor(LINKER, SESSION, resolver).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
-    errno = result.error_code;
-    return result.return_value;
+    const auto result = el::Executor(LINKER, SESSION, resolver).posix_spawnp(pid, file, file_actions, attrp, argv, envp);
+    if (result.is_err()) {
+        LOGGER.debug("posix_spawnp failed.");
+        errno = result.unwrap_err();
+    }
+    return result.unwrap_or(-1);
 }
 
 //extern "C"

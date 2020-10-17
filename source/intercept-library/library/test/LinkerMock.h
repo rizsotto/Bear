@@ -26,14 +26,14 @@
 class LinkerMock : public el::Linker {
 public:
     MOCK_METHOD(
-        int,
+        (rust::Result<int, int>),
         execve,
         (const char* path, char* const argv[], char* const envp[]),
         (const, noexcept, override)
     );
 
     MOCK_METHOD(
-        int,
+        (rust::Result<int, int>),
         posix_spawn,
         (   pid_t* pid,
             const char* path,
@@ -41,13 +41,6 @@ public:
             const posix_spawnattr_t* attrp,
             char* const argv[],
             char* const envp[]),
-        (const, noexcept, override)
-    );
-
-    MOCK_METHOD(
-        int,
-        error_code,
-        (),
         (const, noexcept, override)
     );
 };

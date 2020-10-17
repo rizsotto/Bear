@@ -44,23 +44,24 @@ namespace el {
         result_[0] = 0;
     }
 
-    Resolver::Result Resolver::from_current_directory(std::string_view const &file) {
+    rust::Result<const char*, int> Resolver::from_current_directory(std::string_view const &file) {
         // create absolute path to the given file.
         if (nullptr == realpath(file.begin(), result_)) {
-            return Resolver::Result {nullptr, ENOENT };
+            return rust::Err(ENOENT);
         }
         // check if it's okay to execute.
         if (0 == access(result_, X_OK)) {
-            return Resolver::Result {result_, 0 };
+            const char *ptr = result_;
+            return rust::Ok(ptr);
         }
         // try to set a meaningful error value.
         if (0 == access(result_, F_OK)) {
-            return Resolver::Result {nullptr, EACCES };
+            return rust::Err(EACCES);
         }
-        return Resolver::Result {nullptr, ENOENT };
+        return rust::Err(ENOENT);
     }
 
-    Resolver::Result Resolver::from_path(std::string_view const &file, char* const* envp) {
+    rust::Result<const char*, int> Resolver::from_path(std::string_view const &file, char* const* envp) {
         if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
@@ -78,11 +79,11 @@ namespace el {
                     return from_search_path(file, search_path);
                 }
             }
-            return Resolver::Result {nullptr, ENOENT };
+            return rust::Err(ENOENT);
         }
     }
 
-    Resolver::Result Resolver::from_search_path(std::string_view const &file, const char *search_path) {
+    rust::Result<const char*, int> Resolver::from_search_path(std::string_view const &file, const char *search_path) {
         if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
@@ -102,12 +103,12 @@ namespace el {
                     *it = 0;
                 }
                 // check if it's okay to execute.
-                if (auto result = from_current_directory(candidate); result) {
+                if (auto result = from_current_directory(candidate); result.is_ok()) {
                     return result;
                 }
             }
             // if all attempt were failing, then quit with a failure.
-            return Resolver::Result {nullptr, ENOENT };
+            return rust::Err(ENOENT);
         }
     }
 }

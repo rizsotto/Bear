@@ -19,6 +19,7 @@ add_library(exec_a OBJECT
 target_include_directories(exec_a PUBLIC source)
 target_link_libraries(exec_a PUBLIC exec_api)
 target_link_libraries(exec_a PUBLIC er_api)
+target_link_libraries(exec_a PUBLIC result_a)
 target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
 set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"

@@ -21,6 +21,8 @@
 
 #include <spawn.h>
 
+#include "libresult/Result.h"
+
 namespace el {
 
     /**
@@ -33,21 +35,18 @@ namespace el {
         virtual ~Linker() noexcept = default;
 
         [[nodiscard]]
-        virtual int execve(
+        virtual rust::Result<int, int> execve(
             const char* path,
             char* const argv[],
             char* const envp[]) const noexcept;
 
         [[nodiscard]]
-        virtual int posix_spawn(
+        virtual rust::Result<int, int> posix_spawn(
             pid_t* pid,
             const char* path,
             const posix_spawn_file_actions_t* file_actions,
             const posix_spawnattr_t* attrp,
             char* const argv[],
             char* const envp[]) const noexcept;
-
-        [[nodiscard]]
-        virtual int error_code() const noexcept;
     };
 }
