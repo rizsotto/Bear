@@ -5,11 +5,15 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
-
+    continue-on-error: ${{ matrix.experimental }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-10.15]
+        os: [ubuntu-20.04]
+        experimental: [false]
+        include:
+          - os: macos-10.15
+            experimental: true
 
     steps:
       - name: Checkout code
@@ -19,13 +23,13 @@ jobs:
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind \
-                                  libfmt-dev libspdlog-dev nlohmann-json3-dev
+          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'macos' )
         run: |
-          brew install fmt spdlog nlohmann-json grpc pkg-config
+          brew install cmake pkg-config fmt spdlog nlohmann-json grpc
+          echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -48,7 +52,6 @@ jobs:
       - name: Build
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
-          PKG_CONFIG_PATH: "/usr/local/opt/openssl@1.1/lib/pkgconfig"
         run: |
           cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR"
           cmake --build "$BUILD_DIR" --parallel 4 --target install
