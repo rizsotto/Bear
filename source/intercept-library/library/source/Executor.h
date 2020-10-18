@@ -21,6 +21,8 @@
 
 #include <spawn.h>
 
+#include "libresult/Result.h"
+
 namespace el {
 
     struct Linker;
@@ -46,30 +48,24 @@ namespace el {
      */
     class Executor {
     public:
-        struct Result {
-            const int return_value;
-            const int error_code;
-        };
-
-    public:
         Executor(el::Linker const& linker, el::Session const& session, el::Resolver &resolver) noexcept;
 
         ~Executor() noexcept = default;
 
     public:
-        Result execve(const char* path, char* const argv[], char* const envp[]) const;
+        rust::Result<int, int> execve(const char* path, char* const argv[], char* const envp[]) const;
 
-        Result execvpe(const char* file, char* const argv[], char* const envp[]) const;
+        rust::Result<int, int> execvpe(const char* file, char* const argv[], char* const envp[]) const;
 
-        Result execvP(const char* file, const char* search_path, char* const argv[], char* const envp[]) const;
+        rust::Result<int, int> execvP(const char* file, const char* search_path, char* const argv[], char* const envp[]) const;
 
-        Result posix_spawn(pid_t* pid, const char* path,
+        rust::Result<int, int> posix_spawn(pid_t* pid, const char* path,
             const posix_spawn_file_actions_t* file_actions,
             const posix_spawnattr_t* attrp,
             char* const argv[],
             char* const envp[]) const;
 
-        Result posix_spawnp(pid_t* pid, const char* file,
+        rust::Result<int, int> posix_spawnp(pid_t* pid, const char* file,
             const posix_spawn_file_actions_t* file_actions,
             const posix_spawnattr_t* attrp,
             char* const argv[],

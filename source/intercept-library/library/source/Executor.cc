@@ -38,7 +38,7 @@ namespace {
     do {                                                  \
         if (!el::session::is_valid(SESSION_)) {           \
             LOGGER.warning("session is not initialized"); \
-            return el::Executor::Result { -1, EIO };      \
+            return rust::Err(EIO);                        \
         }                                                 \
     } while (false)
 
@@ -46,7 +46,7 @@ namespace {
     do {                                                \
         if (nullptr == (PTR_)) {                        \
             LOGGER.debug("null pointer received");      \
-            return el::Executor::Result { -1, EFAULT }; \
+            return rust::Err(EFAULT);                   \
         }                                               \
     } while (false)
 
@@ -111,92 +111,87 @@ namespace el {
             , resolver_(resolver)
     { }
 
-    Executor::Result Executor::execve(const char* path, char* const* argv, char* const* envp) const
+    rust::Result<int, int> Executor::execve(const char* path, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        if (auto executable = resolver_.from_current_directory(path); executable) {
-            const CommandBuilder cmd(session_, executable.return_value, argv);
+        if (auto executable = resolver_.from_current_directory(path); executable.is_ok()) {
+            const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result {return_value, linker_.error_code() };
+            return linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
         } else {
-            return Executor::Result { -1, executable.error_code };
+            return rust::Err(executable.unwrap_err());
         }
     }
 
-    Executor::Result Executor::execvpe(const char* file, char* const* argv, char* const* envp) const
+    rust::Result<int, int> Executor::execvpe(const char* file, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (auto executable = resolver_.from_path(file, envp); executable) {
-            const CommandBuilder cmd(session_, executable.return_value, argv);
+        if (auto executable = resolver_.from_path(file, envp); executable.is_ok()) {
+            const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result {return_value, linker_.error_code() };
+            return linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
         } else {
-            return Executor::Result { -1, executable.error_code };
+            return rust::Err(executable.unwrap_err());
         }
     }
 
-    Executor::Result Executor::execvP(const char* file, const char* search_path, char* const* argv, char* const* envp) const
+    rust::Result<int, int> Executor::execvP(const char* file, const char* search_path, char* const* argv, char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (auto executable = resolver_.from_search_path(file, search_path); executable) {
-            const CommandBuilder cmd(session_, executable.return_value, argv);
+        if (auto executable = resolver_.from_search_path(file, search_path); executable.is_ok()) {
+            const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
-            return Executor::Result {return_value, linker_.error_code() };
+            return linker_.execve(cmd.file(), const_cast<char* const*>(dst), envp);
         } else {
-            return Executor::Result { -1, executable.error_code };
+            return rust::Err(executable.unwrap_err());
         }
     }
 
-    Executor::Result Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
+    rust::Result<int, int> Executor::posix_spawn(pid_t* pid, const char* path, const posix_spawn_file_actions_t* file_actions,
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(path);
 
-        if (auto executable = resolver_.from_current_directory(path); executable) {
-            const CommandBuilder cmd(session_, executable.return_value, argv);
+        if (auto executable = resolver_.from_current_directory(path); executable.is_ok()) {
+            const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
-            return Executor::Result {return_value, linker_.error_code() };
+            return linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
         } else {
-            return Executor::Result { -1, executable.error_code };
+            return rust::Err(executable.unwrap_err());
         }
     }
 
-    Executor::Result Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
+    rust::Result<int, int> Executor::posix_spawnp(pid_t* pid, const char* file, const posix_spawn_file_actions_t* file_actions,
         const posix_spawnattr_t* attrp, char* const* argv,
         char* const* envp) const
     {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (auto executable = resolver_.from_path(file, envp); executable) {
-            const CommandBuilder cmd(session_, executable.return_value, argv);
+        if (auto executable = resolver_.from_path(file, envp); executable.is_ok()) {
+            const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
 
-            auto return_value = linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
-            return Executor::Result {return_value, linker_.error_code() };
+            return linker_.posix_spawn(pid, cmd.file(), file_actions, attrp, const_cast<char* const*>(dst), envp);
         } else {
-            return Executor::Result { -1, executable.error_code };
+            return rust::Err(executable.unwrap_err());
         }
     }
 }

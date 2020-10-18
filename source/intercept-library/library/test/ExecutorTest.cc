@@ -36,26 +36,9 @@ using ::testing::Matcher;
 using ::testing::NotNull;
 using ::testing::Return;
 
-namespace el {
-
-    bool operator==(const Executor::Result &lhs, const Executor::Result &rhs)
-    {
-        return
-            (lhs.return_value == rhs.return_value) &&
-            (lhs.return_value == 0 || lhs.error_code == rhs.error_code);
-    }
-
-    std::ostream& operator<<(std::ostream &os, const Executor::Result &value)
-    {
-        os << "return value: " << value.return_value << ", error code: " << value.error_code;
-        return os;
-    }
-}
-
 namespace {
 
-    char* LS_PATH = const_cast<char*>("/usr/bin/ls");
-    size_t LS_PATH_SIZE = el::array::length(LS_PATH);
+    const char* LS_PATH = "/usr/bin/ls";
     char* LS_FILE = const_cast<char*>("ls");
     char* LS_ARGV[] = {
         const_cast<char*>("ls"),
@@ -80,13 +63,6 @@ namespace {
         true
     };
 
-    constexpr el::Executor::Result SUCCESS = { 0, 0 };
-
-    constexpr el::Executor::Result failure(int const error_code) noexcept
-    {
-        return el::Executor::Result { -1, error_code };
-    }
-
     MATCHER_P(CStyleArrayEqual, expecteds, "")
     {
         size_t idx = 0;
@@ -102,6 +78,8 @@ namespace {
 
     TEST(Executor, fails_without_session)
     {
+        const rust::Result<int, int> expected = rust::Err(EIO);
+
         el::Session session = el::session::init();
 
         LinkerMock linker;
@@ -113,21 +91,23 @@ namespace {
         EXPECT_CALL(resolver, from_path(_, _)).Times(0);
         EXPECT_CALL(resolver, from_search_path(_, _)).Times(0);
 
-        EXPECT_EQ(failure(EIO), el::Executor(linker, session, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(failure(EIO), el::Executor(linker, session, resolver).execvpe(LS_FILE, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(failure(EIO), el::Executor(linker, session, resolver).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(expected, el::Executor(linker, session, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(expected, el::Executor(linker, session, resolver).execvpe(LS_FILE, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(expected, el::Executor(linker, session, resolver).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP));
 
         pid_t pid;
-        EXPECT_EQ(failure(EIO), el::Executor(linker, session, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP));
-        EXPECT_EQ(failure(EIO), el::Executor(linker, session, resolver).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(expected, el::Executor(linker, session, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP));
+        EXPECT_EQ(expected, el::Executor(linker, session, resolver).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP));
     }
 
     TEST(Executor, execve_silent_library)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
+
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_current_directory(testing::Eq(std::string_view(LS_PATH))))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker,execve(SILENT_SESSION.reporter,
@@ -143,20 +123,20 @@ namespace {
                                   }),
                                   LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, SILENT_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, execve_verbose_library)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
+
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_current_directory(testing::Eq(std::string_view(LS_PATH))))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
@@ -173,35 +153,37 @@ namespace {
                                    }),
                                    LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, execvpe_fails_on_resolve)
     {
+        const rust::Result<int, int> expected = rust::Err(ENOENT);
+
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_current_directory(testing::Eq(std::string_view(LS_PATH))))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{nullptr, ENOENT}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Err(ENOENT))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(_, _, _)).Times(0);
         EXPECT_CALL(linker, posix_spawn(_, _, _, _, _, _)).Times(0);
 
         auto result = el::Executor(linker, SILENT_SESSION, resolver).execve(LS_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(failure(ENOENT), result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, execvpe_passes)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
+
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_path(testing::Eq(std::string_view(LS_FILE)), testing::Eq(LS_ENVP)))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
@@ -218,20 +200,20 @@ namespace {
                                    }),
                                    LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).execvpe(LS_FILE, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, execvp2_passes)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
+
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_search_path(testing::Eq(std::string_view(LS_FILE)), testing::Eq(SEARCH_PATH)))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
@@ -248,22 +230,21 @@ namespace {
                                    }),
                                    LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).execvP(LS_FILE, SEARCH_PATH, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, spawn_passes)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
         pid_t pid;
 
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_current_directory(testing::Eq(std::string_view(LS_PATH))))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
@@ -280,39 +261,39 @@ namespace {
                                         }),
                                         LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, spawn_fails_on_access)
     {
+        const rust::Result<int, int> expected = rust::Err(ENOENT);
         pid_t pid;
 
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_current_directory(testing::Eq(std::string_view(LS_PATH))))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{nullptr, ENOENT}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Err(ENOENT))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(_, _, _)).Times(0);
         EXPECT_CALL(linker, posix_spawn(_, _, _, _, _, _)).Times(0);
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).posix_spawn(&pid, LS_PATH, nullptr, nullptr, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(failure(ENOENT), result);
+        EXPECT_EQ(expected, result);
     }
 
     TEST(Executor, spawnp_passes)
     {
+        const rust::Result<int, int> expected = rust::Ok(0);
         pid_t pid;
 
         ResolverMock resolver;
         EXPECT_CALL(resolver, from_path(testing::Eq(std::string_view(LS_FILE)), testing::Eq(LS_ENVP)))
                 .Times(1)
-                .WillOnce(Return(el::Resolver::Result{LS_PATH, 0}));
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok(LS_PATH))));
 
         LinkerMock linker;
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
@@ -329,11 +310,9 @@ namespace {
                                         }),
                                         LS_ENVP))
                 .Times(1)
-                .WillOnce(Return(0));
-        EXPECT_CALL(linker, error_code())
-                .WillRepeatedly(Return(0));
+                .WillOnce(Return(expected));
 
         auto result = el::Executor(linker, VERBOSE_SESSION, resolver).posix_spawnp(&pid, LS_FILE, nullptr, nullptr, LS_ARGV, LS_ENVP);
-        EXPECT_EQ(SUCCESS, result);
+        EXPECT_EQ(expected, result);
     }
 }

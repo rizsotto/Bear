@@ -19,6 +19,7 @@ add_library(exec_a OBJECT
 target_include_directories(exec_a PUBLIC source)
 target_link_libraries(exec_a PUBLIC exec_api)
 target_link_libraries(exec_a PUBLIC er_api)
+target_link_libraries(exec_a PUBLIC result_a)
 target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
 set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"
@@ -42,9 +43,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
 endif ()
 
-include(GNUInstallDirs)
-install(TARGETS exec
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+if (SUPPORT_PRELOAD)
+    include(GNUInstallDirs)
+    install(TARGETS exec
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+endif ()
 
 # Create unit test.
 if (ENABLE_UNIT_TESTS)
