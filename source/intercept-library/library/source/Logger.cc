@@ -47,7 +47,7 @@ namespace el::log {
     void set(Level level)
     {
         LEVEL = level;
-        fdatasync(STDERR_FILENO);
+        fsync(STDERR_FILENO);
     }
 
     void Logger::debug(char const* message) const noexcept
