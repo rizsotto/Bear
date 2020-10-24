@@ -1,0 +1,55 @@
+# https://docs.github.com/en/github/finding-security-vulnerabilities-and-errors-in-your-code/configuring-code-scanning#overriding-automatic-language-detection
+
+name: "CodeQL"
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  schedule:
+    - cron: '0 13 * * 2'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-20.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install package dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y cmake pkg-config
+
+      - name: Prepare
+        run: |
+          mkdir "$HOME/work/bear_build"
+          echo "BUILD_DIR=$HOME/work/bear_build" >> $GITHUB_ENV
+
+      # Initializes the CodeQL tools for scanning.
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: ${{ matrix.language }}
+          # If you wish to specify custom queries, you can do so here or in a config file.
+          # By default, queries listed here will override any specified in a config file.
+          # Prefix the list here with "+" to use these queries and those in the config file.
+          # queries: ./path/to/local/query, your-org/your-repo/queries@main
+
+      - name: Build
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        run: |
+          cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" -DENABLE_FUNC_TESTS=OFF
+          cmake --build "$BUILD_DIR" --parallel 4
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
