@@ -46,7 +46,7 @@ removed).
 How to install
 --------------
 
-Bear is packaged for many distributions. Check out your package manager.
+Bear is [packaged](https://repology.org/project/bear/versions) for many distributions. Check out your package manager.
 Or [build it](INSTALL.md) from source.
 
 How to use
