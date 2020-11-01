@@ -20,6 +20,7 @@
 #include "config.h"
 #include "Reporter.h"
 #include "Application.h"
+#include "libsys/Os.h"
 
 #include <spdlog/spdlog.h>
 
@@ -73,7 +74,7 @@ namespace {
 
     void update_run_with_started(report::Run& target, const supervise::Event& source)
     {
-        spdlog::debug("Received event is merged into execution report. [pid: {}, even: start]", source.pid());
+        spdlog::debug("Received event is merged into execution report. [pid: {}, event: start]", source.pid());
         auto event = report::Event {
             "started",
             source.timestamp(),
@@ -167,23 +168,23 @@ namespace ic {
 
     void Reporter::report(const ::supervise::Event& event)
     {
-        const pid_t pid = event.pid();
-        if (auto it = executions_.find(pid); it != executions_.end()) {
+        const auto rid = event.rid();
+        if (auto it = executions_.find(rid); it != executions_.end()) {
             // the process entry exits
             if (event.has_terminated()) {
                 update_run_with_terminated(it->second.run, event);
             } else if (event.has_signalled()) {
                 update_run_with_signaled(it->second.run, event);
             } else {
-                spdlog::info("Received start event could not be merged into execution report. Ignored.");
+                spdlog::warn("Received start event could not be merged into execution report. Ignored.");
             }
         } else {
             // the process entry not exists
             if (event.has_started()) {
                 auto entry = init_execution(event);
-                executions_.emplace(std::make_pair(pid, std::move(entry)));
+                executions_.emplace(std::make_pair(rid, std::move(entry)));
             } else {
-                spdlog::info("Received event could not be merged into execution report. Ignored.");
+                spdlog::warn("Received event could not be merged into execution report. Ignored.");
             }
         }
     }

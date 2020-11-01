@@ -84,16 +84,19 @@ service Interceptor {
 message Event {
 
     // Required.
-    uint32 pid = 1;
+    uint64 rid = 1;
+
+    // Required.
+    uint32 pid = 2;
 
     // Optional.
-    uint32 ppid = 2;
+    uint32 ppid = 3;
 
     // Required.
     // (ISO-8601 date-tie format with microsecond precision in UTC timezone)
-    string timestamp = 3;
+    string timestamp = 4;
 
-    reserved 4 to 10;
+    reserved 5 to 10;
 
     // Required.
     oneof event {

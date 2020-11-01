@@ -33,6 +33,7 @@ add_library(rpc_a OBJECT
         ${CMAKE_CURRENT_BINARY_DIR}/source/supervise.pb.cc
         ${CMAKE_CURRENT_BINARY_DIR}/source/supervise.grpc.pb.cc
         ${CMAKE_CURRENT_SOURCE_DIR}/source/InterceptClient.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/source/EventFactory.cc
         )
 
 target_include_directories(rpc_a PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/include/librpc")
