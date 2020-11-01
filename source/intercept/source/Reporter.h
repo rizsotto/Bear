@@ -23,11 +23,11 @@
 #include "libflags/Flags.h"
 #include "libreport/Report.h"
 #include "libresult/Result.h"
-#include "libsys/Os.h"
 #include "librpc/supervise.pb.h"
 
 #include <filesystem>
 #include <memory>
+#include <cstdint>
 
 namespace fs = std::filesystem;
 
@@ -61,6 +61,6 @@ namespace ic {
     private:
         fs::path output_;
         report::Context context_;
-        std::map<pid_t, report::Execution> executions_;
+        std::map<uint64_t, report::Execution> executions_;
     };
 }

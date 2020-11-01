@@ -18,16 +18,12 @@
  */
 
 #include "Application.h"
+#include "librpc/EventFactory.h"
 #include "librpc/InterceptClient.h"
-#include "librpc/supervise.grpc.pb.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 #include "libwrapper/Environment.h"
 
-#include <fmt/chrono.h>
-#include <fmt/format.h>
-
-#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -56,8 +52,8 @@ namespace {
     std::vector<std::string> from(const char** args)
     {
         const char** end = args;
-        for (; *end != nullptr; ++end)
-            ;
+        while (*end != nullptr)
+            ++end;
         return std::vector<std::string>(args, end);
     }
 
@@ -80,57 +76,6 @@ namespace {
             .map<Execution>([&path, &command, &environment](auto cwd) {
                 return Execution { path, command, cwd, environment };
             });
-    }
-
-    std::string now_as_string()
-    {
-        const auto now = std::chrono::system_clock::now();
-        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
-
-        return fmt::format("{:%Y-%m-%dT%H:%M:%S}.{:06d}Z",
-                           fmt::localtime(std::chrono::system_clock::to_time_t(now)),
-                           micros.count() % 1000000);
-    }
-
-    supervise::Event make_start_event(
-        pid_t pid,
-        const Execution& execution)
-    {
-        supervise::Event result;
-        result.set_timestamp(now_as_string());
-        result.set_pid(pid);
-
-        std::unique_ptr<supervise::Event_Started> event = std::make_unique<supervise::Event_Started>();
-        event->set_executable(execution.command.data());
-        for (const auto& arg : execution.arguments) {
-            event->add_arguments(arg.data());
-        }
-        event->set_working_dir(execution.working_directory);
-        event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
-
-        result.set_allocated_started(event.release());
-        return result;
-    }
-
-    supervise::Event make_status_event(pid_t pid, sys::ExitStatus status)
-    {
-        supervise::Event result;
-        result.set_timestamp(now_as_string());
-        result.set_pid(pid);
-
-        if (status.is_signaled()) {
-            // TODO: this shall return a termination event too
-            std::unique_ptr<supervise::Event_Signalled> event = std::make_unique<supervise::Event_Signalled>();
-            event->set_number(status.signal().value());
-
-            result.set_allocated_signalled(event.release());
-        } else {
-            std::unique_ptr<supervise::Event_Terminated> event = std::make_unique<supervise::Event_Terminated>();
-            event->set_status(status.code().value());
-
-            result.set_allocated_terminated(event.release());
-        }
-        return result;
     }
 }
 
@@ -156,6 +101,7 @@ namespace wr {
 
     rust::Result<int> Application::operator()() const
     {
+        rpc::EventFactory event_factory;
         rpc::InterceptClient client(impl_->session.destination);
         auto command = client.get_wrapped_command(impl_->execution.command);
         auto environment = client.get_environment_update(impl_->execution.environment);
@@ -172,21 +118,31 @@ namespace wr {
                     environment
                 };
             })
-            .and_then<sys::Process>([&client](auto execution) {
+            .and_then<sys::Process>([&client, &event_factory](auto execution) {
                 return sys::Process::Builder(execution.command)
                     .add_arguments(execution.arguments.begin(), execution.arguments.end())
                     .set_environment(execution.environment)
                     .spawn()
-                    .on_success([&client, &execution](auto& child) {
-                        client.report(make_start_event(child.get_pid(), execution));
+                    .on_success([&client, &event_factory, &execution](auto& child) {
+                        auto event = event_factory.start(
+                                child.get_pid(),
+                                getppid(),
+                                execution.command,
+                                execution.arguments,
+                                execution.working_directory,
+                                execution.environment);
+                        client.report(std::move(event));
                     });
             })
-            .and_then<sys::ExitStatus>([&client](auto child) {
+            .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
                 sys::SignalForwarder guard(child);
                 while (true) {
                     auto status = child.wait(true);
-                    status.on_success([&client, &child](auto exit) {
-                        client.report(make_status_event(child.get_pid(), exit));
+                    status.on_success([&client, &event_factory](auto exit) {
+                        auto event = exit.is_signaled()
+                                     ? event_factory.signal(exit.signal().value())
+                                     : event_factory.terminate(exit.code().value());
+                        client.report(std::move(event));
                     });
                     if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
                         return status;
