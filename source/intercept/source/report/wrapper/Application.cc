@@ -22,7 +22,7 @@
 #include "librpc/InterceptClient.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
-#include "libwrapper/Environment.h"
+#include "Environment.h"
 
 #include <filesystem>
 #include <memory>
