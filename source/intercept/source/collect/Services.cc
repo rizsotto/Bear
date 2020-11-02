@@ -17,9 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Reporter.h"
-#include "Services.h"
-#include "Session.h"
+#include "collect/Reporter.h"
+#include "collect/Services.h"
+#include "collect/Session.h"
 
 namespace ic {
 

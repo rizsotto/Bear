@@ -30,7 +30,7 @@
 // - Return child exit code.
 
 #include "config.h"
-#include "Application.h"
+#include "collect/Application.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>

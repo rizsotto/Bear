@@ -17,12 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Session.h"
+#include "collect/Session.h"
 
-#include "SessionWrapper.h"
-#include "Application.h"
+#include "collect/SessionWrapper.h"
+#include "collect/Application.h"
 #ifdef SUPPORT_PRELOAD
-#include "SessionLibrary.h"
+#include "collect/SessionLibrary.h"
 #endif
 
 #include "libsys/Path.h"

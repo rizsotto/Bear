@@ -19,9 +19,8 @@
 
 #include "config.h"
 
-#include "Application.h"
-
-#include "Environment.h"
+#include "report/wrapper/Application.h"
+#include "report/wrapper/Environment.h"
 #include "libsys/Os.h"
 
 #include <spdlog/spdlog.h>

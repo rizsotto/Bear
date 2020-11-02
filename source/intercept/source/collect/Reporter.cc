@@ -18,8 +18,8 @@
  */
 
 #include "config.h"
-#include "Reporter.h"
-#include "Application.h"
+#include "collect/Reporter.h"
+#include "collect/Application.h"
 #include "libsys/Os.h"
 
 #include <spdlog/spdlog.h>

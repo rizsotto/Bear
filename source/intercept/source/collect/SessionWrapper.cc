@@ -17,9 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "SessionWrapper.h"
+#include "collect/SessionWrapper.h"
 
-#include "Application.h"
+#include "collect/Application.h"
 #include "report/wrapper/Environment.h"
 #include "libsys/Os.h"
 #include "libsys/Path.h"

@@ -17,10 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Application.h"
-#include "Reporter.h"
-#include "Services.h"
-#include "Session.h"
+#include "collect/Application.h"
+#include "collect/Reporter.h"
+#include "collect/Services.h"
+#include "collect/Session.h"
 #include "libsys/Os.h"
 #include "libsys/Signal.h"
 

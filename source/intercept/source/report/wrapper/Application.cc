@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Application.h"
+#include "report/wrapper/Application.h"
 #include "librpc/EventFactory.h"
 #include "librpc/InterceptClient.h"
 #include "libsys/Process.h"

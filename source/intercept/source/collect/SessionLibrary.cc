@@ -17,9 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "SessionLibrary.h"
+#include "collect/SessionLibrary.h"
 
-#include "Application.h"
+#include "collect/Application.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libexec/Environment.h"
