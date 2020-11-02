@@ -17,23 +17,30 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <algorithm>
+#pragma once
 
-#include "Array.h"
-#include "Buffer.h"
+#include "report/libexec/Linker.h"
 
-namespace el {
+#include "gmock/gmock.h"
 
-    char const* Buffer::store(char const* const input) noexcept
-    {
-        if (input == nullptr)
-            return nullptr;
+class LinkerMock : public el::Linker {
+public:
+    MOCK_METHOD(
+        (rust::Result<int, int>),
+        execve,
+        (const char* path, char* const argv[], char* const envp[]),
+        (const, noexcept, override)
+    );
 
-        auto input_end = el::array::end(input) + 1; // include the zero element
-        auto top = el::array::copy(input, input_end, top_, end_);
-        if (top != nullptr)
-            std::swap(top_, top);
-        return top;
-    }
-
-}
+    MOCK_METHOD(
+        (rust::Result<int, int>),
+        posix_spawn,
+        (   pid_t* pid,
+            const char* path,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]),
+        (const, noexcept, override)
+    );
+};

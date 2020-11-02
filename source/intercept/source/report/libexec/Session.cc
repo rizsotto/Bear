@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Session.h"
+#include "report/libexec/Session.h"
 
-#include "Buffer.h"
-#include "Environment.h"
-#include "libexec/Environment.h"
+#include "report/libexec/Buffer.h"
+#include "report/libexec/Environment.h"
+#include "report/libexec/Environments.h"
 
 namespace el::session {
 

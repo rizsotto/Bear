@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Linker.h"
+#include "report/libexec/Linker.h"
 
 #include <cerrno>
 #include <dlfcn.h>

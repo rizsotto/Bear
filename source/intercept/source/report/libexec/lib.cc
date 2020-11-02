@@ -22,11 +22,11 @@
 #include <climits>
 #include <cstdarg>
 
-#include "Executor.h"
-#include "Linker.h"
-#include "Logger.h"
-#include "Resolver.h"
-#include "Session.h"
+#include "report/libexec/Executor.h"
+#include "report/libexec/Linker.h"
+#include "report/libexec/Logger.h"
+#include "report/libexec/Resolver.h"
+#include "report/libexec/Session.h"
 
 #if defined HAVE_NSGETENVIRON
 #include <crt_externs.h>

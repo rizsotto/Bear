@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Logger.h"
+#include "report/libexec/Logger.h"
 
 #include <ctime>
 #include <cstdio>

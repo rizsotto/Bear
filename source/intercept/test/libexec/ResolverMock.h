@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Resolver.h"
+#include "report/libexec/Resolver.h"
 
 #include "gmock/gmock.h"
 

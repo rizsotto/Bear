@@ -17,28 +17,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
+#include <algorithm>
 
-#include "Environment.h"
-#include "Array.h"
+#include "report/libexec/Array.h"
+#include "report/libexec/Buffer.h"
 
-namespace el::env {
+namespace el {
 
-    const char* get_env_value(const char** envp, const char* key) noexcept
+    char const* Buffer::store(char const* const input) noexcept
     {
-        const size_t key_size = el::array::length(key);
+        if (input == nullptr)
+            return nullptr;
 
-        for (const char** it = envp; *it != nullptr; ++it) {
-            const char* const current = *it;
-            // Is the key a prefix of the pointed string?
-            if (!el::array::equal_n(key, current, key_size))
-                continue;
-            // Is the next character is the equal sign?
-            if (current[key_size] != '=')
-                continue;
-            // It must be the one! Calculate the address of the value.
-            return current + key_size + 1;
-        }
-        return nullptr;
+        auto input_end = el::array::end(input) + 1; // include the zero element
+        auto top = el::array::copy(input, input_end, top_, end_);
+        if (top != nullptr)
+            std::swap(top_, top);
+        return top;
     }
+
 }

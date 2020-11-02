@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Array.h"
+#include "report/libexec/Array.h"
 
 namespace {
 

@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Resolver.h"
+#include "report/libexec/Resolver.h"
 
-#include "Array.h"
-#include "Environment.h"
-#include "Paths.h"
+#include "report/libexec/Array.h"
+#include "report/libexec/Environment.h"
+#include "report/libexec/Paths.h"
 
 #include <algorithm>
 #include <cerrno>

@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Paths.h"
+#include "report/libexec/Paths.h"
 
 namespace {
 

@@ -17,9 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Executor.h"
-
-#include "../../../intercept/source/report/supervisor/Flags.h"
+#include "report/libexec/Executor.h"
+#include "report/supervisor/Flags.h"
 
 #include "Array.h"
 #include "Logger.h"

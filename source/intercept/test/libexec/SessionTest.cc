@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Session.h"
+#include "report/libexec/Session.h"
 
 namespace {
 

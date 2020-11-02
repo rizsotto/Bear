@@ -19,12 +19,12 @@
 
 #include "gtest/gtest.h"
 
-#include "Executor.h"
+#include "report/libexec/Executor.h"
 #include "ResolverMock.h"
 #include "LinkerMock.h"
-#include "Session.h"
-#include "Array.h"
-#include "../../../intercept/source/report/supervisor/Flags.h"
+#include "report/libexec/Session.h"
+#include "report/libexec/Array.h"
+#include "report/supervisor/Flags.h"
 
 #include <cerrno>
 

@@ -19,11 +19,6 @@ target_link_libraries(intercept_a PUBLIC rpc_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
-target_link_libraries(intercept_a PUBLIC wrapper_api)
-if (SUPPORT_PRELOAD)
-    target_link_libraries(intercept_a PUBLIC er_api)
-    target_link_libraries(intercept_a PUBLIC exec_api)
-endif()
 
 # Create an executable from the sub projects.
 add_executable(intercept
@@ -70,26 +65,16 @@ if (ENABLE_UNIT_TESTS)
     add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
 endif ()
 
-# Create library for the interface only
-add_library(wrapper_api INTERFACE
-        )
-
-target_include_directories(wrapper_api INTERFACE include/)
-
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(wrapper_a OBJECT
         source/report/wrapper/Application.cc
         )
 
 target_include_directories(wrapper_a PUBLIC source/)
-target_link_libraries(wrapper_a PUBLIC wrapper_api)
 target_link_libraries(wrapper_a PUBLIC result_a)
 target_link_libraries(wrapper_a PRIVATE sys_a)
 target_link_libraries(wrapper_a PRIVATE rpc_a)
 target_link_libraries(wrapper_a PUBLIC spdlog::spdlog)
-set_target_properties(wrapper_a PROPERTIES
-        LINKER_LANGUAGE "C"
-        )
 
 # Create an executable from the sub projects.
 add_executable(wrapper
@@ -100,9 +85,6 @@ target_link_libraries(wrapper wrapper_a)
 target_link_libraries(wrapper sys_a)
 target_link_libraries(wrapper rpc_a)
 target_link_libraries(wrapper spdlog::spdlog)
-set_target_properties(wrapper PROPERTIES
-        LINKER_LANGUAGE "C"
-        )
 
 include(GNUInstallDirs)
 install(TARGETS wrapper
@@ -143,11 +125,6 @@ install(CODE "
         WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/wrapper.d
     )
 ")
-# Create library for the interface only
-add_library(er_api INTERFACE
-        )
-
-target_include_directories(er_api INTERFACE include/)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(er_a OBJECT
@@ -155,16 +132,11 @@ add_library(er_a OBJECT
         )
 
 target_include_directories(er_a PUBLIC source/)
-target_link_libraries(er_a PUBLIC er_api)
-target_link_libraries(er_a PUBLIC exec_api)
 target_link_libraries(er_a PUBLIC result_a)
 target_link_libraries(er_a PUBLIC flags_a)
 target_link_libraries(er_a PRIVATE sys_a)
 target_link_libraries(er_a PRIVATE rpc_a)
 target_link_libraries(er_a PUBLIC spdlog::spdlog)
-set_target_properties(er_a PROPERTIES
-        LINKER_LANGUAGE "C"
-        )
 
 # Create an executable from the sub projects.
 add_executable(er
@@ -176,10 +148,65 @@ target_link_libraries(er flags_a)
 target_link_libraries(er sys_a)
 target_link_libraries(er rpc_a)
 target_link_libraries(er spdlog::spdlog)
-set_target_properties(er PROPERTIES
-        LINKER_LANGUAGE "C"
-        )
 
 include(GNUInstallDirs)
 install(TARGETS er
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+# Create library for test and te final target
+add_library(exec_a OBJECT
+        source/report/libexec/Buffer.cc
+        source/report/libexec/Environment.cc
+        source/report/libexec/Executor.cc
+        source/report/libexec/Linker.cc
+        source/report/libexec/Logger.cc
+        source/report/libexec/Paths.cc
+        source/report/libexec/Resolver.cc
+        source/report/libexec/Session.cc
+        )
+
+target_include_directories(exec_a PUBLIC source)
+target_link_libraries(exec_a PUBLIC result_a)
+target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
+set_target_properties(exec_a PROPERTIES
+        LINKER_LANGUAGE "C"
+        POSITION_INDEPENDENT_CODE 1)
+
+# Create a shared library from the sub projects.
+add_library(exec SHARED
+        source/report/libexec/lib.cc
+        source/report/libexec/std.cc
+        )
+
+target_link_libraries(exec exec_a)
+set_target_properties(exec PROPERTIES
+        LINKER_LANGUAGE "C"
+        OSX_ARCHITECTURES:STRING "i386;x86_64"
+        MACOSX_RPATH:BOOL ON
+        )
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+    set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
+endif ()
+
+include(GNUInstallDirs)
+install(TARGETS exec
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+# Create unit test.
+if (ENABLE_UNIT_TESTS)
+    add_executable(exec_unit_test
+            test/libexec/ArrayTest.cc
+            test/libexec/BufferTest.cc
+            test/libexec/ExecutorTest.cc
+            test/libexec/PathsTest.cc
+            test/libexec/SessionTest.cc
+            )
+
+    target_include_directories(exec_unit_test PRIVATE test)
+    target_link_libraries(exec_unit_test exec_a)
+    target_link_libraries(exec_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
+
+    add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
+endif ()

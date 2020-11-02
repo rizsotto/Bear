@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Buffer.h"
+#include "report/libexec/Buffer.h"
 
 namespace {
 

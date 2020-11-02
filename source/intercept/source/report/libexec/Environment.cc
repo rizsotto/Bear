@@ -17,30 +17,28 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "config.h"
 
-#include "Linker.h"
+#include "report/libexec/Environment.h"
+#include "report/libexec/Array.h"
 
-#include "gmock/gmock.h"
+namespace el::env {
 
-class LinkerMock : public el::Linker {
-public:
-    MOCK_METHOD(
-        (rust::Result<int, int>),
-        execve,
-        (const char* path, char* const argv[], char* const envp[]),
-        (const, noexcept, override)
-    );
+    const char* get_env_value(const char** envp, const char* key) noexcept
+    {
+        const size_t key_size = el::array::length(key);
 
-    MOCK_METHOD(
-        (rust::Result<int, int>),
-        posix_spawn,
-        (   pid_t* pid,
-            const char* path,
-            const posix_spawn_file_actions_t* file_actions,
-            const posix_spawnattr_t* attrp,
-            char* const argv[],
-            char* const envp[]),
-        (const, noexcept, override)
-    );
-};
+        for (const char** it = envp; *it != nullptr; ++it) {
+            const char* const current = *it;
+            // Is the key a prefix of the pointed string?
+            if (!el::array::equal_n(key, current, key_size))
+                continue;
+            // Is the next character is the equal sign?
+            if (current[key_size] != '=')
+                continue;
+            // It must be the one! Calculate the address of the value.
+            return current + key_size + 1;
+        }
+        return nullptr;
+    }
+}
