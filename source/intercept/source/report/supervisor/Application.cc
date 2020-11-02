@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Application.h"
-#include "er/Flags.h"
+#include "report/supervisor/Application.h"
+#include "report/supervisor/Flags.h"
 #include "librpc/EventFactory.h"
 #include "librpc/InterceptClient.h"
 #include "libsys/Process.h"

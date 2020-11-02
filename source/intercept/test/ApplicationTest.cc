@@ -20,8 +20,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "Application.h"
-#include "er/Flags.h"
+#include "report/supervisor/Application.h"
+#include "report/supervisor/Flags.h"
 #include "libflags/Flags.h"
 
 using ::testing::_;

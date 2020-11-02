@@ -24,7 +24,7 @@
 #include "LinkerMock.h"
 #include "Session.h"
 #include "Array.h"
-#include "er/Flags.h"
+#include "../../../intercept/source/report/supervisor/Flags.h"
 
 #include <cerrno>
 

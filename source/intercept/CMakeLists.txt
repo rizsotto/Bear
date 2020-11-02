@@ -5,6 +5,7 @@ add_library(intercept_a OBJECT
         source/collect/Services.cc
         source/collect/Session.cc
         source/collect/SessionWrapper.cc
+        source/report/supervisor/Application.cc
         )
 
 if (SUPPORT_PRELOAD)
@@ -56,12 +57,14 @@ if (ENABLE_UNIT_TESTS)
     add_executable(intercept_unit_test
             test/ReporterTest.cc
             test/SessionTest.cc
+            test/ApplicationTest.cc
             )
 
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)
     target_link_libraries(intercept_unit_test rpc_a)
     target_link_libraries(intercept_unit_test sys_a)
+    target_link_libraries(intercept_unit_test flags_a)
     target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
@@ -140,3 +143,43 @@ install(CODE "
         WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/wrapper.d
     )
 ")
+# Create library for the interface only
+add_library(er_api INTERFACE
+        )
+
+target_include_directories(er_api INTERFACE include/)
+
+# Create a static library, which is used for unit tests and the final shared library.
+add_library(er_a OBJECT
+        source/report/supervisor/Application.cc
+        )
+
+target_include_directories(er_a PUBLIC source/)
+target_link_libraries(er_a PUBLIC er_api)
+target_link_libraries(er_a PUBLIC exec_api)
+target_link_libraries(er_a PUBLIC result_a)
+target_link_libraries(er_a PUBLIC flags_a)
+target_link_libraries(er_a PRIVATE sys_a)
+target_link_libraries(er_a PRIVATE rpc_a)
+target_link_libraries(er_a PUBLIC spdlog::spdlog)
+set_target_properties(er_a PROPERTIES
+        LINKER_LANGUAGE "C"
+        )
+
+# Create an executable from the sub projects.
+add_executable(er
+        source/report/supervisor/main.cc
+        )
+
+target_link_libraries(er er_a)
+target_link_libraries(er flags_a)
+target_link_libraries(er sys_a)
+target_link_libraries(er rpc_a)
+target_link_libraries(er spdlog::spdlog)
+set_target_properties(er PROPERTIES
+        LINKER_LANGUAGE "C"
+        )
+
+include(GNUInstallDirs)
+install(TARGETS er
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})

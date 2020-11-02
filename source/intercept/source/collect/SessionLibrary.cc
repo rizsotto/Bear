@@ -23,7 +23,7 @@
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libexec/Environment.h"
-#include "er/Flags.h"
+#include "report/supervisor/Flags.h"
 
 #include <spdlog/spdlog.h>
 

@@ -19,7 +19,7 @@
 
 #include "Executor.h"
 
-#include "er/Flags.h"
+#include "../../../intercept/source/report/supervisor/Flags.h"
 
 #include "Array.h"
 #include "Logger.h"

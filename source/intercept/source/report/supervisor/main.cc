@@ -18,9 +18,8 @@
  */
 
 #include "config.h"
-#include "Application.h"
-
-#include "er/Flags.h"
+#include "report/supervisor/Application.h"
+#include "report/supervisor/Flags.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
