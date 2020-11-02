@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "Reporter.h"
+#include "collect/Reporter.h"
 
 namespace {
 

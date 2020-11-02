@@ -1,14 +1,14 @@
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
-        source/Application.cc
-        source/Reporter.cc
-        source/Services.cc
-        source/Session.cc
-        source/SessionWrapper.cc
+        source/collect/Application.cc
+        source/collect/Reporter.cc
+        source/collect/Services.cc
+        source/collect/Session.cc
+        source/collect/SessionWrapper.cc
         )
 
 if (SUPPORT_PRELOAD)
-    target_sources(intercept_a PRIVATE source/SessionLibrary.cc)
+    target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
 endif()
 
 target_include_directories(intercept_a PUBLIC source/)
@@ -26,7 +26,7 @@ endif()
 
 # Create an executable from the sub projects.
 add_executable(intercept
-        main.cc
+        source/collect/main.cc
         )
 
 target_link_libraries(intercept intercept_a)
