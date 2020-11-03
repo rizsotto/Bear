@@ -21,6 +21,7 @@
 #include "report/supervisor/Flags.h"
 #include "report/EventFactory.h"
 #include "report/InterceptClient.h"
+#include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 
@@ -41,15 +42,6 @@ namespace {
                 });
     }
 
-    rust::Result<std::string> get_cwd()
-    {
-        std::error_code error_code;
-        auto result = fs::current_path(error_code);
-        return (error_code)
-                ? rust::Result<std::string>(rust::Err(std::runtime_error(error_code.message())))
-                : rust::Result<std::string>(rust::Ok(result.string()));
-    }
-
     rust::Result<rpc::ExecutionContext> make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept
     {
         auto path = args.as_string(::er::flags::EXECUTE)
@@ -58,12 +50,12 @@ namespace {
                 .map<std::vector<std::string>>([](auto args) {
                     return std::vector<std::string>(args.begin(), args.end());
                 });
-        auto working_dir = get_cwd();
+        auto working_dir = sys::path::get_cwd();
 
         return merge(path, command, working_dir)
                 .map<rpc::ExecutionContext>([&environment](auto tuple) {
                     const auto&[_path, _command, _working_dir] = tuple;
-                    return rpc::ExecutionContext{_path, _command, _working_dir, std::move(environment)};
+                    return rpc::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
                 });
     }
 }

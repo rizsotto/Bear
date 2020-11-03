@@ -20,6 +20,7 @@
 #include "report/wrapper/Application.h"
 #include "report/EventFactory.h"
 #include "report/InterceptClient.h"
+#include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 #include "Environment.h"
@@ -50,24 +51,15 @@ namespace {
         return std::vector<std::string>(args, end);
     }
 
-    rust::Result<std::string> get_cwd()
-    {
-        std::error_code error_code;
-        auto result = fs::current_path(error_code);
-        return (error_code)
-               ? rust::Result<std::string>(rust::Err(std::runtime_error(error_code.message())))
-               : rust::Result<std::string>(rust::Ok(result.string()));
-    }
-
     rust::Result<rpc::ExecutionContext> make_execution(const char** args, sys::env::Vars&& environment) noexcept
     {
         auto path = fs::path(args[0]).string();
         auto command = from(args);
-        auto working_dir = get_cwd();
+        auto working_dir = sys::path::get_cwd();
 
         return working_dir
             .map<rpc::ExecutionContext>([&path, &command, &environment](auto cwd) {
-                return rpc::ExecutionContext {path, command, cwd, environment };
+                return rpc::ExecutionContext {path, command, cwd.string(), environment };
             });
     }
 }

@@ -19,6 +19,9 @@
 
 #pragma once
 
+#include "config.h"
+#include "libresult/Result.h"
+
 #include <filesystem>
 #include <list>
 #include <string>
@@ -32,4 +35,6 @@ namespace sys::path {
     // https://en.wikipedia.org/wiki/PATH_(variable)
     std::list<fs::path> split(const std::string &input);
     std::string join(const std::list<fs::path> &input);
+
+    rust::Result<fs::path> get_cwd();
 }
