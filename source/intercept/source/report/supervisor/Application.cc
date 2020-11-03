@@ -30,15 +30,11 @@
 
 namespace {
 
-    struct Session {
-        const std::string_view destination;
-    };
-
-    rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
+    rust::Result<rpc::Session> make_session(const ::flags::Arguments& args) noexcept
     {
         return args.as_string(er::flags::DESTINATION)
-                .map<Session>([](const auto& destination) {
-                    return Session { destination };
+                .map<rpc::Session>([](const auto& destination) {
+                    return rpc::Session { std::string(destination) };
                 });
     }
 
@@ -63,7 +59,7 @@ namespace {
 namespace er {
 
     struct Application::State {
-        Session session;
+        rpc::Session session;
         rpc::ExecutionContext execution;
     };
 
@@ -80,7 +76,7 @@ namespace er {
     rust::Result<int> Application::operator()() const
     {
         rpc::EventFactory event_factory;
-        rpc::InterceptClient client(impl_->session.destination);
+        rpc::InterceptClient client(impl_->session);
 
         auto result = client.get_environment_update(impl_->execution.environment)
             .map<rpc::ExecutionContext>([this](auto environment) {

@@ -28,9 +28,13 @@
 
 namespace rpc {
 
+    struct Session {
+        const std::string destination;
+    };
+
     class InterceptClient {
     public:
-        explicit InterceptClient(const std::string_view& address);
+        explicit InterceptClient(const Session& session);
 
         InterceptClient() = delete;
         InterceptClient(const InterceptClient&) = delete;

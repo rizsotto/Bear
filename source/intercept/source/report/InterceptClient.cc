@@ -33,8 +33,8 @@ namespace {
 
 namespace rpc {
 
-    InterceptClient::InterceptClient(const std::string_view& address)
-            : channel_(grpc::CreateChannel(address.data(), grpc::InsecureChannelCredentials()))
+    InterceptClient::InterceptClient(const Session& session)
+            : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
             , supervisor_(supervise::Supervisor::NewStub(channel_))
             , interceptor_(supervise::Interceptor::NewStub(channel_))
     {

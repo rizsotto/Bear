@@ -31,16 +31,12 @@
 
 namespace {
 
-    struct Session {
-        const std::string destination;
-    };
-
-    rust::Result<Session> make_session(const sys::env::Vars& environment) noexcept
+    rust::Result<rpc::Session> make_session(const sys::env::Vars& environment) noexcept
     {
         auto destination = environment.find(wr::env::KEY_DESTINATION);
         return (destination == environment.end())
-               ? rust::Result<Session>(rust::Err(std::runtime_error("Unknown destination.")))
-               : rust::Result<Session>(rust::Ok(Session { destination->second }));
+               ? rust::Result<rpc::Session>(rust::Err(std::runtime_error("Unknown destination.")))
+               : rust::Result<rpc::Session>(rust::Ok(rpc::Session { destination->second }));
     }
 
     std::vector<std::string> from(const char** args)
@@ -67,7 +63,7 @@ namespace {
 namespace wr {
 
     struct Application::State {
-        Session session;
+        rpc::Session session;
         rpc::ExecutionContext execution;
     };
 
@@ -87,7 +83,7 @@ namespace wr {
     rust::Result<int> Application::operator()() const
     {
         rpc::EventFactory event_factory;
-        rpc::InterceptClient client(impl_->session.destination);
+        rpc::InterceptClient client(impl_->session);
         auto command = client.get_wrapped_command(impl_->execution.command);
         auto environment = client.get_environment_update(impl_->execution.environment);
 
