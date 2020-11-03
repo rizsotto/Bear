@@ -70,4 +70,13 @@ namespace sys::path {
     {
         return join_with(input, OS_PATH_SEPARATOR);
     }
+
+    rust::Result<fs::path> get_cwd()
+    {
+        std::error_code error_code;
+        auto result = fs::current_path(error_code);
+        return (error_code)
+               ? rust::Result<fs::path>(rust::Err(std::runtime_error(error_code.message())))
+               : rust::Result<fs::path>(rust::Ok(result));
+    }
 }

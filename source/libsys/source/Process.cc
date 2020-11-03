@@ -146,15 +146,6 @@ namespace {
         return (!path.empty()) && (path.at(0) == fs::path::preferred_separator);
     }
 
-    rust::Result<fs::path> get_cwd()
-    {
-        std::error_code error_code;
-        auto result = fs::current_path(error_code);
-        return (error_code)
-               ? rust::Result<fs::path>(rust::Err(std::runtime_error(error_code.message())))
-               : rust::Result<fs::path>(rust::Ok(result));
-    }
-
     std::runtime_error could_not_find(const fs::path& name, const int error)
     {
         return std::runtime_error(
@@ -185,7 +176,7 @@ namespace {
             // the current working directory.
             auto path = starts_with_separator(name)
                 ? rust::Ok(fs::path(name))
-                : get_cwd().map<fs::path>([&name](auto cwd) { return cwd  / name; });
+                : sys::path::get_cwd().map<fs::path>([&name](auto cwd) { return cwd  / name; });
 
             return path.and_then<fs::path>([](auto path) { return check_executable(path); });
         } else {

@@ -17,24 +17,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include <algorithm>
 
-#include "config.h"
-#include "libresult/Result.h"
+#include "report/libexec/Array.h"
+#include "report/libexec/Buffer.h"
 
-#include <filesystem>
-#include <list>
-#include <string>
+namespace el {
 
-namespace fs = std::filesystem;
+    char const* Buffer::store(char const* const input) noexcept
+    {
+        if (input == nullptr)
+            return nullptr;
 
-namespace sys::path {
+        auto input_end = el::array::end(input) + 1; // include the zero element
+        auto top = el::array::copy(input, input_end, top_, end_);
+        if (top != nullptr)
+            std::swap(top_, top);
+        return top;
+    }
 
-    // PATH variable manipulation functions
-    //
-    // https://en.wikipedia.org/wiki/PATH_(variable)
-    std::list<fs::path> split(const std::string &input);
-    std::string join(const std::list<fs::path> &input);
-
-    rust::Result<fs::path> get_cwd();
 }

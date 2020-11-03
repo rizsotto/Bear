@@ -1,41 +1,39 @@
+add_subdirectory(proto)
+
+include(GNUInstallDirs)
+
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
-        source/Application.cc
-        source/Reporter.cc
-        source/Services.cc
-        source/Session.cc
-        source/SessionWrapper.cc
+        source/collect/Application.cc
+        source/collect/Reporter.cc
+        source/collect/Services.cc
+        source/collect/Session.cc
+        source/collect/SessionWrapper.cc
         )
 
 if (SUPPORT_PRELOAD)
-    target_sources(intercept_a PRIVATE source/SessionLibrary.cc)
+    target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
 endif()
 
 target_include_directories(intercept_a PUBLIC source/)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
-target_link_libraries(intercept_a PUBLIC rpc_a)
+target_link_libraries(intercept_a PUBLIC supervise_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
-target_link_libraries(intercept_a PUBLIC wrapper_api)
-if (SUPPORT_PRELOAD)
-    target_link_libraries(intercept_a PUBLIC er_api)
-    target_link_libraries(intercept_a PUBLIC exec_api)
-endif()
 
 # Create an executable from the sub projects.
 add_executable(intercept
-        main.cc
+        source/collect/main.cc
         )
 
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept report_a)
-target_link_libraries(intercept rpc_a)
+target_link_libraries(intercept supervise_a)
 target_link_libraries(intercept sys_a)
 target_link_libraries(intercept flags_a)
 
-include(GNUInstallDirs)
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
@@ -60,9 +58,148 @@ if (ENABLE_UNIT_TESTS)
 
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)
-    target_link_libraries(intercept_unit_test rpc_a)
+    target_link_libraries(intercept_unit_test supervise_a)
     target_link_libraries(intercept_unit_test sys_a)
+    target_link_libraries(intercept_unit_test flags_a)
     target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
+endif ()
+
+# Create a static library, which is used for unit tests and the final shared library.
+add_library(reporter_a OBJECT
+        source/report/EventFactory.cc
+        source/report/InterceptClient.cc
+        )
+
+target_include_directories(reporter_a PUBLIC source/)
+target_link_libraries(reporter_a PUBLIC supervise_a)
+target_link_libraries(reporter_a PUBLIC result_a)
+target_link_libraries(reporter_a PUBLIC spdlog::spdlog)
+
+
+add_executable(wrapper
+        source/report/wrapper/Application.cc
+        source/report/wrapper/main.cc
+        )
+
+target_include_directories(wrapper PUBLIC source/)
+target_link_libraries(wrapper PUBLIC reporter_a)
+target_link_libraries(wrapper PUBLIC result_a)
+target_link_libraries(wrapper PUBLIC sys_a)
+target_link_libraries(wrapper PUBLIC supervise_a)
+target_link_libraries(wrapper PUBLIC spdlog::spdlog)
+
+install(TARGETS wrapper
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+install(DIRECTORY
+        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/wrapper.d)
+install(CODE "
+    execute_process(
+        COMMAND ln -sf ../wrapper ar
+        COMMAND ln -sf ../wrapper as
+        COMMAND ln -sf ../wrapper cc
+        COMMAND ln -sf ../wrapper c++
+        COMMAND ln -sf ../wrapper cpp
+        COMMAND ln -sf ../wrapper gcc
+        COMMAND ln -sf ../wrapper g++
+        COMMAND ln -sf ../wrapper f77
+        COMMAND ln -sf ../wrapper m2c
+        COMMAND ln -sf ../wrapper pc
+        COMMAND ln -sf ../wrapper lex
+        COMMAND ln -sf ../wrapper flex
+        COMMAND ln -sf ../wrapper yacc
+        COMMAND ln -sf ../wrapper bison
+        COMMAND ln -sf ../wrapper lint
+        COMMAND ln -sf ../wrapper makeinfo
+        COMMAND ln -sf ../wrapper tex
+        COMMAND ln -sf ../wrapper tex2dvi
+        COMMAND ln -sf ../wrapper weave
+        COMMAND ln -sf ../wrapper cweave
+        COMMAND ln -sf ../wrapper tangle
+        COMMAND ln -sf ../wrapper ctangle
+        COMMAND ln -sf ../wrapper nm
+        COMMAND ln -sf ../wrapper ld
+        COMMAND ln -sf ../wrapper strip
+        COMMAND ln -sf ../wrapper objcopy
+        COMMAND ln -sf ../wrapper objdump
+        COMMAND ln -sf ../wrapper ranlib
+        COMMAND ln -sf ../wrapper readelf
+        WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/wrapper.d
+    )
+")
+
+add_executable(er
+        source/report/supervisor/Application.cc
+        source/report/supervisor/main.cc
+        )
+
+target_include_directories(er PUBLIC source/)
+target_link_libraries(er reporter_a)
+target_link_libraries(er result_a)
+target_link_libraries(er flags_a)
+target_link_libraries(er sys_a)
+target_link_libraries(er supervise_a)
+target_link_libraries(er spdlog::spdlog)
+
+install(TARGETS er
+        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+add_library(exec_a OBJECT
+        source/report/libexec/Buffer.cc
+        source/report/libexec/Environment.cc
+        source/report/libexec/Executor.cc
+        source/report/libexec/Linker.cc
+        source/report/libexec/Logger.cc
+        source/report/libexec/Paths.cc
+        source/report/libexec/Resolver.cc
+        source/report/libexec/Session.cc
+        )
+
+target_include_directories(exec_a PUBLIC source)
+target_link_libraries(exec_a PUBLIC result_a)
+target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
+set_target_properties(exec_a PROPERTIES
+        LINKER_LANGUAGE "C"
+        POSITION_INDEPENDENT_CODE 1)
+
+# Create a shared library from the sub projects.
+add_library(exec SHARED
+        source/report/libexec/lib.cc
+        source/report/libexec/std.cc
+        )
+
+target_link_libraries(exec exec_a)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set_target_properties(exec PROPERTIES
+            LINKER_LANGUAGE "C"
+            CMAKE_CXX_IMPLICIT_LINK_LIBRARIES ""
+            LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version"
+            )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set_target_properties(exec PROPERTIES
+            LINKER_LANGUAGE "C"
+            OSX_ARCHITECTURES:STRING "i386;x86_64"
+            MACOSX_RPATH:BOOL ON
+            )
+endif ()
+
+install(TARGETS exec
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+
+# Create unit test.
+if (ENABLE_UNIT_TESTS)
+    add_executable(exec_unit_test
+            test/libexec/ArrayTest.cc
+            test/libexec/BufferTest.cc
+            test/libexec/ExecutorTest.cc
+            test/libexec/PathsTest.cc
+            test/libexec/SessionTest.cc
+            )
+
+    target_include_directories(exec_unit_test PRIVATE test)
+    target_link_libraries(exec_unit_test exec_a)
+    target_link_libraries(exec_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
+
+    add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
 endif ()

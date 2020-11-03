@@ -20,7 +20,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "Session.h"
+#include "collect/Session.h"
 
 namespace {
 

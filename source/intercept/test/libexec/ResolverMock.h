@@ -19,22 +19,30 @@
 
 #pragma once
 
-#include "config.h"
-#include "libresult/Result.h"
+#include "report/libexec/Resolver.h"
 
-#include <filesystem>
-#include <list>
-#include <string>
+#include "gmock/gmock.h"
 
-namespace fs = std::filesystem;
+class ResolverMock : public el::Resolver {
+public:
+    MOCK_METHOD(
+            (rust::Result<const char*, int>),
+            from_current_directory,
+            (std::string_view const &),
+            (override)
+    );
 
-namespace sys::path {
+    MOCK_METHOD(
+            (rust::Result<const char*, int>),
+            from_path,
+            (std::string_view const &, char *const *),
+            (override)
+    );
 
-    // PATH variable manipulation functions
-    //
-    // https://en.wikipedia.org/wiki/PATH_(variable)
-    std::list<fs::path> split(const std::string &input);
-    std::string join(const std::list<fs::path> &input);
-
-    rust::Result<fs::path> get_cwd();
-}
+    MOCK_METHOD(
+            (rust::Result<const char*, int>),
+            from_search_path,
+            (std::string_view const &, const char *),
+            (override)
+    );
+};

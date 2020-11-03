@@ -19,22 +19,38 @@
 
 #pragma once
 
-#include "config.h"
-#include "libresult/Result.h"
-
-#include <filesystem>
-#include <list>
+#include <cstdint>
+#include <unistd.h>
+#include <map>
 #include <string>
+#include <vector>
 
-namespace fs = std::filesystem;
+#include "supervise.pb.h"
 
-namespace sys::path {
+namespace rpc {
 
-    // PATH variable manipulation functions
-    //
-    // https://en.wikipedia.org/wiki/PATH_(variable)
-    std::list<fs::path> split(const std::string &input);
-    std::string join(const std::list<fs::path> &input);
+    struct ExecutionContext {
+        std::string command;
+        std::vector<std::string> arguments;
+        std::string working_directory;
+        std::map<std::string, std::string> environment;
+    };
 
-    rust::Result<fs::path> get_cwd();
+    class EventFactory {
+    public:
+        EventFactory() noexcept;
+        ~EventFactory() noexcept = default;
+
+        [[nodiscard]] supervise::Event start(
+                pid_t pid,
+                pid_t ppid,
+                const ExecutionContext &execution) const;
+
+        [[nodiscard]] supervise::Event signal(int number) const;
+
+        [[nodiscard]] supervise::Event terminate(int code) const;
+
+    private:
+        uint64_t rid_;
+    };
 }

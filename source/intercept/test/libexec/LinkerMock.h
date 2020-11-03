@@ -19,22 +19,28 @@
 
 #pragma once
 
-#include "config.h"
-#include "libresult/Result.h"
+#include "report/libexec/Linker.h"
 
-#include <filesystem>
-#include <list>
-#include <string>
+#include "gmock/gmock.h"
 
-namespace fs = std::filesystem;
+class LinkerMock : public el::Linker {
+public:
+    MOCK_METHOD(
+        (rust::Result<int, int>),
+        execve,
+        (const char* path, char* const argv[], char* const envp[]),
+        (const, noexcept, override)
+    );
 
-namespace sys::path {
-
-    // PATH variable manipulation functions
-    //
-    // https://en.wikipedia.org/wiki/PATH_(variable)
-    std::list<fs::path> split(const std::string &input);
-    std::string join(const std::list<fs::path> &input);
-
-    rust::Result<fs::path> get_cwd();
-}
+    MOCK_METHOD(
+        (rust::Result<int, int>),
+        posix_spawn,
+        (   pid_t* pid,
+            const char* path,
+            const posix_spawn_file_actions_t* file_actions,
+            const posix_spawnattr_t* attrp,
+            char* const argv[],
+            char* const envp[]),
+        (const, noexcept, override)
+    );
+};
