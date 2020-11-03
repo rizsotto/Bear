@@ -42,13 +42,6 @@ namespace {
                : rust::Result<Session>(rust::Ok(Session { destination->second }));
     }
 
-    struct Execution {
-        const std::string command;
-        const std::vector<std::string> arguments;
-        const std::string working_directory;
-        const std::map<std::string, std::string> environment;
-    };
-
     std::vector<std::string> from(const char** args)
     {
         const char** end = args;
@@ -66,15 +59,15 @@ namespace {
                : rust::Result<std::string>(rust::Ok(result.string()));
     }
 
-    rust::Result<Execution> make_execution(const char** args, sys::env::Vars&& environment) noexcept
+    rust::Result<rpc::ExecutionContext> make_execution(const char** args, sys::env::Vars&& environment) noexcept
     {
         auto path = fs::path(args[0]).string();
         auto command = from(args);
         auto working_dir = get_cwd();
 
         return working_dir
-            .map<Execution>([&path, &command, &environment](auto cwd) {
-                return Execution { path, command, cwd, environment };
+            .map<rpc::ExecutionContext>([&path, &command, &environment](auto cwd) {
+                return rpc::ExecutionContext {path, command, cwd, environment };
             });
     }
 }
@@ -83,7 +76,7 @@ namespace wr {
 
     struct Application::State {
         Session session;
-        Execution execution;
+        rpc::ExecutionContext execution;
     };
 
     rust::Result<Application> Application::create(const char** args, sys::env::Vars&& environment)
@@ -107,11 +100,11 @@ namespace wr {
         auto environment = client.get_environment_update(impl_->execution.environment);
 
         auto result = rust::merge(command, environment)
-            .map<Execution>([this](auto tuple) {
+            .map<rpc::ExecutionContext>([this](auto tuple) {
                 const auto& [command, environment] = tuple;
                 auto arguments = impl_->execution.arguments;
                 arguments.front() = command;
-                return Execution {
+                return rpc::ExecutionContext {
                     command,
                     arguments,
                     impl_->execution.working_directory,
@@ -124,13 +117,7 @@ namespace wr {
                     .set_environment(execution.environment)
                     .spawn()
                     .on_success([&client, &event_factory, &execution](auto& child) {
-                        auto event = event_factory.start(
-                                child.get_pid(),
-                                getppid(),
-                                execution.command,
-                                execution.arguments,
-                                execution.working_directory,
-                                execution.environment);
+                        auto event = event_factory.start(child.get_pid(), getppid(), execution);
                         client.report(std::move(event));
                     });
             })

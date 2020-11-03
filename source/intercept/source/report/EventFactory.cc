@@ -54,10 +54,7 @@ namespace rpc {
     supervise::Event EventFactory::start(
             pid_t pid,
             pid_t ppid,
-            const std::string &command,
-            const std::vector<std::string> &arguments,
-            const std::string &working_directory,
-            const std::map<std::string, std::string> &environment) const {
+            const ExecutionContext &execution) const {
         supervise::Event result;
         result.set_rid(rid_);
         result.set_pid(pid);
@@ -65,12 +62,12 @@ namespace rpc {
         result.set_timestamp(now_as_string());
         {
             auto event = std::make_unique<supervise::Event_Started>();
-            event->set_executable(command);
-            for (const auto &arg : arguments) {
+            event->set_executable(execution.command);
+            for (const auto &arg : execution.arguments) {
                 event->add_arguments(arg.data());
             }
-            event->set_working_dir(working_directory);
-            event->mutable_environment()->insert(environment.begin(), environment.end());
+            event->set_working_dir(execution.working_directory);
+            event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
 
             result.set_allocated_started(event.release());
         }

@@ -29,16 +29,17 @@
 
 namespace {
 
-    struct Execution {
-        std::string command;
-        std::vector<std::string> arguments;
-        std::string working_directory;
-        sys::env::Vars environment;
-    };
-
     struct Session {
         const std::string_view destination;
     };
+
+    rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
+    {
+        return args.as_string(er::flags::DESTINATION)
+                .map<Session>([](const auto& destination) {
+                    return Session { destination };
+                });
+    }
 
     rust::Result<std::string> get_cwd()
     {
@@ -49,7 +50,7 @@ namespace {
                 : rust::Result<std::string>(rust::Ok(result.string()));
     }
 
-    rust::Result<Execution> make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept
+    rust::Result<rpc::ExecutionContext> make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept
     {
         auto path = args.as_string(::er::flags::EXECUTE)
                 .map<std::string>([](auto file) { return std::string(file); });
@@ -60,18 +61,10 @@ namespace {
         auto working_dir = get_cwd();
 
         return merge(path, command, working_dir)
-                .map<Execution>([&environment](auto tuple) {
+                .map<rpc::ExecutionContext>([&environment](auto tuple) {
                     const auto&[_path, _command, _working_dir] = tuple;
-                    return Execution{_path, _command, _working_dir, std::move(environment)};
+                    return rpc::ExecutionContext{_path, _command, _working_dir, std::move(environment)};
                 });
-    }
-
-    rust::Result<Session> make_session(const ::flags::Arguments& args) noexcept
-    {
-        return args.as_string(er::flags::DESTINATION)
-            .map<Session>([](const auto& destination) {
-                return Session { destination };
-            });
     }
 }
 
@@ -79,7 +72,7 @@ namespace er {
 
     struct Application::State {
         Session session;
-        Execution execution;
+        rpc::ExecutionContext execution;
     };
 
     rust::Result<Application> Application::create(const ::flags::Arguments& args, sys::env::Vars &&environment)
@@ -98,8 +91,8 @@ namespace er {
         rpc::InterceptClient client(impl_->session.destination);
 
         auto result = client.get_environment_update(impl_->execution.environment)
-            .map<Execution>([this](auto environment) {
-                return Execution {
+            .map<rpc::ExecutionContext>([this](auto environment) {
+                return rpc::ExecutionContext {
                     impl_->execution.command,
                     impl_->execution.arguments,
                     impl_->execution.working_directory,
@@ -112,13 +105,7 @@ namespace er {
                     .set_environment(execution.environment)
                     .spawn_with_preload()
                     .on_success([&client, &event_factory, &execution](auto& child) {
-                        auto event = event_factory.start(
-                                child.get_pid(),
-                                getppid(),
-                                execution.command,
-                                execution.arguments,
-                                execution.working_directory,
-                                execution.environment);
+                        auto event = event_factory.start(child.get_pid(), getppid(), execution);
                         client.report(std::move(event));
                     });
             })

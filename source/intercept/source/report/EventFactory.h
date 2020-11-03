@@ -21,10 +21,20 @@
 
 #include <cstdint>
 #include <unistd.h>
+#include <map>
+#include <string>
+#include <vector>
 
 #include "supervise.pb.h"
 
 namespace rpc {
+
+    struct ExecutionContext {
+        std::string command;
+        std::vector<std::string> arguments;
+        std::string working_directory;
+        std::map<std::string, std::string> environment;
+    };
 
     class EventFactory {
     public:
@@ -34,10 +44,7 @@ namespace rpc {
         [[nodiscard]] supervise::Event start(
                 pid_t pid,
                 pid_t ppid,
-                const std::string &command,
-                const std::vector<std::string> &arguments,
-                const std::string &working_directory,
-                const std::map<std::string, std::string> &environment) const;
+                const ExecutionContext &execution) const;
 
         [[nodiscard]] supervise::Event signal(int number) const;
 
