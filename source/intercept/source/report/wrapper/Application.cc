@@ -18,8 +18,8 @@
  */
 
 #include "report/wrapper/Application.h"
-#include "librpc/EventFactory.h"
-#include "librpc/InterceptClient.h"
+#include "report/EventFactory.h"
+#include "report/InterceptClient.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 #include "Environment.h"

@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "librpc/EventFactory.h"
+#include "report/EventFactory.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>

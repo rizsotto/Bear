@@ -23,7 +23,7 @@
 #include "libflags/Flags.h"
 #include "libreport/Report.h"
 #include "libresult/Result.h"
-#include "librpc/supervise.pb.h"
+#include "supervise.pb.h"
 
 #include <filesystem>
 #include <memory>

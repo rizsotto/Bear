@@ -19,8 +19,8 @@
 
 #include "report/supervisor/Application.h"
 #include "report/supervisor/Flags.h"
-#include "librpc/EventFactory.h"
-#include "librpc/InterceptClient.h"
+#include "report/EventFactory.h"
+#include "report/InterceptClient.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 

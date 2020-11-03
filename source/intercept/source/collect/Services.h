@@ -21,7 +21,7 @@
 
 #include <mutex>
 
-#include "librpc/supervise.grpc.pb.h"
+#include "supervise.grpc.pb.h"
 
 namespace ic {
 

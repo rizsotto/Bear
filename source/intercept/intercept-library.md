@@ -65,7 +65,7 @@ With these limitation, an average build process can still be intercepted.
 
 It's a shared library.
 
-- It's written in C++ 14.
+- It's written in C++ 17.
 - It's using symbols only from the `libc` and `libdl`.
 - Memory handling:
    - It does not allocates heap memory. (no malloc, no new)
@@ -74,9 +74,9 @@ It's a shared library.
    - Any error is fatal.
    - Errors are reported on `stderr` only if requested.
 
-## `er`
+## `er` supervisor
 
-It's statically linked executable.
+It's an executable.
 
 - It's written in C++ 17.
 - It's using the standard library and some 3rd party libraries.

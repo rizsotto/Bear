@@ -22,7 +22,7 @@
 #include <cstdint>
 #include <unistd.h>
 
-#include "librpc/supervise.pb.h"
+#include "supervise.pb.h"
 
 namespace rpc {
 

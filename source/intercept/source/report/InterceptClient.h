@@ -22,7 +22,7 @@
 #include "libresult/Result.h"
 
 #include <grpcpp/channel.h>
-#include "librpc/supervise.grpc.pb.h"
+#include "supervise.grpc.pb.h"
 
 #include <list>
 

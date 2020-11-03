@@ -1,3 +1,7 @@
+add_subdirectory(proto)
+
+include(GNUInstallDirs)
+
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
@@ -5,7 +9,6 @@ add_library(intercept_a OBJECT
         source/collect/Services.cc
         source/collect/Session.cc
         source/collect/SessionWrapper.cc
-        source/report/supervisor/Application.cc
         )
 
 if (SUPPORT_PRELOAD)
@@ -15,7 +18,7 @@ endif()
 target_include_directories(intercept_a PUBLIC source/)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
-target_link_libraries(intercept_a PUBLIC rpc_a)
+target_link_libraries(intercept_a PUBLIC supervise_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
@@ -27,11 +30,10 @@ add_executable(intercept
 
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept report_a)
-target_link_libraries(intercept rpc_a)
+target_link_libraries(intercept supervise_a)
 target_link_libraries(intercept sys_a)
 target_link_libraries(intercept flags_a)
 
-include(GNUInstallDirs)
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
@@ -52,12 +54,11 @@ if (ENABLE_UNIT_TESTS)
     add_executable(intercept_unit_test
             test/ReporterTest.cc
             test/SessionTest.cc
-            test/ApplicationTest.cc
             )
 
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)
-    target_link_libraries(intercept_unit_test rpc_a)
+    target_link_libraries(intercept_unit_test supervise_a)
     target_link_libraries(intercept_unit_test sys_a)
     target_link_libraries(intercept_unit_test flags_a)
     target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
@@ -66,27 +67,29 @@ if (ENABLE_UNIT_TESTS)
 endif ()
 
 # Create a static library, which is used for unit tests and the final shared library.
-add_library(wrapper_a OBJECT
-        source/report/wrapper/Application.cc
+add_library(reporter_a OBJECT
+        source/report/EventFactory.cc
+        source/report/InterceptClient.cc
         )
 
-target_include_directories(wrapper_a PUBLIC source/)
-target_link_libraries(wrapper_a PUBLIC result_a)
-target_link_libraries(wrapper_a PRIVATE sys_a)
-target_link_libraries(wrapper_a PRIVATE rpc_a)
-target_link_libraries(wrapper_a PUBLIC spdlog::spdlog)
+target_include_directories(reporter_a PUBLIC source/)
+target_link_libraries(reporter_a PUBLIC supervise_a)
+target_link_libraries(reporter_a PUBLIC result_a)
+target_link_libraries(reporter_a PUBLIC spdlog::spdlog)
 
-# Create an executable from the sub projects.
+
 add_executable(wrapper
+        source/report/wrapper/Application.cc
         source/report/wrapper/main.cc
         )
 
-target_link_libraries(wrapper wrapper_a)
-target_link_libraries(wrapper sys_a)
-target_link_libraries(wrapper rpc_a)
-target_link_libraries(wrapper spdlog::spdlog)
+target_include_directories(wrapper PUBLIC source/)
+target_link_libraries(wrapper PUBLIC reporter_a)
+target_link_libraries(wrapper PUBLIC result_a)
+target_link_libraries(wrapper PUBLIC sys_a)
+target_link_libraries(wrapper PUBLIC supervise_a)
+target_link_libraries(wrapper PUBLIC spdlog::spdlog)
 
-include(GNUInstallDirs)
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 install(DIRECTORY
@@ -126,34 +129,22 @@ install(CODE "
     )
 ")
 
-# Create a static library, which is used for unit tests and the final shared library.
-add_library(er_a OBJECT
-        source/report/supervisor/Application.cc
-        )
-
-target_include_directories(er_a PUBLIC source/)
-target_link_libraries(er_a PUBLIC result_a)
-target_link_libraries(er_a PUBLIC flags_a)
-target_link_libraries(er_a PRIVATE sys_a)
-target_link_libraries(er_a PRIVATE rpc_a)
-target_link_libraries(er_a PUBLIC spdlog::spdlog)
-
-# Create an executable from the sub projects.
 add_executable(er
+        source/report/supervisor/Application.cc
         source/report/supervisor/main.cc
         )
 
-target_link_libraries(er er_a)
+target_include_directories(er PUBLIC source/)
+target_link_libraries(er reporter_a)
+target_link_libraries(er result_a)
 target_link_libraries(er flags_a)
 target_link_libraries(er sys_a)
-target_link_libraries(er rpc_a)
+target_link_libraries(er supervise_a)
 target_link_libraries(er spdlog::spdlog)
 
-include(GNUInstallDirs)
 install(TARGETS er
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
-# Create library for test and te final target
 add_library(exec_a OBJECT
         source/report/libexec/Buffer.cc
         source/report/libexec/Environment.cc
@@ -179,18 +170,20 @@ add_library(exec SHARED
         )
 
 target_link_libraries(exec exec_a)
-set_target_properties(exec PROPERTIES
-        LINKER_LANGUAGE "C"
-        OSX_ARCHITECTURES:STRING "i386;x86_64"
-        MACOSX_RPATH:BOOL ON
-        )
-
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
-    set_target_properties(exec PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version")
+    set_target_properties(exec PROPERTIES
+            LINKER_LANGUAGE "C"
+            CMAKE_CXX_IMPLICIT_LINK_LIBRARIES ""
+            LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/libexec.version"
+            )
+elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set_target_properties(exec PROPERTIES
+            LINKER_LANGUAGE "C"
+            OSX_ARCHITECTURES:STRING "i386;x86_64"
+            MACOSX_RPATH:BOOL ON
+            )
 endif ()
 
-include(GNUInstallDirs)
 install(TARGETS exec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
