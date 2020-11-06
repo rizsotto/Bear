@@ -20,9 +20,11 @@
 #include "collect/SessionLibrary.h"
 
 #include "collect/Application.h"
+#include "libsys/Errors.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "report/libexec/Environments.h"
+#include "report/libexec/Resolver.h"
 #include "report/supervisor/Flags.h"
 
 #include <spdlog/spdlog.h>
@@ -53,30 +55,33 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, sys::env::Vars&& environment)
+    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
     {
+        auto verbose = args.as_bool(ic::Application::VERBOSE).unwrap_or(false);
         auto library = args.as_string(ic::Application::LIBRARY);
         auto executor = args.as_string(ic::Application::EXECUTOR);
-        auto verbose = args.as_bool(ic::Application::VERBOSE);
+        auto environment = sys::env::from(envp);
+        auto path = sys::os::get_path(environment);
 
-        return merge(library, executor, verbose)
-            .map<Session::SharedPtr>([&environment](auto tuple) {
-                const auto& [library, executor, verbose] = tuple;
-                auto result = new LibraryPreloadSession(library, executor, verbose, std::move(environment));
-                return std::shared_ptr<Session>(result);
+        return merge(library, executor, path)
+            .map<Session::SharedPtr>([&verbose, &environment](auto tuple) {
+                const auto& [library, executor, path] = tuple;
+                return std::make_shared<LibraryPreloadSession>(library, executor, verbose, path, std::move(environment));
             });
     }
 
     LibraryPreloadSession::LibraryPreloadSession(
-        const std::string_view& library,
-        const std::string_view& executor,
+        const std::string_view &library,
+        const std::string_view &executor,
         bool verbose,
-        sys::env::Vars&& environment)
+        const std::string &path,
+        sys::env::Vars &&environment)
             : Session()
             , library_(library)
             , executor_(executor)
+            , path_(path)
             , verbose_(verbose)
-            , environment_(std::move(environment))
+            , environment_(environment)
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
@@ -101,10 +106,16 @@ namespace ic {
 
     rust::Result<sys::Process::Builder> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
+        auto resolver = el::Resolver();
+        auto program = resolver.from_search_path(command.front(), path_.c_str())
+                .map<std::string>([](auto ptr) {
+                    return std::string(ptr);
+                })
+                .map_err<std::runtime_error>([&command](auto error) {
+                    return std::runtime_error(
+                            fmt::format("Could not found: {}: {}", command.front(), sys::error_string(error)));
+                });
         auto environment = update(environment_);
-        auto program = sys::Process::Builder(command.front())
-                .set_environment(environment_)
-                .resolve_executable();
 
         return rust::merge(program, environment)
             .map<sys::Process::Builder>([&command, this](auto pair) {

@@ -103,15 +103,6 @@ namespace sys {
         Builder& set_environment(std::map<std::string, std::string>&&);
         Builder& set_environment(const std::map<std::string, std::string>&);
 
-        // These are not used in this project.
-        //Builder& set_working_dir(const std::string&);
-
-        //Builder& set_std_in(int fd);
-        //Builder& set_std_out(int fd);
-        //Builder& set_std_err(int fd);
-
-        rust::Result<fs::path> resolve_executable();
-
         rust::Result<Process> spawn();
 
 #ifdef SUPPORT_PRELOAD

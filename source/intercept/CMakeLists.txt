@@ -16,11 +16,12 @@ if (SUPPORT_PRELOAD)
 endif()
 
 target_include_directories(intercept_a PUBLIC source/)
-target_link_libraries(intercept_a PUBLIC result_a)
+target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC supervise_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
+target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
 
 # Create an executable from the sub projects.
@@ -33,6 +34,7 @@ target_link_libraries(intercept report_a)
 target_link_libraries(intercept supervise_a)
 target_link_libraries(intercept sys_a)
 target_link_libraries(intercept flags_a)
+target_link_libraries(intercept exec_a)
 
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -56,6 +58,7 @@ if (ENABLE_UNIT_TESTS)
             test/SessionTest.cc
             )
 
+    target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)
     target_link_libraries(intercept_unit_test supervise_a)

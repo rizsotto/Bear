@@ -18,9 +18,11 @@
  */
 
 #include "collect/SessionWrapper.h"
-
 #include "collect/Application.h"
+#include "report/libexec/Resolver.h"
+#include "report/libexec/Environment.h"
 #include "report/wrapper/Environment.h"
+#include "libsys/Errors.h"
 #include "libsys/Os.h"
 #include "libsys/Path.h"
 
@@ -85,31 +87,6 @@ namespace {
         return os;
     }
 
-    rust::Result<fs::path> is_executable(const fs::path& path)
-    {
-        // Check if we can get the relpath of this file
-        std::error_code error_code;
-        auto result = fs::canonical(path, error_code);
-        if (error_code) {
-            return rust::Err(std::runtime_error(error_code.message()));
-        }
-        // Check if the file is executable.
-        return (0 == access(result.c_str(), X_OK))
-               ? rust::Result<fs::path>(rust::Ok(result))
-               : rust::Result<fs::path>(rust::Err(std::runtime_error("Not executable")));
-    }
-
-    rust::Result<fs::path> find_from_path(const std::list<fs::path>& paths, const fs::path& file)
-    {
-        for (const auto& path : paths) {
-            auto executable = is_executable(path / file);
-            if (executable.is_ok()) {
-                return executable;
-            }
-        }
-        return rust::Err(std::runtime_error("Not found"));
-    }
-
     rust::Result<std::list<fs::path>> list_dir(const fs::path& path)
     {
         std::list<fs::path> result;
@@ -129,42 +106,42 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, sys::env::Vars&& environment)
+    rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, const char **envp)
     {
         const bool verbose = args.as_bool(ic::Application::VERBOSE).unwrap_or(false);
-        auto path = sys::os::get_path(environment);
         auto wrapper_dir = args.as_string(ic::Application::WRAPPER);
         auto wrappers = wrapper_dir
                             .and_then<std::list<fs::path>>([](auto wrapper_dir) {
                                 return list_dir(wrapper_dir);
                             });
+        auto environment = sys::env::from(envp);
+        auto path = sys::os::get_path(environment);
 
-        auto mapping_and_override = rust::merge(path, wrappers)
-            .map<std::map<std::string, std::string>>([](auto tuple) {
-                const auto& [paths, wrappers] = tuple;
+        auto mapping_and_override = wrappers
+            .map<std::map<std::string, std::string>>([&envp](auto wrappers) {
                 // Find the executables with the same name from the path.
-                std::map<std::string, std::string> result = {};
+                std::map<std::string, std::string> result;
+                el::Resolver resolver;
                 for (const auto& wrapper : wrappers) {
                     auto basename = wrapper.filename();
-                    auto candidate = find_from_path(paths, basename);
+                    auto candidate = resolver.from_path(basename.c_str(), const_cast<char* const*>(envp));
                     candidate.on_success([&result, &basename](auto candidate) {
-                        result[basename] = candidate.string();
+                        result[basename] = candidate;
                     });
                 }
                 return result;
             })
-            .map<std::tuple<std::map<std::string, std::string>, std::map<std::string, std::string>>>([&environment](auto mapping) {
+            .map<std::tuple<std::map<std::string, std::string>, std::map<std::string, std::string>>>([&envp](auto mapping) {
                 std::map<std::string, std::string> override;
+                el::Resolver resolver;
                 // check if any environment variable is naming the real compiler
                 for (auto implicit : IMPLICITS) {
                     // find any of the implicit defined in environment.
-                    if (auto env_it = environment.find(implicit.env); env_it != environment.end()) {
+                    if (auto env_it = el::env::get_env_value(envp, implicit.env); env_it != nullptr) {
                         // FIXME: it would be more correct if we shell-split the `env_it->second`
                         //        and use only the program name, but not the argument. But then how
                         //        to deal with the errors?
-                        auto program = sys::Process::Builder(env_it->second)
-                                .set_environment(environment)
-                                .resolve_executable();
+                        auto program = resolver.from_path(std::string_view(env_it), const_cast<char* const*>(envp));
 
                         // find the current mapping for the program the user wants to run.
                         // and replace the program what the wrapper will call.
@@ -184,25 +161,27 @@ namespace ic {
                 return std::make_tuple(mapping, override);
             });
 
-        return rust::merge(wrapper_dir, mapping_and_override)
+        return rust::merge(wrapper_dir, mapping_and_override, path)
             .map<Session::SharedPtr>([&verbose, &environment](const auto& tuple) {
-                const auto& [const_wrapper_dir, const_mapping_and_override] = tuple;
+                const auto& [const_wrapper_dir, const_mapping_and_override, path] = tuple;
                 const auto& [const_mapping, const_override] = const_mapping_and_override;
                 std::string wrapper_dir(const_wrapper_dir);
                 std::map<std::string, std::string> mapping(const_mapping);
                 std::map<std::string, std::string> override(const_override);
-                return std::make_shared<WrapperSession>(verbose, std::move(wrapper_dir), std::move(mapping), std::move(override), environment);
+                return std::make_shared<WrapperSession>(verbose, path, std::move(wrapper_dir), std::move(mapping), std::move(override), std::move(environment));
             });
     }
 
     WrapperSession::WrapperSession(
         bool verbose,
+        std::string path,
         std::string&& wrapper_dir,
         std::map<std::string, std::string>&& mapping,
         std::map<std::string, std::string>&& override,
-        const sys::env::Vars& environment)
+        sys::env::Vars&& environment)
             : Session()
             , verbose_(verbose)
+            , path_(std::move(path))
             , wrapper_dir_(wrapper_dir)
             , mapping_(mapping)
             , override_(override)
@@ -250,10 +229,17 @@ namespace ic {
 
     rust::Result<sys::Process::Builder> WrapperSession::supervise(const std::vector<std::string_view>& command) const
     {
-        return rust::Ok(
-            sys::Process::Builder(command.front())
-                .add_arguments(command.begin(), command.end())
-                .set_environment(set_up_environment()));
+        auto resolver = el::Resolver();
+        return resolver.from_search_path(command.front(), path_.c_str())
+                .map<sys::Process::Builder>([this, &command](auto ptr) {
+                    return sys::Process::Builder(ptr)
+                            .add_arguments(command.begin(), command.end())
+                            .set_environment(set_up_environment());
+                })
+                .map_err<std::runtime_error>([&command](auto error) {
+                    return std::runtime_error(
+                            fmt::format("Could not found: {}: {}", command.front(), sys::error_string(error)));
+                });
     }
 
     std::string WrapperSession::get_session_type() const

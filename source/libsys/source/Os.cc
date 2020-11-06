@@ -18,8 +18,7 @@
  */
 
 #include "libsys/Os.h"
-#include "libsys/Path.h"
-#include "Errors.h"
+#include "libsys/Errors.h"
 #include "Guard.h"
 #include "config.h"
 
@@ -74,19 +73,16 @@ namespace sys::os {
         return rust::Ok(result);
     }
 
-    rust::Result<std::list<fs::path>> get_path(const sys::env::Vars& environment)
+    rust::Result<std::string> get_path(const sys::env::Vars& environment)
     {
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
-            return rust::Ok(sys::path::split(candidate->second));
+            return rust::Ok(candidate->second);
         }
 #ifdef HAVE_CS_PATH
         return get_confstr(_CS_PATH)
-            .map<std::list<fs::path>>([](const auto& paths) {
-                return sys::path::split(paths);
-            })
             .map_err<std::runtime_error>([](auto error) {
                 return std::runtime_error(
-                    fmt::format("Could not find PATH: ()", error.what()));
+                    fmt::format("Could not find PATH: {}", error.what()));
             });
 #else
         return rust::Err(std::runtime_error("Could not find PATH in environment."));

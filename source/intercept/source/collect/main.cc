@@ -91,8 +91,7 @@ int main(int argc, char* argv[], char* envp[])
         })
         // if parsing success, we create the main command and execute it.
         .and_then<ic::Application>([&envp](auto args) {
-            auto environment = sys::env::from(const_cast<const char **>(envp));
-            return ic::Application::from(args, std::move(environment));
+            return ic::Application::from(args, const_cast<const char **>(envp));
         })
         .and_then<int>([](const auto& command) {
             return command();

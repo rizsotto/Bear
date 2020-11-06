@@ -38,7 +38,7 @@ namespace ic {
         static constexpr char FORCE_WRAPPER[] = "--force-wrapper";
         static constexpr char FORCE_PRELOAD[] = "--force-preload";
 
-        static ::rust::Result<Application> from(const flags::Arguments& args, sys::env::Vars &&environment);
+        static ::rust::Result<Application> from(const flags::Arguments& args, const char **envp);
 
         ::rust::Result<int> operator()() const;
 

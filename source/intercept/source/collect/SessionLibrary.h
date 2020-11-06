@@ -26,12 +26,14 @@ namespace ic {
     class LibraryPreloadSession : public ic::Session {
     public:
         LibraryPreloadSession(
-            const std::string_view& library,
-            const std::string_view& executor,
-            bool verbose,
-            sys::env::Vars&& environment);
+                const std::string_view &library,
+                const std::string_view &executor,
+                bool verbose,
+                const std::string &path,
+                sys::env::Vars &&environment
+        );
 
-        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, sys::env::Vars&&);
+        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const char **envp);
 
     public:
         [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const override;
@@ -43,6 +45,7 @@ namespace ic {
     private:
         std::string library_;
         std::string executor_;
+        std::string path_;
         bool verbose_;
         sys::env::Vars environment_;
     };

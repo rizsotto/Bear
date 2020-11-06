@@ -24,7 +24,7 @@
 
 namespace el::env {
 
-    const char* get_env_value(const char** envp, const char* key) noexcept
+    const char* get_env_value(const char **envp, const char* key) noexcept
     {
         const size_t key_size = el::array::length(key);
 

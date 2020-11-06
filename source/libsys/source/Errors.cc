@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Errors.h"
+#include "libsys/Errors.h"
 
 #include "config.h"
 
