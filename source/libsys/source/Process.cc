@@ -49,6 +49,8 @@
 
 namespace {
 
+    constexpr char PATH_TO_SH[] = "/bin/sh";
+
     struct Arguments {
         const std::list<std::string>& value;
     };
@@ -90,7 +92,7 @@ namespace {
             pid_t child;
             if (0 != posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawn\" failed: {}", sys::error_string(errno))));
+                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
                 return rust::Ok(child);
             }
@@ -124,7 +126,7 @@ namespace {
             if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 dlclose(handle);
                 return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawn\" failed: {}", sys::error_string(errno))));
+                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
                 dlclose(handle);
                 return rust::Ok(child);
@@ -150,6 +152,12 @@ namespace {
         sys::env::Guard env(environment);
 
         return fp(program.c_str(), args.data(), const_cast<char**>(env.data()))
+                // The file is accessible but it is not an executable file.
+                // Invoke the shell to interpret it as a script.
+                .or_else([&](const std::runtime_error&) {
+                    args.insert(args.begin(), const_cast<char*>(PATH_TO_SH));
+                    return fp(PATH_TO_SH, args.data(), const_cast<char**>(env.data()));
+                })
                 .map<sys::Process>([](const auto& pid) {
                     return sys::Process(pid);
                 })
@@ -157,8 +165,8 @@ namespace {
                     spdlog::debug("Process spawned. [pid: {}, command: {}]",
                                   process.get_pid(), Arguments { parameters });
                 })
-                .on_error([&program](const auto& error) {
-                    spdlog::debug("Process spawn '{}' failed. {}", program.string(), error.what());
+                .on_error([](const auto& error) {
+                    spdlog::debug("Process spawn failed. {}", error.what());
                 });
     }
 

@@ -120,10 +120,15 @@ namespace ic {
         return rust::merge(program, environment)
             .map<sys::Process::Builder>([&command, this](auto pair) {
                 const auto& [program, environment] = pair;
-                return sys::Process::Builder(executor_)
+                auto result = sys::Process::Builder(executor_)
                     .add_argument(executor_)
                     .add_argument(er::flags::DESTINATION)
-                    .add_argument(server_address_)
+                    .add_argument(server_address_);
+                if (verbose_) {
+                    result.add_argument(er::flags::VERBOSE);
+                }
+
+                return result
                     .add_argument(er::flags::EXECUTE)
                     .add_argument(program)
                     .add_argument(er::flags::COMMAND)
