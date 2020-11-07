@@ -75,10 +75,10 @@ namespace ic {
         Session::SharedPtr session_;
     };
 
-    rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
+    rust::Result<Application> Application::from(const flags::Arguments& args, const char **envp)
     {
         auto command = Command::from(args);
-        auto session = Session::from(args, std::move(environment));
+        auto session = Session::from(args, envp);
         auto reporter = session
                             .and_then<Reporter::SharedPtr>([&args](const auto& session) {
                                 return Reporter::from(args, *session);

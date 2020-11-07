@@ -29,15 +29,15 @@
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, sys::env::Vars&& environment)
+    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const char **envp)
 #ifdef SUPPORT_PRELOAD
     {
         if (args.as_bool(ic::Application::FORCE_WRAPPER).unwrap_or(false))
-            return WrapperSession::from(args, std::move(environment));
+            return WrapperSession::from(args, envp);
         if (args.as_bool(ic::Application::FORCE_PRELOAD).unwrap_or(false))
-            return LibraryPreloadSession::from(args, std::move(environment));
+            return LibraryPreloadSession::from(args, envp);
 
-        return LibraryPreloadSession::from(args, std::move(environment));
+        return LibraryPreloadSession::from(args, envp);
     }
 #else
     {

@@ -18,14 +18,12 @@
  */
 
 #include "libsys/Process.h"
-#include "libsys/Os.h"
 #include "libsys/Path.h"
-#include "Errors.h"
+#include "libsys/Errors.h"
 #include "Guard.h"
 
 #include <cerrno>
 #include <cstdlib>
-#include <csignal>
 #include <filesystem>
 #include <utility>
 #include <iostream>
@@ -50,6 +48,8 @@
 #include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
+
+    constexpr char PATH_TO_SH[] = "/bin/sh";
 
     struct Arguments {
         const std::list<std::string>& value;
@@ -90,9 +90,9 @@ namespace {
                                      char* const envp[]) -> rust::Result<pid_t> {
             errno = 0;
             pid_t child;
-            if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+            if (0 != posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawn\" failed: {}", sys::error_string(errno))));
+                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
                 return rust::Ok(child);
             }
@@ -114,7 +114,7 @@ namespace {
             }
             dlerror();
 
-            auto fp = reinterpret_cast<posix_spawn_t>(dlsym(handle, "posix_spawn"));
+            auto fp = reinterpret_cast<posix_spawn_t>(dlsym(handle, "posix_spawnp"));
             if (fp == nullptr) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
@@ -126,7 +126,7 @@ namespace {
             if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 dlclose(handle);
                 return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawn\" failed: {}", sys::error_string(errno))));
+                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
                 dlclose(handle);
                 return rust::Ok(child);
@@ -136,86 +136,34 @@ namespace {
     }
 #endif
 
-    bool contains_separator(const std::string& path)
-    {
-        return (std::find(path.begin(), path.end(), fs::path::preferred_separator) != path.end());
-    }
-
-    bool starts_with_separator(const std::string& path)
-    {
-        return (!path.empty()) && (path.at(0) == fs::path::preferred_separator);
-    }
-
-    std::runtime_error could_not_find(const fs::path& name, const int error)
-    {
-        return std::runtime_error(
-                fmt::format("Could not find executable: {} ({})", name.c_str(), sys::error_string(error)));
-    }
-
-    rust::Result<fs::path> check_executable(const fs::path& path)
-    {
-        // Check if we can get the relpath of this file
-        std::error_code error_code;
-        auto result = fs::canonical(path, error_code);
-        if (error_code) {
-            return rust::Err(std::runtime_error(error_code.message()));
-        }
-        // Check if the file is executable.
-        return (0 == access(result.c_str(), X_OK))
-                ? rust::Result<fs::path>(rust::Ok(result))
-                : rust::Result<fs::path>(rust::Err(could_not_find(result, EACCES)));
-    }
-
-    rust::Result<fs::path> resolve_executable(const fs::path& name, const sys::env::Vars& environment)
-    {
-        // If the requested program name contains a separator, then we need to use
-        // that as is. Otherwise we need to search the paths given.
-        if (contains_separator(name)) {
-            // If the requested program name starts with the separator, then it's
-            // absolute and will be used as is. Otherwise we need to create it from
-            // the current working directory.
-            auto path = starts_with_separator(name)
-                ? rust::Ok(fs::path(name))
-                : sys::path::get_cwd().map<fs::path>([&name](auto cwd) { return cwd  / name; });
-
-            return path.and_then<fs::path>([](auto path) { return check_executable(path); });
-        } else {
-            return sys::os::get_path(environment)
-                .and_then<fs::path>([&name](const auto& directories) {
-                    for (const auto& directory : directories) {
-                        if (auto result = check_executable(directory / name); result.is_ok()) {
-                            return result;
-                        }
-                    }
-                    return rust::Result<fs::path>(rust::Err(could_not_find(name, ENOENT)));
-                });
-        }
-    }
-
     rust::Result<sys::Process> spawn_process(
             spawn_function_t fp,
             const fs::path& program,
             const std::list<std::string>& parameters,
             const std::map<std::string, std::string>& environment)
     {
-        return resolve_executable(program, environment)
-                .and_then<pid_t>([&parameters, &environment, &fp](const auto& path) {
-                    // convert the arguments into a c-style array
-                    std::vector<char*> args;
-                    std::transform(parameters.begin(), parameters.end(),
-                                   std::back_insert_iterator(args),
-                                   [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
-                    args.push_back(nullptr);
-                    // convert the environment into a c-style array
-                    sys::env::Guard env(environment);
+        // convert the arguments into a c-style array
+        std::vector<char*> args;
+        std::transform(parameters.begin(), parameters.end(),
+                       std::back_insert_iterator(args),
+                       [](const auto& arg) { return const_cast<char*>(arg.c_str()); });
+        args.push_back(nullptr);
+        // convert the environment into a c-style array
+        sys::env::Guard env(environment);
 
-                    return fp(path.c_str(), args.data(), const_cast<char**>(env.data()));
+        return fp(program.c_str(), args.data(), const_cast<char**>(env.data()))
+                // The file is accessible but it is not an executable file.
+                // Invoke the shell to interpret it as a script.
+                .or_else([&](const std::runtime_error&) {
+                    args.insert(args.begin(), const_cast<char*>(PATH_TO_SH));
+                    return fp(PATH_TO_SH, args.data(), const_cast<char**>(env.data()));
                 })
                 .map<sys::Process>([](const auto& pid) {
                     return sys::Process(pid);
                 })
                 .on_success([&parameters](const auto& process) {
-                    spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), Arguments { parameters });
+                    spdlog::debug("Process spawned. [pid: {}, command: {}]",
+                                  process.get_pid(), Arguments { parameters });
                 })
                 .on_error([](const auto& error) {
                     spdlog::debug("Process spawn failed. {}", error.what());
@@ -353,11 +301,6 @@ namespace sys {
     {
         environment_ = environment;
         return *this;
-    }
-
-    rust::Result<fs::path> Process::Builder::resolve_executable()
-    {
-        return ::resolve_executable(program_, environment_);
     }
 
     rust::Result<Process> Process::Builder::spawn()
