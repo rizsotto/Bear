@@ -27,7 +27,6 @@ namespace ic {
     public:
         WrapperSession(
             bool verbose,
-            std::string path,
             std::string&& wrapper_dir,
             std::map<std::string, std::string>&& mapping,
             std::map<std::string, std::string>&& override,
@@ -47,7 +46,6 @@ namespace ic {
 
     private:
         bool verbose_;
-        std::string path_;
         std::string wrapper_dir_;
         std::map<std::string, std::string> mapping_;
         std::map<std::string, std::string> override_;

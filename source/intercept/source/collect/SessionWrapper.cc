@@ -114,8 +114,6 @@ namespace ic {
                             .and_then<std::list<fs::path>>([](auto wrapper_dir) {
                                 return list_dir(wrapper_dir);
                             });
-        auto environment = sys::env::from(envp);
-        auto path = sys::os::get_path(environment);
 
         auto mapping_and_override = wrappers
             .map<std::map<std::string, std::string>>([&envp](auto wrappers) {
@@ -161,27 +159,25 @@ namespace ic {
                 return std::make_tuple(mapping, override);
             });
 
-        return rust::merge(wrapper_dir, mapping_and_override, path)
-            .map<Session::SharedPtr>([&verbose, &environment](const auto& tuple) {
-                const auto& [const_wrapper_dir, const_mapping_and_override, path] = tuple;
+        return rust::merge(wrapper_dir, mapping_and_override)
+            .map<Session::SharedPtr>([&verbose, &envp](const auto& tuple) {
+                const auto& [const_wrapper_dir, const_mapping_and_override] = tuple;
                 const auto& [const_mapping, const_override] = const_mapping_and_override;
                 std::string wrapper_dir(const_wrapper_dir);
                 std::map<std::string, std::string> mapping(const_mapping);
                 std::map<std::string, std::string> override(const_override);
-                return std::make_shared<WrapperSession>(verbose, path, std::move(wrapper_dir), std::move(mapping), std::move(override), std::move(environment));
+                return std::make_shared<WrapperSession>(verbose, std::move(wrapper_dir), std::move(mapping), std::move(override), sys::env::from(envp));
             });
     }
 
     WrapperSession::WrapperSession(
         bool verbose,
-        std::string path,
         std::string&& wrapper_dir,
         std::map<std::string, std::string>&& mapping,
         std::map<std::string, std::string>&& override,
         sys::env::Vars&& environment)
             : Session()
             , verbose_(verbose)
-            , path_(std::move(path))
             , wrapper_dir_(wrapper_dir)
             , mapping_(mapping)
             , override_(override)
@@ -229,17 +225,11 @@ namespace ic {
 
     rust::Result<sys::Process::Builder> WrapperSession::supervise(const std::vector<std::string_view>& command) const
     {
-        auto resolver = el::Resolver();
-        return resolver.from_search_path(command.front(), path_.c_str())
-                .map<sys::Process::Builder>([this, &command](auto ptr) {
-                    return sys::Process::Builder(ptr)
-                            .add_arguments(command.begin(), command.end())
-                            .set_environment(set_up_environment());
-                })
-                .map_err<std::runtime_error>([&command](auto error) {
-                    return std::runtime_error(
-                            fmt::format("Could not found: {}: {}", command.front(), sys::error_string(error)));
-                });
+        auto result = sys::Process::Builder(command.front())
+                .add_arguments(command.begin(), command.end())
+                .set_environment(set_up_environment());
+
+        return rust::Ok(result);
     }
 
     std::string WrapperSession::get_session_type() const

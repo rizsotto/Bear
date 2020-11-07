@@ -88,7 +88,7 @@ namespace {
                                      char* const envp[]) -> rust::Result<pid_t> {
             errno = 0;
             pid_t child;
-            if (0 != posix_spawn(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+            if (0 != posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"posix_spawn\" failed: {}", sys::error_string(errno))));
             } else {
@@ -112,7 +112,7 @@ namespace {
             }
             dlerror();
 
-            auto fp = reinterpret_cast<posix_spawn_t>(dlsym(handle, "posix_spawn"));
+            auto fp = reinterpret_cast<posix_spawn_t>(dlsym(handle, "posix_spawnp"));
             if (fp == nullptr) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
