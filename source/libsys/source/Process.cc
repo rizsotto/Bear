@@ -23,6 +23,7 @@
 #include "Guard.h"
 
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <utility>
@@ -90,7 +91,7 @@ namespace {
                                      char* const envp[]) -> rust::Result<pid_t> {
             errno = 0;
             pid_t child;
-            if (0 != posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+            if (0 != ::posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
@@ -107,28 +108,28 @@ namespace {
                                  char* const argv[],
                                  char* const envp[]) -> rust::Result<pid_t> {
 
-            auto handle = dlopen(LIBC_SO, RTLD_LAZY);
+            void *handle = ::dlopen(LIBC_SO, RTLD_LAZY);
             if (handle == nullptr) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"dlopen\" failed: {}", sys::error_string(errno))));
             }
-            dlerror();
+            ::dlerror();
 
-            auto fp = reinterpret_cast<posix_spawn_t>(dlsym(handle, "posix_spawnp"));
+            auto fp = reinterpret_cast<posix_spawn_t>(::dlsym(handle, "posix_spawnp"));
             if (fp == nullptr) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
             }
-            dlerror();
+            ::dlerror();
 
             errno = 0;
             pid_t child;
             if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-                dlclose(handle);
+                ::dlclose(handle);
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
-                dlclose(handle);
+                ::dlclose(handle);
                 return rust::Ok(child);
             }
         };
@@ -174,7 +175,7 @@ namespace {
     {
         errno = 0;
         const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
-        if (int status; - 1 != waitpid(pid, &status, mask)) {
+        if (int status; -1 != ::waitpid(pid, &status, mask)) {
             if (WIFEXITED(status)) {
                 return rust::Ok(sys::ExitStatus(true, WEXITSTATUS(status)));
             } else if (WIFSIGNALED(status)) {
@@ -195,7 +196,7 @@ namespace {
     rust::Result<int> send_signal(pid_t pid, int num)
     {
         errno = 0;
-        if (const int result = kill(pid, num); 0 == result) {
+        if (const int result = ::kill(pid, num); 0 == result) {
             return rust::Ok(result);
         } else {
             auto message = fmt::format("System call \"kill\" failed: {}", sys::error_string(errno));

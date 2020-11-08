@@ -49,7 +49,7 @@ namespace sys {
     {
         CHILD_PROCESS = &child;
         for (int signum = 1; signum < NSIG; ++signum) {
-            handlers_[signum] = signal(signum, &handler);
+            handlers_[signum] = ::signal(signum, &handler);
         }
     }
 
@@ -57,7 +57,7 @@ namespace sys {
     {
         CHILD_PROCESS = nullptr;
         for (int signum = 1; signum < NSIG; ++signum) {
-            signal(signum, handlers_[signum]);
+            ::signal(signum, handlers_[signum]);
         }
     }
 }
