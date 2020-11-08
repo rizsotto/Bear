@@ -21,8 +21,7 @@
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Tool.h"
-
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 
 #include <filesystem>
 

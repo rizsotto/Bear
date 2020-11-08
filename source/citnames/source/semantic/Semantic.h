@@ -20,7 +20,7 @@
 #pragma once
 
 #include "Output.h"
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 
 #include <filesystem>
 #include <list>

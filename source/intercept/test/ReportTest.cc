@@ -19,7 +19,7 @@
 
 #include "gtest/gtest.h"
 
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 
 #include <iostream>
 #include <sstream>
