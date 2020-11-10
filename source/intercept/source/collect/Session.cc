@@ -41,7 +41,7 @@ namespace ic {
     }
 #else
     {
-        return WrapperSession::from(args, std::move(environment));
+        return WrapperSession::from(args, envp);
     }
 #endif
 
