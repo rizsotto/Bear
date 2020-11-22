@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 
 #include <iomanip>
 #include <fstream>

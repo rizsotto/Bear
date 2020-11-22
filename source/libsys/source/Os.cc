@@ -41,9 +41,9 @@ namespace sys::os {
     {
 #ifdef HAVE_CONFSTR
         errno = 0;
-        if (const size_t buffer_size = confstr(key, nullptr, 0); buffer_size != 0) {
+        if (const size_t buffer_size = ::confstr(key, nullptr, 0); buffer_size != 0) {
             char buffer[buffer_size];
-            if (const size_t size = confstr(key, buffer, buffer_size); size != 0) {
+            if (const size_t size = ::confstr(key, buffer, buffer_size); size != 0) {
                 return rust::Ok(std::string(buffer));
             }
         }
@@ -61,7 +61,7 @@ namespace sys::os {
         std::map<std::string, std::string> result;
 #ifdef HAVE_UNAME
         auto name = utsname {};
-        if (const int status = uname(&name); status >= 0) {
+        if (const int status = ::uname(&name); status >= 0) {
             result.insert({ "sysname", std::string(name.sysname) });
             result.insert({ "release", std::string(name.release) });
             result.insert({ "version", std::string(name.version) });

@@ -2,6 +2,16 @@ add_subdirectory(proto)
 
 include(GNUInstallDirs)
 
+add_library(report_a OBJECT
+        source/collect/Report.cc
+        )
+
+target_include_directories(report_a PUBLIC include)
+target_link_libraries(report_a PUBLIC result_a)
+target_link_libraries(report_a PRIVATE fmt::fmt)
+target_link_libraries(report_a PRIVATE nlohmann_json::nlohmann_json)
+target_compile_options(report_a PRIVATE -fexceptions)
+
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
@@ -54,6 +64,7 @@ install(FILES man/intercept.1
 # Create unit test
 if (ENABLE_UNIT_TESTS)
     add_executable(intercept_unit_test
+            test/ReportTest.cc
             test/ReporterTest.cc
             test/SessionTest.cc
             )

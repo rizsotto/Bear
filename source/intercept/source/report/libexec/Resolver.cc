@@ -46,16 +46,16 @@ namespace el {
 
     rust::Result<const char*, int> Resolver::from_current_directory(std::string_view const &file) {
         // create absolute path to the given file.
-        if (nullptr == realpath(file.begin(), result_)) {
+        if (nullptr == ::realpath(file.begin(), result_)) {
             return rust::Err(ENOENT);
         }
         // check if it's okay to execute.
-        if (0 == access(result_, X_OK)) {
+        if (0 == ::access(result_, X_OK)) {
             const char *ptr = result_;
             return rust::Ok(ptr);
         }
         // try to set a meaningful error value.
-        if (0 == access(result_, F_OK)) {
+        if (0 == ::access(result_, F_OK)) {
             return rust::Err(EACCES);
         }
         return rust::Err(ENOENT);
@@ -75,7 +75,7 @@ namespace el {
             const size_t search_path_length = confstr(_CS_PATH, nullptr, 0);
             if (search_path_length != 0) {
                 char search_path[search_path_length];
-                if (confstr(_CS_PATH, search_path, search_path_length) != 0) {
+                if (::confstr(_CS_PATH, search_path, search_path_length) != 0) {
                     return from_search_path(file, search_path);
                 }
             }

@@ -21,7 +21,7 @@
 
 #include "collect/Session.h"
 #include "libflags/Flags.h"
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 #include "libresult/Result.h"
 #include "supervise.pb.h"
 

@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <fstream>
+#include <set>
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -63,29 +64,27 @@ namespace {
         };
     }
 
-    using Comparator = std::function<bool(const cs::Entry &lhs, const cs::Entry &rhs)>;
+    using Hash = std::function<std::string(const cs::Entry &entry)>;
 
-    bool compare_by_output(const cs::Entry &lhs, const cs::Entry &rhs) {
-        // compare entries by the source and the output attribute only.
-        return (lhs.file == rhs.file) && (lhs.output == rhs.output);
+    std::string hash_by_output(const cs::Entry &entry) {
+        return fmt::format("{}<->{}",
+                           entry.file.string(),
+                           entry.output.value_or(fs::path()).string());
     }
 
-    bool compare_by_all(const cs::Entry &lhs, const cs::Entry &rhs) {
-        // compare entries by all possible attributes except the output field.
-        return (lhs.file == rhs.file)
-               && (lhs.directory == rhs.directory)
-               && (std::equal(
-                std::next(lhs.arguments.begin()),
-                lhs.arguments.end(),
-                std::next(rhs.arguments.begin())));
+    std::string hash_by_all(const cs::Entry &entry) {
+        return fmt::format("{}<->{}<->{}",
+                           entry.file.string(),
+                           entry.directory.string(),
+                           fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
     }
 
-    Comparator select_comparator(const cs::Entries &lhs, const cs::Entries &rhs) {
-        // Select comparator based on the input values.
+    Hash select_hash(const cs::Entries &lhs, const cs::Entries &rhs) {
+        // Select hash function based on the input values.
         const bool lhs_outputs = std::all_of(lhs.begin(), lhs.end(), [](auto entry) { return entry.output; });
         const bool rhs_outputs = std::all_of(rhs.begin(), rhs.end(), [](auto entry) { return entry.output; });
         // if all entries have the output field, it can compare by the output field.
-        return (lhs_outputs && rhs_outputs) ? compare_by_output : compare_by_all;
+        return (lhs_outputs && rhs_outputs) ? hash_by_output : hash_by_all;
     }
 }
 
@@ -239,14 +238,24 @@ namespace cs {
     Entries merge(const Entries &lhs, const Entries &rhs) {
         Entries result;
         // create a predicate which decides if the entry is already in the result.
-        auto comparator = select_comparator(lhs, rhs);
-        auto not_in_result = [&result, &comparator](const auto &it) {
-            return std::none_of(result.begin(), result.end(),
-                                [&comparator, &it](const auto &already_in) { return comparator(already_in, it); });
-        };
-        // apply the predicate.
-        std::copy_if(lhs.begin(), lhs.end(), std::back_inserter(result), not_in_result);
-        std::copy_if(rhs.begin(), rhs.end(), std::back_inserter(result), not_in_result);
+        auto hasher = select_hash(lhs, rhs);
+        std::set<std::string> in_results_hashes;
+        // copy the elements into the result list depending if it already there.
+        for (const auto &entry : lhs) {
+            auto hash = hasher(entry);
+            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
+                in_results_hashes.insert(hash);
+                result.push_back(entry);
+            }
+        }
+        for (const auto &entry : rhs) {
+            auto hash = hasher(entry);
+            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
+                in_results_hashes.insert(hash);
+                result.push_back(entry);
+            }
+        }
+
         return result;
     }
 

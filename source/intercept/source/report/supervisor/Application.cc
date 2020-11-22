@@ -91,7 +91,11 @@ namespace er {
                 return sys::Process::Builder(execution.command)
                     .add_arguments(execution.arguments.begin(), execution.arguments.end())
                     .set_environment(execution.environment)
+#ifdef SUPPORT_PRELOAD
                     .spawn_with_preload()
+#else
+                    .spawn()
+#endif
                     .on_success([&client, &event_factory, &execution](auto& child) {
                         auto event = event_factory.start(child.get_pid(), getppid(), execution);
                         client.report(std::move(event));

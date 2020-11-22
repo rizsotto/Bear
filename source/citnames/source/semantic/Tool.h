@@ -23,7 +23,7 @@
 #include "Output.h"
 #include "semantic/Semantic.h"
 #include "libresult/Result.h"
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 
 #include <filesystem>
 #include <list>

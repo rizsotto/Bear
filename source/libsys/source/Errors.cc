@@ -34,11 +34,11 @@ namespace sys {
 #ifdef HAVE_STRERROR_R
 #if defined(__GLIBC__) && defined(_GNU_SOURCE)
         char buffer[256];
-        char* result = strerror_r(error, buffer, 255);
+        char* result = ::strerror_r(error, buffer, 255);
         return std::string(result);
 #else
         char buffer[256];
-        strerror_r(error, buffer, 255);
+        ::strerror_r(error, buffer, 255);
         return std::string(buffer);
 #endif
 #else

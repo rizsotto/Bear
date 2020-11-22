@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "libreport/Report.h"
+#include "intercept/output/Report.h"
 #include "libresult/Result.h"
 
 #include <cstdint>

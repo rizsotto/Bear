@@ -29,7 +29,7 @@ else ()
             GIT_REPOSITORY
                 https://github.com/grpc/grpc
             GIT_TAG
-                v1.33.1
+                v1.33.2
             GIT_SUBMODULES
             UPDATE_COMMAND
                 ""

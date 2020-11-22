@@ -30,14 +30,14 @@ namespace {
     void verbose_message(char const* name, char const* message, char const* variable)
     {
         struct timespec ts { 0, 0 };
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        if (::clock_gettime(CLOCK_REALTIME, &ts) == -1) {
             // ignore failure, default values will be good
         }
         struct tm local_time {};
-        localtime_r(&ts.tv_sec, &local_time);
+        ::localtime_r(&ts.tv_sec, &local_time);
         const unsigned long micros = ts.tv_nsec / 1000;
-        const pid_t pid = getpid();
-        dprintf(STDERR_FILENO, "[%02d:%02d:%02d.%06ld, el, %d] %s; %s%s\n",
+        const pid_t pid = ::getpid();
+        ::dprintf(STDERR_FILENO, "[%02d:%02d:%02d.%06ld, el, %d] %s; %s%s\n",
             local_time.tm_hour, local_time.tm_min, local_time.tm_sec, micros, pid, name, message, variable);
     }
 }
