@@ -7,8 +7,8 @@ tested on FreeBSD, GNU/Linux and OS X.
 ## Build dependencies
 
 1. **C++ compiler**, to compile the sources. (Shall support
-   [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).) For
-   Xcode < 11 users, build LLVM toolchain from source with clang, libcxx, and
+   [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).) Xcode < 11
+   users should build LLVM toolchain from source with clang, libcxx, and
    libcxxabi, or install it via brew. Make sure that `clang++ -v` returns
    correct `InstalledDir`.
 2. **CMake**, to configure the build. (Minimum version is 3.12) And a
