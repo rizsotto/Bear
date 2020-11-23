@@ -7,7 +7,10 @@ tested on FreeBSD, GNU/Linux and OS X.
 ## Build dependencies
 
 1. **C++ compiler**, to compile the sources. (Shall support
-   [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).)
+   [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).) For
+   Xcode < 11 users, build LLVM toolchain from source with clang, libcxx, and
+   libcxxabi, or install it via brew. Make sure that `clang++ -v` returns
+   correct `InstalledDir`.
 2. **CMake**, to configure the build. (Minimum version is 3.12) And a
    build tool [supported](https://cmake.org/cmake/help/v3.5/manual/cmake-generators.7.html)
    by CMake.
@@ -59,6 +62,10 @@ Install dependencies from packages on Alpine edge
 
 ## Build commands
 
+If you have OpenSSL installed via brew, and it's keg-only, run the following:
+    
+    export PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig
+    
 Ideally, you should build Bear in a separate build directory.
 
     cmake -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF $BEAR_SOURCE_DIR
