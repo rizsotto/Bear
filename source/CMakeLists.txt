@@ -33,6 +33,10 @@ if (UNIX AND NOT APPLE)
     set(SUPPORT_PRELOAD 1)
 endif()
 
+if(APPLE)
+    include(platform_apple.cmake)
+endif()
+
 include(CheckIncludeFile)
 check_include_file(spawn.h HAVE_SPAWN_H)
 check_include_file(unistd.h HAVE_UNISTD_H)
