@@ -29,6 +29,7 @@ if(CMAKE_SYSTEM_VERSION VERSION_LESS 19)
         message(WARNING "${ERROR_COPY_LIB}")
     endif()
     # https://libcxx.llvm.org/docs/UsingLibcxx.html#alternate-libcxx
+    # Don't use system C++ dylib, but the one LLVM supplies.
     add_compile_options("-stdlib=libc++;-nostdinc++;-I${CLANG_INSTALL_PREFIX}/include/c++/v1")
     # For linking and testing, executables should find the dylibs here.
     add_link_options("-L${CLANG_INSTALL_PREFIX}/lib;-Wl,-rpath,${INSTALL_PATH_LIBCPPDYLIB}")
