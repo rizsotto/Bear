@@ -61,7 +61,8 @@ Install dependencies from packages on Alpine edge
 
 Xcode < 11 or macOS < 10.15 users should get [LLVM Clang](https://releases.llvm.org) binaries and headers. Make
 sure that `clang++ -v` returns correct `InstalledDir`. This is because `std::filesystem` is not available
-on Clang supplied with Xcode < 11, and `std::filesystem::path` is not available in system C++ dylib.
+on Clang supplied with Xcode < 11, and `std::filesystem::path` is not available in system C++ dylib for
+macOS < 10.15.
 
 If OpenSSL is installed via Brew, and it's keg-only, run the following for pkg-config
 to find it as grpc's dependency:
