@@ -8,7 +8,7 @@ intercept - intercept command executions in user space.
 
 # SYNOPSIS
 
-intercept [*options*] -- [*build command*]
+intercept [*options*] \-\- [*build command*]
 
 # DESCRIPTION
 

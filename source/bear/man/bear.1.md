@@ -8,7 +8,7 @@ Bear - Build EAR
 
 # SYNOPSIS
 
-bear [*options*] -- [*build command*]
+bear [*options*] \-\- [*build command*]
 
 # DESCRIPTION
 
