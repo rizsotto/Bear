@@ -69,7 +69,7 @@ to find it as grpc's dependency:
     export PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig
 
 ## Build commands
-    
+
 Ideally, you should build Bear in a separate build directory.
 
     cmake -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF $BEAR_SOURCE_DIR
