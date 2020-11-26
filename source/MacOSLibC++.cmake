@@ -1,6 +1,4 @@
-if( NOT APPLE)
-    message(FATAL_ERROR "Don't include this on non-macOS platforms.")
-endif()
+# Contains changes needed to make Bear usable on macOS versions < 10.15.
 
 include(CheckIncludeFileCXX)
 check_include_file_cxx(filesystem HAVE_FILESYSTEM)
