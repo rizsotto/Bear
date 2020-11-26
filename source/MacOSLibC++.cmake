@@ -34,13 +34,3 @@ if(CMAKE_SYSTEM_VERSION VERSION_LESS 19)
     # For distribution and running from installed directories, executables should find the dylibs here.
     add_link_options("-Wl,-rpath,@executable_path/../libexec")
 endif()
-
-macro(remove_temporary_rpath
-    target_name
-    )
-
-    add_custom_command(TARGET ${target_name}
-        COMMAND xcrun install_name_tool -delete_rpath ${INSTALL_PATH_LIBCPPDYLIB} $<TARGET_FILE:${target_name}>
-        POST_BUILD
-    )
-endmacro()
