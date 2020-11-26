@@ -34,7 +34,7 @@ if (UNIX AND NOT APPLE)
 endif()
 
 if(APPLE)
-    include(platform_apple.cmake)
+    include(MacOSLibC++.cmake)
 endif()
 
 include(CheckIncludeFile)
