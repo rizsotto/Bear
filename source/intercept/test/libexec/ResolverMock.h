@@ -35,7 +35,7 @@ public:
     MOCK_METHOD(
             (rust::Result<const char*, int>),
             from_path,
-            (std::string_view const &, char *const *),
+            (std::string_view const &, const char **),
             (override)
     );
 

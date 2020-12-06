@@ -53,8 +53,7 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("citnames: %v");
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("citnames", VERSION,
-                               { { cs::Application::VERBOSE, { 0, false, "run the application verbose", std::nullopt, std::nullopt } },
+    const flags::Parser parser("citnames", VERSION,{
                                  { cs::Application::INPUT, { 1, false, "path of the input file", { "commands.json" }, std::nullopt } },
                                  { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
                                  { cs::Application::CONFIG, { 1, false, "path of the config file", std::nullopt, std::nullopt } },
@@ -66,7 +65,7 @@ int main(int argc, char* argv[], char* envp[])
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
             .on_success([&argv, &envp](const auto& args) {
-                if (args.as_bool(cs::Application::VERBOSE).unwrap_or(false)) {
+                if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
                     spdlog::set_pattern("[%H:%M:%S.%f, cs, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }

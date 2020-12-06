@@ -29,7 +29,6 @@ namespace ic {
 
     class Application {
     public:
-        static constexpr char VERBOSE[] = "--verbose";
         static constexpr char OUTPUT[] = "--output";
         static constexpr char LIBRARY[] = "--library";
         static constexpr char EXECUTOR[] = "--executor";

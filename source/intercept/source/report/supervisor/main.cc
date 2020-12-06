@@ -56,11 +56,11 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern(fmt::format("er: %v [pid: %P]"));
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("er", VERSION,
-        { { ::er::flags::VERBOSE, { 0, false, "make the interception run verbose", std::nullopt, std::nullopt } },
+    const flags::Parser parser("er", VERSION,{
             { ::er::flags::DESTINATION, { 1, true, "path to report directory", std::nullopt, std::nullopt } },
             { ::er::flags::EXECUTE, { 1, true, "the path parameter for the command", std::nullopt, std::nullopt } },
-            { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } } });
+            { ::er::flags::COMMAND, { -1, true, "the executed command", std::nullopt, std::nullopt } }
+    });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // log the original command line as it was received.
         .on_success([&argv, &envp](const auto& args) {

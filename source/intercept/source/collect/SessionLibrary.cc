@@ -57,7 +57,7 @@ namespace ic {
 
     rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
     {
-        auto verbose = args.as_bool(ic::Application::VERBOSE).unwrap_or(false);
+        auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto library = args.as_string(ic::Application::LIBRARY);
         auto executor = args.as_string(ic::Application::EXECUTOR);
         auto environment = sys::env::from(envp);

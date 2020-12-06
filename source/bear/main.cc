@@ -38,7 +38,6 @@ namespace {
     constexpr std::optional<std::string_view> ADVANCED_GROUP = { "advanced options" };
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 
-    constexpr char VERBOSE[] = "--verbose";
     constexpr char APPEND[] = "--append";
     constexpr char OUTPUT[] = "--output";
     constexpr char CITNAMES[] = "--citnames";
@@ -96,7 +95,7 @@ namespace {
         auto library = arguments.as_string(LIBRARY);
         auto executor = arguments.as_string(EXECUTOR);
         auto wrapper = arguments.as_string(WRAPPER);
-        auto verbose = arguments.as_bool(VERBOSE).unwrap_or(false);
+        auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
         auto force_wrapper = arguments.as_bool(FORCE_WRAPPER).unwrap_or(false);
         auto force_preload = arguments.as_bool(FORCE_PRELOAD).unwrap_or(false);
 
@@ -136,7 +135,7 @@ namespace {
         auto program = arguments.as_string(CITNAMES);
         auto output = arguments.as_string(OUTPUT);
         auto append = arguments.as_bool(APPEND).unwrap_or(false);
-        auto verbose = arguments.as_bool(VERBOSE).unwrap_or(false);
+        auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
         auto include = arguments.as_string_list(INCLUDE).unwrap_or({});
         auto exclude = arguments.as_string_list(EXCLUDE).unwrap_or({});
 
@@ -206,8 +205,7 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("bear: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("bear", VERSION,
-                               { { VERBOSE, { 0, false,"run the interception verbose", std::nullopt, std::nullopt } },
+    const flags::Parser parser("bear", VERSION,{
                                  { OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
                                  { APPEND, { 0, false, "append result to an existing output file", std::nullopt, ADVANCED_GROUP } },
                                  { INCLUDE, { 1, false, "directory where from source file shall be in the output", std::nullopt, ADVANCED_GROUP } },
@@ -219,11 +217,12 @@ int main(int argc, char* argv[], char* envp[])
                                  { WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
                                  { CITNAMES, { 1, false, "path to the citnames executable", { CITNAMES_DEFAULT_PATH }, DEVELOPER_GROUP } },
                                  { INTERCEPT, { 1, false, "path to the intercept executable", { INTERCEPT_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
+                                 { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
+    });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
             .on_success([&argv, &envp](const auto& args) {
-                if (args.as_bool(VERBOSE).unwrap_or(false)) {
+                if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
                     spdlog::set_pattern("[%H:%M:%S.%f, br, %P] %v");
                     spdlog::set_level(spdlog::level::debug);
                 }

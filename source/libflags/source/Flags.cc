@@ -21,17 +21,13 @@
 
 #include <cstring>
 #include <iostream>
-#include <list>
-#include <numeric>
 #include <optional>
 #include <set>
+#include <utility>
 
 #include <fmt/format.h>
 
 namespace {
-
-    constexpr char HELP[] = "--help";
-    constexpr char VERSION[] = "--version";
 
     constexpr char QUERY_GROUP[] = "query options";
 
@@ -205,6 +201,7 @@ namespace flags {
             , version_(version)
             , options_(options)
     {
+        options_.insert({ VERBOSE, { 0, false, "run in verbose mode", std::nullopt, std::nullopt } });
         options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
         options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, { QUERY_GROUP } } });
     }

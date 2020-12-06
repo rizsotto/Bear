@@ -27,7 +27,6 @@ namespace cs {
 
     class Application {
     public:
-        static constexpr char VERBOSE[] = "--verbose";
         static constexpr char INPUT[] = "--input";
         static constexpr char OUTPUT[] = "--output";
         static constexpr char INCLUDE[] = "--include";
