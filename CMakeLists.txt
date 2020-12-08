@@ -58,8 +58,6 @@ ExternalProject_Add(BearSource
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
-        BUILD_ALWAYS
-            1
         TEST_BEFORE_INSTALL
             1
         TEST_COMMAND
