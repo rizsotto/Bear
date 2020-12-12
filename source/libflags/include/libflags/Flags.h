@@ -31,6 +31,10 @@
 
 namespace flags {
 
+    constexpr char HELP[] = "--help";
+    constexpr char VERSION[] = "--version";
+    constexpr char VERBOSE[] = "--verbose";
+
     class Parser;
 
     class Arguments {

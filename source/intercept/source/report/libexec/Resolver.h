@@ -47,7 +47,7 @@ namespace el {
         virtual rust::Result<const char*, int> from_current_directory(std::string_view const &file);
 
         [[nodiscard]]
-        virtual rust::Result<const char*, int> from_path(std::string_view const &file, char *const *envp);
+        virtual rust::Result<const char*, int> from_path(std::string_view const &file, const char **envp);
 
         [[nodiscard]]
         virtual rust::Result<const char*, int> from_search_path(std::string_view const &file, const char *search_path);

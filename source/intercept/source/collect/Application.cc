@@ -103,7 +103,7 @@ namespace ic {
         auto server = grpc::ServerBuilder()
                           .RegisterService(&supervisor)
                           .RegisterService(&interceptor)
-                          .AddListeningPort("0.0.0.0:0", grpc::InsecureServerCredentials(), &port)
+                          .AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
         std::string server_address = fmt::format("0.0.0.0:{}", port);

@@ -108,7 +108,7 @@ namespace ic {
 
     rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, const char **envp)
     {
-        const bool verbose = args.as_bool(ic::Application::VERBOSE).unwrap_or(false);
+        const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto wrapper_dir = args.as_string(ic::Application::WRAPPER);
         auto wrappers = wrapper_dir
                             .and_then<std::list<fs::path>>([](auto wrapper_dir) {
@@ -122,7 +122,7 @@ namespace ic {
                 el::Resolver resolver;
                 for (const auto& wrapper : wrappers) {
                     auto basename = wrapper.filename();
-                    auto candidate = resolver.from_path(basename.c_str(), const_cast<char* const*>(envp));
+                    auto candidate = resolver.from_path(basename.c_str(), envp);
                     candidate.on_success([&result, &basename](auto candidate) {
                         result[basename] = candidate;
                     });
@@ -139,7 +139,7 @@ namespace ic {
                         // FIXME: it would be more correct if we shell-split the `env_it->second`
                         //        and use only the program name, but not the argument. But then how
                         //        to deal with the errors?
-                        auto program = resolver.from_path(std::string_view(env_it), const_cast<char* const*>(envp));
+                        auto program = resolver.from_path(std::string_view(env_it), envp);
 
                         // find the current mapping for the program the user wants to run.
                         // and replace the program what the wrapper will call.

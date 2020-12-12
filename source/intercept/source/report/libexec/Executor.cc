@@ -131,7 +131,7 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (auto executable = resolver_.from_path(file, envp); executable.is_ok()) {
+        if (auto executable = resolver_.from_path(file, const_cast<const char **>(envp)); executable.is_ok()) {
             const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);
@@ -183,7 +183,7 @@ namespace el {
         CHECK_SESSION(session_);
         CHECK_POINTER(file);
 
-        if (auto executable = resolver_.from_path(file, envp); executable.is_ok()) {
+        if (auto executable = resolver_.from_path(file, const_cast<const char **>(envp)); executable.is_ok()) {
             const CommandBuilder cmd(session_, executable.unwrap(), argv);
             const char* dst[cmd.length()];
             cmd.assemble(dst);

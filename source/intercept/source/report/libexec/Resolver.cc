@@ -61,13 +61,13 @@ namespace el {
         return rust::Err(ENOENT);
     }
 
-    rust::Result<const char*, int> Resolver::from_path(std::string_view const &file, char* const* envp) {
+    rust::Result<const char*, int> Resolver::from_path(std::string_view const &file, const char **envp) {
         if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
             return from_current_directory(file);
         } else {
             // otherwise use the PATH variable to locate the executable.
-            const char *paths = el::env::get_env_value(const_cast<const char **>(envp), "PATH");
+            const char *paths = el::env::get_env_value(envp, "PATH");
             if (paths != nullptr) {
                 return from_search_path(file, paths);
             }

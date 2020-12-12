@@ -68,19 +68,19 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("intercept: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("intercept", VERSION,
-        { { ic::Application::VERBOSE, { 0, false, "run the interception verbose", std::nullopt, std::nullopt } },
+    const flags::Parser parser("intercept", VERSION, {
             { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
             { ic::Application::FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, DEVELOPER_GROUP } },
             { ic::Application::FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, DEVELOPER_GROUP } },
             { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
             { ic::Application::WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } } });
+            { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
+    });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // change the log verbosity if requested.
         .on_success([&argv, &envp](const auto& args) {
-            if (args.as_bool(ic::Application::VERBOSE).unwrap_or(false)) {
+            if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
                 spdlog::set_pattern("[%H:%M:%S.%f, ic, %P] %v");
                 spdlog::set_level(spdlog::level::debug);
             }
