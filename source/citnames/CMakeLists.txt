@@ -26,6 +26,7 @@ add_library(citnames_a OBJECT
         source/semantic/ToolExtendingWrapper.cc
         )
 
+target_include_directories(citnames_a PUBLIC include/)
 target_include_directories(citnames_a PUBLIC source/)
 target_link_libraries(citnames_a PUBLIC result_a)
 target_link_libraries(citnames_a PUBLIC flags_a)

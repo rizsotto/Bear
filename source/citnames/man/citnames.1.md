@@ -1,6 +1,6 @@
 % CITNAMES(1) Bear User Manuals
 % László Nagy
-% Sep 14, 2020
+% Dec 14, 2020
 
 # NAME
 
@@ -8,7 +8,7 @@ citnames - Deduce command semantic
 
 # SYNOPSIS
 
-citnames [*options*] --input <file> --output <file>
+citnames [*options*] \--input \<file\> \--output \<file\>
 
 # DESCRIPTION
 
@@ -43,11 +43,6 @@ is currently the only output of the tool.)
 :   Specify output file. (Default file name provided.) The output is
     currently a JSON compilation database.
 
-\--run-checks
-:   Allow the program to verify file location checks on the current machine
-    it runs. (Default value provided. Run help to query it.) This is important
-    if the execution list is not from the current host.
-
 \--append
 :   Use previously generated output file and append the new entries to it.
 	This way you can run continuously during work, and it keeps the
@@ -55,17 +50,10 @@ is currently the only output of the tool.)
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
 
-\--include *directory*
-:   Only include this directories or files to the output. The flag can
-    be used multiple times. The directory is either absolute or
-    relative to current working directory. Use `--exclude` to filter
-    entries out from these directory.
-
-\--exclude *directory*
-:   Exclude these directories or files from the output. The flag can
-    be used multiple times. The directory is either absolute or
-    relative to current working directory. The `--include` will
-    not enable entries from these directories.
+\--run-checks
+:   Allow the program to verify file location checks on the current machine
+    it runs. (Default value provided. Run help to query it.) This is important
+    if the execution list is not from the current host.
 
 \--config *file*
 :   Specify a configuration file. The configuration file captures how
@@ -144,9 +132,9 @@ the command line argument overrides the config file values.
     be removed from the output.
 
 `output.content`
-:   The `paths_to_include` and the `paths_to_exclude` are the same as the command
-    line flags `--include` and `--exclude`. The `include_only_existing_source`
-    allows or disables file check for the output.
+:   The `paths_to_include` and `paths_to_exclude` are for filter out entries from
+    these directories. (Directory names has to be absolute paths.)
+    The `include_only_existing_source` allows or disables file check for the output.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.

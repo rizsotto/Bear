@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "citnames/Flags.h"
 #include "Application.h"
 
 #include <spdlog/spdlog.h>
@@ -53,15 +54,16 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("citnames: %v");
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("citnames", VERSION,{
-                                 { cs::Application::INPUT, { 1, false, "path of the input file", { "commands.json" }, std::nullopt } },
-                                 { cs::Application::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
-                                 { cs::Application::CONFIG, { 1, false, "path of the config file", std::nullopt, std::nullopt } },
-                                 { cs::Application::INCLUDE, { 1, false, "directory where from source file shall be in the output", std::nullopt, std::nullopt } },
-                                 { cs::Application::EXCLUDE, { 1, false, "directory where from source file shall not be in the output", std::nullopt, std::nullopt } },
-                                 { cs::Application::APPEND, { 0, false, "append to output, instead of overwrite it", std::nullopt, std::nullopt } },
-                                 { cs::Application::RUN_CHECKS, { 0, false, "can run checks on the current host", std::nullopt, std::nullopt } }
-                               });
+    const flags::Parser parser(
+            "citnames",
+            VERSION,
+            {
+                { cs::INPUT, { 1, false, "path of the input file", { "commands.json" }, std::nullopt } },
+                { cs::OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
+                { cs::CONFIG, { 1, false, "path of the config file", std::nullopt, std::nullopt } },
+                { cs::APPEND, { 0, false, "append to output, instead of overwrite it", std::nullopt, std::nullopt } },
+                { cs::RUN_CHECKS, { 0, false, "can run checks on the current host", std::nullopt, std::nullopt } }
+           });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
             .on_success([&argv, &envp](const auto& args) {

@@ -18,6 +18,7 @@
  */
 
 #include "Application.h"
+#include "citnames/Flags.h"
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Tool.h"
@@ -38,28 +39,6 @@ namespace {
         return fs::exists(path, error_code);
     }
 
-    std::list<fs::path> to_path_list(const std::vector<std::string_view>& strings)
-    {
-        // best effort, try to make these string as path (absolute or relative).
-        std::error_code error_code;
-        auto cwd = fs::current_path(error_code);
-        if (error_code) {
-            spdlog::info("Getting current directory failed. (ignored)");
-            return std::list<fs::path>(strings.begin(), strings.end());
-        } else {
-            std::list<fs::path> result;
-            for (auto string : strings) {
-                auto path = fs::path(string);
-                if (path.is_absolute()) {
-                    result.emplace_back(path);
-                } else {
-                    result.emplace_back(cwd / path);
-                }
-            }
-            return result;
-        }
-    }
-
     struct Arguments {
         fs::path input;
         fs::path output;
@@ -68,9 +47,9 @@ namespace {
 
     rust::Result<Arguments> into_arguments(const flags::Arguments& args)
     {
-        auto input = args.as_string(cs::Application::INPUT);
-        auto output = args.as_string(cs::Application::OUTPUT);
-        auto append = args.as_bool(cs::Application::APPEND)
+        auto input = args.as_string(cs::INPUT);
+        auto output = args.as_string(cs::OUTPUT);
+        auto append = args.as_bool(cs::APPEND)
                 .unwrap_or(false);
 
         return rust::merge(input, output)
@@ -113,7 +92,7 @@ namespace {
 
     rust::Result<cs::Configuration> into_configuration(const flags::Arguments& args, const sys::env::Vars& environment)
     {
-        auto config_arg = args.as_string(cs::Application::CONFIG);
+        auto config_arg = args.as_string(cs::CONFIG);
         auto config = config_arg.is_ok()
                 ? config_arg
                               .and_then<cs::Configuration>([](auto candidate) {
@@ -123,19 +102,9 @@ namespace {
 
         // command line arguments overrides the default values or the configuration content.
         return config.map<cs::Configuration>([&args](auto config) {
-            args.as_bool(cs::Application::RUN_CHECKS)
+            args.as_bool(cs::RUN_CHECKS)
                     .on_success([&config](auto run) {
                         config.output.content.include_only_existing_source = run;
-                    });
-            args.as_string_list(cs::Application::INCLUDE)
-                    .map<std::list<fs::path>>(&to_path_list)
-                    .on_success([&config](auto includes) {
-                        config.output.content.paths_to_include = includes;
-                    });
-            args.as_string_list(cs::Application::EXCLUDE)
-                    .map<std::list<fs::path>>(&to_path_list)
-                    .on_success([&config](auto excludes) {
-                        config.output.content.paths_to_exclude = excludes;
                     });
 
             return config;
