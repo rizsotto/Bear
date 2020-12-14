@@ -31,6 +31,7 @@
 
 #include "config.h"
 #include "collect/Application.h"
+#include "intercept/Flags.h"
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -69,13 +70,13 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_level(spdlog::level::info);
 
     const flags::Parser parser("intercept", VERSION, {
-            { ic::Application::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
-            { ic::Application::FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, DEVELOPER_GROUP } },
-            { ic::Application::FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, DEVELOPER_GROUP } },
-            { ic::Application::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
-            { ic::Application::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
+            { ic::OUTPUT, { 1, false, "path of the result file", { "commands.json" }, std::nullopt } },
+            { ic::FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, DEVELOPER_GROUP } },
+            { ic::FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, DEVELOPER_GROUP } },
+            { ic::LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
+            { ic::COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
     });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
         // change the log verbosity if requested.

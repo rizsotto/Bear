@@ -18,7 +18,7 @@
  */
 
 #include "collect/SessionWrapper.h"
-#include "collect/Application.h"
+#include "intercept/Flags.h"
 #include "report/libexec/Resolver.h"
 #include "report/libexec/Environment.h"
 #include "report/wrapper/Environment.h"
@@ -109,7 +109,7 @@ namespace ic {
     rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, const char **envp)
     {
         const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto wrapper_dir = args.as_string(ic::Application::WRAPPER);
+        auto wrapper_dir = args.as_string(ic::WRAPPER);
         auto wrappers = wrapper_dir
                             .and_then<std::list<fs::path>>([](auto wrapper_dir) {
                                 return list_dir(wrapper_dir);

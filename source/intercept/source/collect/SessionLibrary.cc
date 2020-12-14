@@ -19,7 +19,7 @@
 
 #include "collect/SessionLibrary.h"
 
-#include "collect/Application.h"
+#include "intercept/Flags.h"
 #include "libsys/Errors.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
@@ -58,8 +58,8 @@ namespace ic {
     rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto library = args.as_string(ic::Application::LIBRARY);
-        auto executor = args.as_string(ic::Application::EXECUTOR);
+        auto library = args.as_string(ic::LIBRARY);
+        auto executor = args.as_string(ic::EXECUTOR);
         auto environment = sys::env::from(envp);
         auto path = sys::os::get_path(environment);
 
