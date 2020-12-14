@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "citnames/Flags.h"
+#include "intercept/Flags.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
@@ -106,25 +107,21 @@ namespace {
 
                     auto builder = sys::Process::Builder(program)
                             .set_environment(environment)
-                            .add_argument(program);
-                    builder.add_argument("--library")
-                            .add_argument(library);
-                    builder.add_argument("--executor")
-                            .add_argument(executor);
-                    builder.add_argument("--wrapper")
-                            .add_argument(wrapper);
-                    builder.add_argument("--output")
-                            .add_argument(output);
+                            .add_argument(program)
+                            .add_argument(ic::LIBRARY).add_argument(library)
+                            .add_argument(ic::EXECUTOR).add_argument(executor)
+                            .add_argument(ic::WRAPPER).add_argument(wrapper)
+                            .add_argument(ic::OUTPUT).add_argument(output);
                     if (force_wrapper) {
-                        builder.add_argument("--force-wrapper");
+                        builder.add_argument(ic::FORCE_WRAPPER);
                     }
                     if (force_preload) {
-                        builder.add_argument("--force-preload");
+                        builder.add_argument(ic::FORCE_PRELOAD);
                     }
                     if (verbose) {
-                        builder.add_argument("--verbose");
+                        builder.add_argument(flags::VERBOSE);
                     }
-                    builder.add_argument("--")
+                    builder.add_argument(ic::COMMAND)
                             .add_arguments(command.begin(), command.end());
                     return builder;
                 });
