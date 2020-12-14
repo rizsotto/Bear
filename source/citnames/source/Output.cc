@@ -40,7 +40,7 @@ namespace {
     bool contains(const std::list<fs::path> &root, const fs::path &file) {
         return std::any_of(root.begin(), root.end(), [&file](auto directory) {
             // check if the path elements (list of directory names) are the same.
-            auto[end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
+            const auto [end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
             // the file is contained in the directory if all path elements are
             // in the file paths too.
             return (end == directory.end());

@@ -116,8 +116,12 @@ namespace cs {
     }
 
     void from_json(const nlohmann::json &j, Configuration &rhs) {
-        j.at("output").get_to(rhs.output);
-        j.at("compilation").get_to(rhs.compilation);
+        if (j.contains("output")) {
+            j.at("output").get_to(rhs.output);
+        }
+        if (j.contains("compilation")) {
+            j.at("compilation").get_to(rhs.compilation);
+        }
     }
 
     void to_json(nlohmann::json &j, const Configuration &rhs) {
