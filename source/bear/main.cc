@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "citnames/Flags.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
@@ -45,8 +46,7 @@ namespace {
     constexpr char LIBRARY[] = "--libexec";
     constexpr char EXECUTOR[] = "--executor";
     constexpr char WRAPPER[] = "--wrapper";
-    constexpr char INCLUDE[] = "--include";
-    constexpr char EXCLUDE[] = "--exclude";
+    constexpr char CONFIG[] = "--config";
     constexpr char FORCE_WRAPPER[] = "--force-wrapper";
     constexpr char FORCE_PRELOAD[] = "--force-preload";
     constexpr char COMMAND[] = "--";
@@ -134,36 +134,29 @@ namespace {
     {
         auto program = arguments.as_string(CITNAMES);
         auto output = arguments.as_string(OUTPUT);
+        auto config = arguments.as_string(CONFIG);
         auto append = arguments.as_bool(APPEND).unwrap_or(false);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto include = arguments.as_string_list(INCLUDE).unwrap_or({});
-        auto exclude = arguments.as_string_list(EXCLUDE).unwrap_or({});
 
         return rust::merge(program, output)
-                .map<sys::Process::Builder>([&environment, &input, &append, &verbose, &include, &exclude](auto tuple) {
+                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto tuple) {
                     const auto& [program, output] = tuple;
 
                     auto builder = sys::Process::Builder(program)
                             .set_environment(environment)
                             .add_argument(program)
-                            .add_argument("--input")
-                            .add_argument(input)
-                            .add_argument("--output")
-                            .add_argument(output)
-                            .add_argument("--run-checks");
+                            .add_argument(cs::INPUT).add_argument(input)
+                            .add_argument(cs::OUTPUT).add_argument(output)
+                            // can run the file checks, because we are on the host.
+                            .add_argument(cs::RUN_CHECKS);
                     if (append) {
-                        builder.add_argument("--append");
+                        builder.add_argument(cs::APPEND);
+                    }
+                    if (config.is_ok()) {
+                        builder.add_argument(cs::CONFIG).add_argument(config.unwrap());
                     }
                     if (verbose) {
-                        builder.add_argument("--verbose");
-                    }
-                    for (auto entry : include) {
-                        builder.add_argument("--include");
-                        builder.add_argument(entry);
-                    }
-                    for (auto entry : exclude) {
-                        builder.add_argument("--exclude");
-                        builder.add_argument(entry);
+                        builder.add_argument(flags::VERBOSE);
                     }
                     return builder;
                 });
@@ -201,19 +194,21 @@ int main(int argc, char* argv[], char* envp[])
     spdlog::set_pattern("bear: %v [pid: %P]");
     spdlog::set_level(spdlog::level::info);
 
-    const flags::Parser parser("bear", VERSION,{
-                                 { OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
-                                 { APPEND, { 0, false, "append result to an existing output file", std::nullopt, ADVANCED_GROUP } },
-                                 { INCLUDE, { 1, false, "directory where from source file shall be in the output", std::nullopt, ADVANCED_GROUP } },
-                                 { EXCLUDE, { 1, false, "directory where from source file shall not be in the output", std::nullopt, ADVANCED_GROUP } },
-                                 { FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, ADVANCED_GROUP } },
-                                 { FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, ADVANCED_GROUP } },
-                                 { LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { CITNAMES, { 1, false, "path to the citnames executable", { CITNAMES_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { INTERCEPT, { 1, false, "path to the intercept executable", { INTERCEPT_DEFAULT_PATH }, DEVELOPER_GROUP } },
-                                 { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
+    const flags::Parser parser(
+            "bear",
+            VERSION,
+            {
+                { OUTPUT, { 1, false, "path of the result file", { "compile_commands.json" }, std::nullopt } },
+                { APPEND, { 0, false, "append result to an existing output file", std::nullopt, ADVANCED_GROUP } },
+                { CONFIG, { 1, false, "path of the config file", std::nullopt, ADVANCED_GROUP } },
+                { FORCE_PRELOAD, { 0, false, "force to use library preload", std::nullopt, ADVANCED_GROUP } },
+                { FORCE_WRAPPER, { 0, false, "force to use compiler wrappers", std::nullopt, ADVANCED_GROUP } },
+                { LIBRARY, { 1, false, "path to the preload library", { LIBRARY_DEFAULT_PATH }, DEVELOPER_GROUP } },
+                { EXECUTOR, { 1, false, "path to the preload executable", { EXECUTOR_DEFAULT_PATH }, DEVELOPER_GROUP } },
+                { WRAPPER, { 1, false, "path to the wrapper directory", { WRAPPER_DEFAULT_PATH }, DEVELOPER_GROUP } },
+                { CITNAMES, { 1, false, "path to the citnames executable", { CITNAMES_DEFAULT_PATH }, DEVELOPER_GROUP } },
+                { INTERCEPT, { 1, false, "path to the intercept executable", { INTERCEPT_DEFAULT_PATH }, DEVELOPER_GROUP } },
+                { COMMAND, { -1, true, "command to execute", std::nullopt, std::nullopt } }
     });
     return parser.parse_or_exit(argc, const_cast<const char**>(argv))
             // change the log verbosity if requested.
