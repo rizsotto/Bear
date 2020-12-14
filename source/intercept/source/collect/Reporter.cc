@@ -18,6 +18,7 @@
  */
 
 #include "config.h"
+#include "intercept/Flags.h"
 #include "collect/Reporter.h"
 #include "collect/Application.h"
 #include "libsys/Os.h"
@@ -149,7 +150,7 @@ namespace ic {
     rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const ic::Session& session)
     {
         auto host_info = create_host_info();
-        auto output = flags.as_string(Application::OUTPUT);
+        auto output = flags.as_string(OUTPUT);
 
         return merge(host_info, output)
             .map<Reporter::SharedPtr>([&session](auto pair) {

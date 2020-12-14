@@ -25,6 +25,7 @@ if (SUPPORT_PRELOAD)
     target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
 endif()
 
+target_include_directories(intercept_a PUBLIC include/)
 target_include_directories(intercept_a PUBLIC source/)
 target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)

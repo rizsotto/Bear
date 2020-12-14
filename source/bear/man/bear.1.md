@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% May 10, 2019
+% Dec 14, 2020
 
 # NAME
 
@@ -47,17 +47,9 @@ compilation database.
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
 
-\--include *directory*
-:   Only include this directories or files to the output. The flag can
-    be used multiple times. The directory is either absolute or
-    relative to current working directory. Use `--exclude` to filter
-    entries out from these directory.
-
-\--exclude *directory*
-:   Exclude these directories or files from the output. The flag can
-    be used multiple times. The directory is either absolute or
-    relative to current working directory. The `--include` will
-    not enable entries from these directories.
+\--config *file*
+:   Specify a configuration file. The configuration file captures how
+    the output should be formatted and which entries it shall contain.
 
 \--force-preload
 :   Force to use the dynamic linker method of `intercept` command.
@@ -84,6 +76,11 @@ version of Bear generates entries where:
     can force to emit the `command` field.) The compiler as the first argument
     has absolute path. Some non compilation related flags are filtered out from
     the final output.
+
+# CONFIG FILE
+
+Read `citnames` man page for the content of this file. `bear` is not reading the
+content of this file, but passing the file name to `citnames`.
 
 # EXIT STATUS
 

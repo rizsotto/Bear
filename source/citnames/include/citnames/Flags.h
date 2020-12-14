@@ -19,34 +19,11 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
-#include "libresult/Result.h"
-#include "libsys/Environment.h"
-
 namespace cs {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> from(const flags::Arguments&, sys::env::Vars&&);
-
-        ::rust::Result<int> operator()() const;
-
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
-
-    private:
-        struct State;
-
-        explicit Application(State*);
-
-    private:
-        State const* impl_;
-    };
+    constexpr char INPUT[] = "--input";
+    constexpr char OUTPUT[] = "--output";
+    constexpr char APPEND[] = "--append";
+    constexpr char RUN_CHECKS[] = "--run-checks";
+    constexpr char CONFIG[] = "--config";
 }

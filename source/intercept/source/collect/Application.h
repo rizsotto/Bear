@@ -29,14 +29,6 @@ namespace ic {
 
     class Application {
     public:
-        static constexpr char OUTPUT[] = "--output";
-        static constexpr char LIBRARY[] = "--library";
-        static constexpr char EXECUTOR[] = "--executor";
-        static constexpr char WRAPPER[] = "--wrapper";
-        static constexpr char COMMAND[] = "--";
-        static constexpr char FORCE_WRAPPER[] = "--force-wrapper";
-        static constexpr char FORCE_PRELOAD[] = "--force-preload";
-
         static ::rust::Result<Application> from(const flags::Arguments& args, const char **envp);
 
         ::rust::Result<int> operator()() const;

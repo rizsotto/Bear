@@ -19,8 +19,8 @@
 
 #include "collect/Session.h"
 
+#include "intercept/Flags.h"
 #include "collect/SessionWrapper.h"
-#include "collect/Application.h"
 #ifdef SUPPORT_PRELOAD
 #include "collect/SessionLibrary.h"
 #endif
@@ -32,9 +32,9 @@ namespace ic {
     rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const char **envp)
 #ifdef SUPPORT_PRELOAD
     {
-        if (args.as_bool(ic::Application::FORCE_WRAPPER).unwrap_or(false))
+        if (args.as_bool(ic::FORCE_WRAPPER).unwrap_or(false))
             return WrapperSession::from(args, envp);
-        if (args.as_bool(ic::Application::FORCE_PRELOAD).unwrap_or(false))
+        if (args.as_bool(ic::FORCE_PRELOAD).unwrap_or(false))
             return LibraryPreloadSession::from(args, envp);
 
         return LibraryPreloadSession::from(args, envp);

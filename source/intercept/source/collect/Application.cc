@@ -21,6 +21,7 @@
 #include "collect/Reporter.h"
 #include "collect/Services.h"
 #include "collect/Session.h"
+#include "intercept/Flags.h"
 #include "libsys/Os.h"
 #include "libsys/Signal.h"
 
@@ -57,7 +58,7 @@ namespace {
     struct Command {
         static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
         {
-            return args.as_string_list(ic::Application::COMMAND)
+            return args.as_string_list(ic::COMMAND)
                     .and_then<std::vector<std::string_view>>([](auto cmd) {
                         return (cmd.empty())
                                 ? rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Command is empty.")))
