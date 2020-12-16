@@ -44,7 +44,7 @@ namespace {
     }
 }
 
-namespace main {
+namespace ps {
 
     ApplicationLogConfig::ApplicationLogConfig(const char *name, const char *id)
             : name_(name)

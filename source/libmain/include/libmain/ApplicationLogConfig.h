@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace main {
+namespace ps {
 
     struct ApplicationLogConfig {
         ApplicationLogConfig(const char *name, const char *id);

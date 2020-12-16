@@ -23,7 +23,7 @@
 
 #include <memory>
 
-namespace main {
+namespace ps {
 
     struct Command {
         virtual ~Command() noexcept = default;

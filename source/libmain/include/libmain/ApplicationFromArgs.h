@@ -24,10 +24,16 @@
 #include "libresult/Result.h"
 #include "libflags/Flags.h"
 
-namespace main {
+namespace ps {
 
     struct ApplicationFromArgs : Application {
-        ApplicationFromArgs(ApplicationLogConfig) noexcept;
+        explicit ApplicationFromArgs(const ApplicationLogConfig&) noexcept;
+
+        ApplicationFromArgs(const ApplicationFromArgs&) = default;
+        ApplicationFromArgs(ApplicationFromArgs&&) noexcept = default;
+
+        ApplicationFromArgs& operator=(const ApplicationFromArgs&) = default;
+        ApplicationFromArgs& operator=(ApplicationFromArgs&&) noexcept = default;
 
         rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const override;
 

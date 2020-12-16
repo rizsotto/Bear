@@ -23,11 +23,11 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
-namespace main {
+namespace ps {
 
-    ApplicationFromArgs::ApplicationFromArgs(ApplicationLogConfig log_config) noexcept
+    ApplicationFromArgs::ApplicationFromArgs(const ApplicationLogConfig &log_config) noexcept
             : Application()
-            , log_config_(std::move(log_config))
+            , log_config_(log_config)
     {
         log_config_.initForSilent();
     }
@@ -43,7 +43,7 @@ namespace main {
                 spdlog::debug("arguments parsed: {0}", args);
             })
             // if parsing success, we create the main command and execute it.
-            .and_then<main::CommandPtr>([this, &envp](auto args) {
+            .and_then<CommandPtr>([this, &envp](auto args) {
                 return this->command(args, envp);
             });
     }
