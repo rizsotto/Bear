@@ -81,7 +81,7 @@ namespace {
     // This is used for being multi thread safe (loading time only).
     std::atomic<bool> LOADED(false);
     // These are related to the functionality of this library.
-    el::Session SESSION = el::session::init();
+    el::Session SESSION;
     el::Linker LINKER;
 
     constexpr el::log::Logger LOGGER("lib.cc");

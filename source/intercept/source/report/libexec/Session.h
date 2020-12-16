@@ -29,18 +29,12 @@ namespace el {
      * It does not own the memory (of the pointed areas).
      */
     struct Session {
-        char const* reporter;
-        char const* destination;
-        bool verbose;
+        char const* reporter = nullptr;
+        char const* destination = nullptr;
+        bool verbose = false;
     };
 
     namespace session {
-
-        // Util method to create instance.
-        inline constexpr Session init() noexcept
-        {
-            return { nullptr, nullptr, true };
-        }
 
         // Util method to initialize instance.
         void from(Session& session, const char** environment) noexcept;

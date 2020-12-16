@@ -80,7 +80,7 @@ namespace {
     {
         const rust::Result<int, int> expected = rust::Err(EIO);
 
-        el::Session session = el::session::init();
+        el::Session session;
 
         LinkerMock linker;
         EXPECT_CALL(linker, execve(_, _, _)).Times(0);
