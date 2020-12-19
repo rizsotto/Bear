@@ -27,6 +27,7 @@ endif()
 
 target_include_directories(intercept_a PUBLIC include/)
 target_include_directories(intercept_a PUBLIC source/)
+target_link_libraries(intercept_a PUBLIC main_a)
 target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC supervise_a)
@@ -40,6 +41,7 @@ add_executable(intercept
         source/collect/main.cc
         )
 
+target_link_libraries(intercept main_a)
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept report_a)
 target_link_libraries(intercept supervise_a)
@@ -70,6 +72,7 @@ if (ENABLE_UNIT_TESTS)
             test/SessionTest.cc
             )
 
+    target_link_libraries(intercept_unit_test main_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)

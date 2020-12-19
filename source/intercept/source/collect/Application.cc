@@ -34,6 +34,8 @@
 
 namespace {
 
+    constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
+
     rust::Result<int> execute_command(const ic::Session& session, const std::vector<std::string_view>& command) {
         return session.supervise(command)
             .and_then<sys::Process>([](auto builder) {
@@ -55,52 +57,25 @@ namespace {
             });
     }
 
-    struct Command {
-        static rust::Result<std::vector<std::string_view>> from(const flags::Arguments& args)
-        {
-            return args.as_string_list(ic::COMMAND)
-                    .and_then<std::vector<std::string_view>>([](auto cmd) {
-                        return (cmd.empty())
-                                ? rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Command is empty.")))
-                                : rust::Result<std::vector<std::string_view>>(rust::Ok(cmd));
-                    });
-        }
-    };
+    rust::Result<std::vector<std::string_view>> get_command(const flags::Arguments& args)
+    {
+        return args.as_string_list(ic::COMMAND)
+                .and_then<std::vector<std::string_view>>([](auto cmd) {
+                    return (cmd.empty())
+                            ? rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Command is empty.")))
+                            : rust::Result<std::vector<std::string_view>>(rust::Ok(cmd));
+                });
+    }
 }
 
 namespace ic {
 
-    struct Application::State {
-        std::vector<std::string_view> command;
-        Reporter::SharedPtr reporter_;
-        Session::SharedPtr session_;
-    };
-
-    rust::Result<Application> Application::from(const flags::Arguments& args, const char **envp)
-    {
-        auto command = Command::from(args);
-        auto session = Session::from(args, envp);
-        auto reporter = session
-                            .and_then<Reporter::SharedPtr>([&args](const auto& session) {
-                                return Reporter::from(args, *session);
-                            });
-
-        return rust::merge(command, reporter, session)
-                   .map<Application::State*>([](auto tuple) {
-                       const auto& [command, reporter, session] = tuple;
-                       return new Application::State { command, reporter, session };
-                   })
-                   .map<Application>([](auto impl) {
-                       return Application { impl };
-                   });
-    }
-
-    ::rust::Result<int> Application::operator()() const
+    rust::Result<int> Command::execute() const
     {
         // Create and start the gRPC server
         int port = 0;
-        ic::SupervisorImpl supervisor(*(impl_->session_));
-        ic::InterceptorImpl interceptor(*(impl_->reporter_));
+        ic::SupervisorImpl supervisor(*(session_));
+        ic::InterceptorImpl interceptor(*(reporter_));
         auto server = grpc::ServerBuilder()
                           .RegisterService(&supervisor)
                           .RegisterService(&interceptor)
@@ -110,41 +85,47 @@ namespace ic {
         std::string server_address = fmt::format("0.0.0.0:{}", port);
         spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
         // Configure the session and the reporter objects
-        impl_->session_->set_server_address(server_address);
+        session_->set_server_address(server_address);
         // Execute the build command
-        auto result = execute_command(*impl_->session_, impl_->command);
+        auto result = execute_command(*session_, command_);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();
         // Write output file.
-        impl_->reporter_->flush();
+        reporter_->flush();
         // Exit with the build status
         return result;
     }
 
-    Application::Application(Application::State* const impl)
-            : impl_(impl)
-    {
+    Application::Application() noexcept
+            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("intercept", "ic"))
+    { }
+
+    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
+        const flags::Parser parser("intercept", VERSION, {
+                {ic::OUTPUT,        {1,  false, "path of the result file",        {"commands.json"},       std::nullopt}},
+                {ic::FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,            DEVELOPER_GROUP}},
+                {ic::FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,            DEVELOPER_GROUP}},
+                {ic::LIBRARY,       {1,  false, "path to the preload library",    {LIBRARY_DEFAULT_PATH},  DEVELOPER_GROUP}},
+                {ic::EXECUTOR,      {1,  false, "path to the preload executable", {EXECUTOR_DEFAULT_PATH}, DEVELOPER_GROUP}},
+                {ic::WRAPPER,       {1,  false, "path to the wrapper directory",  {WRAPPER_DEFAULT_PATH},  DEVELOPER_GROUP}},
+                {ic::COMMAND,       {-1, true,  "command to execute",             std::nullopt,            std::nullopt}}
+        });
+        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }
 
-    Application::Application(Application&& rhs) noexcept
-            : impl_(rhs.impl_)
-    {
-        rhs.impl_ = nullptr;
-    }
+    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
+        auto command = get_command(args);
+        auto session = Session::from(args, envp);
+        auto reporter = session
+                .and_then<Reporter::SharedPtr>([&args](const auto& session) {
+                    return Reporter::from(args, *session);
+                });
 
-    Application& Application::operator=(Application&& rhs) noexcept
-    {
-        if (&rhs != this) {
-            delete impl_;
-            impl_ = rhs.impl_;
-        }
-        return *this;
-    }
-
-    Application::~Application()
-    {
-        delete impl_;
-        impl_ = nullptr;
+        return rust::merge(command, session, reporter)
+                .map<ps::CommandPtr>([](auto tuple) {
+                    const auto& [command, session, reporter] = tuple;
+                    return std::make_unique<Command>(command, session, reporter);
+                });
     }
 }
