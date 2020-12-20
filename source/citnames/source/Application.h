@@ -19,34 +19,51 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
+#include "Output.h"
+#include "semantic/Tool.h"
+#include "libmain/ApplicationFromArgs.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
+#include "intercept/output/Report.h"
+
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace cs {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> from(const flags::Arguments&, sys::env::Vars&&);
+    struct Arguments {
+        fs::path input;
+        fs::path output;
+        bool append;
+    };
 
-        ::rust::Result<int> operator()() const;
+    struct Command : ps::Command {
+        Command(Arguments arguments,
+                report::ReportSerializer report_serializer,
+                cs::semantic::Tools tools,
+                cs::CompilationDatabase output)
+                : ps::Command()
+                , arguments_(arguments)
+                , report_serializer_(report_serializer)
+                , tools_(tools)
+                , output_(output)
+        { }
 
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
+        [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
-        struct State;
+        Arguments arguments_;
+        report::ReportSerializer report_serializer_;
+        cs::semantic::Tools tools_;
+        cs::CompilationDatabase output_;
+    };
 
-        explicit Application(State*);
+    struct Application : ps::ApplicationFromArgs {
+        Application() noexcept;
 
-    private:
-        State const* impl_;
+        rust::Result<flags::Arguments> parse(int argc, const char **argv) const override;
+
+        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
     };
 }

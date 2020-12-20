@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "Application.h"
 #include "citnames/Flags.h"
 #include "Configuration.h"
@@ -33,41 +34,33 @@ namespace fs = std::filesystem;
 
 namespace {
 
-    bool is_exists(const fs::path& path)
-    {
+    bool is_exists(const fs::path &path) {
         std::error_code error_code;
         return fs::exists(path, error_code);
     }
 
-    struct Arguments {
-        fs::path input;
-        fs::path output;
-        bool append;
-    };
-
-    rust::Result<Arguments> into_arguments(const flags::Arguments& args)
-    {
+    rust::Result<cs::Arguments> into_arguments(const flags::Arguments &args) {
         auto input = args.as_string(cs::INPUT);
         auto output = args.as_string(cs::OUTPUT);
         auto append = args.as_bool(cs::APPEND)
                 .unwrap_or(false);
 
         return rust::merge(input, output)
-                .map<Arguments>([&append](auto tuple) {
-                    const auto& [input, output] = tuple;
-                    return Arguments {
+                .map<cs::Arguments>([&append](auto tuple) {
+                    const auto&[input, output] = tuple;
+                    return cs::Arguments{
                             fs::path(input),
                             fs::path(output),
                             append,
                     };
                 })
-                // validate
-                .and_then<Arguments>([](auto arguments) -> rust::Result<Arguments> {
+                .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
+                    // validate
                     if (!is_exists(arguments.input)) {
                         return rust::Err(std::runtime_error(
                                 fmt::format("Missing input file: {}", arguments.input)));
                     }
-                    return rust::Ok(Arguments {
+                    return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
                             (arguments.append && is_exists(arguments.output)),
@@ -75,8 +68,7 @@ namespace {
                 });
     }
 
-    std::list<fs::path> compilers(const sys::env::Vars& environment)
-    {
+    std::list<fs::path> compilers(const sys::env::Vars &environment) {
         std::list<fs::path> result;
         if (auto it = environment.find("CC"); it != environment.end()) {
             result.emplace_back(it->second);
@@ -90,50 +82,95 @@ namespace {
         return result;
     }
 
-    rust::Result<cs::Configuration> into_configuration(const flags::Arguments& args, const sys::env::Vars& environment)
-    {
+    rust::Result<cs::Configuration>
+    into_configuration(const flags::Arguments &args, const sys::env::Vars &environment) {
         auto config_arg = args.as_string(cs::CONFIG);
         auto config = config_arg.is_ok()
-                ? config_arg
+                      ? config_arg
                               .and_then<cs::Configuration>([](auto candidate) {
                                   return cs::ConfigurationSerializer().from_json(fs::path(candidate));
                               })
-                : rust::Ok(cs::Configuration());
+                      : rust::Ok(cs::Configuration());
 
-        // command line arguments overrides the default values or the configuration content.
         return config.map<cs::Configuration>([&args](auto config) {
-            args.as_bool(cs::RUN_CHECKS)
-                    .on_success([&config](auto run) {
-                        config.output.content.include_only_existing_source = run;
-                    });
+                    // command line arguments overrides the default values or the configuration content.
+                    args.as_bool(cs::RUN_CHECKS)
+                            .on_success([&config](auto run) {
+                                config.output.content.include_only_existing_source = run;
+                            });
 
-            return config;
-        })
-        // recognize compilers from known environment variables.
-        .map<cs::Configuration>([&environment](auto config) {
-            for (const auto& compiler : compilers(environment)) {
-                auto wrapped = cs::CompilerWrapper { compiler, {} };
-                config.compilation.compilers_to_recognize.emplace_back(wrapped);
-            }
-            return config;
-        })
-        .on_success([](const auto& config) {
-            spdlog::debug("Configuration: {}", config);
-        });
+                    return config;
+                })
+                .map<cs::Configuration>([&environment](auto config) {
+                    // recognize compilers from known environment variables.
+                    for (const auto &compiler : compilers(environment)) {
+                        auto wrapped = cs::CompilerWrapper{compiler, {}};
+                        config.compilation.compilers_to_recognize.emplace_back(wrapped);
+                    }
+                    return config;
+                })
+                .on_success([](const auto &config) {
+                    spdlog::debug("Configuration: {}", config);
+                });
     }
 }
 
 namespace cs {
 
-    struct Application::State {
-        Arguments arguments;
-        report::ReportSerializer report_serializer;
-        cs::semantic::Tools semantic;
-        cs::CompilationDatabase output;
-    };
+    rust::Result<int> Command::execute() const {
+        // get current compilations from the input.
+        return report_serializer_.from_json(arguments_.input)
+                .map<Entries>([this](const auto &commands) {
+                    spdlog::debug("commands have read. [size: {}]", commands.executions.size());
+                    auto compilations = tools_.transform(commands);
+                    // remove duplicates
+                    return merge({}, compilations);
+                })
+                .and_then<Entries>([this](const auto &compilations) {
+                    // read back the current content and extend with the new elements.
+                    spdlog::debug("compilation entries created. [size: {}]", compilations.size());
+                    return (arguments_.append)
+                           ? output_.from_json(arguments_.output.c_str())
+                                   .template map<Entries>([&compilations](auto old_entries) {
+                                       spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
+                                       return merge(compilations, old_entries);
+                                   })
+                           : rust::Result<Entries>(rust::Ok(compilations));
+                })
+                .and_then<size_t>([this](const auto &compilations) {
+                    // write the entries into the output file.
+                    spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
+                    return output_.to_json(arguments_.output.c_str(), compilations);
+                })
+                .map<int>([](auto size) {
+                    // just map to success exit code if it was successful.
+                    spdlog::debug("compilation entries written. [size: {}]", size);
+                    return EXIT_SUCCESS;
+                });
+    }
 
-    rust::Result<Application> Application::from(const flags::Arguments& args, sys::env::Vars&& environment)
-    {
+    Application::Application() noexcept
+            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("citnames", "cs"))
+    { }
+
+    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
+
+        const flags::Parser parser(
+                "citnames",
+                VERSION,
+                {
+                        {cs::INPUT,      {1, false, "path of the input file",                    {"commands.json"},         std::nullopt}},
+                        {cs::OUTPUT,     {1, false, "path of the result file",                   {"compile_commands.json"}, std::nullopt}},
+                        {cs::CONFIG,     {1, false, "path of the config file",                   std::nullopt,              std::nullopt}},
+                        {cs::APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,              std::nullopt}},
+                        {cs::RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,              std::nullopt}}
+                });
+        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
+    }
+
+    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
+        auto environment = sys::env::from(const_cast<const char **>(envp));
+
         auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
         auto semantic = configuration.and_then<cs::semantic::Tools>([](auto config) {
@@ -141,75 +178,12 @@ namespace cs {
         });
 
         return rust::merge(arguments, configuration, semantic)
-                .map<Application::State*>([](auto tuples) {
-                    const auto& [arguments, configuration, semantic] = tuples;
+                .map<ps::CommandPtr>([](auto tuples) {
+                    const auto&[arguments, configuration, semantic] = tuples;
                     // read the configuration
                     cs::CompilationDatabase output(configuration.output.format, configuration.output.content);
                     report::ReportSerializer report_serializer;
-                    return new Application::State { arguments, report_serializer, semantic, output };
-                })
-                .map<Application>([](auto impl) {
-                    spdlog::debug("application object initialized.");
-                    return Application { impl };
+                    return std::make_unique<Command>(arguments, report_serializer, semantic, output);
                 });
-    }
-
-    rust::Result<int> Application::operator()() const
-    {
-        // get current compilations from the input.
-        return impl_->report_serializer.from_json(impl_->arguments.input)
-            .map<Entries>([this](const auto& commands) {
-                spdlog::debug("commands have read. [size: {}]", commands.executions.size());
-                auto compilations = impl_->semantic.transform(commands);
-                // remove duplicates
-                return merge({}, compilations);
-            })
-            // read back the current content and extend with the new elements.
-            .and_then<Entries>([this](const auto& compilations) {
-                spdlog::debug("compilation entries created. [size: {}]", compilations.size());
-                return (impl_->arguments.append)
-                    ? impl_->output.from_json(impl_->arguments.output.c_str())
-                            .template map<Entries>([&compilations](auto old_entries) {
-                                spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
-                                return merge(compilations, old_entries);
-                            })
-                    : rust::Result<Entries>(rust::Ok(compilations));
-            })
-            // write the entries into the output file.
-            .and_then<size_t>([this](const auto& compilations) {
-                spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
-                return impl_->output.to_json(impl_->arguments.output.c_str(), compilations);
-            })
-            // just map to success exit code if it was successful.
-            .map<int>([](auto size) {
-                spdlog::debug("compilation entries written. [size: {}]", size);
-                return EXIT_SUCCESS;
-            });
-    }
-
-    Application::Application(Application::State* const impl)
-        : impl_(impl)
-    {
-    }
-
-    Application::Application(Application&& rhs) noexcept
-        : impl_(rhs.impl_)
-    {
-        rhs.impl_ = nullptr;
-    }
-
-    Application& Application::operator=(Application&& rhs) noexcept
-    {
-        if (&rhs != this) {
-            delete impl_;
-            impl_ = rhs.impl_;
-        }
-        return *this;
-    }
-
-    Application::~Application()
-    {
-        delete impl_;
-        impl_ = nullptr;
     }
 }

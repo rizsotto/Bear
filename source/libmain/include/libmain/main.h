@@ -28,7 +28,7 @@ namespace ps {
     template <class App>
     int main(int argc, char* argv[], char* envp[]) {
         App app;
-        ps::Application *ptr = &app;
+        auto ptr = reinterpret_cast<ps::Application*>(&app);
 
         return ptr->command(argc,
                             const_cast<const char **>(argv),
