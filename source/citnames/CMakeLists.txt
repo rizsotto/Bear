@@ -35,7 +35,6 @@ target_link_libraries(citnames_a PUBLIC report_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
-target_compile_options(citnames_a PRIVATE -frtti)
 
 # Create an executable from the sub projects.
 add_executable(citnames
