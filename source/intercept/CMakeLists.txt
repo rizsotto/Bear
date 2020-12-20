@@ -153,6 +153,7 @@ add_executable(er
         )
 
 target_include_directories(er PUBLIC source/)
+target_link_libraries(er main_a)
 target_link_libraries(er reporter_a)
 target_link_libraries(er result_a)
 target_link_libraries(er flags_a)

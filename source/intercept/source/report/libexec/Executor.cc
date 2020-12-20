@@ -71,14 +71,14 @@ namespace {
             const char** const it_end = it + length();
 
             *it++ = session.reporter;
-            *it++ = er::flags::DESTINATION;
+            *it++ = er::DESTINATION;
             *it++ = session.destination;
             if (session.verbose) {
-                *it++ = er::flags::VERBOSE;
+                *it++ = er::VERBOSE;
             }
-            *it++ = er::flags::EXECUTE;
+            *it++ = er::EXECUTE;
             *it++ = path;
-            *it++ = er::flags::COMMAND;
+            *it++ = er::COMMAND;
             {
                 char* const* const argv_end = el::array::end(argv);
                 it = el::array::copy(argv, argv_end, it, it_end);

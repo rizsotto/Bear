@@ -19,34 +19,29 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
-#include "libresult/Result.h"
-#include "libsys/Environment.h"
+#include "libmain/ApplicationFromArgs.h"
+#include "report/EventFactory.h"
+#include "report/InterceptClient.h"
 
 namespace er {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> create(const flags::Arguments &args, sys::env::Vars &&);
+    struct Command : ps::Command {
+        Command(rpc::Session session, rpc::ExecutionContext context)
+                : ps::Command()
+                , session_(session)
+                , context_(context)
+        { }
 
-        ::rust::Result<int> operator()() const;
-
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
+        [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
-        struct State;
+        rpc::Session session_;
+        rpc::ExecutionContext context_;
+    };
 
-        explicit Application(State*);
-
-    private:
-        State const* impl_;
+    struct Application : ps::ApplicationFromArgs {
+        Application() noexcept;
+        rust::Result<flags::Arguments> parse(int argc, const char **argv) const override;
+        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
     };
 }

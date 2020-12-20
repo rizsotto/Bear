@@ -30,9 +30,9 @@
 namespace ic {
 
     struct Command : ps::Command {
-        explicit Command(std::vector<std::string_view> command,
-                         Session::SharedPtr session,
-                         Reporter::SharedPtr reporter)
+        Command(std::vector<std::string_view> command,
+                Session::SharedPtr session,
+                Reporter::SharedPtr reporter)
                 : ps::Command()
                 , command_(std::move(command))
                 , session_(session)
