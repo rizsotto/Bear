@@ -122,16 +122,16 @@ namespace ic {
                 const auto& [program, environment] = pair;
                 auto result = sys::Process::Builder(executor_)
                     .add_argument(executor_)
-                    .add_argument(er::flags::DESTINATION)
+                    .add_argument(er::DESTINATION)
                     .add_argument(server_address_);
                 if (verbose_) {
-                    result.add_argument(er::flags::VERBOSE);
+                    result.add_argument(er::VERBOSE);
                 }
 
                 return result
-                    .add_argument(er::flags::EXECUTE)
+                    .add_argument(er::EXECUTE)
                     .add_argument(program)
-                    .add_argument(er::flags::COMMAND)
+                    .add_argument(er::COMMAND)
                     .add_arguments(command.begin(), command.end())
                     .set_environment(environment);
             });

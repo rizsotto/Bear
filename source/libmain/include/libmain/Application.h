@@ -17,10 +17,27 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libmain/main.h"
-#include "report/supervisor/Application.h"
+#pragma once
 
-int main(int argc, char* argv[], char* envp[])
-{
-    return ps::main<er::Application>(argc, argv, envp);
+#include "libresult/Result.h"
+
+#include <memory>
+
+namespace ps {
+
+    struct Command {
+        virtual ~Command() noexcept = default;
+
+        [[nodiscard]]
+        virtual rust::Result<int> execute() const = 0;
+    };
+
+    using CommandPtr = std::unique_ptr<Command>;
+
+    struct Application {
+        virtual ~Application() noexcept = default;
+
+        [[nodiscard]]
+        virtual rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const = 0;
+    };
 }

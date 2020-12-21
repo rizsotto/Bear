@@ -19,30 +19,29 @@
 
 #include "report/supervisor/Application.h"
 #include "report/supervisor/Flags.h"
-#include "report/EventFactory.h"
-#include "report/InterceptClient.h"
+#include "libsys/Environment.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 
-#include <filesystem>
+#include <spdlog/spdlog.h>
+
 #include <memory>
 
 namespace {
 
-    rust::Result<rpc::Session> make_session(const ::flags::Arguments& args) noexcept
-    {
-        return args.as_string(er::flags::DESTINATION)
-                .map<rpc::Session>([](const auto& destination) {
-                    return rpc::Session { std::string(destination) };
+    rust::Result<rpc::Session> make_session(const ::flags::Arguments &args) noexcept {
+        return args.as_string(er::DESTINATION)
+                .map<rpc::Session>([](const auto &destination) {
+                    return rpc::Session{std::string(destination)};
                 });
     }
 
-    rust::Result<rpc::ExecutionContext> make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept
-    {
-        auto path = args.as_string(::er::flags::EXECUTE)
+    rust::Result<rpc::ExecutionContext>
+    make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept {
+        auto path = args.as_string(er::EXECUTE)
                 .map<std::string>([](auto file) { return std::string(file); });
-        auto command = args.as_string_list(::er::flags::COMMAND)
+        auto command = args.as_string_list(er::COMMAND)
                 .map<std::vector<std::string>>([](auto args) {
                     return std::vector<std::string>(args.begin(), args.end());
                 });
@@ -54,98 +53,91 @@ namespace {
                     return rpc::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
                 });
     }
+
+    struct ApplicationLogConfig : ps::ApplicationLogConfig {
+
+        ApplicationLogConfig()
+                : ps::ApplicationLogConfig("er", "er")
+        { }
+
+        void initForVerbose() const override {
+            spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
+            spdlog::set_level(spdlog::level::debug);
+        }
+    };
 }
 
 namespace er {
 
-    struct Application::State {
-        rpc::Session session;
-        rpc::ExecutionContext execution;
-    };
-
-    rust::Result<Application> Application::create(const ::flags::Arguments& args, sys::env::Vars &&environment)
-    {
-        return rust::merge(make_session(args), make_execution(args, std::move(environment)))
-            .map<Application>([](auto in) {
-                const auto& [session, execution] = in;
-                auto state = new Application::State { session, execution };
-                return Application(state);
-            });
-    }
-
-    rust::Result<int> Application::operator()() const
-    {
+    rust::Result<int> Command::execute() const {
         rpc::EventFactory event_factory;
-        rpc::InterceptClient client(impl_->session);
+        rpc::InterceptClient client(session_);
 
-        auto result = client.get_environment_update(impl_->execution.environment)
-            .map<rpc::ExecutionContext>([this](auto environment) {
-                return rpc::ExecutionContext {
-                    impl_->execution.command,
-                    impl_->execution.arguments,
-                    impl_->execution.working_directory,
-                    environment
-                };
-            })
-            .and_then<sys::Process>([&client, &event_factory](auto execution) {
-                return sys::Process::Builder(execution.command)
-                    .add_arguments(execution.arguments.begin(), execution.arguments.end())
-                    .set_environment(execution.environment)
+        auto result = client.get_environment_update(context_.environment)
+                .map<rpc::ExecutionContext>([this](auto environment) {
+                    return rpc::ExecutionContext{
+                            context_.command,
+                            context_.arguments,
+                            context_.working_directory,
+                            environment
+                    };
+                })
+                .and_then<sys::Process>([&client, &event_factory](auto execution) {
+                    return sys::Process::Builder(execution.command)
+                            .add_arguments(execution.arguments.begin(), execution.arguments.end())
+                            .set_environment(execution.environment)
 #ifdef SUPPORT_PRELOAD
-                    .spawn_with_preload()
+                            .spawn_with_preload()
 #else
-                    .spawn()
+                            .spawn()
 #endif
-                    .on_success([&client, &event_factory, &execution](auto& child) {
-                        auto event = event_factory.start(child.get_pid(), getppid(), execution);
-                        client.report(std::move(event));
-                    });
-            })
-            .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
-                sys::SignalForwarder guard(child);
-                while (true) {
-                    auto status = child.wait(true);
-                    status.on_success([&client, &event_factory](auto exit) {
-                        auto event = exit.is_signaled()
-                                ? event_factory.signal(exit.signal().value())
-                                : event_factory.terminate(exit.code().value());
-                        client.report(std::move(event));
-                    });
-                    if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
-                        return status;
+                            .on_success([&client, &event_factory, &execution](auto &child) {
+                                auto event = event_factory.start(child.get_pid(), getppid(), execution);
+                                client.report(std::move(event));
+                            });
+                })
+                .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
+                    sys::SignalForwarder guard(child);
+                    while (true) {
+                        auto status = child.wait(true);
+                        status.on_success([&client, &event_factory](auto exit) {
+                            auto event = exit.is_signaled()
+                                         ? event_factory.signal(exit.signal().value())
+                                         : event_factory.terminate(exit.code().value());
+                            client.report(std::move(event));
+                        });
+                        if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(
+                                false)) {
+                            return status;
+                        }
                     }
-                }
-            })
-            .map<int>([](auto status) {
-                return status.code().value_or(EXIT_FAILURE);
-            });
+                })
+                .map<int>([](auto status) {
+                    return status.code().value_or(EXIT_FAILURE);
+                });
 
         return result;
     }
 
-    Application::Application(Application::State* const impl)
-            : impl_(impl)
-    {
+    Application::Application() noexcept
+            : ps::ApplicationFromArgs(ApplicationLogConfig())
+    { }
+
+    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
+        const flags::Parser parser("er", VERSION, {
+                {::er::DESTINATION, {1,  true, "path to report directory",           std::nullopt, std::nullopt}},
+                {::er::EXECUTE,     {1,  true, "the path parameter for the command", std::nullopt, std::nullopt}},
+                {::er::COMMAND,     {-1, true, "the executed command",               std::nullopt, std::nullopt}}
+        });
+        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }
 
-    Application::Application(Application&& rhs) noexcept
-            : impl_(rhs.impl_)
-    {
-        rhs.impl_ = nullptr;
-    }
-
-    Application& Application::operator=(Application&& rhs) noexcept
-    {
-        if (&rhs != this) {
-            delete impl_;
-            impl_ = rhs.impl_;
-        }
-        return *this;
-    }
-
-    Application::~Application()
-    {
-        delete impl_;
-        impl_ = nullptr;
+    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
+        auto environment = sys::env::from(const_cast<const char **>(envp));
+        return rust::merge(make_session(args), make_execution(args, std::move(environment)))
+                .map<ps::CommandPtr>([](auto in) {
+                    const auto&[session, execution] = in;
+                    return std::make_unique<Command>(session, execution);
+                });
     }
 }

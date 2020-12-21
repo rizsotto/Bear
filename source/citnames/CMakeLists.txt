@@ -28,19 +28,20 @@ add_library(citnames_a OBJECT
 
 target_include_directories(citnames_a PUBLIC include/)
 target_include_directories(citnames_a PUBLIC source/)
+target_link_libraries(citnames_a PUBLIC main_a)
 target_link_libraries(citnames_a PUBLIC result_a)
 target_link_libraries(citnames_a PUBLIC flags_a)
 target_link_libraries(citnames_a PUBLIC report_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
-target_compile_options(citnames_a PRIVATE -frtti)
 
 # Create an executable from the sub projects.
 add_executable(citnames
         main.cc
         )
 
+target_link_libraries(citnames main_a)
 target_link_libraries(citnames citnames_a)
 target_link_libraries(citnames citnames_json_a)
 target_link_libraries(citnames result_a)
@@ -75,10 +76,12 @@ if (ENABLE_UNIT_TESTS)
             test/ToolGccTest.cc
             )
 
+    target_link_libraries(citnames_unit_test main_a)
     target_link_libraries(citnames_unit_test citnames_a)
     target_link_libraries(citnames_unit_test citnames_json_a)
     target_link_libraries(citnames_unit_test result_a)
     target_link_libraries(citnames_unit_test report_a)
+    target_link_libraries(citnames_unit_test flags_a)
     target_link_libraries(citnames_unit_test shell_a)
     target_link_libraries(citnames_unit_test sys_a)
     target_link_libraries(citnames_unit_test fmt::fmt)

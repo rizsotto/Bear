@@ -6,7 +6,7 @@ project(BearSource
         LANGUAGES C CXX
         )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSPDLOG_NO_EXCEPTIONS")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DGOOGLE_PROTOBUF_NO_RTTI")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
@@ -69,6 +69,7 @@ add_subdirectory(libresult)
 add_subdirectory(libflags)
 add_subdirectory(libshell)
 add_subdirectory(libsys)
+add_subdirectory(libmain)
 add_subdirectory(intercept)
 add_subdirectory(citnames)
 add_subdirectory(bear)

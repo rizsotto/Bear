@@ -19,7 +19,7 @@
 
 #pragma once
 
-namespace er::flags {
+namespace er {
 
     constexpr char VERBOSE[] = "--verbose";
     constexpr char DESTINATION[] = "--destination";

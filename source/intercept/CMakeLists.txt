@@ -27,6 +27,7 @@ endif()
 
 target_include_directories(intercept_a PUBLIC include/)
 target_include_directories(intercept_a PUBLIC source/)
+target_link_libraries(intercept_a PUBLIC main_a)
 target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC supervise_a)
@@ -40,6 +41,7 @@ add_executable(intercept
         source/collect/main.cc
         )
 
+target_link_libraries(intercept main_a)
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept report_a)
 target_link_libraries(intercept supervise_a)
@@ -70,6 +72,7 @@ if (ENABLE_UNIT_TESTS)
             test/SessionTest.cc
             )
 
+    target_link_libraries(intercept_unit_test main_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test report_a)
@@ -99,11 +102,13 @@ add_executable(wrapper
         )
 
 target_include_directories(wrapper PUBLIC source/)
-target_link_libraries(wrapper PUBLIC reporter_a)
-target_link_libraries(wrapper PUBLIC result_a)
-target_link_libraries(wrapper PUBLIC sys_a)
-target_link_libraries(wrapper PUBLIC supervise_a)
-target_link_libraries(wrapper PUBLIC spdlog::spdlog)
+target_link_libraries(wrapper main_a)
+target_link_libraries(wrapper flags_a)
+target_link_libraries(wrapper reporter_a)
+target_link_libraries(wrapper result_a)
+target_link_libraries(wrapper sys_a)
+target_link_libraries(wrapper supervise_a)
+target_link_libraries(wrapper spdlog::spdlog)
 
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
@@ -150,6 +155,7 @@ add_executable(er
         )
 
 target_include_directories(er PUBLIC source/)
+target_link_libraries(er main_a)
 target_link_libraries(er reporter_a)
 target_link_libraries(er result_a)
 target_link_libraries(er flags_a)

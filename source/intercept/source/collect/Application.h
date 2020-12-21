@@ -19,36 +19,37 @@
 
 #pragma once
 
-#include "libflags/Flags.h"
-#include "libresult/Result.h"
-#include "libsys/Environment.h"
+#include "libmain/ApplicationFromArgs.h"
+#include "Session.h"
+#include "Reporter.h"
 
-#include <memory>
+#include <utility>
+#include <vector>
+#include <string_view>
 
 namespace ic {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> from(const flags::Arguments& args, const char **envp);
+    struct Command : ps::Command {
+        Command(std::vector<std::string_view> command,
+                Session::SharedPtr session,
+                Reporter::SharedPtr reporter)
+                : ps::Command()
+                , command_(std::move(command))
+                , session_(session)
+                , reporter_(reporter)
+        { }
 
-        ::rust::Result<int> operator()() const;
-
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
+        [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
-        struct State;
+        std::vector<std::string_view> command_;
+        Session::SharedPtr session_;
+        Reporter::SharedPtr reporter_;
+    };
 
-        explicit Application(State*);
-
-    private:
-        State const* impl_;
+    struct Application : ps::ApplicationFromArgs {
+        Application() noexcept;
+        rust::Result<flags::Arguments> parse(int argc, const char **argv) const override;
+        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
     };
 }

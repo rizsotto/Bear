@@ -17,10 +17,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libmain/main.h"
-#include "report/supervisor/Application.h"
+#pragma once
 
-int main(int argc, char* argv[], char* envp[])
-{
-    return ps::main<er::Application>(argc, argv, envp);
+namespace ps {
+
+    struct ApplicationLogConfig {
+        ApplicationLogConfig(const char *name, const char *id);
+        virtual ~ApplicationLogConfig() = default;
+
+        virtual void initForSilent() const;
+        virtual void initForVerbose() const;
+
+        virtual void record(const char** argv, const char** envp) const;
+
+    protected:
+        const char *name_;
+        const char *id_;
+    };
 }
