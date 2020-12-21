@@ -18,8 +18,8 @@
  */
 
 #include "report/wrapper/Application.h"
-#include "report/EventFactory.h"
-#include "report/InterceptClient.h"
+#include "libmain/ApplicationLogConfig.h"
+#include "libsys/Environment.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
@@ -62,98 +62,78 @@ namespace {
 
 namespace wr {
 
-    struct Application::State {
-        rpc::Session session;
-        rpc::ExecutionContext execution;
-    };
-
-    rust::Result<Application> Application::create(const char** args, sys::env::Vars&& environment)
-    {
-        auto session = make_session(environment);
-        auto execution = make_execution(args, std::move(environment));
-
-        return rust::merge(session, execution)
-            .map<Application>([](auto in) {
-                const auto& [session, execution] = in;
-                auto state = new Application::State { session, execution };
-                return Application(state);
-            });
-    }
-
-    rust::Result<int> Application::operator()() const
-    {
+    rust::Result<int> Command::execute() const {
         rpc::EventFactory event_factory;
-        rpc::InterceptClient client(impl_->session);
-        auto command = client.get_wrapped_command(impl_->execution.command);
-        auto environment = client.get_environment_update(impl_->execution.environment);
+        rpc::InterceptClient client(session_);
+        auto command = client.get_wrapped_command(context_.command);
+        auto environment = client.get_environment_update(context_.environment);
 
         auto result = rust::merge(command, environment)
-            .map<rpc::ExecutionContext>([this](auto tuple) {
-                const auto& [command, environment] = tuple;
-                auto arguments = impl_->execution.arguments;
-                arguments.front() = command;
-                return rpc::ExecutionContext {
-                    command,
-                    arguments,
-                    impl_->execution.working_directory,
-                    environment
-                };
-            })
-            .and_then<sys::Process>([&client, &event_factory](auto execution) {
-                return sys::Process::Builder(execution.command)
-                    .add_arguments(execution.arguments.begin(), execution.arguments.end())
-                    .set_environment(execution.environment)
-                    .spawn()
-                    .on_success([&client, &event_factory, &execution](auto& child) {
-                        auto event = event_factory.start(child.get_pid(), getppid(), execution);
-                        client.report(std::move(event));
-                    });
-            })
-            .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
-                sys::SignalForwarder guard(child);
-                while (true) {
-                    auto status = child.wait(true);
-                    status.on_success([&client, &event_factory](auto exit) {
-                        auto event = exit.is_signaled()
-                                     ? event_factory.signal(exit.signal().value())
-                                     : event_factory.terminate(exit.code().value());
-                        client.report(std::move(event));
-                    });
-                    if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
-                        return status;
+                .map<rpc::ExecutionContext>([this](auto tuple) {
+                    const auto& [command, environment] = tuple;
+                    auto arguments = context_.arguments;
+                    arguments.front() = command;
+                    return rpc::ExecutionContext {
+                            command,
+                            arguments,
+                            context_.working_directory,
+                            environment
+                    };
+                })
+                .and_then<sys::Process>([&client, &event_factory](auto execution) {
+                    return sys::Process::Builder(execution.command)
+                            .add_arguments(execution.arguments.begin(), execution.arguments.end())
+                            .set_environment(execution.environment)
+                            .spawn()
+                            .on_success([&client, &event_factory, &execution](auto& child) {
+                                auto event = event_factory.start(child.get_pid(), getppid(), execution);
+                                client.report(std::move(event));
+                            });
+                })
+                .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
+                    sys::SignalForwarder guard(child);
+                    while (true) {
+                        auto status = child.wait(true);
+                        status.on_success([&client, &event_factory](auto exit) {
+                            auto event = exit.is_signaled()
+                                         ? event_factory.signal(exit.signal().value())
+                                         : event_factory.terminate(exit.code().value());
+                            client.report(std::move(event));
+                        });
+                        if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
+                            return status;
+                        }
                     }
-                }
-            })
-            .map<int>([](auto status) {
-                return status.code().value_or(EXIT_FAILURE);
-            });
+                })
+                .map<int>([](auto status) {
+                    return status.code().value_or(EXIT_FAILURE);
+                });
 
         return result;
     }
 
-    Application::Application(Application::State* const impl)
-            : impl_(impl)
+    Application::Application() noexcept
+            : ps::Application()
+            , log_config(ps::ApplicationLogConfig("wrapper", "wr"))
     {
-    }
-
-    Application::Application(Application&& rhs) noexcept
-            : impl_(rhs.impl_)
-    {
-        rhs.impl_ = nullptr;
-    }
-
-    Application& Application::operator=(Application&& rhs) noexcept
-    {
-        if (&rhs != this) {
-            delete impl_;
-            impl_ = rhs.impl_;
+        if (const bool verbose = (nullptr != getenv(wr::env::KEY_VERBOSE)); verbose) {
+            log_config.initForVerbose();
+        } else {
+            log_config.initForSilent();
         }
-        return *this;
     }
 
-    Application::~Application()
-    {
-        delete impl_;
-        impl_ = nullptr;
+    rust::Result<ps::CommandPtr> Application::command(int argc, const char **argv, const char **envp) const {
+        log_config.record(argv, envp);
+
+        auto environment = sys::env::from(const_cast<const char **>(envp));
+        auto session = make_session(environment);
+        auto execution = make_execution(argv, std::move(environment));
+
+        return rust::merge(session, execution)
+                .map<ps::CommandPtr>([](auto in) {
+                    const auto& [session, execution] = in;
+                    return std::make_unique<Command>(session, execution);
+                });
     }
 }

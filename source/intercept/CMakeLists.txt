@@ -102,11 +102,13 @@ add_executable(wrapper
         )
 
 target_include_directories(wrapper PUBLIC source/)
-target_link_libraries(wrapper PUBLIC reporter_a)
-target_link_libraries(wrapper PUBLIC result_a)
-target_link_libraries(wrapper PUBLIC sys_a)
-target_link_libraries(wrapper PUBLIC supervise_a)
-target_link_libraries(wrapper PUBLIC spdlog::spdlog)
+target_link_libraries(wrapper main_a)
+target_link_libraries(wrapper flags_a)
+target_link_libraries(wrapper reporter_a)
+target_link_libraries(wrapper result_a)
+target_link_libraries(wrapper sys_a)
+target_link_libraries(wrapper supervise_a)
+target_link_libraries(wrapper spdlog::spdlog)
 
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})

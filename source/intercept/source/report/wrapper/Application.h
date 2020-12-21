@@ -19,33 +19,32 @@
 
 #pragma once
 
-#include "libresult/Result.h"
-#include "libsys/Environment.h"
+#include "libmain/Application.h"
+#include "libmain/ApplicationLogConfig.h"
+#include "report/EventFactory.h"
+#include "report/InterceptClient.h"
 
 namespace wr {
 
-    class Application {
-    public:
-        static ::rust::Result<Application> create(const char** args, sys::env::Vars&&);
+    struct Command : ps::Command {
+        Command(rpc::Session session, rpc::ExecutionContext context)
+                : ps::Command()
+                , session_(session)
+                , context_(context)
+        { }
 
-        ::rust::Result<int> operator()() const;
-
-    public:
-        Application() = delete;
-        ~Application();
-
-        Application(const Application&) = delete;
-        Application(Application&&) noexcept;
-
-        Application& operator=(const Application&) = delete;
-        Application& operator=(Application&&) noexcept;
+        [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
-        struct State;
+        rpc::Session session_;
+        rpc::ExecutionContext context_;
+    };
 
-        explicit Application(State*);
+    struct Application : ps::Application {
+        Application() noexcept;
+        rust::Result<ps::CommandPtr> command(int argc, const char **argv, const char **envp) const override;
 
     private:
-        State const* impl_;
+        ps::ApplicationLogConfig log_config;
     };
 }
