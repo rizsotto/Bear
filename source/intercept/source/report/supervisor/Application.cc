@@ -24,6 +24,8 @@
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
 
+#include <spdlog/spdlog.h>
+
 #include <memory>
 
 namespace {
@@ -51,6 +53,18 @@ namespace {
                     return rpc::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
                 });
     }
+
+    struct ApplicationLogConfig : ps::ApplicationLogConfig {
+
+        ApplicationLogConfig()
+                : ps::ApplicationLogConfig("er", "er")
+        { }
+
+        void initForVerbose() const override {
+            spdlog::set_pattern(fmt::format("[%H:%M:%S.%f, er, {0}, ppid: {1}] %v", getpid(), getppid()));
+            spdlog::set_level(spdlog::level::debug);
+        }
+    };
 }
 
 namespace er {
@@ -106,7 +120,7 @@ namespace er {
     }
 
     Application::Application() noexcept
-            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("er", "er"))
+            : ps::ApplicationFromArgs(ApplicationLogConfig())
     { }
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
