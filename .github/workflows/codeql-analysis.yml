@@ -27,7 +27,7 @@ jobs:
       - name: Install package dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake pkg-config
+          sudo apt-get install -y cmake pkg-config libsqlite3-dev
 
       - name: Prepare
         run: |

@@ -35,6 +35,7 @@ target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+target_link_libraries(intercept_a PUBLIC PkgConfig::sqlite)
 
 # Create an executable from the sub projects.
 add_executable(intercept
