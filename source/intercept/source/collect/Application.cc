@@ -82,7 +82,7 @@ namespace ic {
                           .AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
-        std::string server_address = fmt::format("0.0.0.0:{}", port);
+        std::string server_address = fmt::format("127.0.0.1:{}", port);
         spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
         // Configure the session and the reporter objects
         session_->set_server_address(server_address);
