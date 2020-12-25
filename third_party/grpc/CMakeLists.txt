@@ -1,6 +1,6 @@
 message(STATUS "Looking for gRPC::grpc++ dependency")
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(gRPC protobuf>=3.11 grpc++>=1.28)
+pkg_check_modules(gRPC protobuf>=3.11 grpc++>=1.26)
 if (gRPC_FOUND)
     message(STATUS "Looking for gRPC::grpc++ dependency -- found")
 
