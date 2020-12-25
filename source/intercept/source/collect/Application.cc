@@ -23,7 +23,6 @@
 #include "collect/Session.h"
 #include "intercept/Flags.h"
 #include "libsys/Os.h"
-#include "libsys/Signal.h"
 
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
@@ -35,27 +34,6 @@
 namespace {
 
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
-
-    rust::Result<int> execute_command(const ic::Session& session, const std::vector<std::string_view>& command) {
-        return session.supervise(command)
-            .and_then<sys::Process>([](auto builder) {
-                return builder.spawn();
-            })
-            .and_then<sys::ExitStatus>([](auto child) {
-                sys::SignalForwarder guard(child);
-                return child.wait();
-            })
-            .map<int>([](auto status) {
-                return status.code().value_or(EXIT_FAILURE);
-            })
-            .map_err<std::runtime_error>([](auto error) {
-                spdlog::warn("Command execution failed: {}", error.what());
-                return error;
-            })
-            .on_success([](auto status) {
-                spdlog::debug("Running command. [Exited with {0}]", status);
-            });
-    }
 
     rust::Result<std::vector<std::string_view>> get_command(const flags::Arguments& args)
     {
@@ -87,7 +65,7 @@ namespace ic {
         // Configure the session and the reporter objects
         session_->set_server_address(server_address);
         // Execute the build command
-        auto result = execute_command(*session_, command_);
+        auto result = session_->execute(command_);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();

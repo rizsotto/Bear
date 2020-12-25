@@ -26,6 +26,9 @@
 #endif
 
 #include "libsys/Path.h"
+#include "libsys/Signal.h"
+
+#include <spdlog/spdlog.h>
 
 namespace ic {
 
@@ -72,5 +75,26 @@ namespace ic {
         });
 
         return sys::path::join(result);
+    }
+
+    rust::Result<int> Session::execute(const std::vector<std::string_view> &command) const {
+        return supervise(command)
+                .and_then<sys::Process>([](auto builder) {
+                    return builder.spawn();
+                })
+                .and_then<sys::ExitStatus>([](auto child) {
+                    sys::SignalForwarder guard(child);
+                    return child.wait();
+                })
+                .map<int>([](auto status) {
+                    return status.code().value_or(EXIT_FAILURE);
+                })
+                .map_err<std::runtime_error>([](auto error) {
+                    spdlog::warn("Command execution failed: {}", error.what());
+                    return error;
+                })
+                .on_success([](auto status) {
+                    spdlog::debug("Running command. [Exited with {0}]", status);
+                });
     }
 }
