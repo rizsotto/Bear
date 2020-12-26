@@ -24,12 +24,12 @@
 namespace ic {
 
     SupervisorImpl::SupervisorImpl(const Session& session)
-        : ::supervise::Supervisor::Service()
+        : rpc::Supervisor::Service()
         , session_(session)
     {
     }
 
-    ::grpc::Status SupervisorImpl::Update(::grpc::ServerContext*, const ::supervise::Environment* request, ::supervise::Environment* response)
+    ::grpc::Status SupervisorImpl::Update(::grpc::ServerContext*, const rpc::Environment* request, rpc::Environment* response)
     {
         const std::map<std::string, std::string> copy(request->values().begin(), request->values().end());
         return session_.update(copy)
@@ -40,7 +40,7 @@ namespace ic {
             .unwrap_or(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "environment update failed"));
     }
 
-    ::grpc::Status SupervisorImpl::ResolveProgram(::grpc::ServerContext*, const ::supervise::ResolveRequest* request, ::supervise::ResolveResponse* response)
+    ::grpc::Status SupervisorImpl::ResolveProgram(::grpc::ServerContext*, const rpc::ResolveRequest* request, rpc::ResolveResponse* response)
     {
         return session_.resolve(request->path())
             .map<grpc::Status>([&response](auto path) {
@@ -51,13 +51,13 @@ namespace ic {
     }
 
     InterceptorImpl::InterceptorImpl(Reporter& reporter)
-        : ::supervise::Interceptor::Service()
+        : rpc::Interceptor::Service()
         , reporter_(reporter)
         , lock_()
     {
     }
 
-    ::grpc::Status InterceptorImpl::Register(::grpc::ServerContext*, const ::supervise::Event* request, ::supervise::Empty*)
+    ::grpc::Status InterceptorImpl::Register(::grpc::ServerContext*, const rpc::Event* request, rpc::Empty*)
     {
         std::lock_guard<std::mutex> guard(lock_);
 

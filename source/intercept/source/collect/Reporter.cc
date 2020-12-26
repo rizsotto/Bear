@@ -20,7 +20,6 @@
 #include "config.h"
 #include "intercept/Flags.h"
 #include "collect/Reporter.h"
-#include "collect/Application.h"
 #include "libsys/Os.h"
 
 #include <spdlog/spdlog.h>
@@ -73,7 +72,7 @@ namespace {
             });
     }
 
-    void update_run_with_started(report::Run& target, const supervise::Event& source)
+    void update_run_with_started(report::Run& target, const rpc::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: start]", source.pid());
         auto event = report::Event {
@@ -85,7 +84,7 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_signaled(report::Run& target, const supervise::Event& source)
+    void update_run_with_signaled(report::Run& target, const rpc::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: signal]", source.pid());
         auto event = report::Event {
@@ -97,7 +96,7 @@ namespace {
         target.events.emplace_back(event);
     }
 
-    void update_run_with_terminated(report::Run& target, const supervise::Event& source)
+    void update_run_with_terminated(report::Run& target, const rpc::Event& source)
     {
         spdlog::debug("Received event is merged into execution report. [pid: {}, event: stop]", source.pid());
         auto event = report::Event {
@@ -124,7 +123,7 @@ namespace {
         return (value == 0 ? std::nullopt : std::make_optional(value));
     }
 
-    report::Execution init_execution(const supervise::Event& source)
+    report::Execution init_execution(const rpc::Event& source)
     {
         const auto& started = source.started();
 
@@ -167,7 +166,7 @@ namespace ic {
     {
     }
 
-    void Reporter::report(const ::supervise::Event& event)
+    void Reporter::report(const rpc::Event& event)
     {
         const auto rid = event.rid();
         if (auto it = executions_.find(rid); it != executions_.end()) {

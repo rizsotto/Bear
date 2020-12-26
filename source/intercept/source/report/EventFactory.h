@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-#include "supervise.pb.h"
+#include "intercept.pb.h"
 
 namespace rpc {
 
@@ -41,14 +41,14 @@ namespace rpc {
         EventFactory() noexcept;
         ~EventFactory() noexcept = default;
 
-        [[nodiscard]] supervise::Event start(
+        [[nodiscard]] rpc::Event start(
                 pid_t pid,
                 pid_t ppid,
                 const ExecutionContext &execution) const;
 
-        [[nodiscard]] supervise::Event signal(int number) const;
+        [[nodiscard]] rpc::Event signal(int number) const;
 
-        [[nodiscard]] supervise::Event terminate(int code) const;
+        [[nodiscard]] rpc::Event terminate(int code) const;
 
     private:
         uint64_t rid_;

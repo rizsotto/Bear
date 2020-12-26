@@ -21,6 +21,7 @@
 
 #include <mutex>
 
+#include "intercept.grpc.pb.h"
 #include "supervise.grpc.pb.h"
 
 namespace ic {
@@ -28,24 +29,24 @@ namespace ic {
     class Reporter;
     class Session;
 
-    class SupervisorImpl final : public ::supervise::Supervisor::Service {
+    class SupervisorImpl final : public rpc::Supervisor::Service {
     public:
         explicit SupervisorImpl(const Session&);
         ~SupervisorImpl() override = default;
 
-        ::grpc::Status ResolveProgram(::grpc::ServerContext* context, const ::supervise::ResolveRequest* request, ::supervise::ResolveResponse* response) override;
-        ::grpc::Status Update(::grpc::ServerContext* context, const ::supervise::Environment* request, ::supervise::Environment* response) override;
+        ::grpc::Status ResolveProgram(::grpc::ServerContext* context, const rpc::ResolveRequest* request, rpc::ResolveResponse* response) override;
+        ::grpc::Status Update(::grpc::ServerContext* context, const rpc::Environment* request, rpc::Environment* response) override;
 
     private:
         const Session& session_;
     };
 
-    class InterceptorImpl final : public ::supervise::Interceptor::Service {
+    class InterceptorImpl final : public rpc::Interceptor::Service {
     public:
         explicit InterceptorImpl(Reporter&);
         ~InterceptorImpl() override = default;
 
-        ::grpc::Status Register(::grpc::ServerContext* context, const ::supervise::Event* request, ::supervise::Empty* response) override;
+        ::grpc::Status Register(::grpc::ServerContext* context, const rpc::Event* request, rpc::Empty* response) override;
 
     private:
         Reporter& reporter_;

@@ -23,9 +23,9 @@
 
 namespace {
 
-    supervise::Event start_event()
+    rpc::Event start_event()
     {
-        auto inner = new supervise::Event_Started();
+        auto inner = new rpc::Event_Started();
         inner->set_executable("/usr/bin/ls");
         inner->add_arguments("ls");
         inner->add_arguments("-l");
@@ -33,7 +33,7 @@ namespace {
         inner->mutable_environment()->insert({ "HOME", "/home/user" });
         inner->mutable_environment()->insert({ "PATH", "/usr/bin:/usr/local/bin" });
 
-        auto result = supervise::Event();
+        auto result = rpc::Event();
         result.set_timestamp("2020-04-04T07:13:47.027Z");
         result.set_pid(42);
         result.set_ppid(12);
@@ -42,12 +42,12 @@ namespace {
         return result;
     }
 
-    supervise::Event signal_event()
+    rpc::Event signal_event()
     {
-        auto inner = new supervise::Event_Signalled();
+        auto inner = new rpc::Event_Signalled();
         inner->set_number(15);
 
-        auto result = supervise::Event();
+        auto result = rpc::Event();
         result.set_pid(42);
         result.set_timestamp("2020-04-04T07:13:47.045Z");
         result.set_allocated_signalled(inner);
@@ -55,12 +55,12 @@ namespace {
         return result;
     }
 
-    supervise::Event stop_event()
+    rpc::Event stop_event()
     {
-        auto inner = new supervise::Event_Terminated();
+        auto inner = new rpc::Event_Terminated();
         inner->set_status(0);
 
-        auto result = supervise::Event();
+        auto result = rpc::Event();
         result.set_pid(42);
         result.set_timestamp("2020-04-04T07:13:47.074Z");
         result.set_allocated_terminated(inner);

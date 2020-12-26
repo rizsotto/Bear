@@ -35,8 +35,8 @@ namespace rpc {
 
     InterceptClient::InterceptClient(const Session& session)
             : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
-            , supervisor_(supervise::Supervisor::NewStub(channel_))
-            , interceptor_(supervise::Interceptor::NewStub(channel_))
+            , supervisor_(rpc::Supervisor::NewStub(channel_))
+            , interceptor_(rpc::Interceptor::NewStub(channel_))
     {
     }
 
@@ -45,8 +45,8 @@ namespace rpc {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetWrappedCommand");
 
         grpc::ClientContext context;
-        supervise::ResolveRequest request;
-        supervise::ResolveResponse response;
+        rpc::ResolveRequest request;
+        rpc::ResolveResponse response;
 
         request.set_path(name);
 
@@ -62,8 +62,8 @@ namespace rpc {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetEnvironmentUpdate");
 
         grpc::ClientContext context;
-        supervise::Environment request;
-        supervise::Environment response;
+        rpc::Environment request;
+        rpc::Environment response;
 
         request.mutable_values()->insert(input.begin(), input.end());
 
@@ -76,12 +76,12 @@ namespace rpc {
         return rust::Err(create_error(status));
     }
 
-    rust::Result<int> InterceptClient::report(supervise::Event&& event)
+    rust::Result<int> InterceptClient::report(rpc::Event&& event)
     {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Report");
 
         grpc::ClientContext context;
-        supervise::Empty response;
+        rpc::Empty response;
 
         const grpc::Status status = interceptor_->Register(&context, event, &response);
         spdlog::debug("gRPC call [Register] finished: {}", status.ok());
