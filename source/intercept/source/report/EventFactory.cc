@@ -51,17 +51,17 @@ namespace rpc {
             : rid_(generate_unique_id())
     { }
 
-    supervise::Event EventFactory::start(
+    rpc::Event EventFactory::start(
             pid_t pid,
             pid_t ppid,
             const ExecutionContext &execution) const {
-        supervise::Event result;
+        rpc::Event result;
         result.set_rid(rid_);
         result.set_pid(pid);
         result.set_ppid(ppid);
         result.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<supervise::Event_Started>();
+            auto event = std::make_unique<rpc::Event_Started>();
             event->set_executable(execution.command);
             for (const auto &arg : execution.arguments) {
                 event->add_arguments(arg.data());
@@ -74,12 +74,12 @@ namespace rpc {
         return result;
     }
 
-    supervise::Event EventFactory::signal(int number) const {
-        supervise::Event result;
+    rpc::Event EventFactory::signal(int number) const {
+        rpc::Event result;
         result.set_rid(rid_);
         result.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<supervise::Event_Signalled>();
+            auto event = std::make_unique<rpc::Event_Signalled>();
             event->set_number(number);
 
             result.set_allocated_signalled(event.release());
@@ -87,12 +87,12 @@ namespace rpc {
         return result;
     }
 
-    supervise::Event EventFactory::terminate(int code) const {
-        supervise::Event result;
+    rpc::Event EventFactory::terminate(int code) const {
+        rpc::Event result;
         result.set_rid(rid_);
         result.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<supervise::Event_Terminated>();
+            auto event = std::make_unique<rpc::Event_Terminated>();
             event->set_status(code);
 
             result.set_allocated_terminated(event.release());

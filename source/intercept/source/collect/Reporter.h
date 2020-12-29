@@ -23,7 +23,7 @@
 #include "libflags/Flags.h"
 #include "intercept/output/Report.h"
 #include "libresult/Result.h"
-#include "supervise.pb.h"
+#include "intercept.pb.h"
 
 #include <filesystem>
 #include <memory>
@@ -39,7 +39,7 @@ namespace ic {
         using SharedPtr = std::shared_ptr<Reporter>;
         static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const ic::Session&);
 
-        void report(const ::supervise::Event& request);
+        void report(const rpc::Event& request);
         void flush();
 
     public:

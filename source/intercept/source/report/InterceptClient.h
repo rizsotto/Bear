@@ -22,6 +22,7 @@
 #include "libresult/Result.h"
 
 #include <grpcpp/channel.h>
+#include "intercept.grpc.pb.h"
 #include "supervise.grpc.pb.h"
 
 #include <list>
@@ -46,11 +47,11 @@ namespace rpc {
     public:
         rust::Result<std::string> get_wrapped_command(const std::string&);
         rust::Result<std::map<std::string, std::string>> get_environment_update(const std::map<std::string, std::string>&);
-        rust::Result<int> report(supervise::Event&&);
+        rust::Result<int> report(rpc::Event&&);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;
-        std::unique_ptr<supervise::Supervisor::Stub> supervisor_;
-        std::unique_ptr<supervise::Interceptor::Stub> interceptor_;
+        std::unique_ptr<rpc::Supervisor::Stub> supervisor_;
+        std::unique_ptr<rpc::Interceptor::Stub> interceptor_;
     };
 }

@@ -19,7 +19,7 @@
 
 syntax = "proto3";
 
-package supervise;
+package rpc;
 option cc_enable_arenas = true;
 
 // This represents a (remote) supervisor process to set up program execution.
@@ -63,69 +63,3 @@ message ResolveResponse {
 message Environment {
     map<string, string> values = 1;
 }
-
-// Represents the remote sink of supervised process events.
-//
-// Events from a process execution can be sent from many actors (mostly
-// supervisor processes). The events are collected in a common place
-// in order to reconstruct of final report of a build process.
-service Interceptor {
-
-    // Register a process related events.
-    rpc Register (Event) returns (Empty) {}
-}
-
-// Represent a relevant life cycle event of a process.
-//
-// Currently it's only the process life cycle events (start, signal,
-// terminate), but can be extended later with performance related
-// events like monitoring the CPU usage or the memory allocation if
-// those information are available to the the supervisor process.
-message Event {
-
-    // Required.
-    uint64 rid = 1;
-
-    // Required.
-    uint32 pid = 2;
-
-    // Optional.
-    uint32 ppid = 3;
-
-    // Required.
-    // (ISO-8601 date-tie format with microsecond precision in UTC timezone)
-    string timestamp = 4;
-
-    reserved 5 to 10;
-
-    // Required.
-    oneof event {
-        Started started = 11;
-        Terminated terminated = 12;
-        Signalled signalled = 13;
-    }
-
-    // Represents a successful process execution.
-    message Started {
-        // All fields are required.
-        string executable = 3;
-        repeated string arguments = 4;
-        string working_dir = 5;
-        map<string, string> environment = 6;
-    }
-
-    // Represents the termination of the supervised process.
-    message Terminated {
-        // Optional.
-        // (Killed processes have no exit status.)
-        int64 status = 1;
-    }
-
-    // Represents the supervised process received a signal.
-    message Signalled {
-        // Required.
-        int32 number = 1;
-    }
-}
-
-message Empty {}

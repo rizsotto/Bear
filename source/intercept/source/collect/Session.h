@@ -42,6 +42,7 @@ namespace ic {
         [[nodiscard]] virtual rust::Result<std::string> resolve(const std::string& name) const = 0;
         [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
         [[nodiscard]] virtual rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const = 0;
+        [[nodiscard]] virtual rust::Result<int> execute(const std::vector<std::string_view>& command) const;
 
         [[nodiscard]] virtual std::string get_session_type() const = 0;
 
