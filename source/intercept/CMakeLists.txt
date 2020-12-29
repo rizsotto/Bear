@@ -15,6 +15,7 @@ target_compile_options(report_a PRIVATE -fexceptions)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
+        source/collect/Database.cc
         source/collect/Reporter.cc
         source/collect/Services.cc
         source/collect/Session.cc

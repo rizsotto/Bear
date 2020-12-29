@@ -150,24 +150,41 @@ namespace ic {
     {
         auto host_info = create_host_info();
         auto output = flags.as_string(OUTPUT);
+        auto db = output
+                .and_then<DatabaseWriter::Ptr>([](auto file) {
+                    return DatabaseWriter::create(fmt::format("{}.sqlite3", file));
+                });
 
-        return merge(host_info, output)
-            .map<Reporter::SharedPtr>([&session](auto pair) {
-                const auto& [host_info, output] = pair;
+        return merge(host_info, output, db)
+            .map<Reporter::SharedPtr>([&session](auto tuple) {
+                const auto& [host_info, output, db] = tuple;
                 auto context = report::Context { session.get_session_type(), host_info };
-                return Reporter::SharedPtr(new Reporter(output, std::move(context)));
+                return std::make_shared<Reporter>(output, std::move(context), db);
             });
     }
 
-    Reporter::Reporter(const std::string_view& output, report::Context&& context)
+    Reporter::Reporter(const std::string_view& output, report::Context&& context, ic::DatabaseWriter::Ptr db)
             : output_(output)
             , context_(context)
             , executions_()
+            , db_(std::move(db))
     {
+    }
+
+    Reporter::~Reporter() noexcept {
+        std::error_code error_code;
+        fs::remove(fmt::format("{}.sqlite3", output_.string()), error_code);
     }
 
     void Reporter::report(const rpc::Event& event)
     {
+        if (db_) {
+            db_->insert_event(event)
+                    .on_error([](auto error) {
+                        spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
+                    });
+        }
+
         const auto rid = event.rid();
         if (auto it = executions_.find(rid); it != executions_.end()) {
             // the process entry exits

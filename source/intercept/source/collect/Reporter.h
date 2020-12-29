@@ -20,6 +20,7 @@
 #pragma once
 
 #include "collect/Session.h"
+#include "collect/Database.h"
 #include "libflags/Flags.h"
 #include "intercept/output/Report.h"
 #include "libresult/Result.h"
@@ -44,7 +45,7 @@ namespace ic {
 
     public:
         Reporter() = delete;
-        virtual ~Reporter() noexcept = default;
+        virtual ~Reporter() noexcept;
 
         Reporter(const Reporter&) = delete;
         Reporter(Reporter&&) noexcept = delete;
@@ -52,9 +53,7 @@ namespace ic {
         Reporter& operator=(const Reporter&) = delete;
         Reporter& operator=(Reporter&&) noexcept = delete;
 
-    protected:
-        // These methods are visible for testing...
-        Reporter(const std::string_view& view, report::Context&& context);
+        Reporter(const std::string_view& view, report::Context&& context, ic::DatabaseWriter::Ptr db);
 
         [[nodiscard]] report::Report makeReport() const;
 
@@ -62,5 +61,6 @@ namespace ic {
         fs::path output_;
         report::Context context_;
         std::map<uint64_t, report::Execution> executions_;
+        ic::DatabaseWriter::Ptr db_;
     };
 }

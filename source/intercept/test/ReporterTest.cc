@@ -68,26 +68,17 @@ namespace {
         return result;
     }
 
-    struct ReporterFixture : ic::Reporter {
-    public:
-        ReporterFixture(const std::string_view& view, report::Context&& context)
-                : Reporter(view, std::move(context))
-        {
-        }
-
-        using Reporter::flush;
-        using Reporter::makeReport;
-    };
-
     TEST(reporter, builder_makes_empty_execution_object)
     {
         report::Report expected = report::Report {
             report::Context { "session", { { "key", "value" } } },
             {}
         };
-        ReporterFixture sut(
+        ic::Reporter sut(
             "ignore",
-            report::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } },
+            ic::DatabaseWriter::Ptr()
+            );
 
         report::Report result = sut.makeReport();
         EXPECT_EQ(result, expected);
@@ -99,9 +90,11 @@ namespace {
             report::Context { "session", { { "key", "value" } } },
             {}
         };
-        ReporterFixture sut(
+        ic::Reporter sut(
             "ignore",
-            report::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } },
+            ic::DatabaseWriter::Ptr()
+            );
         sut.report(signal_event());
         sut.report(stop_event());
 
@@ -132,9 +125,11 @@ namespace {
                 }
             }
         };
-        ReporterFixture sut(
+        ic::Reporter sut(
             "ignore",
-            report::Context { "session", { { "key", "value" } } });
+            report::Context { "session", { { "key", "value" } } },
+            ic::DatabaseWriter::Ptr()
+            );
         sut.report(start_event());
         sut.report(signal_event());
         sut.report(stop_event());
