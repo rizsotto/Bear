@@ -33,79 +33,72 @@ struct sqlite3_stmt;
 
 namespace ic {
 
-    class DatabaseWriter {
-    public:
-        using Ptr = std::shared_ptr<DatabaseWriter>;
+    class EventsIterator;
 
-        [[nodiscard]] static rust::Result<DatabaseWriter::Ptr> create(const fs::path &file);
+    class EventsDatabase {
+    public:
+        using Ptr = std::shared_ptr<EventsDatabase>;
+
+        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file);
+        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> create(const fs::path &file);
 
         [[nodiscard]] rust::Result<int> insert_event(const rpc::Event &event);
 
+        [[nodiscard]] EventsIterator events_by_process_begin();
+        [[nodiscard]] EventsIterator events_by_process_end();
+
     private:
-        [[nodiscard]] std::runtime_error create_error(const char*);
+        friend class EventsIterator;
+
+        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file, bool create);
+
+        [[nodiscard]] EventsIterator next() noexcept;
 
     public:
-        DatabaseWriter(sqlite3 *handle, sqlite3_stmt *insert) noexcept;
-        ~DatabaseWriter() noexcept;
+        EventsDatabase(sqlite3 *handle,
+                       sqlite3_stmt *insert_event,
+                       sqlite3_stmt *select_events,
+                       sqlite3_stmt *select_events_per_run) noexcept;
+        ~EventsDatabase() noexcept;
 
-        DatabaseWriter(const DatabaseWriter &) = delete;
-        DatabaseWriter(DatabaseWriter &&) noexcept = delete;
+        EventsDatabase(const EventsDatabase &) = delete;
+        EventsDatabase(EventsDatabase &&) noexcept = delete;
 
-        DatabaseWriter &operator=(const DatabaseWriter &) = delete;
-        DatabaseWriter &operator=(DatabaseWriter &&) noexcept = delete;
+        EventsDatabase &operator=(const EventsDatabase &) = delete;
+        EventsDatabase &operator=(EventsDatabase &&) noexcept = delete;
 
     private:
         sqlite3 *handle_;
-        sqlite3_stmt *insert_;
+        sqlite3_stmt *insert_event_;
+        sqlite3_stmt *select_events_;
+        sqlite3_stmt *select_events_per_run_;
     };
 
-//    class EventsIterator;
-//
-//    class DatabaseReader {
-//    public:
-//        using Ptr = std::shared_ptr<DatabaseReader>;
-//
-//        [[nodiscard]] static rust::Result<DatabaseReader::Ptr> open(const fs::path &file);
-//
-//        [[nodiscard]] EventsIterator events_by_process_begin();
-//        [[nodiscard]] EventsIterator events_by_process_end();
-//
-//    private:
-//        [[nodiscard]] std::runtime_error create_error(const char*);
-//
-//    public:
-//        explicit DatabaseReader(sqlite3 *handle) noexcept;
-//        ~DatabaseReader() noexcept;
-//
-//        DatabaseReader(const DatabaseReader &) = delete;
-//        DatabaseReader(DatabaseReader &&) noexcept = delete;
-//
-//        DatabaseReader &operator=(const DatabaseReader &) = delete;
-//        DatabaseReader &operator=(DatabaseReader &&) noexcept = delete;
-//
-//    private:
-//        sqlite3 *handle_;
-//    };
-//
-//    class EventsIterator {
-//    public:
-//        using difference_type = std::ptrdiff_t;
-//        using iterator_category = std::input_iterator_tag;
-//        using value_type = rust::Result<std::vector<rpc::Event>>;
-//        using pointer = value_type const *;
-//        using reference = value_type const &;
-//
-//    public:
-//        EventsIterator();
-//
-//        reference operator*() const;
-//
-//        EventsIterator operator++(int);
-//        EventsIterator &operator++();
-//
-//        bool operator==(const EventsIterator &other) const;
-//        bool operator!=(const EventsIterator &other) const;
-//
-//    private:
-//    };
+    using EventPtr = std::shared_ptr<rpc::Event>;
+    using EventPtrs = std::vector<EventPtr>;
+
+    class EventsIterator {
+    public:
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::input_iterator_tag;
+        using value_type = rust::Result<std::vector<std::shared_ptr<rpc::Event>>>;
+        using pointer = value_type const *;
+        using reference = value_type const &;
+
+    public:
+        EventsIterator() noexcept;
+        EventsIterator(EventsDatabase *source, rust::Result<EventPtrs> value) noexcept;
+
+        reference operator*() const;
+
+        EventsIterator operator++(int);
+        EventsIterator &operator++();
+
+        bool operator==(const EventsIterator &other) const;
+        bool operator!=(const EventsIterator &other) const;
+
+    private:
+        EventsDatabase *source_;
+        rust::Result<EventPtrs> value_;
+    };
 }

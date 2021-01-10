@@ -142,6 +142,27 @@ namespace {
 
         return report::Execution { command, run };
     }
+
+    report::Execution to_execution(ic::EventsIterator::value_type const &result)
+    {
+        report::Execution execution;
+
+        if (result.is_ok()) {
+            for (const auto& event : result.unwrap()) {
+                if (event->has_started()) {
+                    execution = init_execution(*event);
+                } else if (event->has_terminated()) {
+                    update_run_with_terminated(execution.run, *event);
+                } else if (event->has_signalled()) {
+                    update_run_with_signaled(execution.run, *event);
+                }
+            }
+        } else {
+            spdlog::error("reading event is failed: {}", result.unwrap_err().what());
+        }
+
+        return execution;
+    }
 }
 
 namespace ic {
@@ -150,59 +171,42 @@ namespace ic {
     {
         auto host_info = create_host_info();
         auto output = flags.as_string(OUTPUT);
-        auto db = output
-                .and_then<DatabaseWriter::Ptr>([](auto file) {
-                    return DatabaseWriter::create(fmt::format("{}.sqlite3", file));
+        auto events = output
+                .and_then<EventsDatabase::Ptr>([](auto file) {
+                    return EventsDatabase::create(fmt::format("{}.sqlite3", file));
                 });
 
-        return merge(host_info, output, db)
+        return merge(host_info, output, events)
             .map<Reporter::SharedPtr>([&session](auto tuple) {
-                const auto& [host_info, output, db] = tuple;
+                const auto& [host_info, output, events] = tuple;
                 auto context = report::Context { session.get_session_type(), host_info };
-                return std::make_shared<Reporter>(output, std::move(context), db);
+                return std::make_shared<Reporter>(output, std::move(context), events);
             });
     }
 
-    Reporter::Reporter(const std::string_view& output, report::Context&& context, ic::DatabaseWriter::Ptr db)
+    Reporter::Reporter(const std::string_view& output,
+                       report::Context&& context,
+                       ic::EventsDatabase::Ptr events)
             : output_(output)
             , context_(context)
-            , executions_()
-            , db_(std::move(db))
+            , events_(std::move(events))
     {
     }
 
     Reporter::~Reporter() noexcept {
+        events_.reset();
+
         std::error_code error_code;
         fs::remove(fmt::format("{}.sqlite3", output_.string()), error_code);
     }
 
     void Reporter::report(const rpc::Event& event)
     {
-        if (db_) {
-            db_->insert_event(event)
+        if (events_) {
+            events_->insert_event(event)
                     .on_error([](auto error) {
                         spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
                     });
-        }
-
-        const auto rid = event.rid();
-        if (auto it = executions_.find(rid); it != executions_.end()) {
-            // the process entry exits
-            if (event.has_terminated()) {
-                update_run_with_terminated(it->second.run, event);
-            } else if (event.has_signalled()) {
-                update_run_with_signaled(it->second.run, event);
-            } else {
-                spdlog::warn("Received start event could not be merged into execution report. Ignored.");
-            }
-        } else {
-            // the process entry not exists
-            if (event.has_started()) {
-                auto entry = init_execution(event);
-                executions_.emplace(std::make_pair(rid, std::move(entry)));
-            } else {
-                spdlog::warn("Received event could not be merged into execution report. Ignored.");
-            }
         }
     }
 
@@ -218,9 +222,12 @@ namespace ic {
     report::Report Reporter::makeReport() const
     {
         report::Report report = report::Report { context_, { } };
-        std::transform(executions_.begin(), executions_.end(),
-                       std::back_inserter(report.executions),
-                       [](auto pid_execution_pair) { return pid_execution_pair.second; });
+        if (events_) {
+            std::transform(events_->events_by_process_begin(),
+                           events_->events_by_process_end(),
+                           std::back_inserter(report.executions),
+                           to_execution);
+        }
         return report;
     }
 }

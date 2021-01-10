@@ -53,14 +53,15 @@ namespace ic {
         Reporter& operator=(const Reporter&) = delete;
         Reporter& operator=(Reporter&&) noexcept = delete;
 
-        Reporter(const std::string_view& view, report::Context&& context, ic::DatabaseWriter::Ptr db);
+        Reporter(const std::string_view& view,
+                 report::Context&& context,
+                 ic::EventsDatabase::Ptr events);
 
         [[nodiscard]] report::Report makeReport() const;
 
     private:
         fs::path output_;
         report::Context context_;
-        std::map<uint64_t, report::Execution> executions_;
-        ic::DatabaseWriter::Ptr db_;
+        ic::EventsDatabase::Ptr events_;
     };
 }
