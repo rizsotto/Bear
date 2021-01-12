@@ -75,11 +75,11 @@ namespace cs::semantic {
 
         Tools(ToolPtrs &&, std::list<fs::path>&&) noexcept;
 
-//        [[nodiscard]]
-//        rust::Result<SemanticPtrs> recognize(const report::Execution &execution) const;
-//
-//        [[nodiscard]]
-//        rust::Result<ToolPtr> select(const report::Command &command) const;
+        [[nodiscard]]
+        rust::Result<SemanticPtrs> recognize(const Command &command, uint32_t pid) const;
+
+        [[nodiscard]]
+        rust::Result<ToolPtr> select(const Command &command) const;
 
     private:
         ToolPtrs tools_;

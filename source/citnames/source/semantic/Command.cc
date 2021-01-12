@@ -25,16 +25,6 @@
 
 namespace cs::semantic {
 
-    void to_json(nlohmann::json& j, const Command& rhs)
-    {
-        j = nlohmann::json {
-                { "program", rhs.program },
-                { "arguments", nlohmann::json(rhs.arguments) },
-                { "working_dir", rhs.working_dir },
-                { "environment", nlohmann::json(rhs.environment) }
-        };
-    }
-
     bool operator==(const Command& lhs, const Command& rhs)
     {
         return (lhs.program == rhs.program)
