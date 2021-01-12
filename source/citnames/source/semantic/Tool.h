@@ -21,9 +21,10 @@
 
 #include "Configuration.h"
 #include "Output.h"
+#include "semantic/Command.h"
 #include "semantic/Semantic.h"
 #include "libresult/Result.h"
-#include "intercept/output/Report.h"
+#include "intercept/EventsDatabase.h"
 
 #include <filesystem>
 #include <list>
@@ -52,7 +53,7 @@ namespace cs::semantic {
         // Can return an optional with an empty list, which says that it was
         // recognized the tool execution, but the execution was not a compilation.
         [[nodiscard]]
-        virtual rust::Result<SemanticPtrs> compilations(const report::Command &) const = 0;
+        virtual rust::Result<SemanticPtrs> compilations(const Command &) const = 0;
     };
 
     // Represents an expert system which can recognize compilation entries from
@@ -66,7 +67,7 @@ namespace cs::semantic {
         static rust::Result<Tools> from(Compilation cfg);
 
         [[nodiscard]]
-        Entries transform(const report::Report &command) const;
+        Entries transform(ic::EventsDatabase::Ptr events) const;
 
     private:
         using ToolPtr = std::shared_ptr<Tool>;
@@ -74,11 +75,11 @@ namespace cs::semantic {
 
         Tools(ToolPtrs &&, std::list<fs::path>&&) noexcept;
 
-        [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const report::Execution &execution) const;
-
-        [[nodiscard]]
-        rust::Result<ToolPtr> select(const report::Command &command) const;
+//        [[nodiscard]]
+//        rust::Result<SemanticPtrs> recognize(const report::Execution &execution) const;
+//
+//        [[nodiscard]]
+//        rust::Result<ToolPtr> select(const report::Command &command) const;
 
     private:
         ToolPtrs tools_;

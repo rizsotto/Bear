@@ -201,9 +201,9 @@ namespace {
         {
             auto commands = args.as_string(OUTPUT)
                     .map<fs::path>([](const auto &output) {
-                        return fs::path(output).replace_extension(".commands.json");
+                        return fs::path(output).replace_extension(".sqlite3");
                     })
-                    .unwrap_or(fs::path("commands.json"));
+                    .unwrap_or(fs::path("commands.sqlite3"));
 
             auto environment = sys::env::from(const_cast<const char **>(envp));
             auto intercept = prepare_intercept(args, environment, commands);

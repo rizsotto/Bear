@@ -2,6 +2,7 @@
 add_library(citnames_json_a OBJECT
         source/Configuration.cc
         source/Output.cc
+        source/semantic/Command.cc
         )
 
 target_link_libraries(citnames_json_a PUBLIC result_a)

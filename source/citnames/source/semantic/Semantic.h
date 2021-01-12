@@ -20,7 +20,7 @@
 #pragma once
 
 #include "Output.h"
-#include "intercept/output/Report.h"
+#include "semantic/Command.h"
 
 #include <filesystem>
 #include <list>
@@ -35,7 +35,7 @@ namespace cs::semantic {
     // Represents a recognized command. Which we can find out the intent of
     // that command. And therefore we know the semantic of it.
     struct Semantic {
-        explicit Semantic(report::Command) noexcept;
+        explicit Semantic(Command) noexcept;
         virtual ~Semantic() noexcept = default;
 
         [[nodiscard]] virtual std::optional<cs::Entry> into_entry() const = 0;
@@ -43,7 +43,7 @@ namespace cs::semantic {
         virtual bool operator==(Semantic const&) const = 0;
         virtual std::ostream& operator<<(std::ostream&) const = 0;
 
-        report::Command command;
+        Command command;
     };
 
     using SemanticPtr = std::shared_ptr<Semantic>;
@@ -52,7 +52,7 @@ namespace cs::semantic {
     // Represents a compiler call, which does process any input, but query
     // something from the compiler itself. It can be a help or a version query.
     struct QueryCompiler : public Semantic {
-        explicit QueryCompiler(report::Command) noexcept;
+        explicit QueryCompiler(Command) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
@@ -62,7 +62,7 @@ namespace cs::semantic {
 
     // Represents a compiler call, which runs the preprocessor pass.
     struct Preprocess : public Semantic {
-        Preprocess(report::Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
+        Preprocess(Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
@@ -76,7 +76,7 @@ namespace cs::semantic {
 
     // Represents a compiler call, which runs the compilation pass.
     struct Compile : public Semantic {
-        Compile(report::Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
+        Compile(Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 

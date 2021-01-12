@@ -162,7 +162,7 @@ namespace {
         return flags;
     }
 
-    rust::Result<CompilerFlags> parse_flags(const report::Command &command)
+    rust::Result<CompilerFlags> parse_flags(const Command &command)
     {
         static auto const parser =
                 Repeat(
@@ -308,7 +308,7 @@ namespace cs::semantic {
         return std::regex_match(program.filename().c_str(), m, pattern);
     }
 
-    rust::Result<SemanticPtrs> ToolGcc::compilations(const report::Command &command) const {
+    rust::Result<SemanticPtrs> ToolGcc::compilations(const Command &command) const {
         return parse_flags(command)
                 .and_then<SemanticPtrs>([&command](auto flags) -> rust::Result<SemanticPtrs> {
                     if (is_compiler_query(flags)) {

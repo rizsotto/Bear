@@ -34,7 +34,7 @@ namespace cs {
         return compilers_to_recognize_.executable == program;
     }
 
-    rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const report::Command &command) const {
+    rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const Command &command) const {
         return ToolGcc().compilations(command)
                 .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
                     for (auto& semantic : semantics) {

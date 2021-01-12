@@ -3,7 +3,6 @@ add_subdirectory(proto)
 include(GNUInstallDirs)
 
 add_library(report_a OBJECT
-        source/collect/Report.cc
         source/collect/EventsDatabase.cc
         )
 
@@ -14,7 +13,6 @@ target_link_libraries(report_a PUBLIC spdlog::spdlog)
 target_link_libraries(report_a PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(report_a PUBLIC rpc_a)
 target_link_libraries(report_a PUBLIC PkgConfig::sqlite)
-target_compile_options(report_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
@@ -209,7 +207,6 @@ if (ENABLE_UNIT_TESTS)
     add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
 
     add_executable(intercept_unit_test
-            test/ReportTest.cc
             test/SessionTest.cc
             )
 

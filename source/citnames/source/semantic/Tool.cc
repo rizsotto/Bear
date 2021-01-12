@@ -173,57 +173,57 @@ namespace cs::semantic {
         return rust::Ok(Tools(std::move(tools), std::move(cfg.compilers_to_exclude)));
     }
 
-    Entries Tools::transform(const report::Report &report) const {
-        auto semantics =
-                Forest<report::Execution, report::Pid>(
-                        report.executions,
-                        [](report::Execution const &execution) -> report::Pid { return execution.run.pid; },
-                        [](report::Execution const &execution) -> report::Pid { return execution.run.ppid; }
-                ).bfs<SemanticPtr>([this](const auto &command) {
-                    return this->recognize(command);
-                });
+    Entries Tools::transform(ic::EventsDatabase::Ptr events) const {
+//        auto semantics =
+//                Forest<report::Execution, report::Pid>(
+//                        report.executions,
+//                        [](report::Execution const &execution) -> report::Pid { return execution.run.pid; },
+//                        [](report::Execution const &execution) -> report::Pid { return execution.run.ppid; }
+//                ).bfs<SemanticPtr>([this](const auto &command) {
+//                    return this->recognize(command);
+//                });
 
         Entries result;
-        for (const auto &semantic : semantics) {
-            if (auto candidate = semantic->into_entry(); candidate) {
-                result.emplace_back(candidate.value());
-            }
-        }
+//        for (const auto &semantic : semantics) {
+//            if (auto candidate = semantic->into_entry(); candidate) {
+//                result.emplace_back(candidate.value());
+//            }
+//        }
         return result;
     }
 
-    [[nodiscard]]
-    rust::Result<SemanticPtrs> Tools::recognize(const report::Execution &execution) const {
-        spdlog::debug("[pid: {}] command: {}", execution.run.pid, execution.command);
-        return select(execution.command)
-                .on_success([&execution](auto tool) {
-                    spdlog::debug("[pid: {}] recognized with: {}", execution.run.pid, tool->name());
-                })
-                .and_then<SemanticPtrs>([&execution](auto tool) {
-                    return tool->compilations(execution.command);
-                })
-                .on_success([&execution](auto items) {
-                     spdlog::debug("[pid: {}] recognized as: [{}]", execution.run.pid, items);
-                })
-                .on_error([&execution](const auto &error) {
-                    spdlog::debug("[pid: {}] failed: {}", execution.run.pid, error.what());
-                });
-    }
-
-    [[nodiscard]]
-    rust::Result<Tools::ToolPtr> Tools::select(const report::Command &command) const {
-        // do different things if the command is matching one of the nominated compilers.
-        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.program)) {
-            return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
-        } else {
-            // check if any tool can recognize the command.
-            for (const auto &tool : tools_) {
-                // when the tool is matching...
-                if (tool->recognize(command.program)) {
-                    return rust::Ok(tool);
-                }
-            }
-        }
-        return rust::Err(std::runtime_error("No tools recognize this command."));
-    }
+//    [[nodiscard]]
+//    rust::Result<SemanticPtrs> Tools::recognize(const report::Execution &execution) const {
+//        spdlog::debug("[pid: {}] command: {}", execution.run.pid, execution.command);
+//        return select(execution.command)
+//                .on_success([&execution](auto tool) {
+//                    spdlog::debug("[pid: {}] recognized with: {}", execution.run.pid, tool->name());
+//                })
+//                .and_then<SemanticPtrs>([&execution](auto tool) {
+//                    return tool->compilations(execution.command);
+//                })
+//                .on_success([&execution](auto items) {
+//                     spdlog::debug("[pid: {}] recognized as: [{}]", execution.run.pid, items);
+//                })
+//                .on_error([&execution](const auto &error) {
+//                    spdlog::debug("[pid: {}] failed: {}", execution.run.pid, error.what());
+//                });
+//    }
+//
+//    [[nodiscard]]
+//    rust::Result<Tools::ToolPtr> Tools::select(const report::Command &command) const {
+//        // do different things if the command is matching one of the nominated compilers.
+//        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.program)) {
+//            return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
+//        } else {
+//            // check if any tool can recognize the command.
+//            for (const auto &tool : tools_) {
+//                // when the tool is matching...
+//                if (tool->recognize(command.program)) {
+//                    return rust::Ok(tool);
+//                }
+//            }
+//        }
+//        return rust::Err(std::runtime_error("No tools recognize this command."));
+//    }
 }

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "intercept/output/Report.h"
+#include "semantic/Command.h"
 #include "libresult/Result.h"
 
 #include <cstdint>
@@ -284,7 +284,7 @@ namespace cs::semantic {
     };
 
     template <typename Parser>
-    rust::Result<CompilerFlags> parse(const Parser &parser, const report::Command &command)
+    rust::Result<CompilerFlags> parse(const Parser &parser, const Command &command)
     {
         auto input = Input { std::next(command.arguments.begin()), command.arguments.end() };
         if (input.begin == input.end) {
