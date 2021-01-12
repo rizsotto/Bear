@@ -55,7 +55,7 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto library = args.as_string(ic::LIBRARY);
@@ -64,7 +64,7 @@ namespace ic {
         auto path = sys::os::get_path(environment);
 
         return merge(library, executor, path)
-            .map<Session::SharedPtr>([&verbose, &environment](auto tuple) {
+            .map<Session::Ptr>([&verbose, &environment](auto tuple) {
                 const auto& [library, executor, path] = tuple;
                 return std::make_shared<LibraryPreloadSession>(library, executor, verbose, path, std::move(environment));
             });

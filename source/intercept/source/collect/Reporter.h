@@ -22,7 +22,6 @@
 #include "collect/Session.h"
 #include "intercept/EventsDatabase.h"
 #include "libflags/Flags.h"
-#include "intercept/output/Report.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
@@ -37,15 +36,16 @@ namespace ic {
     // Responsible to collect executions and persist them into an output file.
     class Reporter {
     public:
-        using SharedPtr = std::shared_ptr<Reporter>;
-        static rust::Result<Reporter::SharedPtr> from(const flags::Arguments&, const ic::Session&);
+        using Ptr = std::shared_ptr<Reporter>;
+        static rust::Result<Reporter::Ptr> from(const flags::Arguments&);
 
         void report(const rpc::Event& request);
-        void flush();
 
     public:
+        Reporter(fs::path output, ic::EventsDatabase::Ptr events);
+
         Reporter() = delete;
-        virtual ~Reporter() noexcept;
+        ~Reporter() noexcept = default;
 
         Reporter(const Reporter&) = delete;
         Reporter(Reporter&&) noexcept = delete;
@@ -53,15 +53,8 @@ namespace ic {
         Reporter& operator=(const Reporter&) = delete;
         Reporter& operator=(Reporter&&) noexcept = delete;
 
-        Reporter(const std::string_view& view,
-                 report::Context&& context,
-                 ic::EventsDatabase::Ptr events);
-
-        [[nodiscard]] report::Report makeReport() const;
-
     private:
         fs::path output_;
-        report::Context context_;
         ic::EventsDatabase::Ptr events_;
     };
 }

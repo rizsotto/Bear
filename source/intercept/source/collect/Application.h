@@ -30,21 +30,20 @@
 namespace ic {
 
     struct Command : ps::Command {
-        Command(std::vector<std::string_view> command,
-                Session::SharedPtr session,
-                Reporter::SharedPtr reporter)
+
+        Command(std::vector<std::string_view> command, Session::Ptr session, Reporter::Ptr reporter)
                 : ps::Command()
                 , command_(std::move(command))
-                , session_(session)
-                , reporter_(reporter)
+                , session_(std::move(session))
+                , reporter_(std::move(reporter))
         { }
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
         std::vector<std::string_view> command_;
-        Session::SharedPtr session_;
-        Reporter::SharedPtr reporter_;
+        Session::Ptr session_;
+        Reporter::Ptr reporter_;
     };
 
     struct Application : ps::ApplicationFromArgs {

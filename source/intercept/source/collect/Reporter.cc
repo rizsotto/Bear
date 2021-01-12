@@ -27,7 +27,6 @@
 #include <fstream>
 #include <memory>
 #include <utility>
-#include <functional>
 #include <unistd.h>
 
 namespace {
@@ -71,163 +70,37 @@ namespace {
                 return std::runtime_error(fmt::format("failed to get host info: {}", error.what()));
             });
     }
-
-    void update_run_with_started(report::Run& target, const rpc::Event& source)
-    {
-        spdlog::debug("Received event is merged into execution report. [pid: {}, event: start]", source.pid());
-        auto event = report::Event {
-            "started",
-            source.timestamp(),
-            std::nullopt,
-            std::nullopt
-        };
-        target.events.emplace_back(event);
-    }
-
-    void update_run_with_signaled(report::Run& target, const rpc::Event& source)
-    {
-        spdlog::debug("Received event is merged into execution report. [pid: {}, event: signal]", source.pid());
-        auto event = report::Event {
-            "signaled",
-            source.timestamp(),
-            std::nullopt,
-            { source.signalled().number() }
-        };
-        target.events.emplace_back(event);
-    }
-
-    void update_run_with_terminated(report::Run& target, const rpc::Event& source)
-    {
-        spdlog::debug("Received event is merged into execution report. [pid: {}, event: stop]", source.pid());
-        auto event = report::Event {
-            "terminated",
-            source.timestamp(),
-            { source.terminated().status() },
-            std::nullopt
-        };
-        target.events.emplace_back(event);
-    }
-
-    inline std::list<std::string> to_list(const google::protobuf::RepeatedPtrField<std::string>& field)
-    {
-        return std::list<std::string>(field.begin(), field.end());
-    }
-
-    inline std::map<std::string, std::string> to_map(const google::protobuf::Map<std::string, std::string>& map)
-    {
-        return std::map<std::string, std::string>(map.begin(), map.end());
-    }
-
-    inline std::optional<uint32_t> to_optional(google::protobuf::int64 value)
-    {
-        return (value == 0 ? std::nullopt : std::make_optional(value));
-    }
-
-    report::Execution init_execution(const rpc::Event& source)
-    {
-        const auto& started = source.started();
-
-        auto command = report::Command {
-            started.executable(),
-            to_list(started.arguments()),
-            started.working_dir(),
-            to_map(started.environment())
-        };
-        auto run = report::Run {
-            to_optional(source.pid()).value_or(0u),
-            to_optional(source.ppid()).value_or(0u),
-            std::list<report::Event>()
-        };
-        update_run_with_started(run, source);
-
-        return report::Execution { command, run };
-    }
-
-    report::Execution to_execution(ic::EventsIterator::value_type const &result)
-    {
-        report::Execution execution;
-
-        if (result.is_ok()) {
-            for (const auto& event : result.unwrap()) {
-                if (event->has_started()) {
-                    execution = init_execution(*event);
-                } else if (event->has_terminated()) {
-                    update_run_with_terminated(execution.run, *event);
-                } else if (event->has_signalled()) {
-                    update_run_with_signaled(execution.run, *event);
-                }
-            }
-        } else {
-            spdlog::error("reading event is failed: {}", result.unwrap_err().what());
-        }
-
-        return execution;
-    }
 }
 
 namespace ic {
 
-    rust::Result<Reporter::SharedPtr> Reporter::from(const flags::Arguments& flags, const ic::Session& session)
+    rust::Result<Reporter::Ptr> Reporter::from(const flags::Arguments& flags)
     {
         auto host_info = create_host_info();
         auto output = flags.as_string(OUTPUT);
         auto events = output
                 .and_then<EventsDatabase::Ptr>([](auto file) {
-                    return EventsDatabase::create(fmt::format("{}.sqlite3", file));
+                    return EventsDatabase::create(file);
                 });
 
         return merge(host_info, output, events)
-            .map<Reporter::SharedPtr>([&session](auto tuple) {
-                const auto& [host_info, output, events] = tuple;
-                auto context = report::Context { session.get_session_type(), host_info };
-                return std::make_shared<Reporter>(output, std::move(context), events);
-            });
+                .map<Reporter::Ptr>([](auto tuple) {
+                    const auto&[host_info, output, events] = tuple;
+                    return std::make_shared<Reporter>(fs::path(output), events);
+                });
     }
 
-    Reporter::Reporter(const std::string_view& output,
-                       report::Context&& context,
+    Reporter::Reporter(fs::path output,
                        ic::EventsDatabase::Ptr events)
-            : output_(output)
-            , context_(context)
+            : output_(std::move(output))
             , events_(std::move(events))
-    {
-    }
-
-    Reporter::~Reporter() noexcept {
-        events_.reset();
-
-        std::error_code error_code;
-        fs::remove(fmt::format("{}.sqlite3", output_.string()), error_code);
-    }
+    { }
 
     void Reporter::report(const rpc::Event& event)
     {
-        if (events_) {
-            events_->insert_event(event)
-                    .on_error([](auto error) {
-                        spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
-                    });
-        }
-    }
-
-    void Reporter::flush()
-    {
-        report::ReportSerializer serializer;
-        serializer.to_json(output_, makeReport())
-            .on_error([this](auto error) {
-                spdlog::warn("Writing output file \"{}\" failed with: {}", output_, error.what());
-            });
-    }
-
-    report::Report Reporter::makeReport() const
-    {
-        report::Report report = report::Report { context_, { } };
-        if (events_) {
-            std::transform(events_->events_by_process_begin(),
-                           events_->events_by_process_end(),
-                           std::back_inserter(report.executions),
-                           to_execution);
-        }
-        return report;
+        events_->insert_event(event)
+                .on_error([](auto error) {
+                    spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
+                });
     }
 }

@@ -33,7 +33,7 @@ namespace ic {
                 sys::env::Vars &&environment
         );
 
-        static rust::Result<Session::SharedPtr> from(const flags::Arguments&, const char **envp);
+        static rust::Result<Session::Ptr> from(const flags::Arguments&, const char **envp);
 
     public:
         [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const override;

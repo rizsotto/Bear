@@ -210,7 +210,6 @@ if (ENABLE_UNIT_TESTS)
 
     add_executable(intercept_unit_test
             test/ReportTest.cc
-            test/ReporterTest.cc
             test/SessionTest.cc
             )
 
