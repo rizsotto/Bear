@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Database.h"
+#include "intercept/EventsDatabase.h"
 
 #include <google/protobuf/util/json_util.h>
 #include <sqlite3.h>

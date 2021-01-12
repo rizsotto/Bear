@@ -4,18 +4,21 @@ include(GNUInstallDirs)
 
 add_library(report_a OBJECT
         source/collect/Report.cc
+        source/collect/EventsDatabase.cc
         )
 
 target_include_directories(report_a PUBLIC include)
 target_link_libraries(report_a PUBLIC result_a)
-target_link_libraries(report_a PRIVATE fmt::fmt)
-target_link_libraries(report_a PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(report_a PUBLIC fmt::fmt)
+target_link_libraries(report_a PUBLIC spdlog::spdlog)
+target_link_libraries(report_a PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(report_a PUBLIC rpc_a)
+target_link_libraries(report_a PUBLIC PkgConfig::sqlite)
 target_compile_options(report_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
-        source/collect/Database.cc
         source/collect/Reporter.cc
         source/collect/Services.cc
         source/collect/Session.cc
@@ -36,7 +39,6 @@ target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
-target_link_libraries(intercept_a PUBLIC PkgConfig::sqlite)
 
 # Create an executable from the sub projects.
 add_executable(intercept
@@ -65,26 +67,6 @@ install(TARGETS intercept
 
 install(FILES man/intercept.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-
-# Create unit test
-if (ENABLE_UNIT_TESTS)
-    add_executable(intercept_unit_test
-            test/ReportTest.cc
-            test/ReporterTest.cc
-            test/SessionTest.cc
-            )
-
-    target_link_libraries(intercept_unit_test main_a)
-    target_link_libraries(intercept_unit_test exec_a)
-    target_link_libraries(intercept_unit_test intercept_a)
-    target_link_libraries(intercept_unit_test report_a)
-    target_link_libraries(intercept_unit_test rpc_a)
-    target_link_libraries(intercept_unit_test sys_a)
-    target_link_libraries(intercept_unit_test flags_a)
-    target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
-
-    add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
-endif ()
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(reporter_a OBJECT
@@ -225,4 +207,21 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(exec_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
+
+    add_executable(intercept_unit_test
+            test/ReportTest.cc
+            test/ReporterTest.cc
+            test/SessionTest.cc
+            )
+
+    target_link_libraries(intercept_unit_test main_a)
+    target_link_libraries(intercept_unit_test exec_a)
+    target_link_libraries(intercept_unit_test intercept_a)
+    target_link_libraries(intercept_unit_test report_a)
+    target_link_libraries(intercept_unit_test rpc_a)
+    target_link_libraries(intercept_unit_test sys_a)
+    target_link_libraries(intercept_unit_test flags_a)
+    target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
+
+    add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
 endif ()
