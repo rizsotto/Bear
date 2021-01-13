@@ -5,6 +5,7 @@ import sys
 import argparse
 import json
 import logging
+import sqlite3
 
 
 def main():
@@ -26,8 +27,7 @@ def main():
     args = parser.parse_args()
     logging.debug(args)
 
-    content = json.load(args.input)
-    commands = [execution['command'] for execution in content['executions']]
+    commands = list(load_commands(args.input.name))
     if args.command == 'count':
         count = len(commands)
         logging.debug("%s has %d command entries", args.input.name, count)
@@ -57,6 +57,19 @@ def main():
             return 1
 
     return 0
+
+
+def load_commands(filename):
+    with sqlite3.connect(filename) as db:
+        cursor = db.cursor()
+        for content in cursor.execute('SELECT value FROM events'):
+            event = json.loads(content[0])
+            if 'started' in event:
+                yield {
+                    'program': event['started']['executable'],
+                    'working_dir': event['started']['workingDir'],
+                    'arguments': event['started']['arguments']
+                }
 
 
 def filter_from(args):
