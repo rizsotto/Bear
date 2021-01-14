@@ -34,7 +34,7 @@ namespace cs::semantic {
         bool recognize(const fs::path& program) const override;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const report::Command &command) const override;
+        rust::Result<SemanticPtrs> compilations(const Command &command) const override;
 
     private:
         CompilerWrapper compilers_to_recognize_;

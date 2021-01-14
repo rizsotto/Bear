@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+# UNSUPPORTED: true
 # RUN: cd %T; %{shell} %s %t
 # RUN: assert_compilation %t.compilations.json count -eq 1
 # RUN: assert_compilation %t.compilations.json contains -file /home/user/broken_build.c -directory /home/user -arguments /usr/bin/gcc -c -o broken_build.o broken_build.c

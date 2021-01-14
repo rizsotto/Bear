@@ -2,6 +2,7 @@ add_subdirectory(nlohmann_json)
 add_subdirectory(fmt)
 add_subdirectory(spdlog)
 add_subdirectory(grpc)
+add_subdirectory(sqlite)
 
 if (ENABLE_UNIT_TESTS)
     add_subdirectory(googletest)

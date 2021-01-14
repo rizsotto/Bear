@@ -23,7 +23,6 @@
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Tool.h"
-#include "intercept/output/Report.h"
 
 #include <filesystem>
 
@@ -118,29 +117,30 @@ namespace {
 namespace cs {
 
     rust::Result<int> Command::execute() const {
+        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
+
         // get current compilations from the input.
-        return report_serializer_.from_json(arguments_.input)
+        return ic::EventsDatabase::open(arguments_.input)
                 .map<Entries>([this](const auto &commands) {
-                    spdlog::debug("commands have read. [size: {}]", commands.executions.size());
                     auto compilations = tools_.transform(commands);
                     // remove duplicates
                     return merge({}, compilations);
                 })
-                .and_then<Entries>([this](const auto &compilations) {
+                .and_then<Entries>([this, &output](const auto &compilations) {
                     // read back the current content and extend with the new elements.
                     spdlog::debug("compilation entries created. [size: {}]", compilations.size());
                     return (arguments_.append)
-                           ? output_.from_json(arguments_.output.c_str())
+                           ? output.from_json(arguments_.output.c_str())
                                    .template map<Entries>([&compilations](auto old_entries) {
                                        spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
                                        return merge(compilations, old_entries);
                                    })
                            : rust::Result<Entries>(rust::Ok(compilations));
                 })
-                .and_then<size_t>([this](const auto &compilations) {
+                .and_then<size_t>([this, &output](const auto &compilations) {
                     // write the entries into the output file.
                     spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
-                    return output_.to_json(arguments_.output.c_str(), compilations);
+                    return output.to_json(arguments_.output.c_str(), compilations);
                 })
                 .map<int>([](auto size) {
                     // just map to success exit code if it was successful.
@@ -159,7 +159,7 @@ namespace cs {
                 "citnames",
                 VERSION,
                 {
-                        {cs::INPUT,      {1, false, "path of the input file",                    {"commands.json"},         std::nullopt}},
+                        {cs::INPUT,      {1, false, "path of the input file",                    {"commands.sqlite3"},         std::nullopt}},
                         {cs::OUTPUT,     {1, false, "path of the result file",                   {"compile_commands.json"}, std::nullopt}},
                         {cs::CONFIG,     {1, false, "path of the config file",                   std::nullopt,              std::nullopt}},
                         {cs::APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,              std::nullopt}},
@@ -173,17 +173,16 @@ namespace cs {
 
         auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
-        auto semantic = configuration.and_then<cs::semantic::Tools>([](auto config) {
-            return semantic::Tools::from(config.compilation);
-        });
+        auto tools = configuration
+                .and_then<cs::semantic::Tools>([](auto config) {
+                    return semantic::Tools::from(config.compilation);
+                });
 
-        return rust::merge(arguments, configuration, semantic)
+        return rust::merge(arguments, configuration, tools)
                 .map<ps::CommandPtr>([](auto tuples) {
-                    const auto&[arguments, configuration, semantic] = tuples;
+                    const auto&[arguments, configuration, tools] = tuples;
                     // read the configuration
-                    cs::CompilationDatabase output(configuration.output.format, configuration.output.content);
-                    report::ReportSerializer report_serializer;
-                    return std::make_unique<Command>(arguments, report_serializer, semantic, output);
+                    return std::make_unique<Command>(arguments, configuration, tools);
                 });
     }
 }

@@ -17,20 +17,30 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "Command.h"
 
-#include "Tool.h"
+#include <iostream>
+
+#include <nlohmann/json.hpp>
 
 namespace cs::semantic {
 
-    struct ToolGcc : public Tool {
-        [[nodiscard]]
-        const char* name() const override;
+    bool operator==(const Command& lhs, const Command& rhs)
+    {
+        return (lhs.program == rhs.program)
+               && (lhs.arguments == rhs.arguments)
+               && (lhs.working_dir == rhs.working_dir)
+               && (lhs.environment == rhs.environment);
+    }
 
-        [[nodiscard]]
-        bool recognize(const fs::path& program) const override;
-
-        [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const Command &command) const override;
-    };
+    std::ostream& operator<<(std::ostream& os, const Command& rhs)
+    {
+        nlohmann::json payload = nlohmann::json {
+                { "program", rhs.program },
+                { "arguments", nlohmann::json(rhs.arguments) },
+                { "working_dir", rhs.working_dir },
+        };
+        os << payload;
+        return os;
+    }
 }

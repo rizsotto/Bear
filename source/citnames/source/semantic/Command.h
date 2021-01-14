@@ -19,18 +19,26 @@
 
 #pragma once
 
-#include "Tool.h"
+#include <filesystem>
+#include <list>
+#include <map>
+#include <string>
+#include <iosfwd>
+
+namespace fs = std::filesystem;
 
 namespace cs::semantic {
 
-    struct ToolGcc : public Tool {
-        [[nodiscard]]
-        const char* name() const override;
-
-        [[nodiscard]]
-        bool recognize(const fs::path& program) const override;
-
-        [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const Command &command) const override;
+    // This represents the executed command itself. Describes all the
+    // context that the caller was given. And these are the those parameters
+    // which are essential for re-run the command.
+    struct Command {
+        fs::path program;
+        std::list<std::string> arguments;
+        fs::path working_dir;
+        std::map<std::string, std::string> environment;
     };
+
+    bool operator==(const Command& lhs, const Command& rhs);
+    std::ostream& operator<<(std::ostream&, const Command&);
 }

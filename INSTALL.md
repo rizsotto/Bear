@@ -23,6 +23,7 @@ and build locally.
 - [fmt](https://github.com/fmtlib/fmt) >= 6.2
 - [spdlog](https://github.com/gabime/spdlog) >= 1.5
 - [json](https://github.com/nlohmann/json) >= 3.7
+- [sqlite](https://www.sqlite.org/) >= 3.14
 
 Developer dependencies:
 
@@ -57,29 +58,30 @@ it before.
 Install dependencies from packages on Fedora 32/33
 
     dnf install python cmake pkg-config
-    dnf install json-devel spdlog-devel fmt-devel grpc-devel grpc-plugins
+    dnf install json-devel spdlog-devel fmt-devel sqlite-devel grpc-devel grpc-plugins
     dnf install gtest-devel gmock-devel # optional for running the tests
     
 Install dependencies from packages on Arch
 
     pacman -S python cmake pkg-config
-    pacman -S grpc spdlog fmt nlohmann-json
+    pacman -S grpc spdlog fmt nlohmann-json sqlite
     pacman -S gtest gmock # optional for running the tests
 
 Install dependencies from packages on Ubuntu 20.04
 
     apt-get install python cmake pkg-config
-    apt-get install libfmt-dev libspdlog-dev nlohmann-json3-dev
+    apt-get install libfmt-dev libspdlog-dev nlohmann-json3-dev libsqlite3-dev
     apt-get install libgrpc++-dev protobuf-compiler-grpc libssl-dev
 
 Install dependencies from packages from Brew
 
-    brew install fmt spdlog nlohmann-json grpc pkg-config
+    brew install fmt spdlog nlohmann-json sqlite grpc pkg-config
 
 Install dependencies from packages on Alpine edge
 
     apk add git cmake pkgconf make g++
-    apk add protobuf-dev grpc-dev fmt-dev spdlog-dev nlohmann-json c-ares-dev
+    apk add fmt-dev spdlog-dev nlohmann-json sqlite-dev
+    apk add protobuf-dev grpc-dev c-ares-dev
 
 ### Platform: macOS
 

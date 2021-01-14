@@ -21,12 +21,13 @@
 
 #include "Output.h"
 #include "semantic/Tool.h"
+#include "intercept/EventsDatabase.h"
 #include "libmain/ApplicationFromArgs.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
-#include "intercept/output/Report.h"
 
 #include <filesystem>
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -39,24 +40,20 @@ namespace cs {
     };
 
     struct Command : ps::Command {
-        Command(Arguments arguments,
-                report::ReportSerializer report_serializer,
-                cs::semantic::Tools tools,
-                cs::CompilationDatabase output)
+
+        Command(Arguments arguments, cs::Configuration configuration, cs::semantic::Tools tools)
                 : ps::Command()
-                , arguments_(arguments)
-                , report_serializer_(report_serializer)
+                , arguments_(std::move(arguments))
+                , configuration_(std::move(configuration))
                 , tools_(tools)
-                , output_(output)
         { }
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
         Arguments arguments_;
-        report::ReportSerializer report_serializer_;
+        cs::Configuration configuration_;
         cs::semantic::Tools tools_;
-        cs::CompilationDatabase output_;
     };
 
     struct Application : ps::ApplicationFromArgs {

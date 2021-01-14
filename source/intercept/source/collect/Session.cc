@@ -32,7 +32,7 @@
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> Session::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> Session::from(const flags::Arguments& args, const char **envp)
 #ifdef SUPPORT_PRELOAD
     {
         if (args.as_bool(ic::FORCE_WRAPPER).unwrap_or(false))

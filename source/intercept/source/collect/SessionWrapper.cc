@@ -106,7 +106,7 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::SharedPtr> WrapperSession::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments& args, const char **envp)
     {
         const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto wrapper_dir = args.as_string(ic::WRAPPER);
@@ -160,7 +160,7 @@ namespace ic {
             });
 
         return rust::merge(wrapper_dir, mapping_and_override)
-            .map<Session::SharedPtr>([&verbose, &envp](const auto& tuple) {
+            .map<Session::Ptr>([&verbose, &envp](const auto& tuple) {
                 const auto& [const_wrapper_dir, const_mapping_and_override] = tuple;
                 const auto& [const_mapping, const_override] = const_mapping_and_override;
                 std::string wrapper_dir(const_wrapper_dir);

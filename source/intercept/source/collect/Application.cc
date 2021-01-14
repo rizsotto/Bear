@@ -69,8 +69,6 @@ namespace ic {
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();
-        // Write output file.
-        reporter_->flush();
         // Exit with the build status
         return result;
     }
@@ -81,7 +79,7 @@ namespace ic {
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
         const flags::Parser parser("intercept", VERSION, {
-                {ic::OUTPUT,        {1,  false, "path of the result file",        {"commands.json"},       std::nullopt}},
+                {ic::OUTPUT,        {1,  false, "path of the result file",        {"commands.sqlite3"},    std::nullopt}},
                 {ic::FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,            DEVELOPER_GROUP}},
                 {ic::FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,            DEVELOPER_GROUP}},
                 {ic::LIBRARY,       {1,  false, "path to the preload library",    {LIBRARY_DEFAULT_PATH},  DEVELOPER_GROUP}},
@@ -95,10 +93,7 @@ namespace ic {
     rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
         auto command = get_command(args);
         auto session = Session::from(args, envp);
-        auto reporter = session
-                .and_then<Reporter::SharedPtr>([&args](const auto& session) {
-                    return Reporter::from(args, *session);
-                });
+        auto reporter = Reporter::from(args);
 
         return rust::merge(command, session, reporter)
                 .map<ps::CommandPtr>([](auto tuple) {

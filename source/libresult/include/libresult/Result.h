@@ -22,6 +22,7 @@
 #include <functional>
 #include <stdexcept>
 #include <type_traits>
+#include <cstring>
 
 namespace rust {
 
@@ -221,6 +222,12 @@ namespace rust {
         internals::Storage<T, E> storage_;
     };
 
+    template <typename T>
+    bool operator==(Result<T, std::runtime_error> const &lhs, Result<T, std::runtime_error> const &rhs) {
+        return  (lhs.is_ok() && rhs.is_ok() && (lhs.unwrap() == rhs.unwrap())) ||
+                (lhs.is_err() && rhs.is_err() && (std::strcmp(lhs.unwrap_err().what(), rhs.unwrap_err().what()) == 0));
+    }
+
     template <typename T, typename E>
     bool operator==(Result<T, E> const &lhs, Result<T, E> const &rhs) {
         return  (lhs.is_ok() && rhs.is_ok() && (lhs.unwrap() == rhs.unwrap())) ||
@@ -247,6 +254,18 @@ namespace rust {
                 });
             });
         });
+    }
+
+    template<typename T1, typename T2, typename T3, typename T4>
+    Result<std::tuple<T1, T2, T3, T4>>
+    merge(const Result<T1> &t1, const Result<T2> &t2, const Result<T3> &t3, const Result<T4> &t4) {
+        return merge(merge(t1, t2), merge(t3, t4))
+                .template map<std::tuple<T1, T2, T3, T4>>([](auto tuple) {
+                    const auto&[t12, t34] = tuple;
+                    const auto&[t1, t2] = t12;
+                    const auto&[t3, t4] = t34;
+                    return std::make_tuple(t1, t2, t3, t4);
+                });
     }
 
     template <typename T, typename E>

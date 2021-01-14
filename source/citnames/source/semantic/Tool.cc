@@ -57,54 +57,60 @@ namespace {
     // compilation) we don't inspect the children processes.
     template<typename Entry, typename Id>
     struct Forest {
-        Forest(std::list<Entry> const &input,
-               std::function<Id(Entry const &)> id_extractor,
-               std::function<Id(Entry const &)> parent_id_extractor);
 
-        template<typename Output>
-        std::list<Output> bfs(std::function<rust::Result<std::list<Output>>(const Entry &)>) const;
+        template<
+                typename Iterator,
+                typename Extractor = std::function<rust::Result<std::tuple<Entry, Id, Id>>(typename Iterator::reference)>
+                >
+        Forest(Iterator begin, Iterator end, Extractor extractor);
+
+        template<
+                typename Output,
+                typename Converter = std::function<rust::Result<std::list<Output>>(const Entry &, Id)>
+                >
+        std::list<Output> bfs(Converter) const;
 
     private:
-        std::unordered_map<Id, Entry const*> entries;
+        std::unordered_map<Id, Entry> entries;
         std::unordered_map<Id, std::list<Id>> nodes;
         std::list<Id> roots;
     };
 
     template<typename Entry, typename Id>
-    Forest<Entry, Id>::Forest(std::list<Entry> const &input,
-                              std::function<Id(Entry const &)> id_extractor,
-                              std::function<Id(Entry const &)> parent_id_extractor)
-            : entries()
-            , nodes()
-            , roots()
-    {
+    template<typename Iterator, typename Extractor>
+    Forest<Entry, Id>::Forest(Iterator begin, Iterator end, Extractor extractor) {
         std::unordered_set<Id> maybe_roots;
         std::unordered_set<Id> non_roots;
-        for (Entry const &entry : input) {
-            Id const id = id_extractor(entry);
-            Id const parent = parent_id_extractor(entry);
-            // emplace into the entry map
-            entries.emplace(std::make_pair(id, &entry));
-            // put into the nodes map, if it's not yet exists
-            if (auto search = nodes.find(id); search == nodes.end()) {
-                std::list<Id> children = {};
-                nodes.emplace(std::make_pair(id, children));
-            }
-            // update (or create) the parent element with the new child
-            if (auto search = nodes.find(parent); search != nodes.end()) {
-                search->second.push_back(id);
-            } else {
-                std::list<Id> children = {id};
-                nodes.emplace(std::make_pair(parent, children));
-            }
-            // update the root nodes
-            if (maybe_roots.count(id) != 0) {
-                maybe_roots.erase(id);
-            }
-            non_roots.insert(id);
-            if (non_roots.count(parent) == 0) {
-                maybe_roots.insert(parent);
-            }
+        for (auto it = begin; it != end; ++it) {
+            extractor(*it)
+                .on_success([this, &maybe_roots, &non_roots](auto tuple) {
+                    const auto &[entry, id, parent] = tuple;
+                    // emplace into the entry map
+                    entries.emplace(std::make_pair(id, entry));
+                    // put into the nodes map, if it's not yet exists
+                    if (auto search = nodes.find(id); search == nodes.end()) {
+                        std::list<Id> children = {};
+                        nodes.emplace(std::make_pair(id, children));
+                    }
+                    // update (or create) the parent element with the new child
+                    if (auto search = nodes.find(parent); search != nodes.end()) {
+                        search->second.push_back(id);
+                    } else {
+                        std::list<Id> children = {id};
+                        nodes.emplace(std::make_pair(parent, children));
+                    }
+                    // update the root nodes
+                    if (maybe_roots.count(id) != 0) {
+                        maybe_roots.erase(id);
+                    }
+                    non_roots.insert(id);
+                    if (non_roots.count(parent) == 0) {
+                        maybe_roots.insert(parent);
+                    }
+                })
+                .on_error([](auto error) {
+                    spdlog::warn("Could not read value from database: {}", error.what());
+                });
         }
         // fixing the phantom root node which has no entry
         std::unordered_set<Id> new_roots;
@@ -123,8 +129,8 @@ namespace {
     }
 
     template<typename Entry, typename Id>
-    template<typename Output>
-    std::list<Output> Forest<Entry, Id>::bfs(std::function<rust::Result<std::list<Output>>(const Entry &)> function) const {
+    template<typename Output, typename Converter>
+    std::list<Output> Forest<Entry, Id>::bfs(Converter function) const {
         std::list<Output> result;
         // define a work queue
         std::list<Id> queue = roots;
@@ -134,7 +140,7 @@ namespace {
             queue.pop_front();
             // get the entry for the id
             auto entry = entries.at(id);
-            function(*entry)
+            function(entry, id)
                     .on_success([&result](const auto& outputs) {
                         // if we found the semantic for an entry, we add that to the output.
                         // and we don't process the children processes.
@@ -148,6 +154,47 @@ namespace {
                     });
         }
         return result;
+    }
+
+    cs::semantic::Command to_command(const rpc::Event_Started& started) {
+        // TODO: fail on missing attributes
+        return cs::semantic::Command {
+                fs::path(started.executable()),
+                std::list(started.arguments().begin(), started.arguments().end()),
+                fs::path(started.working_dir()),
+                std::map(started.environment().begin(), started.environment().end())
+        };
+    }
+
+    rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>> extract(ic::EventsIterator::reference input) {
+        using Result = rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>;
+        return input
+                .and_then<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>([](auto events) {
+                    if (events.empty()) {
+                        return Result(
+                                rust::Err(
+                                        std::runtime_error("Event list is empty.")
+                                )
+                        );
+                    }
+                    if (auto start = events.front(); !start->has_started()) {
+                        return Result(
+                                rust::Err(
+                                        std::runtime_error("Could not find start event.")
+                                )
+                        );
+                    } else {
+                        return Result(
+                                rust::Ok(
+                                        std::make_tuple(
+                                                to_command(start->started()),
+                                                start->pid(),
+                                                start->ppid()
+                                        )
+                                )
+                        );
+                    }
+                });
     }
 }
 
@@ -173,14 +220,14 @@ namespace cs::semantic {
         return rust::Ok(Tools(std::move(tools), std::move(cfg.compilers_to_exclude)));
     }
 
-    Entries Tools::transform(const report::Report &report) const {
+    Entries Tools::transform(ic::EventsDatabase::Ptr events) const {
         auto semantics =
-                Forest<report::Execution, report::Pid>(
-                        report.executions,
-                        [](report::Execution const &execution) -> report::Pid { return execution.run.pid; },
-                        [](report::Execution const &execution) -> report::Pid { return execution.run.ppid; }
-                ).bfs<SemanticPtr>([this](const auto &command) {
-                    return this->recognize(command);
+                Forest<Command, uint32_t>(
+                        events->events_by_process_begin(),
+                        events->events_by_process_end(),
+                        ::extract
+                ).bfs<SemanticPtr>([this](const auto &command, const auto pid) {
+                    return this->recognize(command, pid);
                 });
 
         Entries result;
@@ -193,25 +240,25 @@ namespace cs::semantic {
     }
 
     [[nodiscard]]
-    rust::Result<SemanticPtrs> Tools::recognize(const report::Execution &execution) const {
-        spdlog::debug("[pid: {}] command: {}", execution.run.pid, execution.command);
-        return select(execution.command)
-                .on_success([&execution](auto tool) {
-                    spdlog::debug("[pid: {}] recognized with: {}", execution.run.pid, tool->name());
+    rust::Result<SemanticPtrs> Tools::recognize(const Command &command, const uint32_t pid) const {
+        spdlog::debug("[pid: {}] command: {}", pid, command);
+        return select(command)
+                .on_success([&pid](auto tool) {
+                    spdlog::debug("[pid: {}] recognized with: {}", pid, tool->name());
                 })
-                .and_then<SemanticPtrs>([&execution](auto tool) {
-                    return tool->compilations(execution.command);
+                .and_then<SemanticPtrs>([&command](auto tool) {
+                    return tool->compilations(command);
                 })
-                .on_success([&execution](auto items) {
-                     spdlog::debug("[pid: {}] recognized as: [{}]", execution.run.pid, items);
+                .on_success([&pid](auto items) {
+                     spdlog::debug("[pid: {}] recognized as: [{}]", pid, items);
                 })
-                .on_error([&execution](const auto &error) {
-                    spdlog::debug("[pid: {}] failed: {}", execution.run.pid, error.what());
+                .on_error([&pid](const auto &error) {
+                    spdlog::debug("[pid: {}] failed: {}", pid, error.what());
                 });
     }
 
     [[nodiscard]]
-    rust::Result<Tools::ToolPtr> Tools::select(const report::Command &command) const {
+    rust::Result<Tools::ToolPtr> Tools::select(const Command &command) const {
         // do different things if the command is matching one of the nominated compilers.
         if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.program)) {
             return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));

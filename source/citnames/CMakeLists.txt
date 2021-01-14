@@ -2,6 +2,7 @@
 add_library(citnames_json_a OBJECT
         source/Configuration.cc
         source/Output.cc
+        source/semantic/Command.cc
         )
 
 target_link_libraries(citnames_json_a PUBLIC result_a)
@@ -49,6 +50,7 @@ target_link_libraries(citnames report_a)
 target_link_libraries(citnames flags_a)
 target_link_libraries(citnames shell_a)
 target_link_libraries(citnames sys_a)
+target_link_libraries(citnames rpc_a)
 target_link_libraries(citnames fmt::fmt)
 target_link_libraries(citnames spdlog::spdlog)
 target_link_libraries(citnames nlohmann_json::nlohmann_json)
@@ -84,6 +86,7 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(citnames_unit_test flags_a)
     target_link_libraries(citnames_unit_test shell_a)
     target_link_libraries(citnames_unit_test sys_a)
+    target_link_libraries(citnames_unit_test rpc_a)
     target_link_libraries(citnames_unit_test fmt::fmt)
     target_link_libraries(citnames_unit_test nlohmann_json::nlohmann_json)
     target_link_libraries(citnames_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})

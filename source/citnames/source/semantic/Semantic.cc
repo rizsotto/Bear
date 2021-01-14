@@ -24,29 +24,29 @@
 namespace {
 
     inline
-    fs::path make_absolute(report::Command const& command, fs::path && path) {
+    fs::path make_absolute(cs::semantic::Command const& command, fs::path && path) {
         return (path.is_absolute()) ? path : command.working_dir / path;
     }
 }
 
 namespace cs::semantic {
 
-    Semantic::Semantic(report::Command _command) noexcept
+    Semantic::Semantic(Command _command) noexcept
             : command(std::move(_command))
     { }
 
-    QueryCompiler::QueryCompiler(report::Command _command) noexcept
+    QueryCompiler::QueryCompiler(Command _command) noexcept
             : Semantic(std::move(_command))
     { }
 
-    Preprocess::Preprocess(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
+    Preprocess::Preprocess(Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
             : Semantic(std::move(_command))
             , source(make_absolute(command, std::move(_source)))
             , output(make_absolute(command, std::move(_output)))
             , flags(std::move(_flags))
     { }
 
-    Compile::Compile(report::Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
+    Compile::Compile(Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
             : Semantic(std::move(_command))
             , source(make_absolute(command, std::move(_source)))
             , output(make_absolute(command, std::move(_output)))
