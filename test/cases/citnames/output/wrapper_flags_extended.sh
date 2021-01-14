@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+# UNSUPPORTED: true
 # RUN: cd %T; %{shell} %s %t
 # RUN: %{citnames} --verbose --input %t.commands.json --output %t.compilations.json --config %t.config.json
 # RUN: assert_compilation %t.compilations.json count -eq 1
