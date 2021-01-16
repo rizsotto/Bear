@@ -23,8 +23,8 @@ namespace ic {
 
     static constexpr char OUTPUT[] = "--output";
     static constexpr char LIBRARY[] = "--library";
-    static constexpr char EXECUTOR[] = "--executor";
     static constexpr char WRAPPER[] = "--wrapper";
+    static constexpr char WRAPPER_DIR[] = "--wrapper-dir";
     static constexpr char COMMAND[] = "--";
     static constexpr char FORCE_WRAPPER[] = "--force-wrapper";
     static constexpr char FORCE_PRELOAD[] = "--force-preload";

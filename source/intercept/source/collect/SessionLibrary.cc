@@ -59,14 +59,14 @@ namespace ic {
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto library = args.as_string(ic::LIBRARY);
-        auto executor = args.as_string(ic::EXECUTOR);
+        auto wrapper = args.as_string(ic::WRAPPER);
         auto environment = sys::env::from(envp);
         auto path = sys::os::get_path(environment);
 
-        return merge(library, executor, path)
+        return merge(library, wrapper, path)
             .map<Session::Ptr>([&verbose, &environment](auto tuple) {
-                const auto& [library, executor, path] = tuple;
-                return std::make_shared<LibraryPreloadSession>(library, executor, verbose, path, std::move(environment));
+                const auto& [library, wrapper, path] = tuple;
+                return std::make_shared<LibraryPreloadSession>(library, wrapper, verbose, path, std::move(environment));
             });
     }
 

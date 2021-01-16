@@ -109,7 +109,7 @@ namespace ic {
     rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments& args, const char **envp)
     {
         const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto wrapper_dir = args.as_string(ic::WRAPPER);
+        auto wrapper_dir = args.as_string(ic::WRAPPER_DIR);
         auto wrappers = wrapper_dir
                             .and_then<std::list<fs::path>>([](auto wrapper_dir) {
                                 return list_dir(wrapper_dir);

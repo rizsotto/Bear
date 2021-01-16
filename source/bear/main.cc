@@ -48,8 +48,8 @@ namespace {
     constexpr char CITNAMES[] = "--citnames";
     constexpr char INTERCEPT[] = "--interceptor";
     constexpr char LIBRARY[] = "--libexec";
-    constexpr char EXECUTOR[] = "--executor";
     constexpr char WRAPPER[] = "--wrapper";
+    constexpr char WRAPPER_DIR[] = "--wrapper-dir";
     constexpr char CONFIG[] = "--config";
     constexpr char FORCE_WRAPPER[] = "--force-wrapper";
     constexpr char FORCE_PRELOAD[] = "--force-preload";
@@ -60,24 +60,24 @@ namespace {
         auto program = arguments.as_string(INTERCEPT);
         auto command = arguments.as_string_list(COMMAND);
         auto library = arguments.as_string(LIBRARY);
-        auto executor = arguments.as_string(EXECUTOR);
         auto wrapper = arguments.as_string(WRAPPER);
+        auto wrapper_dir = arguments.as_string(WRAPPER_DIR);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
         auto force_wrapper = arguments.as_bool(FORCE_WRAPPER).unwrap_or(false);
         auto force_preload = arguments.as_bool(FORCE_PRELOAD).unwrap_or(false);
 
-        return rust::merge(program, command, rust::merge(library, executor, wrapper))
+        return rust::merge(program, command, rust::merge(library, wrapper, wrapper_dir))
                 .map<sys::Process::Builder>(
                         [&environment, &output, &verbose, &force_wrapper, &force_preload](auto tuple) {
                             const auto&[program, command, pack] = tuple;
-                            const auto&[library, executor, wrapper] = pack;
+                            const auto&[library, wrapper, wrapper_dir] = pack;
 
                             auto builder = sys::Process::Builder(program)
                                     .set_environment(environment)
                                     .add_argument(program)
                                     .add_argument(ic::LIBRARY).add_argument(library)
-                                    .add_argument(ic::EXECUTOR).add_argument(executor)
                                     .add_argument(ic::WRAPPER).add_argument(wrapper)
+                                    .add_argument(ic::WRAPPER_DIR).add_argument(wrapper_dir)
                                     .add_argument(ic::OUTPUT).add_argument(output);
                             if (force_wrapper) {
                                 builder.add_argument(ic::FORCE_WRAPPER);
@@ -182,17 +182,17 @@ namespace {
                     "bear",
                     VERSION,
                     {
-                            {OUTPUT,        {1,  false, "path of the result file",                  {"compile_commands.json"}, std::nullopt}},
-                            {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,              ADVANCED_GROUP}},
-                            {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,              ADVANCED_GROUP}},
-                            {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,              ADVANCED_GROUP}},
-                            {FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,              ADVANCED_GROUP}},
-                            {LIBRARY,       {1,  false, "path to the preload library",              {LIBRARY_DEFAULT_PATH},    DEVELOPER_GROUP}},
-                            {EXECUTOR,      {1,  false, "path to the preload executable",           {EXECUTOR_DEFAULT_PATH},   DEVELOPER_GROUP}},
-                            {WRAPPER,       {1,  false, "path to the wrapper directory",            {WRAPPER_DEFAULT_PATH},    DEVELOPER_GROUP}},
-                            {CITNAMES,      {1,  false, "path to the citnames executable",          {CITNAMES_DEFAULT_PATH},   DEVELOPER_GROUP}},
-                            {INTERCEPT,     {1,  false, "path to the intercept executable",         {INTERCEPT_DEFAULT_PATH},  DEVELOPER_GROUP}},
-                            {COMMAND,       {-1, true,  "command to execute",                       std::nullopt,              std::nullopt}}
+                            {OUTPUT,        {1,  false, "path of the result file",                  {"compile_commands.json"},  std::nullopt}},
+                            {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,               ADVANCED_GROUP}},
+                            {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,               ADVANCED_GROUP}},
+                            {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,               ADVANCED_GROUP}},
+                            {FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,               ADVANCED_GROUP}},
+                            {LIBRARY,       {1,  false, "path to the preload library",              {LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                            {WRAPPER,       {1,  false, "path to the wrapper executable",           {WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                            {WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
+                            {CITNAMES,      {1,  false, "path to the citnames executable",          {CITNAMES_DEFAULT_PATH},    DEVELOPER_GROUP}},
+                            {INTERCEPT,     {1,  false, "path to the intercept executable",         {INTERCEPT_DEFAULT_PATH},   DEVELOPER_GROUP}},
+                            {COMMAND,       {-1, true,  "command to execute",                       std::nullopt,               std::nullopt}}
                     });
             return parser.parse_or_exit(argc, const_cast<const char **>(argv));
         }
