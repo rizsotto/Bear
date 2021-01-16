@@ -19,22 +19,27 @@
 
 #pragma once
 
-#include "report/wrapper/Types.h"
+#include <filesystem>
+#include <map>
+#include <string>
+#include <vector>
+#include <cstdint>
 
-#include "intercept.pb.h"
+namespace fs = std::filesystem;
 
 namespace wr {
 
-    class EventFactory {
-    public:
-        EventFactory() noexcept;
-        ~EventFactory() noexcept = default;
-
-        [[nodiscard]] rpc::Event start(Pid pid, Pid ppid, const Execution &execution) const;
-        [[nodiscard]] rpc::Event signal(int number) const;
-        [[nodiscard]] rpc::Event terminate(int code) const;
-
-    private:
-        Rid rid_;
+    struct Session {
+        const std::string destination;
     };
+
+    struct Execution {
+        fs::path program;
+        std::vector<std::string> arguments;
+        fs::path working_dir;
+        std::map<std::string, std::string> environment;
+    };
+
+    using Rid = uint64_t;
+    using Pid = uint32_t;
 }

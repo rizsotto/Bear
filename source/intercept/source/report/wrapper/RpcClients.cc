@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "InterceptClient.h"
+#include "report/wrapper/RpcClients.h"
 
 #include <fmt/format.h>
 #include <grpcpp/create_channel.h>
@@ -33,15 +33,12 @@ namespace {
 
 namespace wr {
 
-    InterceptClient::InterceptClient(const Session& session)
+    SupervisorClient::SupervisorClient(const Session &session)
             : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
             , supervisor_(rpc::Supervisor::NewStub(channel_))
-            , interceptor_(rpc::Interceptor::NewStub(channel_))
-    {
-    }
+    { }
 
-    rust::Result<std::string> InterceptClient::get_wrapped_command(const std::string& name)
-    {
+    rust::Result<fs::path> SupervisorClient::resolve_program(const std::string &name) {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetWrappedCommand");
 
         grpc::ClientContext context;
@@ -53,12 +50,12 @@ namespace wr {
         const grpc::Status status = supervisor_->ResolveProgram(&context, request, &response);
         spdlog::debug("gRPC call [ResolveProgram] finished: {}", status.ok());
         return status.ok()
-            ? rust::Result<std::string>(rust::Ok(response.path()))
-            : rust::Result<std::string>(rust::Err(create_error(status)));
+               ? rust::Result<fs::path>(rust::Ok(fs::path(response.path())))
+               : rust::Result<fs::path>(rust::Err(create_error(status)));
     }
 
-    rust::Result<std::map<std::string, std::string>> InterceptClient::get_environment_update(const std::map<std::string, std::string>& input)
-    {
+    rust::Result<std::map<std::string, std::string>>
+    SupervisorClient::update_environment(const std::map<std::string, std::string> &input) {
         spdlog::debug("gRPC call requested: supervise::Interceptor::GetEnvironmentUpdate");
 
         grpc::ClientContext context;
@@ -76,8 +73,12 @@ namespace wr {
         return rust::Err(create_error(status));
     }
 
-    rust::Result<int> InterceptClient::report(rpc::Event&& event)
-    {
+    InterceptorClient::InterceptorClient(const Session &session)
+            : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
+            , interceptor_(rpc::Interceptor::NewStub(channel_))
+    { }
+
+    rust::Result<int> InterceptorClient::report(rpc::Event &&event) {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Report");
 
         grpc::ClientContext context;

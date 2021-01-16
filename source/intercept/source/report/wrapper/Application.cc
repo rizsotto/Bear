@@ -17,20 +17,25 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "report/wrapper/Environment.h"
+#include "report/wrapper/Flags.h"
+#include "report/wrapper/EventFactory.h"
+#include "report/wrapper/RpcClients.h"
 #include "report/wrapper/Application.h"
 #include "libmain/ApplicationLogConfig.h"
 #include "libsys/Environment.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "libsys/Signal.h"
-#include "Environment.h"
-#include "Flags.h"
 
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
+
+namespace fs = std::filesystem;
 
 namespace {
 
@@ -58,31 +63,31 @@ namespace {
     }
 
     struct Wrapper : wr::Command {
-        Wrapper(const wr::Session &session, const wr::ExecutionContext &context)
-                : Command(session, context)
+
+        Wrapper(wr::Session session, wr::Execution execution)
+                : wr::Command(std::move(session), std::move(execution))
         { }
 
-        [[nodiscard]] rust::Result<wr::ExecutionContext> context() const override {
-            wr::InterceptClient client(session_);
+        [[nodiscard]] rust::Result<wr::Execution> execution() const override {
+            wr::SupervisorClient client(session_);
 
-            auto command = client.get_wrapped_command(context_.command);
-            auto environment = client.get_environment_update(context_.environment);
+            auto program = client.resolve_program(execution_.program);
+            auto environment = client.update_environment(execution_.environment);
+            auto arguments = program
+                    .map<std::vector<std::string>>([this](const auto &program) {
+                        auto result = execution_.arguments;
+                        result.front() = program;
+                        return result;
+                    });
 
-            return rust::merge(command, environment)
-                    .map<wr::ExecutionContext>([this](auto tuple) {
-                        const auto&[command, environment] = tuple;
-                        auto arguments = context_.arguments;
-                        arguments.front() = command;
-                        return wr::ExecutionContext{
-                                command,
-                                arguments,
-                                context_.working_directory,
-                                environment
-                        };
+            return rust::merge(program, arguments, environment)
+                    .map<wr::Execution>([this](const auto &tuple) {
+                        const auto&[program, arguments, environment] = tuple;
+                        return wr::Execution{program, arguments, execution_.working_dir, environment};
                     });
         }
 
-        static rust::Result<wr::Session> make_session(const sys::env::Vars& environment) noexcept
+        static rust::Result<wr::Session> make_session(const sys::env::Vars &environment) noexcept
         {
             auto destination = environment.find(wr::env::KEY_DESTINATION);
             return (destination == environment.end())
@@ -90,67 +95,67 @@ namespace {
                    : rust::Result<wr::Session>(rust::Ok(wr::Session {destination->second }));
         }
 
-        static std::vector<std::string> from(const char** args)
+        static std::vector<std::string> from(const char **argv)
         {
-            const char** end = args;
+            const char** end = argv;
             while (*end != nullptr)
                 ++end;
-            return std::vector<std::string>(args, end);
+            return std::vector<std::string>(argv, end);
         }
 
-        static rust::Result<wr::ExecutionContext> make_execution(const char** args, sys::env::Vars&& environment) noexcept
+        static rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
         {
-            auto path = fs::path(args[0]).string();
-            auto command = from(args);
-            auto working_dir = sys::path::get_cwd();
+            auto program = fs::path(argv[0]);
+            auto arguments = from(argv);
 
-            return working_dir
-                    .map<wr::ExecutionContext>([&path, &command, &environment](auto cwd) {
-                        return wr::ExecutionContext {path, command, cwd.string(), environment };
+            return sys::path::get_cwd()
+                    .map<wr::Execution>([&program, &arguments, &environment](auto working_dir) {
+                        return wr::Execution{program, arguments, working_dir, environment};
                     });
         }
     };
 
     struct Supervisor : wr::Command {
-        Supervisor(const wr::Session &session, const wr::ExecutionContext &context)
-                : Command(session, context)
+
+        Supervisor(wr::Session session, wr::Execution execution)
+                : wr::Command(std::move(session), std::move(execution))
         { }
 
-        [[nodiscard]] rust::Result<wr::ExecutionContext> context() const override {
-            wr::InterceptClient client(session_);
+        [[nodiscard]] rust::Result<wr::Execution> execution() const override {
+            wr::SupervisorClient client(session_);
 
-            return client.get_environment_update(context_.environment)
-                    .map<wr::ExecutionContext>([this](auto environment) {
-                        return wr::ExecutionContext{
-                                context_.command,
-                                context_.arguments,
-                                context_.working_directory,
+            return client.update_environment(execution_.environment)
+                    .map<wr::Execution>([this](const auto &environment) {
+                        return wr::Execution{
+                                execution_.program,
+                                execution_.arguments,
+                                execution_.working_dir,
                                 environment
                         };
                     });
         }
 
-        static rust::Result<wr::Session> make_session(const ::flags::Arguments &args) noexcept {
+        static rust::Result<wr::Session> make_session(const flags::Arguments &args) noexcept {
             return args.as_string(wr::DESTINATION)
                     .map<wr::Session>([](const auto &destination) {
                         return wr::Session{std::string(destination)};
                     });
         }
 
-        static rust::Result<wr::ExecutionContext>
-        make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept {
-            auto path = args.as_string(wr::EXECUTE)
-                    .map<std::string>([](auto file) { return std::string(file); });
-            auto command = args.as_string_list(wr::COMMAND)
+        static rust::Result<wr::Execution>
+        make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
+            auto program = args.as_string(wr::EXECUTE)
+                    .map<fs::path>([](auto file) { return fs::path(file); });
+            auto arguments = args.as_string_list(wr::COMMAND)
                     .map<std::vector<std::string>>([](auto args) {
                         return std::vector<std::string>(args.begin(), args.end());
                     });
             auto working_dir = sys::path::get_cwd();
 
-            return merge(path, command, working_dir)
-                    .map<wr::ExecutionContext>([&environment](auto tuple) {
-                        const auto&[_path, _command, _working_dir] = tuple;
-                        return wr::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
+            return merge(program, arguments, working_dir)
+                    .map<wr::Execution>([&environment](const auto &tuple) {
+                        const auto&[program, arguments, working_dir] = tuple;
+                        return wr::Execution{program, arguments, working_dir, environment};
                     });
         }
     };
@@ -158,19 +163,19 @@ namespace {
 
 namespace wr {
 
-    Command::Command(wr::Session session, wr::ExecutionContext context) noexcept
+    Command::Command(wr::Session session, wr::Execution execution) noexcept
             : ps::Command()
             , session_(std::move(session))
-            , context_(std::move(context))
+            , execution_(std::move(execution))
     { }
 
     rust::Result<int> Command::execute() const {
         wr::EventFactory event_factory;
-        wr::InterceptClient client(session_);
+        wr::InterceptorClient client(session_);
 
-        return context()
+        return execution()
                 .and_then<sys::Process>([&client, &event_factory](auto execution) {
-                    return sys::Process::Builder(execution.command)
+                    return sys::Process::Builder(execution.program)
                             .add_arguments(execution.arguments.begin(), execution.arguments.end())
                             .set_environment(execution.environment)
 #ifdef SUPPORT_PRELOAD
@@ -217,7 +222,7 @@ namespace wr {
             }
             log_config.record(argv, envp);
 
-            return from_envs(argc, argv, envp);
+            return Application::from_envs(argc, argv, envp);
         } else {
             return Application::parse(argc, argv)
                     .on_success([this, &argv, &envp](const auto& args) {
@@ -240,8 +245,8 @@ namespace wr {
         auto execution = Wrapper::make_execution(argv, std::move(environment));
 
         return rust::merge(session, execution)
-                .map<ps::CommandPtr>([](auto in) {
-                    const auto& [session, execution] = in;
+                .map<ps::CommandPtr>([](const auto &tuple) {
+                    const auto&[session, execution] = tuple;
                     return std::make_unique<Wrapper>(session, execution);
                 });
     }
@@ -252,8 +257,8 @@ namespace wr {
         auto execution = Supervisor::make_execution(args, std::move(environment));
 
         return rust::merge(session, execution)
-                .map<ps::CommandPtr>([](auto in) {
-                    const auto&[session, execution] = in;
+                .map<ps::CommandPtr>([](const auto &tuple) {
+                    const auto&[session, execution] = tuple;
                     return std::make_unique<Supervisor>(session, execution);
                 });
     }

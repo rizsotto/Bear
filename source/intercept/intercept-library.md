@@ -74,7 +74,7 @@ It's a shared library.
    - Any error is fatal.
    - Errors are reported on `stderr` only if requested.
 
-## `er` supervisor
+## `wrapper` supervisor
 
 It's an executable.
 

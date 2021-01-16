@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "EventFactory.h"
+#include "report/wrapper/EventFactory.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -27,10 +27,10 @@
 
 namespace {
 
-    uint64_t generate_unique_id() {
+    wr::Rid generate_unique_id() {
         std::random_device random_device;
         std::mt19937_64 generator(random_device());
-        std::uniform_int_distribution<uint64_t> distribution;
+        std::uniform_int_distribution<wr::Rid> distribution;
 
         return distribution(generator);
     }
@@ -51,10 +51,7 @@ namespace wr {
             : rid_(generate_unique_id())
     { }
 
-    rpc::Event EventFactory::start(
-            pid_t pid,
-            pid_t ppid,
-            const ExecutionContext &execution) const {
+    rpc::Event EventFactory::start(Pid pid, Pid ppid, const Execution &execution) const {
         rpc::Event result;
         result.set_rid(rid_);
         result.set_pid(pid);
@@ -62,11 +59,11 @@ namespace wr {
         result.set_timestamp(now_as_string());
         {
             auto event = std::make_unique<rpc::Event_Started>();
-            event->set_executable(execution.command);
-            for (const auto &arg : execution.arguments) {
-                event->add_arguments(arg.data());
+            event->set_executable(execution.program);
+            for (const auto &argument : execution.arguments) {
+                event->add_arguments(argument.data());
             }
-            event->set_working_dir(execution.working_directory);
+            event->set_working_dir(execution.working_dir);
             event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
 
             result.set_allocated_started(event.release());

@@ -19,25 +19,22 @@
 
 #pragma once
 
+#include "report/wrapper/Types.h"
 #include "libmain/Application.h"
 #include "libmain/ApplicationLogConfig.h"
-#include "EventFactory.h"
-#include "InterceptClient.h"
 #include "libflags/Flags.h"
-
-#include <utility>
 
 namespace wr {
 
     struct Command : ps::Command {
-        Command(wr::Session session, wr::ExecutionContext context) noexcept;
+        Command(wr::Session session, wr::Execution execution) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
-        [[nodiscard]] virtual rust::Result<wr::ExecutionContext> context() const = 0;
+        [[nodiscard]] virtual rust::Result<wr::Execution> execution() const = 0;
 
     protected:
         wr::Session session_;
-        wr::ExecutionContext context_;
+        wr::Execution execution_;
     };
 
     struct Application : ps::Application {
