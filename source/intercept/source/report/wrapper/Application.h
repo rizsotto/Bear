@@ -23,19 +23,19 @@
 #include "libmain/ApplicationLogConfig.h"
 #include "report/EventFactory.h"
 #include "report/InterceptClient.h"
+#include "libflags/Flags.h"
+
+#include <utility>
 
 namespace wr {
 
     struct Command : ps::Command {
-        Command(rpc::Session session, rpc::ExecutionContext context)
-                : ps::Command()
-                , session_(session)
-                , context_(context)
-        { }
+        Command(rpc::Session session, rpc::ExecutionContext context) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
+        [[nodiscard]] virtual rust::Result<rpc::ExecutionContext> context() const = 0;
 
-    private:
+    protected:
         rpc::Session session_;
         rpc::ExecutionContext context_;
     };
@@ -44,7 +44,11 @@ namespace wr {
         Application() noexcept;
         rust::Result<ps::CommandPtr> command(int argc, const char **argv, const char **envp) const override;
 
+        static rust::Result<ps::CommandPtr> from_envs(int argc, const char **argv, const char **envp);
+        static rust::Result<ps::CommandPtr> from_args(const flags::Arguments &args, const char **envp);
+        static rust::Result<flags::Arguments> parse(int argc, const char **argv) ;
+
     private:
-        ps::ApplicationLogConfig log_config;
+        ps::ApplicationLogConfig const &log_config;
     };
 }
