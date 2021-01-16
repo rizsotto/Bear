@@ -58,22 +58,22 @@ namespace {
     }
 
     struct Wrapper : wr::Command {
-        Wrapper(const rpc::Session &session, const rpc::ExecutionContext &context)
+        Wrapper(const wr::Session &session, const wr::ExecutionContext &context)
                 : Command(session, context)
         { }
 
-        [[nodiscard]] rust::Result<rpc::ExecutionContext> context() const override {
-            rpc::InterceptClient client(session_);
+        [[nodiscard]] rust::Result<wr::ExecutionContext> context() const override {
+            wr::InterceptClient client(session_);
 
             auto command = client.get_wrapped_command(context_.command);
             auto environment = client.get_environment_update(context_.environment);
 
             return rust::merge(command, environment)
-                    .map<rpc::ExecutionContext>([this](auto tuple) {
+                    .map<wr::ExecutionContext>([this](auto tuple) {
                         const auto&[command, environment] = tuple;
                         auto arguments = context_.arguments;
                         arguments.front() = command;
-                        return rpc::ExecutionContext{
+                        return wr::ExecutionContext{
                                 command,
                                 arguments,
                                 context_.working_directory,
@@ -82,12 +82,12 @@ namespace {
                     });
         }
 
-        static rust::Result<rpc::Session> make_session(const sys::env::Vars& environment) noexcept
+        static rust::Result<wr::Session> make_session(const sys::env::Vars& environment) noexcept
         {
             auto destination = environment.find(wr::env::KEY_DESTINATION);
             return (destination == environment.end())
-                   ? rust::Result<rpc::Session>(rust::Err(std::runtime_error("Unknown destination.")))
-                   : rust::Result<rpc::Session>(rust::Ok(rpc::Session { destination->second }));
+                   ? rust::Result<wr::Session>(rust::Err(std::runtime_error("Unknown destination.")))
+                   : rust::Result<wr::Session>(rust::Ok(wr::Session {destination->second }));
         }
 
         static std::vector<std::string> from(const char** args)
@@ -98,30 +98,30 @@ namespace {
             return std::vector<std::string>(args, end);
         }
 
-        static rust::Result<rpc::ExecutionContext> make_execution(const char** args, sys::env::Vars&& environment) noexcept
+        static rust::Result<wr::ExecutionContext> make_execution(const char** args, sys::env::Vars&& environment) noexcept
         {
             auto path = fs::path(args[0]).string();
             auto command = from(args);
             auto working_dir = sys::path::get_cwd();
 
             return working_dir
-                    .map<rpc::ExecutionContext>([&path, &command, &environment](auto cwd) {
-                        return rpc::ExecutionContext {path, command, cwd.string(), environment };
+                    .map<wr::ExecutionContext>([&path, &command, &environment](auto cwd) {
+                        return wr::ExecutionContext {path, command, cwd.string(), environment };
                     });
         }
     };
 
     struct Supervisor : wr::Command {
-        Supervisor(const rpc::Session &session, const rpc::ExecutionContext &context)
+        Supervisor(const wr::Session &session, const wr::ExecutionContext &context)
                 : Command(session, context)
         { }
 
-        [[nodiscard]] rust::Result<rpc::ExecutionContext> context() const override {
-            rpc::InterceptClient client(session_);
+        [[nodiscard]] rust::Result<wr::ExecutionContext> context() const override {
+            wr::InterceptClient client(session_);
 
             return client.get_environment_update(context_.environment)
-                    .map<rpc::ExecutionContext>([this](auto environment) {
-                        return rpc::ExecutionContext{
+                    .map<wr::ExecutionContext>([this](auto environment) {
+                        return wr::ExecutionContext{
                                 context_.command,
                                 context_.arguments,
                                 context_.working_directory,
@@ -130,14 +130,14 @@ namespace {
                     });
         }
 
-        static rust::Result<rpc::Session> make_session(const ::flags::Arguments &args) noexcept {
+        static rust::Result<wr::Session> make_session(const ::flags::Arguments &args) noexcept {
             return args.as_string(wr::DESTINATION)
-                    .map<rpc::Session>([](const auto &destination) {
-                        return rpc::Session{std::string(destination)};
+                    .map<wr::Session>([](const auto &destination) {
+                        return wr::Session{std::string(destination)};
                     });
         }
 
-        static rust::Result<rpc::ExecutionContext>
+        static rust::Result<wr::ExecutionContext>
         make_execution(const ::flags::Arguments &args, sys::env::Vars &&environment) noexcept {
             auto path = args.as_string(wr::EXECUTE)
                     .map<std::string>([](auto file) { return std::string(file); });
@@ -148,9 +148,9 @@ namespace {
             auto working_dir = sys::path::get_cwd();
 
             return merge(path, command, working_dir)
-                    .map<rpc::ExecutionContext>([&environment](auto tuple) {
+                    .map<wr::ExecutionContext>([&environment](auto tuple) {
                         const auto&[_path, _command, _working_dir] = tuple;
-                        return rpc::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
+                        return wr::ExecutionContext{_path, _command, _working_dir.string(), std::move(environment)};
                     });
         }
     };
@@ -158,15 +158,15 @@ namespace {
 
 namespace wr {
 
-    Command::Command(rpc::Session session, rpc::ExecutionContext context) noexcept
+    Command::Command(wr::Session session, wr::ExecutionContext context) noexcept
             : ps::Command()
             , session_(std::move(session))
             , context_(std::move(context))
     { }
 
     rust::Result<int> Command::execute() const {
-        rpc::EventFactory event_factory;
-        rpc::InterceptClient client(session_);
+        wr::EventFactory event_factory;
+        wr::InterceptClient client(session_);
 
         return context()
                 .and_then<sys::Process>([&client, &event_factory](auto execution) {

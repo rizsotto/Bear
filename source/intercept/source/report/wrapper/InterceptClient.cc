@@ -31,7 +31,7 @@ namespace {
     }
 }
 
-namespace rpc {
+namespace wr {
 
     InterceptClient::InterceptClient(const Session& session)
             : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))

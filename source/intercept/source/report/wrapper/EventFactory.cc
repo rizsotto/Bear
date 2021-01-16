@@ -45,7 +45,7 @@ namespace {
     }
 }
 
-namespace rpc {
+namespace wr {
 
     EventFactory::EventFactory() noexcept
             : rid_(generate_unique_id())

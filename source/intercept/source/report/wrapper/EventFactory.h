@@ -27,7 +27,7 @@
 
 #include "intercept.pb.h"
 
-namespace rpc {
+namespace wr {
 
     struct ExecutionContext {
         std::string command;

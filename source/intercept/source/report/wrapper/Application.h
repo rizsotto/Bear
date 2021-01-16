@@ -30,14 +30,14 @@
 namespace wr {
 
     struct Command : ps::Command {
-        Command(rpc::Session session, rpc::ExecutionContext context) noexcept;
+        Command(wr::Session session, wr::ExecutionContext context) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
-        [[nodiscard]] virtual rust::Result<rpc::ExecutionContext> context() const = 0;
+        [[nodiscard]] virtual rust::Result<wr::ExecutionContext> context() const = 0;
 
     protected:
-        rpc::Session session_;
-        rpc::ExecutionContext context_;
+        wr::Session session_;
+        wr::ExecutionContext context_;
     };
 
     struct Application : ps::Application {

@@ -27,7 +27,7 @@
 
 #include <list>
 
-namespace rpc {
+namespace wr {
 
     struct Session {
         const std::string destination;
