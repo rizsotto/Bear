@@ -66,6 +66,5 @@ namespace wr {
     private:
         std::shared_ptr<::grpc::Channel> channel_;
         std::unique_ptr<rpc::Interceptor::Stub> interceptor_;
-        EventFactory event_factory_;
     };
 }

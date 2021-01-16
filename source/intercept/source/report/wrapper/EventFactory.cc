@@ -27,10 +27,10 @@
 
 namespace {
 
-    wr::Rid generate_unique_id() {
+    std::uint64_t generate_unique_id() {
         std::random_device random_device;
         std::mt19937_64 generator(random_device());
-        std::uniform_int_distribution<wr::Rid> distribution;
+        std::uniform_int_distribution<std::uint64_t> distribution;
 
         return distribution(generator);
     }
@@ -51,7 +51,7 @@ namespace wr {
             : rid_(generate_unique_id())
     { }
 
-    rpc::Event EventFactory::start(Pid pid, Pid ppid, const Execution &execution) const {
+    rpc::Event EventFactory::start(ProcessId pid, ProcessId ppid, const Execution &execution) const {
         rpc::Event result;
         result.set_rid(rid_);
         result.set_pid(pid);

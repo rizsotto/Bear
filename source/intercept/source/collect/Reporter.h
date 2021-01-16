@@ -42,7 +42,7 @@ namespace ic {
         void report(const rpc::Event& request);
 
     public:
-        Reporter(fs::path output, ic::EventsDatabase::Ptr events);
+        explicit Reporter(ic::EventsDatabase::Ptr events);
 
         Reporter() = delete;
         ~Reporter() noexcept = default;
@@ -54,7 +54,6 @@ namespace ic {
         Reporter& operator=(Reporter&&) noexcept = delete;
 
     private:
-        fs::path output_;
         ic::EventsDatabase::Ptr events_;
     };
 }

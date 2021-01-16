@@ -18,7 +18,7 @@
  */
 
 #include "collect/Reporter.h"
-#include "collect/Services.h"
+#include "collect/RpcServices.h"
 #include "collect/Session.h"
 
 namespace ic {

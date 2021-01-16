@@ -44,12 +44,6 @@ namespace {
             (const std::vector<std::string_view>& command),
             (const, override));
 
-        MOCK_METHOD(
-            std::string,
-            get_session_type,
-            (),
-            (const, override));
-
         using Session::keep_front_in_path;
         using Session::remove_from_path;
     };

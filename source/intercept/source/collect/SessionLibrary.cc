@@ -136,9 +136,4 @@ namespace ic {
                     .set_environment(environment);
             });
     }
-
-    std::string LibraryPreloadSession::get_session_type() const
-    {
-        return std::string("library preload");
-    }
 }

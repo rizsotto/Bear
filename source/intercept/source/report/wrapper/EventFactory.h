@@ -30,11 +30,11 @@ namespace wr {
         EventFactory() noexcept;
         ~EventFactory() noexcept = default;
 
-        [[nodiscard]] rpc::Event start(Pid pid, Pid ppid, const Execution &execution) const;
+        [[nodiscard]] rpc::Event start(ProcessId pid, ProcessId ppid, const Execution &execution) const;
         [[nodiscard]] rpc::Event signal(int number) const;
         [[nodiscard]] rpc::Event terminate(int code) const;
 
     private:
-        Rid rid_;
+        ReporterId rid_;
     };
 }

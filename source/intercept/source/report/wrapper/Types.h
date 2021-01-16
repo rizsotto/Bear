@@ -40,6 +40,6 @@ namespace wr {
         std::map<std::string, std::string> environment;
     };
 
-    using Rid = uint64_t;
-    using Pid = uint32_t;
+    using ReporterId = uint64_t;
+    using ProcessId = uint32_t;
 }

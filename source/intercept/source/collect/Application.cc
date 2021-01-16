@@ -19,7 +19,7 @@
 
 #include "collect/Application.h"
 #include "collect/Reporter.h"
-#include "collect/Services.h"
+#include "collect/RpcServices.h"
 #include "collect/Session.h"
 #include "intercept/Flags.h"
 #include "libsys/Os.h"
@@ -32,16 +32,56 @@
 #include <vector>
 
 namespace {
+    using HostInfo = std::map<std::string, std::string>;
+
+    rust::Result<HostInfo> create_host_info()
+    {
+        return sys::os::get_uname()
+#ifdef HAVE_CS_PATH
+                .map<HostInfo>([](auto result) {
+                    sys::os::get_confstr(_CS_PATH)
+                            .map<int>([&result](auto value) {
+                                result.insert({ "_CS_PATH", value });
+                                return 0;
+                            });
+                    return result;
+                })
+#endif
+#ifdef HAVE_CS_GNU_LIBC_VERSION
+                .map<HostInfo>([](auto result) {
+                    sys::os::get_confstr(_CS_GNU_LIBC_VERSION)
+                            .map<int>([&result](auto value) {
+                                result.insert({ "_CS_GNU_LIBC_VERSION", value });
+                                return 0;
+                            });
+                    return result;
+                })
+#endif
+#ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
+                .map<HostInfo>([](auto result) {
+                    sys::os::get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
+                            .map<int>([&result](auto value) {
+                                result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
+                                return 0;
+                            });
+                    return result;
+                })
+#endif
+                .map_err<std::runtime_error>([](auto error) {
+                    return std::runtime_error(fmt::format("failed to get host info: {}", error.what()));
+                });
+    }
 
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 
     rust::Result<std::vector<std::string_view>> get_command(const flags::Arguments& args)
     {
+        using Result = rust::Result<std::vector<std::string_view>>;
         return args.as_string_list(ic::COMMAND)
                 .and_then<std::vector<std::string_view>>([](auto cmd) {
                     return (cmd.empty())
-                            ? rust::Result<std::vector<std::string_view>>(rust::Err(std::runtime_error("Command is empty.")))
-                            : rust::Result<std::vector<std::string_view>>(rust::Ok(cmd));
+                            ? Result(rust::Err(std::runtime_error("Command is empty.")))
+                            : Result(rust::Ok(cmd));
                 });
     }
 }
@@ -60,12 +100,11 @@ namespace ic {
                           .AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
-        std::string server_address = fmt::format("127.0.0.1:{}", port);
-        spdlog::debug("Running gRPC server. [Listening on {0}]", server_address);
-        // Configure the session and the reporter objects
-        session_->set_server_address(server_address);
+        // Create address URL for the services
+        std::string address = fmt::format("127.0.0.1:{}", port);
+        spdlog::debug("Running gRPC server. [Listening on {0}]", address);
         // Execute the build command
-        auto result = session_->execute(command_);
+        auto result = session_->execute(command_, address);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();
@@ -97,7 +136,7 @@ namespace ic {
 
         return rust::merge(command, session, reporter)
                 .map<ps::CommandPtr>([](auto tuple) {
-                    const auto& [command, session, reporter] = tuple;
+                    const auto&[command, session, reporter] = tuple;
                     return std::make_unique<Command>(command, session, reporter);
                 });
     }

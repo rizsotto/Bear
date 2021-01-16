@@ -48,11 +48,6 @@ namespace ic {
     }
 #endif
 
-    void Session::set_server_address(const std::string& value)
-    {
-        server_address_ = value;
-    }
-
     std::string Session::keep_front_in_path(const std::string& path, const std::string& paths)
     {
         std::list<fs::path> result = { path };
@@ -77,7 +72,8 @@ namespace ic {
         return sys::path::join(result);
     }
 
-    rust::Result<int> Session::execute(const std::vector<std::string_view> &command) const {
+    rust::Result<int> Session::execute(const std::vector<std::string_view> &command, const std::string &address) {
+        server_address_ = address;
         return supervise(command)
                 .and_then<sys::Process>([](auto builder) {
                     return builder.spawn();

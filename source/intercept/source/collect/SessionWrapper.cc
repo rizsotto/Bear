@@ -232,11 +232,6 @@ namespace ic {
         return rust::Ok(result);
     }
 
-    std::string WrapperSession::get_session_type() const
-    {
-        return std::string("Wrapper");
-    }
-
     std::map<std::string, std::string> WrapperSession::set_up_environment() const
     {
         std::map<std::string, std::string> environment(environment_);

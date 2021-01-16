@@ -39,8 +39,6 @@ namespace ic {
         [[nodiscard]] rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const override;
         [[nodiscard]] rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const override;
 
-        [[nodiscard]] std::string get_session_type() const override;
-
     private:
         [[nodiscard]] std::map<std::string, std::string> set_up_environment() const;
 

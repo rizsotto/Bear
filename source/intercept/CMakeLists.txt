@@ -18,7 +18,7 @@ target_link_libraries(report_a PUBLIC PkgConfig::sqlite)
 add_library(intercept_a OBJECT
         source/collect/Application.cc
         source/collect/Reporter.cc
-        source/collect/Services.cc
+        source/collect/RpcServices.cc
         source/collect/Session.cc
         source/collect/SessionWrapper.cc
         )
