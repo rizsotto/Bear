@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "report/InterceptClient.h"
+#include "InterceptClient.h"
 
 #include <fmt/format.h>
 #include <grpcpp/create_channel.h>

@@ -234,7 +234,7 @@ namespace wr {
         }
     }
 
-    rust::Result<ps::CommandPtr> Application::from_envs(int argc, const char **argv, const char **envp) {
+    rust::Result<ps::CommandPtr> Application::from_envs(int, const char **argv, const char **envp) {
         auto environment = sys::env::from(const_cast<const char **>(envp));
         auto session = Wrapper::make_session(environment);
         auto execution = Wrapper::make_execution(argv, std::move(environment));

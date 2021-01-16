@@ -66,19 +66,9 @@ install(TARGETS intercept
 install(FILES man/intercept.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-# Create a static library, which is used for unit tests and the final shared library.
-add_library(reporter_a OBJECT
-        source/report/EventFactory.cc
-        source/report/InterceptClient.cc
-        )
-
-target_include_directories(reporter_a PUBLIC source/)
-target_link_libraries(reporter_a PUBLIC rpc_a)
-target_link_libraries(reporter_a PUBLIC result_a)
-target_link_libraries(reporter_a PUBLIC spdlog::spdlog)
-
-
 add_executable(wrapper
+        source/report/wrapper/EventFactory.cc
+        source/report/wrapper/InterceptClient.cc
         source/report/wrapper/Application.cc
         source/report/wrapper/main.cc
         )
@@ -86,7 +76,6 @@ add_executable(wrapper
 target_include_directories(wrapper PUBLIC source/)
 target_link_libraries(wrapper main_a)
 target_link_libraries(wrapper flags_a)
-target_link_libraries(wrapper reporter_a)
 target_link_libraries(wrapper result_a)
 target_link_libraries(wrapper sys_a)
 target_link_libraries(wrapper rpc_a)
@@ -130,23 +119,6 @@ install(CODE "
         WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/wrapper.d
     )
 ")
-
-add_executable(er
-        source/report/supervisor/Application.cc
-        source/report/supervisor/main.cc
-        )
-
-target_include_directories(er PUBLIC source/)
-target_link_libraries(er main_a)
-target_link_libraries(er reporter_a)
-target_link_libraries(er result_a)
-target_link_libraries(er flags_a)
-target_link_libraries(er sys_a)
-target_link_libraries(er rpc_a)
-target_link_libraries(er spdlog::spdlog)
-
-install(TARGETS er
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
 add_library(exec_a OBJECT
         source/report/libexec/Buffer.cc

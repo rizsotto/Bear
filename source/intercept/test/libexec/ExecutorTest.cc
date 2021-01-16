@@ -24,7 +24,7 @@
 #include "LinkerMock.h"
 #include "report/libexec/Session.h"
 #include "report/libexec/Array.h"
-#include "report/supervisor/Flags.h"
+#include "report/wrapper/Flags.h"
 
 #include <cerrno>
 
@@ -113,11 +113,11 @@ namespace {
         EXPECT_CALL(linker,execve(SILENT_SESSION.reporter,
                                   CStyleArrayEqual(std::vector<const char *> {
                                       SILENT_SESSION.reporter,
-                                      er::DESTINATION,
+                                      wr::DESTINATION,
                                       SILENT_SESSION.destination,
-                                      er::EXECUTE,
+                                      wr::EXECUTE,
                                       LS_PATH,
-                                      er::COMMAND,
+                                      wr::COMMAND,
                                       LS_ARGV[0],
                                       LS_ARGV[1]
                                   }),
@@ -142,12 +142,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                            VERBOSE_SESSION.reporter,
-                                           er::DESTINATION,
+                                           wr::DESTINATION,
                                            VERBOSE_SESSION.destination,
-                                           er::VERBOSE,
-                                           er::EXECUTE,
+                                           wr::VERBOSE,
+                                           wr::EXECUTE,
                                            LS_PATH,
-                                           er::COMMAND,
+                                           wr::COMMAND,
                                            LS_ARGV[0],
                                            LS_ARGV[1]
                                    }),
@@ -189,12 +189,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                        VERBOSE_SESSION.reporter,
-                                       er::DESTINATION,
+                                       wr::DESTINATION,
                                        VERBOSE_SESSION.destination,
-                                       er::VERBOSE,
-                                       er::EXECUTE,
+                                       wr::VERBOSE,
+                                       wr::EXECUTE,
                                        LS_PATH,
-                                       er::COMMAND,
+                                       wr::COMMAND,
                                        LS_ARGV[0],
                                        LS_ARGV[1]
                                    }),
@@ -219,12 +219,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                            VERBOSE_SESSION.reporter,
-                                           er::DESTINATION,
+                                           wr::DESTINATION,
                                            VERBOSE_SESSION.destination,
-                                           er::VERBOSE,
-                                           er::EXECUTE,
+                                           wr::VERBOSE,
+                                           wr::EXECUTE,
                                            LS_PATH,
-                                           er::COMMAND,
+                                           wr::COMMAND,
                                            LS_ARGV[0],
                                            LS_ARGV[1]
                                    }),
@@ -250,12 +250,12 @@ namespace {
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
                                         CStyleArrayEqual(std::vector<const char *> {
                                                 VERBOSE_SESSION.reporter,
-                                                er::DESTINATION,
+                                                wr::DESTINATION,
                                                 VERBOSE_SESSION.destination,
-                                                er::VERBOSE,
-                                                er::EXECUTE,
+                                                wr::VERBOSE,
+                                                wr::EXECUTE,
                                                 LS_PATH,
-                                                er::COMMAND,
+                                                wr::COMMAND,
                                                 LS_ARGV[0],
                                                 LS_ARGV[1]
                                         }),
@@ -299,12 +299,12 @@ namespace {
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
                                         CStyleArrayEqual(std::vector<const char *> {
                                                 VERBOSE_SESSION.reporter,
-                                                er::DESTINATION,
+                                                wr::DESTINATION,
                                                 VERBOSE_SESSION.destination,
-                                                er::VERBOSE,
-                                                er::EXECUTE,
+                                                wr::VERBOSE,
+                                                wr::EXECUTE,
                                                 LS_PATH,
-                                                er::COMMAND,
+                                                wr::COMMAND,
                                                 LS_ARGV[0],
                                                 LS_ARGV[1]
                                         }),

@@ -18,7 +18,7 @@
  */
 
 #include "report/libexec/Executor.h"
-#include "report/supervisor/Flags.h"
+#include "report/wrapper/Flags.h"
 
 #include "Array.h"
 #include "Logger.h"
@@ -71,14 +71,14 @@ namespace {
             const char** const it_end = it + length();
 
             *it++ = session.reporter;
-            *it++ = er::DESTINATION;
+            *it++ = wr::DESTINATION;
             *it++ = session.destination;
             if (session.verbose) {
-                *it++ = er::VERBOSE;
+                *it++ = wr::VERBOSE;
             }
-            *it++ = er::EXECUTE;
+            *it++ = wr::EXECUTE;
             *it++ = path;
-            *it++ = er::COMMAND;
+            *it++ = wr::COMMAND;
             {
                 char* const* const argv_end = el::array::end(argv);
                 it = el::array::copy(argv, argv_end, it, it_end);

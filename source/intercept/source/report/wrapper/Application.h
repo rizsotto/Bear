@@ -21,8 +21,8 @@
 
 #include "libmain/Application.h"
 #include "libmain/ApplicationLogConfig.h"
-#include "report/EventFactory.h"
-#include "report/InterceptClient.h"
+#include "EventFactory.h"
+#include "InterceptClient.h"
 #include "libflags/Flags.h"
 
 #include <utility>

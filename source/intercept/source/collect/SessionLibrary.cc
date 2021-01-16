@@ -25,7 +25,7 @@
 #include "libsys/Process.h"
 #include "report/libexec/Environments.h"
 #include "report/libexec/Resolver.h"
-#include "report/supervisor/Flags.h"
+#include "report/wrapper/Flags.h"
 
 #include <spdlog/spdlog.h>
 
@@ -122,16 +122,16 @@ namespace ic {
                 const auto& [program, environment] = pair;
                 auto result = sys::Process::Builder(executor_)
                     .add_argument(executor_)
-                    .add_argument(er::DESTINATION)
+                    .add_argument(wr::DESTINATION)
                     .add_argument(server_address_);
                 if (verbose_) {
-                    result.add_argument(er::VERBOSE);
+                    result.add_argument(wr::VERBOSE);
                 }
 
                 return result
-                    .add_argument(er::EXECUTE)
+                    .add_argument(wr::EXECUTE)
                     .add_argument(program)
-                    .add_argument(er::COMMAND)
+                    .add_argument(wr::COMMAND)
                     .add_arguments(command.begin(), command.end())
                     .set_environment(environment);
             });
