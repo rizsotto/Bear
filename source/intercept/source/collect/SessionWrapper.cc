@@ -188,16 +188,39 @@ namespace ic {
         spdlog::debug("session initialized with: override: {}", MapHolder { override_ });
     }
 
+    rust::Result<ic::Execution> WrapperSession::resolve(const ic::Execution &input) const {
+        return resolve(input.executable)
+                .map<ic::Execution>([this, &input](auto executable) {
+                    auto arguments = input.arguments;
+                    arguments.front() = executable;
+                    return ic::Execution{
+                            executable,
+                            arguments,
+                            input.working_dir,
+                            update(input.environment)
+                    };
+                });
+    }
+
+    rust::Result<sys::Process::Builder> WrapperSession::supervise(const std::vector<std::string_view>& command) const
+    {
+        auto result = sys::Process::Builder(command.front())
+                .add_arguments(command.begin(), command.end())
+                .set_environment(set_up_environment());
+
+        return rust::Ok(result);
+    }
+
     rust::Result<std::string> WrapperSession::resolve(const std::string& name) const
     {
         spdlog::debug("trying to resolve for wrapper: {}", name);
         auto candidate = mapping_.find(name);
         return (candidate != mapping_.end())
-                ? rust::Result<std::string>(rust::Ok(candidate->second))
-                : rust::Result<std::string>(rust::Err(std::runtime_error("TODO")));
+               ? rust::Result<std::string>(rust::Ok(candidate->second))
+               : rust::Result<std::string>(rust::Err(std::runtime_error("not recognized wrapper")));
     }
 
-    rust::Result<std::map<std::string, std::string>> WrapperSession::update(const std::map<std::string, std::string>& env) const
+    std::map<std::string, std::string> WrapperSession::update(const std::map<std::string, std::string>& env) const
     {
         std::map<std::string, std::string> copy(env);
 
@@ -219,17 +242,7 @@ namespace ic {
                 copy.erase(it);
             }
         }
-
-        return rust::Ok(copy);
-    }
-
-    rust::Result<sys::Process::Builder> WrapperSession::supervise(const std::vector<std::string_view>& command) const
-    {
-        auto result = sys::Process::Builder(command.front())
-                .add_arguments(command.begin(), command.end())
-                .set_environment(set_up_environment());
-
-        return rust::Ok(result);
+        return copy;
     }
 
     std::map<std::string, std::string> WrapperSession::set_up_environment() const

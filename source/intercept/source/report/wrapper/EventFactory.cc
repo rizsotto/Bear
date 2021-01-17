@@ -52,23 +52,17 @@ namespace wr {
     { }
 
     rpc::Event EventFactory::start(ProcessId pid, ProcessId ppid, const Execution &execution) const {
-        rpc::Event result;
-        result.set_rid(rid_);
-        result.set_pid(pid);
-        result.set_ppid(ppid);
-        result.set_timestamp(now_as_string());
+        rpc::Event event;
+        event.set_rid(rid_);
+        event.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<rpc::Event_Started>();
-            event->set_executable(execution.program);
-            for (const auto &argument : execution.arguments) {
-                event->add_arguments(argument.data());
-            }
-            event->set_working_dir(execution.working_dir);
-            event->mutable_environment()->insert(execution.environment.begin(), execution.environment.end());
-
-            result.set_allocated_started(event.release());
+            auto event_started_ptr = std::make_unique<rpc::Event_Started>();
+            event_started_ptr->set_pid(pid);
+            event_started_ptr->set_ppid(ppid);
+            event_started_ptr->set_allocated_execution(new rpc::Execution(into(execution)));
+            event.set_allocated_started(event_started_ptr.release());
         }
-        return result;
+        return event;
     }
 
     rpc::Event EventFactory::signal(int number) const {

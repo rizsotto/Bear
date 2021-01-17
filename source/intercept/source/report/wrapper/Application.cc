@@ -62,32 +62,9 @@ namespace {
         return false;
     }
 
-    struct Wrapper : wr::Command {
+    namespace Wrapper {
 
-        Wrapper(wr::Session session, wr::Execution execution)
-                : wr::Command(std::move(session), std::move(execution))
-        { }
-
-        [[nodiscard]] rust::Result<wr::Execution> execution() const override {
-            wr::SupervisorClient client(session_);
-
-            auto program = client.resolve_program(execution_.program);
-            auto environment = client.update_environment(execution_.environment);
-            auto arguments = program
-                    .map<std::vector<std::string>>([this](const auto &program) {
-                        auto result = execution_.arguments;
-                        result.front() = program;
-                        return result;
-                    });
-
-            return rust::merge(program, arguments, environment)
-                    .map<wr::Execution>([this](const auto &tuple) {
-                        const auto&[program, arguments, environment] = tuple;
-                        return wr::Execution{program, arguments, execution_.working_dir, environment};
-                    });
-        }
-
-        static rust::Result<wr::Session> make_session(const sys::env::Vars &environment) noexcept
+        rust::Result<wr::Session> make_session(const sys::env::Vars &environment) noexcept
         {
             auto destination = environment.find(wr::env::KEY_DESTINATION);
             return (destination == environment.end())
@@ -95,7 +72,7 @@ namespace {
                    : rust::Result<wr::Session>(rust::Ok(wr::Session {destination->second }));
         }
 
-        static std::vector<std::string> from(const char **argv)
+        std::vector<std::string> from(const char **argv)
         {
             const char** end = argv;
             while (*end != nullptr)
@@ -103,7 +80,7 @@ namespace {
             return std::vector<std::string>(argv, end);
         }
 
-        static rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
+        rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
         {
             auto program = fs::path(argv[0]);
             auto arguments = from(argv);
@@ -113,37 +90,18 @@ namespace {
                         return wr::Execution{program, arguments, working_dir, environment};
                     });
         }
-    };
+    }
 
-    struct Supervisor : wr::Command {
+    namespace Supervisor {
 
-        Supervisor(wr::Session session, wr::Execution execution)
-                : wr::Command(std::move(session), std::move(execution))
-        { }
-
-        [[nodiscard]] rust::Result<wr::Execution> execution() const override {
-            wr::SupervisorClient client(session_);
-
-            return client.update_environment(execution_.environment)
-                    .map<wr::Execution>([this](const auto &environment) {
-                        return wr::Execution{
-                                execution_.program,
-                                execution_.arguments,
-                                execution_.working_dir,
-                                environment
-                        };
-                    });
-        }
-
-        static rust::Result<wr::Session> make_session(const flags::Arguments &args) noexcept {
+        rust::Result<wr::Session> make_session(const flags::Arguments &args) noexcept {
             return args.as_string(wr::DESTINATION)
                     .map<wr::Session>([](const auto &destination) {
                         return wr::Session{std::string(destination)};
                     });
         }
 
-        static rust::Result<wr::Execution>
-        make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
+        rust::Result<wr::Execution> make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
             auto program = args.as_string(wr::EXECUTE)
                     .map<fs::path>([](auto file) { return fs::path(file); });
             auto arguments = args.as_string_list(wr::COMMAND)
@@ -158,7 +116,7 @@ namespace {
                         return wr::Execution{program, arguments, working_dir, environment};
                     });
         }
-    };
+    }
 }
 
 namespace wr {
@@ -171,11 +129,12 @@ namespace wr {
 
     rust::Result<int> Command::execute() const {
         wr::EventFactory event_factory;
-        wr::InterceptorClient client(session_);
+        wr::InterceptorClient interceptor_client(session_);
+        wr::SupervisorClient supervisor_client(session_);
 
-        return execution()
-                .and_then<sys::Process>([&client, &event_factory](auto execution) {
-                    return sys::Process::Builder(execution.program)
+        return supervisor_client.resolve(execution_)
+                .and_then<sys::Process>([&interceptor_client, &event_factory](auto execution) {
+                    return sys::Process::Builder(execution.executable)
                             .add_arguments(execution.arguments.begin(), execution.arguments.end())
                             .set_environment(execution.environment)
 #ifdef SUPPORT_PRELOAD
@@ -183,20 +142,20 @@ namespace wr {
 #else
                             .spawn()
 #endif
-                            .on_success([&client, &event_factory, &execution](auto &child) {
+                            .on_success([&interceptor_client, &event_factory, &execution](auto &child) {
                                 auto event = event_factory.start(child.get_pid(), getppid(), execution);
-                                client.report(std::move(event));
+                                interceptor_client.report(std::move(event));
                             });
                 })
-                .and_then<sys::ExitStatus>([&client, &event_factory](auto child) {
+                .and_then<sys::ExitStatus>([&interceptor_client, &event_factory](auto child) {
                     sys::SignalForwarder guard(child);
                     while (true) {
                         auto status = child.wait(true);
-                        status.on_success([&client, &event_factory](auto exit) {
+                        status.on_success([&interceptor_client, &event_factory](auto exit) {
                             auto event = exit.is_signaled()
                                          ? event_factory.signal(exit.signal().value())
                                          : event_factory.terminate(exit.code().value());
-                            client.report(std::move(event));
+                            interceptor_client.report(std::move(event));
                         });
                         if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
                             return status;
@@ -247,7 +206,7 @@ namespace wr {
         return rust::merge(session, execution)
                 .map<ps::CommandPtr>([](const auto &tuple) {
                     const auto&[session, execution] = tuple;
-                    return std::make_unique<Wrapper>(session, execution);
+                    return std::make_unique<Command>(session, execution);
                 });
     }
 
@@ -259,7 +218,7 @@ namespace wr {
         return rust::merge(session, execution)
                 .map<ps::CommandPtr>([](const auto &tuple) {
                     const auto&[session, execution] = tuple;
-                    return std::make_unique<Supervisor>(session, execution);
+                    return std::make_unique<Command>(session, execution);
                 });
     }
 

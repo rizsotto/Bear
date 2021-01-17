@@ -36,9 +36,11 @@ namespace ic {
         static rust::Result<Session::Ptr> from(const flags::Arguments&, const char **envp);
 
     public:
-        [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const override;
-        [[nodiscard]] rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const override;
+        [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &input) const override;
         [[nodiscard]] rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const override;
+
+    private:
+        [[nodiscard]] std::map<std::string, std::string> update(const std::map<std::string, std::string>& env) const;
 
     private:
         std::string library_;

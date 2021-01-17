@@ -86,28 +86,19 @@ namespace ic {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
 
-    rust::Result<std::string> LibraryPreloadSession::resolve(const std::string&) const
-    {
-        return rust::Err(std::runtime_error("The session does not support resolve."));
-    }
-
-    rust::Result<std::map<std::string, std::string>> LibraryPreloadSession::update(const std::map<std::string, std::string>& env) const
-    {
-        std::map<std::string, std::string> copy(env);
-        if (verbose_) {
-            copy[el::env::KEY_VERBOSE] = "true";
-        }
-        copy[el::env::KEY_DESTINATION] = server_address_;
-        copy[el::env::KEY_REPORTER] = executor_;
-        insert_or_merge(copy, GLIBC_PRELOAD_KEY, library_, Session::keep_front_in_path);
-
-        return rust::Ok(copy);
+    rust::Result<ic::Execution> LibraryPreloadSession::resolve(const ic::Execution &input) const {
+        return rust::Ok(ic::Execution{
+                input.executable,
+                input.arguments,
+                input.working_dir,
+                update(input.environment)
+        });
     }
 
     rust::Result<sys::Process::Builder> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
     {
         auto resolver = el::Resolver();
-        auto program = resolver.from_search_path(command.front(), path_.c_str())
+        auto executable = resolver.from_search_path(command.front(), path_.c_str())
                 .map<std::string>([](auto ptr) {
                     return std::string(ptr);
                 })
@@ -115,11 +106,9 @@ namespace ic {
                     return std::runtime_error(
                             fmt::format("Could not found: {}: {}", command.front(), sys::error_string(error)));
                 });
-        auto environment = update(environment_);
 
-        return rust::merge(program, environment)
-            .map<sys::Process::Builder>([&command, this](auto pair) {
-                const auto& [program, environment] = pair;
+        return executable
+            .map<sys::Process::Builder>([&command, this](auto executable) {
                 auto result = sys::Process::Builder(executor_)
                     .add_argument(executor_)
                     .add_argument(wr::DESTINATION)
@@ -130,10 +119,23 @@ namespace ic {
 
                 return result
                     .add_argument(wr::EXECUTE)
-                    .add_argument(program)
+                    .add_argument(executable)
                     .add_argument(wr::COMMAND)
                     .add_arguments(command.begin(), command.end())
-                    .set_environment(environment);
+                    .set_environment(update(environment_));
             });
+    }
+
+    std::map<std::string, std::string>
+    LibraryPreloadSession::update(const std::map<std::string, std::string> &env) const {
+        std::map<std::string, std::string> copy(env);
+        if (verbose_) {
+            copy[el::env::KEY_VERBOSE] = "true";
+        }
+        copy[el::env::KEY_DESTINATION] = server_address_;
+        copy[el::env::KEY_REPORTER] = executor_;
+        insert_or_merge(copy, GLIBC_PRELOAD_KEY, library_, Session::keep_front_in_path);
+
+        return copy;
     }
 }

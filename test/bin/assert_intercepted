@@ -66,9 +66,9 @@ def load_commands(filename):
             event = json.loads(content[0])
             if 'started' in event:
                 yield {
-                    'program': event['started']['executable'],
-                    'working_dir': event['started']['workingDir'],
-                    'arguments': event['started']['arguments']
+                    'program': event['started']['execution']['executable'],
+                    'working_dir': event['started']['execution']['workingDir'],
+                    'arguments': event['started']['execution']['arguments']
                 }
 
 

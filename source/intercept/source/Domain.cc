@@ -17,30 +17,44 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Command.h"
+#include "Domain.h"
+#include "Convert.h"
+
+#include <google/protobuf/util/json_util.h>
 
 #include <iostream>
 
-#include <nlohmann/json.hpp>
+namespace domain {
 
-namespace cs::semantic {
-
-    bool operator==(const Command& lhs, const Command& rhs)
-    {
+    bool operator==(const Execution &lhs, const Execution &rhs) {
         return (lhs.executable == rhs.executable)
                && (lhs.arguments == rhs.arguments)
                && (lhs.working_dir == rhs.working_dir)
                && (lhs.environment == rhs.environment);
     }
 
-    std::ostream& operator<<(std::ostream& os, const Command& rhs)
-    {
-        nlohmann::json payload = nlohmann::json {
-                { "executable", rhs.executable },
-                { "arguments", nlohmann::json(rhs.arguments) },
-                { "working_dir", rhs.working_dir },
-        };
-        os << payload;
+    std::ostream &operator<<(std::ostream &os, const Execution &rhs) {
+        auto rpc = into(rhs);
+        std::string json;
+        auto rc = google::protobuf::util::MessageToJsonString(rpc, &json);
+        if (rc.ok()) {
+            os << json;
+        }
+        return os;
+    }
+
+    bool operator==(const Run &lhs, const Run &rhs) {
+        return (lhs.execution == rhs.execution)
+               && (lhs.pid == rhs.pid)
+               && (lhs.ppid == rhs.ppid);
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Run &rhs) {
+        os << std::boolalpha;
+        os << R"({"execution": })" << rhs.execution
+            << R"(, "pid": )" << rhs.pid
+            << R"(, "ppid": )" << rhs.ppid
+            << R"(})";
         return os;
     }
 }

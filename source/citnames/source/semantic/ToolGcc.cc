@@ -325,7 +325,7 @@ namespace cs::semantic {
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
-                    Arguments prefix = { command.program.string() };
+                    Arguments prefix = { command.executable.string() };
                     Arguments extra = flags_from_environment(command.environment);
 
                     SemanticPtrs result;

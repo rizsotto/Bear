@@ -2,6 +2,15 @@ add_subdirectory(proto)
 
 include(GNUInstallDirs)
 
+add_library(domain_a OBJECT
+        source/Domain.cc
+        source/Convert.cc
+        )
+
+target_include_directories(domain_a PUBLIC source)
+target_link_libraries(domain_a PUBLIC rpc_a)
+
+
 add_library(report_a OBJECT
         source/collect/EventsDatabase.cc
         )
@@ -29,6 +38,7 @@ endif()
 
 target_include_directories(intercept_a PUBLIC include/)
 target_include_directories(intercept_a PUBLIC source/)
+target_link_libraries(intercept_a PUBLIC domain_a)
 target_link_libraries(intercept_a PUBLIC main_a)
 target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
@@ -43,6 +53,7 @@ add_executable(intercept
         source/collect/main.cc
         )
 
+target_link_libraries(intercept domain_a)
 target_link_libraries(intercept main_a)
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept report_a)
@@ -74,6 +85,7 @@ add_executable(wrapper
         )
 
 target_include_directories(wrapper PUBLIC source/)
+target_link_libraries(wrapper domain_a)
 target_link_libraries(wrapper main_a)
 target_link_libraries(wrapper flags_a)
 target_link_libraries(wrapper result_a)
@@ -182,6 +194,7 @@ if (ENABLE_UNIT_TESTS)
             test/SessionTest.cc
             )
 
+    target_link_libraries(intercept_unit_test domain_a)
     target_link_libraries(intercept_unit_test main_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)

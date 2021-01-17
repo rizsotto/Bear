@@ -34,11 +34,10 @@ namespace ic {
         explicit SupervisorImpl(const Session&);
         ~SupervisorImpl() override = default;
 
-        ::grpc::Status ResolveProgram(::grpc::ServerContext* context, const rpc::ResolveRequest* request, rpc::ResolveResponse* response) override;
-        ::grpc::Status Update(::grpc::ServerContext* context, const rpc::Environment* request, rpc::Environment* response) override;
+        grpc::Status Resolve(grpc::ServerContext *context, const rpc::ResolveRequest *request, rpc::ResolveResponse *response) override;
 
     private:
-        const Session& session_;
+        const Session &session_;
     };
 
     class InterceptorImpl final : public rpc::Interceptor::Service {

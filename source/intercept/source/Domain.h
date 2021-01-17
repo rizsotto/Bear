@@ -19,15 +19,36 @@
 
 #pragma once
 
-#include "Domain.h"
-#include "Convert.h"
+#include <filesystem>
+#include <map>
 #include <string>
+#include <vector>
+#include <cstdint>
+#include <iosfwd>
 
-namespace wr {
+namespace fs = std::filesystem;
 
-    using namespace domain;
+namespace domain {
 
-    struct Session {
-        const std::string destination;
+    using ReporterId = uint64_t;
+    using ProcessId = uint32_t;
+
+    struct Execution {
+        fs::path executable;
+        std::vector<std::string> arguments;
+        fs::path working_dir;
+        std::map<std::string, std::string> environment;
     };
+
+    bool operator==(const Execution& lhs, const Execution& rhs);
+    std::ostream& operator<<(std::ostream&, const Execution&);
+
+    struct Run {
+        Execution execution;
+        ProcessId pid;
+        ProcessId ppid;
+    };
+
+    bool operator==(const Run& lhs, const Run& rhs);
+    std::ostream& operator<<(std::ostream&, const Run&);
 }

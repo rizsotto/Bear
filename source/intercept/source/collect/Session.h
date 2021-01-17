@@ -19,17 +19,22 @@
 
 #pragma once
 
-#include <map>
-#include <memory>
-#include <string>
-#include <string_view>
-
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Os.h"
 #include "libsys/Process.h"
 
+#include "Domain.h"
+#include "Convert.h"
+
+#include <map>
+#include <memory>
+#include <string>
+#include <string_view>
+
 namespace ic {
+
+    using namespace domain;
 
     class Session {
     public:
@@ -39,8 +44,7 @@ namespace ic {
     public:
         virtual ~Session() = default;
 
-        [[nodiscard]] virtual rust::Result<std::string> resolve(const std::string& name) const = 0;
-        [[nodiscard]] virtual rust::Result<std::map<std::string, std::string>> update(const std::map<std::string, std::string>& env) const = 0;
+        [[nodiscard]] virtual rust::Result<ic::Execution> resolve(const ic::Execution &input) const = 0;
         [[nodiscard]] virtual rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const = 0;
 
         [[nodiscard]] rust::Result<int> execute(const std::vector<std::string_view> &command, const std::string &address);

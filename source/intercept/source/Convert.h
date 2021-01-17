@@ -20,14 +20,10 @@
 #pragma once
 
 #include "Domain.h"
-#include "Convert.h"
-#include <string>
+#include "supervise.grpc.pb.h"
 
-namespace wr {
+namespace domain {
 
-    using namespace domain;
-
-    struct Session {
-        const std::string destination;
-    };
+    Execution from(const rpc::Execution &) noexcept;
+    rpc::Execution into(const Execution &) noexcept;
 }

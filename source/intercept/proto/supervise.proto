@@ -22,44 +22,35 @@ syntax = "proto3";
 package rpc;
 option cc_enable_arenas = true;
 
+// This type represents a program execution.
+message Execution {
+    string executable = 1;
+    repeated string arguments = 2;
+    string working_dir = 3;
+    map<string, string> environment = 4;
+}
+
 // This represents a (remote) supervisor process to set up program execution.
 //
 // A supervisor process executes a single program in the hope that it can
 // get information about the state of the child process. But to decide what
 // is the right strategy to intercept the relevant events from the child
-// process can be done upfront.
+// process is done in the external supervisor process.
 //
 // This interface describes a remote service which can be queried for how to
-// execute the child program. Can resolve the executable name (in case of
-// wrapper session) or update the environment variables (for both kind of
-// sessions).
+// execute the child program. Can resolve the executable name or update the
+// environment variables.
 service Supervisor {
 
-    // Resolve the executable name for the child process.
-    //
-    // Used in a wrapper session, when the build systems executes our wrapper
-    // instead of the real command. Then the wrapper calls the supervisor to
-    // find out which program is the real one to execute.
-    rpc ResolveProgram (ResolveRequest) returns (ResolveResponse) {
-    }
-
-    // Update the environments for the child process.
-    //
-    // This is used for both wrapper and library sessions. The environment
-    // variables are influencing how the processes behaves and which ones
-    // are executed. It also specify the event sink (the interceptor) location.
-    rpc Update (Environment) returns (Environment) {
+    // Resolve the execution for future child process.
+    rpc Resolve (ResolveRequest) returns (ResolveResponse) {
     }
 }
 
 message ResolveRequest {
-    string path = 1;
+    Execution execution = 1;
 }
 
 message ResolveResponse {
-    string path = 1;
-}
-
-message Environment {
-    map<string, string> values = 1;
+    Execution execution = 1;
 }

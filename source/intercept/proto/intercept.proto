@@ -22,6 +22,8 @@ syntax = "proto3";
 package rpc;
 option cc_enable_arenas = true;
 
+import "supervise.proto";
+
 // Represents the remote sink of supervised process events.
 //
 // Events from a process execution can be sent from many actors (mostly
@@ -38,23 +40,17 @@ service Interceptor {
 // Currently it's only the process life cycle events (start, signal,
 // terminate), but can be extended later with performance related
 // events like monitoring the CPU usage or the memory allocation if
-// those information are available to the the supervisor process.
+// those information are available.
 message Event {
 
     // Required.
     uint64 rid = 1;
 
     // Required.
-    uint32 pid = 2;
-
-    // Optional.
-    uint32 ppid = 3;
-
-    // Required.
     // (ISO-8601 date-tie format with microsecond precision in UTC timezone)
-    string timestamp = 4;
+    string timestamp = 2;
 
-    reserved 5 to 10;
+    reserved 3 to 10;
 
     // Required.
     oneof event {
@@ -65,11 +61,15 @@ message Event {
 
     // Represents a successful process execution.
     message Started {
-        // All fields are required.
-        string executable = 3;
-        repeated string arguments = 4;
-        string working_dir = 5;
-        map<string, string> environment = 6;
+
+        // Required.
+        Execution execution = 1;
+
+        // Required.
+        uint32 pid = 2;
+
+        // Optional.
+        uint32 ppid = 3;
     }
 
     // Represents the termination of the supervised process.

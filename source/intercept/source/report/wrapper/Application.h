@@ -30,7 +30,6 @@ namespace wr {
         Command(wr::Session session, wr::Execution execution) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
-        [[nodiscard]] virtual rust::Result<wr::Execution> execution() const = 0;
 
     protected:
         wr::Session session_;

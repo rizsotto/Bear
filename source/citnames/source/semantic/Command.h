@@ -33,7 +33,7 @@ namespace cs::semantic {
     // context that the caller was given. And these are the those parameters
     // which are essential for re-run the command.
     struct Command {
-        fs::path program;
+        fs::path executable;
         std::list<std::string> arguments;
         fs::path working_dir;
         std::map<std::string, std::string> environment;

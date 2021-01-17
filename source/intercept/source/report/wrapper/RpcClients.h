@@ -41,8 +41,7 @@ namespace wr {
         SupervisorClient& operator=(SupervisorClient&&) noexcept = delete;
 
     public:
-        rust::Result<fs::path> resolve_program(const std::string &name);
-        rust::Result<std::map<std::string, std::string>> update_environment(const std::map<std::string, std::string> &input);
+        rust::Result<wr::Execution> resolve(const wr::Execution &execution);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;

@@ -156,13 +156,12 @@ namespace {
         return result;
     }
 
-    cs::semantic::Command to_command(const rpc::Event_Started& started) {
-        // TODO: fail on missing attributes
+    cs::semantic::Command to_command(const rpc::Execution& execution) {
         return cs::semantic::Command {
-                fs::path(started.executable()),
-                std::list(started.arguments().begin(), started.arguments().end()),
-                fs::path(started.working_dir()),
-                std::map(started.environment().begin(), started.environment().end())
+                fs::path(execution.executable()),
+                std::list(execution.arguments().begin(), execution.arguments().end()),
+                fs::path(execution.working_dir()),
+                std::map(execution.environment().begin(), execution.environment().end())
         };
     }
 
@@ -184,12 +183,13 @@ namespace {
                                 )
                         );
                     } else {
+                        const auto &started = start->started();
                         return Result(
                                 rust::Ok(
                                         std::make_tuple(
-                                                to_command(start->started()),
-                                                start->pid(),
-                                                start->ppid()
+                                                to_command(started.execution()),
+                                                started.pid(),
+                                                started.ppid()
                                         )
                                 )
                         );
@@ -260,13 +260,13 @@ namespace cs::semantic {
     [[nodiscard]]
     rust::Result<Tools::ToolPtr> Tools::select(const Command &command) const {
         // do different things if the command is matching one of the nominated compilers.
-        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.program)) {
+        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.executable)) {
             return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
         } else {
             // check if any tool can recognize the command.
             for (const auto &tool : tools_) {
                 // when the tool is matching...
-                if (tool->recognize(command.program)) {
+                if (tool->recognize(command.executable)) {
                     return rust::Ok(tool);
                 }
             }

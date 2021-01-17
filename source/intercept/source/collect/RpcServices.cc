@@ -23,41 +23,29 @@
 
 namespace ic {
 
-    SupervisorImpl::SupervisorImpl(const Session& session)
-        : rpc::Supervisor::Service()
-        , session_(session)
-    {
+    SupervisorImpl::SupervisorImpl(const Session &session)
+            : rpc::Supervisor::Service()
+            , session_(session)
+    { }
+
+    grpc::Status SupervisorImpl::Resolve(grpc::ServerContext *, const rpc::ResolveRequest *request, rpc::ResolveResponse *response) {
+        return session_.resolve(from(request->execution()))
+                .map<grpc::Status>([&response](auto execution) {
+                    // Need to copy the execution into the response.
+                    response->set_allocated_execution(new rpc::Execution(into(execution)));
+                    // Confirm it with an OK.
+                    return ::grpc::Status::OK;
+                })
+                .unwrap_or(grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper"));
     }
 
-    ::grpc::Status SupervisorImpl::Update(::grpc::ServerContext*, const rpc::Environment* request, rpc::Environment* response)
-    {
-        const std::map<std::string, std::string> copy(request->values().begin(), request->values().end());
-        return session_.update(copy)
-            .map<grpc::Status>([&response](auto update) {
-                response->mutable_values()->insert(update.begin(), update.end());
-                return grpc::Status::OK;
-            })
-            .unwrap_or(grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "environment update failed"));
-    }
+    InterceptorImpl::InterceptorImpl(Reporter &reporter)
+            : rpc::Interceptor::Service()
+            , reporter_(reporter)
+            , lock_()
+    { }
 
-    ::grpc::Status SupervisorImpl::ResolveProgram(::grpc::ServerContext*, const rpc::ResolveRequest* request, rpc::ResolveResponse* response)
-    {
-        return session_.resolve(request->path())
-            .map<grpc::Status>([&response](auto path) {
-                response->set_path(path.data());
-                return ::grpc::Status::OK;
-            })
-            .unwrap_or(grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper"));
-    }
-
-    InterceptorImpl::InterceptorImpl(Reporter& reporter)
-        : rpc::Interceptor::Service()
-        , reporter_(reporter)
-        , lock_()
-    {
-    }
-
-    ::grpc::Status InterceptorImpl::Register(::grpc::ServerContext*, const rpc::Event* request, rpc::Empty*)
+    grpc::Status InterceptorImpl::Register(grpc::ServerContext*, const rpc::Event* request, rpc::Empty*)
     {
         std::lock_guard<std::mutex> guard(lock_);
 

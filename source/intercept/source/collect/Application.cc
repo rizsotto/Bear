@@ -52,8 +52,8 @@ namespace ic {
     {
         // Create and start the gRPC server
         int port = 0;
-        ic::SupervisorImpl supervisor(*(session_));
-        ic::InterceptorImpl interceptor(*(reporter_));
+        ic::SupervisorImpl supervisor(*session_);
+        ic::InterceptorImpl interceptor(*reporter_);
         auto server = grpc::ServerBuilder()
                           .RegisterService(&supervisor)
                           .RegisterService(&interceptor)

@@ -27,15 +27,9 @@ namespace {
     struct SessionFixture : ic::Session {
     public:
         MOCK_METHOD(
-            rust::Result<std::string>,
+            rust::Result<ic::Execution>,
             resolve,
-            (const std::string& name),
-            (const, override));
-
-        MOCK_METHOD(
-            (rust::Result<std::map<std::string, std::string>>),
-            update,
-            ((const std::map<std::string, std::string>&)env),
+            (const ic::Execution &input),
             (const, override));
 
         MOCK_METHOD(
