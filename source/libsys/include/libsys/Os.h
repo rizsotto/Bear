@@ -33,7 +33,6 @@ namespace sys::os {
 
     // Query methods about the system.
     [[nodiscard]] rust::Result<std::string> get_confstr(int key);
-    [[nodiscard]] rust::Result<std::map<std::string, std::string>> get_uname();
 
     // Return PATH from environment and fall back to confstr default one.
     [[nodiscard]] rust::Result<std::string> get_path(const sys::env::Vars& env);

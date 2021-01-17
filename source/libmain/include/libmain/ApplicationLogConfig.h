@@ -28,7 +28,8 @@ namespace ps {
         virtual void initForSilent() const;
         virtual void initForVerbose() const;
 
-        virtual void record(const char** argv, const char** envp) const;
+        void record(const char** argv, const char** envp) const;
+        void context() const;
 
     protected:
         const char *name_;

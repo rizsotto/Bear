@@ -24,6 +24,10 @@
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
+#ifdef HAVE_SYS_UTSNAME_H
+#include <sys/utsname.h>
+#endif
+
 namespace {
 
     struct PointerArray {
@@ -55,7 +59,7 @@ namespace ps {
 
     void ApplicationLogConfig::initForSilent() const
     {
-        spdlog::set_pattern(fmt::format("{0}: %v [pid: %P]", name_));
+        spdlog::set_pattern(fmt::format("{0}: %v", name_));
         spdlog::set_level(spdlog::level::info);
     }
 
@@ -70,5 +74,18 @@ namespace ps {
         spdlog::debug("{0}: {1}", name_, VERSION);
         spdlog::debug("arguments: {0}", PointerArray { argv });
         spdlog::debug("environment: {0}", PointerArray { envp });
+    }
+
+    void ApplicationLogConfig::context() const {
+#ifdef HAVE_UNAME
+        auto name = utsname{};
+        if (const int status = uname(&name); status >= 0) {
+            spdlog::debug("sysname: {0}", name.sysname);
+            spdlog::debug("release: {0}", name.release);
+            spdlog::debug("version: {0}", name.version);
+            spdlog::debug("machine: {0}", name.machine);
+        }
+        errno = 0;
+#endif
     }
 }

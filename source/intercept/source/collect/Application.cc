@@ -22,7 +22,6 @@
 #include "collect/RpcServices.h"
 #include "collect/Session.h"
 #include "intercept/Flags.h"
-#include "libsys/Os.h"
 
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
@@ -32,45 +31,6 @@
 #include <vector>
 
 namespace {
-    using HostInfo = std::map<std::string, std::string>;
-
-    rust::Result<HostInfo> create_host_info()
-    {
-        return sys::os::get_uname()
-#ifdef HAVE_CS_PATH
-                .map<HostInfo>([](auto result) {
-                    sys::os::get_confstr(_CS_PATH)
-                            .map<int>([&result](auto value) {
-                                result.insert({ "_CS_PATH", value });
-                                return 0;
-                            });
-                    return result;
-                })
-#endif
-#ifdef HAVE_CS_GNU_LIBC_VERSION
-                .map<HostInfo>([](auto result) {
-                    sys::os::get_confstr(_CS_GNU_LIBC_VERSION)
-                            .map<int>([&result](auto value) {
-                                result.insert({ "_CS_GNU_LIBC_VERSION", value });
-                                return 0;
-                            });
-                    return result;
-                })
-#endif
-#ifdef HAVE_CS_GNU_LIBPTHREAD_VERSION
-                .map<HostInfo>([](auto result) {
-                    sys::os::get_confstr(_CS_GNU_LIBPTHREAD_VERSION)
-                            .map<int>([&result](auto value) {
-                                result.insert({ "_CS_GNU_LIBPTHREAD_VERSION", value });
-                                return 0;
-                            });
-                    return result;
-                })
-#endif
-                .map_err<std::runtime_error>([](auto error) {
-                    return std::runtime_error(fmt::format("failed to get host info: {}", error.what()));
-                });
-    }
 
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 

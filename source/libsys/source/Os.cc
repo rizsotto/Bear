@@ -25,24 +25,20 @@
 #include <cerrno>
 #include <unistd.h>
 
-#ifdef HAVE_SYS_UTSNAME_H
-#include <sys/utsname.h>
-#endif
-
 #include <fmt/format.h>
 
 
 namespace sys::os {
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wvla"
+    constexpr const size_t BUFFER_SIZE = 1024;
 
     rust::Result<std::string> get_confstr(const int key)
     {
 #ifdef HAVE_CONFSTR
         errno = 0;
-        if (const size_t buffer_size = ::confstr(key, nullptr, 0); buffer_size != 0) {
-            char buffer[buffer_size];
+        const size_t buffer_size = ::confstr(key, nullptr, 0);
+        if (buffer_size != 0 && buffer_size < BUFFER_SIZE) {
+            char buffer[BUFFER_SIZE];
             if (const size_t size = ::confstr(key, buffer, buffer_size); size != 0) {
                 return rust::Ok(std::string(buffer));
             }
@@ -50,27 +46,8 @@ namespace sys::os {
         return rust::Err(std::runtime_error(
             fmt::format("System call \"confstr\" failed.: {}", error_string(errno))));
 #else
-        return rust::Err(std::runtime_error("System call \"confstr\" not exists."));
+#error "System call "confstr" not exists."
 #endif
-    }
-
-#pragma GCC diagnostic pop
-
-    rust::Result<std::map<std::string, std::string>> get_uname()
-    {
-        std::map<std::string, std::string> result;
-#ifdef HAVE_UNAME
-        auto name = utsname {};
-        if (const int status = ::uname(&name); status >= 0) {
-            result.insert({ "sysname", std::string(name.sysname) });
-            result.insert({ "release", std::string(name.release) });
-            result.insert({ "version", std::string(name.version) });
-            result.insert({ "machine", std::string(name.machine) });
-        }
-#else
-        result.insert({ "sysname", "unknown" });
-#endif
-        return rust::Ok(result);
     }
 
     rust::Result<std::string> get_path(const sys::env::Vars& environment)

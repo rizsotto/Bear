@@ -40,6 +40,7 @@ namespace ps {
                     log_config_.initForVerbose();
                 }
                 log_config_.record(argv, envp);
+                log_config_.context();
                 spdlog::debug("arguments parsed: {0}", args);
             })
             // if parsing success, we create the main command and execute it.
