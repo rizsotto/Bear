@@ -33,9 +33,9 @@ namespace {
             (const, override));
 
         MOCK_METHOD(
-            (rust::Result<sys::Process::Builder>),
+            (sys::Process::Builder),
             supervise,
-            (const std::vector<std::string_view>& command),
+            (const ic::Execution &),
             (const, override));
 
         using Session::keep_front_in_path;

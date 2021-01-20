@@ -39,15 +39,15 @@ namespace ic {
     class Session {
     public:
         using Ptr = std::shared_ptr<Session>;
-        static rust::Result<Session::Ptr> from(const flags::Arguments&, const char **envp);
+        static rust::Result<Session::Ptr> from(const flags::Arguments &args, const char **envp);
 
     public:
         virtual ~Session() = default;
 
-        [[nodiscard]] virtual rust::Result<ic::Execution> resolve(const ic::Execution &input) const = 0;
-        [[nodiscard]] virtual rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const = 0;
+        [[nodiscard]] virtual rust::Result<ic::Execution> resolve(const ic::Execution &execution) const = 0;
+        [[nodiscard]] virtual sys::Process::Builder supervise(const ic::Execution &execution) const = 0;
 
-        [[nodiscard]] rust::Result<int> execute(const std::vector<std::string_view> &command, const std::string &address);
+        [[nodiscard]] rust::Result<int> run(const ic::Execution &execution, const std::string &address);
 
     protected:
         static std::string keep_front_in_path(const std::string& path, const std::string& paths);

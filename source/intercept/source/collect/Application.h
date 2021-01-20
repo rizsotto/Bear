@@ -31,9 +31,9 @@ namespace ic {
 
     struct Command : ps::Command {
 
-        Command(std::vector<std::string_view> command, Session::Ptr session, Reporter::Ptr reporter)
+        Command(Execution execution, Session::Ptr session, Reporter::Ptr reporter)
                 : ps::Command()
-                , command_(std::move(command))
+                , execution_(std::move(execution))
                 , session_(std::move(session))
                 , reporter_(std::move(reporter))
         { }
@@ -41,7 +41,7 @@ namespace ic {
         [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
-        std::vector<std::string_view> command_;
+        Execution execution_;
         Session::Ptr session_;
         Reporter::Ptr reporter_;
     };

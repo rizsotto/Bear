@@ -24,13 +24,11 @@
 #include "libsys/Path.h"
 #include "libsys/Process.h"
 #include "report/libexec/Environments.h"
-#include "report/libexec/Resolver.h"
 #include "report/wrapper/Flags.h"
 
 #include <spdlog/spdlog.h>
 
 #include <functional>
-#include <utility>
 
 namespace {
 
@@ -55,79 +53,64 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args)
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto library = args.as_string(ic::LIBRARY);
         auto wrapper = args.as_string(ic::WRAPPER);
-        auto environment = sys::env::from(envp);
-        auto path = sys::os::get_path(environment);
 
-        return merge(library, wrapper, path)
-            .map<Session::Ptr>([&verbose, &environment](auto tuple) {
-                const auto& [library, wrapper, path] = tuple;
-                return std::make_shared<LibraryPreloadSession>(library, wrapper, verbose, path, std::move(environment));
+        return merge(library, wrapper)
+            .map<Session::Ptr>([&verbose](auto tuple) {
+                const auto& [library, wrapper] = tuple;
+                return std::make_shared<LibraryPreloadSession>(verbose, library, wrapper);
             });
     }
 
     LibraryPreloadSession::LibraryPreloadSession(
-        const std::string_view &library,
-        const std::string_view &executor,
         bool verbose,
-        const std::string &path,
-        sys::env::Vars &&environment)
+        const std::string_view &library,
+        const std::string_view &executor)
             : Session()
+            , verbose_(verbose)
             , library_(library)
             , executor_(executor)
-            , path_(path)
-            , verbose_(verbose)
-            , environment_(environment)
     {
         spdlog::debug("Created library preload session. [library={0}, executor={1}]", library_, executor_);
     }
 
-    rust::Result<ic::Execution> LibraryPreloadSession::resolve(const ic::Execution &input) const {
+    rust::Result<ic::Execution> LibraryPreloadSession::resolve(const ic::Execution &execution) const
+    {
+        spdlog::debug("trying to resolve for library: {}", execution.executable.string());
         return rust::Ok(ic::Execution{
-                input.executable,
-                input.arguments,
-                input.working_dir,
-                update(input.environment)
+                execution.executable,
+                execution.arguments,
+                execution.working_dir,
+                update(execution.environment)
         });
     }
 
-    rust::Result<sys::Process::Builder> LibraryPreloadSession::supervise(const std::vector<std::string_view>& command) const
+    sys::Process::Builder LibraryPreloadSession::supervise(const ic::Execution &execution) const
     {
-        auto resolver = el::Resolver();
-        auto executable = resolver.from_search_path(command.front(), path_.c_str())
-                .map<std::string>([](auto ptr) {
-                    return std::string(ptr);
-                })
-                .map_err<std::runtime_error>([&command](auto error) {
-                    return std::runtime_error(
-                            fmt::format("Could not found: {}: {}", command.front(), sys::error_string(error)));
-                });
+        auto builder = sys::Process::Builder(executor_)
+                .add_argument(executor_)
+                .add_argument(wr::DESTINATION)
+                .add_argument(server_address_);
 
-        return executable
-            .map<sys::Process::Builder>([&command, this](auto executable) {
-                auto result = sys::Process::Builder(executor_)
-                    .add_argument(executor_)
-                    .add_argument(wr::DESTINATION)
-                    .add_argument(server_address_);
-                if (verbose_) {
-                    result.add_argument(wr::VERBOSE);
-                }
+        if (verbose_) {
+            builder.add_argument(wr::VERBOSE);
+        }
 
-                return result
-                    .add_argument(wr::EXECUTE)
-                    .add_argument(executable)
-                    .add_argument(wr::COMMAND)
-                    .add_arguments(command.begin(), command.end())
-                    .set_environment(update(environment_));
-            });
+        return builder
+                .add_argument(wr::EXECUTE)
+                .add_argument(execution.executable)
+                .add_argument(wr::COMMAND)
+                .add_arguments(execution.arguments.begin(), execution.arguments.end())
+                .set_environment(update(execution.environment));
     }
 
     std::map<std::string, std::string>
-    LibraryPreloadSession::update(const std::map<std::string, std::string> &env) const {
+    LibraryPreloadSession::update(const std::map<std::string, std::string> &env) const
+    {
         std::map<std::string, std::string> copy(env);
         if (verbose_) {
             copy[el::env::KEY_VERBOSE] = "true";

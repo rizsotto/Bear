@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 namespace {
 
@@ -106,16 +107,13 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments &args, const char **envp)
     {
         const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
         auto wrapper_dir = args.as_string(ic::WRAPPER_DIR);
-        auto wrappers = wrapper_dir
-                            .and_then<std::list<fs::path>>([](auto wrapper_dir) {
-                                return list_dir(wrapper_dir);
-                            });
+        auto wrappers = wrapper_dir.and_then<std::list<fs::path>>(list_dir);
 
-        auto mapping_and_override = wrappers
+        auto mapping = wrappers
             .map<std::map<std::string, std::string>>([&envp](auto wrappers) {
                 // Find the executables with the same name from the path.
                 std::map<std::string, std::string> result;
@@ -128,8 +126,13 @@ namespace ic {
                     });
                 }
                 return result;
-            })
-            .map<std::tuple<std::map<std::string, std::string>, std::map<std::string, std::string>>>([&envp](auto mapping) {
+            });
+
+        return rust::merge(wrapper_dir, mapping)
+            .map<Session::Ptr>([&envp, &verbose](const auto &tuple) {
+                const auto& [wrapper_dir, const_mapping] = tuple;
+
+                std::map<std::string, std::string> mapping(const_mapping);
                 std::map<std::string, std::string> override;
                 el::Resolver resolver;
                 // check if any environment variable is naming the real compiler
@@ -156,68 +159,57 @@ namespace ic {
                         }
                     }
                 }
-                return std::make_tuple(mapping, override);
-            });
-
-        return rust::merge(wrapper_dir, mapping_and_override)
-            .map<Session::Ptr>([&verbose, &envp](const auto& tuple) {
-                const auto& [const_wrapper_dir, const_mapping_and_override] = tuple;
-                const auto& [const_mapping, const_override] = const_mapping_and_override;
-                std::string wrapper_dir(const_wrapper_dir);
-                std::map<std::string, std::string> mapping(const_mapping);
-                std::map<std::string, std::string> override(const_override);
-                return std::make_shared<WrapperSession>(verbose, std::move(wrapper_dir), std::move(mapping), std::move(override), sys::env::from(envp));
+                return std::make_shared<WrapperSession>(verbose, std::string(wrapper_dir), std::move(mapping), std::move(override));
             });
     }
 
     WrapperSession::WrapperSession(
         bool verbose,
-        std::string&& wrapper_dir,
-        std::map<std::string, std::string>&& mapping,
-        std::map<std::string, std::string>&& override,
-        sys::env::Vars&& environment)
+        std::string wrapper_dir,
+        std::map<std::string, std::string> mapping,
+        std::map<std::string, std::string> override)
             : Session()
             , verbose_(verbose)
-            , wrapper_dir_(wrapper_dir)
-            , mapping_(mapping)
-            , override_(override)
-            , environment_(environment)
+            , wrapper_dir_(std::move(wrapper_dir))
+            , mapping_(std::move(mapping))
+            , override_(std::move(override))
     {
         spdlog::debug("session initialized with: wrapper_dir: {}", wrapper_dir_);
         spdlog::debug("session initialized with: mapping: {}", MapHolder { mapping_ });
         spdlog::debug("session initialized with: override: {}", MapHolder { override_ });
     }
 
-    rust::Result<ic::Execution> WrapperSession::resolve(const ic::Execution &input) const {
-        return resolve(input.executable)
-                .map<ic::Execution>([this, &input](auto executable) {
-                    auto arguments = input.arguments;
+    rust::Result<ic::Execution> WrapperSession::resolve(const ic::Execution &execution) const
+    {
+        spdlog::debug("trying to resolve for wrapper: {}", execution.executable.string());
+        return resolve(execution.executable)
+                .map<ic::Execution>([this, &execution](auto executable) {
+                    auto arguments = execution.arguments;
                     arguments.front() = executable;
                     return ic::Execution{
-                            executable,
-                            arguments,
-                            input.working_dir,
-                            update(input.environment)
+                            fs::path(executable),
+                            std::move(arguments),
+                            fs::path(execution.working_dir),
+                            update(execution.environment)
                     };
                 });
     }
 
-    rust::Result<sys::Process::Builder> WrapperSession::supervise(const std::vector<std::string_view>& command) const
+    sys::Process::Builder WrapperSession::supervise(const ic::Execution &execution) const
     {
-        auto result = sys::Process::Builder(command.front())
-                .add_arguments(command.begin(), command.end())
-                .set_environment(set_up_environment());
+        auto result = sys::Process::Builder(execution.executable)
+                .add_arguments(execution.arguments.begin(), execution.arguments.end())
+                .set_environment(set_up(execution.environment));
 
-        return rust::Ok(result);
+        return result;
     }
 
     rust::Result<std::string> WrapperSession::resolve(const std::string& name) const
     {
-        spdlog::debug("trying to resolve for wrapper: {}", name);
-        auto candidate = mapping_.find(name);
-        return (candidate != mapping_.end())
-               ? rust::Result<std::string>(rust::Ok(candidate->second))
-               : rust::Result<std::string>(rust::Err(std::runtime_error("not recognized wrapper")));
+        if (auto candidate = mapping_.find(name); candidate != mapping_.end()) {
+            return rust::Ok(candidate->second);
+        }
+        return rust::Err(std::runtime_error("not recognized wrapper"));
     }
 
     std::map<std::string, std::string> WrapperSession::update(const std::map<std::string, std::string>& env) const
@@ -245,9 +237,9 @@ namespace ic {
         return copy;
     }
 
-    std::map<std::string, std::string> WrapperSession::set_up_environment() const
+    std::map<std::string, std::string> WrapperSession::set_up(const std::map<std::string, std::string>& env) const
     {
-        std::map<std::string, std::string> environment(environment_);
+        std::map<std::string, std::string> environment(env);
         // enable verbose logging to wrappers
         if (verbose_) {
             environment[wr::env::KEY_VERBOSE] = "true";

@@ -22,26 +22,62 @@
 #include "collect/RpcServices.h"
 #include "collect/Session.h"
 #include "intercept/Flags.h"
+#include "report/libexec/Resolver.h"
+#include "libsys/Environment.h"
+#include "libsys/Errors.h"
+#include "libsys/Os.h"
 
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server_builder.h>
 #include <spdlog/spdlog.h>
 #include <fmt/format.h>
 
+#include <filesystem>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 namespace {
 
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
 
-    rust::Result<std::vector<std::string_view>> get_command(const flags::Arguments& args)
+    rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
     {
-        using Result = rust::Result<std::vector<std::string_view>>;
-        return args.as_string_list(ic::COMMAND)
-                .and_then<std::vector<std::string_view>>([](auto cmd) {
-                    return (cmd.empty())
+        auto path = sys::os::get_path(environment);
+
+        auto command = args.as_string_list(ic::COMMAND)
+                .and_then<std::vector<std::string_view>>([](auto args) {
+                    using Result = rust::Result<std::vector<std::string_view>>;
+                    return (args.empty())
                             ? Result(rust::Err(std::runtime_error("Command is empty.")))
-                            : Result(rust::Ok(cmd));
+                            : Result(rust::Ok(args));
+                });
+
+        auto executable = rust::merge(path, command)
+                .and_then<fs::path>([](auto tuple) {
+                    const auto&[path, command] = tuple;
+                    auto executable = command.front();
+
+                    auto resolver = el::Resolver();
+                    return resolver.from_search_path(executable, path.c_str())
+                            .template map<fs::path>([](auto ptr) {
+                                return fs::path(ptr);
+                            })
+                            .template map_err<std::runtime_error>([&executable](auto error) {
+                                return std::runtime_error(
+                                        fmt::format("Could not found: {}: {}", executable, sys::error_string(error)));
+                            });
+                });
+
+        return rust::merge(executable, command)
+                .map<ic::Execution>([&environment](auto tuple) {
+                    const auto&[executable, command] = tuple;
+                    return ic::Execution{
+                        executable,
+                        std::vector<std::string>(command.begin(), command.end()),
+                        fs::path("ignored"),
+                        std::move(environment)
+                    };
                 });
     }
 }
@@ -64,7 +100,7 @@ namespace ic {
         std::string address = fmt::format("127.0.0.1:{}", port);
         spdlog::debug("Running gRPC server. [Listening on {0}]", address);
         // Execute the build command
-        auto result = session_->execute(command_, address);
+        auto result = session_->run(execution_, address);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();
@@ -90,14 +126,14 @@ namespace ic {
     }
 
     rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
-        auto command = get_command(args);
+        auto execution = capture_execution(args, sys::env::from(envp));
         auto session = Session::from(args, envp);
         auto reporter = Reporter::from(args);
 
-        return rust::merge(command, session, reporter)
+        return rust::merge(execution, session, reporter)
                 .map<ps::CommandPtr>([](auto tuple) {
-                    const auto&[command, session, reporter] = tuple;
-                    return std::make_unique<Command>(command, session, reporter);
+                    const auto&[execution, session, reporter] = tuple;
+                    return std::make_unique<Command>(execution, session, reporter);
                 });
     }
 }

@@ -25,28 +25,20 @@ namespace ic {
 
     class LibraryPreloadSession : public ic::Session {
     public:
-        LibraryPreloadSession(
-                const std::string_view &library,
-                const std::string_view &executor,
-                bool verbose,
-                const std::string &path,
-                sys::env::Vars &&environment
-        );
+        LibraryPreloadSession(bool verbose, const std::string_view &library, const std::string_view &executor);
 
-        static rust::Result<Session::Ptr> from(const flags::Arguments&, const char **envp);
+        static rust::Result<Session::Ptr> from(const flags::Arguments&);
 
     public:
-        [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &input) const override;
-        [[nodiscard]] rust::Result<sys::Process::Builder> supervise(const std::vector<std::string_view>& command) const override;
+        [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &execution) const override;
+        [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;
 
     private:
         [[nodiscard]] std::map<std::string, std::string> update(const std::map<std::string, std::string>& env) const;
 
     private:
+        bool verbose_;
         std::string library_;
         std::string executor_;
-        std::string path_;
-        bool verbose_;
-        sys::env::Vars environment_;
     };
 }

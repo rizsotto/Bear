@@ -38,9 +38,9 @@ namespace ic {
         if (args.as_bool(ic::FORCE_WRAPPER).unwrap_or(false))
             return WrapperSession::from(args, envp);
         if (args.as_bool(ic::FORCE_PRELOAD).unwrap_or(false))
-            return LibraryPreloadSession::from(args, envp);
+            return LibraryPreloadSession::from(args);
 
-        return LibraryPreloadSession::from(args, envp);
+        return LibraryPreloadSession::from(args);
     }
 #else
     {
@@ -50,12 +50,13 @@ namespace ic {
 
     std::string Session::keep_front_in_path(const std::string& path, const std::string& paths)
     {
-        std::list<fs::path> result = { path };
+        std::list<fs::path> result = {path};
 
         auto existing = sys::path::split(paths);
-        std::copy_if(existing.begin(), existing.end(), std::back_inserter(result), [&path](auto current) {
-            return current != path;
-        });
+        std::copy_if(existing.begin(), existing.end(),
+                     std::back_inserter(result),
+                     [&path](auto current) { return current != path; }
+        );
 
         return sys::path::join(result);
     }
@@ -65,19 +66,18 @@ namespace ic {
         std::list<fs::path> result = { };
 
         auto existing = sys::path::split(paths);
-        std::copy_if(existing.begin(), existing.end(), std::back_inserter(result), [&path](auto current) {
-            return current != path;
-        });
+        std::copy_if(existing.begin(), existing.end(),
+                     std::back_inserter(result),
+                     [&path](auto current) { return current != path; }
+        );
 
         return sys::path::join(result);
     }
 
-    rust::Result<int> Session::execute(const std::vector<std::string_view> &command, const std::string &address) {
+    rust::Result<int> Session::run(const ic::Execution &execution, const std::string &address) {
         server_address_ = address;
-        return supervise(command)
-                .and_then<sys::Process>([](auto builder) {
-                    return builder.spawn();
-                })
+        return supervise(execution)
+                .spawn()
                 .and_then<sys::ExitStatus>([](auto child) {
                     sys::SignalForwarder guard(child);
                     return child.wait();
@@ -85,9 +85,8 @@ namespace ic {
                 .map<int>([](auto status) {
                     return status.code().value_or(EXIT_FAILURE);
                 })
-                .map_err<std::runtime_error>([](auto error) {
+                .on_error([](auto error) {
                     spdlog::warn("Command execution failed: {}", error.what());
-                    return error;
                 })
                 .on_success([](auto status) {
                     spdlog::debug("Running command. [Exited with {0}]", status);
