@@ -13,6 +13,7 @@ target_link_libraries(citnames_json_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_json_a PUBLIC spdlog::spdlog)
 target_link_libraries(citnames_json_a PRIVATE nlohmann_json::nlohmann_json)
 target_compile_options(citnames_json_a PRIVATE -fexceptions)
+target_link_libraries(citnames_json_a PUBLIC stdc++fs)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT
@@ -36,6 +37,7 @@ target_link_libraries(citnames_a PUBLIC report_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
+target_link_libraries(citnames_a PUBLIC stdc++fs)
 
 # Create an executable from the sub projects.
 add_executable(citnames
@@ -54,6 +56,7 @@ target_link_libraries(citnames rpc_a)
 target_link_libraries(citnames fmt::fmt)
 target_link_libraries(citnames spdlog::spdlog)
 target_link_libraries(citnames nlohmann_json::nlohmann_json)
+target_link_libraries(citnames stdc++fs)
 
 include(GNUInstallDirs)
 install(TARGETS citnames

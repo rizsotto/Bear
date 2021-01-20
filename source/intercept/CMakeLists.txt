@@ -37,6 +37,7 @@ target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+target_link_libraries(intercept_a PUBLIC stdc++fs)
 
 # Create an executable from the sub projects.
 add_executable(intercept
@@ -80,6 +81,7 @@ target_link_libraries(wrapper result_a)
 target_link_libraries(wrapper sys_a)
 target_link_libraries(wrapper rpc_a)
 target_link_libraries(wrapper spdlog::spdlog)
+target_link_libraries(wrapper stdc++fs)
 
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
