@@ -51,4 +51,6 @@ namespace domain {
 
     bool operator==(const Run& lhs, const Run& rhs);
     std::ostream& operator<<(std::ostream&, const Run&);
+
+    using SessionLocator = std::string;
 }

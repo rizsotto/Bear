@@ -245,7 +245,7 @@ namespace ic {
             environment[wr::env::KEY_VERBOSE] = "true";
         }
         // sets the server address to wrappers
-        environment[wr::env::KEY_DESTINATION] = server_address_;
+        environment[wr::env::KEY_DESTINATION] = *session_locator_;
         // change PATH to put the wrapper directory at the front.
         if (auto it = environment.find("PATH"); it != environment.end()) {
             it->second = keep_front_in_path(wrapper_dir_, it->second);

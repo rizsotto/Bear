@@ -94,7 +94,7 @@ namespace ic {
         auto builder = sys::Process::Builder(executor_)
                 .add_argument(executor_)
                 .add_argument(wr::DESTINATION)
-                .add_argument(server_address_);
+                .add_argument(*session_locator_);
 
         if (verbose_) {
             builder.add_argument(wr::VERBOSE);
@@ -115,7 +115,7 @@ namespace ic {
         if (verbose_) {
             copy[el::env::KEY_VERBOSE] = "true";
         }
-        copy[el::env::KEY_DESTINATION] = server_address_;
+        copy[el::env::KEY_DESTINATION] = *session_locator_;
         copy[el::env::KEY_REPORTER] = executor_;
         insert_or_merge(copy, GLIBC_PRELOAD_KEY, library_, Session::keep_front_in_path);
 

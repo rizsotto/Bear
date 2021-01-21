@@ -19,11 +19,12 @@
 
 #pragma once
 
-#include "report/wrapper/Types.h"
+#include "Domain.h"
 
 #include "intercept.pb.h"
 
 namespace wr {
+    using namespace domain;
 
     class EventFactory {
     public:

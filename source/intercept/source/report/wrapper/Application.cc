@@ -64,12 +64,12 @@ namespace {
 
     namespace Wrapper {
 
-        rust::Result<wr::Session> make_session(const sys::env::Vars &environment) noexcept
+        rust::Result<wr::SessionLocator> make_session(const sys::env::Vars &environment) noexcept
         {
             auto destination = environment.find(wr::env::KEY_DESTINATION);
             return (destination == environment.end())
-                   ? rust::Result<wr::Session>(rust::Err(std::runtime_error("Unknown destination.")))
-                   : rust::Result<wr::Session>(rust::Ok(wr::Session {destination->second }));
+                   ? rust::Result<wr::SessionLocator>(rust::Err(std::runtime_error("Unknown destination.")))
+                   : rust::Result<wr::SessionLocator>(rust::Ok(wr::SessionLocator{destination->second}));
         }
 
         std::vector<std::string> from(const char **argv)
@@ -94,10 +94,10 @@ namespace {
 
     namespace Supervisor {
 
-        rust::Result<wr::Session> make_session(const flags::Arguments &args) noexcept {
+        rust::Result<wr::SessionLocator> make_session(const flags::Arguments &args) noexcept {
             return args.as_string(wr::DESTINATION)
-                    .map<wr::Session>([](const auto &destination) {
-                        return wr::Session{std::string(destination)};
+                    .map<wr::SessionLocator>([](const auto &destination) {
+                        return wr::SessionLocator{std::string(destination)};
                     });
         }
 
@@ -121,7 +121,7 @@ namespace {
 
 namespace wr {
 
-    Command::Command(wr::Session session, wr::Execution execution) noexcept
+    Command::Command(wr::SessionLocator session, wr::Execution execution) noexcept
             : ps::Command()
             , session_(std::move(session))
             , execution_(std::move(execution))

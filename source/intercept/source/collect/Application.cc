@@ -96,11 +96,11 @@ namespace ic {
                           .AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
-        // Create address URL for the services
-        std::string address = fmt::format("127.0.0.1:{}", port);
-        spdlog::debug("Running gRPC server. [Listening on {0}]", address);
+        // Create session_locator URL for the services
+        auto session_locator = SessionLocator(fmt::format("127.0.0.1:{}", port));
+        spdlog::debug("Running gRPC server. {0}", session_locator);
         // Execute the build command
-        auto result = session_->run(execution_, address);
+        auto result = session_->run(execution_, session_locator);
         // Stop the gRPC server
         spdlog::debug("Stopping gRPC server.");
         server->Shutdown();

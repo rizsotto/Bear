@@ -18,6 +18,7 @@
  */
 
 #include "report/wrapper/EventFactory.h"
+#include "Convert.h"
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>

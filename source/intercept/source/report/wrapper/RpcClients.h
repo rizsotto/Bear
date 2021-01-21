@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "report/wrapper/Types.h"
+#include "Domain.h"
 #include "report/wrapper/EventFactory.h"
 #include "libresult/Result.h"
 
@@ -28,10 +28,11 @@
 #include "supervise.grpc.pb.h"
 
 namespace wr {
+    using namespace domain;
 
     class SupervisorClient {
     public:
-        explicit SupervisorClient(const Session& session);
+        explicit SupervisorClient(const wr::SessionLocator& session_locator);
 
         SupervisorClient() = delete;
         SupervisorClient(const SupervisorClient&) = delete;
@@ -50,7 +51,7 @@ namespace wr {
 
     class InterceptorClient {
     public:
-        explicit InterceptorClient(const Session& session);
+        explicit InterceptorClient(const wr::SessionLocator& session_locator);
 
         InterceptorClient() = delete;
         InterceptorClient(const InterceptorClient&) = delete;

@@ -18,6 +18,7 @@
  */
 
 #include "report/wrapper/RpcClients.h"
+#include "Convert.h"
 
 #include <fmt/format.h>
 #include <grpcpp/create_channel.h>
@@ -32,8 +33,8 @@ namespace {
 
 namespace wr {
 
-    SupervisorClient::SupervisorClient(const Session &session)
-            : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
+    SupervisorClient::SupervisorClient(const SessionLocator &session_locator)
+            : channel_(grpc::CreateChannel(session_locator, grpc::InsecureChannelCredentials()))
             , supervisor_(rpc::Supervisor::NewStub(channel_))
     { }
 
@@ -53,8 +54,8 @@ namespace wr {
                : rust::Result<wr::Execution>(rust::Err(create_error(status)));
     }
 
-    InterceptorClient::InterceptorClient(const Session &session)
-            : channel_(grpc::CreateChannel(session.destination, grpc::InsecureChannelCredentials()))
+    InterceptorClient::InterceptorClient(const SessionLocator &session_locator)
+            : channel_(grpc::CreateChannel(session_locator, grpc::InsecureChannelCredentials()))
             , interceptor_(rpc::Interceptor::NewStub(channel_))
     { }
 

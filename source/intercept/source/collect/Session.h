@@ -47,13 +47,13 @@ namespace ic {
         [[nodiscard]] virtual rust::Result<ic::Execution> resolve(const ic::Execution &execution) const = 0;
         [[nodiscard]] virtual sys::Process::Builder supervise(const ic::Execution &execution) const = 0;
 
-        [[nodiscard]] rust::Result<int> run(const ic::Execution &execution, const std::string &address);
+        [[nodiscard]] rust::Result<int> run(const ic::Execution &execution, const SessionLocator &session_locator);
 
     protected:
         static std::string keep_front_in_path(const std::string& path, const std::string& paths);
         static std::string remove_from_path(const std::string& path, const std::string& paths);
 
     protected:
-        std::string server_address_;
+        std::unique_ptr<SessionLocator> session_locator_;
     };
 }

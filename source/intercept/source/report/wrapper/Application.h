@@ -19,20 +19,21 @@
 
 #pragma once
 
-#include "report/wrapper/Types.h"
+#include "Domain.h"
 #include "libmain/Application.h"
 #include "libmain/ApplicationLogConfig.h"
 #include "libflags/Flags.h"
 
 namespace wr {
+    using namespace domain;
 
     struct Command : ps::Command {
-        Command(wr::Session session, wr::Execution execution) noexcept;
+        Command(wr::SessionLocator session, wr::Execution execution) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
     protected:
-        wr::Session session_;
+        wr::SessionLocator session_;
         wr::Execution execution_;
     };
 

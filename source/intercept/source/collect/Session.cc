@@ -74,8 +74,8 @@ namespace ic {
         return sys::path::join(result);
     }
 
-    rust::Result<int> Session::run(const ic::Execution &execution, const std::string &address) {
-        server_address_ = address;
+    rust::Result<int> Session::run(const ic::Execution &execution, const SessionLocator &session_locator) {
+        session_locator_ = std::make_unique<SessionLocator>(session_locator);
         return supervise(execution)
                 .spawn()
                 .and_then<sys::ExitStatus>([](auto child) {
