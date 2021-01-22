@@ -21,7 +21,6 @@
 
 #include "Output.h"
 #include "semantic/Tool.h"
-#include "intercept/EventsDatabase.h"
 #include "libmain/ApplicationFromArgs.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"

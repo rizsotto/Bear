@@ -20,7 +20,7 @@
 #pragma once
 
 #include "collect/Session.h"
-#include "intercept/EventsDatabase.h"
+#include "EventsDatabase.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"

@@ -39,26 +39,12 @@ namespace ic {
     public:
         using Ptr = std::shared_ptr<EventsDatabase>;
 
-        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file);
         [[nodiscard]] static rust::Result<EventsDatabase::Ptr> create(const fs::path &file);
 
         [[nodiscard]] rust::Result<int> insert_event(const rpc::Event &event);
 
-        [[nodiscard]] EventsIterator events_by_process_begin();
-        [[nodiscard]] EventsIterator events_by_process_end();
-
-    private:
-        friend class EventsIterator;
-
-        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file, bool create);
-
-        [[nodiscard]] EventsIterator next() noexcept;
-
     public:
-        EventsDatabase(sqlite3 *handle,
-                       sqlite3_stmt *insert_event,
-                       sqlite3_stmt *select_events,
-                       sqlite3_stmt *select_events_per_run) noexcept;
+        EventsDatabase(sqlite3 *handle, sqlite3_stmt *insert_event) noexcept;
         ~EventsDatabase() noexcept;
 
         EventsDatabase(const EventsDatabase &) = delete;
@@ -70,35 +56,5 @@ namespace ic {
     private:
         sqlite3 *handle_;
         sqlite3_stmt *insert_event_;
-        sqlite3_stmt *select_events_;
-        sqlite3_stmt *select_events_per_run_;
-    };
-
-    using EventPtr = std::shared_ptr<rpc::Event>;
-    using EventPtrs = std::vector<EventPtr>;
-
-    class EventsIterator {
-    public:
-        using difference_type = std::ptrdiff_t;
-        using iterator_category = std::input_iterator_tag;
-        using value_type = rust::Result<std::vector<std::shared_ptr<rpc::Event>>>;
-        using pointer = value_type const *;
-        using reference = value_type const &;
-
-    public:
-        EventsIterator() noexcept;
-        EventsIterator(EventsDatabase *source, rust::Result<EventPtrs> value) noexcept;
-
-        reference operator*() const;
-
-        EventsIterator operator++(int);
-        EventsIterator &operator++();
-
-        bool operator==(const EventsIterator &other) const;
-        bool operator!=(const EventsIterator &other) const;
-
-    private:
-        EventsDatabase *source_;
-        rust::Result<EventPtrs> value_;
     };
 }

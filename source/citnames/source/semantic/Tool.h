@@ -20,11 +20,11 @@
 #pragma once
 
 #include "Configuration.h"
+#include "EventsDatabase.h"
 #include "Output.h"
 #include "semantic/Command.h"
 #include "semantic/Semantic.h"
 #include "libresult/Result.h"
-#include "intercept/EventsDatabase.h"
 
 #include <filesystem>
 #include <list>
@@ -67,7 +67,7 @@ namespace cs::semantic {
         static rust::Result<Tools> from(Compilation cfg);
 
         [[nodiscard]]
-        Entries transform(ic::EventsDatabase::Ptr events) const;
+        Entries transform(cs::EventsDatabase::Ptr events) const;
 
     private:
         using ToolPtr = std::shared_ptr<Tool>;

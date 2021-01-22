@@ -165,7 +165,7 @@ namespace {
         };
     }
 
-    rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>> extract(ic::EventsIterator::reference input) {
+    rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>> extract(cs::EventsIterator::reference input) {
         using Result = rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>;
         return input
                 .and_then<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>([](auto events) {
@@ -220,7 +220,7 @@ namespace cs::semantic {
         return rust::Ok(Tools(std::move(tools), std::move(cfg.compilers_to_exclude)));
     }
 
-    Entries Tools::transform(ic::EventsDatabase::Ptr events) const {
+    Entries Tools::transform(cs::EventsDatabase::Ptr events) const {
         auto semantics =
                 Forest<Command, uint32_t>(
                         events->events_by_process_begin(),

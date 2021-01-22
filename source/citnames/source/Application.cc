@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "Application.h"
+#include "EventsDatabase.h"
 #include "citnames/Flags.h"
 #include "Configuration.h"
 #include "Output.h"
@@ -120,7 +121,7 @@ namespace cs {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
 
         // get current compilations from the input.
-        return ic::EventsDatabase::open(arguments_.input)
+        return cs::EventsDatabase::open(arguments_.input)
                 .map<Entries>([this](const auto &commands) {
                     auto compilations = tools_.transform(commands);
                     // remove duplicates

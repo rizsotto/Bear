@@ -11,21 +11,10 @@ target_include_directories(domain_a PUBLIC source)
 target_link_libraries(domain_a PUBLIC rpc_a)
 
 
-add_library(report_a OBJECT
-        source/collect/EventsDatabase.cc
-        )
-
-target_include_directories(report_a PUBLIC include)
-target_link_libraries(report_a PUBLIC result_a)
-target_link_libraries(report_a PUBLIC fmt::fmt)
-target_link_libraries(report_a PUBLIC spdlog::spdlog)
-target_link_libraries(report_a PUBLIC nlohmann_json::nlohmann_json)
-target_link_libraries(report_a PUBLIC rpc_a)
-target_link_libraries(report_a PUBLIC PkgConfig::sqlite)
-
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
+        source/collect/EventsDatabase.cc
         source/collect/Reporter.cc
         source/collect/RpcServices.cc
         source/collect/Session.cc
@@ -44,9 +33,9 @@ target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC rpc_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
-target_link_libraries(intercept_a PUBLIC report_a)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+target_link_libraries(intercept_a PUBLIC PkgConfig::sqlite)
 
 # Create an executable from the sub projects.
 add_executable(intercept
@@ -56,7 +45,6 @@ add_executable(intercept
 target_link_libraries(intercept domain_a)
 target_link_libraries(intercept main_a)
 target_link_libraries(intercept intercept_a)
-target_link_libraries(intercept report_a)
 target_link_libraries(intercept rpc_a)
 target_link_libraries(intercept sys_a)
 target_link_libraries(intercept flags_a)
@@ -198,7 +186,6 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(intercept_unit_test main_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
-    target_link_libraries(intercept_unit_test report_a)
     target_link_libraries(intercept_unit_test rpc_a)
     target_link_libraries(intercept_unit_test sys_a)
     target_link_libraries(intercept_unit_test flags_a)
