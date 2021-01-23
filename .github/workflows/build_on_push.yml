@@ -72,7 +72,7 @@ jobs:
       - name: Execute [functional test]
         run: |
           mkdir $HOME/work/zlib_intercept && cd $HOME/work/zlib_intercept
-          intercept --output ignore.json   -- $ZLIB_SRC_DIR/configure
-          intercept --output commands.json -- make
-          cat commands.json
-          $GITHUB_WORKSPACE/test/bin/assert_intercepted commands.json count -gt 30
+          intercept --output ignore.sqlite3   -- $ZLIB_SRC_DIR/configure
+          intercept --output commands.sqlite3 -- make
+          sqlite3 commands.sqlite3 "select * from events limit 30;"
+          $GITHUB_WORKSPACE/test/bin/assert_intercepted commands.sqlite3 count -gt 30
