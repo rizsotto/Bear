@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-# RUN: %{intercept} --verbose --output %t.json -- %{true}
+# RUN: %{intercept} --verbose --output %t.sqlite3 -- %{true}

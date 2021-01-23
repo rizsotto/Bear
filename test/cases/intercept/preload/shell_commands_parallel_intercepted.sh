@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload
-# RUN: %{intercept} --verbose --output %t.json -- %{shell} %s
-# RUN: assert_intercepted %t.json count -ge 4
-# RUN: assert_intercepted %t.json contains -program %{true}
-# RUN: assert_intercepted %t.json contains -program %{shell} -arguments %{shell} %s
+# RUN: %{intercept} --verbose --output %t.sqlite3 -- %{shell} %s
+# RUN: assert_intercepted %t.sqlite3 count -ge 4
+# RUN: assert_intercepted %t.sqlite3 contains -program %{true}
+# RUN: assert_intercepted %t.sqlite3 contains -program %{shell} -arguments %{shell} %s
 
 $TRUE &
 $TRUE &

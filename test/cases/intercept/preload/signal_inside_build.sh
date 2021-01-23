@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload, shell, dynamic-shell
-# RUN: %{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true}
-# RUN: assert_intercepted %t.json count -ge 3
-# RUN: assert_intercepted %t.json contains -program %{true} -arguments %{true}
-# RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 1
-# RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 5
+# RUN: %{intercept} --verbose --output %t.sqlite3 -- %{shell} %s --sleep %{sleep} --true %{true}
+# RUN: assert_intercepted %t.sqlite3 count -ge 3
+# RUN: assert_intercepted %t.sqlite3 contains -program %{true} -arguments %{true}
+# RUN: assert_intercepted %t.sqlite3 contains -program %{sleep} -arguments %{sleep} 1
+# RUN: assert_intercepted %t.sqlite3 contains -program %{sleep} -arguments %{sleep} 5
 
 for i in "$@"
 do

@@ -1,9 +1,9 @@
 // REQUIRES: preload, c_api_execvp
 // RUN: %{compile} '-D_PROGRAM="echo"' -o %t %s
-// RUN: %{intercept} --verbose --output %t.json -- %t
-// RUN: assert_intercepted %t.json count -eq 2
-// RUN: assert_intercepted %t.json contains -program %t -arguments %t
-// RUN: assert_intercepted %t.json contains -program %{echo} -arguments echo "hi there"
+// RUN: %{intercept} --verbose --output %t.sqlite3 -- %t
+// RUN: assert_intercepted %t.sqlite3 count -eq 2
+// RUN: assert_intercepted %t.sqlite3 contains -program %t -arguments %t
+// RUN: assert_intercepted %t.sqlite3 contains -program %{echo} -arguments echo "hi there"
 
 #include "config.h"
 
