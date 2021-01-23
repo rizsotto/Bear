@@ -22,7 +22,6 @@
 #include "Configuration.h"
 #include "EventsDatabase.h"
 #include "Output.h"
-#include "semantic/Command.h"
 #include "semantic/Semantic.h"
 #include "libresult/Result.h"
 
@@ -53,7 +52,7 @@ namespace cs::semantic {
         // Can return an optional with an empty list, which says that it was
         // recognized the tool execution, but the execution was not a compilation.
         [[nodiscard]]
-        virtual rust::Result<SemanticPtrs> compilations(const Command &) const = 0;
+        virtual rust::Result<SemanticPtrs> compilations(const Execution &) const = 0;
     };
 
     // Represents an expert system which can recognize compilation entries from
@@ -76,10 +75,10 @@ namespace cs::semantic {
         Tools(ToolPtrs &&, std::list<fs::path>&&) noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const Command &command, uint32_t pid) const;
+        rust::Result<SemanticPtrs> recognize(const Execution &execution, uint32_t pid) const;
 
         [[nodiscard]]
-        rust::Result<ToolPtr> select(const Command &command) const;
+        rust::Result<ToolPtr> select(const Execution &execution) const;
 
     private:
         ToolPtrs tools_;

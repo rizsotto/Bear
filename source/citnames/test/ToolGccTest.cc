@@ -42,7 +42,7 @@ namespace {
     }
 
     TEST(ToolGcc, fails_on_empty) {
-        cs::semantic::Command input = {};
+        cs::semantic::Execution input = {};
 
         cs::semantic::ToolGcc sut({});
 
@@ -50,7 +50,7 @@ namespace {
     }
 
     TEST(ToolGcc, simple) {
-        cs::semantic::Command input = {
+        cs::semantic::Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "-o", "source.o", "source.c"},
                 "/home/user/project",
@@ -75,7 +75,7 @@ namespace {
     }
 
     TEST(ToolGcc, linker_flag_filtered) {
-        cs::semantic::Command input = {
+        cs::semantic::Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
                 "/home/user/project",
@@ -100,7 +100,7 @@ namespace {
     }
 
     TEST(ToolGcc, pass_on_help) {
-        cs::semantic::Command input = {
+        cs::semantic::Execution input = {
                 "/usr/bin/gcc",
                 {"gcc", "--version"},
                 "/home/user/project",
@@ -120,7 +120,7 @@ namespace {
     }
 
     TEST(ToolGcc, simple_with_C_PATH) {
-        cs::semantic::Command input = {
+        cs::semantic::Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "source.c"},
                 "/home/user/project",

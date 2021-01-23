@@ -34,8 +34,8 @@ namespace cs {
         return compilers_to_recognize_.executable == program;
     }
 
-    rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const Command &command) const {
-        return ToolGcc().compilations(command)
+    rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const Execution &execution) const {
+        return ToolGcc().compilations(execution)
                 .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
                     for (auto& semantic : semantics) {
                         if (auto* ptr = dynamic_cast<Preprocess*>(semantic.get()); ptr != nullptr) {

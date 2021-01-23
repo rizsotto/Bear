@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "semantic/Command.h"
 #include "libresult/Result.h"
+#include "Domain.h"
 
 #include <cstdint>
 #include <list>
@@ -32,8 +32,10 @@
 
 namespace cs::semantic {
 
+    using namespace domain;
+
     // Represents command line arguments.
-    using Arguments = std::list<std::string>;
+    using Arguments = std::vector<std::string>;
 
     // Represents a segment of a whole command line arguments,
     // which belongs together.
@@ -284,12 +286,12 @@ namespace cs::semantic {
     };
 
     template <typename Parser>
-    rust::Result<CompilerFlags> parse(const Parser &parser, const Command &command)
+    rust::Result<CompilerFlags> parse(const Parser &parser, const Execution &execution)
     {
-        auto input = Input { std::next(command.arguments.begin()), command.arguments.end() };
-        if (input.begin == input.end) {
+        if (execution.arguments.empty()) {
             return rust::Err(std::runtime_error("Failed to recognize: no arguments found."));
         }
+        auto input = Input {std::next(execution.arguments.begin()), execution.arguments.end() };
         return parser.parse(input)
                 .template map_err<std::runtime_error>([](auto remainder) {
                     return std::runtime_error(

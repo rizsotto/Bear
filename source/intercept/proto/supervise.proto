@@ -22,7 +22,9 @@ syntax = "proto3";
 package rpc;
 option cc_enable_arenas = true;
 
-// This type represents a program execution.
+// This represents the executed command itself. Describes all the
+// context that the caller was given. And these are the those parameters
+// which are essential for re-run the command.
 message Execution {
     string executable = 1;
     repeated string arguments = 2;

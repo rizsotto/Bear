@@ -23,6 +23,7 @@
 #include "ToolCuda.h"
 #include "ToolWrapper.h"
 #include "ToolExtendingWrapper.h"
+#include "Convert.h"
 
 #include <filesystem>
 #include <functional>
@@ -156,19 +157,10 @@ namespace {
         return result;
     }
 
-    cs::semantic::Command to_command(const rpc::Execution& execution) {
-        return cs::semantic::Command {
-                fs::path(execution.executable()),
-                std::list(execution.arguments().begin(), execution.arguments().end()),
-                fs::path(execution.working_dir()),
-                std::map(execution.environment().begin(), execution.environment().end())
-        };
-    }
-
-    rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>> extract(cs::EventsIterator::reference input) {
-        using Result = rust::Result<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>;
+    rust::Result<domain::Run> extract(cs::EventsIterator::reference input) {
+        using Result = rust::Result<domain::Run>;
         return input
-                .and_then<std::tuple<cs::semantic::Command, uint32_t, uint32_t>>([](auto events) {
+                .and_then<domain::Run>([](auto events) {
                     if (events.empty()) {
                         return Result(
                                 rust::Err(
@@ -186,11 +178,11 @@ namespace {
                         const auto &started = start->started();
                         return Result(
                                 rust::Ok(
-                                        std::make_tuple(
-                                                to_command(started.execution()),
+                                        domain::Run{
+                                                domain::from(started.execution()),
                                                 started.pid(),
                                                 started.ppid()
-                                        )
+                                        }
                                 )
                         );
                     }
@@ -222,12 +214,12 @@ namespace cs::semantic {
 
     Entries Tools::transform(cs::EventsDatabase::Ptr events) const {
         auto semantics =
-                Forest<Command, uint32_t>(
+                Forest<Execution, uint32_t>(
                         events->events_by_process_begin(),
                         events->events_by_process_end(),
                         ::extract
-                ).bfs<SemanticPtr>([this](const auto &command, const auto pid) {
-                    return this->recognize(command, pid);
+                ).bfs<SemanticPtr>([this](const auto &execution, const auto pid) {
+                    return this->recognize(execution, pid);
                 });
 
         Entries result;
@@ -240,14 +232,14 @@ namespace cs::semantic {
     }
 
     [[nodiscard]]
-    rust::Result<SemanticPtrs> Tools::recognize(const Command &command, const uint32_t pid) const {
-        spdlog::debug("[pid: {}] command: {}", pid, command);
-        return select(command)
+    rust::Result<SemanticPtrs> Tools::recognize(const Execution &execution, const uint32_t pid) const {
+        spdlog::debug("[pid: {}] execution: {}", pid, execution);
+        return select(execution)
                 .on_success([&pid](auto tool) {
                     spdlog::debug("[pid: {}] recognized with: {}", pid, tool->name());
                 })
-                .and_then<SemanticPtrs>([&command](auto tool) {
-                    return tool->compilations(command);
+                .and_then<SemanticPtrs>([&execution](auto tool) {
+                    return tool->compilations(execution);
                 })
                 .on_success([&pid](auto items) {
                      spdlog::debug("[pid: {}] recognized as: [{}]", pid, items);
@@ -258,19 +250,19 @@ namespace cs::semantic {
     }
 
     [[nodiscard]]
-    rust::Result<Tools::ToolPtr> Tools::select(const Command &command) const {
-        // do different things if the command is matching one of the nominated compilers.
-        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), command.executable)) {
+    rust::Result<Tools::ToolPtr> Tools::select(const Execution &execution) const {
+        // do different things if the execution is matching one of the nominated compilers.
+        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), execution.executable)) {
             return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
         } else {
-            // check if any tool can recognize the command.
+            // check if any tool can recognize the execution.
             for (const auto &tool : tools_) {
                 // when the tool is matching...
-                if (tool->recognize(command.executable)) {
+                if (tool->recognize(execution.executable)) {
                     return rust::Ok(tool);
                 }
             }
         }
-        return rust::Err(std::runtime_error("No tools recognize this command."));
+        return rust::Err(std::runtime_error("No tools recognize this execution."));
     }
 }

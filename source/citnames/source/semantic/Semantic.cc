@@ -24,32 +24,32 @@
 namespace {
 
     inline
-    fs::path make_absolute(cs::semantic::Command const& command, fs::path && path) {
-        return (path.is_absolute()) ? path : command.working_dir / path;
+    fs::path make_absolute(cs::semantic::Execution const &execution, fs::path &&path) {
+        return (path.is_absolute()) ? path : execution.working_dir / path;
     }
 }
 
 namespace cs::semantic {
 
-    Semantic::Semantic(Command _command) noexcept
-            : command(std::move(_command))
+    Semantic::Semantic(Execution _execution) noexcept
+            : execution(std::move(_execution))
     { }
 
-    QueryCompiler::QueryCompiler(Command _command) noexcept
-            : Semantic(std::move(_command))
+    QueryCompiler::QueryCompiler(Execution _execution) noexcept
+            : Semantic(std::move(_execution))
     { }
 
-    Preprocess::Preprocess(Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
-            : Semantic(std::move(_command))
-            , source(make_absolute(command, std::move(_source)))
-            , output(make_absolute(command, std::move(_output)))
+    Preprocess::Preprocess(Execution _execution, fs::path _source, fs::path _output, std::vector<std::string> _flags) noexcept
+            : Semantic(std::move(_execution))
+            , source(make_absolute(execution, std::move(_source)))
+            , output(make_absolute(execution, std::move(_output)))
             , flags(std::move(_flags))
     { }
 
-    Compile::Compile(Command _command, fs::path _source, fs::path _output, std::list<std::string> _flags) noexcept
-            : Semantic(std::move(_command))
-            , source(make_absolute(command, std::move(_source)))
-            , output(make_absolute(command, std::move(_output)))
+    Compile::Compile(Execution _execution, fs::path _source, fs::path _output, std::vector<std::string> _flags) noexcept
+            : Semantic(std::move(_execution))
+            , source(make_absolute(execution, std::move(_source)))
+            , output(make_absolute(execution, std::move(_output)))
             , flags(std::move(_flags))
     { }
 
@@ -65,9 +65,9 @@ namespace cs::semantic {
     std::optional<cs::Entry> Compile::into_entry() const {
         auto entry = cs::Entry {
                 source,
-                command.working_dir,
+                execution.working_dir,
                 std::make_optional(output),
-                flags
+                std::list<std::string>(flags.begin(), flags.end())
         };
         return std::make_optional(std::move(entry));
     }
@@ -77,7 +77,7 @@ namespace cs::semantic {
             return true;
 
         if (const auto* ptr = dynamic_cast<QueryCompiler const*>(&rhs); ptr != nullptr) {
-            return (command == ptr->command);
+            return (execution == ptr->execution);
         }
         return false;
     }
@@ -87,7 +87,7 @@ namespace cs::semantic {
             return true;
 
         if (const auto* ptr = dynamic_cast<Preprocess const*>(&rhs); ptr != nullptr) {
-            return (command == ptr->command) &&
+            return (execution == ptr->execution) &&
                    (source == ptr->source) &&
                    (output == ptr->output) &&
                    (flags == ptr->flags);
@@ -100,7 +100,7 @@ namespace cs::semantic {
             return true;
 
         if (const auto* ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
-            return (command == ptr->command) &&
+            return (execution == ptr->execution) &&
                    (source == ptr->source) &&
                    (output == ptr->output) &&
                    (flags == ptr->flags);

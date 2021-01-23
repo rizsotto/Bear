@@ -20,7 +20,7 @@
 #pragma once
 
 #include "Output.h"
-#include "semantic/Command.h"
+#include "Domain.h"
 
 #include <filesystem>
 #include <list>
@@ -32,10 +32,12 @@ namespace fs = std::filesystem;
 
 namespace cs::semantic {
 
+    using namespace domain;
+
     // Represents a recognized command. Which we can find out the intent of
     // that command. And therefore we know the semantic of it.
     struct Semantic {
-        explicit Semantic(Command) noexcept;
+        explicit Semantic(Execution) noexcept;
         virtual ~Semantic() noexcept = default;
 
         [[nodiscard]] virtual std::optional<cs::Entry> into_entry() const = 0;
@@ -43,7 +45,7 @@ namespace cs::semantic {
         virtual bool operator==(Semantic const&) const = 0;
         virtual std::ostream& operator<<(std::ostream&) const = 0;
 
-        Command command;
+        Execution execution;
     };
 
     using SemanticPtr = std::shared_ptr<Semantic>;
@@ -52,7 +54,7 @@ namespace cs::semantic {
     // Represents a compiler call, which does process any input, but query
     // something from the compiler itself. It can be a help or a version query.
     struct QueryCompiler : public Semantic {
-        explicit QueryCompiler(Command) noexcept;
+        explicit QueryCompiler(Execution) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
@@ -62,7 +64,7 @@ namespace cs::semantic {
 
     // Represents a compiler call, which runs the preprocessor pass.
     struct Preprocess : public Semantic {
-        Preprocess(Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
+        Preprocess(Execution, fs::path source, fs::path output, std::vector<std::string>) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
@@ -71,12 +73,12 @@ namespace cs::semantic {
 
         fs::path source;
         fs::path output;
-        std::list<std::string> flags;
+        std::vector<std::string> flags;
     };
 
     // Represents a compiler call, which runs the compilation pass.
     struct Compile : public Semantic {
-        Compile(Command, fs::path source, fs::path output, std::list<std::string>) noexcept;
+        Compile(Execution, fs::path source, fs::path output, std::vector<std::string>) noexcept;
 
         [[nodiscard]] std::optional<cs::Entry> into_entry() const override;
 
@@ -85,7 +87,7 @@ namespace cs::semantic {
 
         fs::path source;
         fs::path output;
-        std::list<std::string> flags;
+        std::vector<std::string> flags;
     };
 
     inline

@@ -162,7 +162,7 @@ namespace {
         return flags;
     }
 
-    rust::Result<CompilerFlags> parse_flags(const Command &command)
+    rust::Result<CompilerFlags> parse_flags(const Execution &execution)
     {
         static auto const parser =
                 Repeat(
@@ -173,7 +173,7 @@ namespace {
                         )
                 );
 
-        return parse(parser, command);
+        return parse(parser, execution);
     }
 
     bool is_compiler_query(const CompilerFlags& flags)
@@ -308,11 +308,11 @@ namespace cs::semantic {
         return std::regex_match(program.filename().c_str(), m, pattern);
     }
 
-    rust::Result<SemanticPtrs> ToolGcc::compilations(const Command &command) const {
-        return parse_flags(command)
-                .and_then<SemanticPtrs>([&command](auto flags) -> rust::Result<SemanticPtrs> {
+    rust::Result<SemanticPtrs> ToolGcc::compilations(const Execution &execution) const {
+        return parse_flags(execution)
+                .and_then<SemanticPtrs>([&execution](auto flags) -> rust::Result<SemanticPtrs> {
                     if (is_compiler_query(flags)) {
-                        SemanticPtrs result = { SemanticPtr(new QueryCompiler(command)) };
+                        SemanticPtrs result = { SemanticPtr(new QueryCompiler(execution)) };
                         return rust::Ok(result);
                     }
                     if (!is_prerpocessor_only(flags)) {
@@ -325,8 +325,8 @@ namespace cs::semantic {
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
-                    Arguments prefix = { command.executable.string() };
-                    Arguments extra = flags_from_environment(command.environment);
+                    Arguments prefix = {execution.executable.string()};
+                    Arguments extra = flags_from_environment(execution.environment);
 
                     SemanticPtrs result;
                     if (linking(flags)) {
@@ -343,8 +343,8 @@ namespace cs::semantic {
                                       : output_opt.value();
                         result.emplace_back(
                                 preprocess
-                                ? SemanticPtr(new Preprocess(command, source, output, arguments))
-                                : SemanticPtr(new Compile(command, source, output, arguments)));
+                                ? SemanticPtr(new Preprocess(execution, source, output, arguments))
+                                : SemanticPtr(new Compile(execution, source, output, arguments)));
                     }
                     return rust::Ok(result);
                 });

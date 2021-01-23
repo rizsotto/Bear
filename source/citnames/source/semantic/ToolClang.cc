@@ -35,7 +35,7 @@ namespace cs::semantic {
         return std::regex_match(program.filename().c_str(), m, pattern);
     }
 
-    rust::Result<SemanticPtrs> ToolClang::compilations(const Command &command) const {
-        return ToolGcc().compilations(command);
+    rust::Result<SemanticPtrs> ToolClang::compilations(const Execution &execution) const {
+        return ToolGcc().compilations(execution);
     }
 }

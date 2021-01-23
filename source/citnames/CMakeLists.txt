@@ -2,7 +2,6 @@
 add_library(citnames_json_a OBJECT
         source/Configuration.cc
         source/Output.cc
-        source/semantic/Command.cc
         )
 
 target_link_libraries(citnames_json_a PUBLIC result_a)
@@ -30,6 +29,7 @@ add_library(citnames_a OBJECT
 target_include_directories(citnames_a PUBLIC include/)
 target_include_directories(citnames_a PUBLIC source/)
 target_link_libraries(citnames_a PUBLIC main_a)
+target_link_libraries(citnames_a PUBLIC domain_a)
 target_link_libraries(citnames_a PUBLIC result_a)
 target_link_libraries(citnames_a PUBLIC flags_a)
 target_link_libraries(citnames_a PUBLIC rpc_a)
@@ -46,6 +46,7 @@ add_executable(citnames
 target_link_libraries(citnames main_a)
 target_link_libraries(citnames citnames_a)
 target_link_libraries(citnames citnames_json_a)
+target_link_libraries(citnames domain_a)
 target_link_libraries(citnames result_a)
 target_link_libraries(citnames rpc_a)
 target_link_libraries(citnames flags_a)
@@ -83,6 +84,7 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(citnames_unit_test main_a)
     target_link_libraries(citnames_unit_test citnames_a)
     target_link_libraries(citnames_unit_test citnames_json_a)
+    target_link_libraries(citnames_unit_test domain_a)
     target_link_libraries(citnames_unit_test result_a)
     target_link_libraries(citnames_unit_test rpc_a)
     target_link_libraries(citnames_unit_test flags_a)

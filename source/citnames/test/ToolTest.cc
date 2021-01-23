@@ -53,7 +53,7 @@ namespace {
 //                report::Context { "session", {} },
 //                {
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/cc",
 //                                        { "cc", "--version" },
 //                                        "/home/user/project",
@@ -62,7 +62,7 @@ namespace {
 //                                report::Run { 1, 0, {} }
 //                        },
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/ls",
 //                                        { "ls", "-la" },
 //                                        "/home/user/project",
@@ -71,7 +71,7 @@ namespace {
 //                                report::Run { 2, 0, {} }
 //                        },
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/cc",
 //                                        { "cc", "-c", "-Wall", "source.1.c" },
 //                                        "/home/user/project",
@@ -80,7 +80,7 @@ namespace {
 //                                report::Run { 3, 0, {} }
 //                        },
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/c++",
 //                                        { "c++", "-c", "-Wall", "source.2.cc" },
 //                                        "/home/user/project",
@@ -124,7 +124,7 @@ namespace {
 //                report::Context { "session", {} },
 //                {
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/nvcc",
 //                                        { "cc", "-c", "source.cu" },
 //                                        "/home/user/project",
@@ -133,7 +133,7 @@ namespace {
 //                                report::Run { 1, 0, {} }
 //                        },
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/gcc",
 //                                        { "cc", "-E", "source.cu" },
 //                                        "/home/user/project",
@@ -142,7 +142,7 @@ namespace {
 //                                report::Run { 2, 1, {} }
 //                        },
 //                        report::Execution {
-//                                report::Command {
+//                                report::Execution {
 //                                        "/usr/bin/gcc",
 //                                        { "cc", "-c", "-Dthing", "source.cu" },
 //                                        "/home/user/project",
