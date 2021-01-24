@@ -67,6 +67,7 @@ install(FILES man/intercept.1
 
 add_executable(wrapper
         source/report/wrapper/EventFactory.cc
+        source/report/wrapper/EventReporter.cc
         source/report/wrapper/RpcClients.cc
         source/report/wrapper/Application.cc
         source/report/wrapper/main.cc

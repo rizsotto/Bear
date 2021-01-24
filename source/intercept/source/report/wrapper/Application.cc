@@ -20,6 +20,7 @@
 #include "report/wrapper/Environment.h"
 #include "report/wrapper/Flags.h"
 #include "report/wrapper/EventFactory.h"
+#include "report/wrapper/EventReporter.h"
 #include "report/wrapper/RpcClients.h"
 #include "report/wrapper/Application.h"
 #include "libmain/ApplicationLogConfig.h"
@@ -117,6 +118,12 @@ namespace {
                     });
         }
     }
+
+    bool is_exited(const rust::Result<sys::ExitStatus> &status) {
+        return status
+                .map<bool>([](auto _status) { return _status.is_exited(); })
+                .unwrap_or(true);
+    }
 }
 
 namespace wr {
@@ -128,12 +135,11 @@ namespace wr {
     { }
 
     rust::Result<int> Command::execute() const {
-        wr::EventFactory event_factory;
-        wr::InterceptorClient interceptor_client(session_);
+        wr::EventReporter event_reporter(session_);
         wr::SupervisorClient supervisor_client(session_);
 
         return supervisor_client.resolve(execution_)
-                .and_then<sys::Process>([&interceptor_client, &event_factory](auto execution) {
+                .and_then<sys::Process>([&event_reporter](auto execution) {
                     return sys::Process::Builder(execution.executable)
                             .add_arguments(execution.arguments.begin(), execution.arguments.end())
                             .set_environment(execution.environment)
@@ -142,22 +148,18 @@ namespace wr {
 #else
                             .spawn()
 #endif
-                            .on_success([&interceptor_client, &event_factory, &execution](auto &child) {
-                                auto event = event_factory.start(child.get_pid(), getppid(), execution);
-                                interceptor_client.report(std::move(event));
+                            .on_success([&event_reporter, &execution](auto &child) {
+                                event_reporter.report_start(child.get_pid(), execution);
                             });
                 })
-                .and_then<sys::ExitStatus>([&interceptor_client, &event_factory](auto child) {
+                .and_then<sys::ExitStatus>([&event_reporter](auto child) {
                     sys::SignalForwarder guard(child);
                     while (true) {
-                        auto status = child.wait(true);
-                        status.on_success([&interceptor_client, &event_factory](auto exit) {
-                            auto event = exit.is_signaled()
-                                         ? event_factory.signal(exit.signal().value())
-                                         : event_factory.terminate(exit.code().value());
-                            interceptor_client.report(std::move(event));
-                        });
-                        if (status.template map<bool>([](auto _status) { return _status.is_exited(); }).unwrap_or(false)) {
+                        auto status = child.wait(true)
+                                .on_success([&event_reporter](auto exit) {
+                                    event_reporter.report_wait(exit);
+                                });
+                        if (is_exited(status)) {
                             return status;
                         }
                     }
