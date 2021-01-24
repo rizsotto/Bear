@@ -106,9 +106,9 @@ target_link_libraries(wrapper
         wrapper_a)
 
 install(TARGETS wrapper
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/bear)
+  RUNTIME DESTINATION ${PRIVATE_INSTALLDIR})
 install(DIRECTORY
-        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/bear/wrapper.d)
+  DESTINATION ${PRIVATE_INSTALLDIR}/wrapper.d)
 install(CODE "
     execute_process(
         COMMAND ln -sf ../wrapper ar
@@ -142,7 +142,7 @@ install(CODE "
         COMMAND ln -sf ../wrapper objdump
         COMMAND ln -sf ../wrapper ranlib
         COMMAND ln -sf ../wrapper readelf
-        WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBEXECDIR}/bear/wrapper.d
+        WORKING_DIRECTORY ${DESTDIR}${CMAKE_INSTALL_PREFIX}/${PRIVATE_INSTALLDIR}/wrapper.d
     )
 ")
 
@@ -187,7 +187,7 @@ elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif ()
 
 install(TARGETS exec
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/bear)
+  LIBRARY DESTINATION ${PRIVATE_INSTALLDIR})
 
 
 # Create unit test.
