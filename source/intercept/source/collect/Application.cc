@@ -58,9 +58,9 @@ namespace {
                     const auto&[path, command] = tuple;
                     auto executable = command.front();
 
-                    auto resolver = el::Resolver();
+                    el::Resolver resolver;
                     return resolver.from_search_path(executable, path.c_str())
-                            .template map<fs::path>([](auto ptr) {
+                            .template map<fs::path>([](const auto &ptr) {
                                 return fs::path(ptr);
                             })
                             .template map_err<std::runtime_error>([&executable](auto error) {

@@ -45,8 +45,8 @@ namespace domain {
 
     struct Run {
         Execution execution;
-        ProcessId pid;
-        ProcessId ppid;
+        ProcessId pid = 0u;
+        ProcessId ppid = 0u;
     };
 
     bool operator==(const Run& lhs, const Run& rhs);
