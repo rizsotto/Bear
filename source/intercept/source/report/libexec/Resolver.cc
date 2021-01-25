@@ -94,12 +94,17 @@ namespace el {
                 if (path.empty()) {
                     continue;
                 }
+                // check if it's possible to assemble a PATH
+                if ((file.size() + path.size() + 2) > PATH_MAX) {
+                    continue;
+                }
                 // create a path
                 char candidate[PATH_MAX];
                 {
-                    auto it = el::array::copy(path.begin(), path.end(), candidate, candidate + PATH_MAX);
+                    auto candidate_end = candidate + PATH_MAX;
+                    auto it = el::array::copy(path.begin(), path.end(), candidate, candidate_end);
                     *it++ = DIR_SEPARATOR;
-                    it = el::array::copy(file.begin(), file.end(), it, candidate + PATH_MAX);
+                    it = el::array::copy(file.begin(), file.end(), it, candidate_end);
                     *it = 0;
                 }
                 // check if it's okay to execute.

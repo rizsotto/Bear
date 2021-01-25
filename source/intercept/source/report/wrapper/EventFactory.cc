@@ -57,11 +57,10 @@ namespace wr {
         event.set_rid(rid_);
         event.set_timestamp(now_as_string());
         {
-            auto event_started_ptr = std::make_unique<rpc::Event_Started>();
-            event_started_ptr->set_pid(pid);
-            event_started_ptr->set_ppid(ppid);
-            event_started_ptr->set_allocated_execution(new rpc::Execution(into(execution)));
-            event.set_allocated_started(event_started_ptr.release());
+            rpc::Event_Started &event_started = *event.mutable_started();
+            event_started.set_pid(pid);
+            event_started.set_ppid(ppid);
+            *event_started.mutable_execution() = into(execution);
         }
         return event;
     }
@@ -71,10 +70,8 @@ namespace wr {
         result.set_rid(rid_);
         result.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<rpc::Event_Signalled>();
-            event->set_number(number);
-
-            result.set_allocated_signalled(event.release());
+            rpc::Event_Signalled &event = *result.mutable_signalled();
+            event.set_number(number);
         }
         return result;
     }
@@ -84,10 +81,8 @@ namespace wr {
         result.set_rid(rid_);
         result.set_timestamp(now_as_string());
         {
-            auto event = std::make_unique<rpc::Event_Terminated>();
-            event->set_status(code);
-
-            result.set_allocated_terminated(event.release());
+            rpc::Event_Terminated &event = *result.mutable_terminated();
+            event.set_status(code);
         }
         return result;
     }
