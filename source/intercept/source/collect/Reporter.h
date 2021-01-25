@@ -19,17 +19,13 @@
 
 #pragma once
 
-#include "collect/Session.h"
-#include "EventsDatabase.h"
+#include "collect/EventsDatabase.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
-#include <filesystem>
 #include <memory>
-#include <cstdint>
-
-namespace fs = std::filesystem;
+#include <mutex>
 
 namespace ic {
 
@@ -37,12 +33,12 @@ namespace ic {
     class Reporter {
     public:
         using Ptr = std::shared_ptr<Reporter>;
-        static rust::Result<Reporter::Ptr> from(const flags::Arguments&);
+        static rust::Result<Reporter::Ptr> from(const flags::Arguments &flags);
 
-        void report(const rpc::Event& request);
+        void report(const rpc::Event &request);
 
     public:
-        explicit Reporter(ic::EventsDatabase::Ptr events);
+        explicit Reporter(ic::EventsDatabase::Ptr database);
 
         Reporter() = delete;
         ~Reporter() noexcept = default;
@@ -54,6 +50,7 @@ namespace ic {
         Reporter& operator=(Reporter&&) noexcept = delete;
 
     private:
-        ic::EventsDatabase::Ptr events_;
+        ic::EventsDatabase::Ptr database_;
+        std::mutex mutex_;
     };
 }

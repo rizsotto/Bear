@@ -42,15 +42,11 @@ namespace ic {
     InterceptorImpl::InterceptorImpl(Reporter &reporter)
             : rpc::Interceptor::Service()
             , reporter_(reporter)
-            , lock_()
     { }
 
     grpc::Status InterceptorImpl::Register(grpc::ServerContext*, const rpc::Event* request, rpc::Empty*)
     {
-        std::lock_guard<std::mutex> guard(lock_);
-
         reporter_.report(*request);
-
         return ::grpc::Status::OK;
     }
 }

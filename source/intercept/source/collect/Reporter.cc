@@ -22,7 +22,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <memory>
 #include <utility>
 
 namespace ic {
@@ -38,12 +37,14 @@ namespace ic {
                 });
     }
 
-    Reporter::Reporter(ic::EventsDatabase::Ptr events)
-            : events_(std::move(events))
+    Reporter::Reporter(ic::EventsDatabase::Ptr database)
+            : database_(std::move(database))
+            , mutex_()
     { }
 
     void Reporter::report(const rpc::Event& event) {
-        events_->insert_event(event)
+        std::lock_guard<std::mutex> guard(mutex_);
+        database_->insert_event(event)
                 .on_error([](auto error) {
                     spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
                 });

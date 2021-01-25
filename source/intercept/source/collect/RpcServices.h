@@ -19,8 +19,6 @@
 
 #pragma once
 
-#include <mutex>
-
 #include "intercept.grpc.pb.h"
 #include "supervise.grpc.pb.h"
 
@@ -49,6 +47,5 @@ namespace ic {
 
     private:
         Reporter& reporter_;
-        std::mutex lock_;
     };
 }
