@@ -23,6 +23,7 @@
 #include "libmain/Application.h"
 #include "libmain/ApplicationLogConfig.h"
 #include "libflags/Flags.h"
+#include "libresult/Result.h"
 
 namespace wr {
     using namespace domain;

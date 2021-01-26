@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "report/libexec/Resolver.h"
 
 #include "report/libexec/Array.h"
@@ -25,7 +26,10 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <cstdlib>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 
 namespace {
 

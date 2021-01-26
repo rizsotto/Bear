@@ -25,6 +25,8 @@
 
 #include <chrono>
 #include <random>
+#include <cstdint>
+#include <string>
 
 namespace {
 

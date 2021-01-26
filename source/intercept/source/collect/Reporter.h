@@ -35,7 +35,7 @@ namespace ic {
         using Ptr = std::shared_ptr<Reporter>;
         static rust::Result<Reporter::Ptr> from(const flags::Arguments &flags);
 
-        void report(const rpc::Event &request);
+        void report(const rpc::Event &event);
 
     public:
         explicit Reporter(ic::EventsDatabase::Ptr database);

@@ -20,6 +20,7 @@
 #include "libshell/Command.h"
 
 #include <regex>
+#include <stdexcept>
 
 namespace sh {
 

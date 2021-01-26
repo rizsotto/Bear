@@ -17,8 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
-
 #include "report/libexec/Environment.h"
 #include "report/libexec/Array.h"
 

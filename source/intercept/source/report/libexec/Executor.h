@@ -19,9 +19,14 @@
 
 #pragma once
 
-#include <spawn.h>
+#include "config.h"
 
 #include "libresult/Result.h"
+
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
+#endif
+#include <sys/types.h>
 
 namespace el {
 

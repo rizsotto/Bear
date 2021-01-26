@@ -20,7 +20,7 @@
 #pragma once
 
 #include "Domain.h"
-#include "supervise.grpc.pb.h"
+#include "supervise.pb.h"
 
 namespace domain {
 

@@ -22,12 +22,7 @@
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
 
-#include <filesystem>
-#include <list>
-#include <map>
 #include <string>
-
-namespace fs = std::filesystem;
 
 namespace sys::os {
 

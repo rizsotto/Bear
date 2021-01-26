@@ -23,6 +23,8 @@
 #include "report/wrapper/EventFactory.h"
 #include "libresult/Result.h"
 
+#include <memory>
+
 #include <grpcpp/channel.h>
 #include "intercept.grpc.pb.h"
 #include "supervise.grpc.pb.h"

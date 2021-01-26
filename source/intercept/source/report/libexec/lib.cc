@@ -17,6 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <atomic>
 #include <cerrno>
 #include <climits>
@@ -28,6 +30,9 @@
 #include "report/libexec/Resolver.h"
 #include "report/libexec/Session.h"
 
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
+#endif
 #if defined HAVE_NSGETENVIRON
 #include <crt_externs.h>
 #else
