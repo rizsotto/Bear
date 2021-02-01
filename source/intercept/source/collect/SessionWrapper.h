@@ -28,8 +28,8 @@ namespace ic {
         WrapperSession(
             bool verbose,
             std::string wrapper_dir,
-            std::map<std::string, std::string> mapping,
-            std::map<std::string, std::string> override);
+            std::map<std::string, fs::path> mapping,
+            std::map<std::string, fs::path> override);
 
         static rust::Result<Session::Ptr> from(const flags::Arguments &args, const char **envp);
 
@@ -38,14 +38,14 @@ namespace ic {
         [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;
 
     private:
-        [[nodiscard]] rust::Result<std::string> resolve(const std::string& name) const;
+        [[nodiscard]] rust::Result<fs::path> resolve(const fs::path &name) const;
         [[nodiscard]] std::map<std::string, std::string> update(const std::map<std::string, std::string>& env) const;
         [[nodiscard]] std::map<std::string, std::string> set_up(const std::map<std::string, std::string>& env) const;
 
     private:
         bool verbose_;
         std::string wrapper_dir_;
-        std::map<std::string, std::string> mapping_;
-        std::map<std::string, std::string> override_;
+        std::map<std::string, fs::path> mapping_;
+        std::map<std::string, fs::path> override_;
     };
 }

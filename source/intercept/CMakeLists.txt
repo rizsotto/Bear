@@ -95,6 +95,8 @@ install(CODE "
         COMMAND ln -sf ../wrapper cpp
         COMMAND ln -sf ../wrapper gcc
         COMMAND ln -sf ../wrapper g++
+        COMMAND ln -sf ../wrapper clang
+        COMMAND ln -sf ../wrapper clang++
         COMMAND ln -sf ../wrapper f77
         COMMAND ln -sf ../wrapper m2c
         COMMAND ln -sf ../wrapper pc
