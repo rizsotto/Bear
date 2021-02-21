@@ -183,6 +183,7 @@ if (ENABLE_UNIT_TESTS)
 
     add_executable(intercept_unit_test
             test/SessionTest.cc
+            test/ThreadSafeQueueTest.cc
             )
 
     target_link_libraries(intercept_unit_test domain_a)
