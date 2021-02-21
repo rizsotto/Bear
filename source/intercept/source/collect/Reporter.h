@@ -20,6 +20,7 @@
 #pragma once
 
 #include "collect/EventsDatabase.h"
+#include "ThreadSafeQueueConsumer.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"
@@ -51,6 +52,6 @@ namespace ic {
 
     private:
         ic::EventsDatabase::Ptr database_;
-        std::mutex mutex_;
+        domain::ThreadSafeQueueConsumer<rpc::Event> consumer_;
     };
 }
