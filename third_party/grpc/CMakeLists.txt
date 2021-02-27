@@ -31,6 +31,8 @@ else ()
             GIT_TAG
                 v1.35.0
             GIT_SUBMODULES
+	    GIT_SHALLOW
+	    	1
             UPDATE_COMMAND
                 ""
             LOG_CONFIGURE
