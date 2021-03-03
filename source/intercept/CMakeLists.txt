@@ -1,7 +1,10 @@
-add_subdirectory(proto)
-
 include(GNUInstallDirs)
 
+# RPC related types and stubs.
+add_subdirectory(proto)
+
+
+# Domain types and methods for intercept artefacts.
 add_library(domain_a OBJECT
         source/Domain.cc
         source/Convert.cc
@@ -11,7 +14,7 @@ target_include_directories(domain_a PUBLIC source)
 target_link_libraries(domain_a PUBLIC rpc_a)
 
 
-# Create a static library, which is used for unit tests and the final shared library.
+# Intercept orchestrator code.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
         source/collect/EventsDatabase.cc
@@ -37,7 +40,8 @@ target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
 target_link_libraries(intercept_a PUBLIC PkgConfig::sqlite)
 
-# Create an executable from the sub projects.
+
+# Intercept orchestrator executable.
 add_executable(intercept
         source/collect/main.cc
         )
@@ -53,6 +57,7 @@ target_link_libraries(intercept exec_a)
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.
 #
@@ -65,22 +70,38 @@ install(TARGETS intercept
 install(FILES man/intercept.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-add_executable(wrapper
+
+# Intercept report sender code.
+add_library(wrapper_a OBJECT
         source/report/wrapper/EventFactory.cc
         source/report/wrapper/EventReporter.cc
         source/report/wrapper/RpcClients.cc
         source/report/wrapper/Application.cc
+        )
+
+target_include_directories(wrapper_a PUBLIC source/)
+target_link_libraries(wrapper_a PUBLIC domain_a)
+target_link_libraries(wrapper_a PUBLIC flags_a)
+target_link_libraries(wrapper_a PUBLIC main_a)
+target_link_libraries(wrapper_a PUBLIC result_a)
+target_link_libraries(wrapper_a PUBLIC sys_a)
+target_link_libraries(wrapper_a PUBLIC rpc_a)
+target_link_libraries(wrapper_a PUBLIC spdlog::spdlog)
+
+
+# Intercept report sender executable.
+add_executable(wrapper
         source/report/wrapper/main.cc
         )
 
 target_include_directories(wrapper PUBLIC source/)
+target_link_libraries(wrapper wrapper_a)
 target_link_libraries(wrapper domain_a)
 target_link_libraries(wrapper main_a)
 target_link_libraries(wrapper flags_a)
 target_link_libraries(wrapper result_a)
 target_link_libraries(wrapper sys_a)
 target_link_libraries(wrapper rpc_a)
-target_link_libraries(wrapper spdlog::spdlog)
 
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
@@ -123,6 +144,8 @@ install(CODE "
     )
 ")
 
+
+# Execution interceptor code.
 add_library(exec_a OBJECT
         source/report/libexec/Buffer.cc
         source/report/libexec/Environment.cc
@@ -141,7 +164,8 @@ set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"
         POSITION_INDEPENDENT_CODE 1)
 
-# Create a shared library from the sub projects.
+
+# Execution interceptor shared library.
 add_library(exec SHARED
         source/report/libexec/lib.cc
         source/report/libexec/std.cc
@@ -165,6 +189,7 @@ endif ()
 install(TARGETS exec
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 
+
 # Create unit test.
 if (ENABLE_UNIT_TESTS)
     add_executable(exec_unit_test
@@ -182,6 +207,7 @@ if (ENABLE_UNIT_TESTS)
     add_test(NAME bear::exec_unit_test COMMAND $<TARGET_FILE:exec_unit_test>)
 
     add_executable(intercept_unit_test
+            test/EventFactoryTest.cc
             test/SessionTest.cc
             test/ThreadSafeQueueTest.cc
             )
@@ -190,6 +216,7 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(intercept_unit_test main_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
+    target_link_libraries(intercept_unit_test wrapper_a)
     target_link_libraries(intercept_unit_test rpc_a)
     target_link_libraries(intercept_unit_test sys_a)
     target_link_libraries(intercept_unit_test flags_a)
