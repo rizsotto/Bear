@@ -43,7 +43,7 @@ namespace {
         return std::runtime_error(fmt::format("{}: {}", message, sqlite3_errmsg(handle)));
     }
 
-    rust::Result<sqlite3 *> open(const fs::path &file) {
+    rust::Result<sqlite3 *> open_sqlite(const fs::path &file) {
         sqlite3 *handle;
         if (auto rc = sqlite3_open(file.c_str(), &handle); rc == SQLITE_OK) {
             return rust::Ok(handle);
@@ -132,7 +132,7 @@ namespace cs {
     }
 
     rust::Result<EventsDatabase::Ptr> EventsDatabase::open(const fs::path &file) {
-        auto handle = ::open(file);
+        auto handle = open_sqlite(file);
 
         auto select_events = handle
                 .and_then<sqlite3_stmt *>([](auto handle) {

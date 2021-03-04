@@ -42,7 +42,7 @@ namespace {
         return std::runtime_error(fmt::format("{}: {}", message, sqlite3_errmsg(handle)));
     }
 
-    rust::Result<sqlite3 *> open(const fs::path &file) {
+    rust::Result<sqlite3 *> open_sqlite(const fs::path &file) {
         sqlite3 *handle;
         if (auto rc = sqlite3_open(file.c_str(), &handle); rc == SQLITE_OK) {
             return rust::Ok(handle);
@@ -92,7 +92,7 @@ namespace ic {
     }
 
     rust::Result<EventsDatabase::Ptr> EventsDatabase::create(const fs::path &file) {
-        auto handle = open(file)
+        auto handle = open_sqlite(file)
                 .and_then<sqlite3 *>([](auto handle) {
                     constexpr const char *sql =
                             "DROP TABLE IF EXISTS events;"
