@@ -40,18 +40,8 @@ namespace cs {
     // of strings or a single string (shell escaping to protect white spaces).
     // Another format element is if the output field is emitted or not.
     struct Format {
-        bool command_as_array;
-        bool drop_output_field;
-
-        constexpr Format() noexcept
-                : command_as_array(true)
-                , drop_output_field(false)
-        { }
-
-        constexpr Format(bool _command_as_array, bool _drop_output_field) noexcept
-                : command_as_array(_command_as_array)
-                , drop_output_field(_drop_output_field)
-        { }
+        bool command_as_array = true;
+        bool drop_output_field = false;
     };
 
     // Controls the content of the output.
@@ -60,23 +50,9 @@ namespace cs {
     // These attributes can be read from the configuration file, and can be
     // overridden by command line arguments.
     struct Content {
-        bool include_only_existing_source;
-        std::list<fs::path> paths_to_include;
-        std::list<fs::path> paths_to_exclude;
-
-        Content() noexcept
-                : include_only_existing_source(false)
-                , paths_to_include()
-                , paths_to_exclude()
-        { }
-
-        Content(bool _include_only_existing_source,
-                std::list<fs::path> _paths_to_include,
-                std::list<fs::path> _paths_to_exclude) noexcept
-                : include_only_existing_source(_include_only_existing_source)
-                , paths_to_include(std::move(_paths_to_include))
-                , paths_to_exclude(std::move(_paths_to_exclude))
-        { }
+        bool include_only_existing_source = false;
+        std::list<fs::path> paths_to_include = {};
+        std::list<fs::path> paths_to_exclude = {};
     };
 
     // Groups together the output related configurations.

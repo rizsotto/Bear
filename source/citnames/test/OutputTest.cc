@@ -25,8 +25,8 @@
 
 namespace {
 
-    constexpr cs::Format AS_ARGUMENTS( true, false);
-    constexpr cs::Format AS_COMMAND(false, false);
+    constexpr cs::Format AS_ARGUMENTS { true, false };
+    constexpr cs::Format AS_COMMAND { false, false };
 
     cs::Content NO_FILTER {
         false, {}, {}
