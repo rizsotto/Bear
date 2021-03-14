@@ -18,6 +18,7 @@
  */
 
 #include "Tool.h"
+#include "ToolAny.h"
 #include "ToolGcc.h"
 #include "ToolClang.h"
 #include "ToolCuda.h"
@@ -192,14 +193,13 @@ namespace {
 
 namespace cs::semantic {
 
-    Tools::Tools(ToolPtrs &&tools, std::list<fs::path>&& compilers) noexcept
-            : tools_(tools)
-            , to_exclude_(compilers)
-    {}
+    Tools::Tools(std::shared_ptr<Tool> tool) noexcept
+            : tool_(std::move(tool))
+    { }
 
     rust::Result<Tools> Tools::from(Compilation cfg) {
         // TODO: use `cfg.flags_to_remove`
-        ToolPtrs tools = {
+        ToolAny::ToolPtrs tools = {
                 std::make_shared<ToolGcc>(),
                 std::make_shared<ToolClang>(),
                 std::make_shared<ToolWrapper>(),
@@ -208,8 +208,10 @@ namespace cs::semantic {
         for (auto && compiler : cfg.compilers_to_recognize) {
             tools.emplace_back(std::make_shared<ToolExtendingWrapper>(std::move(compiler)));
         }
+        std::shared_ptr<ToolAny> tool =
+                std::make_shared<ToolAny>(std::move(tools), std::move(cfg.compilers_to_exclude));
 
-        return rust::Ok(Tools(std::move(tools), std::move(cfg.compilers_to_exclude)));
+        return rust::Ok(Tools(tool));
     }
 
     Entries Tools::transform(cs::EventsDatabase::Ptr events) const {
@@ -234,35 +236,15 @@ namespace cs::semantic {
     [[nodiscard]]
     rust::Result<SemanticPtrs> Tools::recognize(const Execution &execution, const uint32_t pid) const {
         spdlog::debug("[pid: {}] execution: {}", pid, execution);
-        return select(execution)
-                .on_success([&pid](auto tool) {
-                    spdlog::debug("[pid: {}] recognized with: {}", pid, tool->name());
-                })
-                .and_then<SemanticPtrs>([&execution](auto tool) {
-                    return tool->compilations(execution);
-                })
-                .on_success([&pid](auto items) {
-                     spdlog::debug("[pid: {}] recognized as: [{}]", pid, items);
-                })
-                .on_error([&pid](const auto &error) {
-                    spdlog::debug("[pid: {}] failed: {}", pid, error.what());
-                });
-    }
+        auto result = tool_->recognize(execution);
 
-    [[nodiscard]]
-    rust::Result<Tools::ToolPtr> Tools::select(const Execution &execution) const {
-        // do different things if the execution is matching one of the nominated compilers.
-        if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), execution.executable)) {
-            return rust::Err(std::runtime_error("The compiler is on the exclude list from configuration."));
-        } else {
-            // check if any tool can recognize the execution.
-            for (const auto &tool : tools_) {
-                // when the tool is matching...
-                if (tool->recognize(execution.executable)) {
-                    return rust::Ok(tool);
-                }
-            }
+        if (Tool::recognized_ok(result)) {
+            spdlog::debug("[pid: {}] recognized.", pid);
+        } else if (Tool::recognized_with_error(result)) {
+            spdlog::debug("[pid: {}] recognition failed: {}", pid, result.unwrap_err().what());
+        } else if (Tool::not_recognized(result)) {
+            spdlog::debug("[pid: {}] not recognized.", pid);
         }
-        return rust::Err(std::runtime_error("No tools recognize this execution."));
+        return result;
     }
 }

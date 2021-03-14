@@ -25,7 +25,12 @@
 namespace {
 
     TEST(ToolGcc, recognize) {
-        cs::semantic::ToolGcc sut({});
+        struct Expose : public cs::semantic::ToolGcc {
+            [[nodiscard]] bool recognize(const fs::path& program) const override {
+                return ToolGcc::recognize(program);
+            }
+        };
+        Expose sut;
 
         EXPECT_TRUE(sut.recognize("cc"));
         EXPECT_TRUE(sut.recognize("/usr/bin/cc"));
@@ -44,9 +49,9 @@ namespace {
     TEST(ToolGcc, fails_on_empty) {
         cs::semantic::Execution input = {};
 
-        cs::semantic::ToolGcc sut({});
+        cs::semantic::ToolGcc sut;
 
-        EXPECT_FALSE(sut.compilations(input).is_ok());
+        EXPECT_TRUE(cs::semantic::Tool::not_recognized(sut.recognize(input)));
     }
 
     TEST(ToolGcc, simple) {
@@ -69,7 +74,7 @@ namespace {
 
         cs::semantic::ToolGcc sut({});
 
-        auto result = sut.compilations(input);
+        auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
@@ -94,7 +99,7 @@ namespace {
 
         cs::semantic::ToolGcc sut({});
 
-        auto result = sut.compilations(input);
+        auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
@@ -114,7 +119,7 @@ namespace {
 
         cs::semantic::ToolGcc sut({});
 
-        auto result = sut.compilations(input);
+        auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }
@@ -148,7 +153,7 @@ namespace {
 
         cs::semantic::ToolGcc sut({});
 
-        auto result = sut.compilations(input);
+        auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
         EXPECT_EQ(expected, result.unwrap_or({}));
     }

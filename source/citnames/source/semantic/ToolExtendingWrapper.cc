@@ -18,24 +18,19 @@
  */
 
 #include "ToolExtendingWrapper.h"
-#include "ToolGcc.h"
 
-namespace cs {
+namespace cs::semantic {
 
-    semantic::ToolExtendingWrapper::ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept
+    ToolExtendingWrapper::ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept
             : compilers_to_recognize_(compilers_to_recognize)
     { }
 
-    const char *semantic::ToolExtendingWrapper::name() const {
-        return compilers_to_recognize_.executable.c_str();
-    }
-
-    bool semantic::ToolExtendingWrapper::recognize(const fs::path &program) const {
+    bool ToolExtendingWrapper::recognize(const fs::path &program) const {
         return compilers_to_recognize_.executable == program;
     }
 
-    rust::Result<cs::semantic::SemanticPtrs> semantic::ToolExtendingWrapper::compilations(const Execution &execution) const {
-        return ToolGcc().compilations(execution)
+    rust::Result<SemanticPtrs> ToolExtendingWrapper::recognize(const Execution &execution) const {
+        return ToolGcc::recognize(execution)
                 .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
                     for (auto& semantic : semantics) {
                         if (auto* ptr = dynamic_cast<Preprocess*>(semantic.get()); ptr != nullptr) {

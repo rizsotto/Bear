@@ -33,27 +33,36 @@ namespace fs = std::filesystem;
 
 namespace cs::semantic {
 
-    // Represents a compiler or an executable which produce relevant entries
-    // to the compilation database. It can recognize the tool execution from
-    // a command line invocation and its context.
+    // Represents a program, which can recognize the intent of the execution
+    // and return the semantic of that. It can be a compiler or any other
+    // program participating in a build process.
     struct Tool {
         virtual ~Tool() noexcept = default;
 
-        // Returns the tool name.
+        // Returns the semantic of a command execution.
         [[nodiscard]]
-        virtual const char* name() const = 0;
+        virtual rust::Result<SemanticPtrs> recognize(const Execution &) const = 0;
 
-        // Returns true if the tool is identified from the executable name or path.
-        [[nodiscard]]
-        virtual bool recognize(const fs::path &program) const = 0;
-
-        // Returns the compilation entries if those were recognised.
-        //
-        // Can return an optional with an empty list, which says that it was
-        // recognized the tool execution, but the execution was not a compilation.
-        [[nodiscard]]
-        virtual rust::Result<SemanticPtrs> compilations(const Execution &) const = 0;
+        // Helper methods to evaluate the recognize method result.
+        static bool recognized_ok(const rust::Result<SemanticPtrs> &result) noexcept;
+        static bool recognized_with_error(const rust::Result<SemanticPtrs> &result) noexcept;
+        static bool not_recognized(const rust::Result<SemanticPtrs> &result) noexcept;
     };
+
+    inline
+    bool Tool::recognized_ok(const rust::Result<SemanticPtrs> &result) noexcept {
+        return result.is_ok() && !(result.unwrap().empty());
+    }
+
+    inline
+    bool Tool::recognized_with_error(const rust::Result<SemanticPtrs> &result) noexcept {
+        return result.is_err();
+    }
+
+    inline
+    bool Tool::not_recognized(const rust::Result<SemanticPtrs> &result) noexcept {
+        return result.is_ok() && result.unwrap().empty();
+    }
 
     // Represents an expert system which can recognize compilation entries from
     // command executions. It covers multiple tools and consider omit results
@@ -69,19 +78,12 @@ namespace cs::semantic {
         Entries transform(cs::EventsDatabase::Ptr events) const;
 
     private:
-        using ToolPtr = std::shared_ptr<Tool>;
-        using ToolPtrs = std::list<ToolPtr>;
-
-        Tools(ToolPtrs &&, std::list<fs::path>&&) noexcept;
+        explicit Tools(std::shared_ptr<Tool> tool) noexcept;
 
         [[nodiscard]]
         rust::Result<SemanticPtrs> recognize(const Execution &execution, uint32_t pid) const;
 
-        [[nodiscard]]
-        rust::Result<ToolPtr> select(const Execution &execution) const;
-
     private:
-        ToolPtrs tools_;
-        std::list<fs::path> to_exclude_;
+        std::shared_ptr<Tool> tool_;
     };
 }

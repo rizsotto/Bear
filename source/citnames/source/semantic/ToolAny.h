@@ -19,12 +19,22 @@
 
 #pragma once
 
-#include "ToolGcc.h"
+#include "Tool.h"
 
 namespace cs::semantic {
 
-    struct ToolClang : public ToolGcc {
+    class ToolAny : public Tool {
+    public:
+        using ToolPtr = std::shared_ptr<Tool>;
+        using ToolPtrs = std::list<ToolPtr>;
+
+        ToolAny(ToolPtrs &&tools, std::list<fs::path> &&to_exclude) noexcept;
+
         [[nodiscard]]
-        bool recognize(const fs::path &program) const override;
+        rust::Result<SemanticPtrs> recognize(const Execution &execution) const override;
+
+    private:
+        ToolPtrs tools_;
+        std::list<fs::path> to_exclude_;
     };
 }

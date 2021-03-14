@@ -18,24 +18,15 @@
  */
 
 #include "ToolWrapper.h"
-#include "ToolGcc.h"
 
 #include <regex>
 
 namespace cs::semantic {
-
-    const char* ToolWrapper::name() const {
-        return "distcc";
-    }
 
     bool ToolWrapper::recognize(const fs::path& program) const {
         static const auto pattern = std::regex(R"(^(distcc|ccache)$)");
 
         std::cmatch m;
         return std::regex_match(program.filename().c_str(), m, pattern);
-    }
-
-    rust::Result<SemanticPtrs> ToolWrapper::compilations(const Execution &execution) const {
-        return ToolGcc().compilations(execution);
     }
 }

@@ -24,13 +24,12 @@
 namespace cs::semantic {
 
     struct ToolGcc : public Tool {
-        [[nodiscard]]
-        const char* name() const override;
 
         [[nodiscard]]
-        bool recognize(const fs::path& program) const override;
+        rust::Result<SemanticPtrs> recognize(const Execution &execution) const override;
 
+    protected:
         [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const Execution &execution) const override;
+        virtual bool recognize(const fs::path& program) const;
     };
 }

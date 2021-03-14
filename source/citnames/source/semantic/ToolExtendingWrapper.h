@@ -19,22 +19,19 @@
 
 #pragma once
 
-#include "Tool.h"
+#include "ToolGcc.h"
 
 namespace cs::semantic {
 
-    struct ToolExtendingWrapper : public Tool {
+    struct ToolExtendingWrapper : public ToolGcc {
 
         explicit ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept;
-
-        [[nodiscard]]
-        const char* name() const override;
 
         [[nodiscard]]
         bool recognize(const fs::path& program) const override;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const Execution &execution) const override;
+        rust::Result<SemanticPtrs> recognize(const Execution &execution) const override;
 
     private:
         CompilerWrapper compilers_to_recognize_;

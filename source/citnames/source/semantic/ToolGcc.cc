@@ -286,29 +286,8 @@ namespace {
         }
         return result;
     }
-}
 
-namespace cs::semantic {
-
-    const char* ToolGcc::name() const {
-        return "GCC";
-    }
-
-    bool ToolGcc::recognize(const fs::path& program) const {
-        static const std::list<std::string> patterns = {
-                R"(^(cc|c\+\+|cxx|CC)$)",
-                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
-                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
-                R"(^([^-]*-)*[g]?fortran(-?\d+(\.\d+){0,2})?$)",
-        };
-        static const auto pattern = std::regex(
-                fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|")));
-
-        std::cmatch m;
-        return std::regex_match(program.filename().c_str(), m, pattern);
-    }
-
-    rust::Result<SemanticPtrs> ToolGcc::compilations(const Execution &execution) const {
+    rust::Result<SemanticPtrs> compilation(const Execution &execution) {
         return parse_flags(execution)
                 .and_then<SemanticPtrs>([&execution](auto flags) -> rust::Result<SemanticPtrs> {
                     if (is_compiler_query(flags)) {
@@ -348,5 +327,29 @@ namespace cs::semantic {
                     }
                     return rust::Ok(result);
                 });
+    }
+}
+
+namespace cs::semantic {
+
+    bool ToolGcc::recognize(const fs::path& program) const {
+        static const std::list<std::string> patterns = {
+                R"(^(cc|c\+\+|cxx|CC)$)",
+                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
+                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
+                R"(^([^-]*-)*[g]?fortran(-?\d+(\.\d+){0,2})?$)",
+        };
+        static const auto pattern = std::regex(
+                fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|")));
+
+        std::cmatch m;
+        return std::regex_match(program.filename().c_str(), m, pattern);
+    }
+
+    rust::Result<SemanticPtrs> ToolGcc::recognize(const Execution &execution) const {
+        if (recognize(execution.executable)) {
+            return compilation(execution);
+        }
+        return rust::Ok(SemanticPtrs());
     }
 }

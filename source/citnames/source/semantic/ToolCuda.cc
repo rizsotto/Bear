@@ -24,18 +24,10 @@
 
 namespace cs::semantic {
 
-    const char* ToolCuda::name() const {
-        return "CUDA";
-    }
-
     bool ToolCuda::recognize(const fs::path& program) const {
         static const auto pattern = std::regex(R"(^(nvcc)$)");
 
         std::cmatch m;
         return std::regex_match(program.filename().c_str(), m, pattern);
-    }
-
-    rust::Result<SemanticPtrs> ToolCuda::compilations(const Execution &execution) const {
-        return ToolGcc().compilations(execution);
     }
 }

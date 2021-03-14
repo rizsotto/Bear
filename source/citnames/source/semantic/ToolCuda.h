@@ -19,18 +19,12 @@
 
 #pragma once
 
-#include "Tool.h"
+#include "ToolGcc.h"
 
 namespace cs::semantic {
 
-    struct ToolCuda : public Tool {
-        [[nodiscard]]
-        const char* name() const override;
-
+    struct ToolCuda : public ToolGcc {
         [[nodiscard]]
         bool recognize(const fs::path& program) const override;
-
-        [[nodiscard]]
-        rust::Result<SemanticPtrs> compilations(const Execution &execution) const override;
     };
 }
