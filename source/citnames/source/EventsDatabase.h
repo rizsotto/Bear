@@ -33,54 +33,20 @@ struct sqlite3_stmt;
 
 namespace cs {
 
-    class EventsIterator;
-
-    class EventsDatabase {
-    public:
-        using Ptr = std::shared_ptr<EventsDatabase>;
-
-        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file);
-
-        [[nodiscard]] EventsIterator events_by_process_begin();
-        [[nodiscard]] EventsIterator events_by_process_end();
-
-    private:
-        friend class EventsIterator;
-
-        [[nodiscard]] EventsIterator next() noexcept;
-
-    public:
-        EventsDatabase(sqlite3 *handle,
-                       sqlite3_stmt *select_events,
-                       sqlite3_stmt *select_events_per_run) noexcept;
-        ~EventsDatabase() noexcept;
-
-        EventsDatabase(const EventsDatabase &) = delete;
-        EventsDatabase(EventsDatabase &&) noexcept = delete;
-
-        EventsDatabase &operator=(const EventsDatabase &) = delete;
-        EventsDatabase &operator=(EventsDatabase &&) noexcept = delete;
-
-    private:
-        sqlite3 *handle_;
-        sqlite3_stmt *select_events_;
-        sqlite3_stmt *select_events_per_run_;
-    };
-
+    class EventsDatabase;
     using EventPtr = std::shared_ptr<rpc::Event>;
-    using EventPtrs = std::vector<EventPtr>;
 
     class EventsIterator {
     public:
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::input_iterator_tag;
-        using value_type = rust::Result<std::vector<std::shared_ptr<rpc::Event>>>;
+        using value_type = rust::Result<EventPtr>;
         using pointer = value_type const *;
         using reference = value_type const &;
 
     public:
         EventsIterator() noexcept;
-        EventsIterator(EventsDatabase *source, rust::Result<EventPtrs> value) noexcept;
+        EventsIterator(EventsDatabase *source, rust::Result<EventPtr> value) noexcept;
 
         reference operator*() const;
 
@@ -92,6 +58,35 @@ namespace cs {
 
     private:
         EventsDatabase *source_;
-        rust::Result<EventPtrs> value_;
+        rust::Result<EventPtr> value_;
+    };
+
+    class EventsDatabase {
+    public:
+        using Ptr = std::shared_ptr<EventsDatabase>;
+
+        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file);
+
+        [[nodiscard]] EventsIterator events_begin();
+        [[nodiscard]] EventsIterator events_end();
+
+    private:
+        friend class EventsIterator;
+
+        [[nodiscard]] EventsIterator next() noexcept;
+
+    public:
+        EventsDatabase(sqlite3 *handle, sqlite3_stmt *select_events) noexcept;
+        ~EventsDatabase() noexcept;
+
+        EventsDatabase(const EventsDatabase &) = delete;
+        EventsDatabase(EventsDatabase &&) noexcept = delete;
+
+        EventsDatabase &operator=(const EventsDatabase &) = delete;
+        EventsDatabase &operator=(EventsDatabase &&) noexcept = delete;
+
+    private:
+        sqlite3 *handle_;
+        sqlite3_stmt *select_events_;
     };
 }

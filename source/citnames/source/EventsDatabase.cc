@@ -28,10 +28,9 @@
 
 namespace {
 
-    rust::Result<std::shared_ptr<rpc::Event>> from_string(const std::string &value) {
-        auto event = std::make_shared<rpc::Event>();
-        auto input = google::protobuf::StringPiece(value);
-        auto rc = google::protobuf::util::JsonStringToMessage(input, &(*event));
+    rust::Result<cs::EventPtr> from_string(const char *value) {
+        cs::EventPtr event = std::make_shared<rpc::Event>();
+        auto rc = google::protobuf::util::JsonStringToMessage(value, &(*event));
         if (rc.ok()) {
             return rust::Ok(std::move(event));
         } else {
@@ -62,65 +61,16 @@ namespace {
         }
         return rust::Ok(stmt);
     }
-
-    rust::Result<std::tuple<std::uint64_t, bool>> select_events_ids(sqlite3 *handle, sqlite3_stmt *stmt) {
-        auto rc = sqlite3_step(stmt);
-        if (rc == SQLITE_ROW) {
-            std::uint64_t id = sqlite3_column_int64(stmt, 0);
-            return rust::Ok(std::make_tuple(id, false));
-        }
-        if (rc == SQLITE_DONE) {
-            constexpr std::uint64_t id = 0;
-            return rust::Ok(std::make_tuple(id, true));
-        }
-        return rust::Err(create_error("Prepared statement execution failed", handle));
-    }
-
-    rust::Result<cs::EventPtrs> select_events(sqlite3 *handle, sqlite3_stmt *stmt, std::uint64_t id) {
-        cs::EventPtrs results;
-
-        if (auto rc = sqlite3_bind_int64(stmt, 1, id); rc != SQLITE_OK) {
-            return rust::Err(create_error("Prepared statement binding (1) failed", handle));
-        }
-        {
-            auto rc = sqlite3_step(stmt);
-            for (; rc == SQLITE_ROW; rc = sqlite3_step(stmt)) {
-                auto value = (const char *) sqlite3_column_text(stmt, 0);
-                auto event = from_string(std::string(value));
-                if (event.is_err()) {
-                    return rust::Err(event.unwrap_err());
-                }
-                results.push_back(event.unwrap());
-            }
-            if (rc != SQLITE_DONE) {
-                return rust::Err(create_error("Prepared statement step failed", handle));
-            }
-        }
-        if (auto rc = sqlite3_clear_bindings(stmt); rc != SQLITE_OK) {
-            return rust::Err(create_error("Prepared statement clear bindings failed", handle));
-        }
-        if (auto rc = sqlite3_reset(stmt); rc != SQLITE_OK) {
-            return rust::Err(create_error("Prepared statement reset failed", handle));
-        }
-        return rust::Ok(results);
-    }
 }
 
 namespace cs {
 
-    EventsDatabase::EventsDatabase(sqlite3 *handle,
-                                   sqlite3_stmt *select_events,
-                                   sqlite3_stmt *select_events_per_run) noexcept
+    EventsDatabase::EventsDatabase(sqlite3 *handle, sqlite3_stmt *select_events) noexcept
             : handle_(handle)
             , select_events_(select_events)
-            , select_events_per_run_(select_events_per_run)
     { }
 
     EventsDatabase::~EventsDatabase() noexcept {
-        if (auto rc = sqlite3_finalize(select_events_per_run_); rc != SQLITE_OK) {
-            auto error = create_error("Finalize prepared statement failed", handle_);
-            spdlog::warn(error.what());
-        }
         if (auto rc = sqlite3_finalize(select_events_); rc != SQLITE_OK) {
             auto error = create_error("Finalize prepared statement failed", handle_);
             spdlog::warn(error.what());
@@ -137,33 +87,18 @@ namespace cs {
         auto select_events = handle
                 .and_then<sqlite3_stmt *>([](auto handle) {
                     constexpr const char *sql =
-                            "SELECT DISTINCT reporter_id FROM events;";
+                            "SELECT value FROM events ORDER BY timestamp;";
                     return create_prepared_statement(handle, sql);
                 });
 
-        auto select_events_per_run = handle
-                .and_then<sqlite3_stmt *>([](auto handle) {
-                    constexpr const char *sql =
-                            "SELECT value FROM events WHERE reporter_id = ? ORDER BY timestamp;";
-                    return create_prepared_statement(handle, sql);
-                });
-
-        return rust::merge(handle, select_events, select_events_per_run)
+        return rust::merge(handle, select_events)
                 .map<EventsDatabase::Ptr>([](auto tuple) {
-                    const auto& [handle, stmt1, stmt2] = tuple;
-                    return std::make_shared<EventsDatabase>(handle, stmt1, stmt2);
+                    const auto& [handle, stmt] = tuple;
+                    return std::make_shared<EventsDatabase>(handle, stmt);
                 });
     }
 
-    EventsIterator EventsDatabase::events_by_process_begin() {
-        if (auto rc = sqlite3_clear_bindings(select_events_per_run_); rc != SQLITE_OK) {
-            auto error = create_error("Prepared statement clear bindings failed", handle_);
-            spdlog::warn(error.what());
-        }
-        if (auto rc = sqlite3_reset(select_events_per_run_); rc != SQLITE_OK) {
-            auto error = create_error("Prepared statement reset failed", handle_);
-            spdlog::warn(error.what());
-        }
+    EventsIterator EventsDatabase::events_begin() {
         if (auto rc = sqlite3_reset(select_events_); rc != SQLITE_OK) {
             auto error = create_error("Prepared statement reset failed", handle_);
             spdlog::warn(error.what());
@@ -171,23 +106,22 @@ namespace cs {
         return next();
     }
 
-    EventsIterator EventsDatabase::events_by_process_end() {
+    EventsIterator EventsDatabase::events_end() {
         return EventsIterator();
     }
 
     EventsIterator EventsDatabase::next() noexcept {
-        auto tuple = select_events_ids(handle_, select_events_);
-        if (tuple.is_err()) {
-            return EventsIterator(this, rust::Err(tuple.unwrap_err()));
-        } else {
-            const auto&[id, end] = tuple.unwrap();
-            if (end) {
-                return EventsIterator();
-            } else {
-                auto result = select_events(handle_, select_events_per_run_, id);
-                return EventsIterator(this, result);
-            }
+        auto rc = sqlite3_step(select_events_);
+        if (rc == SQLITE_ROW) {
+            auto value = (const char *) sqlite3_column_text(select_events_, 0);
+            return EventsIterator(this, from_string(value));
         }
+        if (rc != SQLITE_DONE) {
+            rust::Result<EventPtr> event =
+                    rust::Err(create_error("Prepared statement step failed", handle_));
+            return EventsIterator(this, event);
+        }
+        return EventsIterator();
     }
 
     EventsIterator::EventsIterator() noexcept
@@ -195,7 +129,7 @@ namespace cs {
             , value_(rust::Err(std::runtime_error("end")))
     { }
 
-    EventsIterator::EventsIterator(EventsDatabase *source, rust::Result<EventPtrs> value) noexcept
+    EventsIterator::EventsIterator(EventsDatabase *source, rust::Result<EventPtr> value) noexcept
             : source_(source)
             , value_(std::move(value))
     { }
@@ -216,7 +150,7 @@ namespace cs {
     }
 
     bool EventsIterator::operator==(const EventsIterator &other) const {
-        return (this == &other) || ((source_ == other.source_) && (value_ == other.value_));
+        return (this == &other) || (source_ == other.source_);
     }
 
     bool EventsIterator::operator!=(const EventsIterator &other) const {
