@@ -41,27 +41,27 @@ namespace cs::semantic {
 
         // Returns the semantic of a command execution.
         [[nodiscard]]
-        virtual rust::Result<SemanticPtrs> recognize(const Execution &) const = 0;
+        virtual rust::Result<SemanticPtr> recognize(const Execution &) const = 0;
 
         // Helper methods to evaluate the recognize method result.
-        static bool recognized_ok(const rust::Result<SemanticPtrs> &result) noexcept;
-        static bool recognized_with_error(const rust::Result<SemanticPtrs> &result) noexcept;
-        static bool not_recognized(const rust::Result<SemanticPtrs> &result) noexcept;
+        static bool recognized_ok(const rust::Result<SemanticPtr> &result) noexcept;
+        static bool recognized_with_error(const rust::Result<SemanticPtr> &result) noexcept;
+        static bool not_recognized(const rust::Result<SemanticPtr> &result) noexcept;
     };
 
     inline
-    bool Tool::recognized_ok(const rust::Result<SemanticPtrs> &result) noexcept {
-        return result.is_ok() && !(result.unwrap().empty());
+    bool Tool::recognized_ok(const rust::Result<SemanticPtr> &result) noexcept {
+        return result.is_ok() && (result.unwrap().operator bool());
     }
 
     inline
-    bool Tool::recognized_with_error(const rust::Result<SemanticPtrs> &result) noexcept {
+    bool Tool::recognized_with_error(const rust::Result<SemanticPtr> &result) noexcept {
         return result.is_err();
     }
 
     inline
-    bool Tool::not_recognized(const rust::Result<SemanticPtrs> &result) noexcept {
-        return result.is_ok() && result.unwrap().empty();
+    bool Tool::not_recognized(const rust::Result<SemanticPtr> &result) noexcept {
+        return result.is_ok() && !(result.unwrap().operator bool());
     }
 
     // Represents an expert system which can recognize compilation entries from
@@ -81,7 +81,7 @@ namespace cs::semantic {
         explicit Tools(std::shared_ptr<Tool> tool) noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const Execution &execution, uint32_t pid) const;
+        rust::Result<SemanticPtr> recognize(const Execution &execution, uint32_t pid) const;
 
     private:
         std::shared_ptr<Tool> tool_;

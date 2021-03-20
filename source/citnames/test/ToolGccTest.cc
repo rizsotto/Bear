@@ -22,10 +22,12 @@
 #include "semantic/Tool.h"
 #include "semantic/ToolGcc.h"
 
+using namespace cs::semantic;
+
 namespace {
 
     TEST(ToolGcc, recognize) {
-        struct Expose : public cs::semantic::ToolGcc {
+        struct Expose : public ToolGcc {
             [[nodiscard]] bool recognize(const fs::path& program) const override {
                 return ToolGcc::recognize(program);
             }
@@ -44,117 +46,109 @@ namespace {
         EXPECT_TRUE(sut.recognize("/usr/bin/arm-none-eabi-g++"));
         EXPECT_TRUE(sut.recognize("gcc-6"));
         EXPECT_TRUE(sut.recognize("/usr/bin/gcc-6"));
+        EXPECT_TRUE(sut.recognize("gfortran"));
+        EXPECT_TRUE(sut.recognize("fortran"));
     }
 
     TEST(ToolGcc, fails_on_empty) {
-        cs::semantic::Execution input = {};
+        Execution input = {};
 
-        cs::semantic::ToolGcc sut;
+        ToolGcc sut;
 
-        EXPECT_TRUE(cs::semantic::Tool::not_recognized(sut.recognize(input)));
+        EXPECT_TRUE(Tool::not_recognized(sut.recognize(input)));
     }
 
     TEST(ToolGcc, simple) {
-        cs::semantic::Execution input = {
+        Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "-o", "source.o", "source.c"},
                 "/home/user/project",
                 {},
         };
-        cs::semantic::SemanticPtrs expected = {
-                cs::semantic::SemanticPtr(
-                        new cs::semantic::Compile(
-                                input,
-                                fs::path("/home/user/project/source.c"),
-                                fs::path("/home/user/project/source.o"),
-                                {"/usr/bin/cc", "-c", "-o", "source.o", "source.c"}
-                        )
-                )
-        };
+        SemanticPtr expected = SemanticPtr(
+                new Compile(
+                        input.working_dir,
+                        input.executable,
+                        {"-c"},
+                        {fs::path("source.c")},
+                        {fs::path("source.o")})
+        );
 
-        cs::semantic::ToolGcc sut({});
+        ToolGcc sut({});
 
         auto result = sut.recognize(input);
-        EXPECT_TRUE(result.is_ok());
-        EXPECT_EQ(expected, result.unwrap_or({}));
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
     TEST(ToolGcc, linker_flag_filtered) {
-        cs::semantic::Execution input = {
+        Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-L.", "-lthing", "-o", "exe", "source.c"},
                 "/home/user/project",
                 {},
         };
-        cs::semantic::SemanticPtrs expected = {
-                cs::semantic::SemanticPtr(
-                        new cs::semantic::Compile(
-                                input,
-                                fs::path("/home/user/project/source.c"),
-                                fs::path("/home/user/project/source.o"),
-                                {"/usr/bin/cc", "-c", "-o", "exe", "source.c"}
-                        )
+        SemanticPtr expected = SemanticPtr(
+                new Compile(
+                        input.working_dir,
+                        input.executable,
+                        {"-c"},
+                        {fs::path("source.c")},
+                        {fs::path("exe")}
                 )
-        };
+        );
 
-        cs::semantic::ToolGcc sut({});
+        ToolGcc sut({});
 
         auto result = sut.recognize(input);
-        EXPECT_TRUE(result.is_ok());
-        EXPECT_EQ(expected, result.unwrap_or({}));
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
     TEST(ToolGcc, pass_on_help) {
-        cs::semantic::Execution input = {
+        Execution input = {
                 "/usr/bin/gcc",
                 {"gcc", "--version"},
                 "/home/user/project",
                 {},
         };
-        cs::semantic::SemanticPtrs expected = {
-                cs::semantic::SemanticPtr(
-                        new cs::semantic::QueryCompiler(input)
-                )
-        };
+        SemanticPtr expected = SemanticPtr(new QueryCompiler());
 
-        cs::semantic::ToolGcc sut({});
+        ToolGcc sut({});
 
         auto result = sut.recognize(input);
         EXPECT_TRUE(result.is_ok());
-        EXPECT_EQ(expected, result.unwrap_or({}));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 
     TEST(ToolGcc, simple_with_C_PATH) {
-        cs::semantic::Execution input = {
+        Execution input = {
                 "/usr/bin/cc",
                 {"cc", "-c", "source.c"},
                 "/home/user/project",
                 {{"CPATH", "/usr/include/path1:/usr/include/path2"},
                  {"C_INCLUDE_PATH", ":/usr/include/path3"}},
         };
-        cs::semantic::SemanticPtrs expected = {
-                cs::semantic::SemanticPtr(
-                        new cs::semantic::Compile(
-                                input,
-                                fs::path("/home/user/project/source.c"),
-                                fs::path("/home/user/project/source.o"),
-                                {
-                                    "/usr/bin/cc",
-                                    "-c",
-                                    "source.c",
-                                    "-I", "/usr/include/path1",
-                                    "-I", "/usr/include/path2",
-                                    "-I", ".",
-                                    "-I", "/usr/include/path3",
-                                }
-                        )
+        SemanticPtr expected = SemanticPtr(
+                new Compile(
+                        input.working_dir,
+                        input.executable,
+                        {
+                                "-c",
+                                "-I", "/usr/include/path1",
+                                "-I", "/usr/include/path2",
+                                "-I", ".",
+                                "-I", "/usr/include/path3",
+                        },
+                        {fs::path("source.c")},
+                        std::nullopt
                 )
-        };
+        );
 
-        cs::semantic::ToolGcc sut({});
+        ToolGcc sut({});
 
         auto result = sut.recognize(input);
-        EXPECT_TRUE(result.is_ok());
-        EXPECT_EQ(expected, result.unwrap_or({}));
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
 }

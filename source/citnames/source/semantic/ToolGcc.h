@@ -26,7 +26,7 @@ namespace cs::semantic {
     struct ToolGcc : public Tool {
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
     protected:
         [[nodiscard]]

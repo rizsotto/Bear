@@ -134,6 +134,20 @@ namespace {
             {"--",                 {Instruction(0, Match::PARTIAL, false), CompilerFlagType::OTHER}},
     };
 
+    rust::Result<CompilerFlags> parse_flags(const Execution &execution)
+    {
+        static auto const parser =
+                Repeat(
+                        OneOf(
+                                FlagParser(FLAG_DEFINITION),
+                                SourceMatcher(),
+                                EverythingElseFlagMatcher()
+                        )
+                );
+
+        return parse(parser, execution);
+    }
+
     // https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
     Arguments flags_from_environment(const std::map<std::string, std::string> &environment) {
         Arguments flags;
@@ -160,20 +174,6 @@ namespace {
         }
 
         return flags;
-    }
-
-    rust::Result<CompilerFlags> parse_flags(const Execution &execution)
-    {
-        static auto const parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(FLAG_DEFINITION),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
-
-        return parse(parser, execution);
     }
 
     bool is_compiler_query(const CompilerFlags& flags)
@@ -218,46 +218,6 @@ namespace {
         });
     }
 
-    std::optional<fs::path> source_file(const CompilerFlag& flag)
-    {
-        if (flag.type == CompilerFlagType::SOURCE) {
-            auto source = fs::path(flag.arguments.front());
-            return std::make_optional(std::move(source));
-        }
-        return std::optional<fs::path>();
-    }
-
-    std::list<fs::path> source_files(const CompilerFlags& flags)
-    {
-        std::list<fs::path> result;
-        for (const auto& flag : flags) {
-            if (auto source = source_file(flag); source) {
-                result.push_back(source.value());
-            }
-        }
-        return result;
-    }
-
-    std::optional<fs::path> output_file(const CompilerFlag& flag)
-    {
-        if (flag.type == CompilerFlagType::KIND_OF_OUTPUT_OUTPUT) {
-            auto output = fs::path(flag.arguments.back());
-            return std::make_optional(std::move(output));
-        }
-        return std::optional<fs::path>();
-    }
-
-    std::optional<fs::path> output_files(const CompilerFlags& flags)
-    {
-        std::list<fs::path> result;
-        for (const auto& flag : flags) {
-            if (auto output = output_file(flag); output) {
-                return output;
-            }
-        }
-        return std::optional<fs::path>();
-    }
-
     bool linking(const CompilerFlags& flags)
     {
         return std::none_of(flags.begin(), flags.end(), [](auto flag) {
@@ -265,67 +225,75 @@ namespace {
         });
     }
 
-    Arguments filter_flags(const CompilerFlags& flags, const fs::path source)
-    {
-        static const auto type_filter_out = [](CompilerFlagType type) -> bool {
-            return (type == CompilerFlagType::LINKER)
-                   || (type == CompilerFlagType::PREPROCESSOR_MAKE)
-                   || (type == CompilerFlagType::DIRECTORY_SEARCH_LINKER);
-        };
+    std::tuple<
+            std::vector<std::string>,
+            std::vector<fs::path>,
+            std::optional<fs::path>
+    > split(const CompilerFlags &flags) {
+        Arguments arguments;
+        std::vector<fs::path> sources;
+        std::optional<fs::path> output;
 
-        const auto source_filter = [&source](const CompilerFlag& flag) -> bool {
-            auto candidate = source_file(flag);
-            return (!candidate) || (candidate && (candidate.value() == source));
-        };
-
-        Arguments result;
         for (const auto& flag : flags) {
-            if (!type_filter_out(flag.type) && source_filter(flag)) {
-                std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(result));
+            switch (flag.type) {
+                case CompilerFlagType::SOURCE: {
+                    auto candidate = fs::path(flag.arguments.front());
+                    sources.emplace_back(std::move(candidate));
+                    break;
+                }
+                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
+                    auto candidate = fs::path(flag.arguments.back());
+                    output = std::make_optional(std::move(candidate));
+                    break;
+                }
+                case CompilerFlagType::LINKER:
+                case CompilerFlagType::PREPROCESSOR_MAKE:
+                case CompilerFlagType::DIRECTORY_SEARCH_LINKER:
+                    break;
+                default: {
+                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
+                    break;
+                }
             }
         }
-        return result;
+        return std::make_tuple(arguments, sources, output);
     }
 
-    rust::Result<SemanticPtrs> compilation(const Execution &execution) {
+    rust::Result<SemanticPtr> compilation(const Execution &execution) {
         return parse_flags(execution)
-                .and_then<SemanticPtrs>([&execution](auto flags) -> rust::Result<SemanticPtrs> {
+                .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
-                        SemanticPtrs result = { SemanticPtr(new QueryCompiler(execution)) };
-                        return rust::Ok(result);
+                        SemanticPtr result = SemanticPtr(new QueryCompiler());
+                        return rust::Ok(std::move(result));
                     }
-                    if (!is_prerpocessor_only(flags)) {
-                        return rust::Err(std::runtime_error("Compiler call does not run compilation pass."));
+                    if (!is_prerpocessor_only(flags) || is_prerpocessor(flags)) {
+                        SemanticPtr result = SemanticPtr(new Preprocess());
+                        return rust::Ok(std::move(result));
                     }
-                    const bool preprocess = is_prerpocessor(flags);
 
-                    auto output_opt = output_files(flags);
-                    auto sources = source_files(flags);
+                    auto[arguments, sources, output] = split(flags);
+                    // Validate: must have source files.
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
                     }
-                    Arguments prefix = {execution.executable.string()};
-                    Arguments extra = flags_from_environment(execution.environment);
-
-                    SemanticPtrs result;
+                    // TODO: introduce semantic type for linking
                     if (linking(flags)) {
-                        // TODO: add a linker entry
-                        prefix.emplace_back("-c");
+                        arguments.insert(arguments.begin(), "-c");
                     }
-                    for (const auto &source : sources) {
-                        Arguments arguments = filter_flags(flags, source);
-                        std::copy(prefix.begin(), prefix.end(), std::inserter(arguments, arguments.begin()));
-                        std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
+                    // Create compiler flags from environment variables if present.
+                    Arguments extra = flags_from_environment(execution.environment);
+                    std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
 
-                        auto output = ((!output_opt.has_value()) || linking(flags))
-                                      ? fs::path(source).replace_extension(preprocess ? ".i" : ".o")
-                                      : output_opt.value();
-                        result.emplace_back(
-                                preprocess
-                                ? SemanticPtr(new Preprocess(execution, source, output, arguments))
-                                : SemanticPtr(new Compile(execution, source, output, arguments)));
-                    }
-                    return rust::Ok(result);
+                    SemanticPtr result = SemanticPtr(
+                            new Compile(
+                                    execution.working_dir,
+                                    execution.executable,
+                                    arguments,
+                                    sources,
+                                    output
+                            )
+                    );
+                    return rust::Ok(std::move(result));
                 });
     }
 }
@@ -333,23 +301,25 @@ namespace {
 namespace cs::semantic {
 
     bool ToolGcc::recognize(const fs::path& program) const {
-        static const std::list<std::string> patterns = {
-                R"(^(cc|c\+\+|cxx|CC)$)",
-                R"(^([^-]*-)*[mg]cc(-?\d+(\.\d+){0,2})?$)",
-                R"(^([^-]*-)*[mg]\+\+(-?\d+(\.\d+){0,2})?$)",
-                R"(^([^-]*-)*[g]?fortran(-?\d+(\.\d+){0,2})?$)",
-        };
         static const auto pattern = std::regex(
-                fmt::format("({})", fmt::join(patterns.begin(), patterns.end(), "|")));
+                // - cc
+                // - c++
+                // - cxx
+                // - CC
+                // - mcc, gcc, m++, g++, gfortran, fortran
+                //   - with prefixes like: arm-none-eabi-
+                //   - with postfixes like: -7.0 or 6.4.0
+            R"(^(cc|c\+\+|cxx|CC|(([^-]*-)*([mg](cc|\+\+)|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)"
+        );
 
         std::cmatch m;
         return std::regex_match(program.filename().c_str(), m, pattern);
     }
 
-    rust::Result<SemanticPtrs> ToolGcc::recognize(const Execution &execution) const {
+    rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution) const {
         if (recognize(execution.executable)) {
             return compilation(execution);
         }
-        return rust::Ok(SemanticPtrs());
+        return rust::Ok(SemanticPtr());
     }
 }

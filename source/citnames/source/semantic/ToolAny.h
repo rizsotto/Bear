@@ -31,7 +31,7 @@ namespace cs::semantic {
         ToolAny(ToolPtrs &&tools, std::list<fs::path> &&to_exclude) noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtrs> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
     private:
         ToolPtrs tools_;

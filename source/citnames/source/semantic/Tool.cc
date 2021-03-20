@@ -143,10 +143,10 @@ namespace {
             // get the entry for the id
             auto entry = entries.at(id);
             function(entry, id)
-                    .on_success([&result](const auto& outputs) {
+                    .on_success([&result](const auto& output) {
                         // if we found the semantic for an entry, we add that to the output.
                         // and we don't process the children processes.
-                        std::copy(outputs.begin(), outputs.end(), std::back_inserter(result));
+                        result.push_back(output);
                     })
                     .on_error([this, &queue, &id](const auto&) {
                         // if it did not recognize the entry, we continue to process the
@@ -226,15 +226,17 @@ namespace cs::semantic {
 
         Entries result;
         for (const auto &semantic : semantics) {
-            if (auto candidate = semantic->into_entry(); candidate) {
-                result.emplace_back(candidate.value());
+            auto candidate = dynamic_cast<const CompilerCall*>(semantic.get());
+            if (candidate != nullptr) {
+                auto entries = candidate->into_entries();
+                std::copy(entries.begin(), entries.end(), std::back_inserter(result));
             }
         }
         return result;
     }
 
     [[nodiscard]]
-    rust::Result<SemanticPtrs> Tools::recognize(const Execution &execution, const uint32_t pid) const {
+    rust::Result<SemanticPtr> Tools::recognize(const Execution &execution, const uint32_t pid) const {
         spdlog::debug("[pid: {}] execution: {}", pid, execution);
         auto result = tool_->recognize(execution);
 

@@ -21,89 +21,20 @@
 
 #include <fmt/format.h>
 
-namespace {
+namespace fmt {
 
-    inline
-    fs::path make_absolute(cs::semantic::Execution const &execution, fs::path &&path) {
-        return (path.is_absolute()) ? path : execution.working_dir / path;
-    }
+    template <>
+    struct formatter<fs::path> : formatter<std::string> {};
 }
 
 namespace cs::semantic {
-
-    Semantic::Semantic(Execution _execution) noexcept
-            : execution(std::move(_execution))
-    { }
-
-    QueryCompiler::QueryCompiler(Execution _execution) noexcept
-            : Semantic(std::move(_execution))
-    { }
-
-    Preprocess::Preprocess(Execution _execution, fs::path _source, fs::path _output, std::vector<std::string> _flags) noexcept
-            : Semantic(std::move(_execution))
-            , source(make_absolute(execution, std::move(_source)))
-            , output(make_absolute(execution, std::move(_output)))
-            , flags(std::move(_flags))
-    { }
-
-    Compile::Compile(Execution _execution, fs::path _source, fs::path _output, std::vector<std::string> _flags) noexcept
-            : Semantic(std::move(_execution))
-            , source(make_absolute(execution, std::move(_source)))
-            , output(make_absolute(execution, std::move(_output)))
-            , flags(std::move(_flags))
-    { }
-
-    std::optional<cs::Entry> QueryCompiler::into_entry() const {
-        return std::optional<cs::Entry>();
-    }
-
-    std::optional<cs::Entry> Preprocess::into_entry() const {
-        // TODO
-        return std::optional<cs::Entry>();
-    }
-
-    std::optional<cs::Entry> Compile::into_entry() const {
-        auto entry = cs::Entry {
-                source,
-                execution.working_dir,
-                std::make_optional(output),
-                std::list<std::string>(flags.begin(), flags.end())
-        };
-        return std::make_optional(std::move(entry));
-    }
 
     bool QueryCompiler::operator==(const Semantic &rhs) const {
         if (this == &rhs)
             return true;
 
         if (const auto* ptr = dynamic_cast<QueryCompiler const*>(&rhs); ptr != nullptr) {
-            return (execution == ptr->execution);
-        }
-        return false;
-    }
-
-    bool Preprocess::operator==(const Semantic &rhs) const {
-        if (this == &rhs)
             return true;
-
-        if (const auto* ptr = dynamic_cast<Preprocess const*>(&rhs); ptr != nullptr) {
-            return (execution == ptr->execution) &&
-                   (source == ptr->source) &&
-                   (output == ptr->output) &&
-                   (flags == ptr->flags);
-        }
-        return false;
-    }
-
-    bool Compile::operator==(const Semantic &rhs) const {
-        if (this == &rhs)
-            return true;
-
-        if (const auto* ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
-            return (execution == ptr->execution) &&
-                   (source == ptr->source) &&
-                   (output == ptr->output) &&
-                   (flags == ptr->flags);
         }
         return false;
     }
@@ -113,19 +44,79 @@ namespace cs::semantic {
         return os;
     }
 
+    cs::Entries QueryCompiler::into_entries() const {
+        return cs::Entries();
+    }
+
+    bool Preprocess::operator==(const Semantic &) const {
+        return false;
+    }
+
     std::ostream &Preprocess::operator<<(std::ostream &os) const {
-        os  << "Preprocess { source: " << source
-            << ", output: " << output
+        os << "Preprocess";
+        return os;
+    }
+
+    cs::Entries Preprocess::into_entries() const {
+        return cs::Entries();
+    }
+
+    Compile::Compile(fs::path working_dir,
+                     fs::path compiler,
+                     std::vector<std::string> flags,
+                     std::vector<fs::path> sources,
+                     std::optional<fs::path> output)
+            : working_dir(std::move(working_dir))
+            , compiler(std::move(compiler))
+            , flags(std::move(flags))
+            , sources(std::move(sources))
+            , output(std::move(output))
+    { }
+
+    bool Compile::operator==(const Semantic &rhs) const {
+        if (this == &rhs)
+            return true;
+
+        if (const auto* ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
+            return (working_dir == ptr->working_dir)
+                && (compiler == ptr->compiler)
+                && (output == ptr->output)
+                && (sources == ptr->sources)
+                && (flags == ptr->flags);
+        }
+        return false;
+    }
+
+    std::ostream &Compile::operator<<(std::ostream &os) const {
+        os  << "Compile { working_dir: " << working_dir
+            << ", compiler: " << compiler
             << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << ", sources: " << fmt::format("[{}]", fmt::join(sources.begin(), sources.end(), ", "))
+            << ", output: " << (output ? output.value().string() : "")
             << " }";
         return os;
     }
 
-    std::ostream &Compile::operator<<(std::ostream &os) const {
-        os  << "Compile { source: " << source
-            << ", output: " << output
-            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
-            << " }";
-        return os;
+    cs::Entries Compile::into_entries() const {
+        const auto abspath = [this](const fs::path &path) -> fs::path {
+            return (path.is_absolute()) ? path : working_dir / path;
+        };
+        cs::Entries results;
+        for (const auto& source : sources) {
+            cs::Entry result {
+                abspath(source),
+                working_dir,
+                output ? std::optional(abspath(output.value())) : std::nullopt,
+                { compiler.string() }
+            };
+            std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
+            if (output) {
+                result.arguments.emplace_back("-o");
+                result.arguments.push_back(output.value().string());
+            }
+            result.arguments.push_back(source);
+            results.emplace_back(std::move(result));
+        }
+        return results;
     }
 }

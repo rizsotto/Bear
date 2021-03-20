@@ -29,22 +29,15 @@ namespace cs::semantic {
         return compilers_to_recognize_.executable == program;
     }
 
-    rust::Result<SemanticPtrs> ToolExtendingWrapper::recognize(const Execution &execution) const {
+    rust::Result<SemanticPtr> ToolExtendingWrapper::recognize(const Execution &execution) const {
         return ToolGcc::recognize(execution)
-                .map<cs::semantic::SemanticPtrs>([this](auto semantics) {
-                    for (auto& semantic : semantics) {
-                        if (auto* ptr = dynamic_cast<Preprocess*>(semantic.get()); ptr != nullptr) {
-                            std::copy(compilers_to_recognize_.additional_flags.begin(),
-                                      compilers_to_recognize_.additional_flags.end(),
-                                      std::back_inserter(ptr->flags));
-                        }
-                        if (auto* ptr = dynamic_cast<Compile*>(semantic.get()); ptr != nullptr) {
-                            std::copy(compilers_to_recognize_.additional_flags.begin(),
-                                      compilers_to_recognize_.additional_flags.end(),
-                                      std::back_inserter(ptr->flags));
-                        }
+                .map<cs::semantic::SemanticPtr>([this](auto semantic) {
+                    if (auto* ptr = dynamic_cast<Compile*>(semantic.get()); ptr != nullptr) {
+                        std::copy(compilers_to_recognize_.additional_flags.begin(),
+                                  compilers_to_recognize_.additional_flags.end(),
+                                  std::back_inserter(ptr->flags));
                     }
-                    return semantics;
+                    return semantic;
                 });
     }
 }

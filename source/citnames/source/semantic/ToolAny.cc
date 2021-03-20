@@ -26,7 +26,7 @@ namespace cs::semantic {
             , to_exclude_(to_exclude)
     { }
 
-    rust::Result<SemanticPtrs> ToolAny::recognize(const domain::Execution &execution) const {
+    rust::Result<SemanticPtr> ToolAny::recognize(const domain::Execution &execution) const {
         // do different things if the execution is matching one of the nominated compilers.
         if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), execution.executable)) {
             return rust::Err(std::runtime_error("The tool is on the exclude list from configuration."));
