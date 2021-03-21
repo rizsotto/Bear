@@ -39,20 +39,13 @@ namespace cs {
     };
 
     struct Command : ps::Command {
-
-        Command(Arguments arguments, cs::Configuration configuration, cs::semantic::Tools tools)
-                : ps::Command()
-                , arguments_(std::move(arguments))
-                , configuration_(std::move(configuration))
-                , tools_(tools)
-        { }
+        Command(Arguments arguments, cs::Configuration configuration) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
     private:
         Arguments arguments_;
         cs::Configuration configuration_;
-        cs::semantic::Tools tools_;
     };
 
     struct Application : ps::ApplicationFromArgs {

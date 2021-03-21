@@ -23,6 +23,7 @@
 #include "citnames/Flags.h"
 #include "Configuration.h"
 #include "Output.h"
+#include "semantic/Build.h"
 #include "semantic/Tool.h"
 
 #include <filesystem>
@@ -113,6 +114,24 @@ namespace {
                     spdlog::debug("Configuration: {}", config);
                 });
     }
+
+    cs::Entries transform(cs::semantic::Build &build, const cs::EventsDatabase::Ptr& events) {
+        cs::Entries results;
+        for (cs::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
+            (*it)
+                    .and_then<cs::semantic::SemanticPtr>([&build](const auto &event) {
+                        return build.recognize(*event);
+                    })
+                    .on_success([&results](const auto &semantic) {
+                        auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+                        if (candidate != nullptr) {
+                            auto entries = candidate->into_entries();
+                            std::copy(entries.begin(), entries.end(), std::back_inserter(results));
+                        }
+                    });
+        }
+        return results;
+    }
 }
 
 namespace cs {
@@ -123,7 +142,8 @@ namespace cs {
         // get current compilations from the input.
         return cs::EventsDatabase::open(arguments_.input)
                 .map<Entries>([this](const auto &commands) {
-                    auto compilations = tools_.transform(commands);
+                    auto build = cs::semantic::Build(configuration_.compilation);
+                    auto compilations = transform(build, commands);
                     // remove duplicates
                     return merge({}, compilations);
                 })
@@ -150,6 +170,12 @@ namespace cs {
                 });
     }
 
+    Command::Command(Arguments arguments, cs::Configuration configuration) noexcept
+            : ps::Command()
+            , arguments_(std::move(arguments))
+            , configuration_(std::move(configuration))
+    { }
+
     Application::Application() noexcept
             : ps::ApplicationFromArgs(ps::ApplicationLogConfig("citnames", "cs"))
     { }
@@ -174,16 +200,12 @@ namespace cs {
 
         auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
-        auto tools = configuration
-                .and_then<cs::semantic::Tools>([](auto config) {
-                    return semantic::Tools::from(config.compilation);
-                });
 
-        return rust::merge(arguments, configuration, tools)
+        return rust::merge(arguments, configuration)
                 .map<ps::CommandPtr>([](auto tuples) {
-                    const auto&[arguments, configuration, tools] = tuples;
+                    const auto&[arguments, configuration] = tuples;
                     // read the configuration
-                    return std::make_unique<Command>(arguments, configuration, tools);
+                    return std::make_unique<Command>(arguments, configuration);
                 });
     }
 }

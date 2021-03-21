@@ -19,17 +19,10 @@
 
 #pragma once
 
-#include "Configuration.h"
-#include "EventsDatabase.h"
-#include "Output.h"
 #include "semantic/Semantic.h"
 #include "libresult/Result.h"
 
-#include <filesystem>
-#include <list>
 #include <memory>
-
-namespace fs = std::filesystem;
 
 namespace cs::semantic {
 
@@ -63,27 +56,4 @@ namespace cs::semantic {
     bool Tool::not_recognized(const rust::Result<SemanticPtr> &result) noexcept {
         return result.is_ok() && !(result.unwrap().operator bool());
     }
-
-    // Represents an expert system which can recognize compilation entries from
-    // command executions. It covers multiple tools and consider omit results
-    // based on configuration.
-    class Tools {
-    public:
-        Tools() = delete;
-        ~Tools() noexcept = default;
-
-        static rust::Result<Tools> from(Compilation cfg);
-
-        [[nodiscard]]
-        Entries transform(cs::EventsDatabase::Ptr events) const;
-
-    private:
-        explicit Tools(std::shared_ptr<Tool> tool) noexcept;
-
-        [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const Execution &execution, uint32_t pid) const;
-
-    private:
-        std::shared_ptr<Tool> tool_;
-    };
 }
