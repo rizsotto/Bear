@@ -27,9 +27,7 @@
 #include "Convert.h"
 
 #include <filesystem>
-#include <functional>
 #include <unordered_map>
-#include <unordered_set>
 #include <stdexcept>
 #include <utility>
 
@@ -37,159 +35,6 @@
 #include <spdlog/fmt/ostr.h>
 
 namespace fs = std::filesystem;
-
-namespace {
-
-    // Represent a process tree.
-    //
-    // Processes have parent process (which started). If all process execution
-    // could have been captured this is a single process tree. But because some
-    // execution might escape (static executables are not visible for dynamic
-    // loader) the tree falls apart into a forest.
-    //
-    // Why create the process forest?
-    //
-    // The idea helps to filter out such executions which are not relevant to the
-    // user. If a compiler executes itself (with different set of arguments) it
-    // will cause duplicate entries, which is not desirable. (CUDA compiler is
-    // is a good example to call GCC multiple times.)
-    //
-    // First we build up the forest, then starting on a single process tree, we
-    // do a breadth first search. If a process can be identified (recognized as
-    // compilation) we don't inspect the children processes.
-    template<typename Entry, typename Id>
-    struct Forest {
-
-        template<
-                typename Iterator,
-                typename Extractor = std::function<rust::Result<std::tuple<Entry, Id, Id>>(typename Iterator::reference)>
-                >
-        Forest(Iterator begin, Iterator end, Extractor extractor);
-
-        template<
-                typename Output,
-                typename Converter = std::function<rust::Result<std::list<Output>>(const Entry &, Id)>
-                >
-        std::list<Output> bfs(Converter) const;
-
-    private:
-        std::unordered_map<Id, Entry> entries;
-        std::unordered_map<Id, std::list<Id>> nodes;
-        std::list<Id> roots;
-    };
-
-    template<typename Entry, typename Id>
-    template<typename Iterator, typename Extractor>
-    Forest<Entry, Id>::Forest(Iterator begin, Iterator end, Extractor extractor) {
-        std::unordered_set<Id> maybe_roots;
-        std::unordered_set<Id> non_roots;
-        for (auto it = begin; it != end; ++it) {
-            extractor(*it)
-                .on_success([this, &maybe_roots, &non_roots](auto tuple) {
-                    const auto &[entry, id, parent] = tuple;
-                    // emplace into the entry map
-                    entries.emplace(std::make_pair(id, entry));
-                    // put into the nodes map, if it's not yet exists
-                    if (auto search = nodes.find(id); search == nodes.end()) {
-                        std::list<Id> children = {};
-                        nodes.emplace(std::make_pair(id, children));
-                    }
-                    // update (or create) the parent element with the new child
-                    if (auto search = nodes.find(parent); search != nodes.end()) {
-                        search->second.push_back(id);
-                    } else {
-                        std::list<Id> children = {id};
-                        nodes.emplace(std::make_pair(parent, children));
-                    }
-                    // update the root nodes
-                    if (maybe_roots.count(id) != 0) {
-                        maybe_roots.erase(id);
-                    }
-                    non_roots.insert(id);
-                    if (non_roots.count(parent) == 0) {
-                        maybe_roots.insert(parent);
-                    }
-                })
-                .on_error([](auto error) {
-                    spdlog::warn("Could not read value from database: {}", error.what());
-                });
-        }
-        // fixing the phantom root node which has no entry
-        std::unordered_set<Id> new_roots;
-        for (auto root : maybe_roots) {
-            if (auto phantom = entries.find(root); phantom == entries.end()) {
-                auto children = nodes.at(root);
-                std::copy(children.begin(), children.end(), std::inserter(new_roots, new_roots.begin()));
-                nodes.erase(root);
-            } else {
-                new_roots.insert(root);
-            }
-        }
-        // set the root nodes as an ordered list
-        std::copy(new_roots.begin(), new_roots.end(), std::back_inserter(roots));
-        roots.sort();
-    }
-
-    template<typename Entry, typename Id>
-    template<typename Output, typename Converter>
-    std::list<Output> Forest<Entry, Id>::bfs(Converter function) const {
-        std::list<Output> result;
-        // define a work queue
-        std::list<Id> queue = roots;
-        while (!queue.empty()) {
-            // get the pivot id
-            Id id = queue.front();
-            queue.pop_front();
-            // get the entry for the id
-            auto entry = entries.at(id);
-            function(entry, id)
-                    .on_success([&result](const auto& output) {
-                        // if we found the semantic for an entry, we add that to the output.
-                        // and we don't process the children processes.
-                        result.push_back(output);
-                    })
-                    .on_error([this, &queue, &id](const auto&) {
-                        // if it did not recognize the entry, we continue to process the
-                        // child processes.
-                        const auto ids = nodes.at(id);
-                        std::copy(ids.begin(), ids.end(), std::back_inserter(queue));
-                    });
-        }
-        return result;
-    }
-
-    rust::Result<domain::Run> extract(cs::EventsIterator::reference input) {
-        using Result = rust::Result<domain::Run>;
-        return input
-                .and_then<domain::Run>([](auto events) {
-                    if (events.empty()) {
-                        return Result(
-                                rust::Err(
-                                        std::runtime_error("Event list is empty.")
-                                )
-                        );
-                    }
-                    if (auto start = events.front(); !start->has_started()) {
-                        return Result(
-                                rust::Err(
-                                        std::runtime_error("Could not find start event.")
-                                )
-                        );
-                    } else {
-                        const auto &started = start->started();
-                        return Result(
-                                rust::Ok(
-                                        domain::Run{
-                                                domain::from(started.execution()),
-                                                started.pid(),
-                                                started.ppid()
-                                        }
-                                )
-                        );
-                    }
-                });
-    }
-}
 
 namespace cs::semantic {
 
@@ -215,31 +60,33 @@ namespace cs::semantic {
     }
 
     Entries Tools::transform(cs::EventsDatabase::Ptr events) const {
-        auto semantics =
-                Forest<Execution, uint32_t>(
-                        events->events_by_process_begin(),
-                        events->events_by_process_end(),
-                        ::extract
-                ).bfs<SemanticPtr>([this](const auto &execution, const auto pid) {
-                    return this->recognize(execution, pid);
-                });
-
-        Entries result;
-        for (const auto &semantic : semantics) {
-            auto candidate = dynamic_cast<const CompilerCall*>(semantic.get());
-            if (candidate != nullptr) {
-                auto entries = candidate->into_entries();
-                std::copy(entries.begin(), entries.end(), std::back_inserter(result));
-            }
+        Entries results;
+        for (EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
+            (*it).and_then<SemanticPtr>([this](const cs::EventPtr &event) {
+                if (event->has_started()) {
+                    auto execution = domain::from(event->started().execution());
+                    auto pid = event->started().pid();
+                    return recognize(execution, pid);
+                } else {
+                    return rust::Result<SemanticPtr>(rust::Err(std::runtime_error("other")));
+                }
+            })
+            .on_success([&results](const auto &semantic) {
+                auto candidate = dynamic_cast<const CompilerCall*>(semantic.get());
+                if (candidate != nullptr) {
+                    auto entries = candidate->into_entries();
+                    std::copy(entries.begin(), entries.end(), std::back_inserter(results));
+                }
+            });
         }
-        return result;
+        return results;
     }
 
     [[nodiscard]]
     rust::Result<SemanticPtr> Tools::recognize(const Execution &execution, const uint32_t pid) const {
         spdlog::debug("[pid: {}] execution: {}", pid, execution);
-        auto result = tool_->recognize(execution);
 
+        auto result = tool_->recognize(execution);
         if (Tool::recognized_ok(result)) {
             spdlog::debug("[pid: {}] recognized.", pid);
         } else if (Tool::recognized_with_error(result)) {
