@@ -39,7 +39,7 @@ namespace ic {
 
     Reporter::Reporter(ic::EventsDatabase::Ptr database)
             : database_(std::move(database))
-            , consumer_([this](rpc::Event &&event) {
+            , consumer_([this](const rpc::Event &event) {
                 database_->insert_event(event)
                         .on_error([](auto error) {
                             spdlog::warn("Writing event into database failed: {} Ignored.", error.what());

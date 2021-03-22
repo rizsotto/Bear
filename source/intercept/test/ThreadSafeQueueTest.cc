@@ -27,31 +27,31 @@ namespace {
     TEST(queue, push_and_pop_works) {
         domain::ThreadSafeQueue<int> sut;
 
-        sut.push(1);
-        sut.push(2);
+        sut.push(std::make_unique<int>(1));
+        sut.push(std::make_unique<int>(2));
 
-        EXPECT_EQ(std::make_optional(1), sut.pop());
-        EXPECT_EQ(std::make_optional(2), sut.pop());
+        EXPECT_EQ(1, *(sut.pop()));
+        EXPECT_EQ(2, *(sut.pop()));
     }
 
     TEST(queue, flush_unblocks) {
         domain::ThreadSafeQueue<int> sut;
         sut.flush();
-        EXPECT_EQ(std::nullopt, sut.pop());
-        EXPECT_EQ(std::nullopt, sut.pop());
+        EXPECT_EQ(std::unique_ptr<int>(), sut.pop());
+        EXPECT_EQ(std::unique_ptr<int>(), sut.pop());
     }
 
     TEST(queue, flush_unblocks_but_returns_value) {
         domain::ThreadSafeQueue<int> sut;
 
-        sut.push(1);
+        sut.push(std::make_unique<int>(1));
         sut.flush();
-        sut.push(2);
+        sut.push(std::make_unique<int>(2));
 
-        EXPECT_EQ(std::make_optional(1), sut.pop());
-        EXPECT_EQ(std::make_optional(2), sut.pop());
-        EXPECT_EQ(std::nullopt, sut.pop());
-        EXPECT_EQ(std::nullopt, sut.pop());
+        EXPECT_EQ(1, *(sut.pop()));
+        EXPECT_EQ(2, *(sut.pop()));
+        EXPECT_EQ(std::unique_ptr<int>(), sut.pop());
+        EXPECT_EQ(std::unique_ptr<int>(), sut.pop());
     }
 
     TEST(queue, consumed_from_another_thread) {

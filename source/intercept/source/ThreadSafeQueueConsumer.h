@@ -24,13 +24,14 @@
 #include <thread>
 #include <atomic>
 #include <functional>
+#include <memory>
 
 namespace domain {
 
     template <class T>
     class ThreadSafeQueueConsumer {
     public:
-        explicit ThreadSafeQueueConsumer(std::function<void(T &&)> consume)
+        explicit ThreadSafeQueueConsumer(std::function<void(const T &)> consume)
                 : queue()
                 , running(true)
                 , consumer([this, consume]() { loop(consume); })
@@ -43,16 +44,16 @@ namespace domain {
         };
 
         void push(const T &value) noexcept {
-            T copy = value;
+            std::unique_ptr<T> copy = std::make_unique<T>(value);
             queue.push(std::move(copy));
         }
 
     private:
-        void loop(std::function<void(T &&)> consume) noexcept {
+        void loop(std::function<void(const T&)> consume) noexcept {
             auto value = queue.pop();
-            while (running || value.has_value()) {
-                if (value.has_value()) {
-                    consume(std::move(value.value()));
+            while (running || value) {
+                if (value) {
+                    consume(*value);
                 }
                 value = queue.pop();
             }

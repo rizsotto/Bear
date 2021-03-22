@@ -21,7 +21,7 @@
 
 #include <queue>
 #include <mutex>
-#include <optional>
+#include <memory>
 #include <condition_variable>
 
 namespace domain {
@@ -32,9 +32,9 @@ namespace domain {
         ThreadSafeQueue() = default;
         ~ThreadSafeQueue() noexcept = default;
 
-        void push(T &&value) noexcept {
+        void push(std::unique_ptr<T> value) noexcept {
             std::lock_guard<std::mutex> lock(mutex);
-            queue.emplace(value);
+            queue.push(std::move(value));
             cv.notify_one();
         }
 
@@ -45,14 +45,14 @@ namespace domain {
         }
 
         [[nodiscard]]
-        std::optional<T> pop() noexcept {
+        std::unique_ptr<T> pop() noexcept {
             std::unique_lock<std::mutex> lock(mutex);
             cv.wait(lock, [this]() { return wake || (!queue.empty()); });
 
             if (queue.empty()) {
-                return std::nullopt;
+                return std::unique_ptr<T>();
             } else {
-                auto value = std::make_optional(queue.front());
+                std::unique_ptr<T> value(queue.front().release());
                 queue.pop();
                 return value;
             }
@@ -61,7 +61,7 @@ namespace domain {
     private:
         std::mutex mutex;
         std::condition_variable cv;
-        std::queue<T> queue;
+        std::queue<std::unique_ptr<T>> queue;
         bool wake = false;
     };
 }
