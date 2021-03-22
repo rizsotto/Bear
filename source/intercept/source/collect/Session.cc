@@ -50,15 +50,19 @@ namespace ic {
 
     std::string Session::keep_front_in_path(const std::string& path, const std::string& paths)
     {
-        std::list<fs::path> result = {path};
+        if (paths == path) {
+            return paths;
+        } else {
+            std::list<fs::path> result = {path};
 
-        auto existing = sys::path::split(paths);
-        std::copy_if(existing.begin(), existing.end(),
-                     std::back_inserter(result),
-                     [&path](auto current) { return current != path; }
-        );
+            auto existing = sys::path::split(paths);
+            std::copy_if(existing.begin(), existing.end(),
+                         std::back_inserter(result),
+                         [&path](auto current) { return current != path; }
+            );
 
-        return sys::path::join(result);
+            return sys::path::join(result);
+        }
     }
 
     std::string Session::remove_from_path(const std::string& path, const std::string& paths)
