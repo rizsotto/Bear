@@ -32,11 +32,13 @@ namespace ic {
         return session_.resolve(from(request->execution()))
                 .map<grpc::Status>([&response](auto execution) {
                     // Need to copy the execution into the response.
-                    response->set_allocated_execution(new rpc::Execution(into(execution)));
+                    response->mutable_execution()->CopyFrom(into(execution));
                     // Confirm it with an OK.
                     return ::grpc::Status::OK;
                 })
-                .unwrap_or(grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, "not recognized wrapper"));
+                .unwrap_or_else([](const auto &error) {
+                    return grpc::Status(::grpc::StatusCode::INVALID_ARGUMENT, error.what());
+                });
     }
 
     InterceptorImpl::InterceptorImpl(Reporter &reporter)
