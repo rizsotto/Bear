@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <list>
 #include <map>
+#include <optional>
 #include <string>
 
 #include <spdlog/spdlog.h>
