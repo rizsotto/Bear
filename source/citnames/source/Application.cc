@@ -19,12 +19,12 @@
 
 #include "config.h"
 #include "Application.h"
-#include "EventsDatabase.h"
 #include "citnames/Flags.h"
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Build.h"
 #include "semantic/Tool.h"
+#include "collect/db/EventsDatabaseReader.h"
 
 #include <filesystem>
 
@@ -32,6 +32,7 @@
 #include <spdlog/spdlog.h>
 
 namespace fs = std::filesystem;
+namespace db = ic::collect::db;
 
 namespace {
 
@@ -115,9 +116,9 @@ namespace {
                 });
     }
 
-    cs::Entries transform(cs::semantic::Build &build, const cs::EventsDatabase::Ptr& events) {
+    cs::Entries transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events) {
         cs::Entries results;
-        for (cs::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
+        for (db::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
             (*it)
                     .and_then<cs::semantic::SemanticPtr>([&build](const auto &event) {
                         return build.recognize(*event);
@@ -140,7 +141,7 @@ namespace cs {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
 
         // get current compilations from the input.
-        return cs::EventsDatabase::open(arguments_.input)
+        return db::EventsDatabaseReader::open(arguments_.input)
                 .map<Entries>([this](const auto &commands) {
                     auto build = cs::semantic::Build(configuration_.compilation);
                     auto compilations = transform(build, commands);

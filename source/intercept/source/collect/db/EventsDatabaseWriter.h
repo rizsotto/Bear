@@ -31,27 +31,25 @@ namespace fs = std::filesystem;
 struct sqlite3;
 struct sqlite3_stmt;
 
-namespace ic {
+namespace ic::collect::db {
 
-    class EventsIterator;
-
-    class EventsDatabase {
+    class EventsDatabaseWriter {
     public:
-        using Ptr = std::shared_ptr<EventsDatabase>;
+        using Ptr = std::shared_ptr<EventsDatabaseWriter>;
 
-        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> create(const fs::path &file);
+        [[nodiscard]] static rust::Result<EventsDatabaseWriter::Ptr> create(const fs::path &file);
 
         [[nodiscard]] rust::Result<int> insert_event(const rpc::Event &event);
 
     public:
-        EventsDatabase(sqlite3 *handle, sqlite3_stmt *insert_event) noexcept;
-        ~EventsDatabase() noexcept;
+        EventsDatabaseWriter(sqlite3 *handle, sqlite3_stmt *insert_event) noexcept;
+        ~EventsDatabaseWriter() noexcept;
 
-        EventsDatabase(const EventsDatabase &) = delete;
-        EventsDatabase(EventsDatabase &&) noexcept = delete;
+        EventsDatabaseWriter(const EventsDatabaseWriter &) = delete;
+        EventsDatabaseWriter(EventsDatabaseWriter &&) noexcept = delete;
 
-        EventsDatabase &operator=(const EventsDatabase &) = delete;
-        EventsDatabase &operator=(EventsDatabase &&) noexcept = delete;
+        EventsDatabaseWriter &operator=(const EventsDatabaseWriter &) = delete;
+        EventsDatabaseWriter &operator=(EventsDatabaseWriter &&) noexcept = delete;
 
     private:
         sqlite3 *handle_;

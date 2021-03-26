@@ -14,10 +14,22 @@ target_include_directories(domain_a PUBLIC source)
 target_link_libraries(domain_a PUBLIC rpc_a)
 
 
+# Event database writing/reading classes.
+add_library(events_db_a OBJECT
+        source/collect/db/EventsDatabaseReader.cc
+        source/collect/db/EventsDatabaseWriter.cc
+        )
+
+target_include_directories(events_db_a PUBLIC source)
+target_link_libraries(events_db_a PUBLIC result_a)
+target_link_libraries(events_db_a PUBLIC rpc_a)
+target_link_libraries(events_db_a PUBLIC spdlog::spdlog)
+target_link_libraries(events_db_a PUBLIC PkgConfig::sqlite)
+
+
 # Intercept orchestrator code.
 add_library(intercept_a OBJECT
         source/collect/Application.cc
-        source/collect/EventsDatabase.cc
         source/collect/Reporter.cc
         source/collect/RpcServices.cc
         source/collect/Session.cc
@@ -32,13 +44,13 @@ target_include_directories(intercept_a PUBLIC include/)
 target_include_directories(intercept_a PUBLIC source/)
 target_link_libraries(intercept_a PUBLIC domain_a)
 target_link_libraries(intercept_a PUBLIC main_a)
+target_link_libraries(intercept_a PUBLIC events_db_a)
 target_link_libraries(intercept_a PUBLIC exec_a)
 target_link_libraries(intercept_a PUBLIC flags_a)
 target_link_libraries(intercept_a PUBLIC rpc_a)
 target_link_libraries(intercept_a PUBLIC sys_a)
 target_link_libraries(intercept_a PUBLIC result_a)
 target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
-target_link_libraries(intercept_a PUBLIC PkgConfig::sqlite)
 
 
 # Intercept orchestrator executable.
@@ -50,6 +62,7 @@ target_link_libraries(intercept domain_a)
 target_link_libraries(intercept main_a)
 target_link_libraries(intercept intercept_a)
 target_link_libraries(intercept rpc_a)
+target_link_libraries(intercept events_db_a)
 target_link_libraries(intercept sys_a)
 target_link_libraries(intercept flags_a)
 target_link_libraries(intercept exec_a)
@@ -214,6 +227,7 @@ if (ENABLE_UNIT_TESTS)
 
     target_link_libraries(intercept_unit_test domain_a)
     target_link_libraries(intercept_unit_test main_a)
+    target_link_libraries(intercept_unit_test events_db_a)
     target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test wrapper_a)

@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "collect/EventsDatabase.h"
+#include "collect/db/EventsDatabaseWriter.h"
 #include "ThreadSafeQueueConsumer.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
@@ -39,7 +39,7 @@ namespace ic {
         void report(const rpc::Event &event);
 
     public:
-        explicit Reporter(ic::EventsDatabase::Ptr database);
+        explicit Reporter(ic::collect::db::EventsDatabaseWriter::Ptr database);
 
         Reporter() = delete;
         ~Reporter() noexcept = default;
@@ -51,7 +51,7 @@ namespace ic {
         Reporter& operator=(Reporter&&) noexcept = delete;
 
     private:
-        ic::EventsDatabase::Ptr database_;
+        ic::collect::db::EventsDatabaseWriter::Ptr database_;
         domain::ThreadSafeQueueConsumer<rpc::Event> consumer_;
     };
 }

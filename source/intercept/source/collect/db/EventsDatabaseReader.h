@@ -31,9 +31,9 @@ namespace fs = std::filesystem;
 struct sqlite3;
 struct sqlite3_stmt;
 
-namespace cs {
+namespace ic::collect::db {
 
-    class EventsDatabase;
+    class EventsDatabaseReader;
     using EventPtr = std::shared_ptr<rpc::Event>;
 
     class EventsIterator {
@@ -46,7 +46,7 @@ namespace cs {
 
     public:
         EventsIterator() noexcept;
-        EventsIterator(EventsDatabase *source, rust::Result<EventPtr> value) noexcept;
+        EventsIterator(EventsDatabaseReader *source, rust::Result<EventPtr> value) noexcept;
 
         reference operator*() const;
 
@@ -57,15 +57,15 @@ namespace cs {
         bool operator!=(const EventsIterator &other) const;
 
     private:
-        EventsDatabase *source_;
+        EventsDatabaseReader *source_;
         rust::Result<EventPtr> value_;
     };
 
-    class EventsDatabase {
+    class EventsDatabaseReader {
     public:
-        using Ptr = std::shared_ptr<EventsDatabase>;
+        using Ptr = std::shared_ptr<EventsDatabaseReader>;
 
-        [[nodiscard]] static rust::Result<EventsDatabase::Ptr> open(const fs::path &file);
+        [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> open(const fs::path &file);
 
         [[nodiscard]] EventsIterator events_begin();
         [[nodiscard]] EventsIterator events_end();
@@ -76,14 +76,14 @@ namespace cs {
         [[nodiscard]] EventsIterator next() noexcept;
 
     public:
-        EventsDatabase(sqlite3 *handle, sqlite3_stmt *select_events) noexcept;
-        ~EventsDatabase() noexcept;
+        EventsDatabaseReader(sqlite3 *handle, sqlite3_stmt *select_events) noexcept;
+        ~EventsDatabaseReader() noexcept;
 
-        EventsDatabase(const EventsDatabase &) = delete;
-        EventsDatabase(EventsDatabase &&) noexcept = delete;
+        EventsDatabaseReader(const EventsDatabaseReader &) = delete;
+        EventsDatabaseReader(EventsDatabaseReader &&) noexcept = delete;
 
-        EventsDatabase &operator=(const EventsDatabase &) = delete;
-        EventsDatabase &operator=(EventsDatabase &&) noexcept = delete;
+        EventsDatabaseReader &operator=(const EventsDatabaseReader &) = delete;
+        EventsDatabaseReader &operator=(EventsDatabaseReader &&) noexcept = delete;
 
     private:
         sqlite3 *handle_;

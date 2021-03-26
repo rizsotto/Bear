@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "EventsDatabase.h"
+#include "EventsDatabaseReader.h"
 
 #include <google/protobuf/util/json_util.h>
 #include <sqlite3.h>
@@ -28,8 +28,8 @@
 
 namespace {
 
-    rust::Result<cs::EventPtr> from_string(const char *value) {
-        cs::EventPtr event = std::make_shared<rpc::Event>();
+    rust::Result<ic::collect::db::EventPtr> from_string(const char *value) {
+        ic::collect::db::EventPtr event = std::make_shared<rpc::Event>();
         auto rc = google::protobuf::util::JsonStringToMessage(value, &(*event));
         if (rc.ok()) {
             return rust::Ok(std::move(event));
@@ -63,14 +63,14 @@ namespace {
     }
 }
 
-namespace cs {
+namespace ic::collect::db {
 
-    EventsDatabase::EventsDatabase(sqlite3 *handle, sqlite3_stmt *select_events) noexcept
+    EventsDatabaseReader::EventsDatabaseReader(sqlite3 *handle, sqlite3_stmt *select_events) noexcept
             : handle_(handle)
             , select_events_(select_events)
     { }
 
-    EventsDatabase::~EventsDatabase() noexcept {
+    EventsDatabaseReader::~EventsDatabaseReader() noexcept {
         if (auto rc = sqlite3_finalize(select_events_); rc != SQLITE_OK) {
             auto error = create_error("Finalize prepared statement failed", handle_);
             spdlog::warn(error.what());
@@ -81,7 +81,7 @@ namespace cs {
         }
     }
 
-    rust::Result<EventsDatabase::Ptr> EventsDatabase::open(const fs::path &file) {
+    rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::open(const fs::path &file) {
         auto handle = open_sqlite(file);
 
         auto select_events = handle
@@ -92,13 +92,13 @@ namespace cs {
                 });
 
         return rust::merge(handle, select_events)
-                .map<EventsDatabase::Ptr>([](auto tuple) {
+                .map<EventsDatabaseReader::Ptr>([](auto tuple) {
                     const auto& [handle, stmt] = tuple;
-                    return std::make_shared<EventsDatabase>(handle, stmt);
+                    return std::make_shared<EventsDatabaseReader>(handle, stmt);
                 });
     }
 
-    EventsIterator EventsDatabase::events_begin() {
+    EventsIterator EventsDatabaseReader::events_begin() {
         if (auto rc = sqlite3_reset(select_events_); rc != SQLITE_OK) {
             auto error = create_error("Prepared statement reset failed", handle_);
             spdlog::warn(error.what());
@@ -106,11 +106,11 @@ namespace cs {
         return next();
     }
 
-    EventsIterator EventsDatabase::events_end() {
+    EventsIterator EventsDatabaseReader::events_end() {
         return EventsIterator();
     }
 
-    EventsIterator EventsDatabase::next() noexcept {
+    EventsIterator EventsDatabaseReader::next() noexcept {
         auto rc = sqlite3_step(select_events_);
         if (rc == SQLITE_ROW) {
             auto value = (const char *) sqlite3_column_text(select_events_, 0);
@@ -129,7 +129,7 @@ namespace cs {
             , value_(rust::Err(std::runtime_error("end")))
     { }
 
-    EventsIterator::EventsIterator(EventsDatabase *source, rust::Result<EventPtr> value) noexcept
+    EventsIterator::EventsIterator(EventsDatabaseReader *source, rust::Result<EventPtr> value) noexcept
             : source_(source)
             , value_(std::move(value))
     { }

@@ -15,7 +15,6 @@ target_compile_options(citnames_json_a PRIVATE -fexceptions)
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT
         source/Application.cc
-        source/EventsDatabase.cc
         source/semantic/Build.cc
         source/semantic/Parsers.cc
         source/semantic/Semantic.cc
@@ -33,6 +32,7 @@ target_link_libraries(citnames_a PUBLIC main_a)
 target_link_libraries(citnames_a PUBLIC domain_a)
 target_link_libraries(citnames_a PUBLIC result_a)
 target_link_libraries(citnames_a PUBLIC flags_a)
+target_link_libraries(citnames_a PUBLIC events_db_a)
 target_link_libraries(citnames_a PUBLIC rpc_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
@@ -47,6 +47,7 @@ add_executable(citnames
 target_link_libraries(citnames main_a)
 target_link_libraries(citnames citnames_a)
 target_link_libraries(citnames citnames_json_a)
+target_link_libraries(citnames events_db_a)
 target_link_libraries(citnames domain_a)
 target_link_libraries(citnames result_a)
 target_link_libraries(citnames rpc_a)
@@ -85,6 +86,7 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(citnames_unit_test main_a)
     target_link_libraries(citnames_unit_test citnames_a)
     target_link_libraries(citnames_unit_test citnames_json_a)
+    target_link_libraries(citnames_unit_test events_db_a)
     target_link_libraries(citnames_unit_test domain_a)
     target_link_libraries(citnames_unit_test result_a)
     target_link_libraries(citnames_unit_test rpc_a)

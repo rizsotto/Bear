@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "EventsDatabase.h"
+#include "EventsDatabaseWriter.h"
 
 #include <google/protobuf/util/json_util.h>
 #include <sqlite3.h>
@@ -73,14 +73,14 @@ namespace {
     }
 }
 
-namespace ic {
+namespace ic::collect::db {
 
-    EventsDatabase::EventsDatabase(sqlite3 *handle, sqlite3_stmt *insert) noexcept
+    EventsDatabaseWriter::EventsDatabaseWriter(sqlite3 *handle, sqlite3_stmt *insert) noexcept
             : handle_(handle)
             , insert_event_(insert)
     { }
 
-    EventsDatabase::~EventsDatabase() noexcept {
+    EventsDatabaseWriter::~EventsDatabaseWriter() noexcept {
         if (auto rc = sqlite3_finalize(insert_event_); rc != SQLITE_OK) {
             auto error = create_error("Finalize prepared statement failed", handle_);
             spdlog::warn(error.what());
@@ -91,7 +91,7 @@ namespace ic {
         }
     }
 
-    rust::Result<EventsDatabase::Ptr> EventsDatabase::create(const fs::path &file) {
+    rust::Result<EventsDatabaseWriter::Ptr> EventsDatabaseWriter::create(const fs::path &file) {
         auto handle = open_sqlite(file)
                 .and_then<sqlite3 *>([](auto handle) {
                     constexpr const char *sql =
@@ -114,13 +114,13 @@ namespace ic {
                 });
 
         return rust::merge(handle, insert_event)
-                .map<EventsDatabase::Ptr>([](auto tuple) {
+                .map<EventsDatabaseWriter::Ptr>([](auto tuple) {
                     const auto& [handle, stmt1] = tuple;
-                    return std::make_shared<EventsDatabase>(handle, stmt1);
+                    return std::make_shared<EventsDatabaseWriter>(handle, stmt1);
                 });
     }
 
-    rust::Result<int> EventsDatabase::insert_event(const rpc::Event &event) {
+    rust::Result<int> EventsDatabaseWriter::insert_event(const rpc::Event &event) {
         return to_string(event)
             .and_then<int>([this, &event](auto value) -> rust::Result<int> {
                 if (auto rc = sqlite3_bind_int64(insert_event_, 1, event.rid()); rc != SQLITE_OK) {

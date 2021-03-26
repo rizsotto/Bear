@@ -29,15 +29,15 @@ namespace ic {
     rust::Result<Reporter::Ptr> Reporter::from(const flags::Arguments& flags) {
         return flags
                 .as_string(OUTPUT)
-                .and_then<EventsDatabase::Ptr>([](auto file) {
-                    return EventsDatabase::create(file);
+                .and_then<ic::collect::db::EventsDatabaseWriter::Ptr>([](auto file) {
+                    return ic::collect::db::EventsDatabaseWriter::create(file);
                 })
                 .map<Reporter::Ptr>([](auto events) {
                     return std::make_shared<Reporter>(events);
                 });
     }
 
-    Reporter::Reporter(ic::EventsDatabase::Ptr database)
+    Reporter::Reporter(ic::collect::db::EventsDatabaseWriter::Ptr database)
             : database_(std::move(database))
             , consumer_([this](const rpc::Event &event) {
                 database_->insert_event(event)
