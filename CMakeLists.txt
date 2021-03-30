@@ -60,6 +60,7 @@ ExternalProject_Add(BearSource
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+            -DENABLE_FUNC_TESTS:BOOL=${ENABLE_FUNC_TESTS}
         TEST_BEFORE_INSTALL
             1
         TEST_COMMAND
@@ -75,6 +76,7 @@ if (ENABLE_FUNC_TESTS)
                 BearSource
             CMAKE_CACHE_ARGS
                 -DSTAGED_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
+                -DBEARSOURCE_BUILD_DIR:PATH=${EP_BASE}/Build/BearSource
             TEST_BEFORE_INSTALL
                 1
             INSTALL_COMMAND

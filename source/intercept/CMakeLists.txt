@@ -238,3 +238,17 @@ if (ENABLE_UNIT_TESTS)
 
     add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
 endif ()
+
+# Create tool for functional testing
+if (ENABLE_FUNC_TESTS)
+    add_executable(events_db
+            test/events_db/main.cc
+            )
+
+    target_link_libraries(events_db main_a)
+    target_link_libraries(events_db events_db_a)
+    target_link_libraries(events_db flags_a)
+    target_link_libraries(events_db rpc_a)
+    target_link_libraries(events_db spdlog::spdlog)
+    target_link_libraries(events_db PkgConfig::sqlite)
+endif()
