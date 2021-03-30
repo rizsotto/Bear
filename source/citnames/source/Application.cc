@@ -28,8 +28,8 @@
 
 #include <filesystem>
 
-#include <fmt/format.h>
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 
 namespace fs = std::filesystem;
 namespace db = ic::collect::db;

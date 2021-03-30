@@ -23,46 +23,44 @@
 #include <map>
 #include <optional>
 #include <string_view>
-#include <tuple>
 #include <vector>
+#include <iosfwd>
 
 #include "libresult/Result.h"
-
-#include <fmt/ostream.h>
 
 namespace flags {
 
     constexpr char HELP[] = "--help";
     constexpr char VERSION[] = "--version";
     constexpr char VERBOSE[] = "--verbose";
+    constexpr char COMMAND[] = "command";
 
     class Parser;
 
+    // Represents a successful parsing result.
+    //
+    // Instance can be created by the `Parser` object `parse` method. The flag
+    // values can be queried by the `as_*` methods, which are returning result
+    // objects.
+    //
+    // The object is hold references to the parser input.
     class Arguments {
     public:
-        [[nodiscard]] virtual std::string_view program() const;
+        [[nodiscard]] rust::Result<bool> as_bool(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<std::string_view> as_string(const std::string_view& key) const;
+        [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
-        [[nodiscard]] virtual rust::Result<bool> as_bool(const std::string_view& key) const;
-        [[nodiscard]] virtual rust::Result<std::string_view> as_string(const std::string_view& key) const;
-        [[nodiscard]] virtual rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
+    public:
+        Arguments() = delete;
 
-        virtual ~Arguments() = default;
-
-        Arguments(const Arguments&) = default;
-        Arguments(Arguments&&) noexcept = default;
-
-        Arguments& operator=(const Arguments&) = default;
-        Arguments& operator=(Arguments&&) noexcept = default;
-
-    protected:
+    private:
         using Parameter = std::vector<std::string_view>;
         using Parameters = std::map<std::string_view, Parameter>;
 
         friend class Parser;
         friend std::ostream& operator<<(std::ostream&, const Arguments&);
 
-        Arguments();
-        Arguments(std::string_view&& program, Parameters&& parameters);
+        Arguments(std::string_view program, Parameters&& parameters);
 
     private:
         std::string_view program_;
@@ -71,6 +69,18 @@ namespace flags {
 
     std::ostream& operator<<(std::ostream&, const Arguments&);
 
+    // Represent instruction how the associated parsing option shall be interpreted.
+    //
+    // `arguments` tells how many argument it has.
+    //    - negative value represent zero or more.
+    //    - zero value represent zero
+    //    - positive value represent exact number of arguments
+    // `required` tells that it is a mandatory option.
+    // `help` is a short message about the option.
+    // `default_value` is a string representation of the value it will have if the
+    //    user was not given any.
+    // `group_name` is a label like name, which is used to group flags and option
+    //    which are semantically belongs together.
     struct Option {
         int arguments;
         bool required;
@@ -82,30 +92,48 @@ namespace flags {
     using OptionMap = std::map<std::string_view, Option>;
     using OptionValue = OptionMap::value_type;
 
+    // Represents a command line parser.
+    //
+    // Why write another one when `getopt` is available. Simply because `getopt` is
+    // not standard enough across operating systems.
+    //
+    // Usage of the parser is the following:
+    // - Create it on the stack. (Make sure all passed parameter outlives the parser)
+    // - Call the `parse` or `parse_or_exit` method. (Can call the same parser multiple
+    //   times with different arguments. Note that the result `Arguments` object will
+    //   holds reference to the input.)
+    //
+    // Functionalities:
+    // - It adds `--help` flag automatically to every parser. Which will produce a
+    //   usage description in case of `parse_or_exit` method is called.
+    // - It adds `--version` flag, which will produce a simple output if `parse_or_exit`
+    //   method is called.
+    // - It adds `--verbose` flag automatically to every parser. Which will appear in
+    //   the result `Arguments` object.
+    // - Sub-command can be created by passing parser objects.
     class Parser {
     public:
         Parser(std::string_view name, std::string_view version, std::initializer_list<OptionValue> options);
+        Parser(std::string_view name, std::initializer_list<OptionValue> options);
+        Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands);
+
         ~Parser() = default;
 
         rust::Result<Arguments> parse(int argc, const char** argv) const;
         rust::Result<Arguments> parse_or_exit(int argc, const char** argv) const;
 
-        void print_help(std::ostream&) const;
-        void print_usage(std::ostream&) const;
+        void print_help(const Parser*, std::ostream&) const;
+        void print_usage(const Parser*, std::ostream&) const;
 
         void print_version(std::ostream&) const;
 
     public:
         Parser() = delete;
-        Parser(const Parser&) = delete;
-        Parser(Parser&&) noexcept = delete;
-
-        Parser& operator=(const Parser&) = delete;
-        Parser& operator=(Parser&&) noexcept = delete;
 
     private:
         const std::string_view name_;
         const std::string_view version_;
         OptionMap options_;
+        std::list<Parser> commands_;
     };
 }

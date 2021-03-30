@@ -23,6 +23,7 @@
 #include <iostream>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <utility>
 
 #include <fmt/format.h>
@@ -56,17 +57,14 @@ namespace {
     std::list<std::list<flags::OptionValue>> group_by(const flags::OptionMap& options)
     {
         // find out what are the option groups.
-        std::set<std::string_view> groups;
+        std::set<std::optional<std::string_view>> groups;
         for (const auto& [_, option] : options) {
-            if (auto group = option.group_name; group) {
-                groups.emplace(group.value());
-            }
+            groups.emplace(option.group_name);
         }
         std::list<std::list<flags::OptionValue>> result;
         // insert to the result list.
-        result.emplace_back(order_by_relevance(options, std::nullopt));
         for (auto& group : groups) {
-            result.emplace_back(order_by_relevance(options, std::optional(group)));
+            result.emplace_back(order_by_relevance(options, group));
         }
         return result;
     }
@@ -87,9 +85,9 @@ namespace {
         }
     }
 
-    void format_options(std::ostream& os, const std::list<flags::OptionValue>& main_options)
+    void format_options(std::ostream& os, const std::list<flags::OptionValue>& options)
     {
-        for (auto& it : main_options) {
+        for (auto& it : options) {
             const auto& [flag, option] = it;
 
             const std::string parameters = format_parameters(option);
@@ -129,22 +127,10 @@ namespace {
 
 namespace flags {
 
-    Arguments::Arguments()
-            : program_()
-            , parameters_()
-    {
-    }
-
-    Arguments::Arguments(std::string_view&& program, Arguments::Parameters&& parameters)
+    Arguments::Arguments(std::string_view program, Arguments::Parameters&& parameters)
             : program_(program)
             , parameters_(parameters)
-    {
-    }
-
-    std::string_view Arguments::program() const
-    {
-        return std::string_view(program_);
-    }
+    { }
 
     rust::Result<bool> Arguments::as_bool(const std::string_view& key) const
     {
@@ -178,7 +164,7 @@ namespace flags {
     std::ostream& operator<<(std::ostream& os, const Arguments& args)
     {
         os << '{';
-        os << "program: " << args.program() << ", arguments: [";
+        os << "program: " << args.program_ << ", arguments: [";
         for (auto arg_it = args.parameters_.begin(); arg_it != args.parameters_.end(); ++arg_it) {
             if (arg_it != args.parameters_.begin()) {
                 os << ", ";
@@ -200,8 +186,29 @@ namespace flags {
             : name_(name)
             , version_(version)
             , options_(options)
+            , commands_()
     {
         options_.insert({ VERBOSE, { 0, false, "run in verbose mode", std::nullopt, std::nullopt } });
+        options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
+        options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, { QUERY_GROUP } } });
+    }
+
+    Parser::Parser(std::string_view name, std::initializer_list<OptionValue> options)
+            : name_(name)
+            , version_()
+            , options_(options)
+            , commands_()
+    {
+        options_.insert({ VERBOSE, { 0, false, "run in verbose mode", std::nullopt, std::nullopt } });
+        options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
+    }
+
+    Parser::Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands)
+            : name_(name)
+            , version_(version)
+            , options_()
+            , commands_(commands)
+    {
         options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
         options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, { QUERY_GROUP } } });
     }
@@ -211,6 +218,20 @@ namespace flags {
         if (argc < 1 || argv == nullptr) {
             return rust::Err(std::runtime_error("Empty argument list."));
         }
+
+        if (!commands_.empty() && argc >= 2) {
+            const std::string_view command = argv[1];
+            const auto sub_command = std::find_if(commands_.begin(), commands_.end(),
+                                           [&command](auto candidate) { return candidate.name_ == command; });
+            if (sub_command != commands_.end()) {
+                return sub_command->parse(argc - 1, argv + 1)
+                        .map<Arguments>([&sub_command](auto arguments) {
+                            arguments.parameters_[COMMAND] = {sub_command->name_};
+                            return arguments;
+                        });
+            }
+        }
+
         std::string_view program(argv[0]);
         Arguments::Parameters parameters;
 
@@ -256,44 +277,56 @@ namespace flags {
                 }
             }
         }
-        return rust::Ok(Arguments(std::move(program), std::move(parameters)));
+        return rust::Ok(Arguments(program, std::move(parameters)));
     }
 
     rust::Result<Arguments> Parser::parse_or_exit(int argc, const char** argv) const
     {
+        auto sub_command = [this](const std::string_view &name) -> const Parser * {
+            const auto it = std::find_if(commands_.begin(), commands_.end(),
+                                         [&name](auto command) { return command.name_ == name; });
+            return (it != commands_.end()) ? &(*it) : nullptr;
+        };
+
         return parse(argc, argv)
             // print error if anything bad happens.
-            .or_else([=](auto error) {
+            .on_error([this](auto error) {
                 std::cerr << error.what() << std::endl;
-                print_usage(std::cerr);
+                print_usage(nullptr, std::cerr);
                 exit(EXIT_FAILURE);
-                return rust::Err(error); // to fix the compiler error
             })
             // if parsing success, check for the `--help` and `--version` flags
-            .and_then<flags::Arguments>([=](auto args) {
-                // print help message and exit zero
-                if (args.as_bool(HELP).unwrap_or(false)) {
-                    print_help(std::cout);
-                    exit(EXIT_SUCCESS);
-                }
+            .on_success([this, &sub_command](auto args) {
                 // print version message and exit zero
                 if (args.as_bool(VERSION).unwrap_or(false)) {
                     print_version(std::cout);
                     exit(EXIT_SUCCESS);
                 }
-                return rust::Ok(args);
+                // print help message and exit zero
+                if (args.as_bool(HELP).unwrap_or(false)) {
+                    if (const auto command = args.as_string(COMMAND); command.is_ok()) {
+                        print_help(sub_command(command.unwrap()), std::cout);
+                    } else {
+                        print_help(nullptr, std::cout);
+                    }
+                    exit(EXIT_SUCCESS);
+                }
             });
     }
 
-    void Parser::print_help(std::ostream& os) const
-    {
-        const std::list<std::list<flags::OptionValue>> options = group_by(options_);
+    void Parser::print_help(const Parser *sub_command, std::ostream& os) const {
+        print_usage(sub_command, os);
 
-        os << "Usage: " << name_;
-        const std::list<flags::OptionValue>& main_options = options.front();
-        format_options(os, main_options);
-        os << std::endl;
-
+        const Parser &parser = (sub_command != nullptr) ? *sub_command : *this;
+        // print commands if exists.
+        if (!parser.commands_.empty()) {
+            os << std::endl << "commands" << std::endl;
+            for (const auto& command : parser.commands_) {
+                os << "  " << command.name_ << std::endl;
+            }
+        }
+        // print options
+        const std::list<std::list<flags::OptionValue>> options = group_by(parser.options_);
         for (const auto& group : options) {
             os << std::endl;
             if (auto group_name = group.front().second.group_name; group_name) {
@@ -303,13 +336,20 @@ namespace flags {
         }
     }
 
-    void Parser::print_usage(std::ostream& os) const
-    {
-        const std::list<std::list<flags::OptionValue>> options = group_by(options_);
-        const std::list<flags::OptionValue>& main_options = options.front();
-
+    void Parser::print_usage(const Parser *sub_command, std::ostream& os) const {
         os << "Usage: " << name_;
-        format_options(os, main_options);
+        // check for the given command
+        if (sub_command != nullptr) {
+            os << " " << sub_command->name_;
+            const auto options = order_by_relevance(sub_command->options_, std::nullopt);
+            format_options(os, options);
+        } else {
+            if (!commands_.empty()) {
+                os << " <command>";
+            }
+            const auto options = order_by_relevance(options_, std::nullopt);
+            format_options(os, options);
+        }
         os << std::endl;
     }
 

@@ -30,6 +30,7 @@
 #include "libsys/Signal.h"
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/ostr.h>
 
 #include <filesystem>
 #include <memory>
