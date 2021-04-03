@@ -2,9 +2,10 @@
 
 # REQUIRES: preload, shell, dynamic-shell
 # RUN: %{shell} -c "%{intercept} --verbose --output %t.sqlite3 -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -15 %1; wait;"
-# RUN: assert_intercepted %t.sqlite3 count -eq 3
-# RUN: assert_intercepted %t.sqlite3 contains -program %{true}
-# RUN: assert_intercepted %t.sqlite3 contains -program %{sleep} -arguments %{sleep} 5
+# RUN: %{events_db} dump --path %t.sqlite3 --output %t.json
+# RUN: assert_intercepted %t.json count -eq 3
+# RUN: assert_intercepted %t.json contains -program %{true}
+# RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 5
 
 for i in "$@"
 do

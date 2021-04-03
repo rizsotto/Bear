@@ -1,9 +1,10 @@
 // REQUIRES: preload, c_api_popen
 // RUN: %{compile} -o %t %s
 // RUN: %{intercept} --verbose --output %t.sqlite3 -- %t
-// RUN: assert_intercepted %t.sqlite3 count -ge 2
-// RUN: assert_intercepted %t.sqlite3 contains -program %t
-// RUN: assert_intercepted %t.sqlite3 contains -arguments more
+// RUN: %{events_db} dump --path %t.sqlite3 --output %t.json
+// RUN: assert_intercepted %t.json count -ge 2
+// RUN: assert_intercepted %t.json contains -program %t
+// RUN: assert_intercepted %t.json contains -arguments more
 
 #include <stdio.h>
 #include <stdlib.h>

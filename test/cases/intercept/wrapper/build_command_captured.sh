@@ -2,4 +2,5 @@
 
 # REQUIRES: shell
 # RUN: %{intercept} --force-wrapper --verbose --output %t.sqlite3 -- env
-# RUN: assert_intercepted %t.sqlite3 count -eq 0
+# RUN: %{events_db} dump --path %t.sqlite3 --output %t.json
+# RUN: assert_intercepted %t.json count -eq 0

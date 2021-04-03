@@ -76,7 +76,7 @@ if (ENABLE_FUNC_TESTS)
                 BearSource
             CMAKE_CACHE_ARGS
                 -DSTAGED_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
-                -DBEARSOURCE_BUILD_DIR:PATH=${EP_BASE}/Build/BearSource
+                -DBEARSOURCE_BUILD_DIR:PATH=${CMAKE_BINARY_DIR}/subprojects/Build/BearSource
             TEST_BEFORE_INSTALL
                 1
             INSTALL_COMMAND

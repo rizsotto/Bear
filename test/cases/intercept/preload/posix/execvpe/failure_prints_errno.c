@@ -2,9 +2,10 @@
 // RUN: %{compile} '-D_PROGRAM="/path/to/not/existing"' -o %t %s
 // RUN: %t > %t.without.errno
 // RUN: %{intercept} --output %t.sqlite3 -- %t > %t.with.errno
+// RUN: %{events_db} dump --path %t.sqlite3 --output %t.json
 // RUN: diff %t.with.errno %t.without.errno
-// RUN: assert_intercepted %t.sqlite3 count -eq 1
-// RUN: assert_intercepted %t.sqlite3 contains -program %t
+// RUN: assert_intercepted %t.json count -eq 1
+// RUN: assert_intercepted %t.json contains -program %t
 
 #include "config.h"
 
