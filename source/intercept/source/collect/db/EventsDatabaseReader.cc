@@ -18,91 +18,42 @@
  */
 
 #include "EventsDatabaseReader.h"
+#include "libsys/Errors.h"
 
-#include <google/protobuf/util/json_util.h>
-#include <sqlite3.h>
-#include <spdlog/spdlog.h>
+#include <google/protobuf/util/delimited_message_util.h>
+#include <fmt/format.h>
 
-#include <memory>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <utility>
-
-namespace {
-
-    rust::Result<ic::collect::db::EventPtr> from_string(const char *value) {
-        ic::collect::db::EventPtr event = std::make_shared<rpc::Event>();
-        auto rc = google::protobuf::util::JsonStringToMessage(value, &(*event));
-        if (rc.ok()) {
-            return rust::Ok(std::move(event));
-        } else {
-            return rust::Err(std::runtime_error(rc.ToString()));
-        }
-    }
-
-    std::runtime_error create_error(const char *message, sqlite3 *handle) {
-        return std::runtime_error(fmt::format("{}: {}", message, sqlite3_errmsg(handle)));
-    }
-
-    rust::Result<sqlite3 *> open_sqlite(const fs::path &file) {
-        sqlite3 *handle;
-        if (auto rc = sqlite3_open(file.c_str(), &handle); rc == SQLITE_OK) {
-            return rust::Ok(handle);
-        }
-        return rust::Err(
-                std::runtime_error(
-                        fmt::format("Opening database {}, failed: {}",
-                                    file.string(),
-                                    sqlite3_errmsg(handle))));
-    }
-
-    rust::Result<sqlite3_stmt *> create_prepared_statement(sqlite3 *handle, const char *sql) {
-        sqlite3_stmt *stmt;
-        if (auto rc = sqlite3_prepare_v2(handle, sql, -1, &stmt, nullptr); rc != SQLITE_OK) {
-            return rust::Err(create_error("Creating prepared statement failed", handle));
-        }
-        return rust::Ok(stmt);
-    }
-}
 
 namespace ic::collect::db {
 
-    EventsDatabaseReader::EventsDatabaseReader(sqlite3 *handle, sqlite3_stmt *select_events) noexcept
-            : handle_(handle)
-            , select_events_(select_events)
+    rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::from(const fs::path &file) {
+        int fd = open(file.c_str(), O_RDONLY);
+        if (fd == -1) {
+            auto message = fmt::format("Events db open failed (file {}): {}", file.string(), sys::error_string(errno));
+            return rust::Err(std::runtime_error(message));
+        }
+        std::unique_ptr<google::protobuf::io::FileInputStream> stream =
+                std::make_unique<google::protobuf::io::FileInputStream>(fd, -1);
+        std::shared_ptr<EventsDatabaseReader> result =
+                std::make_shared<EventsDatabaseReader>(file, std::move(stream));
+        return rust::Ok(result);
+    }
+
+    EventsDatabaseReader::EventsDatabaseReader(fs::path file, StreamPtr stream) noexcept
+            : file_(std::move(file))
+            , stream_(std::move(stream))
     { }
 
     EventsDatabaseReader::~EventsDatabaseReader() noexcept {
-        if (auto rc = sqlite3_finalize(select_events_); rc != SQLITE_OK) {
-            auto error = create_error("Finalize prepared statement failed", handle_);
-            spdlog::warn(error.what());
-        }
-        if (auto rc = sqlite3_close(handle_); rc != SQLITE_OK) {
-            auto error = create_error("Closing database failed", handle_);
-            spdlog::warn(error.what());
-        }
-    }
-
-    rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::open(const fs::path &file) {
-        auto handle = open_sqlite(file);
-
-        auto select_events = handle
-                .and_then<sqlite3_stmt *>([](auto handle) {
-                    constexpr const char *sql =
-                            "SELECT value FROM events ORDER BY timestamp;";
-                    return create_prepared_statement(handle, sql);
-                });
-
-        return rust::merge(handle, select_events)
-                .map<EventsDatabaseReader::Ptr>([](auto tuple) {
-                    const auto& [handle, stmt] = tuple;
-                    return std::make_shared<EventsDatabaseReader>(handle, stmt);
-                });
+        stream_->Close();
     }
 
     EventsIterator EventsDatabaseReader::events_begin() {
-        if (auto rc = sqlite3_reset(select_events_); rc != SQLITE_OK) {
-            auto error = create_error("Prepared statement reset failed", handle_);
-            spdlog::warn(error.what());
-        }
         return next();
     }
 
@@ -111,17 +62,23 @@ namespace ic::collect::db {
     }
 
     EventsIterator EventsDatabaseReader::next() noexcept {
-        auto rc = sqlite3_step(select_events_);
-        if (rc == SQLITE_ROW) {
-            auto value = (const char *) sqlite3_column_text(select_events_, 0);
-            return EventsIterator(this, from_string(value));
+        std::shared_ptr<rpc::Event> event = std::make_shared<rpc::Event>();
+        bool clean_eof;
+        const bool success =
+                google::protobuf::util::ParseDelimitedFromZeroCopyStream(event.get(), stream_.get(), &clean_eof);
+        if (success && !clean_eof) {
+            return EventsIterator(this, rust::Ok(event));
+        } else if (clean_eof) {
+            return EventsIterator();
+        } else {
+            return EventsIterator(this, rust::Err(error()));
         }
-        if (rc != SQLITE_DONE) {
-            rust::Result<EventPtr> event =
-                    rust::Err(create_error("Prepared statement step failed", handle_));
-            return EventsIterator(this, event);
-        }
-        return EventsIterator();
+    }
+
+    std::runtime_error EventsDatabaseReader::error() noexcept {
+        int error_num = stream_->GetErrno();
+        auto message = fmt::format("Events db read failed (from file {}): {}", file_.string(), sys::error_string(error_num));
+        return std::runtime_error(message);
     }
 
     EventsIterator::EventsIterator() noexcept

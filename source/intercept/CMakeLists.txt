@@ -23,8 +23,8 @@ add_library(events_db_a OBJECT
 target_include_directories(events_db_a PUBLIC source)
 target_link_libraries(events_db_a PUBLIC result_a)
 target_link_libraries(events_db_a PUBLIC rpc_a)
-target_link_libraries(events_db_a PUBLIC spdlog::spdlog)
-target_link_libraries(events_db_a PUBLIC PkgConfig::sqlite)
+target_link_libraries(events_db_a PUBLIC sys_a)
+target_link_libraries(events_db_a PUBLIC fmt::fmt)
 
 
 # Intercept orchestrator code.
@@ -247,8 +247,8 @@ if (ENABLE_FUNC_TESTS)
 
     target_link_libraries(events_db main_a)
     target_link_libraries(events_db events_db_a)
+    target_link_libraries(events_db sys_a)
     target_link_libraries(events_db flags_a)
     target_link_libraries(events_db rpc_a)
     target_link_libraries(events_db spdlog::spdlog)
-    target_link_libraries(events_db PkgConfig::sqlite)
 endif()

@@ -141,7 +141,7 @@ namespace cs {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
 
         // get current compilations from the input.
-        return db::EventsDatabaseReader::open(arguments_.input)
+        return db::EventsDatabaseReader::from(arguments_.input)
                 .map<Entries>([this](const auto &commands) {
                     auto build = cs::semantic::Build(configuration_.compilation);
                     auto compilations = transform(build, commands);

@@ -61,7 +61,7 @@ namespace {
 
         [[nodiscard]] rust::Result<int> execute() const override {
             std::ofstream os(output);
-            return ic::collect::db::EventsDatabaseReader::open(path)
+            return ic::collect::db::EventsDatabaseReader::from(path)
                     .and_then<int>([&os](auto db) {
                         unsigned int count = 0;
                         os << "[" << std::endl;

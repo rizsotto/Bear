@@ -22,27 +22,29 @@
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 #include <filesystem>
 #include <memory>
-#include <vector>
 
 namespace fs = std::filesystem;
-
-struct sqlite3;
-struct sqlite3_stmt;
 
 namespace ic::collect::db {
 
     class EventsDatabaseWriter {
     public:
         using Ptr = std::shared_ptr<EventsDatabaseWriter>;
+        using StreamPtr = std::unique_ptr<google::protobuf::io::FileOutputStream>;
 
         [[nodiscard]] static rust::Result<EventsDatabaseWriter::Ptr> create(const fs::path &file);
 
         [[nodiscard]] rust::Result<int> insert_event(const rpc::Event &event);
 
+    private:
+        [[nodiscard]] std::runtime_error error() noexcept;
+
     public:
-        EventsDatabaseWriter(sqlite3 *handle, sqlite3_stmt *insert_event) noexcept;
+        explicit EventsDatabaseWriter(fs::path file, StreamPtr stream) noexcept;
         ~EventsDatabaseWriter() noexcept;
 
         EventsDatabaseWriter(const EventsDatabaseWriter &) = delete;
@@ -52,7 +54,7 @@ namespace ic::collect::db {
         EventsDatabaseWriter &operator=(EventsDatabaseWriter &&) noexcept = delete;
 
     private:
-        sqlite3 *handle_;
-        sqlite3_stmt *insert_event_;
+        fs::path file_;
+        StreamPtr stream_;
     };
 }

@@ -22,14 +22,13 @@
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 #include <filesystem>
 #include <memory>
 #include <vector>
 
 namespace fs = std::filesystem;
-
-struct sqlite3;
-struct sqlite3_stmt;
 
 namespace ic::collect::db {
 
@@ -64,8 +63,9 @@ namespace ic::collect::db {
     class EventsDatabaseReader {
     public:
         using Ptr = std::shared_ptr<EventsDatabaseReader>;
+        using StreamPtr = std::unique_ptr<google::protobuf::io::FileInputStream>;
 
-        [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> open(const fs::path &file);
+        [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> from(const fs::path &file);
 
         [[nodiscard]] EventsIterator events_begin();
         [[nodiscard]] EventsIterator events_end();
@@ -74,9 +74,10 @@ namespace ic::collect::db {
         friend class EventsIterator;
 
         [[nodiscard]] EventsIterator next() noexcept;
+        [[nodiscard]] std::runtime_error error() noexcept;
 
     public:
-        EventsDatabaseReader(sqlite3 *handle, sqlite3_stmt *select_events) noexcept;
+        explicit EventsDatabaseReader(fs::path file, StreamPtr stream) noexcept;
         ~EventsDatabaseReader() noexcept;
 
         EventsDatabaseReader(const EventsDatabaseReader &) = delete;
@@ -86,7 +87,7 @@ namespace ic::collect::db {
         EventsDatabaseReader &operator=(EventsDatabaseReader &&) noexcept = delete;
 
     private:
-        sqlite3 *handle_;
-        sqlite3_stmt *select_events_;
+        fs::path file_;
+        StreamPtr stream_;
     };
 }
