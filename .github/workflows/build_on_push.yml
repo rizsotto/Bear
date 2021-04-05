@@ -23,12 +23,12 @@ jobs:
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind libsqlite3-dev
+          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'macos' )
         run: |
-          brew install cmake pkg-config fmt spdlog nlohmann-json grpc sqlite
+          brew install cmake pkg-config fmt spdlog nlohmann-json grpc
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Set up Python

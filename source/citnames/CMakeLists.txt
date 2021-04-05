@@ -37,7 +37,6 @@ target_link_libraries(citnames_a PUBLIC rpc_a)
 target_link_libraries(citnames_a PUBLIC sys_a)
 target_link_libraries(citnames_a PUBLIC fmt::fmt)
 target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
-target_link_libraries(citnames_a PUBLIC PkgConfig::sqlite)
 
 # Create an executable from the sub projects.
 add_executable(citnames
@@ -58,7 +57,6 @@ target_link_libraries(citnames rpc_a)
 target_link_libraries(citnames fmt::fmt)
 target_link_libraries(citnames spdlog::spdlog)
 target_link_libraries(citnames nlohmann_json::nlohmann_json)
-target_link_libraries(citnames PkgConfig::sqlite)
 
 include(GNUInstallDirs)
 install(TARGETS citnames
@@ -96,7 +94,6 @@ if (ENABLE_UNIT_TESTS)
     target_link_libraries(citnames_unit_test rpc_a)
     target_link_libraries(citnames_unit_test fmt::fmt)
     target_link_libraries(citnames_unit_test nlohmann_json::nlohmann_json)
-    target_link_libraries(citnames_unit_test PkgConfig::sqlite)
     target_link_libraries(citnames_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::citnames_unit_test COMMAND $<TARGET_FILE:citnames_unit_test>)

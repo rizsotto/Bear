@@ -28,7 +28,6 @@ find_package(fmt REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET protobuf grpc++)
-pkg_check_modules(sqlite REQUIRED IMPORTED_TARGET sqlite3)
 
 if (UNIX AND NOT APPLE)
     set(SUPPORT_PRELOAD 1)
