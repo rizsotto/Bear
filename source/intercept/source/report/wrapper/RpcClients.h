@@ -63,7 +63,7 @@ namespace wr {
         InterceptorClient& operator=(InterceptorClient&&) noexcept = delete;
 
     public:
-        rust::Result<int> report(rpc::Event&&);
+        rust::Result<int> report(const rpc::Event &);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;

@@ -59,7 +59,7 @@ namespace wr {
             , interceptor_(rpc::Interceptor::NewStub(channel_))
     { }
 
-    rust::Result<int> InterceptorClient::report(rpc::Event &&event) {
+    rust::Result<int> InterceptorClient::report(const rpc::Event &event) {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Register");
 
         grpc::ClientContext context;
