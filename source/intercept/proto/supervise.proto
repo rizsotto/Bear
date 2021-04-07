@@ -20,7 +20,6 @@
 syntax = "proto3";
 
 package rpc;
-option cc_enable_arenas = true;
 
 // This represents the executed command itself. Describes all the
 // context that the caller was given. And these are the those parameters

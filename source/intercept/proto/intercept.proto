@@ -20,7 +20,6 @@
 syntax = "proto3";
 
 package rpc;
-option cc_enable_arenas = true;
 
 import "supervise.proto";
 
