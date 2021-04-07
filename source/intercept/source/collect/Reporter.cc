@@ -39,15 +39,15 @@ namespace ic {
 
     Reporter::Reporter(ic::collect::db::EventsDatabaseWriter::Ptr database)
             : database_(std::move(database))
-            , consumer_([this](const rpc::Event &event) {
-                database_->insert_event(event)
-                        .on_error([](auto error) {
-                            spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
-                        });
-            })
+            , mutex_()
     { }
 
     void Reporter::report(const rpc::Event& event) {
-        consumer_.push(event);
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        database_->insert_event(event)
+                .on_error([](auto error) {
+                    spdlog::warn("Writing event into database failed: {} Ignored.", error.what());
+                });
     }
 }
