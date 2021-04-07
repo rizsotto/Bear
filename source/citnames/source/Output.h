@@ -65,7 +65,7 @@ namespace cs {
     // above. (More advanced duplicate detection can be done by
     // checking the output field. This might only work if all entries
     // have this field.)
-    Entries merge(const Entries& already_in, const Entries& rhs);
+    Entries& merge(Entries& output, const Entries& input);
 
     // Utility class to persists JSON compilation database.
     //
@@ -76,7 +76,7 @@ namespace cs {
     // It also supports to write different format with configuration
     // parameters. And basic content filtering is also available.
     struct CompilationDatabase {
-        CompilationDatabase(const Format&, const Content&);
+        CompilationDatabase(Format, Content);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.

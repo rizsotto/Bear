@@ -146,7 +146,7 @@ namespace cs {
                     auto build = cs::semantic::Build(configuration_.compilation);
                     auto compilations = transform(build, commands);
                     // remove duplicates
-                    return merge({}, compilations);
+                    return merge(compilations, {});
                 })
                 .and_then<Entries>([this, &output](const auto &compilations) {
                     // read back the current content and extend with the new elements.
@@ -155,7 +155,7 @@ namespace cs {
                            ? output.from_json(arguments_.output.c_str())
                                    .template map<Entries>([&compilations](auto old_entries) {
                                        spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
-                                       return merge(compilations, old_entries);
+                                       return merge(old_entries, compilations);
                                    })
                            : rust::Result<Entries>(rust::Ok(compilations));
                 })

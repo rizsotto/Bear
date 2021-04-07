@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <fstream>
 #include <set>
+#include <utility>
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -90,8 +91,10 @@ namespace {
 
 namespace cs {
 
-    CompilationDatabase::CompilationDatabase(const Format &_format, const Content &_content)
-            : format(_format), content(_content) {}
+    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
+            : format(_format)
+            , content(std::move(_content))
+    { }
 
     nlohmann::json to_json(const Entry &rhs, const Format &format) {
         nlohmann::json json;
@@ -235,28 +238,29 @@ namespace cs {
         }
     }
 
-    Entries merge(const Entries &lhs, const Entries &rhs) {
-        Entries result;
+    Entries& merge(Entries &output, const Entries &input) {
         // create a predicate which decides if the entry is already in the result.
-        auto hasher = select_hash(lhs, rhs);
+        auto hasher = select_hash(output, input);
         std::set<std::string> in_results_hashes;
+        // dedup the output list first.
+        for (auto it = output.begin(); it != output.end(); ) {
+            auto hash = hasher(*it);
+            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
+                in_results_hashes.insert(hash);
+                ++it;
+            } else {
+                it = output.erase(it);
+            }
+        }
         // copy the elements into the result list depending if it already there.
-        for (const auto &entry : lhs) {
+        for (const auto &entry : input) {
             auto hash = hasher(entry);
             if (in_results_hashes.find(hash) == in_results_hashes.end()) {
                 in_results_hashes.insert(hash);
-                result.push_back(entry);
+                output.push_back(entry);
             }
         }
-        for (const auto &entry : rhs) {
-            auto hash = hasher(entry);
-            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
-                in_results_hashes.insert(hash);
-                result.push_back(entry);
-            }
-        }
-
-        return result;
+        return output;
     }
 
     bool operator==(const Entry &lhs, const Entry &rhs) {
