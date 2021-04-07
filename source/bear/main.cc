@@ -182,7 +182,7 @@ namespace {
                     "bear",
                     VERSION,
                     {
-                            {OUTPUT,        {1,  false, "path of the result file",                  {"compile_commands.json"},  std::nullopt}},
+                            {OUTPUT,        {1,  false, "path of the result file",                  {COMPILATION_DB_DEFAULT},  std::nullopt}},
                             {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,               ADVANCED_GROUP}},
                             {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,               ADVANCED_GROUP}},
                             {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,               ADVANCED_GROUP}},
@@ -201,9 +201,9 @@ namespace {
         {
             auto commands = args.as_string(OUTPUT)
                     .map<fs::path>([](const auto &output) {
-                        return fs::path(output).replace_extension(".sqlite3");
+                        return fs::path(output).replace_extension(".db");
                     })
-                    .unwrap_or(fs::path("commands.sqlite3"));
+                    .unwrap_or(fs::path(EVENTS_DB_DEFAULT));
 
             auto environment = sys::env::from(const_cast<const char **>(envp));
             auto intercept = prepare_intercept(args, environment, commands);

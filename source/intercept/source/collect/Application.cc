@@ -114,7 +114,7 @@ namespace ic {
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
         const flags::Parser parser("intercept", VERSION, {
-                {ic::OUTPUT,        {1,  false, "path of the result file",        {"commands.sqlite3"},       std::nullopt}},
+                {ic::OUTPUT,        {1,  false, "path of the result file",        {EVENTS_DB_DEFAULT},       std::nullopt}},
                 {ic::FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,               DEVELOPER_GROUP}},
                 {ic::FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,               DEVELOPER_GROUP}},
                 {ic::LIBRARY,       {1,  false, "path to the preload library",    {LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
