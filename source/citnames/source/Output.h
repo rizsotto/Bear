@@ -59,14 +59,6 @@ namespace cs {
     std::ostream& operator<<(std::ostream&, const Entry&);
     std::ostream& operator<<(std::ostream&, const Entries&);
 
-    // Merge two compilation database without duplicate elements.
-    //
-    // Duplicate detection is based on the equal operator defined
-    // above. (More advanced duplicate detection can be done by
-    // checking the output field. This might only work if all entries
-    // have this field.)
-    Entries& merge(Entries& output, const Entries& input);
-
     // Utility class to persists JSON compilation database.
     //
     // While the JSON compilation database might have different format
@@ -83,8 +75,8 @@ namespace cs {
         [[nodiscard]] virtual rust::Result<size_t> to_json(const fs::path& file, const Entries &entries) const;
         [[nodiscard]] virtual rust::Result<size_t> to_json(std::ostream &ostream, const Entries &entries) const;
 
-        [[nodiscard]] virtual rust::Result<Entries> from_json(const fs::path& file) const;
-        [[nodiscard]] virtual rust::Result<Entries> from_json(std::istream &istream) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_json(const fs::path& file, Entries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_json(std::istream &istream, Entries &entries) const;
 
     private:
         Format format;

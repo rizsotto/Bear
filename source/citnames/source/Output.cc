@@ -31,8 +31,6 @@
 
 namespace {
 
-    using Filter = std::function<bool(const cs::Entry &)>;
-
     bool is_exists(const fs::path &path) {
         std::error_code error_code;
         return fs::exists(path, error_code);
@@ -48,8 +46,17 @@ namespace {
         });
     }
 
-    Filter make_filter(const cs::Content &config) {
-        return [config](const auto &entry) -> bool {
+    struct Filter {
+        virtual ~Filter() noexcept = default;
+        virtual bool apply(const cs::Entry &) = 0;
+    };
+
+    struct ContentFilter : public Filter {
+        explicit ContentFilter(cs::Content config)
+                : config(std::move(config))
+        { }
+
+        bool apply(const cs::Entry &entry) override {
             if (config.include_only_existing_source) {
                 const auto exists = is_exists(entry.file);
 
@@ -62,31 +69,73 @@ namespace {
             }
             // if no check required, accept every entry.
             return true;
-        };
-    }
+        }
 
-    using Hash = std::function<std::string(const cs::Entry &entry)>;
+    private:
+        cs::Content config;
+    };
 
-    std::string hash_by_output(const cs::Entry &entry) {
-        return fmt::format("{}<->{}",
-                           entry.file.string(),
-                           entry.output.value_or(fs::path()).string());
-    }
+    // Duplicate detection filter.
+    //
+    // Duplicate detection can be done two ways: first one is based on the `output` attribute,
+    // second is based on all attributes. The benefit to use the `output` attribute only is,
+    // that it faster and handles compiler flag changes better. The problem with it is, that
+    // it not present in every entries.
+    //
+    // Current implementation is starts with the output one, but computes both hashes (and
+    // maintains the hash sets). If an entry has no output attribute, then it switch to use
+    // all attributes hashes.
+    struct DuplicateFilter : public Filter {
+        DuplicateFilter()
+                : by_output_is_valid(true)
+                , hashes_by_output()
+                , hashes_by_all()
+        { }
 
-    std::string hash_by_all(const cs::Entry &entry) {
-        return fmt::format("{}<->{}<->{}",
-                           entry.file.string(),
-                           entry.directory.string(),
-                           fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
-    }
+        bool apply(const cs::Entry &entry) override {
+            if (by_output_is_valid && (!entry.output.has_value())) {
+                by_output_is_valid = false;
+                hashes_by_output.clear();
+            }
+            if (by_output_is_valid) {
+                if (const auto h1 = hash_by_output(entry); hashes_by_output.find(h1) == hashes_by_output.end()) {
+                    hashes_by_output.insert(h1);
+                    const auto h2 = hash_by_all(entry);
+                    hashes_by_all.insert(h2);
+                    return true;
+                }
+            } else {
+                if (const auto h2 = hash_by_all(entry); hashes_by_all.find(h2) == hashes_by_all.end()) {
+                    hashes_by_all.insert(h2);
+                    return true;
+                }
+            }
+            return false;
+        }
 
-    Hash select_hash(const cs::Entries &lhs, const cs::Entries &rhs) {
-        // Select hash function based on the input values.
-        const bool lhs_outputs = std::all_of(lhs.begin(), lhs.end(), [](auto entry) { return entry.output; });
-        const bool rhs_outputs = std::all_of(rhs.begin(), rhs.end(), [](auto entry) { return entry.output; });
-        // if all entries have the output field, it can compare by the output field.
-        return (lhs_outputs && rhs_outputs) ? hash_by_output : hash_by_all;
-    }
+    private:
+        static std::string hash_by_output(const cs::Entry &entry) {
+            return fmt::format("{}<->{}",
+                               entry.file.string(),
+                               entry.output.value_or(fs::path()).string());
+        }
+
+        // The hash function based on all attributes.
+        //
+        // - It shall ignore the compiler name, but count all compiler flags in.
+        // - Same compiler call semantic is detected by filter out the irrelevant flags.
+        static std::string hash_by_all(const cs::Entry &entry) {
+            return fmt::format("{}<->{}<->{}",
+                               entry.file.string(),
+                               entry.directory.string(),
+                               fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
+        }
+
+    private:
+        bool by_output_is_valid = true;
+        std::set<std::string> hashes_by_output;
+        std::set<std::string> hashes_by_all;
+    };
 }
 
 namespace cs {
@@ -134,11 +183,13 @@ namespace cs {
 
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
+            ContentFilter content_filter(content);
+            DuplicateFilter duplicate_filter;
+
             size_t count = 0;
-            auto filter = make_filter(content);
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
-                if (std::invoke(filter, entry)) {
+                if (content_filter.apply(entry) && duplicate_filter.apply(entry)) {
                     auto json_entry = cs::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
                     ++count;
@@ -206,10 +257,10 @@ namespace cs {
         }
     }
 
-    rust::Result<Entries> CompilationDatabase::from_json(const fs::path &file) const {
+    rust::Result<size_t> CompilationDatabase::from_json(const fs::path &file, Entries &entries) const {
         try {
             std::ifstream source(file);
-            return from_json(source)
+            return from_json(source, entries)
                     .map_err<std::runtime_error>([&file](auto error) {
                         return std::runtime_error(
                                 fmt::format("Failed to read file: {}, cause: {}",
@@ -224,43 +275,18 @@ namespace cs {
         }
     }
 
-    rust::Result<Entries> CompilationDatabase::from_json(std::istream &istream) const {
+    rust::Result<size_t> CompilationDatabase::from_json(std::istream &istream, Entries &entries) const {
         try {
             nlohmann::json in;
             istream >> in;
 
-            Entries result;
-            cs::from_json(in, result);
+            const size_t size = in.size();
+            cs::from_json(in, entries);
 
-            return rust::Ok(result);
+            return rust::Ok(size);
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
-    }
-
-    Entries& merge(Entries &output, const Entries &input) {
-        // create a predicate which decides if the entry is already in the result.
-        auto hasher = select_hash(output, input);
-        std::set<std::string> in_results_hashes;
-        // dedup the output list first.
-        for (auto it = output.begin(); it != output.end(); ) {
-            auto hash = hasher(*it);
-            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
-                in_results_hashes.insert(hash);
-                ++it;
-            } else {
-                it = output.erase(it);
-            }
-        }
-        // copy the elements into the result list depending if it already there.
-        for (const auto &entry : input) {
-            auto hash = hasher(entry);
-            if (in_results_hashes.find(hash) == in_results_hashes.end()) {
-                in_results_hashes.insert(hash);
-                output.push_back(entry);
-            }
-        }
-        return output;
     }
 
     bool operator==(const Entry &lhs, const Entry &rhs) {

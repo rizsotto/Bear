@@ -116,22 +116,23 @@ namespace {
                 });
     }
 
-    cs::Entries transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events) {
-        cs::Entries results;
+    size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, cs::Entries &output) {
+        size_t count = 0;
         for (db::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
             (*it)
                     .and_then<cs::semantic::SemanticPtr>([&build](const auto &event) {
                         return build.recognize(*event);
                     })
-                    .on_success([&results](const auto &semantic) {
+                    .on_success([&output, &count](const auto &semantic) {
                         auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
                         if (candidate != nullptr) {
                             auto entries = candidate->into_entries();
-                            std::copy(entries.begin(), entries.end(), std::back_inserter(results));
+                            count += entries.size();
+                            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
                         }
                     });
         }
-        return results;
+        return count;
     }
 }
 
@@ -139,30 +140,29 @@ namespace cs {
 
     rust::Result<int> Command::execute() const {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
+        cs::Entries entries;
 
         // get current compilations from the input.
         return db::EventsDatabaseReader::from(arguments_.input)
-                .map<Entries>([this](const auto &commands) {
+                .map<size_t>([this, &entries](const auto &commands) {
                     auto build = cs::semantic::Build(configuration_.compilation);
-                    auto compilations = transform(build, commands);
-                    // remove duplicates
-                    return merge(compilations, {});
+                    return transform(build, commands, entries);
                 })
-                .and_then<Entries>([this, &output](const auto &compilations) {
+                .and_then<size_t>([this, &output, &entries](auto new_entries_count) {
+                    spdlog::debug("compilation entries created. [size: {}]", new_entries_count);
                     // read back the current content and extend with the new elements.
-                    spdlog::debug("compilation entries created. [size: {}]", compilations.size());
                     return (arguments_.append)
-                           ? output.from_json(arguments_.output.c_str())
-                                   .template map<Entries>([&compilations](auto old_entries) {
-                                       spdlog::debug("compilation entries have read. [size: {}]", old_entries.size());
-                                       return merge(old_entries, compilations);
-                                   })
-                           : rust::Result<Entries>(rust::Ok(compilations));
+                        ? output.from_json(arguments_.output.c_str(), entries)
+                                .template map<size_t>([&new_entries_count](auto old_entries_count) {
+                                    spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
+                                    return new_entries_count + old_entries_count;
+                                })
+                        : rust::Result<size_t>(rust::Ok(new_entries_count));
                 })
-                .and_then<size_t>([this, &output](const auto &compilations) {
+                .and_then<size_t>([this, &output, &entries](const size_t & size) {
                     // write the entries into the output file.
-                    spdlog::debug("compilation entries to output. [size: {}]", compilations.size());
-                    return output.to_json(arguments_.output.c_str(), compilations);
+                    spdlog::debug("compilation entries to output. [size: {}]", size);
+                    return output.to_json(arguments_.output.c_str(), entries);
                 })
                 .map<int>([](auto size) {
                     // just map to success exit code if it was successful.
