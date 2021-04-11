@@ -44,8 +44,8 @@ namespace cs::semantic {
         return os;
     }
 
-    cs::Entries QueryCompiler::into_entries() const {
-        return cs::Entries();
+    std::list<cs::Entry> QueryCompiler::into_entries() const {
+        return std::list<cs::Entry>();
     }
 
     bool Preprocess::operator==(const Semantic &) const {
@@ -57,8 +57,8 @@ namespace cs::semantic {
         return os;
     }
 
-    cs::Entries Preprocess::into_entries() const {
-        return cs::Entries();
+    std::list<cs::Entry> Preprocess::into_entries() const {
+        return std::list<cs::Entry>();
     }
 
     Compile::Compile(fs::path working_dir,
@@ -97,11 +97,11 @@ namespace cs::semantic {
         return os;
     }
 
-    cs::Entries Compile::into_entries() const {
+    std::list<cs::Entry> Compile::into_entries() const {
         const auto abspath = [this](const fs::path &path) -> fs::path {
             return (path.is_absolute()) ? path : working_dir / path;
         };
-        cs::Entries results;
+        std::list<cs::Entry> results;
         for (const auto& source : sources) {
             cs::Entry result {
                 abspath(source),

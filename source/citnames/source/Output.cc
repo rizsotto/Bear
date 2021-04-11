@@ -140,10 +140,20 @@ namespace {
 
 namespace cs {
 
-    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
-            : format(_format)
-            , content(std::move(_content))
-    { }
+    void validate(const Entry &entry) {
+        if (entry.file.empty()) {
+            throw std::runtime_error("Field 'file' is empty string.");
+        }
+        if (entry.directory.empty()) {
+            throw std::runtime_error("Field 'directory' is empty string.");
+        }
+        if (entry.output.has_value() && entry.output.value().empty()) {
+            throw std::runtime_error("Field 'output' is empty string.");
+        }
+        if (entry.arguments.empty()) {
+            throw std::runtime_error("Field 'arguments' is empty list.");
+        }
+    }
 
     nlohmann::json to_json(const Entry &rhs, const Format &format) {
         nlohmann::json json;
@@ -161,6 +171,56 @@ namespace cs {
 
         return json;
     }
+
+    void from_json(const nlohmann::json &j, Entry &entry) {
+        j.at("file").get_to(entry.file);
+        j.at("directory").get_to(entry.directory);
+        if (j.contains("output")) {
+            std::string output;
+            j.at("output").get_to(output);
+            entry.output.emplace(output);
+        }
+        if (j.contains("arguments")) {
+            std::list<std::string> arguments;
+            j.at("arguments").get_to(arguments);
+            entry.arguments.swap(arguments);
+        } else if (j.contains("command")) {
+            std::string command;
+            j.at("command").get_to(command);
+
+            sh::split(command)
+                    .on_success([&entry](auto arguments) {
+                        entry.arguments = arguments;
+                    })
+                    .on_error([](auto error) {
+                        throw error;
+                    });
+        } else {
+            throw nlohmann::json::out_of_range::create(403, "key 'command' or 'arguments' not found");
+        }
+
+        validate(entry);
+    }
+
+    bool operator==(const Entry &lhs, const Entry &rhs) {
+        return (lhs.file == rhs.file)
+               && (lhs.directory == rhs.directory)
+               && (lhs.output == rhs.output)
+               && (lhs.arguments == rhs.arguments);
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Entry &entry) {
+        Format format;
+        nlohmann::json json = to_json(entry, format);
+        os << json;
+
+        return os;
+    }
+
+    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
+            : format(_format)
+            , content(std::move(_content))
+    { }
 
     rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &rhs) const {
         try {
@@ -204,60 +264,7 @@ namespace cs {
         }
     }
 
-    void validate(const Entry &entry) {
-        if (entry.file.empty()) {
-            throw std::runtime_error("Field 'file' is empty string.");
-        }
-        if (entry.directory.empty()) {
-            throw std::runtime_error("Field 'directory' is empty string.");
-        }
-        if (entry.output.has_value() && entry.output.value().empty()) {
-            throw std::runtime_error("Field 'output' is empty string.");
-        }
-        if (entry.arguments.empty()) {
-            throw std::runtime_error("Field 'arguments' is empty list.");
-        }
-    }
-
-    void from_json(const nlohmann::json &j, Entry &entry) {
-        j.at("file").get_to(entry.file);
-        j.at("directory").get_to(entry.directory);
-        if (j.contains("output")) {
-            std::string output;
-            j.at("output").get_to(output);
-            entry.output.emplace(output);
-        }
-        if (j.contains("arguments")) {
-            std::list<std::string> arguments;
-            j.at("arguments").get_to(arguments);
-            entry.arguments.swap(arguments);
-        } else if (j.contains("command")) {
-            std::string command;
-            j.at("command").get_to(command);
-
-            sh::split(command)
-                    .on_success([&entry](auto arguments) {
-                        entry.arguments = arguments;
-                    })
-                    .on_error([](auto error) {
-                        throw error;
-                    });
-        } else {
-            throw nlohmann::json::out_of_range::create(403, "key 'command' or 'arguments' not found");
-        }
-
-        validate(entry);
-    }
-
-    void from_json(const nlohmann::json &array, Entries &entries) {
-        for (const auto &e : array) {
-            Entry entry;
-            from_json(e, entry);
-            entries.emplace_back(entry);
-        }
-    }
-
-    rust::Result<size_t> CompilationDatabase::from_json(const fs::path &file, Entries &entries) const {
+    rust::Result<size_t> CompilationDatabase::from_json(const fs::path &file, std::list<cs::Entry> &entries) const {
         try {
             std::ifstream source(file);
             return from_json(source, entries)
@@ -275,42 +282,20 @@ namespace cs {
         }
     }
 
-    rust::Result<size_t> CompilationDatabase::from_json(std::istream &istream, Entries &entries) const {
+    rust::Result<size_t> CompilationDatabase::from_json(std::istream &istream, std::list<cs::Entry> &entries) const {
         try {
             nlohmann::json in;
             istream >> in;
 
-            const size_t size = in.size();
-            cs::from_json(in, entries);
+            for (const auto &e : in) {
+                Entry entry;
+                cs::from_json(e, entry);
+                entries.emplace_back(entry);
+            }
 
-            return rust::Ok(size);
+            return rust::Ok(in.size());
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }
-    }
-
-    bool operator==(const Entry &lhs, const Entry &rhs) {
-        return (lhs.file == rhs.file)
-               && (lhs.directory == rhs.directory)
-               && (lhs.output == rhs.output)
-               && (lhs.arguments == rhs.arguments);
-    }
-
-    std::ostream &operator<<(std::ostream &os, const Entry &entry) {
-        Format format;
-        nlohmann::json json = to_json(entry, format);
-        os << json;
-
-        return os;
-    }
-
-    std::ostream &operator<<(std::ostream &os, const Entries &entries) {
-        for (auto it = entries.begin(); it != entries.end(); ++it) {
-            if (it != entries.begin()) {
-                os << ", ";
-            }
-            os << *it;
-        }
-        return os;
     }
 }

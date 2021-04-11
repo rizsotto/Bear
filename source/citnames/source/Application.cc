@@ -116,7 +116,7 @@ namespace {
                 });
     }
 
-    size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, cs::Entries &output) {
+    size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::Entry> &output) {
         size_t count = 0;
         for (db::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
             (*it)
@@ -140,7 +140,7 @@ namespace cs {
 
     rust::Result<int> Command::execute() const {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
-        cs::Entries entries;
+        std::list<cs::Entry> entries;
 
         // get current compilations from the input.
         return db::EventsDatabaseReader::from(arguments_.input)

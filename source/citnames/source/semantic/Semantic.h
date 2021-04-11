@@ -59,7 +59,7 @@ namespace cs::semantic {
 
     // Represents a compiler call command.
     struct CompilerCall : public Semantic {
-        [[nodiscard]] virtual cs::Entries into_entries() const = 0;
+        [[nodiscard]] virtual std::list<cs::Entry> into_entries() const = 0;
     };
 
     // Represents a compiler call, which does process any input, but query
@@ -68,7 +68,7 @@ namespace cs::semantic {
         bool operator==(Semantic const&) const override;
         std::ostream& operator<<(std::ostream&) const override;
 
-        [[nodiscard]] cs::Entries into_entries() const override;
+        [[nodiscard]] std::list<cs::Entry> into_entries() const override;
     };
 
     // Represents a compiler call, which runs only the preprocessor.
@@ -77,7 +77,7 @@ namespace cs::semantic {
         bool operator==(Semantic const&) const override;
         std::ostream& operator<<(std::ostream&) const override;
 
-        [[nodiscard]] cs::Entries into_entries() const override;
+        [[nodiscard]] std::list<cs::Entry> into_entries() const override;
     };
 
     // Represents a compiler call, which runs the compilation pass.
@@ -91,7 +91,7 @@ namespace cs::semantic {
         bool operator==(Semantic const&) const override;
         std::ostream& operator<<(std::ostream&) const override;
 
-        [[nodiscard]] cs::Entries into_entries() const override;
+        [[nodiscard]] std::list<cs::Entry> into_entries() const override;
 
     public:
         fs::path working_dir;

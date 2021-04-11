@@ -35,8 +35,8 @@ namespace {
     };
 
     void value_serialized_and_read_back(
-            const cs::Entries& input,
-            const cs::Entries& expected,
+            const std::list<cs::Entry>& input,
+            const std::list<cs::Entry>& expected,
             cs::Format format)
     {
         cs::CompilationDatabase sut(format, NO_FILTER);
@@ -45,7 +45,7 @@ namespace {
         auto serialized = sut.to_json(buffer, input);
         EXPECT_TRUE(serialized.is_ok());
 
-        cs::Entries deserialized;
+        std::list<cs::Entry> deserialized;
         auto count = sut.from_json(buffer, deserialized);
         EXPECT_TRUE(count.is_ok());
         count.on_success([&expected, &deserialized](auto result) {
@@ -56,7 +56,7 @@ namespace {
 
     TEST(compilation_database, empty_value_serialized_and_read_back)
     {
-        cs::Entries expected = {};
+        std::list<cs::Entry> expected = {};
 
         value_serialized_and_read_back(expected, expected, AS_ARGUMENTS);
         value_serialized_and_read_back(expected, expected, AS_COMMAND);
@@ -64,7 +64,7 @@ namespace {
 
     TEST(compilation_database, same_entries_read_back)
     {
-        cs::Entries expected = {
+        std::list<cs::Entry> expected = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
@@ -76,12 +76,12 @@ namespace {
 
     TEST(compilation_database, entries_without_output_read_back)
     {
-        cs::Entries input = {
+        std::list<cs::Entry> input = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", { "entries.o" }, { "cc", "-c", "-o", "entries.o", "entries.c" } },
         };
-        cs::Entries expected = {
+        std::list<cs::Entry> expected = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
                 { "entries.c", "/path/to", std::nullopt, { "cc", "-c", "-o", "entries.o", "entries.c" } },
@@ -93,13 +93,13 @@ namespace {
 
     TEST(compilation_database, merged_entries_read_back)
     {
-        cs::Entries input = {
+        std::list<cs::Entry> input = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
                 { "entry_one.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc1", "-c", "entry_two.c" } },
         };
-        cs::Entries expected = {
+        std::list<cs::Entry> expected = {
                 { "entry_one.c", "/path/to", std::nullopt, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", std::nullopt, { "cc", "-c", "entry_two.c" } },
         };
@@ -112,13 +112,13 @@ namespace {
 
     TEST(compilation_database, merged_with_output_read_back)
     {
-        cs::Entries input = {
+        std::list<cs::Entry> input = {
                 { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
                 { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c", "-flag" } },
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c", "-flag" } },
         };
-        cs::Entries expected = {
+        std::list<cs::Entry> expected = {
                 { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
         };
@@ -132,7 +132,7 @@ namespace {
         cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
-        cs::Entries deserialized;
+        std::list<cs::Entry> deserialized;
         auto count = sut.from_json(buffer, deserialized);
         EXPECT_FALSE(count.is_ok());
     }
@@ -144,7 +144,7 @@ namespace {
 
         buffer << "[ { } ]";
 
-        cs::Entries deserialized;
+        std::list<cs::Entry> deserialized;
         auto count = sut.from_json(buffer, deserialized);
         EXPECT_FALSE(count.is_ok());
     }
@@ -156,7 +156,7 @@ namespace {
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";
 
-        cs::Entries deserialized;
+        std::list<cs::Entry> deserialized;
         auto count = sut.from_json(buffer, deserialized);
         EXPECT_FALSE(count.is_ok());
     }

@@ -51,13 +51,9 @@ namespace cs {
         std::list<std::string> arguments;
     };
 
-    using Entries = std::list<Entry>;
-
     // Convenient methods for these types.
     bool operator==(const Entry& lhs, const Entry& rhs);
-
     std::ostream& operator<<(std::ostream&, const Entry&);
-    std::ostream& operator<<(std::ostream&, const Entries&);
 
     // Utility class to persists JSON compilation database.
     //
@@ -68,6 +64,8 @@ namespace cs {
     // It also supports to write different format with configuration
     // parameters. And basic content filtering is also available.
     struct CompilationDatabase {
+        using Entries = std::list<Entry>;
+
         CompilationDatabase(Format, Content);
         virtual ~CompilationDatabase() noexcept = default;
 
