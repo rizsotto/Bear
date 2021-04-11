@@ -31,21 +31,6 @@
 
 namespace {
 
-    bool is_exists(const fs::path &path) {
-        std::error_code error_code;
-        return fs::exists(path, error_code);
-    }
-
-    bool contains(const std::list<fs::path> &root, const fs::path &file) {
-        return std::any_of(root.begin(), root.end(), [&file](auto directory) {
-            // check if the path elements (list of directory names) are the same.
-            const auto [end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
-            // the file is contained in the directory if all path elements are
-            // in the file paths too.
-            return (end == directory.end());
-        });
-    }
-
     struct Filter {
         virtual ~Filter() noexcept = default;
         virtual bool apply(const cs::Entry &) = 0;
@@ -72,6 +57,22 @@ namespace {
         }
 
     private:
+        static bool is_exists(const fs::path &path) {
+            std::error_code error_code;
+            return fs::exists(path, error_code);
+        }
+
+        static bool contains(const std::list<fs::path> &root, const fs::path &file) {
+            return std::any_of(root.begin(), root.end(), [&file](auto directory) {
+                // check if the path elements (list of directory names) are the same.
+                const auto [end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
+                // the file is contained in the directory if all path elements are
+                // in the file paths too.
+                return (end == directory.end());
+            });
+        }
+
+    private:
         cs::Content config;
     };
 
@@ -87,54 +88,36 @@ namespace {
     // all attributes hashes.
     struct DuplicateFilter : public Filter {
         DuplicateFilter()
-                : by_output_is_valid(true)
-                , hashes_by_output()
-                , hashes_by_all()
+                : hashes()
         { }
 
         bool apply(const cs::Entry &entry) override {
-            if (by_output_is_valid && (!entry.output.has_value())) {
-                by_output_is_valid = false;
-                hashes_by_output.clear();
-            }
-            if (by_output_is_valid) {
-                if (const auto h1 = hash_by_output(entry); hashes_by_output.find(h1) == hashes_by_output.end()) {
-                    hashes_by_output.insert(h1);
-                    const auto h2 = hash_by_all(entry);
-                    hashes_by_all.insert(h2);
-                    return true;
-                }
-            } else {
-                if (const auto h2 = hash_by_all(entry); hashes_by_all.find(h2) == hashes_by_all.end()) {
-                    hashes_by_all.insert(h2);
-                    return true;
-                }
+            if (const auto h2 = hash(entry); hashes.find(h2) == hashes.end()) {
+                hashes.insert(h2);
+                return true;
             }
             return false;
         }
 
     private:
-        static std::string hash_by_output(const cs::Entry &entry) {
-            return fmt::format("{}<->{}",
-                               entry.file.string(),
-                               entry.output.value_or(fs::path()).string());
-        }
-
         // The hash function based on all attributes.
         //
         // - It shall ignore the compiler name, but count all compiler flags in.
         // - Same compiler call semantic is detected by filter out the irrelevant flags.
-        static std::string hash_by_all(const cs::Entry &entry) {
-            return fmt::format("{}<->{}<->{}",
-                               entry.file.string(),
-                               entry.directory.string(),
-                               fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
+        static std::string hash(const cs::Entry &entry) {
+            auto file = entry.file.string();
+            std::reverse(file.begin(), file.end());
+
+            auto args = fmt::format(
+                    "{}",
+                    fmt::join(entry.arguments.rbegin(), std::prev(entry.arguments.rend()), ","));
+            size_t args_hash = std::hash<std::string>{}(args);
+
+            return fmt::format("{}:{}", args_hash, file);
         }
 
     private:
-        bool by_output_is_valid = true;
-        std::set<std::string> hashes_by_output;
-        std::set<std::string> hashes_by_all;
+        std::set<std::string> hashes;
     };
 }
 

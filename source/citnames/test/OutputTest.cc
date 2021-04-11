@@ -110,23 +110,6 @@ namespace {
         value_serialized_and_read_back(input, expected, AS_COMMAND_NO_OUTPUT);
     }
 
-    TEST(compilation_database, merged_with_output_read_back)
-    {
-        std::list<cs::Entry> input = {
-                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
-                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
-                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c", "-flag" } },
-                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c", "-flag" } },
-        };
-        std::list<cs::Entry> expected = {
-                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
-                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
-        };
-
-        value_serialized_and_read_back(input, expected, AS_ARGUMENTS);
-        value_serialized_and_read_back(input, expected, AS_COMMAND);
-    }
-
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
         cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
