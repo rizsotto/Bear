@@ -1,62 +1,57 @@
 # Create a static library, which is used for unit tests and the final shared library.
-add_library(citnames_json_a OBJECT
-        source/Configuration.cc
-        source/Output.cc
+add_library(citnames_json_a OBJECT)
+target_sources(citnames_json_a
+        PRIVATE
+            source/Configuration.cc
+            source/Output.cc
+        INTERFACE
+            $<TARGET_OBJECTS:citnames_json_a>
         )
-
-target_link_libraries(citnames_json_a PUBLIC result_a)
-target_link_libraries(citnames_json_a PUBLIC shell_a)
-target_link_libraries(citnames_json_a PUBLIC sys_a)
-target_link_libraries(citnames_json_a PUBLIC fmt::fmt)
-target_link_libraries(citnames_json_a PUBLIC spdlog::spdlog)
-target_link_libraries(citnames_json_a PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(citnames_json_a PUBLIC
+        result_a
+        shell_a
+        sys_a
+        fmt::fmt
+        spdlog::spdlog
+        nlohmann_json::nlohmann_json)
 target_compile_options(citnames_json_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.
-add_library(citnames_a OBJECT
-        source/Application.cc
-        source/semantic/Build.cc
-        source/semantic/Parsers.cc
-        source/semantic/Semantic.cc
-        source/semantic/ToolAny.cc
-        source/semantic/ToolClang.cc
-        source/semantic/ToolCuda.cc
-        source/semantic/ToolGcc.cc
-        source/semantic/ToolWrapper.cc
-        source/semantic/ToolExtendingWrapper.cc
+add_library(citnames_a OBJECT)
+target_include_directories(citnames_a PUBLIC include/ source/)
+target_sources(citnames_a
+        PRIVATE
+            source/Application.cc
+            source/semantic/Build.cc
+            source/semantic/Parsers.cc
+            source/semantic/Semantic.cc
+            source/semantic/ToolAny.cc
+            source/semantic/ToolClang.cc
+            source/semantic/ToolCuda.cc
+            source/semantic/ToolGcc.cc
+            source/semantic/ToolWrapper.cc
+            source/semantic/ToolExtendingWrapper.cc
+        INTERFACE
+            $<TARGET_OBJECTS:citnames_a>
         )
-
-target_include_directories(citnames_a PUBLIC include/)
-target_include_directories(citnames_a PUBLIC source/)
-target_link_libraries(citnames_a PUBLIC main_a)
-target_link_libraries(citnames_a PUBLIC domain_a)
-target_link_libraries(citnames_a PUBLIC result_a)
-target_link_libraries(citnames_a PUBLIC flags_a)
-target_link_libraries(citnames_a PUBLIC events_db_a)
-target_link_libraries(citnames_a PUBLIC rpc_a)
-target_link_libraries(citnames_a PUBLIC sys_a)
-target_link_libraries(citnames_a PUBLIC fmt::fmt)
-target_link_libraries(citnames_a PUBLIC spdlog::spdlog)
+target_link_libraries(citnames_a PUBLIC
+        main_a
+        citnames_json_a
+        events_db_a
+        domain_a
+        result_a
+        flags_a
+        sys_a
+        fmt::fmt
+        spdlog::spdlog)
 
 # Create an executable from the sub projects.
 add_executable(citnames
         main.cc
         )
-
-target_link_libraries(citnames main_a)
-target_link_libraries(citnames citnames_a)
-target_link_libraries(citnames citnames_json_a)
-target_link_libraries(citnames events_db_a)
-target_link_libraries(citnames domain_a)
-target_link_libraries(citnames result_a)
-target_link_libraries(citnames rpc_a)
-target_link_libraries(citnames flags_a)
-target_link_libraries(citnames shell_a)
-target_link_libraries(citnames sys_a)
-target_link_libraries(citnames rpc_a)
-target_link_libraries(citnames fmt::fmt)
-target_link_libraries(citnames spdlog::spdlog)
-target_link_libraries(citnames nlohmann_json::nlohmann_json)
+target_link_libraries(citnames
+        citnames_a
+        citnames_json_a)
 
 include(GNUInstallDirs)
 install(TARGETS citnames
@@ -81,19 +76,8 @@ if (ENABLE_UNIT_TESTS)
             test/ToolGccTest.cc
             )
 
-    target_link_libraries(citnames_unit_test main_a)
     target_link_libraries(citnames_unit_test citnames_a)
     target_link_libraries(citnames_unit_test citnames_json_a)
-    target_link_libraries(citnames_unit_test events_db_a)
-    target_link_libraries(citnames_unit_test domain_a)
-    target_link_libraries(citnames_unit_test result_a)
-    target_link_libraries(citnames_unit_test rpc_a)
-    target_link_libraries(citnames_unit_test flags_a)
-    target_link_libraries(citnames_unit_test shell_a)
-    target_link_libraries(citnames_unit_test sys_a)
-    target_link_libraries(citnames_unit_test rpc_a)
-    target_link_libraries(citnames_unit_test fmt::fmt)
-    target_link_libraries(citnames_unit_test nlohmann_json::nlohmann_json)
     target_link_libraries(citnames_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::citnames_unit_test COMMAND $<TARGET_FILE:citnames_unit_test>)

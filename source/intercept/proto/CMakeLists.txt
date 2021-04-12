@@ -49,12 +49,17 @@ add_custom_command(
             "${INTERCEPT_PROTO}"
 )
 
-add_library(rpc_a OBJECT
-        ${CMAKE_CURRENT_BINARY_DIR}/supervise.pb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/supervise.grpc.pb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/intercept.pb.cc
-        ${CMAKE_CURRENT_BINARY_DIR}/intercept.grpc.pb.cc
-        )
 
+# Create a static library, which contains the rpc stubs and clients.
+add_library(rpc_a OBJECT)
 target_include_directories(rpc_a PUBLIC "${CMAKE_CURRENT_BINARY_DIR}")
+target_sources(rpc_a
+        PRIVATE
+            ${CMAKE_CURRENT_BINARY_DIR}/supervise.pb.cc
+            ${CMAKE_CURRENT_BINARY_DIR}/supervise.grpc.pb.cc
+            ${CMAKE_CURRENT_BINARY_DIR}/intercept.pb.cc
+            ${CMAKE_CURRENT_BINARY_DIR}/intercept.grpc.pb.cc
+        INTERFACE
+            $<TARGET_OBJECTS:rpc_a>
+        )
 target_link_libraries(rpc_a PUBLIC PkgConfig::gRPC)

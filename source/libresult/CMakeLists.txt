@@ -1,6 +1,4 @@
-add_library(result_a INTERFACE
-        )
-
+add_library(result_a INTERFACE)
 target_include_directories(result_a INTERFACE include/)
 
 if (ENABLE_UNIT_TESTS)

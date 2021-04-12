@@ -2,14 +2,13 @@
 add_executable(bear
         main.cc
         )
-
-target_include_directories(bear PRIVATE ../citnames/include)
-target_include_directories(bear PRIVATE ../intercept/include)
-target_link_libraries(bear main_a)
-target_link_libraries(bear sys_a)
-target_link_libraries(bear flags_a)
-target_link_libraries(bear fmt::fmt)
-target_link_libraries(bear spdlog::spdlog)
+target_include_directories(bear PRIVATE ../citnames/include ../intercept/include)
+target_link_libraries(bear
+        main_a
+        sys_a
+        flags_a
+        fmt::fmt
+        spdlog::spdlog)
 
 include(GNUInstallDirs)
 install(TARGETS bear

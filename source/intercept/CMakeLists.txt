@@ -5,67 +5,61 @@ add_subdirectory(proto)
 
 
 # Domain types and methods for intercept artefacts.
-add_library(domain_a OBJECT
+add_library(domain_a OBJECT)
+target_include_directories(domain_a PUBLIC source)
+target_sources(domain_a PRIVATE
         source/Domain.cc
         source/Convert.cc
-        )
-
-target_include_directories(domain_a PUBLIC source)
+        INTERFACE $<TARGET_OBJECTS:domain_a>)
 target_link_libraries(domain_a PUBLIC rpc_a)
 
 
 # Event database writing/reading classes.
-add_library(events_db_a OBJECT
+add_library(events_db_a OBJECT)
+target_include_directories(events_db_a PUBLIC source)
+target_sources(events_db_a PRIVATE
         source/collect/db/EventsDatabaseReader.cc
         source/collect/db/EventsDatabaseWriter.cc
-        )
-
-target_include_directories(events_db_a PUBLIC source)
-target_link_libraries(events_db_a PUBLIC result_a)
-target_link_libraries(events_db_a PUBLIC rpc_a)
-target_link_libraries(events_db_a PUBLIC sys_a)
-target_link_libraries(events_db_a PUBLIC fmt::fmt)
+        INTERFACE $<TARGET_OBJECTS:events_db_a>)
+target_link_libraries(events_db_a PUBLIC
+        result_a
+        rpc_a
+        sys_a
+        fmt::fmt)
 
 
 # Intercept orchestrator code.
-add_library(intercept_a OBJECT
+add_library(intercept_a OBJECT)
+target_include_directories(intercept_a PUBLIC include/ source/)
+if (SUPPORT_PRELOAD)
+    target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
+endif()
+target_sources(intercept_a PRIVATE
         source/collect/Application.cc
         source/collect/Reporter.cc
         source/collect/RpcServices.cc
         source/collect/Session.cc
-        source/collect/SessionWrapper.cc
-        )
-
-if (SUPPORT_PRELOAD)
-    target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
-endif()
-
-target_include_directories(intercept_a PUBLIC include/)
-target_include_directories(intercept_a PUBLIC source/)
-target_link_libraries(intercept_a PUBLIC domain_a)
-target_link_libraries(intercept_a PUBLIC main_a)
-target_link_libraries(intercept_a PUBLIC events_db_a)
-target_link_libraries(intercept_a PUBLIC exec_a)
-target_link_libraries(intercept_a PUBLIC flags_a)
-target_link_libraries(intercept_a PUBLIC rpc_a)
-target_link_libraries(intercept_a PUBLIC sys_a)
-target_link_libraries(intercept_a PUBLIC result_a)
-target_link_libraries(intercept_a PUBLIC spdlog::spdlog)
+        source/collect/SessionWrapper.cc)
+target_sources(intercept_a
+        INTERFACE $<TARGET_OBJECTS:intercept_a>)
+target_link_libraries(intercept_a PUBLIC
+        domain_a
+        main_a
+        events_db_a
+        exec_a
+        flags_a
+        rpc_a
+        sys_a
+        result_a
+        spdlog::spdlog)
 
 
 # Intercept orchestrator executable.
 add_executable(intercept
-        source/collect/main.cc
-        )
-
-target_link_libraries(intercept domain_a)
-target_link_libraries(intercept main_a)
-target_link_libraries(intercept intercept_a)
-target_link_libraries(intercept rpc_a)
-target_link_libraries(intercept events_db_a)
-target_link_libraries(intercept sys_a)
-target_link_libraries(intercept flags_a)
-target_link_libraries(intercept exec_a)
+        source/collect/main.cc)
+target_link_libraries(intercept
+        main_a
+        intercept_a)
 
 install(TARGETS intercept
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -85,36 +79,31 @@ install(FILES man/intercept.1
 
 
 # Intercept report sender code.
-add_library(wrapper_a OBJECT
+add_library(wrapper_a OBJECT)
+target_include_directories(wrapper_a PUBLIC source/)
+target_sources(wrapper_a PRIVATE
         source/report/wrapper/EventFactory.cc
         source/report/wrapper/EventReporter.cc
         source/report/wrapper/RpcClients.cc
         source/report/wrapper/Application.cc
-        )
-
-target_include_directories(wrapper_a PUBLIC source/)
-target_link_libraries(wrapper_a PUBLIC domain_a)
-target_link_libraries(wrapper_a PUBLIC flags_a)
-target_link_libraries(wrapper_a PUBLIC main_a)
-target_link_libraries(wrapper_a PUBLIC result_a)
-target_link_libraries(wrapper_a PUBLIC sys_a)
-target_link_libraries(wrapper_a PUBLIC rpc_a)
-target_link_libraries(wrapper_a PUBLIC spdlog::spdlog)
+        INTERFACE $<TARGET_OBJECTS:wrapper_a>)
+target_link_libraries(wrapper_a PUBLIC
+        domain_a
+        flags_a
+        main_a
+        result_a
+        sys_a
+        rpc_a
+        spdlog::spdlog)
 
 
 # Intercept report sender executable.
 add_executable(wrapper
-        source/report/wrapper/main.cc
-        )
-
+        source/report/wrapper/main.cc)
 target_include_directories(wrapper PUBLIC source/)
-target_link_libraries(wrapper wrapper_a)
-target_link_libraries(wrapper domain_a)
-target_link_libraries(wrapper main_a)
-target_link_libraries(wrapper flags_a)
-target_link_libraries(wrapper result_a)
-target_link_libraries(wrapper sys_a)
-target_link_libraries(wrapper rpc_a)
+target_link_libraries(wrapper
+        main_a
+        wrapper_a)
 
 install(TARGETS wrapper
         RUNTIME DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
@@ -159,7 +148,9 @@ install(CODE "
 
 
 # Execution interceptor code.
-add_library(exec_a OBJECT
+add_library(exec_a OBJECT)
+target_include_directories(exec_a PUBLIC source)
+target_sources(exec_a PRIVATE
         source/report/libexec/Buffer.cc
         source/report/libexec/Environment.cc
         source/report/libexec/Executor.cc
@@ -168,11 +159,8 @@ add_library(exec_a OBJECT
         source/report/libexec/Paths.cc
         source/report/libexec/Resolver.cc
         source/report/libexec/Session.cc
-        )
-
-target_include_directories(exec_a PUBLIC source)
-target_link_libraries(exec_a PUBLIC result_a)
-target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS})
+        INTERFACE $<TARGET_OBJECTS:exec_a>)
+target_link_libraries(exec_a PUBLIC ${CMAKE_DL_LIBS} result_a)
 set_target_properties(exec_a PROPERTIES
         LINKER_LANGUAGE "C"
         POSITION_INDEPENDENT_CODE 1)
@@ -183,7 +171,6 @@ add_library(exec SHARED
         source/report/libexec/lib.cc
         source/report/libexec/std.cc
         )
-
 target_link_libraries(exec exec_a)
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set_target_properties(exec PROPERTIES
@@ -212,7 +199,6 @@ if (ENABLE_UNIT_TESTS)
             test/libexec/PathsTest.cc
             test/libexec/SessionTest.cc
             )
-
     target_include_directories(exec_unit_test PRIVATE test)
     target_link_libraries(exec_unit_test exec_a)
     target_link_libraries(exec_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
@@ -223,16 +209,8 @@ if (ENABLE_UNIT_TESTS)
             test/EventFactoryTest.cc
             test/SessionTest.cc
             )
-
-    target_link_libraries(intercept_unit_test domain_a)
-    target_link_libraries(intercept_unit_test main_a)
-    target_link_libraries(intercept_unit_test events_db_a)
-    target_link_libraries(intercept_unit_test exec_a)
     target_link_libraries(intercept_unit_test intercept_a)
     target_link_libraries(intercept_unit_test wrapper_a)
-    target_link_libraries(intercept_unit_test rpc_a)
-    target_link_libraries(intercept_unit_test sys_a)
-    target_link_libraries(intercept_unit_test flags_a)
     target_link_libraries(intercept_unit_test PkgConfig::GTest ${CMAKE_THREAD_LIBS_INIT})
 
     add_test(NAME bear::intercept_unit_test COMMAND $<TARGET_FILE:intercept_unit_test>)
@@ -243,11 +221,9 @@ if (ENABLE_FUNC_TESTS)
     add_executable(events_db
             test/events_db/main.cc
             )
-
-    target_link_libraries(events_db main_a)
-    target_link_libraries(events_db events_db_a)
-    target_link_libraries(events_db sys_a)
-    target_link_libraries(events_db flags_a)
-    target_link_libraries(events_db rpc_a)
-    target_link_libraries(events_db spdlog::spdlog)
+    target_link_libraries(events_db
+            main_a
+            events_db_a
+            flags_a
+            spdlog::spdlog)
 endif()
