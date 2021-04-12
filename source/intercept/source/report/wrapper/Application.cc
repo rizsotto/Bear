@@ -226,7 +226,7 @@ namespace wr {
     }
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) {
-        const flags::Parser parser("wrapper", VERSION, {
+        const flags::Parser parser("wrapper", cfg::VERSION, {
                 {DESTINATION, {1,  true, "path to report directory",   std::nullopt, std::nullopt}},
                 {EXECUTE,     {1,  true, "the path to the executable", std::nullopt, std::nullopt}},
                 {COMMAND,     {-1, true, "the command arguments",      std::nullopt, std::nullopt}},

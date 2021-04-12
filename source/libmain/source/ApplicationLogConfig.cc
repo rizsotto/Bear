@@ -71,7 +71,7 @@ namespace ps {
 
     void ApplicationLogConfig::record(const char** argv, const char** envp) const
     {
-        spdlog::debug("{0}: {1}", name_, VERSION);
+        spdlog::debug("{0}: {1}", name_, cfg::VERSION);
         spdlog::debug("arguments: {0}", PointerArray { argv });
         spdlog::debug("environment: {0}", PointerArray { envp });
     }

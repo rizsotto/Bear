@@ -180,19 +180,19 @@ namespace {
         {
             const flags::Parser parser(
                     "bear",
-                    VERSION,
+                    cfg::VERSION,
                     {
-                            {OUTPUT,        {1,  false, "path of the result file",                  {COMPILATION_DB_DEFAULT},  std::nullopt}},
-                            {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,               ADVANCED_GROUP}},
-                            {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,               ADVANCED_GROUP}},
-                            {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,               ADVANCED_GROUP}},
-                            {FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,               ADVANCED_GROUP}},
-                            {LIBRARY,       {1,  false, "path to the preload library",              {LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                            {WRAPPER,       {1,  false, "path to the wrapper executable",           {WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                            {WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
-                            {CITNAMES,      {1,  false, "path to the citnames executable",          {CITNAMES_DEFAULT_PATH},    DEVELOPER_GROUP}},
-                            {INTERCEPT,     {1,  false, "path to the intercept executable",         {INTERCEPT_DEFAULT_PATH},   DEVELOPER_GROUP}},
-                            {COMMAND,       {-1, true,  "command to execute",                       std::nullopt,               std::nullopt}}
+                            {OUTPUT,        {1,  false, "path of the result file",                  {cfg::COMPILATION_DB_DEFAULT},   std::nullopt}},
+                            {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,                    ADVANCED_GROUP}},
+                            {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,                    ADVANCED_GROUP}},
+                            {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                    ADVANCED_GROUP}},
+                            {FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                    ADVANCED_GROUP}},
+                            {LIBRARY,       {1,  false, "path to the preload library",              {cfg::LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                            {WRAPPER,       {1,  false, "path to the wrapper executable",           {cfg::WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                            {WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cfg::WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
+                            {CITNAMES,      {1,  false, "path to the citnames executable",          {cfg::CITNAMES_DEFAULT_PATH},    DEVELOPER_GROUP}},
+                            {INTERCEPT,     {1,  false, "path to the intercept executable",         {cfg::INTERCEPT_DEFAULT_PATH},   DEVELOPER_GROUP}},
+                            {COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                    std::nullopt}}
                     });
             return parser.parse_or_exit(argc, const_cast<const char **>(argv));
         }
@@ -203,7 +203,7 @@ namespace {
                     .map<fs::path>([](const auto &output) {
                         return fs::path(output).replace_extension(".db");
                     })
-                    .unwrap_or(fs::path(EVENTS_DB_DEFAULT));
+                    .unwrap_or(fs::path(cfg::EVENTS_DB_DEFAULT));
 
             auto environment = sys::env::from(const_cast<const char **>(envp));
             auto intercept = prepare_intercept(args, environment, commands);

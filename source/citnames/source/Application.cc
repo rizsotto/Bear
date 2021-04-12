@@ -185,13 +185,13 @@ namespace cs {
 
         const flags::Parser parser(
                 "citnames",
-                VERSION,
+                cfg::VERSION,
                 {
-                        {cs::INPUT,      {1, false, "path of the input file",                    {EVENTS_DB_DEFAULT},      std::nullopt}},
-                        {cs::OUTPUT,     {1, false, "path of the result file",                   {COMPILATION_DB_DEFAULT}, std::nullopt}},
-                        {cs::CONFIG,     {1, false, "path of the config file",                   std::nullopt,             std::nullopt}},
-                        {cs::APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,             std::nullopt}},
-                        {cs::RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,             std::nullopt}}
+                        {cs::INPUT,      {1, false, "path of the input file",                    {cfg::EVENTS_DB_DEFAULT},      std::nullopt}},
+                        {cs::OUTPUT,     {1, false, "path of the result file",                   {cfg::COMPILATION_DB_DEFAULT}, std::nullopt}},
+                        {cs::CONFIG,     {1, false, "path of the config file",                   std::nullopt,                  std::nullopt}},
+                        {cs::APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                  std::nullopt}},
+                        {cs::RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                  std::nullopt}}
                 });
         return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }

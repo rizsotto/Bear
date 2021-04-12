@@ -61,13 +61,15 @@
 #cmakedefine HAVE_CS_GNU_LIBPTHREAD_VERSION
 
 // const expression about this project
-constexpr char VERSION[] = "@CMAKE_PROJECT_VERSION@";
+namespace cfg {
+    constexpr char VERSION[] = "@CMAKE_PROJECT_VERSION@";
 
-constexpr char CITNAMES_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
-constexpr char INTERCEPT_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
-constexpr char LIBRARY_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
-constexpr char WRAPPER_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper";
-constexpr char WRAPPER_DIR_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d";
+    constexpr char CITNAMES_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
+    constexpr char INTERCEPT_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
+    constexpr char LIBRARY_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
+    constexpr char WRAPPER_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper";
+    constexpr char WRAPPER_DIR_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d";
 
-constexpr char EVENTS_DB_DEFAULT[] = "events.db";
-constexpr char COMPILATION_DB_DEFAULT[] = "compile_commands.json";
+    constexpr char EVENTS_DB_DEFAULT[] = "events.db";
+    constexpr char COMPILATION_DB_DEFAULT[] = "compile_commands.json";
+}

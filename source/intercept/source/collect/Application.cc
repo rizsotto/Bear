@@ -113,14 +113,14 @@ namespace ic {
     { }
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
-        const flags::Parser parser("intercept", VERSION, {
-                {ic::OUTPUT,        {1,  false, "path of the result file",        {EVENTS_DB_DEFAULT},       std::nullopt}},
-                {ic::FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,               DEVELOPER_GROUP}},
-                {ic::FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,               DEVELOPER_GROUP}},
-                {ic::LIBRARY,       {1,  false, "path to the preload library",    {LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                {ic::WRAPPER,       {1,  false, "path to the wrapper executable", {WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                {ic::WRAPPER_DIR,   {1,  false, "path to the wrapper directory",  {WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
-                {ic::COMMAND,       {-1, true,  "command to execute",             std::nullopt,               std::nullopt}}
+        const flags::Parser parser("intercept", cfg::VERSION, {
+                {ic::OUTPUT,        {1,  false, "path of the result file",        {cfg::EVENTS_DB_DEFAULT},        std::nullopt}},
+                {ic::FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,                    DEVELOPER_GROUP}},
+                {ic::FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,                    DEVELOPER_GROUP}},
+                {ic::LIBRARY,       {1,  false, "path to the preload library",    {cfg::LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                {ic::WRAPPER,       {1,  false, "path to the wrapper executable", {cfg::WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
+                {ic::WRAPPER_DIR,   {1,  false, "path to the wrapper directory",  {cfg::WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
+                {ic::COMMAND,       {-1, true,  "command to execute",             std::nullopt,                    std::nullopt}}
         });
         return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }
