@@ -17,8 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "report/wrapper/Environment.h"
-#include "report/wrapper/Flags.h"
 #include "report/wrapper/EventFactory.h"
 #include "report/wrapper/EventReporter.h"
 #include "report/wrapper/RpcClients.h"
@@ -68,7 +66,7 @@ namespace {
 
         rust::Result<wr::SessionLocator> make_session(const sys::env::Vars &environment) noexcept
         {
-            auto destination = environment.find(wr::env::KEY_DESTINATION);
+            auto destination = environment.find(cmd::wrapper::KEY_DESTINATION);
             return (destination == environment.end())
                    ? rust::Result<wr::SessionLocator>(rust::Err(std::runtime_error("Unknown destination.")))
                    : rust::Result<wr::SessionLocator>(rust::Ok(wr::SessionLocator{destination->second}));
@@ -97,16 +95,16 @@ namespace {
     namespace Supervisor {
 
         rust::Result<wr::SessionLocator> make_session(const flags::Arguments &args) noexcept {
-            return args.as_string(wr::DESTINATION)
+            return args.as_string(cmd::wrapper::FLAG_DESTINATION)
                     .map<wr::SessionLocator>([](const auto &destination) {
                         return wr::SessionLocator{std::string(destination)};
                     });
         }
 
         rust::Result<wr::Execution> make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
-            auto program = args.as_string(wr::EXECUTE)
+            auto program = args.as_string(cmd::wrapper::FLAG_EXECUTE)
                     .map<fs::path>([](auto file) { return fs::path(file); });
-            auto arguments = args.as_string_list(wr::COMMAND)
+            auto arguments = args.as_string_list(cmd::wrapper::FLAG_COMMAND)
                     .map<std::vector<std::string>>([](auto args) {
                         return std::vector<std::string>(args.begin(), args.end());
                     });
@@ -179,7 +177,7 @@ namespace wr {
 
     rust::Result<ps::CommandPtr> Application::command(int argc, const char **argv, const char **envp) const {
         if (const bool wrapper = is_wrapper_call(argc, argv); wrapper) {
-            if (const bool verbose = (nullptr != getenv(wr::env::KEY_VERBOSE)); verbose) {
+            if (const bool verbose = (nullptr != getenv(cmd::wrapper::KEY_VERBOSE)); verbose) {
                 log_config.initForVerbose();
             }
             log_config.record(argv, envp);
@@ -226,10 +224,10 @@ namespace wr {
     }
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) {
-        const flags::Parser parser("wrapper", cfg::VERSION, {
-                {DESTINATION, {1,  true, "path to report directory",   std::nullopt, std::nullopt}},
-                {EXECUTE,     {1,  true, "the path to the executable", std::nullopt, std::nullopt}},
-                {COMMAND,     {-1, true, "the command arguments",      std::nullopt, std::nullopt}},
+        const flags::Parser parser("wrapper", cmd::VERSION, {
+                {cmd::wrapper::FLAG_DESTINATION, {1,  true, "path to report directory",   std::nullopt, std::nullopt}},
+                {cmd::wrapper::FLAG_EXECUTE,     {1,  true, "the path to the executable", std::nullopt, std::nullopt}},
+                {cmd::wrapper::FLAG_COMMAND,     {-1, true, "the command arguments",      std::nullopt, std::nullopt}},
         });
         return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }

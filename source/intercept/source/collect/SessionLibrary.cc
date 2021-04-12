@@ -17,14 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "collect/SessionLibrary.h"
 
-#include "intercept/Flags.h"
 #include "libsys/Errors.h"
 #include "libsys/Path.h"
 #include "libsys/Process.h"
-#include "report/libexec/Environments.h"
-#include "report/wrapper/Flags.h"
 
 #include <spdlog/spdlog.h>
 
@@ -56,8 +54,8 @@ namespace ic {
     rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args)
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto library = args.as_string(ic::LIBRARY);
-        auto wrapper = args.as_string(ic::WRAPPER);
+        auto library = args.as_string(cmd::intercept::FLAG_LIBRARY);
+        auto wrapper = args.as_string(cmd::intercept::FLAG_WRAPPER);
 
         return merge(library, wrapper)
             .map<Session::Ptr>([&verbose](auto tuple) {
@@ -93,17 +91,17 @@ namespace ic {
     {
         auto builder = sys::Process::Builder(executor_)
                 .add_argument(executor_)
-                .add_argument(wr::DESTINATION)
+                .add_argument(cmd::wrapper::FLAG_DESTINATION)
                 .add_argument(*session_locator_);
 
         if (verbose_) {
-            builder.add_argument(wr::VERBOSE);
+            builder.add_argument(cmd::wrapper::FLAG_VERBOSE);
         }
 
         return builder
-                .add_argument(wr::EXECUTE)
+                .add_argument(cmd::wrapper::FLAG_EXECUTE)
                 .add_argument(execution.executable)
-                .add_argument(wr::COMMAND)
+                .add_argument(cmd::wrapper::FLAG_COMMAND)
                 .add_arguments(execution.arguments.begin(), execution.arguments.end())
                 .set_environment(update(execution.environment));
     }
@@ -113,10 +111,10 @@ namespace ic {
     {
         std::map<std::string, std::string> copy(env);
         if (verbose_) {
-            copy[el::env::KEY_VERBOSE] = "true";
+            copy[cmd::library::KEY_VERBOSE] = "true";
         }
-        copy[el::env::KEY_DESTINATION] = *session_locator_;
-        copy[el::env::KEY_REPORTER] = executor_;
+        copy[cmd::library::KEY_DESTINATION] = *session_locator_;
+        copy[cmd::library::KEY_REPORTER] = executor_;
         insert_or_merge(copy, GLIBC_PRELOAD_KEY, library_, Session::keep_front_in_path);
 
         return copy;

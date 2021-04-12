@@ -2,7 +2,6 @@
 add_executable(bear
         main.cc
         )
-target_include_directories(bear PRIVATE ../citnames/include ../intercept/include)
 target_link_libraries(bear
         main_a
         sys_a

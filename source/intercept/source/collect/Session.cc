@@ -17,9 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "collect/Session.h"
 
-#include "intercept/Flags.h"
 #include "collect/SessionWrapper.h"
 #ifdef SUPPORT_PRELOAD
 #include "collect/SessionLibrary.h"
@@ -35,9 +35,9 @@ namespace ic {
     rust::Result<Session::Ptr> Session::from(const flags::Arguments& args, const char **envp)
 #ifdef SUPPORT_PRELOAD
     {
-        if (args.as_bool(ic::FORCE_WRAPPER).unwrap_or(false))
+        if (args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER).unwrap_or(false))
             return WrapperSession::from(args, envp);
-        if (args.as_bool(ic::FORCE_PRELOAD).unwrap_or(false))
+        if (args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD).unwrap_or(false))
             return LibraryPreloadSession::from(args);
 
         return LibraryPreloadSession::from(args);

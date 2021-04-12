@@ -19,7 +19,6 @@
 
 #include "config.h"
 #include "Application.h"
-#include "citnames/Flags.h"
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Build.h"
@@ -42,9 +41,9 @@ namespace {
     }
 
     rust::Result<cs::Arguments> into_arguments(const flags::Arguments &args) {
-        auto input = args.as_string(cs::INPUT);
-        auto output = args.as_string(cs::OUTPUT);
-        auto append = args.as_bool(cs::APPEND)
+        auto input = args.as_string(cmd::citnames::FLAG_INPUT);
+        auto output = args.as_string(cmd::citnames::FLAG_OUTPUT);
+        auto append = args.as_bool(cmd::citnames::FLAG_APPEND)
                 .unwrap_or(false);
 
         return rust::merge(input, output)
@@ -86,7 +85,7 @@ namespace {
 
     rust::Result<cs::Configuration>
     into_configuration(const flags::Arguments &args, const sys::env::Vars &environment) {
-        auto config_arg = args.as_string(cs::CONFIG);
+        auto config_arg = args.as_string(cmd::citnames::FLAG_CONFIG);
         auto config = config_arg.is_ok()
                       ? config_arg
                               .and_then<cs::Configuration>([](auto candidate) {
@@ -96,7 +95,7 @@ namespace {
 
         return config.map<cs::Configuration>([&args](auto config) {
                     // command line arguments overrides the default values or the configuration content.
-                    args.as_bool(cs::RUN_CHECKS)
+                    args.as_bool(cmd::citnames::FLAG_RUN_CHECKS)
                             .on_success([&config](auto run) {
                                 config.output.content.include_only_existing_source = run;
                             });
@@ -182,17 +181,13 @@ namespace cs {
     { }
 
     rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
-
-        const flags::Parser parser(
-                "citnames",
-                cfg::VERSION,
-                {
-                        {cs::INPUT,      {1, false, "path of the input file",                    {cfg::EVENTS_DB_DEFAULT},      std::nullopt}},
-                        {cs::OUTPUT,     {1, false, "path of the result file",                   {cfg::COMPILATION_DB_DEFAULT}, std::nullopt}},
-                        {cs::CONFIG,     {1, false, "path of the config file",                   std::nullopt,                  std::nullopt}},
-                        {cs::APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                  std::nullopt}},
-                        {cs::RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                  std::nullopt}}
-                });
+        const flags::Parser parser("citnames", cmd::VERSION, {
+                {cmd::citnames::FLAG_INPUT,      {1, false, "path of the input file",                    {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
+                {cmd::citnames::FLAG_OUTPUT,     {1, false, "path of the result file",                   {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
+                {cmd::citnames::FLAG_CONFIG,     {1, false, "path of the config file",                   std::nullopt,                     std::nullopt}},
+                {cmd::citnames::FLAG_APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                     std::nullopt}},
+                {cmd::citnames::FLAG_RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                     std::nullopt}}
+        });
         return parser.parse_or_exit(argc, const_cast<const char **>(argv));
     }
 

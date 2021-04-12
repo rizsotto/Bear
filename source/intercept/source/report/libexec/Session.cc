@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "report/libexec/Session.h"
 
 #include "report/libexec/Buffer.h"
 #include "report/libexec/Environment.h"
-#include "report/libexec/Environments.h"
 
 namespace el::session {
 
@@ -30,9 +30,9 @@ namespace el::session {
         if (nullptr == environment)
             return;
 
-        session.reporter = env::get_env_value(environment, env::KEY_REPORTER);
-        session.destination = env::get_env_value(environment, env::KEY_DESTINATION);
-        session.verbose = env::get_env_value(environment, env::KEY_VERBOSE) != nullptr;
+        session.reporter = env::get_env_value(environment, cmd::library::KEY_REPORTER);
+        session.destination = env::get_env_value(environment, cmd::library::KEY_DESTINATION);
+        session.verbose = env::get_env_value(environment, cmd::library::KEY_VERBOSE) != nullptr;
     }
 
     void persist(Session &session, char *begin, char *end) noexcept

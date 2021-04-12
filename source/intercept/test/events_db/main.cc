@@ -105,7 +105,7 @@ namespace {
                     {"--output", {1, true, "path of the output file", std::nullopt, std::nullopt}},
                     {"--path",   {1, true, "path of the db file",     std::nullopt, std::nullopt}},
             });
-            const flags::Parser parser("intercept", cfg::VERSION, {append, dump});
+            const flags::Parser parser("intercept", cmd::VERSION, {append, dump});
 
             return parser.parse_or_exit(argc, const_cast<const char **>(argv));
         }

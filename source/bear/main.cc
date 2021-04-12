@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-#include "citnames/Flags.h"
-#include "intercept/Flags.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Environment.h"
@@ -43,28 +41,16 @@ namespace {
     constexpr std::optional<std::string_view> ADVANCED_GROUP = {"advanced options"};
     constexpr std::optional<std::string_view> DEVELOPER_GROUP = {"developer options"};
 
-    constexpr char APPEND[] = "--append";
-    constexpr char OUTPUT[] = "--output";
-    constexpr char CITNAMES[] = "--citnames";
-    constexpr char INTERCEPT[] = "--interceptor";
-    constexpr char LIBRARY[] = "--libexec";
-    constexpr char WRAPPER[] = "--wrapper";
-    constexpr char WRAPPER_DIR[] = "--wrapper-dir";
-    constexpr char CONFIG[] = "--config";
-    constexpr char FORCE_WRAPPER[] = "--force-wrapper";
-    constexpr char FORCE_PRELOAD[] = "--force-preload";
-    constexpr char COMMAND[] = "--";
-
     rust::Result<sys::Process::Builder>
     prepare_intercept(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &output) {
-        auto program = arguments.as_string(INTERCEPT);
-        auto command = arguments.as_string_list(COMMAND);
-        auto library = arguments.as_string(LIBRARY);
-        auto wrapper = arguments.as_string(WRAPPER);
-        auto wrapper_dir = arguments.as_string(WRAPPER_DIR);
+        auto program = arguments.as_string(cmd::bear::FLAG_INTERCEPT);
+        auto command = arguments.as_string_list(cmd::intercept::FLAG_COMMAND);
+        auto library = arguments.as_string(cmd::intercept::FLAG_LIBRARY);
+        auto wrapper = arguments.as_string(cmd::intercept::FLAG_WRAPPER);
+        auto wrapper_dir = arguments.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto force_wrapper = arguments.as_bool(FORCE_WRAPPER).unwrap_or(false);
-        auto force_preload = arguments.as_bool(FORCE_PRELOAD).unwrap_or(false);
+        auto force_wrapper = arguments.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER).unwrap_or(false);
+        auto force_preload = arguments.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD).unwrap_or(false);
 
         return rust::merge(program, command, rust::merge(library, wrapper, wrapper_dir))
                 .map<sys::Process::Builder>(
@@ -75,20 +61,20 @@ namespace {
                             auto builder = sys::Process::Builder(program)
                                     .set_environment(environment)
                                     .add_argument(program)
-                                    .add_argument(ic::LIBRARY).add_argument(library)
-                                    .add_argument(ic::WRAPPER).add_argument(wrapper)
-                                    .add_argument(ic::WRAPPER_DIR).add_argument(wrapper_dir)
-                                    .add_argument(ic::OUTPUT).add_argument(output);
+                                    .add_argument(cmd::intercept::FLAG_LIBRARY).add_argument(library)
+                                    .add_argument(cmd::intercept::FLAG_WRAPPER).add_argument(wrapper)
+                                    .add_argument(cmd::intercept::FLAG_WRAPPER_DIR).add_argument(wrapper_dir)
+                                    .add_argument(cmd::intercept::FLAG_OUTPUT).add_argument(output);
                             if (force_wrapper) {
-                                builder.add_argument(ic::FORCE_WRAPPER);
+                                builder.add_argument(cmd::intercept::FLAG_FORCE_WRAPPER);
                             }
                             if (force_preload) {
-                                builder.add_argument(ic::FORCE_PRELOAD);
+                                builder.add_argument(cmd::intercept::FLAG_FORCE_PRELOAD);
                             }
                             if (verbose) {
                                 builder.add_argument(flags::VERBOSE);
                             }
-                            builder.add_argument(ic::COMMAND)
+                            builder.add_argument(cmd::intercept::FLAG_COMMAND)
                                     .add_arguments(command.begin(), command.end());
                             return builder;
                         });
@@ -96,10 +82,10 @@ namespace {
 
     rust::Result<sys::Process::Builder>
     prepare_citnames(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &input) {
-        auto program = arguments.as_string(CITNAMES);
-        auto output = arguments.as_string(OUTPUT);
-        auto config = arguments.as_string(CONFIG);
-        auto append = arguments.as_bool(APPEND).unwrap_or(false);
+        auto program = arguments.as_string(cmd::bear::FLAG_CITNAMES);
+        auto output = arguments.as_string(cmd::citnames::FLAG_OUTPUT);
+        auto config = arguments.as_string(cmd::citnames::FLAG_CONFIG);
+        auto append = arguments.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
 
         return rust::merge(program, output)
@@ -109,15 +95,15 @@ namespace {
                     auto builder = sys::Process::Builder(program)
                             .set_environment(environment)
                             .add_argument(program)
-                            .add_argument(cs::INPUT).add_argument(input)
-                            .add_argument(cs::OUTPUT).add_argument(output)
+                            .add_argument(cmd::citnames::FLAG_INPUT).add_argument(input)
+                            .add_argument(cmd::citnames::FLAG_OUTPUT).add_argument(output)
                             // can run the file checks, because we are on the host.
-                            .add_argument(cs::RUN_CHECKS);
+                            .add_argument(cmd::citnames::FLAG_RUN_CHECKS);
                     if (append) {
-                        builder.add_argument(cs::APPEND);
+                        builder.add_argument(cmd::citnames::FLAG_APPEND);
                     }
                     if (config.is_ok()) {
-                        builder.add_argument(cs::CONFIG).add_argument(config.unwrap());
+                        builder.add_argument(cmd::citnames::FLAG_CONFIG).add_argument(config.unwrap());
                     }
                     if (verbose) {
                         builder.add_argument(flags::VERBOSE);
@@ -178,32 +164,29 @@ namespace {
 
         rust::Result<flags::Arguments> parse(int argc, const char **argv) const override
         {
-            const flags::Parser parser(
-                    "bear",
-                    cfg::VERSION,
-                    {
-                            {OUTPUT,        {1,  false, "path of the result file",                  {cfg::COMPILATION_DB_DEFAULT},   std::nullopt}},
-                            {APPEND,        {0,  false, "append result to an existing output file", std::nullopt,                    ADVANCED_GROUP}},
-                            {CONFIG,        {1,  false, "path of the config file",                  std::nullopt,                    ADVANCED_GROUP}},
-                            {FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                    ADVANCED_GROUP}},
-                            {FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                    ADVANCED_GROUP}},
-                            {LIBRARY,       {1,  false, "path to the preload library",              {cfg::LIBRARY_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                            {WRAPPER,       {1,  false, "path to the wrapper executable",           {cfg::WRAPPER_DEFAULT_PATH},     DEVELOPER_GROUP}},
-                            {WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cfg::WRAPPER_DIR_DEFAULT_PATH}, DEVELOPER_GROUP}},
-                            {CITNAMES,      {1,  false, "path to the citnames executable",          {cfg::CITNAMES_DEFAULT_PATH},    DEVELOPER_GROUP}},
-                            {INTERCEPT,     {1,  false, "path to the intercept executable",         {cfg::INTERCEPT_DEFAULT_PATH},   DEVELOPER_GROUP}},
-                            {COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                    std::nullopt}}
-                    });
+            const flags::Parser parser("bear", cmd::VERSION, {
+                    {cmd::citnames::FLAG_OUTPUT,         {1,  false, "path of the result file",                  {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
+                    {cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                     ADVANCED_GROUP}},
+                    {cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                     ADVANCED_GROUP}},
+                    {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                     ADVANCED_GROUP}},
+                    {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                     ADVANCED_GROUP}},
+                    {cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
+                    {cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
+                    {cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
+                    {cmd::bear::FLAG_CITNAMES,           {1,  false, "path to the citnames executable",          {cmd::citnames::DEFAULT_PATH},    DEVELOPER_GROUP}},
+                    {cmd::bear::FLAG_INTERCEPT,          {1,  false, "path to the intercept executable",         {cmd::intercept::DEFAULT_PATH},   DEVELOPER_GROUP}},
+                    {cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                     std::nullopt}}
+            });
             return parser.parse_or_exit(argc, const_cast<const char **>(argv));
         }
 
         rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override
         {
-            auto commands = args.as_string(OUTPUT)
+            auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
                     .map<fs::path>([](const auto &output) {
                         return fs::path(output).replace_extension(".db");
                     })
-                    .unwrap_or(fs::path(cfg::EVENTS_DB_DEFAULT));
+                    .unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
 
             auto environment = sys::env::from(const_cast<const char **>(envp));
             auto intercept = prepare_intercept(args, environment, commands);

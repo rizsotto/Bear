@@ -24,7 +24,6 @@
 #include "LinkerMock.h"
 #include "report/libexec/Session.h"
 #include "report/libexec/Array.h"
-#include "report/wrapper/Flags.h"
 
 #include <cerrno>
 
@@ -113,11 +112,11 @@ namespace {
         EXPECT_CALL(linker,execve(SILENT_SESSION.reporter,
                                   CStyleArrayEqual(std::vector<const char *> {
                                       SILENT_SESSION.reporter,
-                                      wr::DESTINATION,
+                                      cmd::wrapper::FLAG_DESTINATION,
                                       SILENT_SESSION.destination,
-                                      wr::EXECUTE,
+                                      cmd::wrapper::FLAG_EXECUTE,
                                       LS_PATH,
-                                      wr::COMMAND,
+                                      cmd::wrapper::FLAG_COMMAND,
                                       LS_ARGV[0],
                                       LS_ARGV[1]
                                   }),
@@ -142,12 +141,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                            VERBOSE_SESSION.reporter,
-                                           wr::DESTINATION,
+                                           cmd::wrapper::FLAG_DESTINATION,
                                            VERBOSE_SESSION.destination,
-                                           wr::VERBOSE,
-                                           wr::EXECUTE,
+                                           cmd::wrapper::FLAG_VERBOSE,
+                                           cmd::wrapper::FLAG_EXECUTE,
                                            LS_PATH,
-                                           wr::COMMAND,
+                                           cmd::wrapper::FLAG_COMMAND,
                                            LS_ARGV[0],
                                            LS_ARGV[1]
                                    }),
@@ -189,12 +188,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                        VERBOSE_SESSION.reporter,
-                                       wr::DESTINATION,
+                                       cmd::wrapper::FLAG_DESTINATION,
                                        VERBOSE_SESSION.destination,
-                                       wr::VERBOSE,
-                                       wr::EXECUTE,
+                                       cmd::wrapper::FLAG_VERBOSE,
+                                       cmd::wrapper::FLAG_EXECUTE,
                                        LS_PATH,
-                                       wr::COMMAND,
+                                       cmd::wrapper::FLAG_COMMAND,
                                        LS_ARGV[0],
                                        LS_ARGV[1]
                                    }),
@@ -219,12 +218,12 @@ namespace {
         EXPECT_CALL(linker, execve(VERBOSE_SESSION.reporter,
                                    CStyleArrayEqual(std::vector<const char *> {
                                            VERBOSE_SESSION.reporter,
-                                           wr::DESTINATION,
+                                           cmd::wrapper::FLAG_DESTINATION,
                                            VERBOSE_SESSION.destination,
-                                           wr::VERBOSE,
-                                           wr::EXECUTE,
+                                           cmd::wrapper::FLAG_VERBOSE,
+                                           cmd::wrapper::FLAG_EXECUTE,
                                            LS_PATH,
-                                           wr::COMMAND,
+                                           cmd::wrapper::FLAG_COMMAND,
                                            LS_ARGV[0],
                                            LS_ARGV[1]
                                    }),
@@ -250,12 +249,12 @@ namespace {
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
                                         CStyleArrayEqual(std::vector<const char *> {
                                                 VERBOSE_SESSION.reporter,
-                                                wr::DESTINATION,
+                                                cmd::wrapper::FLAG_DESTINATION,
                                                 VERBOSE_SESSION.destination,
-                                                wr::VERBOSE,
-                                                wr::EXECUTE,
+                                                cmd::wrapper::FLAG_VERBOSE,
+                                                cmd::wrapper::FLAG_EXECUTE,
                                                 LS_PATH,
-                                                wr::COMMAND,
+                                                cmd::wrapper::FLAG_COMMAND,
                                                 LS_ARGV[0],
                                                 LS_ARGV[1]
                                         }),
@@ -299,12 +298,12 @@ namespace {
         EXPECT_CALL(linker, posix_spawn(&pid, VERBOSE_SESSION.reporter, nullptr, nullptr,
                                         CStyleArrayEqual(std::vector<const char *> {
                                                 VERBOSE_SESSION.reporter,
-                                                wr::DESTINATION,
+                                                cmd::wrapper::FLAG_DESTINATION,
                                                 VERBOSE_SESSION.destination,
-                                                wr::VERBOSE,
-                                                wr::EXECUTE,
+                                                cmd::wrapper::FLAG_VERBOSE,
+                                                cmd::wrapper::FLAG_EXECUTE,
                                                 LS_PATH,
-                                                wr::COMMAND,
+                                                cmd::wrapper::FLAG_COMMAND,
                                                 LS_ARGV[0],
                                                 LS_ARGV[1]
                                         }),

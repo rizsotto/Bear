@@ -6,7 +6,7 @@ add_subdirectory(proto)
 
 # Domain types and methods for intercept artefacts.
 add_library(domain_a OBJECT)
-target_include_directories(domain_a PUBLIC source)
+target_include_directories(domain_a PRIVATE source)
 target_sources(domain_a PRIVATE
         source/Domain.cc
         source/Convert.cc
@@ -30,7 +30,7 @@ target_link_libraries(events_db_a PUBLIC
 
 # Intercept orchestrator code.
 add_library(intercept_a OBJECT)
-target_include_directories(intercept_a PUBLIC include/ source/)
+target_include_directories(intercept_a PRIVATE source/)
 if (SUPPORT_PRELOAD)
     target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
 endif()

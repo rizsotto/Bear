@@ -18,7 +18,7 @@ target_compile_options(citnames_json_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT)
-target_include_directories(citnames_a PUBLIC include/ source/)
+target_include_directories(citnames_a PUBLIC source/)
 target_sources(citnames_a
         PRIVATE
             source/Application.cc

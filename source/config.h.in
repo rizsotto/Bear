@@ -61,15 +61,59 @@
 #cmakedefine HAVE_CS_GNU_LIBPTHREAD_VERSION
 
 // const expression about this project
-namespace cfg {
+namespace cmd {
     constexpr char VERSION[] = "@CMAKE_PROJECT_VERSION@";
 
-    constexpr char CITNAMES_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
-    constexpr char INTERCEPT_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
-    constexpr char LIBRARY_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
-    constexpr char WRAPPER_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper";
-    constexpr char WRAPPER_DIR_DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d";
+    namespace bear {
 
-    constexpr char EVENTS_DB_DEFAULT[] = "events.db";
-    constexpr char COMPILATION_DB_DEFAULT[] = "compile_commands.json";
+        constexpr char FLAG_CITNAMES[] = "--citnames";
+        constexpr char FLAG_INTERCEPT[] = "--interceptor";
+    }
+
+    namespace citnames {
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
+
+        constexpr char FLAG_INPUT[] = "--input";
+        constexpr char FLAG_OUTPUT[] = "--output";
+        constexpr char FLAG_APPEND[] = "--append";
+        constexpr char FLAG_RUN_CHECKS[] = "--run-checks";
+        constexpr char FLAG_CONFIG[] = "--config";
+
+        constexpr char DEFAULT_OUTPUT[] = "compile_commands.json";
+    }
+
+    namespace intercept {
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
+
+        constexpr char FLAG_OUTPUT[] = "--output";
+        constexpr char FLAG_LIBRARY[] = "--library";
+        constexpr char FLAG_WRAPPER[] = "--wrapper";
+        constexpr char FLAG_WRAPPER_DIR[] = "--wrapper-dir";
+        constexpr char FLAG_COMMAND[] = "--";
+        constexpr char FLAG_FORCE_WRAPPER[] = "--force-wrapper";
+        constexpr char FLAG_FORCE_PRELOAD[] = "--force-preload";
+
+        constexpr char DEFAULT_OUTPUT[] = "events.db";
+    }
+
+    namespace wrapper {
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper";
+        constexpr char DEFAULT_DIR_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/wrapper.d";
+
+        constexpr char FLAG_VERBOSE[] = "--verbose";
+        constexpr char FLAG_DESTINATION[] = "--destination";
+        constexpr char FLAG_EXECUTE[] = "--execute";
+        constexpr char FLAG_COMMAND[] = "--";
+
+        constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
+        constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";
+    }
+
+    namespace library {
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBEXECDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
+
+        constexpr char KEY_REPORTER[] = "INTERCEPT_REPORT_COMMAND";
+        constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
+        constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";
+    }
 }

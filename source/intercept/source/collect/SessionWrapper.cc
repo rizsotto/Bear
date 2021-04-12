@@ -17,11 +17,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "collect/SessionWrapper.h"
-#include "intercept/Flags.h"
 #include "report/libexec/Resolver.h"
 #include "report/libexec/Environment.h"
-#include "report/wrapper/Environment.h"
 #include "libsys/Errors.h"
 #include "libsys/Os.h"
 #include "libsys/Path.h"
@@ -110,7 +109,7 @@ namespace ic {
     rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments &args, const char **envp)
     {
         const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto wrapper_dir = args.as_string(ic::WRAPPER_DIR);
+        auto wrapper_dir = args.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
         auto wrappers = wrapper_dir.and_then<std::list<fs::path>>(list_dir);
 
         auto mapping = wrappers
@@ -219,11 +218,11 @@ namespace ic {
             it->second = remove_from_path(wrapper_dir_, it->second);
         }
         // remove verbose flag
-        if (auto it = copy.find(wr::env::KEY_VERBOSE); it != copy.end()) {
+        if (auto it = copy.find(cmd::wrapper::KEY_VERBOSE); it != copy.end()) {
             copy.erase(it);
         }
         // remove destination
-        if (auto it = copy.find(wr::env::KEY_DESTINATION); it != copy.end()) {
+        if (auto it = copy.find(cmd::wrapper::KEY_DESTINATION); it != copy.end()) {
             copy.erase(it);
         }
         // remove all implicits
@@ -240,10 +239,10 @@ namespace ic {
         std::map<std::string, std::string> environment(env);
         // enable verbose logging to wrappers
         if (verbose_) {
-            environment[wr::env::KEY_VERBOSE] = "true";
+            environment[cmd::wrapper::KEY_VERBOSE] = "true";
         }
         // sets the server address to wrappers
-        environment[wr::env::KEY_DESTINATION] = *session_locator_;
+        environment[cmd::wrapper::KEY_DESTINATION] = *session_locator_;
         // change PATH to put the wrapper directory at the front.
         if (auto it = environment.find("PATH"); it != environment.end()) {
             it->second = keep_front_in_path(wrapper_dir_, it->second);

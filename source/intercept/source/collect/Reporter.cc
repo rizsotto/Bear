@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "collect/Reporter.h"
-#include "intercept/Flags.h"
 
 #include <spdlog/spdlog.h>
 
@@ -28,7 +28,7 @@ namespace ic {
 
     rust::Result<Reporter::Ptr> Reporter::from(const flags::Arguments& flags) {
         return flags
-                .as_string(OUTPUT)
+                .as_string(cmd::intercept::FLAG_OUTPUT)
                 .and_then<ic::collect::db::EventsDatabaseWriter::Ptr>([](auto file) {
                     return ic::collect::db::EventsDatabaseWriter::create(file);
                 })
