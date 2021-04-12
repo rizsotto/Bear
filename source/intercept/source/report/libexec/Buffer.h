@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include "config.h"
+
 namespace el {
 
     /**
@@ -47,12 +49,8 @@ namespace el {
          */
         char const* store(char const* input) noexcept;
 
-    public:
-        Buffer(Buffer const&) = delete;
-        Buffer(Buffer&&) noexcept = delete;
-
-        Buffer& operator=(Buffer const&) = delete;
-        Buffer& operator=(Buffer&&) noexcept = delete;
+        NON_DEFAULT_CONSTRUCTABLE(Buffer);
+        NON_COPYABLE_NOR_MOVABLE(Buffer);
 
     private:
         char* top_;

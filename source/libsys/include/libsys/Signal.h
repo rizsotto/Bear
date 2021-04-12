@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include <csignal>
 
 namespace sys {
@@ -31,12 +32,8 @@ namespace sys {
         ~SignalForwarder() noexcept;
 
     public:
-        SignalForwarder() = delete;
-        SignalForwarder(const SignalForwarder&) = delete;
-        SignalForwarder(SignalForwarder&&) noexcept = delete;
-
-        SignalForwarder& operator=(const SignalForwarder&) = delete;
-        SignalForwarder& operator=(SignalForwarder&&) noexcept = delete;
+        NON_DEFAULT_CONSTRUCTABLE(SignalForwarder);
+        NON_COPYABLE_NOR_MOVABLE(SignalForwarder);
 
     private:
         using handler_t = void (*)(int);

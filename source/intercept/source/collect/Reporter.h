@@ -40,14 +40,10 @@ namespace ic {
     public:
         explicit Reporter(ic::collect::db::EventsDatabaseWriter::Ptr database);
 
-        Reporter() = delete;
         ~Reporter() noexcept = default;
 
-        Reporter(const Reporter&) = delete;
-        Reporter(Reporter&&) noexcept = delete;
-
-        Reporter& operator=(const Reporter&) = delete;
-        Reporter& operator=(Reporter&&) noexcept = delete;
+        NON_DEFAULT_CONSTRUCTABLE(Reporter);
+        NON_COPYABLE_NOR_MOVABLE(Reporter);
 
     private:
         ic::collect::db::EventsDatabaseWriter::Ptr database_;

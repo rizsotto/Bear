@@ -151,6 +151,9 @@ namespace {
             return result;
         }
 
+        NON_DEFAULT_CONSTRUCTABLE(Command);
+        NON_COPYABLE_NOR_MOVABLE(Command);
+
     private:
         sys::Process::Builder intercept_;
         sys::Process::Builder citnames_;

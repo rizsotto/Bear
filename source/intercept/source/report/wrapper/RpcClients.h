@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "Domain.h"
 #include "report/wrapper/EventFactory.h"
 #include "libresult/Result.h"
@@ -36,15 +37,10 @@ namespace wr {
     public:
         explicit SupervisorClient(const wr::SessionLocator& session_locator);
 
-        SupervisorClient() = delete;
-        SupervisorClient(const SupervisorClient&) = delete;
-        SupervisorClient(SupervisorClient&&) noexcept = delete;
+        rust::Result<wr::Execution> resolve(const wr::Execution &);
 
-        SupervisorClient& operator=(const SupervisorClient&) = delete;
-        SupervisorClient& operator=(SupervisorClient&&) noexcept = delete;
-
-    public:
-        rust::Result<wr::Execution> resolve(const wr::Execution &execution);
+        NON_DEFAULT_CONSTRUCTABLE(SupervisorClient);
+        NON_COPYABLE_NOR_MOVABLE(SupervisorClient);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;
@@ -55,15 +51,10 @@ namespace wr {
     public:
         explicit InterceptorClient(const wr::SessionLocator& session_locator);
 
-        InterceptorClient() = delete;
-        InterceptorClient(const InterceptorClient&) = delete;
-        InterceptorClient(InterceptorClient&&) noexcept = delete;
-
-        InterceptorClient& operator=(const InterceptorClient&) = delete;
-        InterceptorClient& operator=(InterceptorClient&&) noexcept = delete;
-
-    public:
         rust::Result<int> report(const rpc::Event &);
+
+        NON_DEFAULT_CONSTRUCTABLE(InterceptorClient);
+        NON_COPYABLE_NOR_MOVABLE(InterceptorClient);
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;

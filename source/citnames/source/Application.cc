@@ -144,7 +144,7 @@ namespace cs {
         // get current compilations from the input.
         return db::EventsDatabaseReader::from(arguments_.input)
                 .map<size_t>([this, &entries](const auto &commands) {
-                    auto build = cs::semantic::Build(configuration_.compilation);
+                    cs::semantic::Build build(configuration_.compilation);
                     return transform(build, commands, entries);
                 })
                 .and_then<size_t>([this, &output, &entries](auto new_entries_count) {

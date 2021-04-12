@@ -52,11 +52,7 @@ namespace el {
         [[nodiscard]]
         virtual rust::Result<const char*, int> from_search_path(std::string_view const &file, const char *search_path);
 
-        Resolver(Resolver const &) = delete;
-        Resolver(Resolver &&) noexcept = delete;
-
-        Resolver &operator=(Resolver const &) = delete;
-        Resolver &&operator=(Resolver &&) noexcept = delete;
+        NON_COPYABLE_NOR_MOVABLE(Resolver);
 
     private:
         char result_[PATH_MAX];

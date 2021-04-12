@@ -58,10 +58,6 @@ namespace cs::semantic {
             : tools_(from(std::move(cfg)))
     { }
 
-    Build::Build(std::shared_ptr<Tool> tools) noexcept
-            : tools_(std::move(tools))
-    { }
-
     [[nodiscard]]
     rust::Result<SemanticPtr> Build::recognize(const rpc::Event &event) {
         if (event.has_started()) {

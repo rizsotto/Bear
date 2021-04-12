@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libmain/ApplicationFromArgs.h"
 #include "Session.h"
 #include "Reporter.h"
@@ -39,6 +40,9 @@ namespace ic {
         { }
 
         [[nodiscard]] rust::Result<int> execute() const override;
+
+        NON_DEFAULT_CONSTRUCTABLE(Command);
+        NON_COPYABLE_NOR_MOVABLE(Command);
 
     private:
         Execution execution_;

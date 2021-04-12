@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
@@ -47,11 +48,8 @@ namespace ic::collect::db {
         explicit EventsDatabaseWriter(fs::path file, StreamPtr stream) noexcept;
         ~EventsDatabaseWriter() noexcept;
 
-        EventsDatabaseWriter(const EventsDatabaseWriter &) = delete;
-        EventsDatabaseWriter(EventsDatabaseWriter &&) noexcept = delete;
-
-        EventsDatabaseWriter &operator=(const EventsDatabaseWriter &) = delete;
-        EventsDatabaseWriter &operator=(EventsDatabaseWriter &&) noexcept = delete;
+        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseWriter);
+        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseWriter);
 
     private:
         fs::path file_;

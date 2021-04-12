@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
@@ -80,11 +81,8 @@ namespace ic::collect::db {
         explicit EventsDatabaseReader(fs::path file, StreamPtr stream) noexcept;
         ~EventsDatabaseReader() noexcept;
 
-        EventsDatabaseReader(const EventsDatabaseReader &) = delete;
-        EventsDatabaseReader(EventsDatabaseReader &&) noexcept = delete;
-
-        EventsDatabaseReader &operator=(const EventsDatabaseReader &) = delete;
-        EventsDatabaseReader &operator=(EventsDatabaseReader &&) noexcept = delete;
+        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseReader);
+        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseReader);
 
     private:
         fs::path file_;

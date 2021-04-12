@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libmain/Application.h"
 #include "libmain/ApplicationLogConfig.h"
 #include "libresult/Result.h"
@@ -29,16 +30,12 @@ namespace ps {
     struct ApplicationFromArgs : Application {
         explicit ApplicationFromArgs(const ApplicationLogConfig&) noexcept;
 
-        ApplicationFromArgs(const ApplicationFromArgs&) = default;
-        ApplicationFromArgs(ApplicationFromArgs&&) noexcept = default;
-
-        ApplicationFromArgs& operator=(const ApplicationFromArgs&) = default;
-        ApplicationFromArgs& operator=(ApplicationFromArgs&&) noexcept = default;
-
         rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const override;
 
         virtual rust::Result<flags::Arguments> parse(int argc, const char** argv) const = 0;
         virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
+
+        NON_DEFAULT_CONSTRUCTABLE(ApplicationFromArgs);
 
     protected:
         ApplicationLogConfig log_config_;

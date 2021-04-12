@@ -69,14 +69,7 @@ namespace sys {
     public:
         explicit Process(pid_t pid);
 
-        Process() = delete;
-        ~Process() = default;
-
-        Process(const Process&) = default;
-        Process(Process&&) noexcept = default;
-
-        Process& operator=(const Process&) = default;
-        Process& operator=(Process&&) noexcept = default;
+        NON_DEFAULT_CONSTRUCTABLE(Process);
 
     private:
         pid_t pid_;
@@ -110,11 +103,7 @@ namespace sys {
 #endif
 
     public:
-        Builder(const Builder&) = default;
-        Builder(Builder&&) noexcept = default;
-
-        Builder& operator=(const Builder&) = default;
-        Builder& operator=(Builder&&) noexcept = default;
+        NON_DEFAULT_CONSTRUCTABLE(Builder);
 
     private:
         fs::path program_;

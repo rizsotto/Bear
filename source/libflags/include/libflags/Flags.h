@@ -19,14 +19,15 @@
 
 #pragma once
 
+#include "config.h"
+#include "libresult/Result.h"
+
 #include <list>
 #include <map>
 #include <optional>
 #include <string_view>
 #include <vector>
 #include <iosfwd>
-
-#include "libresult/Result.h"
 
 namespace flags {
 
@@ -51,7 +52,7 @@ namespace flags {
         [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
     public:
-        Arguments() = delete;
+        NON_DEFAULT_CONSTRUCTABLE(Arguments);
 
     private:
         using Parameter = std::vector<std::string_view>;
@@ -128,7 +129,7 @@ namespace flags {
         void print_version(std::ostream&) const;
 
     public:
-        Parser() = delete;
+        NON_DEFAULT_CONSTRUCTABLE(Parser);
 
     private:
         const std::string_view name_;

@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "Configuration.h"
 #include "semantic/Tool.h"
 #include "intercept.grpc.pb.h"
@@ -33,10 +34,12 @@ namespace cs::semantic {
     class Build {
     public:
         explicit Build(Compilation cfg) noexcept;
-        explicit Build(std::shared_ptr<Tool> tools) noexcept;
 
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const rpc::Event &event);
+
+        NON_DEFAULT_CONSTRUCTABLE(Build);
+        NON_COPYABLE_NOR_MOVABLE(Build);
 
     private:
         std::shared_ptr<Tool> tools_;
