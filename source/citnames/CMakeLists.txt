@@ -42,6 +42,7 @@ target_link_libraries(citnames_a PUBLIC
         result_a
         flags_a
         sys_a
+        exec_a
         fmt::fmt
         spdlog::spdlog)
 

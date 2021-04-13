@@ -18,13 +18,42 @@
  */
 
 #include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 #include "semantic/Tool.h"
 #include "semantic/ToolWrapper.h"
+#include "report/libexec/Resolver.h"
 
 using namespace cs::semantic;
+using ::testing::_;
+using ::testing::Eq;
+using ::testing::Return;
 
 namespace {
+
+    class ResolverMock : public el::Resolver {
+    public:
+        MOCK_METHOD(
+        (rust::Result<const char*, int>),
+                from_current_directory,
+        (std::string_view const &),
+        (override)
+        );
+
+        MOCK_METHOD(
+        (rust::Result<const char*, int>),
+                from_path,
+        (std::string_view const &, const char **),
+        (override)
+        );
+
+        MOCK_METHOD(
+        (rust::Result<const char*, int>),
+                from_search_path,
+        (std::string_view const &, const char *),
+        (override)
+        );
+    };
 
     TEST(ToolWrapper, is_ccache_call) {
         EXPECT_FALSE(ToolWrapper::is_ccache_call("cc"));
@@ -70,26 +99,49 @@ namespace {
         EXPECT_FALSE(ToolWrapper::is_ccache_query({"distcc", "cc", "-c"}));
     }
 
-    TEST(ToolWrapper, simple) {
-        Execution input = {
+    TEST(ToolWrapper, remove_wrapper) {
+        const Execution input = {
                 "/usr/bin/ccache",
                 {"ccache", "cc", "-c", "-o", "source.o", "source.c"},
                 "/home/user/project",
-                {},
+                {{"PATH", "/usr/bin:/usr/sbin"}},
         };
-        SemanticPtr expected = SemanticPtr(
-                new Compile(
-                        input.working_dir,
-                        "cc",
-                        {"-c"},
-                        {fs::path("source.c")},
-                        {fs::path("source.o")})
-        );
+        const Execution expected = {
+                "/usr/bin/cc",
+                {"cc", "-c", "-o", "source.o", "source.c"},
+                "/home/user/project",
+                {{"PATH", "/usr/bin:/usr/sbin"}},
+        };
 
-        ToolWrapper sut({});
+        ResolverMock resolver;
+        EXPECT_CALL(resolver, from_search_path(Eq(std::string_view("cc")), _))
+                .Times(1)
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Ok("/usr/bin/cc"))));
 
-        auto result = sut.recognize(input);
-        EXPECT_TRUE(Tool::recognized_ok(result));
-        EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
+        auto result = ToolWrapper::remove_wrapper(resolver, input);
+        EXPECT_EQ(expected, result);
+    }
+
+    TEST(ToolWrapper, remove_wrapper_fails_to_resolve) {
+        const Execution input = {
+                "/usr/bin/ccache",
+                {"ccache", "cc", "-c", "-o", "source.o", "source.c"},
+                "/home/user/project",
+                {{"PATH", "/usr/bin:/usr/sbin"}},
+        };
+        const Execution expected = {
+                "cc",
+                {"cc", "-c", "-o", "source.o", "source.c"},
+                "/home/user/project",
+                {{"PATH", "/usr/bin:/usr/sbin"}},
+        };
+
+        ResolverMock resolver;
+        EXPECT_CALL(resolver, from_search_path(Eq(std::string_view("cc")), _))
+                .Times(1)
+                .WillOnce(Return(rust::Result<const char*, int>(rust::Err(12))));
+
+        auto result = ToolWrapper::remove_wrapper(resolver, input);
+        EXPECT_EQ(expected, result);
     }
 }

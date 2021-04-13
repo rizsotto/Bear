@@ -19,6 +19,9 @@
 
 #include "ToolWrapper.h"
 
+#include "report/libexec/Resolver.h"
+#include "libsys/Errors.h"
+
 #include <set>
 
 namespace {
@@ -33,13 +36,6 @@ namespace {
         };
         return candidate.empty() || (flags.find(candidate) != flags.end());
     }
-
-    rust::Result<domain::Execution> remove_wrapper(const domain::Execution &execution) {
-        domain::Execution result = execution;
-        result.arguments.pop_front();
-        result.executable = result.arguments.front(); // FIXME
-        return rust::Ok(result);
-    }
 }
 
 namespace cs::semantic {
@@ -48,18 +44,12 @@ namespace cs::semantic {
         if (is_ccache_call(execution.executable)) {
             return is_ccache_query(execution.arguments)
                     ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
-                    : remove_wrapper(execution)
-                            .and_then<SemanticPtr>([this](const auto &wrapped_execution) {
-                                return compilation(wrapped_execution);
-                            });
+                    : compilation(remove_wrapper(execution));
         }
         if (is_distcc_call(execution.executable)) {
             return is_distcc_query(execution.arguments)
                     ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
-                    : remove_wrapper(execution)
-                            .and_then<SemanticPtr>([this](const auto &wrapped_execution) {
-                                return compilation(wrapped_execution);
-                            });
+                    : compilation(remove_wrapper(execution));
         }
         return rust::Ok(SemanticPtr());
     }
@@ -92,5 +82,33 @@ namespace cs::semantic {
             return true;
         }
         return false;
+    }
+
+    domain::Execution ToolWrapper::remove_wrapper(const Execution &execution) {
+        el::Resolver resolver;
+        return remove_wrapper(resolver, execution);
+    }
+
+    domain::Execution ToolWrapper::remove_wrapper(el::Resolver &resolver, const Execution &execution) {
+        auto environment = execution.environment;
+        if (auto path = environment.find("PATH"); path != environment.end()) {
+            // take the second argument as a program candidate
+            auto program = std::next(execution.arguments.begin());
+            if (program != execution.arguments.end()) {
+                // use resolver to get the full path to the executable.
+                auto candidate = resolver.from_search_path(*program, path->second.c_str());
+                if (candidate.is_ok()) {
+                    domain::Execution copy = execution;
+                    copy.arguments.pop_front();
+                    copy.executable = candidate.unwrap();
+                    return copy;
+                }
+            }
+        }
+        // fall back to the second argument as an executable.
+        domain::Execution copy = execution;
+        copy.arguments.pop_front();
+        copy.executable = copy.arguments.front();
+        return copy;
     }
 }

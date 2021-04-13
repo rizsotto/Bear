@@ -24,16 +24,25 @@
 #include <list>
 #include <string>
 
+namespace el {
+    class Resolver;
+}
+
 namespace cs::semantic {
 
     struct ToolWrapper : public ToolGcc {
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
+    // visible for testing
+    public:
         static bool is_ccache_call(const fs::path &program);
         static bool is_ccache_query(const std::list<std::string> &arguments);
 
         static bool is_distcc_call(const fs::path &program);
         static bool is_distcc_query(const std::list<std::string> &arguments);
+
+        static domain::Execution remove_wrapper(const domain::Execution &);
+        static domain::Execution remove_wrapper(el::Resolver &, const domain::Execution &);
     };
 }

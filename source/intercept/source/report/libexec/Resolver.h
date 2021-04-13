@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include "libresult/Result.h"
 
 #include <climits>
