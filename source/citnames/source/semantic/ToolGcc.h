@@ -28,7 +28,8 @@ namespace cs::semantic {
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
-    protected:
+    // visible for testing
+    public:
         [[nodiscard]]
         virtual bool recognize(const fs::path& program) const;
 

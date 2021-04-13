@@ -27,12 +27,7 @@ using namespace cs::semantic;
 namespace {
 
     TEST(ToolGcc, recognize) {
-        struct Expose : public ToolGcc {
-            [[nodiscard]] bool recognize(const fs::path& program) const override {
-                return ToolGcc::recognize(program);
-            }
-        };
-        Expose sut;
+        ToolGcc sut;
 
         EXPECT_TRUE(sut.recognize("cc"));
         EXPECT_TRUE(sut.recognize("/usr/bin/cc"));
