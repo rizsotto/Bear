@@ -21,10 +21,19 @@
 
 #include "ToolGcc.h"
 
+#include <list>
+#include <string>
+
 namespace cs::semantic {
 
     struct ToolWrapper : public ToolGcc {
         [[nodiscard]]
-        bool recognize(const fs::path& program) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+
+        static bool is_ccache_call(const fs::path &program);
+        static bool is_ccache_query(const std::list<std::string> &arguments);
+
+        static bool is_distcc_call(const fs::path &program);
+        static bool is_distcc_query(const std::list<std::string> &arguments);
     };
 }

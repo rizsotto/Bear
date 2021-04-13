@@ -31,5 +31,8 @@ namespace cs::semantic {
     protected:
         [[nodiscard]]
         virtual bool recognize(const fs::path& program) const;
+
+        [[nodiscard]]
+        virtual rust::Result<SemanticPtr> compilation(const Execution &execution) const;
     };
 }

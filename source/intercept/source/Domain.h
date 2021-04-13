@@ -20,9 +20,9 @@
 #pragma once
 
 #include <filesystem>
+#include <list>
 #include <map>
 #include <string>
-#include <vector>
 #include <cstdint>
 #include <iosfwd>
 
@@ -35,7 +35,7 @@ namespace domain {
 
     struct Execution {
         fs::path executable;
-        std::vector<std::string> arguments;
+        std::list<std::string> arguments;
         fs::path working_dir;
         std::map<std::string, std::string> environment;
     };

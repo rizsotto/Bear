@@ -36,7 +36,7 @@ namespace cs::semantic {
     using namespace domain;
 
     // Represents command line arguments.
-    using Arguments = std::vector<std::string>;
+    using Arguments = std::list<std::string>;
 
     // Represents a segment of a whole command line arguments,
     // which belongs together.

@@ -28,6 +28,7 @@
 #include <optional>
 #include <ostream>
 #include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -84,7 +85,7 @@ namespace cs::semantic {
     struct Compile : public CompilerCall {
         Compile(fs::path working_dir,
                 fs::path compiler,
-                std::vector<std::string> flags,
+                std::list<std::string> flags,
                 std::vector<fs::path> sources,
                 std::optional<fs::path> output);
 
@@ -96,7 +97,7 @@ namespace cs::semantic {
     public:
         fs::path working_dir;
         fs::path compiler;
-        std::vector<std::string> flags;
+        std::list<std::string> flags;
         std::vector<fs::path> sources;
         std::optional<fs::path> output;
     };

@@ -24,7 +24,7 @@ namespace domain {
     Execution from(const rpc::Execution &input) noexcept {
         return Execution{
                 fs::path(input.executable()),
-                std::vector(input.arguments().begin(), input.arguments().end()),
+                std::list(input.arguments().begin(), input.arguments().end()),
                 fs::path(input.working_dir()),
                 std::map(input.environment().begin(), input.environment().end())
         };

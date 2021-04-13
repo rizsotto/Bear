@@ -74,6 +74,7 @@ if (ENABLE_UNIT_TESTS)
             test/OutputTest.cc
             test/ToolTest.cc
             test/ToolGccTest.cc
+            test/ToolWrapperTest.cc
             )
 
     target_link_libraries(citnames_unit_test citnames_a)

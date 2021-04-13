@@ -72,12 +72,12 @@ namespace {
                    : rust::Result<wr::SessionLocator>(rust::Ok(wr::SessionLocator{destination->second}));
         }
 
-        std::vector<std::string> from(const char **argv)
+        std::list<std::string> from(const char **argv)
         {
             const char** end = argv;
             while (*end != nullptr)
                 ++end;
-            return std::vector<std::string>(argv, end);
+            return std::list<std::string>(argv, end);
         }
 
         rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
@@ -105,8 +105,8 @@ namespace {
             auto program = args.as_string(cmd::wrapper::FLAG_EXECUTE)
                     .map<fs::path>([](auto file) { return fs::path(file); });
             auto arguments = args.as_string_list(cmd::wrapper::FLAG_COMMAND)
-                    .map<std::vector<std::string>>([](auto args) {
-                        return std::vector<std::string>(args.begin(), args.end());
+                    .map<std::list<std::string>>([](auto args) {
+                        return std::list<std::string>(args.begin(), args.end());
                     });
             auto working_dir = sys::path::get_cwd();
 

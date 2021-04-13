@@ -63,7 +63,7 @@ namespace cs::semantic {
 
     Compile::Compile(fs::path working_dir,
                      fs::path compiler,
-                     std::vector<std::string> flags,
+                     std::list<std::string> flags,
                      std::vector<fs::path> sources,
                      std::optional<fs::path> output)
             : working_dir(std::move(working_dir))

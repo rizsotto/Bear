@@ -226,7 +226,7 @@ namespace {
     }
 
     std::tuple<
-            std::vector<std::string>,
+            Arguments,
             std::vector<fs::path>,
             std::optional<fs::path>
     > split(const CompilerFlags &flags) {
@@ -258,47 +258,16 @@ namespace {
         }
         return std::make_tuple(arguments, sources, output);
     }
-
-    rust::Result<SemanticPtr> compilation(const Execution &execution) {
-        return parse_flags(execution)
-                .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
-                    if (is_compiler_query(flags)) {
-                        SemanticPtr result = SemanticPtr(new QueryCompiler());
-                        return rust::Ok(std::move(result));
-                    }
-                    if (!is_prerpocessor_only(flags) || is_prerpocessor(flags)) {
-                        SemanticPtr result = SemanticPtr(new Preprocess());
-                        return rust::Ok(std::move(result));
-                    }
-
-                    auto[arguments, sources, output] = split(flags);
-                    // Validate: must have source files.
-                    if (sources.empty()) {
-                        return rust::Err(std::runtime_error("Source files not found for compilation."));
-                    }
-                    // TODO: introduce semantic type for linking
-                    if (linking(flags)) {
-                        arguments.insert(arguments.begin(), "-c");
-                    }
-                    // Create compiler flags from environment variables if present.
-                    Arguments extra = flags_from_environment(execution.environment);
-                    std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
-
-                    SemanticPtr result = SemanticPtr(
-                            new Compile(
-                                    execution.working_dir,
-                                    execution.executable,
-                                    arguments,
-                                    sources,
-                                    output
-                            )
-                    );
-                    return rust::Ok(std::move(result));
-                });
-    }
 }
 
 namespace cs::semantic {
+
+    rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution) const {
+        if (recognize(execution.executable)) {
+            return compilation(execution);
+        }
+        return rust::Ok(SemanticPtr());
+    }
 
     bool ToolGcc::recognize(const fs::path& program) const {
         static const auto pattern = std::regex(
@@ -316,10 +285,39 @@ namespace cs::semantic {
         return std::regex_match(program.filename().c_str(), m, pattern);
     }
 
-    rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution) const {
-        if (recognize(execution.executable)) {
-            return compilation(execution);
-        }
-        return rust::Ok(SemanticPtr());
+    rust::Result<SemanticPtr> ToolGcc::compilation(const Execution &execution) const {
+        return parse_flags(execution)
+                .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
+                    if (is_compiler_query(flags)) {
+                        SemanticPtr result = std::make_shared<QueryCompiler>();
+                        return rust::Ok(std::move(result));
+                    }
+                    if (!is_prerpocessor_only(flags) || is_prerpocessor(flags)) {
+                        SemanticPtr result = std::make_shared<Preprocess>();
+                        return rust::Ok(std::move(result));
+                    }
+
+                    auto[arguments, sources, output] = split(flags);
+                    // Validate: must have source files.
+                    if (sources.empty()) {
+                        return rust::Err(std::runtime_error("Source files not found for compilation."));
+                    }
+                    // TODO: introduce semantic type for linking
+                    if (linking(flags)) {
+                        arguments.insert(arguments.begin(), "-c");
+                    }
+                    // Create compiler flags from environment variables if present.
+                    Arguments extra = flags_from_environment(execution.environment);
+                    std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
+
+                    SemanticPtr result = std::make_shared<Compile>(
+                            execution.working_dir,
+                            execution.executable,
+                            std::move(arguments),
+                            std::move(sources),
+                            std::move(output)
+                    );
+                    return rust::Ok(std::move(result));
+                });
     }
 }

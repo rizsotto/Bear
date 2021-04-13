@@ -73,7 +73,7 @@ namespace {
                     const auto&[executable, command] = tuple;
                     return ic::Execution{
                         executable,
-                        std::vector<std::string>(command.begin(), command.end()),
+                        std::list<std::string>(command.begin(), command.end()),
                         fs::path("ignored"),
                         std::move(environment)
                     };
