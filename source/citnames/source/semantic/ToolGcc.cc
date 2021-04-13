@@ -25,6 +25,8 @@
 #include <regex>
 #include <utility>
 #include <functional>
+#include <set>
+#include <string_view>
 
 using namespace cs::semantic;
 
@@ -188,33 +190,17 @@ namespace {
         });
     }
 
-    bool is_prerpocessor_only(const CompilerFlags& flags)
-    {
-        constexpr static const char* NO_COMPILATION_FLAG[] {
-                "-M",
-                "-MM",
-        };
-        constexpr static size_t NO_COMPILATION_FLAG_SIZE = sizeof(NO_COMPILATION_FLAG) / sizeof(const char*);
-
-        // one of those make dependency generation also not count as compilation.
-        // (will cause duplicate element, which is hard to detect.)
-        return std::none_of(flags.begin(), flags.end(), [](const auto& flag) {
-            if (flag.type != CompilerFlagType::PREPROCESSOR_MAKE) {
-                return false;
-            }
-
-            const std::string candidate = flag.arguments.front();
-            auto begin = NO_COMPILATION_FLAG;
-            auto end = NO_COMPILATION_FLAG + NO_COMPILATION_FLAG_SIZE;
-            return (std::any_of(begin, end, [&candidate](const char* it) { return candidate == it; }));
-        });
-    }
-
     bool is_prerpocessor(const CompilerFlags& flags)
     {
+        // one of those make dependency generation also not count as compilation.
+        // (will cause duplicate element, which is hard to detect.)
+        static const std::set<std::string_view> NO_COMPILATION_FLAG =
+                { "-M", "-MM" };
+
         return std::any_of(flags.begin(), flags.end(), [](const auto &flag) {
-            return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING) &&
-                   (flag.arguments.front() == "-E");
+            const std::string &candidate = flag.arguments.front();
+            return ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING) && (candidate == "-E"))
+                || ((flag.type == CompilerFlagType::PREPROCESSOR_MAKE) && (NO_COMPILATION_FLAG.find(candidate) != NO_COMPILATION_FLAG.end()));
         });
     }
 
@@ -292,7 +278,7 @@ namespace cs::semantic {
                         SemanticPtr result = std::make_shared<QueryCompiler>();
                         return rust::Ok(std::move(result));
                     }
-                    if (!is_prerpocessor_only(flags) || is_prerpocessor(flags)) {
+                    if (is_prerpocessor(flags)) {
                         SemanticPtr result = std::make_shared<Preprocess>();
                         return rust::Ok(std::move(result));
                     }

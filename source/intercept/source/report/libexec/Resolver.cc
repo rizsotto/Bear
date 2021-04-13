@@ -105,8 +105,9 @@ namespace el {
                 // create a path
                 char candidate[PATH_MAX];
                 {
-                    auto candidate_end = candidate + PATH_MAX;
-                    auto it = el::array::copy(path.begin(), path.end(), candidate, candidate_end);
+                    char *const candidate_begin = candidate;
+                    char *const candidate_end = candidate + PATH_MAX;
+                    auto it = el::array::copy(path.begin(), path.end(), candidate_begin, candidate_end);
                     *it++ = DIR_SEPARATOR;
                     it = el::array::copy(file.begin(), file.end(), it, candidate_end);
                     *it = 0;

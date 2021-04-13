@@ -30,7 +30,7 @@ namespace cs::semantic {
             const auto&[count, type] = match.value();
 
             auto begin = input.begin;
-            auto end = std::next(begin, count + 1);
+            auto end = std::next(begin, size_t(count) + 1);
 
             CompilerFlag compiler_flag = {Arguments(begin, end), type};
             Input remainder = {end, input.end};

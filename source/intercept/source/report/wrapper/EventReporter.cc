@@ -21,7 +21,6 @@
 
 namespace wr {
 
-
     EventReporter::EventReporter(const SessionLocator &session_locator) noexcept
             : event_factory()
             , client(session_locator)
@@ -29,13 +28,13 @@ namespace wr {
 
     void EventReporter::report_start(ProcessId pid, const Execution &execution) {
         auto event = event_factory.start(pid, getppid(), execution);
-        client.report(std::move(event));
+        client.report(event);
     }
 
     void EventReporter::report_wait(sys::ExitStatus exit_status) {
         auto event = (exit_status.is_signaled())
                 ? event_factory.signal(exit_status.signal().value())
                 : event_factory.terminate(exit_status.code().value());
-        client.report(std::move(event));
+        client.report(event);
     }
 }
