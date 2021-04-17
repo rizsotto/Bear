@@ -63,7 +63,7 @@ namespace wr {
         spdlog::debug("gRPC call requested: supervise::Interceptor::Register");
 
         grpc::ClientContext context;
-        rpc::Empty response;
+        google::protobuf::Empty response;
 
         const grpc::Status status = interceptor_->Register(&context, event, &response);
         spdlog::debug("gRPC call [Register] finished: {}", status.ok());

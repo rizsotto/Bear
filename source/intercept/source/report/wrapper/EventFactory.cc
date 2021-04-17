@@ -20,13 +20,11 @@
 #include "report/wrapper/EventFactory.h"
 #include "Convert.h"
 
-#include <fmt/chrono.h>
-#include <fmt/format.h>
+#include <google/protobuf/util/time_util.h>
 
-#include <chrono>
 #include <random>
-#include <cstdint>
-#include <string>
+
+using namespace google::protobuf::util;
 
 namespace {
 
@@ -36,15 +34,6 @@ namespace {
         std::uniform_int_distribution<std::uint64_t> distribution;
 
         return distribution(generator);
-    }
-
-    std::string now_as_string() {
-        const auto now = std::chrono::system_clock::now();
-        auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch());
-
-        return fmt::format("{:%Y-%m-%dT%H:%M:%S}.{:06d}Z",
-                           fmt::localtime(std::chrono::system_clock::to_time_t(now)),
-                           micros.count() % 1000000);
     }
 }
 
@@ -57,7 +46,7 @@ namespace wr {
     rpc::Event EventFactory::start(ProcessId pid, ProcessId ppid, const Execution &execution) const {
         rpc::Event event;
         event.set_rid(rid_);
-        event.set_timestamp(now_as_string());
+        event.mutable_timestamp()->CopyFrom(TimeUtil::GetCurrentTime());
         {
             rpc::Event_Started &event_started = *event.mutable_started();
             event_started.set_pid(pid);
@@ -68,24 +57,24 @@ namespace wr {
     }
 
     rpc::Event EventFactory::signal(int number) const {
-        rpc::Event result;
-        result.set_rid(rid_);
-        result.set_timestamp(now_as_string());
+        rpc::Event event;
+        event.set_rid(rid_);
+        event.mutable_timestamp()->CopyFrom(TimeUtil::GetCurrentTime());
         {
-            rpc::Event_Signalled &event = *result.mutable_signalled();
-            event.set_number(number);
+            rpc::Event_Signalled &event_signalled = *event.mutable_signalled();
+            event_signalled.set_number(number);
         }
-        return result;
+        return event;
     }
 
     rpc::Event EventFactory::terminate(int code) const {
-        rpc::Event result;
-        result.set_rid(rid_);
-        result.set_timestamp(now_as_string());
+        rpc::Event event;
+        event.set_rid(rid_);
+        event.mutable_timestamp()->CopyFrom(TimeUtil::GetCurrentTime());
         {
-            rpc::Event_Terminated &event = *result.mutable_terminated();
-            event.set_status(code);
+            rpc::Event_Terminated &event_terminated = *event.mutable_terminated();
+            event_terminated.set_status(code);
         }
-        return result;
+        return event;
     }
 }

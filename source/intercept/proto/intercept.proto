@@ -21,6 +21,8 @@ syntax = "proto3";
 
 package rpc;
 
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 import "supervise.proto";
 
 // Represents the remote sink of supervised process events.
@@ -31,7 +33,7 @@ import "supervise.proto";
 service Interceptor {
 
     // Register a process related events.
-    rpc Register (Event) returns (Empty) {}
+    rpc Register (Event) returns (google.protobuf.Empty) {}
 }
 
 // Represent a relevant life cycle event of a process.
@@ -47,7 +49,7 @@ message Event {
 
     // Required.
     // (ISO-8601 date-tie format with microsecond precision in UTC timezone)
-    string timestamp = 2;
+    google.protobuf.Timestamp timestamp = 2;
 
     reserved 3 to 10;
 
@@ -84,5 +86,3 @@ message Event {
         int32 number = 1;
     }
 }
-
-message Empty {}

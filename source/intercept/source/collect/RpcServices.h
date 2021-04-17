@@ -46,7 +46,7 @@ namespace ic {
         explicit InterceptorImpl(Reporter&);
         ~InterceptorImpl() override = default;
 
-        ::grpc::Status Register(::grpc::ServerContext* context, const rpc::Event* request, rpc::Empty* response) override;
+        ::grpc::Status Register(::grpc::ServerContext* context, const rpc::Event* request, google::protobuf::Empty* response) override;
 
         NON_DEFAULT_CONSTRUCTABLE(InterceptorImpl);
         NON_COPYABLE_NOR_MOVABLE(InterceptorImpl);

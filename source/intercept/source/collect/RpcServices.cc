@@ -46,7 +46,7 @@ namespace ic {
             , reporter_(reporter)
     { }
 
-    grpc::Status InterceptorImpl::Register(grpc::ServerContext*, const rpc::Event* request, rpc::Empty*)
+    grpc::Status InterceptorImpl::Register(grpc::ServerContext*, const rpc::Event* request, google::protobuf::Empty*)
     {
         reporter_.report(*request);
         return ::grpc::Status::OK;
