@@ -132,10 +132,10 @@ namespace {
 
     struct Command : ps::Command {
     public:
-        Command(sys::Process::Builder intercept, sys::Process::Builder citnames, fs::path output) noexcept
+        Command(const sys::Process::Builder& intercept, const sys::Process::Builder& citnames, fs::path output) noexcept
                 : ps::Command()
-                , intercept_(std::move(intercept))
-                , citnames_(std::move(citnames))
+                , intercept_(intercept)
+                , citnames_(citnames)
                 , output_(std::move(output))
         { }
 
@@ -196,7 +196,7 @@ namespace {
             auto citnames = prepare_citnames(args, environment, commands);
 
             return rust::merge(intercept, citnames)
-                    .map<ps::CommandPtr>([&commands](auto tuple) {
+                    .map<ps::CommandPtr>([&commands](const auto &tuple) {
                         const auto&[intercept, citnames] = tuple;
 
                         return std::make_unique<Command>(intercept, citnames, commands);

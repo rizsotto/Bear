@@ -20,6 +20,8 @@
 #include "libsys/Signal.h"
 #include "libsys/Process.h"
 
+#include <set>
+
 namespace {
 
     inline
@@ -33,21 +35,24 @@ namespace {
         }
     }
 
-    sys::Process* CHILD_PROCESS = nullptr;
+    std::set<pid_t> CHILD_PROCESSES;
 
     void handler(int signum) {
-        if (CHILD_PROCESS != nullptr && shall_forward(signum)) {
-            CHILD_PROCESS->kill(signum);
+        if (shall_forward(signum)) {
+            for (auto pid : CHILD_PROCESSES) {
+                ::kill(pid, signum);
+            }
         }
     }
 }
 
 namespace sys {
 
-    SignalForwarder::SignalForwarder(Process& child)
-            : handlers_()
+    SignalForwarder::SignalForwarder(const Process &child) noexcept
+            : pid_(child.get_pid())
+            , handlers_()
     {
-        CHILD_PROCESS = &child;
+        CHILD_PROCESSES.insert(pid_);
         for (int signum = 1; signum < NSIG; ++signum) {
             handlers_[signum] = ::signal(signum, &handler);
         }
@@ -55,7 +60,7 @@ namespace sys {
 
     SignalForwarder::~SignalForwarder() noexcept
     {
-        CHILD_PROCESS = nullptr;
+        CHILD_PROCESSES.erase(pid_);
         for (int signum = 1; signum < NSIG; ++signum) {
             ::signal(signum, handlers_[signum]);
         }

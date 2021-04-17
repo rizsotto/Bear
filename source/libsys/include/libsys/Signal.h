@@ -28,7 +28,7 @@ namespace sys {
 
     class SignalForwarder {
     public:
-        explicit SignalForwarder(Process& child);
+        explicit SignalForwarder(const Process &child) noexcept;
         ~SignalForwarder() noexcept;
 
     public:
@@ -36,6 +36,7 @@ namespace sys {
         NON_COPYABLE_NOR_MOVABLE(SignalForwarder);
 
     private:
+        pid_t pid_;
         using handler_t = void (*)(int);
         handler_t handlers_[NSIG];
     };
