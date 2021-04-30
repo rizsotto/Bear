@@ -33,6 +33,8 @@ if (NOT CMAKE_INSTALL_LIBEXECDIR)
     include(GNUInstallDirs)
 endif ()
 
+set(PRIVATE_INSTALLDIR "${CMAKE_INSTALL_LIBEXECDIR}/bear" CACHE PATH "Install directory for private binaries")
+
 # Verify or install dependencies
 add_subdirectory(third_party)
 
@@ -58,6 +60,7 @@ ExternalProject_Add(BearSource
             -DCMAKE_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
             -DCMAKE_INSTALL_LIBEXECDIR:PATH=${CMAKE_INSTALL_LIBEXECDIR}
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+            -DPRIVATE_INSTALLDIR:PATH=${PRIVATE_INSTALLDIR}
             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
             -DENABLE_FUNC_TESTS:BOOL=${ENABLE_FUNC_TESTS}
@@ -77,6 +80,7 @@ if (ENABLE_FUNC_TESTS)
             CMAKE_CACHE_ARGS
                 -DSTAGED_INSTALL_PREFIX:PATH=${STAGED_INSTALL_PREFIX}
                 -DBEARSOURCE_BUILD_DIR:PATH=${CMAKE_BINARY_DIR}/subprojects/Build/BearSource
+                -DPRIVATE_INSTALLDIR:PATH=${PRIVATE_INSTALLDIR}
             TEST_BEFORE_INSTALL
                 1
             INSTALL_COMMAND
