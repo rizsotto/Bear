@@ -62,4 +62,4 @@ target_sources(rpc_a
         INTERFACE
             $<TARGET_OBJECTS:rpc_a>
         )
-target_link_libraries(rpc_a PUBLIC PkgConfig::gRPC)
+target_link_libraries(rpc_a PUBLIC ${GRPC_TARGET})
