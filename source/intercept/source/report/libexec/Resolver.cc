@@ -49,10 +49,8 @@ namespace el {
     }
 
     rust::Result<const char*, int> Resolver::from_current_directory(std::string_view const &file) {
-        // create absolute path to the given file.
-        if (nullptr == ::realpath(file.begin(), result_)) {
-            return rust::Err(ENOENT);
-        }
+        // copy the input to result.
+        array::copy(file.begin(), file.end() + 1, result_, result_ + PATH_MAX);
         // check if it's okay to execute.
         if (0 == ::access(result_, X_OK)) {
             const char *ptr = result_;
