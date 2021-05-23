@@ -43,12 +43,12 @@ namespace {
                 std::make_shared<cs::semantic::ToolCuda>(),
         };
         for (auto && compiler : cfg.compilers_to_recognize) {
-            tools.emplace_back(std::make_shared<cs::semantic::ToolExtendingWrapper>(std::move(compiler)));
+            tools.emplace_front(std::make_shared<cs::semantic::ToolExtendingWrapper>(std::move(compiler)));
         }
-        std::shared_ptr<cs::semantic::Tool> wrapper =
-                std::make_shared<cs::semantic::ToolAny>(std::move(tools), std::move(cfg.compilers_to_exclude));
-
-        return wrapper;
+        return std::make_shared<cs::semantic::ToolAny>(
+                std::move(tools),
+                std::move(cfg.compilers_to_exclude)
+        );
     }
 }
 
