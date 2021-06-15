@@ -66,7 +66,7 @@ Side note: Since Bear is executing the build command, only those commands will
 be recorded which were actually executed during the current build. Which means
 if you have already built your project and you re-run the build command with
 Bear you probably end up to have an empty output. (Practically it means you
-need to run `make clean` before you run `bear make`.)
+need to run `make clean` before you run `bear -- make`.)
 
 For more read the [wiki][WIKI] of the project, which talks about limitations,
 known issues and platform specific usage. 
