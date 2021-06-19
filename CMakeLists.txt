@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
-cmake_policy(VERSION 3.12)
+cmake_policy(VERSION 3.13)
 
 project(Bear
         VERSION 3.0.12
