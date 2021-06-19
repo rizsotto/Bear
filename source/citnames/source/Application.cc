@@ -24,6 +24,7 @@
 #include "semantic/Build.h"
 #include "semantic/Tool.h"
 #include "collect/db/EventsDatabaseReader.h"
+#include "libsys/Path.h"
 
 #include <filesystem>
 
@@ -34,6 +35,32 @@ namespace fs = std::filesystem;
 namespace db = ic::collect::db;
 
 namespace {
+
+    std::list<fs::path> to_abspath(const std::list<fs::path> &paths, const fs::path &root) {
+        std::list<fs::path> results;
+        for (auto path : paths) {
+            auto result = path.is_absolute() ? path : root / path;
+            results.emplace_back(result);
+        }
+        return results;
+    }
+
+    cs::Content update_content(cs::Content content, bool run_checks) {
+        if (run_checks) {
+            auto cwd = sys::path::get_cwd();
+            if (cwd.is_ok()) {
+                const fs::path root = cwd.unwrap();
+                return cs::Content {
+                        .include_only_existing_source = run_checks,
+                        .paths_to_include = to_abspath(content.paths_to_include, root),
+                        .paths_to_exclude = to_abspath(content.paths_to_exclude, root)
+                };
+            } else {
+                spdlog::warn("Update configuration failed: {}", cwd.unwrap_err().what());
+            }
+        }
+        return content;
+    }
 
     bool is_exists(const fs::path &path) {
         std::error_code error_code;
@@ -93,19 +120,20 @@ namespace {
                               })
                       : rust::Ok(cs::Configuration());
 
-        return config.map<cs::Configuration>([&args](auto config) {
+        return config
+                .map<cs::Configuration>([&args](auto config) {
                     // command line arguments overrides the default values or the configuration content.
-                    args.as_bool(cmd::citnames::FLAG_RUN_CHECKS)
-                            .on_success([&config](auto run) {
-                                config.output.content.include_only_existing_source = run;
-                            });
-
+                    const auto run_checks = args
+                            .as_bool(cmd::citnames::FLAG_RUN_CHECKS)
+                            .unwrap_or(config.output.content.include_only_existing_source);
+                    // update the content filter parameters according to the run_check outcome.
+                    config.output.content = update_content(config.output.content, run_checks);
                     return config;
                 })
                 .map<cs::Configuration>([&environment](auto config) {
                     // recognize compilers from known environment variables.
                     for (const auto &compiler : compilers(environment)) {
-                        auto wrapped = cs::CompilerWrapper{compiler, {}};
+                        auto wrapped = cs::CompilerWrapper{.executable = compiler, .additional_flags = {}};
                         config.compilation.compilers_to_recognize.emplace_back(wrapped);
                     }
                     return config;
