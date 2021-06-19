@@ -42,28 +42,33 @@ namespace {
         { }
 
         bool apply(const cs::Entry &entry) override {
-            if (config.include_only_existing_source) {
-                const auto exists = is_exists(entry.file);
-
-                const auto &include = config.paths_to_include;
-                const bool to_include = include.empty() || contains(include, entry.file);
-                const auto &exclude = config.paths_to_exclude;
-                const bool to_exclude = !exclude.empty() && contains(exclude, entry.file);
-
-                return exists && to_include && !to_exclude;
-            }
-            // if no check required, accept every entry.
-            return true;
+            const auto &file = entry.file;
+            return exists(file) && to_include(file) && !to_exclude(file);
         }
 
     private:
-        static bool is_exists(const fs::path &path) {
+        [[nodiscard]] inline bool exists(const fs::path &file) const {
+            const auto &to_check = config.include_only_existing_source;
+            return (!to_check) || (to_check && does_exist(file));
+        }
+
+        [[nodiscard]] inline bool to_include(const fs::path &file) const {
+            const auto &include = config.paths_to_include;
+            return include.empty() || does_contain(include, file);
+        }
+
+        [[nodiscard]] inline bool to_exclude(const fs::path &file) const {
+            const auto &exclude = config.paths_to_exclude;
+            return !exclude.empty() && does_contain(exclude, file);
+        }
+
+        [[nodiscard]] static bool does_exist(const fs::path &path) {
             std::error_code error_code;
             return fs::exists(path, error_code);
         }
 
-        static bool contains(const std::list<fs::path> &root, const fs::path &file) {
-            return std::any_of(root.begin(), root.end(), [&file](auto directory) {
+        [[nodiscard]] static bool does_contain(const std::list<fs::path> &directories, const fs::path &file) {
+            return std::any_of(directories.begin(), directories.end(), [&file](auto directory) {
                 // check if the path elements (list of directory names) are the same.
                 const auto [end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
                 // the file is contained in the directory if all path elements are
