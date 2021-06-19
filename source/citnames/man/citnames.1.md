@@ -1,6 +1,6 @@
 % CITNAMES(1) Bear User Manuals
 % László Nagy
-% Dec 14, 2020
+% Jun 19, 2021
 
 # NAME
 
@@ -133,8 +133,10 @@ the command line argument overrides the config file values.
 
 `output.content`
 :   The `paths_to_include` and `paths_to_exclude` are for filter out entries from
-    these directories. (Directory names has to be absolute paths.)
+    these directories. (Directory names can to be absolute paths or relative to the
+    current working directory if the `--run-checks` flag passed.)
     The `include_only_existing_source` allows or disables file check for the output.
+    The `--run-checks` flag overrides this config value.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.
