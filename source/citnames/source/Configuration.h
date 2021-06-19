@@ -68,14 +68,14 @@ namespace cs {
     // entry if the compiler is recognized.
     struct CompilerWrapper {
         fs::path executable;
-        std::list<std::string> additional_flags;
+        std::list<std::string> flags_to_add;
+        std::list<std::string> flags_to_remove;
     };
 
     // Represents compiler related configuration.
     struct Compilation {
         std::list<CompilerWrapper> compilers_to_recognize;
         std::list<fs::path> compilers_to_exclude;
-        std::list<std::string> flags_to_remove;
     };
 
     // Represents the application configuration.

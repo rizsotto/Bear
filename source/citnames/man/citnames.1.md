@@ -101,7 +101,8 @@ the command line argument overrides the config file values.
     "compilers_to_recognize": [
       {
         "executable": "/usr/bin/mpicc",
-        "additional_flags": ["-I/opt/MPI/include"]
+        "flags_to_add": ["-I/opt/MPI/include"],
+        "flags_to_remove": ["-Wall"]
       }
     ],
     "compilers_to_exclude": []
@@ -122,10 +123,14 @@ the command line argument overrides the config file values.
 
 `compilation.compilers_to_recognize`
 :   where compiler can be specified, which are not yet recognized by default.
-    The `executable` is an absolute path to the compiler. The `additional_flags`
+    The `executable` is an absolute path to the compiler. The `flags_to_add`
     is an optional attribute, which contains flags which will append to the final
     output. (It's a good candidate to use this for adding OpenMPI compiler wrapper
-    flags from the `mpicc --showme:compile` output.)
+    flags from the `mpicc --showme:compile` output.) The `flags_to_remove` is
+    an optional attribute, where the given flags will be removed for the final
+    argument list. (The flags checked for equality only, no regex match. Flags
+    with arguments are not good candidates to put here, because the removal logic
+    is too simple for that.)
 
 `compilation.compilers_to_exclude`
 :   this is an optional list of executables (with absolute path) which needs to

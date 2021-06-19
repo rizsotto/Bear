@@ -35,7 +35,6 @@
 namespace {
 
     std::shared_ptr<cs::semantic::Tool> from(cs::Compilation cfg) {
-        // TODO: use `cfg.flags_to_remove`
         cs::semantic::ToolAny::ToolPtrs tools = {
                 std::make_shared<cs::semantic::ToolGcc>(),
                 std::make_shared<cs::semantic::ToolClang>(),

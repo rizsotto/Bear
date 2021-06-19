@@ -108,7 +108,8 @@ values.
     \[dq]compilers_to_recognize\[dq]: [
       {
         \[dq]executable\[dq]: \[dq]/usr/bin/mpicc\[dq],
-        \[dq]additional_flags\[dq]: [\[dq]-I/opt/MPI/include\[dq]]
+        \[dq]flags_to_add\[dq]: [\[dq]-I/opt/MPI/include\[dq]],
+        \[dq]flags_to_remove\[dq]: [\[dq]-Wall\[dq]]
       }
     ],
     \[dq]compilers_to_exclude\[dq]: []
@@ -132,10 +133,15 @@ values.
 where compiler can be specified, which are not yet recognized by
 default.
 The \f[C]executable\f[R] is an absolute path to the compiler.
-The \f[C]additional_flags\f[R] is an optional attribute, which contains
+The \f[C]flags_to_add\f[R] is an optional attribute, which contains
 flags which will append to the final output.
 (It\[cq]s a good candidate to use this for adding OpenMPI compiler
-wrapper flags from the \f[C]mpicc --showme:compile\f[R] output.)
+wrapper flags from the \f[C]mpicc --showme:compile\f[R] output.) The
+\f[C]flags_to_remove\f[R] is an optional attribute, where the given
+flags will be removed for the final argument list.
+(The flags checked for equality only, no regex match.
+Flags with arguments are not good candidates to put here, because the
+removal logic is too simple for that.)
 .TP
 \f[B]\f[CB]compilation.compilers_to_exclude\f[B]\f[R]
 this is an optional list of executables (with absolute path) which needs

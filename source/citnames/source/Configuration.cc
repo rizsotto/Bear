@@ -77,8 +77,11 @@ namespace cs {
     void from_json(const nlohmann::json &j, CompilerWrapper &rhs) {
         j.at("executable").get_to(rhs.executable);
 
-        if (j.contains("additional_flags")) {
-            j.at("additional_flags").get_to(rhs.additional_flags);
+        if (j.contains("flags_to_add")) {
+            j.at("flags_to_add").get_to(rhs.flags_to_add);
+        }
+        if (j.contains("flags_to_remove")) {
+            j.at("flags_to_remove").get_to(rhs.flags_to_remove);
         }
     }
 
@@ -86,8 +89,11 @@ namespace cs {
         j = nlohmann::json{
                 {"executable",  rhs.executable},
         };
-        if (!rhs.additional_flags.empty()) {
-            j["additional_flags"] = rhs.additional_flags;
+        if (!rhs.flags_to_add.empty()) {
+            j["flags_to_add"] = rhs.flags_to_add;
+        }
+        if (!rhs.flags_to_remove.empty()) {
+            j["flags_to_remove"] = rhs.flags_to_remove;
         }
     }
 
@@ -98,9 +104,6 @@ namespace cs {
         if (j.contains("compilers_to_exclude")) {
             j.at("compilers_to_exclude").get_to(rhs.compilers_to_exclude);
         }
-        if (j.contains("flags_to_remove")) {
-            j.at("flags_to_remove").get_to(rhs.flags_to_remove);
-        }
     }
 
     void to_json(nlohmann::json &j, const Compilation &rhs) {
@@ -109,9 +112,6 @@ namespace cs {
         }
         if (!rhs.compilers_to_exclude.empty()) {
             j["compilers_to_exclude"] = rhs.compilers_to_exclude;
-        }
-        if (!rhs.flags_to_remove.empty()) {
-            j["additional_flags"] = rhs.flags_to_remove;
         }
     }
 

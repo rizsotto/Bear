@@ -62,6 +62,25 @@ namespace {
         return content;
     }
 
+    std::list<cs::CompilerWrapper> update_compilers_to_recognize(
+            std::list<cs::CompilerWrapper> wrappers,
+            std::list<fs::path> compilers)
+    {
+        for (auto && compiler : compilers) {
+            const bool already_in_wrappers =
+                    std::any_of(wrappers.begin(), wrappers.end(),
+                                [&compiler](auto wrapper) { return wrapper.executable == compiler; });
+            if (!already_in_wrappers) {
+                wrappers.emplace_back(cs::CompilerWrapper {
+                    .executable = compiler,
+                    .flags_to_add = {},
+                    .flags_to_remove = {}
+                });
+            }
+        }
+        return wrappers;
+    }
+
     bool is_exists(const fs::path &path) {
         std::error_code error_code;
         return fs::exists(path, error_code);
@@ -132,10 +151,9 @@ namespace {
                 })
                 .map<cs::Configuration>([&environment](auto config) {
                     // recognize compilers from known environment variables.
-                    for (const auto &compiler : compilers(environment)) {
-                        auto wrapped = cs::CompilerWrapper{.executable = compiler, .additional_flags = {}};
-                        config.compilation.compilers_to_recognize.emplace_back(wrapped);
-                    }
+                    const auto env_compilers = compilers(environment);
+                    config.compilation.compilers_to_recognize =
+                            update_compilers_to_recognize(config.compilation.compilers_to_recognize, env_compilers);
                     return config;
                 })
                 .on_success([](const auto &config) {

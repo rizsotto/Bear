@@ -33,8 +33,21 @@ namespace cs::semantic {
         return ToolGcc::recognize(execution)
                 .map<cs::semantic::SemanticPtr>([this](auto semantic) {
                     if (auto* ptr = dynamic_cast<Compile*>(semantic.get()); ptr != nullptr) {
-                        std::copy(compilers_to_recognize_.additional_flags.begin(),
-                                  compilers_to_recognize_.additional_flags.end(),
+                        // remove flags which were asked to be removed.
+                        ptr->flags.erase(
+                                std::remove_if(
+                                        ptr->flags.begin(),
+                                        ptr->flags.end(),
+                                        [this](auto flag) {
+                                            return std::any_of(
+                                                    compilers_to_recognize_.flags_to_remove.begin(),
+                                                    compilers_to_recognize_.flags_to_remove.end(),
+                                                    [&flag](auto flag_to_remove) { return flag_to_remove == flag; });
+                                        }),
+                                ptr->flags.end());
+                        // add flags which were asked to be added.
+                        std::copy(compilers_to_recognize_.flags_to_add.begin(),
+                                  compilers_to_recognize_.flags_to_add.end(),
                                   std::back_inserter(ptr->flags));
                     }
                     return semantic;
