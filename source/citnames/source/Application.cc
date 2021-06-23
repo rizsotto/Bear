@@ -38,7 +38,7 @@ namespace {
 
     std::list<fs::path> to_abspath(const std::list<fs::path> &paths, const fs::path &root) {
         std::list<fs::path> results;
-        for (auto path : paths) {
+        for (const auto &path : paths) {
             auto result = path.is_absolute() ? path : root / path;
             results.emplace_back(result);
         }
@@ -49,7 +49,7 @@ namespace {
         if (run_checks) {
             auto cwd = sys::path::get_cwd();
             if (cwd.is_ok()) {
-                const fs::path root = cwd.unwrap();
+                const fs::path& root = cwd.unwrap();
                 return cs::Content {
                         .include_only_existing_source = run_checks,
                         .paths_to_include = to_abspath(content.paths_to_include, root),
