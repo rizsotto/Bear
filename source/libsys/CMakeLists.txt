@@ -1,5 +1,6 @@
 add_library(sys_a OBJECT)
 target_include_directories(sys_a PUBLIC include/)
+target_include_directories(sys_a PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/include/)
 target_sources(sys_a
         PRIVATE
             source/Os.cc
@@ -30,3 +31,32 @@ if (ENABLE_UNIT_TESTS)
 
     add_test(NAME bear::sys_unit_test COMMAND $<TARGET_FILE:sys_unit_test>)
 endif ()
+
+if (SUPPORT_PRELOAD AND NOT HAVE_GNU_LIB_NAMES_H)
+    if (CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        execute_process(
+                COMMAND sh -c "ls /lib/libc.so.*"
+                OUTPUT_VARIABLE LIBC_SO_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        # cmake_path(GET LIBC_SO_PATH FILENAME LIBC_SO)
+        get_filename_component(LIBC_SO ${LIBC_SO_PATH} NAME)
+    elseif (CMAKE_SYSTEM_NAME STREQUAL "OpenBSD")
+        execute_process(
+                COMMAND sh -c "ls /usr/lib/libc.so.*"
+                OUTPUT_VARIABLE LIBC_SO_PATH
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        # cmake_path(GET LIBC_SO_PATH FILENAME LIBC_SO)
+        get_filename_component(LIBC_SO ${LIBC_SO_PATH} NAME)
+    else()
+        set(LIBC_SO "libc.so")
+    endif()
+    message(STATUS "libc.so filename ${LIBC_SO}")
+endif()
+
+configure_file(
+        include/libsys/lib-names.h.in
+        include/libsys/lib-names.h
+        @ONLY
+)

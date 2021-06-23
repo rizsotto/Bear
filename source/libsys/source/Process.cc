@@ -39,9 +39,9 @@
 #include <dlfcn.h>
 #endif
 #ifdef HAVE_GNU_LIB_NAMES_H
-#include <gnu/lib-names.h>
+#  include <gnu/lib-names.h>
 #else
-#define LIBC_SO "libc.so"
+#  include "libsys/lib-names.h"
 #endif
 
 #include <spdlog/spdlog.h>
