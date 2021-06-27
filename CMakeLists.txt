@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
-cmake_policy(VERSION 3.13)
+cmake_policy(VERSION 3.12)
 
 project(Bear
-        VERSION 3.0.12
+        VERSION 3.0.13
         DESCRIPTION "Bear is a tool to generate compilation database for clang tooling."
         LANGUAGES C CXX
         )
