@@ -1,7 +1,6 @@
 // REQUIRES: preload, shell, dynamic-shell
 // RUN: %{compile} '-D_FILE="%t.state"' -fpic -shared -o %t.so %s
-// RUN: env LD_PRELOAD=%t.so %{intercept} --verbose --output %t.events.db -- %{shell} -c %{true}
-// RUN: %{events_db} dump --path %t.events.db --output %t.json
+// RUN: env LD_PRELOAD=%t.so %{intercept} --verbose --output %t.json -- %{shell} -c %{true}
 // RUN: assert_intercepted %t.json count -ge 2
 // RUN: assert_intercepted %t.json contains -arguments %{shell} -c %{true}
 // RUN: assert_intercepted %t.json contains -program %{true} -arguments %{true}

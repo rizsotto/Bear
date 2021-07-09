@@ -163,8 +163,8 @@ namespace {
 
     size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::Entry> &output) {
         size_t count = 0;
-        for (db::EventsIterator it = events->events_begin(), end = events->events_end(); it != end; ++it) {
-            (*it)
+        for (auto event = events->next(); event.has_value(); event = events->next()) {
+            event.value()
                     .and_then<cs::semantic::SemanticPtr>([&build](const auto &event) {
                         return build.recognize(*event);
                     })

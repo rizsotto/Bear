@@ -2,7 +2,7 @@
 
 # REQUIRES: shell
 # RUN: %{shell} %s 2> %t.orig.stderr
-# RUN: %{intercept} --force-wrapper --output %t.events.db -- %{shell} %s 2> %t.fwd.stderr
+# RUN: %{intercept} --force-wrapper --output %t.json -- %{shell} %s 2> %t.fwd.stderr
 # RUN: diff %t.orig.stderr %t.fwd.stderr
 
 >&2 $ECHO "Lorem ipsum dolor sit amet, consectetur adipiscing elit,"

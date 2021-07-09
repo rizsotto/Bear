@@ -23,69 +23,38 @@
 #include "libresult/Result.h"
 #include "intercept.pb.h"
 
-#include <google/protobuf/io/zero_copy_stream_impl.h>
-
+#include <iosfwd>
 #include <filesystem>
 #include <memory>
-#include <vector>
+#include <optional>
 
 namespace fs = std::filesystem;
 
 namespace ic::collect::db {
 
-    class EventsDatabaseReader;
     using EventPtr = std::shared_ptr<rpc::Event>;
-
-    class EventsIterator {
-    public:
-        using difference_type = std::ptrdiff_t;
-        using iterator_category = std::input_iterator_tag;
-        using value_type = rust::Result<EventPtr>;
-        using pointer = value_type const *;
-        using reference = value_type const &;
-
-    public:
-        EventsIterator() noexcept;
-        EventsIterator(EventsDatabaseReader *source, rust::Result<EventPtr> value) noexcept;
-
-        reference operator*() const;
-
-        EventsIterator operator++(int);
-        EventsIterator &operator++();
-
-        bool operator==(const EventsIterator &other) const;
-        bool operator!=(const EventsIterator &other) const;
-
-    private:
-        EventsDatabaseReader *source_;
-        rust::Result<EventPtr> value_;
-    };
 
     class EventsDatabaseReader {
     public:
         using Ptr = std::shared_ptr<EventsDatabaseReader>;
-        using StreamPtr = std::unique_ptr<google::protobuf::io::FileInputStream>;
+        using StreamPtr = std::unique_ptr<std::istream>;
 
-        [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> from(const fs::path &file);
+        [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> from(const fs::path &path);
 
-        [[nodiscard]] EventsIterator events_begin();
-        [[nodiscard]] EventsIterator events_end();
+        [[nodiscard]] std::optional<rust::Result<EventPtr>> next() noexcept;
 
     private:
-        friend class EventsIterator;
-
-        [[nodiscard]] EventsIterator next() noexcept;
-        [[nodiscard]] std::runtime_error error() noexcept;
+        [[nodiscard]] std::optional<rust::Result<std::string>> next_line() noexcept;
+        [[nodiscard]] rust::Result<EventPtr> from_json(const std::string &) noexcept;
 
     public:
-        explicit EventsDatabaseReader(fs::path file, StreamPtr stream) noexcept;
-        ~EventsDatabaseReader() noexcept;
+        explicit EventsDatabaseReader(fs::path path, StreamPtr file) noexcept;
 
         NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseReader);
         NON_COPYABLE_NOR_MOVABLE(EventsDatabaseReader);
 
     private:
-        fs::path file_;
-        StreamPtr stream_;
+        fs::path path_;
+        StreamPtr file_;
     };
 }

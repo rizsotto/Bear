@@ -1,8 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload, shell, dynamic-shell
-# RUN: %{intercept} --output %t.events.db -- %{shell} -c "%{echo} hi | %{shell} %s"
-# RUN: %{events_db} dump --path %t.events.db --output %t.json
+# RUN: %{intercept} --output %t.json -- %{shell} -c "%{echo} hi | %{shell} %s"
 # RUN: assert_intercepted %t.json count -eq 4
 # RUN: assert_intercepted %t.json contains -program %{shell}
 # RUN: assert_intercepted %t.json contains -program %{echo} -arguments %{echo} "hi"

@@ -59,7 +59,8 @@ def main():
 
 
 def load_commands(input):
-    for event in json.load(input):
+    for line in input:
+        event = json.loads(line)
         if 'started' in event:
             yield {
                 'program': event['started']['execution']['executable'],

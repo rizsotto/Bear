@@ -20,12 +20,20 @@
 #include "EventsDatabaseWriter.h"
 #include "libsys/Errors.h"
 
-#include <google/protobuf/util/delimited_message_util.h>
+#include <google/protobuf/util/json_util.h>
 #include <fmt/format.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
+#include <cerrno>
+
+using google::protobuf::util::JsonPrintOptions;
+
+namespace {
+    const JsonPrintOptions print_options;
+}
 
 namespace ic::collect::db {
 
@@ -35,32 +43,53 @@ namespace ic::collect::db {
             auto message = fmt::format("Events db open failed (file {}): {}", file.string(), sys::error_string(errno));
             return rust::Err(std::runtime_error(message));
         }
-        std::unique_ptr<google::protobuf::io::FileOutputStream> stream =
-                std::make_unique<google::protobuf::io::FileOutputStream>(fd, -1);
         std::shared_ptr<EventsDatabaseWriter> result =
-                std::make_shared<EventsDatabaseWriter>(file, std::move(stream));
+                std::make_shared<EventsDatabaseWriter>(file, fd);
         return rust::Ok(result);
     }
 
-    EventsDatabaseWriter::EventsDatabaseWriter(fs::path file, StreamPtr stream) noexcept
-            : file_(std::move(file))
-            , stream_(std::move(stream))
+    EventsDatabaseWriter::EventsDatabaseWriter(fs::path path, int file) noexcept
+            : path_(std::move(path))
+            , file_(file)
     { }
 
     EventsDatabaseWriter::~EventsDatabaseWriter() noexcept {
-        stream_->Flush();
-        stream_->Close();
+        close(file_);
     }
 
     rust::Result<int> EventsDatabaseWriter::insert_event(const rpc::Event &event) {
-        return google::protobuf::util::SerializeDelimitedToZeroCopyStream(event, stream_.get())
-               ? rust::Result<int>(rust::Ok(1))
-               : rust::Result<int>(rust::Err(error()));
+        return to_json(event)
+                .and_then<int>([this](const auto &json) {
+                    return write_to_file(json);
+                })
+                .and_then<int>([this](const auto &) {
+                    return write_to_file("\n");
+                });
     }
 
-    std::runtime_error EventsDatabaseWriter::error() noexcept {
-        int error_num = stream_->GetErrno();
-        auto message = fmt::format("Events db write failed (to file {}): {}", file_.string(), sys::error_string(error_num));
-        return std::runtime_error(message);
+    rust::Result<std::string> EventsDatabaseWriter::to_json(const rpc::Event &event) noexcept {
+        std::string json;
+        if (const auto status = google::protobuf::util::MessageToJsonString(event, &json, print_options); !status.ok()) {
+            auto message = fmt::format(
+                    "Events db write failed (to file {}): JSON formatting error: {}",
+                    path_.string(),
+                    status.error_message().as_string()
+            );
+            return rust::Err(std::runtime_error(message));
+        }
+        return rust::Ok(std::move(json));
+    }
+
+    rust::Result<int> EventsDatabaseWriter::write_to_file(const std::string &content) noexcept {
+        if (-1 == write(file_, content.c_str(), content.size())) {
+            auto message = fmt::format(
+                    "Events db write failed (to file {}): {}",
+                    path_.string(),
+                    sys::error_string(errno)
+            );
+            errno = 0;
+            return rust::Result<int>(rust::Err(std::runtime_error(message)));
+        }
+        return rust::Result<int>(rust::Ok(1));
     }
 }

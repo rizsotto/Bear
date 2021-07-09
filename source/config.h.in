@@ -103,7 +103,7 @@ namespace cmd {
         constexpr char FLAG_FORCE_WRAPPER[] = "--force-wrapper";
         constexpr char FLAG_FORCE_PRELOAD[] = "--force-preload";
 
-        constexpr char DEFAULT_OUTPUT[] = "events.db";
+        constexpr char DEFAULT_OUTPUT[] = "events.json";
     }
 
     namespace wrapper {

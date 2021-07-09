@@ -35,24 +35,23 @@ namespace ic::collect::db {
     class EventsDatabaseWriter {
     public:
         using Ptr = std::shared_ptr<EventsDatabaseWriter>;
-        using StreamPtr = std::unique_ptr<google::protobuf::io::FileOutputStream>;
 
         [[nodiscard]] static rust::Result<EventsDatabaseWriter::Ptr> create(const fs::path &file);
-
         [[nodiscard]] rust::Result<int> insert_event(const rpc::Event &event);
 
-    private:
-        [[nodiscard]] std::runtime_error error() noexcept;
-
     public:
-        explicit EventsDatabaseWriter(fs::path file, StreamPtr stream) noexcept;
+        explicit EventsDatabaseWriter(fs::path path, int file) noexcept;
         ~EventsDatabaseWriter() noexcept;
 
         NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseWriter);
         NON_COPYABLE_NOR_MOVABLE(EventsDatabaseWriter);
 
     private:
-        fs::path file_;
-        StreamPtr stream_;
+        rust::Result<std::string> to_json(const rpc::Event &event) noexcept;
+        rust::Result<int> write_to_file(const std::string &content) noexcept;
+
+    private:
+        fs::path path_;
+        int file_;
     };
 }

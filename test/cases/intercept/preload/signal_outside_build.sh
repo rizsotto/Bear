@@ -1,8 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload, shell, dynamic-shell
-# RUN: %{shell} -c "%{intercept} --verbose --output %t.events.db -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -15 %1; wait;"
-# RUN: %{events_db} dump --path %t.events.db --output %t.json
+# RUN: %{shell} -c "%{intercept} --verbose --output %t.json -- %{shell} %s --sleep %{sleep} --true %{true} & %{sleep} 1; kill -15 %1; wait;"
 # RUN: assert_intercepted %t.json count -eq 3
 # RUN: assert_intercepted %t.json contains -program %{true}
 # RUN: assert_intercepted %t.json contains -program %{sleep} -arguments %{sleep} 5

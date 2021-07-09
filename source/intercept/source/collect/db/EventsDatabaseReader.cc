@@ -20,97 +20,73 @@
 #include "EventsDatabaseReader.h"
 #include "libsys/Errors.h"
 
-#include <google/protobuf/util/delimited_message_util.h>
+#include <google/protobuf/util/json_util.h>
 #include <fmt/format.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-
+#include <iostream>
+#include <fstream>
 #include <utility>
+
+using google::protobuf::util::JsonParseOptions;
+
+namespace {
+    const JsonParseOptions parse_options;
+}
 
 namespace ic::collect::db {
 
-    rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::from(const fs::path &file) {
-        int fd = open(file.c_str(), O_RDONLY);
-        if (fd == -1) {
-            auto message = fmt::format("Events db open failed (file {}): {}", file.string(), sys::error_string(errno));
-            return rust::Err(std::runtime_error(message));
-        }
-        std::unique_ptr<google::protobuf::io::FileInputStream> stream =
-                std::make_unique<google::protobuf::io::FileInputStream>(fd, -1);
+    rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::from(const fs::path &path) {
+        std::unique_ptr<std::istream> file =
+                std::make_unique<std::fstream>(path, std::ios::in);
         std::shared_ptr<EventsDatabaseReader> result =
-                std::make_shared<EventsDatabaseReader>(file, std::move(stream));
+                std::make_shared<EventsDatabaseReader>(path, std::move(file));
         return rust::Ok(result);
     }
 
-    EventsDatabaseReader::EventsDatabaseReader(fs::path file, StreamPtr stream) noexcept
-            : file_(std::move(file))
-            , stream_(std::move(stream))
+    EventsDatabaseReader::EventsDatabaseReader(fs::path path, StreamPtr file) noexcept
+            : path_(std::move(path))
+            , file_(std::move(file))
     { }
 
-    EventsDatabaseReader::~EventsDatabaseReader() noexcept {
-        stream_->Close();
+
+    std::optional<rust::Result<EventPtr>> EventsDatabaseReader::next() noexcept {
+        const auto line = next_line();
+        if (line.has_value()) {
+            return line.value()
+                    .and_then<EventPtr>([this](const auto &line) {
+                        return from_json(line);
+                    });
+        }
+        return std::optional<rust::Result<EventPtr>>();
     }
 
-    EventsIterator EventsDatabaseReader::events_begin() {
-        return next();
-    }
-
-    EventsIterator EventsDatabaseReader::events_end() {
-        return EventsIterator();
-    }
-
-    EventsIterator EventsDatabaseReader::next() noexcept {
-        std::shared_ptr<rpc::Event> event = std::make_shared<rpc::Event>();
-        bool clean_eof;
-        const bool success =
-                google::protobuf::util::ParseDelimitedFromZeroCopyStream(event.get(), stream_.get(), &clean_eof);
-        if (success && !clean_eof) {
-            return EventsIterator(this, rust::Ok(event));
-        } else if (clean_eof) {
-            return EventsIterator();
+    std::optional<rust::Result<std::string>> EventsDatabaseReader::next_line() noexcept {
+        std::string line;
+        if (std::getline(*file_, line)) {
+            return line.empty()
+                    ? std::optional<rust::Result<std::string>>()
+                    : std::make_optional(rust::Ok(std::move(line)));
         } else {
-            return EventsIterator(this, rust::Err(error()));
+            const std::runtime_error error(
+                    fmt::format(
+                            "Events db read failed (from file {}): io error",
+                            path_.string()));
+            return file_->eof()
+                   ? std::optional<rust::Result<std::string>>()
+                   : std::make_optional(rust::Err(error));
         }
     }
 
-    std::runtime_error EventsDatabaseReader::error() noexcept {
-        int error_num = stream_->GetErrno();
-        auto message = fmt::format("Events db read failed (from file {}): {}", file_.string(), sys::error_string(error_num));
-        return std::runtime_error(message);
-    }
-
-    EventsIterator::EventsIterator() noexcept
-            : source_(nullptr)
-            , value_(rust::Err(std::runtime_error("end")))
-    { }
-
-    EventsIterator::EventsIterator(EventsDatabaseReader *source, rust::Result<EventPtr> value) noexcept
-            : source_(source)
-            , value_(std::move(value))
-    { }
-
-    const EventsIterator::value_type &EventsIterator::operator*() const {
-        return value_;
-    }
-
-    EventsIterator EventsIterator::operator++(int) {
-        return (source_ != nullptr) ? source_->next() : *this;
-    }
-
-    EventsIterator &EventsIterator::operator++() {
-        if (source_ != nullptr) {
-            *this = source_->next();
+    rust::Result<EventPtr> EventsDatabaseReader::from_json(const std::string &line) noexcept {
+        std::shared_ptr<rpc::Event> event = std::make_shared<rpc::Event>();
+        if (const auto status = google::protobuf::util::JsonStringToMessage(line, event.get(), parse_options); !status.ok()) {
+            auto message = fmt::format(
+                    "Events db read failed (from file {}): JSON parsing error: {}",
+                    path_.string(),
+                    status.error_message().as_string()
+            );
+            return rust::Err(std::runtime_error(message));
         }
-        return *this;
-    }
-
-    bool EventsIterator::operator==(const EventsIterator &other) const {
-        return (this == &other) || (source_ == other.source_);
-    }
-
-    bool EventsIterator::operator!=(const EventsIterator &other) const {
-        return !(this->operator==(other));
+        return rust::Ok(event);
     }
 }

@@ -1,8 +1,7 @@
 // REQUIRES: preload, c_api_execvP
 // RUN: %{compile} '-D_PROGRAM="/path/to/not/existing"' -o %t %s
 // RUN: %t > %t.without.errno
-// RUN: %{intercept} --output %t.events.db -- %t > %t.with.errno
-// RUN: %{events_db} dump --path %t.events.db --output %t.json
+// RUN: %{intercept} --output %t.json -- %t > %t.with.errno
 // RUN: diff %t.with.errno %t.without.errno
 // RUN: assert_intercepted %t.json count -eq 1
 // RUN: assert_intercepted %t.json contains -program %t
