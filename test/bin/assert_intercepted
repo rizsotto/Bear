@@ -64,7 +64,7 @@ def load_commands(input):
         if 'started' in event:
             yield {
                 'program': event['started']['execution']['executable'],
-                'working_dir': event['started']['execution']['workingDir'],
+                'working_dir': event['started']['execution']['working_dir'],
                 'arguments': event['started']['execution']['arguments']
             }
 
