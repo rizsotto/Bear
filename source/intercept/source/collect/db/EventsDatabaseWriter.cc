@@ -81,9 +81,8 @@ namespace ic::collect::db {
         std::string json;
         if (const auto status = google::protobuf::util::MessageToJsonString(event, &json, print_options); !status.ok()) {
             auto message = fmt::format(
-                    "Events db write failed (to file {}): JSON formatting error: {}",
-                    path_.string(),
-                    status.error_message().as_string()
+                    "Events db write failed (to file {}): JSON formatting error",
+                    path_.string()
             );
             return rust::Err(std::runtime_error(message));
         }

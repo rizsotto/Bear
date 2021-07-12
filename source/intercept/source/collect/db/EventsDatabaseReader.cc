@@ -81,9 +81,8 @@ namespace ic::collect::db {
         std::shared_ptr<rpc::Event> event = std::make_shared<rpc::Event>();
         if (const auto status = google::protobuf::util::JsonStringToMessage(line, event.get(), parse_options); !status.ok()) {
             auto message = fmt::format(
-                    "Events db read failed (from file {}): JSON parsing error: {}",
-                    path_.string(),
-                    status.error_message().as_string()
+                    "Events db read failed (from file {}): JSON parsing error",
+                    path_.string()
             );
             return rust::Err(std::runtime_error(message));
         }
