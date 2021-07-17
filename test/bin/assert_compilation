@@ -5,6 +5,7 @@ import sys
 import argparse
 import json
 import logging
+import shlex
 
 
 def main():
@@ -27,9 +28,9 @@ def main():
     args = parser.parse_args()
     logging.debug(args)
 
-    commands = json.load(args.input)
+    entries = json.load(args.input)
     if args.command == 'count':
-        count = len(commands)
+        count = len(entries)
         logging.debug("%s has %d command entries", args.input.name, count)
         if args.eq is not None and args.eq != count:
             logging.info('failed: expected %d, but got %d', args.eq, count)
@@ -48,9 +49,9 @@ def main():
             return 1
 
     elif args.command == 'contains':
-        logging.debug("%s has command entries: %s", args.input.name, commands)
+        logging.debug("%s has command entries: %s", args.input.name, entries)
         check = filter_from(args)
-        count = len([cmd for cmd in commands if check(cmd)])
+        count = len([cmd for cmd in entries if check(cmd)])
         if count == 0:
             request = to_string(args)
             logging.info('failed: expected at least one entry, but found none: %s', request)
@@ -60,11 +61,17 @@ def main():
 
 
 def filter_from(args):
-    def test(command):
-        p1 = True if args.file is None else command['file'] == args.file
-        p2 = True if args.output is None else command['output'] == args.output
-        p3 = True if args.directory is None else command['directory'] == args.directory
-        p4 = True if args.arguments is None else command['arguments'] == args.arguments
+    def test(entry):
+        p1 = True if args.file is None else entry['file'] == args.file
+        p2 = True if args.output is None else entry['output'] == args.output
+        p3 = True if args.directory is None else entry['directory'] == args.directory
+        if args.arguments is not None:
+            if 'arguments' in entry:
+                p4 = entry['arguments'] == args.arguments
+            else:
+                p4 = shlex.split(entry['command']) == args.arguments
+        else:
+            p4 = True
         return p1 and p2 and p3 and p4
 
     return test

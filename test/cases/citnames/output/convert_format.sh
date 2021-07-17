@@ -1,12 +1,11 @@
 #!/usr/bin/env sh
 
-# UNSUPPORTED: true
 # RUN: cd %T; %{shell} %s %t
 # RUN: assert_compilation %t.compilations.json count -eq 1
 # RUN: assert_compilation %t.compilations.json contains -file /home/user/broken_build.c -directory /home/user -arguments /usr/bin/gcc -c -o broken_build.o broken_build.c
 # RUN: %{citnames} --verbose --input %t.commands.json --output %t.compilations.json --config %t.config.json --append
 # RUN: assert_compilation %t.compilations.json count -eq 1
-# RUN: assert_compilation %t.compilations.json contains -file /home/user/broken_build.c -directory /home/user
+# RUN: assert_compilation %t.compilations.json contains -file /home/user/broken_build.c -directory /home/user -arguments /usr/bin/gcc -c -o broken_build.o broken_build.c
 
 cat > "$1.config.json" << EOF
 {
@@ -50,19 +49,4 @@ cat > "$1.compilations.json" << EOF
 EOF
 
 cat > "$1.commands.json" << EOF
-{
-    "context": {
-        "host_info": {
-            "_CS_GNU_LIBC_VERSION": "glibc 2.31",
-            "_CS_GNU_LIBPTHREAD_VERSION": "NPTL 2.31",
-            "_CS_PATH": "/usr/bin",
-            "machine": "x86_64",
-            "release": "5.8.4-200.fc32.x86_64",
-            "sysname": "Linux",
-            "version": "#1 SMP Wed Aug 26 22:28:08 UTC 2020"
-        },
-        "intercept": "library preload"
-    },
-    "executions": []
-}
 EOF
