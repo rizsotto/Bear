@@ -25,6 +25,6 @@ namespace cs::semantic {
 
     struct ToolClang : public ToolGcc {
         [[nodiscard]]
-        bool recognize(const fs::path &program) const override;
+        bool is_compiler_call(const fs::path &program) const override;
     };
 }

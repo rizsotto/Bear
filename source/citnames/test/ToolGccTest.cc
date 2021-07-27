@@ -26,23 +26,26 @@ using namespace cs::semantic;
 
 namespace {
 
-    TEST(ToolGcc, recognize) {
-        ToolGcc sut;
+    TEST(ToolGcc, is_compiler_call) {
+        struct Expose : public ToolGcc {
+            using ToolGcc::is_compiler_call;
+        };
+        Expose sut;
 
-        EXPECT_TRUE(sut.recognize("cc"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/cc"));
-        EXPECT_TRUE(sut.recognize("gcc"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/gcc"));
-        EXPECT_TRUE(sut.recognize("c++"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/c++"));
-        EXPECT_TRUE(sut.recognize("g++"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/g++"));
-        EXPECT_TRUE(sut.recognize("arm-none-eabi-g++"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/arm-none-eabi-g++"));
-        EXPECT_TRUE(sut.recognize("gcc-6"));
-        EXPECT_TRUE(sut.recognize("/usr/bin/gcc-6"));
-        EXPECT_TRUE(sut.recognize("gfortran"));
-        EXPECT_TRUE(sut.recognize("fortran"));
+        EXPECT_TRUE(sut.is_compiler_call("cc"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/cc"));
+        EXPECT_TRUE(sut.is_compiler_call("gcc"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/gcc"));
+        EXPECT_TRUE(sut.is_compiler_call("c++"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/c++"));
+        EXPECT_TRUE(sut.is_compiler_call("g++"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/g++"));
+        EXPECT_TRUE(sut.is_compiler_call("arm-none-eabi-g++"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/arm-none-eabi-g++"));
+        EXPECT_TRUE(sut.is_compiler_call("gcc-6"));
+        EXPECT_TRUE(sut.is_compiler_call("/usr/bin/gcc-6"));
+        EXPECT_TRUE(sut.is_compiler_call("gfortran"));
+        EXPECT_TRUE(sut.is_compiler_call("fortran"));
     }
 
     TEST(ToolGcc, fails_on_empty) {

@@ -25,7 +25,7 @@ namespace cs::semantic {
             : compilers_to_recognize_(compilers_to_recognize)
     { }
 
-    bool ToolExtendingWrapper::recognize(const fs::path &program) const {
+    bool ToolExtendingWrapper::is_compiler_call(const fs::path &program) const {
         return compilers_to_recognize_.executable == program;
     }
 

@@ -24,7 +24,7 @@
 
 namespace cs::semantic {
 
-    bool ToolClang::recognize(const fs::path& program) const {
+    bool ToolClang::is_compiler_call(const fs::path& program) const {
         static const auto pattern = std::regex(R"(^([^-]*-)*clang(|\+\+)(-?\d+(\.\d+){0,2})?$)");
 
         std::cmatch m;

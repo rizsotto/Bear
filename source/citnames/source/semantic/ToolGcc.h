@@ -20,6 +20,7 @@
 #pragma once
 
 #include "Tool.h"
+#include "Parsers.h"
 
 namespace cs::semantic {
 
@@ -28,12 +29,14 @@ namespace cs::semantic {
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
-    // visible for testing
-    public:
+    protected:
         [[nodiscard]]
-        virtual bool recognize(const fs::path& program) const;
+        virtual bool is_compiler_call(const fs::path& program) const;
 
         [[nodiscard]]
         virtual rust::Result<SemanticPtr> compilation(const Execution &execution) const;
+
+        [[nodiscard]]
+        static rust::Result<SemanticPtr> compilation(const FlagsByName &flags, const Execution &execution);
     };
 }

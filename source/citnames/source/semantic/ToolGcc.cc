@@ -136,20 +136,6 @@ namespace {
             {"--",                 {Instruction(0, Match::PARTIAL, false), CompilerFlagType::OTHER}},
     };
 
-    rust::Result<CompilerFlags> parse_flags(const Execution &execution)
-    {
-        static auto const parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(FLAG_DEFINITION),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
-
-        return parse(parser, execution);
-    }
-
     // https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
     Arguments flags_from_environment(const std::map<std::string, std::string> &environment) {
         Arguments flags;
@@ -249,13 +235,13 @@ namespace {
 namespace cs::semantic {
 
     rust::Result<SemanticPtr> ToolGcc::recognize(const Execution &execution) const {
-        if (recognize(execution.executable)) {
+        if (is_compiler_call(execution.executable)) {
             return compilation(execution);
         }
         return rust::Ok(SemanticPtr());
     }
 
-    bool ToolGcc::recognize(const fs::path& program) const {
+    bool ToolGcc::is_compiler_call(const fs::path& program) const {
         static const auto pattern = std::regex(
                 // - cc
                 // - c++
@@ -272,7 +258,20 @@ namespace cs::semantic {
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const Execution &execution) const {
-        return parse_flags(execution)
+        return compilation(FLAG_DEFINITION, execution);
+    }
+
+    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
+        auto const parser =
+                Repeat(
+                        OneOf(
+                                FlagParser(flags),
+                                SourceMatcher(),
+                                EverythingElseFlagMatcher()
+                        )
+                );
+
+        return parse(parser, execution)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();

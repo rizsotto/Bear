@@ -24,7 +24,7 @@
 
 namespace cs::semantic {
 
-    bool ToolCuda::recognize(const fs::path& program) const {
+    bool ToolCuda::is_compiler_call(const fs::path& program) const {
         static const auto pattern = std::regex(R"(^(nvcc)$)");
 
         std::cmatch m;
