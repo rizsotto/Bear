@@ -75,7 +75,7 @@ namespace cs::semantic {
             }
             return result;
         } else {
-            return rust::Result<SemanticPtr>(rust::Err(std::runtime_error("n/a")));
+            return rust::Err(std::runtime_error("n/a"));
         }
     }
 }

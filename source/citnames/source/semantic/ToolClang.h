@@ -24,7 +24,16 @@
 namespace cs::semantic {
 
     struct ToolClang : public ToolGcc {
+
+        ToolClang() noexcept;
+
+        [[nodiscard]]
+        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+
+    protected:
         [[nodiscard]]
         bool is_compiler_call(const fs::path &program) const override;
+
+        const FlagsByName flag_definition;
     };
 }

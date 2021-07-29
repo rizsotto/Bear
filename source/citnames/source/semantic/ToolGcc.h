@@ -38,5 +38,7 @@ namespace cs::semantic {
 
         [[nodiscard]]
         static rust::Result<SemanticPtr> compilation(const FlagsByName &flags, const Execution &execution);
+
+        static const FlagsByName FLAG_DEFINITION;
     };
 }

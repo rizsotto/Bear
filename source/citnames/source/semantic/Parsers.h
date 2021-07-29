@@ -79,6 +79,7 @@ namespace cs::semantic {
         DIRECTORY_SEARCH_LINKER,
         SOURCE,
         OTHER,
+        STATIC_ANALYZER,
     };
 
     struct CompilerFlag {
