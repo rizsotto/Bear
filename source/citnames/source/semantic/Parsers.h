@@ -105,9 +105,9 @@ namespace cs::semantic {
                 , equal_sign_(equal ? 1u : 0u)
         { }
 
-        [[nodiscard]] constexpr size_t count(bool exact_match) const {
-            if (count_ > 0) {
-                return (exact_match) ? count_ : count_ - 1;
+        [[nodiscard]] constexpr size_t count(bool option_attached) const {
+            if ((count_ > 0) && equal()) {
+                return option_attached ? (count_ - 1) : count_;
             } else {
                 return count_;
             }
@@ -122,7 +122,7 @@ namespace cs::semantic {
         }
 
         [[nodiscard]] constexpr bool equal() const {
-            return (equal_sign_ == 1);
+            return (equal_sign_ == 1u);
         }
 
     private:

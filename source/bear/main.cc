@@ -187,7 +187,7 @@ namespace {
         {
             auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
                     .map<fs::path>([](const auto &output) {
-                        return fs::path(output).replace_extension(".db");
+                        return fs::path(output).replace_extension(".events.json");
                     })
                     .unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
 

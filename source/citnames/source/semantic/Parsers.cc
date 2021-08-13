@@ -19,6 +19,26 @@
 
 #include "Parsers.h"
 
+namespace {
+
+    std::optional<std::string_view> split_extra(const std::string_view &prefix, const std::string_view &candidate) {
+        if (prefix.empty()) {
+            return std::make_optional(candidate);
+        }
+        if (candidate.empty()) {
+            return std::nullopt;
+        }
+        if (prefix.size() > candidate.size()) {
+            return std::nullopt;
+        }
+        const auto common = candidate.substr(0, prefix.size());
+        if (common == prefix) {
+            return std::make_optional(candidate.substr(prefix.size()));
+        }
+        return std::nullopt;
+    }
+}
+
 namespace cs::semantic {
 
     rust::Result<std::pair<CompilerFlag, Input>, Input> FlagParser::parse(const Input &input) const {
@@ -70,19 +90,18 @@ namespace cs::semantic {
     std::optional<FlagParser::Match> FlagParser::check_equal(const std::string_view &key, FlagsByName::const_iterator candidate) {
         if (!key.empty() && candidate->first == key && candidate->second.consumption.exact_match_allowed()) {
             const auto& instruction = candidate->second;
-            return std::make_optional(std::make_tuple(instruction.consumption.count(true), instruction.type));
+            return std::make_optional(std::make_tuple(instruction.consumption.count(false), instruction.type));
         }
         return std::nullopt;
     }
 
     std::optional<FlagParser::Match> FlagParser::check_partial(const std::string_view &key, FlagsByName::const_iterator candidate) {
         if (!key.empty() && candidate->second.consumption.partial_match_allowed()) {
-            const auto length = std::min(key.size(), candidate->first.size());
-            // TODO: make extra check on equal sign
             // TODO: make extra check on mandatory following characters
-            if (key.substr(0, length) == candidate->first.substr(0, length)) {
+            if (const auto extra = split_extra(candidate->first, key); extra) {
                 const auto &instruction = candidate->second;
-                return std::make_optional(std::make_tuple(instruction.consumption.count(false), instruction.type));
+                const bool equal = (extra->find('=') != std::string_view::npos);
+                return std::make_optional(std::make_tuple(instruction.consumption.count(equal), instruction.type));
             }
         }
         return std::nullopt;
