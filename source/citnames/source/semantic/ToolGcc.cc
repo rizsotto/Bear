@@ -60,6 +60,14 @@ namespace {
         return flags;
     }
 
+    Arguments create_argument_list(const Execution &execution) {
+        Arguments input_arguments;
+        std::copy(execution.arguments.begin(), execution.arguments.end(), std::back_inserter(input_arguments));
+        Arguments extra_arguments = flags_from_environment(execution.environment);
+        std::copy(extra_arguments.begin(), extra_arguments.end(), std::back_inserter(input_arguments));
+        return input_arguments;
+    }
+
     bool is_compiler_query(const CompilerFlags& flags)
     {
         // no flag is a no compilation
@@ -271,7 +279,8 @@ namespace cs::semantic {
                         )
                 );
 
-        return parse(parser, execution)
+        Arguments input_arguments = create_argument_list(execution);
+        return parse(parser, input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();
@@ -291,9 +300,6 @@ namespace cs::semantic {
                     if (linking(flags)) {
                         arguments.insert(arguments.begin(), "-c");
                     }
-                    // Create compiler flags from environment variables if present.
-                    Arguments extra = flags_from_environment(execution.environment);
-                    std::copy(extra.begin(), extra.end(), std::back_inserter(arguments));
 
                     SemanticPtr result = std::make_shared<Compile>(
                             execution.working_dir,

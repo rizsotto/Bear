@@ -42,12 +42,7 @@ namespace cs::semantic {
 namespace {
 
     TEST(Parser, EverythingElseFlagMatcher) {
-        const auto input = Execution {
-            .executable = fs::path("/usr/bin/compiler"),
-            .arguments = {"compiler", "this", "is", "all", "parameter"},
-            .working_dir = fs::path(),
-            .environment = {}
-        };
+        const std::list<std::string> input = {"compiler", "this", "is", "all", "parameter"};
 
         const auto parser = Repeat(EverythingElseFlagMatcher());
         const auto flags = parse(parser, input);
@@ -64,12 +59,7 @@ namespace {
     }
 
     TEST(Parser, SourceMatcher) {
-        const auto input = Execution {
-            .executable = fs::path("/usr/bin/compiler"),
-            .arguments = {"compiler", "source1.c", "source2.c", "source1.c"},
-            .working_dir = fs::path(),
-            .environment = {}
-        };
+        const std::list<std::string> input = {"compiler", "source1.c", "source2.c", "source1.c"};
 
         const auto parser = Repeat(SourceMatcher());
         const auto flags = parse(parser, input);
@@ -85,32 +75,26 @@ namespace {
     }
 
     TEST(Parser, FlagParser) {
-        const auto input = Execution {
-            .executable = fs::path("/usr/bin/compiler"),
-            .arguments = {
-                    "compiler",
-                    "-a",
-                    "-b",
-                    "-belle",
-                    "-c",
-                    "-copilot",
-                    "-d", "option",
-                    "-e", "option",
-                    "-e-key", "value",
-                    "-f", "option",
-                    "-f-key", "value",
-                    "--d", "option",
-                    "--e=option",
-                    "--e", "option",
-                    "--e-key=value",
-                    "--e-key", "value",
-                    "--f=option",
-                    "--f", "option",
-                    "--f-key=value",
-                    "--f-key", "value",
-            },
-            .working_dir = fs::path(),
-            .environment = {}
+        const std::list<std::string> input = {
+                "compiler",
+                "-a",
+                "-belle",
+                "-c",
+                "-copilot",
+                "-d", "option",
+                "-e", "option",
+                "-e-key", "value",
+                "-f", "option",
+                "-f-key", "value",
+                "--d", "option",
+                "--e=option",
+                "--e", "option",
+                "--e-key=value",
+                "--e-key", "value",
+                "--f=option",
+                "--f", "option",
+                "--f-key=value",
+                "--f-key", "value",
         };
 
         const FlagsByName flags_by_name = {
@@ -123,7 +107,7 @@ namespace {
                 {"--d", {Instruction(1, Match::EXACT, true),    CompilerFlagType::OTHER}},
                 {"--e", {Instruction(1, Match::PARTIAL, true),  CompilerFlagType::OTHER}},
                 {"--f", {Instruction(1, Match::BOTH, true),     CompilerFlagType::OTHER}},
-                };
+        };
         const auto parser = Repeat(FlagParser(flags_by_name));
         const auto flags = parse(parser, input);
 
@@ -134,7 +118,6 @@ namespace {
 
         const CompilerFlags expected = {
                 CompilerFlag { .arguments = {"-a"}, .type = CompilerFlagType::OTHER },
-                CompilerFlag { .arguments = {"-b"}, .type = CompilerFlagType::OTHER },
                 CompilerFlag { .arguments = {"-belle"}, .type = CompilerFlagType::OTHER },
                 CompilerFlag { .arguments = {"-c"}, .type = CompilerFlagType::OTHER },
                 CompilerFlag { .arguments = {"-copilot"}, .type = CompilerFlagType::OTHER },

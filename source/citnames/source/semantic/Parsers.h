@@ -38,13 +38,6 @@ namespace cs::semantic {
     // Represents command line arguments.
     using Arguments = std::list<std::string>;
 
-    // Represents a segment of a whole command line arguments,
-    // which belongs together.
-    struct ArgumentsSegment {
-        Arguments::const_iterator begin;
-        Arguments::const_iterator end;
-    };
-
 //    enum class Category {
 //        CONTROL,
 //        INPUT,
@@ -88,7 +81,45 @@ namespace cs::semantic {
     };
 
     using CompilerFlags = std::list<CompilerFlag>;
-    using Input = ArgumentsSegment;
+
+    struct Input {
+        using iterator = Arguments::const_iterator;
+
+        explicit Input(const Arguments &input) noexcept
+                : begin_(std::next(input.begin()))
+                , end_(input.end())
+        { }
+
+        explicit Input(iterator begin, iterator end) noexcept
+                : begin_(begin)
+                , end_(end)
+        { }
+
+        [[nodiscard]] iterator begin() const {
+            return begin_;
+        }
+
+        [[nodiscard]] iterator end() const {
+            return end_;
+        }
+
+        [[nodiscard]] bool empty() const {
+            return (begin_ == end_);
+        }
+
+        [[nodiscard]] std::tuple<Arguments, Input> take(size_t count) const {
+            auto end = std::next(begin_, count);
+
+            auto arguments = Arguments(begin_, end);
+            auto remainder = Input(end, end_);
+
+            return std::make_tuple(std::move(arguments), std::move(remainder));
+        }
+
+    private:
+        iterator begin_;
+        iterator end_;
+    };
 
     enum class Match {
         EXACT,
@@ -201,22 +232,19 @@ namespace cs::semantic {
 
         [[nodiscard]]
         static rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) {
-            const std::string candidate = take_extension(*input.begin);
+            const auto candidate = take_extension(*input.begin());
             for (auto extension : EXTENSIONS) {
                 if (candidate == extension) {
-                    auto begin = input.begin;
-                    auto end = std::next(begin, 1);
-
-                    CompilerFlag compiler_flag = {Arguments(begin, end), CompilerFlagType::SOURCE };
-                    Input remainder = { end, input.end };
-                    return rust::Ok(std::make_pair(compiler_flag, remainder));
+                    auto [arguments, remainder] = input.take(1);
+                    auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::SOURCE };
+                    return rust::Ok(std::make_pair(flag, remainder));
                 }
             }
             return rust::Err(input);
         }
 
         [[nodiscard]]
-        static std::string take_extension(const std::string& file) {
+        static std::string_view take_extension(const std::string_view& file) {
             auto pos = file.rfind('.');
             return (pos == std::string::npos) ? file : file.substr(pos);
         }
@@ -261,16 +289,16 @@ namespace cs::semantic {
         using result_type = rust::Result<CompilerFlags, Input>;
         Parser const parser;
 
-        explicit constexpr Repeat(Parser  p) noexcept
+        explicit constexpr Repeat(Parser p) noexcept
                 : parser(std::move(p))
         { }
 
         [[nodiscard]]
-        result_type parse(const Input& input) const
+        result_type parse(const Input &input) const
         {
             CompilerFlags flags;
-            auto it = Input { input.begin, input.end };
-            for (; it.begin != it.end;) {
+            Input it = input;
+            while (!it.empty()) {
                 auto result = parser.parse(it)
                         .on_success([&flags, &it](const auto& tuple) {
                             const auto& [flag, remainder] = tuple;
@@ -281,24 +309,25 @@ namespace cs::semantic {
                     break;
                 }
             }
-            return (it.begin == it.end)
+            return (it.empty())
                    ? result_type(rust::Ok(flags))
                    : result_type(rust::Err(it));
         }
     };
 
     template <typename Parser>
-    rust::Result<CompilerFlags> parse(const Parser &parser, const Execution &execution)
+    rust::Result<CompilerFlags> parse(const Parser &parser, const Arguments &arguments)
     {
-        if (execution.arguments.empty()) {
+        if (arguments.empty()) {
             return rust::Err(std::runtime_error("Failed to recognize: no arguments found."));
         }
-        auto input = Input {std::next(execution.arguments.begin()), execution.arguments.end() };
+
+        Input input(arguments);
         return parser.parse(input)
                 .template map_err<std::runtime_error>([](auto remainder) {
                     return std::runtime_error(
                             fmt::format("Failed to recognize: {}",
-                                        fmt::join(remainder.begin, remainder.end, ", ")));
+                                        fmt::join(remainder.begin(), remainder.end(), ", ")));
                 });
     }
 }

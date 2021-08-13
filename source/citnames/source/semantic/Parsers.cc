@@ -42,19 +42,15 @@ namespace {
 namespace cs::semantic {
 
     rust::Result<std::pair<CompilerFlag, Input>, Input> FlagParser::parse(const Input &input) const {
-        if (input.begin == input.end) {
+        if (input.empty()) {
             return rust::Err(input);
         }
-        const std::string_view key(*input.begin);
+        const auto key = *input.begin();
         if (auto match = lookup(key); match) {
             const auto&[count, type] = match.value();
-
-            auto begin = input.begin;
-            auto end = std::next(begin, size_t(count) + 1);
-
-            CompilerFlag compiler_flag = {Arguments(begin, end), type};
-            Input remainder = {end, input.end};
-            return rust::Ok(std::make_pair(compiler_flag, remainder));
+            auto [arguments, remainder] = input.take(count + 1);
+            auto flag = CompilerFlag { .arguments = arguments, .type = type };
+            return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
     }
@@ -108,13 +104,10 @@ namespace cs::semantic {
     }
 
     rust::Result<std::pair<CompilerFlag, Input>, Input> EverythingElseFlagMatcher::parse(const Input &input) {
-        if (const std::string& front = *input.begin; !front.empty()) {
-            auto begin = input.begin;
-            auto end = std::next(begin);
-
-            CompilerFlag compiler_flag = {Arguments(begin, end), CompilerFlagType::LINKER_OBJECT_FILE};
-            Input remainder = {end, input.end};
-            return rust::Ok(std::make_pair(compiler_flag, remainder));
+        if (const auto &front = *input.begin(); !front.empty()) {
+            auto [arguments, remainder] = input.take(1);
+            auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::LINKER_OBJECT_FILE };
+            return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
     }
