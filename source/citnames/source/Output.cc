@@ -184,7 +184,7 @@ namespace cs {
                         throw error;
                     });
         } else {
-            throw nlohmann::json::out_of_range::create(403, "key 'command' or 'arguments' not found");
+            throw std::runtime_error("Field 'command' or 'arguments' not found");
         }
 
         validate(entry);
