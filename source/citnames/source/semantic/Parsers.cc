@@ -19,7 +19,14 @@
 
 #include "Parsers.h"
 
+#include <set>
+
 namespace {
+
+    std::string_view take_extension(const std::string_view &file) {
+        auto pos = file.rfind('.');
+        return (pos == std::string::npos) ? file : file.substr(pos);
+    }
 
     std::optional<std::string_view> split_extra(const std::string_view &prefix, const std::string_view &candidate) {
         if (prefix.empty()) {
@@ -37,19 +44,150 @@ namespace {
         }
         return std::nullopt;
     }
+
+    enum class FlagMatch {
+        SEP,
+        GLUED,
+        GLUED_WITH_EQ,
+    };
+
+    FlagMatch classify_flag_matching(const std::string_view &flag) {
+        if (flag.empty()) {
+            return FlagMatch::SEP;
+        } else {
+            if (flag[0] == '=') {
+                return FlagMatch::GLUED_WITH_EQ;
+            } else {
+                return FlagMatch::GLUED;
+            }
+        }
+    }
+
+    using namespace cs::semantic;
+
+    bool is_exact_match_only(MatchInstruction match_instruction) {
+        switch (match_instruction) {
+            case MatchInstruction::EXACTLY:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_OR_WITHOUT_EQ_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_2_OPTS:
+            case MatchInstruction::EXACTLY_WITH_3_OPTS:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_prefix_match(MatchInstruction match_instruction) {
+        switch (match_instruction) {
+            case MatchInstruction::PREFIX:
+            case MatchInstruction::PREFIX_WITH_1_OPT:
+            case MatchInstruction::PREFIX_WITH_2_OPTS:
+            case MatchInstruction::PREFIX_WITH_3_OPTS:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_glue_allowed(MatchInstruction match_instruction) {
+        switch (match_instruction) {
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_OR_WITHOUT_EQ_OR_SEP:
+            case MatchInstruction::PREFIX:
+            case MatchInstruction::PREFIX_WITH_1_OPT:
+            case MatchInstruction::PREFIX_WITH_2_OPTS:
+            case MatchInstruction::PREFIX_WITH_3_OPTS:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_glue_with_equal_allowed(MatchInstruction match_instruction) {
+        switch (match_instruction) {
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_OR_WITHOUT_EQ_OR_SEP:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    [[nodiscard]] size_t count_of_arguments(MatchInstruction match_instruction) {
+        switch (match_instruction) {
+            case MatchInstruction::EXACTLY:
+                return 1;
+            case MatchInstruction::EXACTLY_WITH_1_OPT_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP:
+            case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_OR_WITHOUT_EQ_OR_SEP:
+                return 2;
+            case MatchInstruction::EXACTLY_WITH_2_OPTS:
+                return 3;
+            case MatchInstruction::EXACTLY_WITH_3_OPTS:
+                return 4;
+            case MatchInstruction::PREFIX:
+                return 1;
+            case MatchInstruction::PREFIX_WITH_1_OPT:
+                return 2;
+            case MatchInstruction::PREFIX_WITH_2_OPTS:
+                return 3;
+            case MatchInstruction::PREFIX_WITH_3_OPTS:
+                return 4;
+        }
+        return 0;
+    }
 }
 
 namespace cs::semantic {
 
+    std::tuple<Arguments, Input> Input::take(const size_t count) const {
+        const auto size = std::distance(begin_, end_);
+        if (size < count) {
+            auto arguments = Arguments();
+            auto remainder = Input(end_, end_);
+            return std::make_tuple(std::move(arguments), remainder);
+        } else {
+            auto end = std::next(begin_, count);
+            auto arguments = Arguments(begin_, end);
+            auto remainder = Input(end, end_);
+            return std::make_tuple(std::move(arguments), remainder);
+        }
+    }
+
+    Arguments::value_type Input::front() const {
+        return *begin_;
+    }
+
+    std::string Input::to_string() const {
+        return fmt::format("{}", fmt::join(begin_, end_, ", "));
+    }
+
     rust::Result<std::pair<CompilerFlag, Input>, Input> FlagParser::parse(const Input &input) const {
+        // early exit if there is nothing to do.
         if (input.empty()) {
             return rust::Err(input);
         }
-        const auto key = *input.begin();
+        // early exit if the flag is an empty string.
+        const auto key = input.front();
+        if (key.empty()) {
+            return rust::Err(input);
+        }
+        // based on the lookup result, consume the input.
         if (auto match = lookup(key); match) {
             const auto&[count, type] = match.value();
-            auto [arguments, remainder] = input.take(count + 1);
-            auto flag = CompilerFlag { .arguments = arguments, .type = type };
+            auto [arguments, remainder] = input.take(count);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { .arguments = std::move(arguments), .type = type };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
@@ -83,29 +221,99 @@ namespace cs::semantic {
         return std::nullopt;
     }
 
-    std::optional<FlagParser::Match> FlagParser::check_equal(const std::string_view &key, FlagsByName::const_iterator candidate) {
-        if (!key.empty() && candidate->first == key && candidate->second.consumption.exact_match_allowed()) {
-            const auto& instruction = candidate->second;
-            return std::make_optional(std::make_tuple(instruction.consumption.count(false), instruction.type));
+    std::optional<FlagParser::Match>
+    FlagParser::check_equal(const std::string_view &key, FlagsByName::const_iterator candidate) {
+        const auto &flag_definition = candidate->second;
+        if ((is_exact_match_only(flag_definition.match) || is_prefix_match(flag_definition.match)) && key == candidate->first) {
+            const size_t count = count_of_arguments(flag_definition.match);
+            return std::make_optional(std::make_tuple(count, flag_definition.type));
         }
         return std::nullopt;
     }
 
-    std::optional<FlagParser::Match> FlagParser::check_partial(const std::string_view &key, FlagsByName::const_iterator candidate) {
-        if (!key.empty() && candidate->second.consumption.partial_match_allowed()) {
-            // TODO: make extra check on mandatory following characters
-            if (const auto extra = split_extra(candidate->first, key); extra) {
-                const auto &instruction = candidate->second;
-                const bool equal = (extra->find('=') != std::string_view::npos);
-                return std::make_optional(std::make_tuple(instruction.consumption.count(equal), instruction.type));
+    std::optional<FlagParser::Match>
+    FlagParser::check_partial(const std::string_view &key, FlagsByName::const_iterator candidate) {
+        const auto &flag_definition = candidate->second;
+        if (const auto extra = split_extra(candidate->first, key); extra) {
+            const auto flag_matching = classify_flag_matching(extra.value());
+            switch (flag_matching) {
+                case FlagMatch::GLUED:
+                    if (is_glue_allowed(flag_definition.match)) {
+                        const size_t decrease = is_prefix_match(flag_definition.match) ? 0 : 1;
+                        const size_t count = count_of_arguments(flag_definition.match) - decrease;
+                        return std::make_optional(std::make_tuple(count, flag_definition.type));
+                    }
+                    break;
+                case FlagMatch::GLUED_WITH_EQ:
+                    if (is_glue_with_equal_allowed(flag_definition.match)) {
+                        const size_t count = count_of_arguments(flag_definition.match) - 1;
+                        return std::make_optional(std::make_tuple(count, flag_definition.type));
+                    }
+                    break;
+                default:
+                    // This should not happen here. Exact match is already filtered out.
+                    return std::nullopt;
             }
         }
         return std::nullopt;
     }
 
-    rust::Result<std::pair<CompilerFlag, Input>, Input> EverythingElseFlagMatcher::parse(const Input &input) {
-        if (const auto &front = *input.begin(); !front.empty()) {
+    rust::Result<std::pair<CompilerFlag, Input>, Input> SourceMatcher::parse(const Input &input) {
+        static const std::set<std::string_view> extensions = {
+                // header files
+                ".h", ".hh", ".H", ".hp", ".hxx", ".hpp", ".HPP", ".h++", ".tcc",
+                // C
+                ".c", ".C",
+                // C++
+                ".cc", ".CC", ".c++", ".C++", ".cxx", ".cpp", ".cp",
+                // CUDA
+                ".cu",
+                // ObjectiveC
+                ".m", ".mi", ".mm", ".M", ".mii",
+                // Preprocessed
+                ".i", ".ii",
+                // Assembly
+                ".s", ".S", ".sx", ".asm",
+                // Fortran
+                ".f", ".for", ".ftn",
+                ".F", ".FOR", ".fpp", ".FPP", ".FTN",
+                ".f90", ".f95", ".f03", ".f08",
+                ".F90", ".F95", ".F03", ".F08",
+                // go
+                ".go",
+                // brig
+                ".brig",
+                // D
+                ".d", ".di", ".dd",
+                // Ada
+                ".ads", ".abd"
+        };
+
+        if (input.empty()) {
+            return rust::Err(input);
+        }
+        const auto candidate = input.front();
+        const auto extension = take_extension(candidate);
+        if (extensions.find(extension) != extensions.end()) {
             auto [arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::SOURCE };
+            return rust::Ok(std::make_pair(flag, remainder));
+        }
+        return rust::Err(input);
+    }
+
+    rust::Result<std::pair<CompilerFlag, Input>, Input> EverythingElseFlagMatcher::parse(const Input &input) {
+        if (input.empty()) {
+            return rust::Err(input);
+        }
+        if (const auto &front = input.front(); !front.empty()) {
+            auto [arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
             auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::LINKER_OBJECT_FILE };
             return rust::Ok(std::make_pair(flag, remainder));
         }
