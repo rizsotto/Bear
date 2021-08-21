@@ -37,6 +37,14 @@ namespace cs::semantic {
     bool operator==(const CompilerFlag &lhs, const CompilerFlag &rhs) {
         return (lhs.arguments == rhs.arguments) && (lhs.type == rhs.type);
     }
+
+    ArgumentsView slice(const Arguments &input, size_t start, size_t stop = 0) {
+        const auto begin = std::next(input.begin(), start);
+        const auto end = (stop < start)
+                ? std::next(begin)
+                : std::next(input.begin(), stop);
+        return ArgumentsView(begin, end);
+    }
 }
 
 namespace {
@@ -44,14 +52,14 @@ namespace {
     TEST(Parser, EverythingElseFlagMatcher) {
         const auto sut = Repeat(EverythingElseFlagMatcher());
 
-        const std::list<std::string> input = {"compiler", "this", "is", "all", "parameter"};
+        const Arguments input = {"compiler", "this", "is", "all", "parameter"};
         const auto flags = parse(sut, input);
         EXPECT_TRUE(flags.is_ok());
         const CompilerFlags expected = {
-                CompilerFlag{.arguments = {"this"}, .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = {"is"}, .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = {"all"}, .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = {"parameter"}, .type = CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{.arguments = slice(input, 4), .type = CompilerFlagType::LINKER_OBJECT_FILE},
         };
         EXPECT_EQ(expected, flags.unwrap());
     }
@@ -60,25 +68,25 @@ namespace {
         const auto sut = Repeat(SourceMatcher());
 
         {
-            const std::list<std::string> input = {"compiler", "source1.c", "source2.c", "source1.c"};
+            const Arguments input = {"compiler", "source1.c", "source2.c", "source1.c"};
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"source1.c"}, .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = {"source2.c"}, .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = {"source1.c"}, .type = CompilerFlagType::SOURCE},
-                    };
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::SOURCE},
+            };
             EXPECT_EQ(expected, flags.unwrap());
         }
         {
-            const std::list<std::string> input = {"compiler", "source1.f", "source2.f95", "source1.f08"};
+            const Arguments input = {"compiler", "source1.f", "source2.f95", "source1.f08"};
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"source1.f"}, .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = {"source2.f95"}, .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = {"source1.f08"}, .type = CompilerFlagType::SOURCE},
-                    };
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::SOURCE},
+            };
             EXPECT_EQ(expected, flags.unwrap());
         }
     }
@@ -97,10 +105,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-a"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-b", "op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-c", "op1", "op2"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-d", "op1", "op2", "op3"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 4, 7), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 7, 11), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -142,10 +150,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-a", "op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-c", "op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-e", "op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-f", "op1"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 3, 5), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 5, 7), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 7, 9), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -154,10 +162,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-b=op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-c=op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-f=op1"}, .type = CompilerFlagType::OTHER},
-                    };
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::OTHER},
+            };
             EXPECT_EQ(expected, flags.unwrap());
         }
         {
@@ -165,9 +173,9 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-dop1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-eop1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-fop1"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -207,8 +215,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-a"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-b", "op1"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -217,8 +225,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-alice"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-bob", "op1"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -227,8 +235,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-cecil", "opt1", "opt2"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-dave", "opt1", "opt2", "opt3"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 4, 8), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -237,8 +245,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = {"-alice=op1"}, .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = {"-bob=op1", "op2"}, .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }

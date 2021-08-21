@@ -37,15 +37,14 @@ namespace cs::semantic {
     // Represents command line arguments.
     using Arguments = std::list<std::string>;
 
-    struct Input {
-        using iterator = Arguments::const_iterator;
-
-        explicit Input(const Arguments &input) noexcept
+    // Represents a segment of command line arguments.
+    struct ArgumentsView {
+        explicit ArgumentsView(const Arguments &input) noexcept
                 : begin_(std::next(input.begin()))
                 , end_(input.end())
         { }
 
-        explicit Input(iterator begin, iterator end) noexcept
+        explicit ArgumentsView(Arguments::const_iterator begin, Arguments::const_iterator end) noexcept
                 : begin_(begin)
                 , end_(end)
         { }
@@ -54,16 +53,28 @@ namespace cs::semantic {
             return (begin_ == end_);
         }
 
+        [[nodiscard]] Arguments::const_iterator begin() const {
+            return begin_;
+        }
+
+        [[nodiscard]] Arguments::const_iterator end() const {
+            return end_;
+        }
+
         [[nodiscard]] Arguments::value_type front() const;
+        [[nodiscard]] Arguments::value_type back() const;
 
-        [[nodiscard]] std::tuple<Arguments, Input> take(size_t count) const;
-
-        [[nodiscard]] std::string to_string() const;
+        [[nodiscard]] std::tuple<ArgumentsView, ArgumentsView> take(size_t count) const;
 
     private:
-        iterator begin_;
-        iterator end_;
+        Arguments::const_iterator begin_;
+        Arguments::const_iterator end_;
     };
+
+    inline
+    bool operator==(const ArgumentsView &lhs, const ArgumentsView &rhs) {
+        return (lhs.begin() == rhs.begin()) && (lhs.end() == rhs.end());
+    }
 
 //    enum class Category {
 //        CONTROL,
@@ -103,7 +114,7 @@ namespace cs::semantic {
     };
 
     struct CompilerFlag {
-        Arguments arguments;
+        ArgumentsView arguments;
         CompilerFlagType type;
     };
 
@@ -142,7 +153,7 @@ namespace cs::semantic {
         { }
 
         [[nodiscard]]
-        rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const;
+        rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input) const;
 
     private:
         using Match = std::tuple<size_t, CompilerFlagType>;
@@ -162,13 +173,13 @@ namespace cs::semantic {
     // Parser combinator which recognize source files as a single argument of a compiler call.
     struct SourceMatcher {
         [[nodiscard]]
-        static rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input);
+        static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
     };
 
     // A parser combinator, which recognize a single compiler flag without any conditions.
     struct EverythingElseFlagMatcher {
         [[nodiscard]]
-        static rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input);
+        static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
     };
 
     // A parser combinator, which takes multiple parsers and executes them
@@ -184,9 +195,9 @@ namespace cs::semantic {
         { }
 
         [[nodiscard]]
-        rust::Result<std::pair<CompilerFlag, Input>, Input> parse(const Input &input) const
+        rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input) const
         {
-            rust::Result<std::pair<CompilerFlag, Input>, Input> result = rust::Err(input);
+            rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> result = rust::Err(input);
             const bool valid =
                     std::apply([&input, &result](auto &&... parser) {
                         return ((result = parser.parse(input), result.is_ok()) || ... );
@@ -201,7 +212,7 @@ namespace cs::semantic {
     // the input is all consumed, it fails.
     template <typename Parser>
     struct Repeat {
-        using result_type = rust::Result<CompilerFlags, Input>;
+        using result_type = rust::Result<CompilerFlags, ArgumentsView>;
         Parser const parser;
 
         explicit constexpr Repeat(Parser p) noexcept
@@ -209,7 +220,7 @@ namespace cs::semantic {
         { }
 
         [[nodiscard]]
-        result_type parse(Input input) const
+        result_type parse(ArgumentsView input) const
         {
             CompilerFlags flags;
             while (!input.empty()) {
@@ -236,11 +247,11 @@ namespace cs::semantic {
             return rust::Err(std::runtime_error("Failed to recognize: no arguments found."));
         }
 
-        Input input(arguments);
+        ArgumentsView input(arguments);
         return parser.parse(input)
                 .template map_err<std::runtime_error>([](auto remainder) {
                     return std::runtime_error(
-                            fmt::format("Failed to recognize: {}", remainder.to_string())
+                            fmt::format("Failed to recognize: {}", fmt::join(remainder.begin(), remainder.end(), ", "))
                     );
                 });
     }

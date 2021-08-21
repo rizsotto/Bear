@@ -148,29 +148,29 @@ namespace {
 
 namespace cs::semantic {
 
-    std::tuple<Arguments, Input> Input::take(const size_t count) const {
+    std::tuple<ArgumentsView, ArgumentsView> ArgumentsView::take(const size_t count) const {
         const auto size = std::distance(begin_, end_);
         if (size < count) {
-            auto arguments = Arguments();
-            auto remainder = Input(end_, end_);
-            return std::make_tuple(std::move(arguments), remainder);
+            auto arguments = ArgumentsView(begin_, begin_);
+            auto remainder = ArgumentsView(end_, end_);
+            return std::make_tuple(arguments, remainder);
         } else {
             auto end = std::next(begin_, count);
-            auto arguments = Arguments(begin_, end);
-            auto remainder = Input(end, end_);
-            return std::make_tuple(std::move(arguments), remainder);
+            auto arguments = ArgumentsView(begin_, end);
+            auto remainder = ArgumentsView(end, end_);
+            return std::make_tuple(arguments, remainder);
         }
     }
 
-    Arguments::value_type Input::front() const {
+    Arguments::value_type ArgumentsView::front() const {
         return *begin_;
     }
 
-    std::string Input::to_string() const {
-        return fmt::format("{}", fmt::join(begin_, end_, ", "));
+    Arguments::value_type ArgumentsView::back() const {
+        return *std::prev(end_);
     }
 
-    rust::Result<std::pair<CompilerFlag, Input>, Input> FlagParser::parse(const Input &input) const {
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> FlagParser::parse(const ArgumentsView &input) const {
         // early exit if there is nothing to do.
         if (input.empty()) {
             return rust::Err(input);
@@ -187,7 +187,7 @@ namespace cs::semantic {
             if (arguments.empty()) {
                 return rust::Err(input);
             }
-            auto flag = CompilerFlag { .arguments = std::move(arguments), .type = type };
+            auto flag = CompilerFlag { .arguments = arguments, .type = type };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
@@ -258,7 +258,7 @@ namespace cs::semantic {
         return std::nullopt;
     }
 
-    rust::Result<std::pair<CompilerFlag, Input>, Input> SourceMatcher::parse(const Input &input) {
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> SourceMatcher::parse(const ArgumentsView &input) {
         static const std::set<std::string_view> extensions = {
                 // header files
                 ".h", ".hh", ".H", ".hp", ".hxx", ".hpp", ".HPP", ".h++", ".tcc",
@@ -305,7 +305,7 @@ namespace cs::semantic {
         return rust::Err(input);
     }
 
-    rust::Result<std::pair<CompilerFlag, Input>, Input> EverythingElseFlagMatcher::parse(const Input &input) {
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> EverythingElseFlagMatcher::parse(const ArgumentsView &input) {
         if (input.empty()) {
             return rust::Err(input);
         }
