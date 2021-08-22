@@ -197,34 +197,28 @@ namespace cs::semantic {
         // try to find if the key has an associated instruction
         if (const auto candidate = flags_.lower_bound(key); flags_.end() != candidate) {
             // exact matches are preferred in all cases.
-            if (auto result = check_equal(key, candidate); result) {
+            if (auto result = check_equal(key, *candidate); result) {
                 return result;
             }
             // check if the argument is allowed to stick to the flag
+            if (auto result = check_partial(key, *candidate); result) {
+                return result;
+            }
+        }
+        // partial match is less likely to be a few steps away from the lower bound,
+        // therefore search the whole flag list again.
+        for (const auto candidate : flags_) {
             if (auto result = check_partial(key, candidate); result) {
                 return result;
             }
-            // check if this is the first element or not.
-            if (flags_.begin() != candidate) {
-                const auto previous = std::prev(candidate);
-                if (auto result = check_partial(key, previous); result) {
-                    return result;
-                }
-            }
-        }
-        // check if the last element is not the one we are looking for.
-        // (this is a limitation of `lower_bound` method.)
-        const auto candidate = std::prev(flags_.end());
-        if (auto result = check_partial(key, candidate); result) {
-            return result;
         }
         return std::nullopt;
     }
 
     std::optional<FlagParser::Match>
-    FlagParser::check_equal(const std::string_view &key, FlagsByName::const_iterator candidate) {
-        const auto &flag_definition = candidate->second;
-        if ((is_exact_match_only(flag_definition.match) || is_prefix_match(flag_definition.match)) && key == candidate->first) {
+    FlagParser::check_equal(const std::string_view &key, const FlagsByName::value_type &candidate) {
+        const auto &flag_definition = candidate.second;
+        if ((is_exact_match_only(flag_definition.match) || is_prefix_match(flag_definition.match)) && key == candidate.first) {
             const size_t count = count_of_arguments(flag_definition.match);
             return std::make_optional(std::make_tuple(count, flag_definition.type));
         }
@@ -232,9 +226,9 @@ namespace cs::semantic {
     }
 
     std::optional<FlagParser::Match>
-    FlagParser::check_partial(const std::string_view &key, FlagsByName::const_iterator candidate) {
-        const auto &flag_definition = candidate->second;
-        if (const auto extra = split_extra(candidate->first, key); extra) {
+    FlagParser::check_partial(const std::string_view &key, const FlagsByName::value_type &candidate) {
+        const auto &flag_definition = candidate.second;
+        if (const auto extra = split_extra(candidate.first, key); extra) {
             const auto flag_matching = classify_flag_matching(extra.value());
             switch (flag_matching) {
                 case FlagMatch::GLUED:

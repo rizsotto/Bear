@@ -261,4 +261,63 @@ namespace {
             EXPECT_TRUE(flags.is_err());
         }
     }
+
+    TEST(Parser, parse_flags_with_common_prefixes) {
+        const FlagsByName flags_by_name = {
+                {"-a", {MatchInstruction::EXACTLY, CompilerFlagType::OTHER}},
+                {"-l", {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP, CompilerFlagType::LINKER}},
+                {"-language", {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,  CompilerFlagType::OTHER}},
+                {"-linker", {MatchInstruction::EXACTLY, CompilerFlagType::OTHER}},
+                {"-z", {MatchInstruction::EXACTLY, CompilerFlagType::OTHER}},
+        };
+        const auto sut = Repeat(FlagParser(flags_by_name));
+
+        {
+            const Arguments input = {"compiler", "-library", "-language", "c"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+        {
+            const Arguments input = {"compiler", "-language", "c", "-library"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+        {
+            const Arguments input = {"compiler", "-linker", "-lthing",};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::LINKER},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+        {
+            const Arguments input = {"compiler", "-l", "m", "-link", "-linker", "-lexec"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{.arguments = slice(input, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{.arguments = slice(input, 5), .type = CompilerFlagType::LINKER},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+        {
+            const Arguments input = {"compiler", "-l=thing"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_err());
+        }
+    }
 }

@@ -162,10 +162,10 @@ namespace cs::semantic {
         std::optional<Match> lookup(const std::string_view &key) const;
 
         [[nodiscard]]
-        static std::optional<Match> check_equal(const std::string_view& key, FlagsByName::const_iterator candidate);
+        static std::optional<Match> check_equal(const std::string_view& key, const FlagsByName::value_type &candidate);
 
         [[nodiscard]]
-        static std::optional<Match> check_partial(const std::string_view& key, FlagsByName::const_iterator candidate);
+        static std::optional<Match> check_partial(const std::string_view& key, const FlagsByName::value_type &candidate);
 
         FlagsByName const& flags_;
     };
