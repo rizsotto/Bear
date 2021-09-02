@@ -108,8 +108,8 @@ namespace cmd {
     }
 
     namespace wrapper {
-        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@PRIVATE_INSTALLDIR@/wrapper";
-        constexpr char DEFAULT_DIR_PATH[] = "@ROOT_INSTALL_PREFIX@/@PRIVATE_INSTALLDIR@/wrapper.d";
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/bear/wrapper";
+        constexpr char DEFAULT_DIR_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/bear/wrapper.d";
 
         constexpr char FLAG_VERBOSE[] = "--verbose";
         constexpr char FLAG_DESTINATION[] = "--destination";
@@ -121,7 +121,18 @@ namespace cmd {
     }
 
     namespace library {
-        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@PRIVATE_INSTALLDIR@/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
+        // Multilib is one of the solutions allowing users to run applications
+        // built for various application binary interfaces (ABIs) of the same
+        // architecture. The most common use of multilib is to run 32-bit
+        // applications on 64-bit kernel.
+        //
+        // For Linux, a small tune is needed at build time. Need to compile
+        // `libexec.so` library for 32-bit and for 64-bit too. Then install
+        // these libraries to the OS preferred multilib directories.
+        // And use the `libexec.so` path default value with a single path,
+        // that matches both. (The match can be achieved by the $LIB token
+        // expansion from the dynamic loader. See `man ld.so` for more.)
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/$LIB/bear/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
 
         constexpr char KEY_REPORTER[] = "INTERCEPT_REPORT_COMMAND";
         constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
