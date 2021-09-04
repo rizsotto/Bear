@@ -1,10 +1,10 @@
 % CITNAMES(1) Bear User Manuals
 % László Nagy
-% Jun 19, 2021
+% Sep 04, 2021
 
 # NAME
 
-citnames - Deduce command semantic
+citnames - deduce command semantic
 
 # SYNOPSIS
 
@@ -61,14 +61,14 @@ is currently the only output of the tool.)
 
 # EXIT STATUS
 
-Citnames exit status is non zero in case of IO problems, otherwise it's zero.
-The exit status is independent from how many command it recognized or was
+Citnames exit status is non-zero in case of IO problems, otherwise it's zero.
+The exit status is independent of how many command it recognized or was
 it recognized at all.
 
 # OBSERVABILITY
 
 Any insight about the command recognition logic can be observed with `--verbose`
-flag on the standard error. Otherwise the command is silent.
+flag on the standard error. Otherwise, the command is silent.
 
 # INPUT FILE
 
@@ -81,7 +81,7 @@ Read more about the syntax of the file in the `intercept` man page.
 
 # OUTPUT FILE
 
-Currently the only output format is the JSON compilation database.
+Currently, the only output format is the JSON compilation database.
 Read more about the syntax of that in the `bear` man page. 
 
 # CONFIG FILE

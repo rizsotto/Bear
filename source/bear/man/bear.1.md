@@ -1,18 +1,16 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% Dec 14, 2020
+% Sep 04, 2021
 
 # NAME
 
-Bear - Build EAR
+Bear - a tool to generate compilation database for Clang tooling.
 
 # SYNOPSIS
 
 bear [*options*] \-\- [*build command*]
 
 # DESCRIPTION
-
-Bear is a tool to generate compilation database for clang tooling.
 
 The JSON compilation database
 <http://clang.llvm.org/docs/JSONCompilationDatabase.html> is used in
@@ -79,13 +77,33 @@ version of Bear generates entries where:
 
 # CONFIG FILE
 
-Read `citnames` man page for the content of this file. `bear` is not reading the
-content of this file, but passing the file name to `citnames`.
+Read `citnames` man page for the content of this file. `bear` is not reading
+the content of this file, but passing the file name to `citnames`.
 
 # EXIT STATUS
 
 The exit status of the program is the exit status of the build command.
-Except when the program itself crashes, then it sets to non zero.
+Except when the program itself crashes, then it sets to non-zero.
+
+# TROUBLESHOOTING
+
+The potential problems you can face with are: the build with and without Bear
+behaves differently or the output is empty.
+
+The most common cause for empty outputs is that the build command did not
+execute any commands. The reason for that could be, because incremental builds
+not running the compilers if everything is up-to-date. Remember, Bear does not
+understand the build file (eg.: makefile), but intercepts the executed
+commands.
+
+The other common cause for empty output is that the build has a "configure"
+step, which captures the compiler to build the project. In case of Bear is
+using the _wrapper_ mode (read `intercept` man page), it needs to run the
+configure step with Bear too (and discard that output), before run the build
+with Bear.
+
+There could be many reasons for any of these failures. It's better to consult
+with the project wiki page for known problems, before open a bug report.
 
 # SEE ALSO
 

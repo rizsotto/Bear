@@ -1,6 +1,6 @@
 % INTERCEPT(1) Bear User Manuals
 % László Nagy
-% Jul 11, 2021
+% Sep 04, 2021
 
 # NAME
 
@@ -78,14 +78,14 @@ interception behaves differently (eg.: the build crash with the `intercept`
 tool, but succeed otherwise). The output is empty, and it failed to intercept
 the children process execution by the build command.
 
-There could be many reasons for any of these failures. It's better to consult
-with the project wiki page for known problems, before open a bug report.
-
 The most common cause for empty outputs is that the build command did not
 execute any commands. The reason for that could be, because incremental builds
-not running the compilers if everything is up to date. Remember, `intercept`
-is not understanding the build file (eg.: makefile), but intercepts the executed
+not running the compilers if everything is up-to-date. Remember, `intercept`
+does not understand the build file (eg.: makefile), but intercepts the executed
 commands.
+
+There could be many reasons for any of these failures. It's better to consult
+with the project wiki page for known problems, before open a bug report.
 
 # SEE ALSO
 
