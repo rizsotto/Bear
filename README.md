@@ -14,40 +14,18 @@ The [JSON compilation database][JSONCDB] is used in the clang project
 to provide information on how a single compilation unit is processed.
 With this, it is easy to re-run the compilation with alternate programs.
 
-One way to get a compilation database is to use `cmake` as the build
-tool. Passing `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` to cmake generates
-the `compile_commands.json` file into the current directory.
-
-For non-cmake projects, Bear generates the JSON file during the build process.
+Some build system natively supports the generation of JSON compilation
+database. For projects which does not use such build tool, Bear generates
+the JSON file during the build process.
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
-
-How it works
-------------
-
-The concept behind Bear is: to execute the original build command and
-intercept the command executions issued by the build tool. From the
-log of command executions it tries to identify the compiler calls and
-creates the final compilation database.  
- 
-For intercepting the compiler executions, Bear uses the `LD_PRELOAD`
-or `DYLD_INSERT_LIBRARIES` mechanisms provided by the dynamic linker.
-When the dynamic linker is not working (because the executable is not a
-dynamically linked executable or security protection disables the linker)
-then Bear uses compiler wrappers to record the compiler calls. The wrapper
-sends execution report and calls the real compiler. (Not only compilers,
-but linkers, assemblers and other tools are also wrapped.)
-
-The intercepted commands are filtered and only the compiler executions
-goes into the compilation database. Those commands which ends up in the
-final output are transformed a little bit (some compiler flags are
-removed). 
 
 How to install
 --------------
 
-Bear is [packaged](https://repology.org/project/bear/versions) for many distributions. Check out your package manager.
-Or [build it](INSTALL.md) from source.
+Bear is [packaged](https://repology.org/project/bear/versions) for many
+distributions. Check out your package manager. Or [build it](INSTALL.md)
+from source.
 
 How to use
 ----------
@@ -62,14 +40,8 @@ For more options you can check the man page or pass `--help` parameter. Note
 that if you want to pass parameter to Bear, pass those _before_ the `--` sign,
 everything after that will be the build command. 
 
-Side note: Since Bear is executing the build command, only those commands will
-be recorded which were actually executed during the current build. Which means
-if you have already built your project and you re-run the build command with
-Bear you probably end up to have an empty output. (Practically it means you
-need to run `make clean` before you run `bear -- make`.)
-
-For more read the [wiki][WIKI] of the project, which talks about limitations,
-known issues and platform specific usage. 
+For more, read the man pages or [wiki][WIKI] of the project, which talks about
+limitations, known issues and platform specific usage. 
 
 Problem reports
 ---------------
