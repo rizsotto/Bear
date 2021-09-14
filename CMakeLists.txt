@@ -29,7 +29,17 @@ include(ExternalProject)
 set_property(DIRECTORY PROPERTY EP_BASE ${CMAKE_BINARY_DIR}/subprojects)
 set(STAGED_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/stage)
 set(DEPENDENCIES_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/subprojects/Install)
+# check if CMAKE_INSTALL_LIBDIR is set before GNUInstallDirs sets it
+get_property(bear_libdir_set CACHE CMAKE_INSTALL_LIBDIR PROPERTY TYPE SET)
 include(GNUInstallDirs)
+
+# Default LIBDIR for Debian systems
+if (NOT bear_libdir_set)
+    if (EXISTS "/etc/debian_version" AND CMAKE_LIBRARY_ARCHITECTURE)
+        set_property(CACHE CMAKE_INSTALL_LIBDIR PROPERTY VALUE 
+                "lib/${CMAKE_LIBRARY_ARCHITECTURE}")
+    endif()
+endif()
 
 # Verify or install dependencies
 add_subdirectory(third_party)
