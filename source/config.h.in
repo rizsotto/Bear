@@ -19,8 +19,9 @@
 
 #pragma once
 
-// specific platform indicator, should not using like this. ()needs to be deprecated)
+// specific platform indicator, should not using like this. (needs to be deprecated)
 #cmakedefine SUPPORT_PRELOAD
+#cmakedefine SUPPORT_MULTILIB
 
 // header checks
 #cmakedefine HAVE_SPAWN_H
@@ -121,6 +122,8 @@ namespace cmd {
     }
 
     namespace library {
+
+#ifdef SUPPORT_MULTILIB
         // Multilib is one of the solutions allowing users to run applications
         // built for various application binary interfaces (ABIs) of the same
         // architecture. The most common use of multilib is to run 32-bit
@@ -133,7 +136,9 @@ namespace cmd {
         // that matches both. (The match can be achieved by the $LIB token
         // expansion from the dynamic loader. See `man ld.so` for more.)
         constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/$LIB/bear/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
-
+#else
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_LIBDIR@/bear/@CMAKE_SHARED_LIBRARY_PREFIX@exec@CMAKE_SHARED_LIBRARY_SUFFIX@";
+#endif
         constexpr char KEY_REPORTER[] = "INTERCEPT_REPORT_COMMAND";
         constexpr char KEY_DESTINATION[] = "INTERCEPT_REPORT_DESTINATION";
         constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";
