@@ -6,12 +6,12 @@ tested on FreeBSD, GNU/Linux and OS X.
 
 ## Build dependencies
 
-1. **C++ compiler**, to compile the sources. (Shall support
+1. **C++ compiler**, to compile the sources. (Should support
    [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).)
 2. **CMake**, to configure the build. (Minimum version is 3.12) And a
    build tool [supported](https://cmake.org/cmake/help/v3.5/manual/cmake-generators.7.html)
    by CMake.
-3. **pkg-config** to look up for dependencies' compiler flags. 
+3. **pkg-config** to look up dependencies' compiler flags.
 4. **protoc** and **grpc_cpp_plugin** commands. (See gRPC dependencies.)
 
 ## Dependencies
@@ -49,8 +49,7 @@ are simple `lib` and `lib64` directories.) Passing the flag looks like this:
 
 To run test during the build process, you will need to install the
 test frameworks and re-configure the build. For unit testing Bear
-uses googletest, which will be built from source if you not install
-it before.
+uses googletest, which will be built from source if not already installed.
 
     # install `lit` the functional test framework into a python virtualenv
     mkvirtualenv bear
@@ -91,7 +90,7 @@ Install dependencies from packages on Alpine edge
 ### Platform: macOS
 
 Xcode < 11 or macOS < 10.15 users should get [LLVM Clang](https://releases.llvm.org)
-binaries and headers. Make sure that `clang++ -v` returns correct `InstalledDir`.
+binaries and headers. Make sure that `clang++ -v` returns the correct `InstalledDir`.
 This is because `std::filesystem` is not available on Clang supplied with Xcode < 11,
 and `std::filesystem::path` is not available in system C++ dylib for macOS < 10.15.
 
