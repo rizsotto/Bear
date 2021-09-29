@@ -105,6 +105,19 @@ with Bear.
 There could be many reasons for any of these failures. It's better to consult
 with the project wiki page for known problems, before open a bug report.
 
+# EXAMPLE
+
+Suppose you have a Makefile in your project and you normally compile your
+project with the following command:
+
+    make
+
+then you'd just need to invoke `bear` as follows:
+
+    bear -- make
+
+after that, a `compile_commands.json` should be in your project directory.
+
 # SEE ALSO
 
 intercept(1), citnames(1)

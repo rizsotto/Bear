@@ -43,6 +43,17 @@ everything after that will be the build command.
 For more, read the man pages or [wiki][WIKI] of the project, which talks about
 limitations, known issues and platform specific usage. 
 
+#### Example
+
+Suppose you have a `Makefile` and compile your project with the following bash
+command:
+
+    make
+
+Then you'd just need to invoke bear as follows:
+
+    bear -- make
+
 Problem reports
 ---------------
 
