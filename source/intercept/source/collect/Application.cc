@@ -92,11 +92,11 @@ namespace ic {
         auto server = grpc::ServerBuilder()
                           .RegisterService(&supervisor)
                           .RegisterService(&interceptor)
-                          .AddListeningPort("127.0.0.1:0", grpc::InsecureServerCredentials(), &port)
+                          .AddListeningPort("dns:///localhost:0", grpc::InsecureServerCredentials(), &port)
                           .BuildAndStart();
 
         // Create session_locator URL for the services
-        auto session_locator = SessionLocator(fmt::format("127.0.0.1:{}", port));
+        auto session_locator = SessionLocator(fmt::format("dns:///localhost:{}", port));
         spdlog::debug("Running gRPC server. {0}", session_locator);
         // Execute the build command
         auto result = session_->run(execution_, session_locator);
