@@ -51,6 +51,9 @@ import struct
 import contextlib
 import logging
 
+# Requires for type hinting in IDE
+from typing import Dict, Type, List, Any, Callable, Iterable, Optional
+
 # Map of ignored compiler option for the creation of a compilation database.
 # This map is used in _split_command method, which classifies the parameters
 # and ignores the selected ones. Please note that other parameters might be
@@ -74,10 +77,6 @@ IGNORED_FLAGS = {
     # compilation commands only. so, the compiler would ignore these flags
     # anyway. the benefit to get rid of them is to make the output more
     # readable.
-    '-static': 0,
-    '-shared': 0,
-    '-s': 0,
-    '-rdynamic': 0,
     '-l': 1,
     '-L': 1,
     '-u': 1,
@@ -92,7 +91,6 @@ IGNORED_FLAGS = {
 
 }  # type: Dict[str, int]
 
-
 # Known C/C++ compiler wrapper name patterns.
 COMPILER_PATTERN_WRAPPER = re.compile(r'^(distcc|ccache)$')
 
@@ -106,6 +104,7 @@ COMPILER_PATTERNS_CC = (
     re.compile(r'^([^-]*-)*clang(-\d+(\.\d+){0,2})?$'),
     re.compile(r'^(|i)cc$'),
     re.compile(r'^(g|)xlc$'),
+    re.compile(r'^([^-]*-)*ar$'),
 )
 
 # Known C++ compiler executable name patterns.
@@ -116,6 +115,11 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^icpc$'),
     re.compile(r'^nvcc$'),
     re.compile(r'^(g|)xl(C|c\+\+)$'),
+    re.compile(r'^([^-]*-)*ar$'),
+)
+
+ARCHIVER_PATTERNS = (
+    re.compile(r'^([^-]*-)*ar$'),
 )
 
 # Known Fortran compiler executable name patterns
@@ -135,7 +139,7 @@ Execution = collections.namedtuple('Execution', ['cwd', 'cmd'])
 
 CompilationCommand = collections.namedtuple(
     'CompilationCommand',
-    ['compiler', 'language', 'phase', 'flags', 'files', 'output'])
+    ['compiler', 'language', 'phase', 'flags', 'files', 'output', 'linkflags'])
 
 
 class Tools:
@@ -162,6 +166,11 @@ class Tools:
         use_match = Tools._is_sting_match(cmd, self.c_compilers)
         pattern_match = Tools._is_pattern_match(cmd, COMPILER_PATTERNS_CC)
         return use_match if self.ignore else (use_match or pattern_match)
+
+    def is_archiver(self, cmd):
+        # type: (Tools, str) -> bool
+        pattern_match = Tools._is_pattern_match(cmd, ARCHIVER_PATTERNS)
+        return pattern_match
 
     def is_cxx_compiler(self, cmd):
         # type: (Tools, str) -> bool
@@ -223,6 +232,7 @@ def run_command(command, cwd=None):
     :param cwd: the working directory where the command will be executed
     :return: output of the command
     """
+
     def decode_when_needed(result):
         # type: (Any) -> str
         """ check_output returns bytes or string depend on python version """
@@ -320,9 +330,9 @@ def intercept_build():
     if args.append and os.path.isfile(args.cdb):
         previous = CompilationDatabase.load(args.cdb, tools)
         entries = iter(set(itertools.chain(previous, current)))
-        CompilationDatabase.save(entries, args.cdb, args.field_output)
+        CompilationDatabase.save(entries, args.cdb, args.ldb, args.field_output, args.override_db)
     else:
-        CompilationDatabase.save(current, args.cdb, args.field_output)
+        CompilationDatabase.save(current, args.cdb, args.ldb, args.field_output, args.override_db)
 
     return exit_code
 
@@ -392,7 +402,7 @@ def include(includes, excludes):
 
 
 def make_flags_filter(pattern):
-    # type: str -> str -> bool
+    # type: (Optional[str]) -> Callable[[str], bool]
     """Make a predicate to test if a flag should be removed"""
 
     if pattern is None:
@@ -401,18 +411,19 @@ def make_flags_filter(pattern):
         regs = map(lambda p: re.compile(p), pattern.split(':'))
 
     def flags_filter(arg):
-        # type: str -> bool
+        # type: (str) -> bool
         """Returns True if arg should be removed"""
 
         for reg in regs:
             if reg.match(arg):
                 return True
         return False
+
     return flags_filter
 
 
 def compilations(exec_calls, tools, flags_filter):
-    # type: (Iterable[Execution], Tools) -> Iterable[Compilation]
+    # type: (Iterable[Execution], Tools, Callable[[str], bool]) -> Iterable[Compilation]
     """ Needs to filter out commands which are not compiler calls. And those
     compiler calls shall be compilation (not pre-processing or linking) calls.
     Plus needs to find the source file name from the arguments.
@@ -525,6 +536,11 @@ def parse_args_for_intercept_build():
     logging.debug('Parsed arguments: %s', args)
     return args
 
+def default_preload_file():
+    bear_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    libpath = "@EAR_LIB_PATH@"
+    libear = "@EAR_LIB_FILE@"
+    return os.path.join(bear_path, libpath, libear)
 
 def create_intercept_parser():
     """ Creates a parser for command-line arguments to 'intercept'. """
@@ -547,6 +563,15 @@ def create_intercept_parser():
         metavar='<file>',
         default="compile_commands.json",
         help="""The JSON compilation database.""")
+    parser.add_argument(
+        '--override-db',
+        action='store_true',
+        help="""Overrides existing compilation and link database file.""")
+    parser.add_argument(
+        '--ldb',
+        metavar='<file>',
+        default="link_commands.json",
+        help="""The JSON link database.""")
     parser.add_argument(
         '--field-output',
         action='store_true',
@@ -614,7 +639,7 @@ def create_intercept_parser():
     advanced.add_argument(
         '--libear', '-l',
         dest='libear',
-        default="@DEFAULT_PRELOAD_FILE@",
+        default=default_preload_file(),
         action='store',
         help="""specify libear file location.""")
 
@@ -625,7 +650,7 @@ def create_intercept_parser():
 
 class Compilation:
     def __init__(self,
-                 compiler, language, phase, flags, source, directory, output):
+                 compiler, language, phase, flags, source, directory, output, object_files, linkflags=[]):
         """ Constructor for a single compilation.
 
         This method just normalize the paths and initialize values. """
@@ -635,9 +660,18 @@ class Compilation:
         self.phase = phase
         self.flags = flags
         self.directory = os.path.normpath(directory)
-        self.source = source if os.path.isabs(source) else \
-            os.path.normpath(os.path.join(self.directory, source))
+        if source:
+            self.source = source if os.path.isabs(source) else \
+                os.path.normpath(os.path.join(self.directory, source))
+        else:
+            self.source = None
         self.output = output
+        if object_files:
+            self.object_files = [object if os.path.isabs(object) else \
+                                     os.path.normpath(os.path.join(self.directory, object)) for object in object_files]
+        else:
+            self.object_files = None
+        self.linkflags = linkflags
 
     def __hash__(self):
         # type: (Compilation) -> int
@@ -663,14 +697,23 @@ class Compilation:
     def as_db_entry(self, field_output):
         # type: (Compilation, bool) -> Dict[str, Any]
         """ This method creates a compilation database entry. """
+        if self.object_files:
+            files = [os.path.relpath(object_file, self.directory) for object_file in self.object_files]
+            argument_files = files
+            files_field_name = 'files'
+            compiler_phase_arguments = [self.compiler]
+        else:
+            files = os.path.relpath(self.source, self.directory)
+            argument_files = [files]
+            files_field_name = 'file'
+            compiler_phase_arguments = [self.compiler, self.phase]
 
-        source = os.path.relpath(self.source, self.directory)
         if self.output:
             result = {
-                'file': source,
+                files_field_name: files,
                 'arguments':
-                    [self.compiler, self.phase] + self.flags +
-                    ['-o', self.output] + [source],
+                    compiler_phase_arguments + self.flags +
+                    ['-o', self.output] + argument_files + self.linkflags,
                 'directory': self.directory,
             }
             if field_output:
@@ -678,15 +721,15 @@ class Compilation:
             return result
         else:
             return {
-                'file': source,
+                files_field_name: files,
                 'arguments':
-                    [self.compiler, self.phase] + self.flags + [source],
+                    compiler_phase_arguments + self.flags + argument_files + self.linkflags,
                 'directory': self.directory
             }
 
     @classmethod
     def from_db_entry(cls, entry, tools):
-        # type: (Type[Compilation], Dict[str, str]) -> Iterable[Compilation]
+        # type: (Type[Compilation], Tools) -> Iterable[Compilation]
         """ Parser method for compilation entry.
 
         From compilation database entry it creates the compilation object.
@@ -711,9 +754,30 @@ class Compilation:
         :param tools:       helper object to detect compiler
         :param flags_filter: a predicate that returns True for unwanted flags
         :return: stream of CompilationDbEntry objects """
-
         candidate = cls._split_command(execution.cmd, tools, flags_filter)
-        for source in candidate.files if candidate else []:
+
+        is_link_candidate = candidate and classify_object(candidate.files[0])
+
+        if candidate and is_link_candidate:
+            output = candidate.output[0] if candidate.output else None
+            phase = candidate.phase[0] if candidate.phase else ''
+            result = Compilation(directory=execution.cwd,
+                                 source=None,
+                                 compiler=candidate.compiler,
+                                 language=candidate.language,
+                                 phase=phase,
+                                 flags=candidate.flags,
+                                 output=output,
+                                 object_files=candidate.files,
+                                 linkflags=candidate.linkflags)
+            object_files_exist = True
+            for file in result.object_files:
+                if not os.path.isfile(file):
+                    object_files_exist = False
+            if object_files_exist:
+                yield result
+
+        for source in candidate.files if candidate and not is_link_candidate else []:
             output = candidate.output[0] if candidate.output else None
             phase = candidate.phase[0] if candidate.phase else '-c'
             result = Compilation(directory=execution.cwd,
@@ -722,9 +786,31 @@ class Compilation:
                                  language=candidate.language,
                                  phase=phase,
                                  flags=candidate.flags,
-                                 output=output)
+                                 output=output,
+                                 object_files=None)
             if os.path.isfile(result.source):
                 yield result
+
+    @classmethod
+    def _fix_define_string(cls, command):
+        if '=' not in command:
+            return command
+        key_value = command.split('=')
+        key = key_value[0]
+        value = '='.join(key_value[1:])
+
+        if value[:2] == r'\"' and value[-2:] == r'\"':
+            string_value = value[2:-2]
+        elif value[:1] == r'"' and value[-1:] == r'"':
+            string_value = value[1:-1]
+        else:
+            return command
+
+        prefix_to_add = r'"\"'
+        postfix_to_add = r'\""'
+        new_string_value = prefix_to_add + string_value + postfix_to_add
+        result = key + '=' + new_string_value
+        return result
 
     @classmethod
     def _split_compiler(cls, command, tools):
@@ -781,7 +867,8 @@ class Compilation:
                                     phase=[],
                                     flags=[],
                                     files=[],
-                                    output=[])
+                                    output=[],
+                                    linkflags=[])
         # iterate on the compile options
         args = iter(compiler_and_arguments[2])
         for arg in args:
@@ -795,21 +882,26 @@ class Compilation:
                 count = IGNORED_FLAGS[arg]
                 for _ in range(count):
                     next(args)
-            elif re.match(r'^-(l|L|Wl,).+', arg):
-                pass
             elif flags_filter(arg):
                 pass
             # some parameters look like a filename, take those explicitly
             elif arg in {'-D', '-U', '-I', '-include'}:
                 result.flags.extend([arg, next(args)])
+            elif re.match(r'^-(l|L|Wl,).+', arg):
+                result.linkflags.append(arg)
             # get the output file separately
             elif arg == '-o':
                 result.output.append(next(args))
+            # get library output for ar command
+            elif classify_library(arg) and tools.is_archiver(os.path.basename(compiler_and_arguments[0])):
+                result.output.append(arg)
             # parameter which looks source file is taken...
-            elif re.match(r'^[^-].+', arg) and classify_source(arg):
+            elif re.match(r'^[^-].+', arg) and (classify_source(arg) or classify_object(arg)):
                 result.files.append(arg)
             # and consider everything else as compile option.
             else:
+                if arg.startswith('-D'):
+                    arg = cls._fix_define_string(arg)
                 result.flags.append(arg)
         logging.debug('output is: %s', result)
         # do extra check on number of source files
@@ -820,16 +912,24 @@ class CompilationDatabase:
     """ Compilation Database persistence methods. """
 
     @staticmethod
-    def save(iterator, filename, field_output):
-        # type: (Iterable[Compilation], str, bool) -> None
+    def save(iterator, filename_cdb, filename_ldb, field_output, override_db):
+        # type: (Iterable[Compilation], str, str, bool, bool) -> None
         """ Saves compilations to given file.
 
-        :param filename: the destination file name
+        :param override_db: overrides existing compilation and link database file.
+        :param field_output: puts output field to entries if it founds
+        :param filename_cdb: the destination file name of compile_commands.json
+        :param filename_ldb: the destination file name of link_commands.json
         :param iterator: iterator of Compilation objects. """
-
-        entries = [entry.as_db_entry(field_output) for entry in iterator]
-        with open(filename, 'w') as handle:
-            json.dump(entries, handle, sort_keys=True, indent=4)
+        iterator = list(iterator)
+        compilation_entries = [entry.as_db_entry(field_output) for entry in iterator if not entry.object_files]
+        if not os.path.exists(filename_cdb) or override_db:
+            with open(filename_cdb, 'w') as handle:
+                json.dump(compilation_entries, handle, sort_keys=True, indent=4)
+        link_entries = [entry.as_db_entry(field_output) for entry in iterator if entry.object_files]
+        if not os.path.exists(filename_ldb) or override_db:
+            with open(filename_ldb, 'w') as handle:
+                    json.dump(link_entries, handle, sort_keys=True, indent=4)
 
     @staticmethod
     def load(filename, tools):
@@ -895,6 +995,41 @@ def classify_source(filename, c_compiler=True):
     return mapping.get(extension)
 
 
+def classify_object(filename, c_compiler=True):
+    # type: (str, bool) -> str
+    """ Classify object file names and returns the presumed language,
+    based on the file name extension.
+
+    :param filename:    the source file name
+    :param c_compiler:  indicate that the compiler is a C compiler,
+    :return: the language from file name extension. """
+
+    mapping = {
+        '.o': 'c' if c_compiler else 'c++',
+        '.a': 'c' if c_compiler else 'c++',
+    }
+
+    __, extension = os.path.splitext(os.path.basename(filename))
+    return mapping.get(extension)
+
+
+def classify_library(filename, c_compiler=True):
+    # type: (str, bool) -> str
+    """ Classify object file names and returns the presumed language,
+    based on the file name extension.
+
+    :param filename:    the source file name
+    :param c_compiler:  indicate that the compiler is a C compiler,
+    :return: the language from file name extension. """
+
+    mapping = {
+        '.a': 'c' if c_compiler else 'c++',
+    }
+
+    __, extension = os.path.splitext(os.path.basename(filename))
+    return mapping.get(extension)
+
+
 def get_mpi_call(wrapper):
     # type: (str) -> List[str]
     """ Provide information on how the underlying compiler would have been
@@ -922,3 +1057,4 @@ def temporary_directory(**kwargs):
 
 if __name__ == "__main__":
     sys.exit(intercept_build())
+
