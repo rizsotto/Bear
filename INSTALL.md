@@ -22,7 +22,7 @@ and build locally.
 - [gRPC](https://github.com/grpc/grpc) >= 1.26
 - [fmt](https://github.com/fmtlib/fmt) >= 6.2
 - [spdlog](https://github.com/gabime/spdlog) >= 1.5
-- [json](https://github.com/nlohmann/json) >= 3.7
+- [json](https://github.com/nlohmann/json) >= 3.7 and != 3.10.3
 
 Developer dependencies:
 
