@@ -29,10 +29,10 @@ else ()
             GIT_REPOSITORY
                 https://github.com/grpc/grpc
             GIT_TAG
-                v1.36.4
+                v1.41.1
             GIT_SUBMODULES
-	    GIT_SHALLOW
-	    	1
+            GIT_SHALLOW
+                1
             UPDATE_COMMAND
                 ""
             LOG_CONFIGURE
