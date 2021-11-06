@@ -23,7 +23,7 @@ jobs:
         if:  startsWith( matrix.os, 'ubuntu' )
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit valgrind
+          sudo apt-get install -y cmake pkg-config gfortran nvidia-cuda-toolkit libtool-bin valgrind
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'macos' )
