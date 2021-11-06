@@ -99,7 +99,18 @@ namespace cs::semantic {
 
     std::list<cs::Entry> Compile::into_entries() const {
         const auto abspath = [this](const fs::path &path) -> fs::path {
-            return (path.is_absolute()) ? path : working_dir / path;
+            auto candidate = (path.is_absolute()) ? path : working_dir / path;
+            // Create canonical path without checking of file existence.
+            fs::path result;
+            for (const auto& part : candidate) {
+                if (part == ".")
+                    continue;
+                if (part == "..")
+                    result = result.parent_path();
+                else
+                    result = result / part;
+            }
+            return result;
         };
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
