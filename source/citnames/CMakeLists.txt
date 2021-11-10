@@ -13,7 +13,8 @@ target_link_libraries(citnames_json_a PUBLIC
         sys_a
         fmt::fmt
         spdlog::spdlog
-        nlohmann_json::nlohmann_json)
+        nlohmann_json::nlohmann_json
+        stdc++fs)
 target_compile_options(citnames_json_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.

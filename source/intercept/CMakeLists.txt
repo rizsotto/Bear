@@ -25,7 +25,8 @@ target_link_libraries(events_db_a PUBLIC
         result_a
         rpc_a
         sys_a
-        fmt::fmt)
+        fmt::fmt
+        stdc++fs)
 
 
 # Intercept orchestrator code.

@@ -7,7 +7,8 @@ target_link_libraries(bear
         sys_a
         flags_a
         fmt::fmt
-        spdlog::spdlog)
+        spdlog::spdlog
+        stdc++fs)
 
 include(GNUInstallDirs)
 install(TARGETS bear
