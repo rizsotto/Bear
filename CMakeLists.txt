@@ -9,6 +9,7 @@ project(Bear
 
 option(ENABLE_UNIT_TESTS "Build and run unit test for this project" ON)
 option(ENABLE_FUNC_TESTS "Build and run functional test for this project" ON)
+option(ENABLE_MULTILIB "Enable to build with multilib support" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -46,6 +47,7 @@ ExternalProject_Add(BearSource
             googletest_dependency
         CMAKE_ARGS
             -DENABLE_UNIT_TESTS:BOOL=${ENABLE_UNIT_TESTS}
+            -DENABLE_MULTILIB:BOOL=${ENABLE_MULTILIB}
             -DPKG_CONFIG_EXECUTABLE:PATH=${PKG_CONFIG_EXECUTABLE}
         CMAKE_CACHE_ARGS
             -DCMAKE_PROJECT_VERSION:STRING=${CMAKE_PROJECT_VERSION}

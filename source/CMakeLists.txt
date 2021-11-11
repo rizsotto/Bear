@@ -32,7 +32,7 @@ pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET protobuf grpc++)
 if (UNIX AND NOT APPLE)
     set(SUPPORT_PRELOAD 1)
 endif()
-if (UNIX AND ${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (ENABLE_MULTILIB)
     set(SUPPORT_MULTILIB 1)
 endif()
 
