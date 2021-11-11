@@ -10,9 +10,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04]
+        multilib: [false]
         experimental: [false]
         include:
+          - os: ubuntu-20.04
+            multilib: true
+            experimental: false
           - os: macos-10.15
+            multilib: false
             experimental: true
 
     steps:
@@ -52,8 +57,9 @@ jobs:
       - name: Build
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
+          CMAKE_OPTIONS: -DENABLE_MULTILIB=${{ matrix.multilib }}
         run: |
-          cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu
+          cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" $CMAKE_OPTIONS -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu
           cmake --build "$BUILD_DIR" --parallel 4 --target install
 
       - name: Prepare [functional test]
@@ -64,6 +70,7 @@ jobs:
       - name: Execute [functional test]
         run: |
           mkdir $HOME/work/zlib_compilations && cd $HOME/work/zlib_compilations
+          bear --help
           bear -- $ZLIB_SRC_DIR/configure
           bear -- make
           cat compile_commands.json
