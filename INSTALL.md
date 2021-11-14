@@ -39,13 +39,24 @@ Ideally, you should build Bear in a separate build directory.
     make install
 
 You can configure the build process with passing arguments to cmake.
+
 One of the flags you might want to pay attention is the `CMAKE_INSTALL_LIBDIR`
-flag, which has to be the directory name for libraries. (The value of this
+flag, which has to be the directory name for libraries. The value of this
 varies for different distribution: debian derivatives are using
 `lib/i386-linux-gnu` and `lib/x86_64-linux-gnu`, while many other distributions
-are simple `lib` and `lib64` directories.) Passing the flag looks like this:
+are simple `lib` and `lib64` directories. Check out where the system `libc.so`
+is. And use that directory name for the `CMAKE_INSTALL_LIBDIR`. (If your system
+has it as `/lib/x86_64-linux-gnu/libc.so`, then `lib/x86_64-linux-gnu` is the
+value you need to use.) Passing the flag looks like this:
 
     cmake -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu ... $BEAR_SOURCE_DIR
+
+To enable multilib support, an extra CMake flag is needed. `ENABLE_MULTILIB`
+is defined by this project and will change where Bear looks for files. To use
+multilib, you need to make the `CMAKE_INSTALL_LIBDIR` set right. (See the
+paragraph above.) Passing the flag looks like this: 
+
+    cmake -DENABLE_MULTILIB=ON ... $BEAR_SOURCE_DIR
 
 To run test during the build process, you will need to install the
 test frameworks and re-configure the build. For unit testing Bear
@@ -98,4 +109,3 @@ If OpenSSL is installed via Brew, and it's keg-only, run the following (before t
 build) for pkg-config to find it as grpc's dependency:
     
     export PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig
-
