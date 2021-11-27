@@ -30,11 +30,11 @@
 
 namespace sys::os {
 
+#if defined HAVE_CONFSTR
     constexpr const size_t BUFFER_SIZE = 1024;
 
     rust::Result<std::string> get_confstr(const int key)
     {
-#ifdef HAVE_CONFSTR
         errno = 0;
         const size_t buffer_size = ::confstr(key, nullptr, 0);
         if (buffer_size != 0 && buffer_size < BUFFER_SIZE) {
@@ -45,17 +45,15 @@ namespace sys::os {
         }
         return rust::Err(std::runtime_error(
             fmt::format("System call \"confstr\" failed.: {}", error_string(errno))));
-#else
-#error "System call "confstr" not exists."
-#endif
     }
+#endif
 
     rust::Result<std::string> get_path(const sys::env::Vars& environment)
     {
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
             return rust::Ok(candidate->second);
         }
-#ifdef HAVE_CS_PATH
+#if defined HAVE_CS_PATH && defined HAVE_CONFSTR
         return get_confstr(_CS_PATH)
             .map_err<std::runtime_error>([](auto error) {
                 return std::runtime_error(
