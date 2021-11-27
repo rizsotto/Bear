@@ -19,11 +19,12 @@
 
 #include "libsys/Os.h"
 #include "libsys/Errors.h"
-#include "Guard.h"
 #include "config.h"
 
+#if defined HAVE_CONFSTR
 #include <cerrno>
 #include <unistd.h>
+#endif
 
 #include <fmt/format.h>
 

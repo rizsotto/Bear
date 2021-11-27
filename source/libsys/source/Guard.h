@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "config.h"
 #include <map>
 #include <string>
 
@@ -32,19 +33,14 @@ namespace sys::env {
     // but makes the final `const char**` not leak.
     class Guard {
     public:
-        explicit Guard(const std::map<std::string, std::string>& environ);
+        explicit Guard(const std::map<std::string, std::string> &environment);
+        ~Guard() noexcept;
 
         [[nodiscard]] const char** data() const;
 
     public:
-        Guard() = delete;
-        ~Guard() noexcept;
-
-        Guard(Guard&&) noexcept = delete;
-        Guard(Guard const&) = delete;
-
-        Guard& operator=(Guard&&) noexcept = delete;
-        Guard& operator=(Guard const&) = delete;
+        NON_DEFAULT_CONSTRUCTABLE(Guard);
+        NON_COPYABLE_NOR_MOVABLE(Guard);
 
     private:
         const char** data_;

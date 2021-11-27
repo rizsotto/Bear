@@ -54,8 +54,8 @@ namespace {
 
 namespace sys::env {
 
-    Guard::Guard(const std::map<std::string, std::string>& environ)
-            : data_(to_c_array(environ))
+    Guard::Guard(const std::map<std::string, std::string> &environment)
+            : data_(to_c_array(environment))
     {
     }
 
