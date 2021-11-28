@@ -46,16 +46,14 @@ namespace {
 
     std::string join_with(const std::list<fs::path> &input, const char sep)
     {
-        // make an early return if there is no chance to have something.
-        if (input.empty()) {
-            return "";
+        std::string result;
+        for (auto it = input.begin(); it != input.end(); ++it) {
+            if (it != input.begin()) {
+                result.push_back(sep);
+            }
+            result.append(it->string());
         }
-        // otherwise start to collect the elements into result.
-        return std::accumulate(std::next(input.begin()), input.end(),
-                               *input.begin(),
-                               [&sep](std::string acc, const fs::path &item) {
-                                   return std::move(acc) + sep + item.string();
-                               });
+        return result;
     }
 }
 
