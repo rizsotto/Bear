@@ -28,6 +28,7 @@
 #include <string_view>
 #include <vector>
 #include <iosfwd>
+#include <optional>
 
 namespace flags {
 
