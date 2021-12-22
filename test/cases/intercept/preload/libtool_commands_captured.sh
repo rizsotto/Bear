@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 
 # REQUIRES: preload, shell, dynamic-shell, libtool
-# RUN: %{intercept} --verbose --output %t.json -- %{shell} %s
-# RUN: assert_intercepted %t.json count -ge 6
+# RUN: %{intercept} --force-preload --verbose --output %t.json -- %{shell} %s
+# RUN: assert_intercepted %t.json count -ge 4
 # RUN: assert_intercepted %t.json contains -program %{c_compiler} -arguments %{c_compiler} -g -O -c main.c -o main.o
 # RUN: assert_intercepted %t.json contains -program %{c_compiler} -arguments %{c_compiler} -g -O -c hello.c -o hello.o
 
