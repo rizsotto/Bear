@@ -42,8 +42,8 @@ namespace ic {
 
         ~Reporter() noexcept = default;
 
-        NON_DEFAULT_CONSTRUCTABLE(Reporter);
-        NON_COPYABLE_NOR_MOVABLE(Reporter);
+        NON_DEFAULT_CONSTRUCTABLE(Reporter)
+        NON_COPYABLE_NOR_MOVABLE(Reporter)
 
     private:
         ic::collect::db::EventsDatabaseWriter::Ptr database_;

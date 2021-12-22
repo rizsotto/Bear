@@ -32,8 +32,8 @@ namespace ic {
         [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &execution) const override;
         [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;
 
-        NON_DEFAULT_CONSTRUCTABLE(LibraryPreloadSession);
-        NON_COPYABLE_NOR_MOVABLE(LibraryPreloadSession);
+        NON_DEFAULT_CONSTRUCTABLE(LibraryPreloadSession)
+        NON_COPYABLE_NOR_MOVABLE(LibraryPreloadSession)
 
     private:
         [[nodiscard]] std::map<std::string, std::string> update(const std::map<std::string, std::string>& env) const;

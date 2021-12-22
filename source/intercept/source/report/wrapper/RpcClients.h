@@ -39,8 +39,8 @@ namespace wr {
 
         rust::Result<wr::Execution> resolve(const wr::Execution &);
 
-        NON_DEFAULT_CONSTRUCTABLE(SupervisorClient);
-        NON_COPYABLE_NOR_MOVABLE(SupervisorClient);
+        NON_DEFAULT_CONSTRUCTABLE(SupervisorClient)
+        NON_COPYABLE_NOR_MOVABLE(SupervisorClient)
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;
@@ -53,8 +53,8 @@ namespace wr {
 
         rust::Result<int> report(const rpc::Event &);
 
-        NON_DEFAULT_CONSTRUCTABLE(InterceptorClient);
-        NON_COPYABLE_NOR_MOVABLE(InterceptorClient);
+        NON_DEFAULT_CONSTRUCTABLE(InterceptorClient)
+        NON_COPYABLE_NOR_MOVABLE(InterceptorClient)
 
     private:
         std::shared_ptr<::grpc::Channel> channel_;

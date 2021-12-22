@@ -43,8 +43,8 @@ namespace cs {
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
-        NON_DEFAULT_CONSTRUCTABLE(Command);
-        NON_COPYABLE_NOR_MOVABLE(Command);
+        NON_DEFAULT_CONSTRUCTABLE(Command)
+        NON_COPYABLE_NOR_MOVABLE(Command)
 
     private:
         Arguments arguments_;

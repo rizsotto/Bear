@@ -149,7 +149,7 @@ namespace {
 namespace cs::semantic {
 
     std::tuple<ArgumentsView, ArgumentsView> ArgumentsView::take(const size_t count) const {
-        const auto size = std::distance(begin_, end_);
+        const size_t size = std::distance(begin_, end_);
         if (size < count) {
             auto arguments = ArgumentsView(begin_, begin_);
             auto remainder = ArgumentsView(end_, end_);

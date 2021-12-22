@@ -33,7 +33,7 @@ namespace ps {
         void record(const char** argv, const char** envp) const;
         void context() const;
 
-        NON_DEFAULT_CONSTRUCTABLE(ApplicationLogConfig);
+        NON_DEFAULT_CONSTRUCTABLE(ApplicationLogConfig)
 
     protected:
         const char *name_;

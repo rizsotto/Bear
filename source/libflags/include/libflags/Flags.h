@@ -53,7 +53,7 @@ namespace flags {
         [[nodiscard]] rust::Result<std::vector<std::string_view>> as_string_list(const std::string_view& key) const;
 
     public:
-        NON_DEFAULT_CONSTRUCTABLE(Arguments);
+        NON_DEFAULT_CONSTRUCTABLE(Arguments)
 
     private:
         using Parameter = std::vector<std::string_view>;
@@ -130,7 +130,7 @@ namespace flags {
         void print_version(std::ostream&) const;
 
     public:
-        NON_DEFAULT_CONSTRUCTABLE(Parser);
+        NON_DEFAULT_CONSTRUCTABLE(Parser)
 
     private:
         const std::string_view name_;

@@ -50,8 +50,8 @@ namespace ic::collect::db {
     public:
         explicit EventsDatabaseReader(fs::path path, StreamPtr file) noexcept;
 
-        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseReader);
-        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseReader);
+        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseReader)
+        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseReader)
 
     private:
         fs::path path_;

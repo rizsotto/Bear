@@ -39,8 +39,8 @@ namespace sys::env {
         [[nodiscard]] const char** data() const;
 
     public:
-        NON_DEFAULT_CONSTRUCTABLE(Guard);
-        NON_COPYABLE_NOR_MOVABLE(Guard);
+        NON_DEFAULT_CONSTRUCTABLE(Guard)
+        NON_COPYABLE_NOR_MOVABLE(Guard)
 
     private:
         const char** data_;

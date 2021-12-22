@@ -38,8 +38,8 @@ namespace cs::semantic {
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const rpc::Event &event);
 
-        NON_DEFAULT_CONSTRUCTABLE(Build);
-        NON_COPYABLE_NOR_MOVABLE(Build);
+        NON_DEFAULT_CONSTRUCTABLE(Build)
+        NON_COPYABLE_NOR_MOVABLE(Build)
 
     private:
         std::shared_ptr<Tool> tools_;

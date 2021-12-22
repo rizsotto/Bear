@@ -36,8 +36,8 @@ namespace ic {
         [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &execution) const override;
         [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;
 
-        NON_DEFAULT_CONSTRUCTABLE(WrapperSession);
-        NON_COPYABLE_NOR_MOVABLE(WrapperSession);
+        NON_DEFAULT_CONSTRUCTABLE(WrapperSession)
+        NON_COPYABLE_NOR_MOVABLE(WrapperSession)
 
     private:
         [[nodiscard]] rust::Result<fs::path> resolve(const fs::path &name) const;

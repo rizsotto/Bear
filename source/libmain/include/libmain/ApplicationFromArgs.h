@@ -35,7 +35,7 @@ namespace ps {
         virtual rust::Result<flags::Arguments> parse(int argc, const char** argv) const = 0;
         virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
 
-        NON_DEFAULT_CONSTRUCTABLE(ApplicationFromArgs);
+        NON_DEFAULT_CONSTRUCTABLE(ApplicationFromArgs)
 
     protected:
         ApplicationLogConfig log_config_;

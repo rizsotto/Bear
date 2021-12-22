@@ -33,8 +33,8 @@ namespace wr {
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
-        NON_DEFAULT_CONSTRUCTABLE(Command);
-        NON_COPYABLE_NOR_MOVABLE(Command);
+        NON_DEFAULT_CONSTRUCTABLE(Command)
+        NON_COPYABLE_NOR_MOVABLE(Command)
 
     protected:
         wr::SessionLocator session_;

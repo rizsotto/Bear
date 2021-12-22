@@ -43,8 +43,8 @@ namespace ic::collect::db {
         explicit EventsDatabaseWriter(fs::path path, int file) noexcept;
         ~EventsDatabaseWriter() noexcept;
 
-        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseWriter);
-        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseWriter);
+        NON_DEFAULT_CONSTRUCTABLE(EventsDatabaseWriter)
+        NON_COPYABLE_NOR_MOVABLE(EventsDatabaseWriter)
 
     private:
         rust::Result<std::string> to_json(const rpc::Event &event) noexcept;

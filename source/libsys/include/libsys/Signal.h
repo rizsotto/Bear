@@ -32,8 +32,8 @@ namespace sys {
         ~SignalForwarder() noexcept;
 
     public:
-        NON_DEFAULT_CONSTRUCTABLE(SignalForwarder);
-        NON_COPYABLE_NOR_MOVABLE(SignalForwarder);
+        NON_DEFAULT_CONSTRUCTABLE(SignalForwarder)
+        NON_COPYABLE_NOR_MOVABLE(SignalForwarder)
 
     private:
         pid_t pid_;

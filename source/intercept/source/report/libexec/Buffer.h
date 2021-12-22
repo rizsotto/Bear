@@ -49,8 +49,8 @@ namespace el {
          */
         char const* store(char const* input) noexcept;
 
-        NON_DEFAULT_CONSTRUCTABLE(Buffer);
-        NON_COPYABLE_NOR_MOVABLE(Buffer);
+        NON_DEFAULT_CONSTRUCTABLE(Buffer)
+        NON_COPYABLE_NOR_MOVABLE(Buffer)
 
     private:
         char* top_;

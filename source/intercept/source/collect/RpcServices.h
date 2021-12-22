@@ -34,8 +34,8 @@ namespace ic {
 
         grpc::Status Resolve(grpc::ServerContext *context, const rpc::ResolveRequest *request, rpc::ResolveResponse *response) override;
 
-        NON_DEFAULT_CONSTRUCTABLE(SupervisorImpl);
-        NON_COPYABLE_NOR_MOVABLE(SupervisorImpl);
+        NON_DEFAULT_CONSTRUCTABLE(SupervisorImpl)
+        NON_COPYABLE_NOR_MOVABLE(SupervisorImpl)
 
     private:
         const Session &session_;
@@ -48,8 +48,8 @@ namespace ic {
 
         ::grpc::Status Register(::grpc::ServerContext* context, const rpc::Event* request, google::protobuf::Empty* response) override;
 
-        NON_DEFAULT_CONSTRUCTABLE(InterceptorImpl);
-        NON_COPYABLE_NOR_MOVABLE(InterceptorImpl);
+        NON_DEFAULT_CONSTRUCTABLE(InterceptorImpl)
+        NON_COPYABLE_NOR_MOVABLE(InterceptorImpl)
 
     private:
         Reporter& reporter_;

@@ -69,7 +69,7 @@ namespace sys {
     public:
         explicit Process(pid_t pid);
 
-        NON_DEFAULT_CONSTRUCTABLE(Process);
+        NON_DEFAULT_CONSTRUCTABLE(Process)
 
     private:
         pid_t pid_;
@@ -103,7 +103,7 @@ namespace sys {
 #endif
 
     public:
-        NON_DEFAULT_CONSTRUCTABLE(Builder);
+        NON_DEFAULT_CONSTRUCTABLE(Builder)
 
     private:
         fs::path program_;

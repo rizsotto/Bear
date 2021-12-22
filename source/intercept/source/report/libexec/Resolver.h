@@ -53,7 +53,7 @@ namespace el {
         [[nodiscard]]
         virtual rust::Result<const char*, int> from_search_path(std::string_view const &file, const char *search_path);
 
-        NON_COPYABLE_NOR_MOVABLE(Resolver);
+        NON_COPYABLE_NOR_MOVABLE(Resolver)
 
     private:
         char result_[PATH_MAX];

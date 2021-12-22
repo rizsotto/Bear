@@ -41,8 +41,8 @@ namespace wr {
         void report_start(ProcessId pid, const Execution &execution);
         void report_wait(sys::ExitStatus exit_status);
 
-        NON_DEFAULT_CONSTRUCTABLE(EventReporter);
-        NON_COPYABLE_NOR_MOVABLE(EventReporter);
+        NON_DEFAULT_CONSTRUCTABLE(EventReporter)
+        NON_COPYABLE_NOR_MOVABLE(EventReporter)
 
     private:
         EventFactory event_factory;
