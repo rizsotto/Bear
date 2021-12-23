@@ -19,28 +19,36 @@
 
 #pragma once
 
+#include "config.h"
+
 #include <iterator>
 #include <string_view>
 
 namespace el {
 
-    class PathsIterator;
-
     class Paths {
     public:
-        using iterator = PathsIterator;
+        class Iterator;
+        friend class Iterator;
 
     public:
-        explicit Paths(std::string_view path);
+        explicit Paths(const char *path) noexcept;
 
-        [[nodiscard]] iterator begin() const;
-        [[nodiscard]] iterator end() const;
+        NON_DEFAULT_CONSTRUCTABLE(Paths)
+        NON_COPYABLE_NOR_MOVABLE(Paths)
+
+        [[nodiscard]] Iterator begin() const;
+        [[nodiscard]] Iterator end() const;
 
     private:
-        std::string_view path_;
+        [[nodiscard]] std::pair<const char *, const char *> next(const char *current) const;
+
+    private:
+        const char *const begin_;
+        const char *const end_;
     };
 
-    class PathsIterator {
+    class Paths::Iterator {
     public:
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::input_iterator_tag;
@@ -49,18 +57,19 @@ namespace el {
         using reference = value_type const&;
 
     public:
-        PathsIterator(std::string_view paths, bool start);
+        Iterator(const Paths &paths, const char *begin, const char *end) noexcept;
 
-        reference operator*() const;
+        value_type operator*() const;
 
-        PathsIterator operator++(int);
-        PathsIterator &operator++();
+        Iterator operator++(int);
+        Iterator &operator++();
 
-        bool operator==(const PathsIterator &other) const;
-        bool operator!=(const PathsIterator &other) const;
+        bool operator==(const Iterator &other) const;
+        bool operator!=(const Iterator &other) const;
 
     private:
-        std::string_view paths_;
-        std::string_view current_;
+        const Paths &paths_;
+        const char *begin_;
+        const char *end_;
     };
 }

@@ -18,6 +18,7 @@
  */
 
 #include "report/libexec/Paths.h"
+#include "report/libexec/Array.h"
 
 namespace {
 
@@ -30,72 +31,67 @@ namespace {
         }
         return it;
     }
-
-    std::string_view first(std::string_view const& paths) {
-        const char *const begin = paths.begin();
-        const char *const end = next_path_separator(begin, paths.end());
-
-        return std::string_view(begin, (end - begin));
-    }
-
-    std::string_view last(std::string_view const& paths) {
-        return std::string_view(paths.end(), 0);
-    }
 }
 
 namespace el {
 
-    Paths::Paths(std::string_view path)
-            : path_(path)
+    Paths::Paths(const char *const path) noexcept
+            : begin_(path)
+            , end_(array::end(path))
     { }
 
-    Paths::iterator Paths::begin() const {
-        return el::Paths::iterator(path_, true);
+    Paths::Iterator Paths::begin() const {
+        if (begin_ == end_)
+            return {*this, nullptr, nullptr};
+
+        const auto candidate = next_path_separator(begin_, end_);
+        return {*this, begin_, candidate};
     }
 
-    Paths::iterator Paths::end() const {
-        return el::Paths::iterator(path_, false);
+    Paths::Iterator Paths::end() const {
+        return {*this, nullptr, nullptr};
     }
 
-    PathsIterator::PathsIterator(std::string_view paths, bool start)
+    std::pair<const char *, const char *> Paths::next(const char *const current) const {
+        if (current == end_)
+            return std::make_pair(nullptr, nullptr);
+
+        const auto begin = std::next(current);
+        if (begin == end_)
+            return std::make_pair(nullptr, nullptr);
+
+        const auto candidate = next_path_separator(begin, end_);
+        return std::make_pair(begin, candidate);
+    }
+
+    Paths::Iterator::Iterator(const Paths &paths, const char *begin, const char *end) noexcept
             : paths_(paths)
-            , current_(start ? first(paths) : last(paths))
+            , begin_(begin)
+            , end_(end)
     { }
 
-    PathsIterator::reference PathsIterator::operator*() const {
-        return current_;
+    Paths::Iterator::value_type Paths::Iterator::operator*() const {
+        return std::string_view(begin_, (end_ - begin_));
     }
 
-    PathsIterator PathsIterator::operator++(int) {
-        PathsIterator result(*this);
+    Paths::Iterator Paths::Iterator::operator++(int) {
+        Paths::Iterator result(*this);
         this->operator++();
         return result;
     }
 
-    PathsIterator &PathsIterator::operator++() {
-        if (current_.end() != paths_.end()) {
-            const char *const begin = current_.end() + 1;
-            const char *const end = next_path_separator(begin, paths_.end());
-
-            current_ = std::string_view(begin, (end - begin));
-        } else {
-            current_ = last(paths_);
-        }
+    Paths::Iterator &Paths::Iterator::operator++() {
+        const auto&[begin, end] = paths_.next(end_);
+        begin_ = begin;
+        end_ = end;
         return *this;
     }
 
-    bool PathsIterator::operator==(const PathsIterator &other) const {
-        if (this == &other) {
-            return true;
-        }
-        // simple equal would make two empty to be the same.
-        return (paths_.begin() == other.paths_.begin()) &&
-                (paths_.size() == other.paths_.size()) &&
-                (current_.begin() == other.current_.begin()) &&
-                (current_.size() == other.current_.size());
+    bool Paths::Iterator::operator==(const Paths::Iterator &other) const {
+        return &paths_ == &other.paths_ && begin_ == other.begin_ && end_ == other.end_;
     }
 
-    bool PathsIterator::operator!=(const PathsIterator &other) const {
+    bool Paths::Iterator::operator!=(const Paths::Iterator &other) const {
         return !(this->operator==(other));
     }
 }

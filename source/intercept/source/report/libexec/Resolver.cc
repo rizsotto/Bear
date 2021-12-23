@@ -91,7 +91,7 @@ namespace el {
             return from_current_directory(file);
         } else {
             // otherwise use the given search path to locate the executable.
-            for (const auto path : el::Paths(search_path)) {
+            for (const auto &path : el::Paths(search_path)) {
                 // ignore empty entries
                 if (path.empty()) {
                     continue;

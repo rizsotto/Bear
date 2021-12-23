@@ -50,8 +50,8 @@ namespace {
         }
         EXPECT_EQ(4, count);
 
-        el::Paths::iterator it = paths.begin();
-        el::Paths::iterator end = paths.end();
+        el::Paths::Iterator it = paths.begin();
+        el::Paths::Iterator end = paths.end();
         EXPECT_NE(it, end);
         EXPECT_EQ(std::string_view("/bin"), *(it++));
         EXPECT_NE(it, end);
