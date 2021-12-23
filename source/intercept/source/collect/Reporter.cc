@@ -43,7 +43,7 @@ namespace ic {
     { }
 
     void Reporter::report(const rpc::Event& event) {
-        std::lock_guard<std::mutex> lock(mutex_);
+        const std::lock_guard<std::mutex> lock(mutex_);
 
         database_->insert_event(event)
                 .on_error([](auto error) {

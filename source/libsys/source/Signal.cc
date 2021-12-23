@@ -25,7 +25,7 @@
 namespace {
 
     inline
-    constexpr bool shall_forward(int signum) {
+    constexpr bool shall_forward(const int signum) {
         switch (signum) {
             case SIGKILL:
             case SIGCHLD:
@@ -37,9 +37,9 @@ namespace {
 
     std::set<pid_t> CHILD_PROCESSES;
 
-    void handler(int signum) {
+    void handler(const int signum) {
         if (shall_forward(signum)) {
-            for (auto pid : CHILD_PROCESSES) {
+            for (const auto pid : CHILD_PROCESSES) {
                 ::kill(pid, signum);
             }
         }

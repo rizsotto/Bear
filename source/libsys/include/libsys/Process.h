@@ -52,8 +52,8 @@ namespace sys {
         bool is_exited() const;
 
     private:
-        bool is_code_;
-        int code_;
+        const bool is_code_;
+        const int code_;
     };
 
     class Process {
@@ -72,7 +72,7 @@ namespace sys {
         NON_DEFAULT_CONSTRUCTABLE(Process)
 
     private:
-        pid_t pid_;
+        const pid_t pid_;
     };
 
     class Process::Builder {

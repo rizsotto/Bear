@@ -42,9 +42,9 @@ namespace {
 
     rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
     {
-        auto path = sys::os::get_path(environment);
+        const auto path = sys::os::get_path(environment);
 
-        auto command = args.as_string_list(cmd::intercept::FLAG_COMMAND)
+        const auto command = args.as_string_list(cmd::intercept::FLAG_COMMAND)
                 .and_then<std::vector<std::string_view>>([](auto args) {
                     using Result = rust::Result<std::vector<std::string_view>>;
                     return (args.empty())
@@ -52,7 +52,7 @@ namespace {
                             : Result(rust::Ok(args));
                 });
 
-        auto executable = rust::merge(path, command)
+        const auto executable = rust::merge(path, command)
                 .and_then<fs::path>([](auto tuple) {
                     const auto&[path, command] = tuple;
                     auto executable = command.front();
@@ -125,9 +125,9 @@ namespace ic {
     }
 
     rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
-        auto execution = capture_execution(args, sys::env::from(envp));
-        auto session = Session::from(args, envp);
-        auto reporter = Reporter::from(args);
+        const auto execution = capture_execution(args, sys::env::from(envp));
+        const auto session = Session::from(args, envp);
+        const auto reporter = Reporter::from(args);
 
         return rust::merge(execution, session, reporter)
                 .map<ps::CommandPtr>([](auto tuple) {

@@ -56,10 +56,10 @@ namespace {
         const auto flags = parse(sut, input);
         EXPECT_TRUE(flags.is_ok());
         const CompilerFlags expected = {
-                CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{.arguments = slice(input, 4), .type = CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 1), CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 2), CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 3), CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 4), CompilerFlagType::LINKER_OBJECT_FILE},
         };
         EXPECT_EQ(expected, flags.unwrap());
     }
@@ -72,9 +72,9 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::SOURCE},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -83,9 +83,9 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::SOURCE},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::SOURCE},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::SOURCE},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -105,10 +105,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 4, 7), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 7, 11), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 4, 7), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 7, 11), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -150,10 +150,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 3, 5), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 5, 7), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 7, 9), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1, 3), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 3, 5), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 5, 7), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 7, 9), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -162,9 +162,9 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -173,9 +173,9 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -215,8 +215,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -225,8 +225,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -235,8 +235,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1, 4), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 4, 8), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1, 4), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 4, 8), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -245,8 +245,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -277,8 +277,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::LINKER},
-                    CompilerFlag{.arguments = slice(input, 2, 4), .type = CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -287,8 +287,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 1, 3), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::LINKER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -297,8 +297,8 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 2), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::LINKER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
@@ -307,10 +307,10 @@ namespace {
             const auto flags = parse(sut, input);
             EXPECT_TRUE(flags.is_ok());
             const CompilerFlags expected = {
-                    CompilerFlag{.arguments = slice(input, 1, 3), .type = CompilerFlagType::LINKER},
-                    CompilerFlag{.arguments = slice(input, 3), .type = CompilerFlagType::LINKER},
-                    CompilerFlag{.arguments = slice(input, 4), .type = CompilerFlagType::OTHER},
-                    CompilerFlag{.arguments = slice(input, 5), .type = CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 1, 3), CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 4), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 5), CompilerFlagType::LINKER},
             };
             EXPECT_EQ(expected, flags.unwrap());
         }

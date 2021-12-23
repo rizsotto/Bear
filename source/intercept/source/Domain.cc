@@ -34,9 +34,9 @@ namespace domain {
     }
 
     std::ostream &operator<<(std::ostream &os, const Execution &rhs) {
-        auto rpc = into(rhs);
+        const auto rpc = into(rhs);
         std::string json;
-        auto rc = google::protobuf::util::MessageToJsonString(rpc, &json);
+        const auto rc = google::protobuf::util::MessageToJsonString(rpc, &json);
         if (rc.ok()) {
             os << json;
         }

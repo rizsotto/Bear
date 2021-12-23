@@ -33,7 +33,7 @@ namespace cs::semantic {
         if (this == &rhs)
             return true;
 
-        if (const auto* ptr = dynamic_cast<QueryCompiler const*>(&rhs); ptr != nullptr) {
+        if (const auto *const ptr = dynamic_cast<QueryCompiler const*>(&rhs); ptr != nullptr) {
             return true;
         }
         return false;
@@ -45,7 +45,7 @@ namespace cs::semantic {
     }
 
     std::list<cs::Entry> QueryCompiler::into_entries() const {
-        return std::list<cs::Entry>();
+        return {};
     }
 
     bool Preprocess::operator==(const Semantic &) const {
@@ -58,7 +58,7 @@ namespace cs::semantic {
     }
 
     std::list<cs::Entry> Preprocess::into_entries() const {
-        return std::list<cs::Entry>();
+        return {};
     }
 
     Compile::Compile(fs::path working_dir,
@@ -77,7 +77,7 @@ namespace cs::semantic {
         if (this == &rhs)
             return true;
 
-        if (const auto* ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
+        if (const auto *const ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
             return (working_dir == ptr->working_dir)
                 && (compiler == ptr->compiler)
                 && (output == ptr->output)

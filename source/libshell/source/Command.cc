@@ -33,7 +33,7 @@ namespace sh {
         const std::regex ESCAPE_PATTERN(R"#(([^A-Za-z0-9_\-.,:/@\n]))#");
         const std::regex LINE_FEED(R"#(\n)#");
 
-        auto output = std::regex_replace(input, ESCAPE_PATTERN, "\\$1");
+        const auto output = std::regex_replace(input, ESCAPE_PATTERN, "\\$1");
         return std::regex_replace(output, LINE_FEED, "'\n'");
     }
 
@@ -59,8 +59,8 @@ namespace sh {
         std::list<std::string> words;
         std::string field;
 
-        auto input_begin = std::sregex_iterator(input.begin(), input.end(), MAIN_PATTERN);
-        auto input_end = std::sregex_iterator();
+        const auto input_begin = std::sregex_iterator(input.begin(), input.end(), MAIN_PATTERN);
+        const auto input_end = std::sregex_iterator();
         for (auto it = input_begin; it != input_end; ++it) {
             if (it->ready()) {
                 if (it->operator[](1).matched) {

@@ -54,8 +54,8 @@ namespace ic {
     rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args)
     {
         auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto library = args.as_string(cmd::intercept::FLAG_LIBRARY);
-        auto wrapper = args.as_string(cmd::intercept::FLAG_WRAPPER);
+        const auto library = args.as_string(cmd::intercept::FLAG_LIBRARY);
+        const auto wrapper = args.as_string(cmd::intercept::FLAG_WRAPPER);
 
         return merge(library, wrapper)
             .map<Session::Ptr>([&verbose](auto tuple) {

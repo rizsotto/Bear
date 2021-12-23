@@ -37,7 +37,7 @@ namespace el {
     {
         using type = int (*)(const char*, char* const[], char* const[]);
 
-        auto fp = dynamic_linker<type>("execve");
+        const auto fp = dynamic_linker<type>("execve");
         if (fp == nullptr) {
             return rust::Err(EINVAL);
         }
@@ -63,7 +63,7 @@ namespace el {
             char* const argv[],
             char* const envp[]);
 
-        auto fp = dynamic_linker<type>("posix_spawn");
+        const auto fp = dynamic_linker<type>("posix_spawn");
         if (fp == nullptr) {
             return rust::Err(EINVAL);
         }

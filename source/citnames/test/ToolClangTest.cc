@@ -105,8 +105,8 @@ namespace {
 
     TEST(ToolClang, pass_on_Xclang) {
         const Execution input = {
-                .executable = "/usr/bin/clang",
-                .arguments = {
+                "/usr/bin/clang",
+                {
                         "clang",
                         "-c",
                         "-o",
@@ -117,8 +117,8 @@ namespace {
                         "-Xclang",
                         "/path/to/LLVMHello.so"
                 },
-                .working_dir = "/home/user/project",
-                .environment = {},
+                "/home/user/project",
+                {},
         };
         const Compile expected(
                 input.working_dir,
@@ -137,8 +137,8 @@ namespace {
 
     TEST(ToolClang, pass_on_Xarch) {
         const Execution input = {
-                .executable = "/usr/bin/clang",
-                .arguments = {
+                "/usr/bin/clang",
+                {
                         "clang",
                         "-c",
                         "-o",
@@ -151,8 +151,8 @@ namespace {
                         "-Xarch_host",
                         "host1"
                 },
-                .working_dir = "/home/user/project",
-                .environment = {},
+                "/home/user/project",
+                {},
         };
         const Compile expected(
                 input.working_dir,
@@ -171,8 +171,8 @@ namespace {
 
     TEST(ToolClang, pass_on_Xcuda) {
         const Execution input = {
-                .executable = "/usr/bin/clang",
-                .arguments = {
+                "/usr/bin/clang",
+                {
                         "clang",
                         "-c",
                         "-o",
@@ -183,8 +183,8 @@ namespace {
                         "-Xcuda-ptxas",
                         "arg2"
                 },
-                .working_dir = "/home/user/project",
-                .environment = {},
+                "/home/user/project",
+                {},
         };
         const Compile expected(
                 input.working_dir,
@@ -203,8 +203,8 @@ namespace {
 
     TEST(ToolClang, pass_on_Xopenmp) {
         const Execution input = {
-                .executable = "/usr/bin/clang",
-                .arguments = {
+                "/usr/bin/clang",
+                {
                         "clang",
                         "-c",
                         "-o",
@@ -215,8 +215,8 @@ namespace {
                         "-Xopenmp-target=arg1",
                         "arg2"
                 },
-                .working_dir = "/home/user/project",
-                .environment = {},
+                "/home/user/project",
+                {},
         };
         const Compile expected(
                 input.working_dir,
@@ -235,8 +235,8 @@ namespace {
 
     TEST(ToolClang, pass_on_analyze) {
         const Execution input = {
-                .executable = "/usr/bin/clang",
-                .arguments = {
+                "/usr/bin/clang",
+                {
                         "clang",
                         "-c",
                         "-o",
@@ -247,8 +247,8 @@ namespace {
                         "-aargs",
                         "--analyze"
                 },
-                .working_dir = "/home/user/project",
-                .environment = {},
+                "/home/user/project",
+                {},
         };
         const Compile expected(
                 input.working_dir,

@@ -24,7 +24,7 @@
 namespace {
 
     std::string_view take_extension(const std::string_view &file) {
-        auto pos = file.rfind('.');
+        const auto pos = file.rfind('.');
         return (pos == std::string::npos) ? file : file.substr(pos);
     }
 
@@ -65,7 +65,7 @@ namespace {
 
     using namespace cs::semantic;
 
-    bool is_exact_match_only(MatchInstruction match_instruction) {
+    bool is_exact_match_only(const MatchInstruction match_instruction) {
         switch (match_instruction) {
             case MatchInstruction::EXACTLY:
             case MatchInstruction::EXACTLY_WITH_1_OPT_SEP:
@@ -80,7 +80,7 @@ namespace {
         }
     }
 
-    bool is_prefix_match(MatchInstruction match_instruction) {
+    bool is_prefix_match(const MatchInstruction match_instruction) {
         switch (match_instruction) {
             case MatchInstruction::PREFIX:
             case MatchInstruction::PREFIX_WITH_1_OPT:
@@ -92,7 +92,7 @@ namespace {
         }
     }
 
-    bool is_glue_allowed(MatchInstruction match_instruction) {
+    bool is_glue_allowed(const MatchInstruction match_instruction) {
         switch (match_instruction) {
             case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED:
             case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP:
@@ -107,7 +107,7 @@ namespace {
         }
     }
 
-    bool is_glue_with_equal_allowed(MatchInstruction match_instruction) {
+    bool is_glue_with_equal_allowed(const MatchInstruction match_instruction) {
         switch (match_instruction) {
             case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ:
             case MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ_OR_SEP:
@@ -155,7 +155,7 @@ namespace cs::semantic {
             auto remainder = ArgumentsView(end_, end_);
             return std::make_tuple(arguments, remainder);
         } else {
-            auto end = std::next(begin_, count);
+            const auto end = std::next(begin_, count);
             auto arguments = ArgumentsView(begin_, end);
             auto remainder = ArgumentsView(end, end_);
             return std::make_tuple(arguments, remainder);
@@ -183,11 +183,11 @@ namespace cs::semantic {
         // based on the lookup result, consume the input.
         if (auto match = lookup(key); match) {
             const auto&[count, type] = match.value();
-            auto [arguments, remainder] = input.take(count);
+            const auto&[arguments, remainder] = input.take(count);
             if (arguments.empty()) {
                 return rust::Err(input);
             }
-            auto flag = CompilerFlag { .arguments = arguments, .type = type };
+            auto flag = CompilerFlag { arguments, type };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
@@ -207,7 +207,7 @@ namespace cs::semantic {
         }
         // partial match is less likely to be a few steps away from the lower bound,
         // therefore search the whole flag list again.
-        for (const auto candidate : flags_) {
+        for (const auto &candidate : flags_) {
             if (auto result = check_partial(key, candidate); result) {
                 return result;
             }
@@ -228,7 +228,7 @@ namespace cs::semantic {
     std::optional<FlagParser::Match>
     FlagParser::check_partial(const std::string_view &key, const FlagsByName::value_type &candidate) {
         const auto &flag_definition = candidate.second;
-        if (const auto extra = split_extra(candidate.first, key); extra) {
+        if (const auto &extra = split_extra(candidate.first, key); extra) {
             const auto flag_matching = classify_flag_matching(extra.value());
             switch (flag_matching) {
                 case FlagMatch::GLUED:
@@ -286,14 +286,14 @@ namespace cs::semantic {
         if (input.empty()) {
             return rust::Err(input);
         }
-        const auto candidate = input.front();
-        const auto extension = take_extension(candidate);
+        const auto &candidate = input.front();
+        const auto &extension = take_extension(candidate);
         if (extensions.find(extension) != extensions.end()) {
-            auto [arguments, remainder] = input.take(1);
+            const auto &[arguments, remainder] = input.take(1);
             if (arguments.empty()) {
                 return rust::Err(input);
             }
-            auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::SOURCE };
+            auto flag = CompilerFlag { arguments, CompilerFlagType::SOURCE };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);
@@ -304,11 +304,11 @@ namespace cs::semantic {
             return rust::Err(input);
         }
         if (const auto &front = input.front(); !front.empty()) {
-            auto [arguments, remainder] = input.take(1);
+            const auto &[arguments, remainder] = input.take(1);
             if (arguments.empty()) {
                 return rust::Err(input);
             }
-            auto flag = CompilerFlag { .arguments = arguments, .type = CompilerFlagType::LINKER_OBJECT_FILE };
+            auto flag = CompilerFlag { arguments, CompilerFlagType::LINKER_OBJECT_FILE };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);

@@ -63,7 +63,7 @@ namespace cs::semantic {
         if (arguments.size() <= 1) {
             return true;
         }
-        if (auto second = std::next(arguments.begin()); looks_like_ccache_parameter(*second)) {
+        if (const auto second = std::next(arguments.begin()); looks_like_ccache_parameter(*second)) {
             return true;
         }
         return false;
@@ -78,7 +78,7 @@ namespace cs::semantic {
         if (arguments.size() <= 1) {
             return true;
         }
-        if (auto second = std::next(arguments.begin()); looks_like_distcc_parameter(*second)) {
+        if (const auto second = std::next(arguments.begin()); looks_like_distcc_parameter(*second)) {
             return true;
         }
         return false;
@@ -91,12 +91,12 @@ namespace cs::semantic {
 
     domain::Execution ToolWrapper::remove_wrapper(el::Resolver &resolver, const Execution &execution) {
         auto environment = execution.environment;
-        if (auto path = environment.find("PATH"); path != environment.end()) {
+        if (const auto path = environment.find("PATH"); path != environment.end()) {
             // take the second argument as a program candidate
-            auto program = std::next(execution.arguments.begin());
+            const auto program = std::next(execution.arguments.begin());
             if (program != execution.arguments.end()) {
                 // use resolver to get the full path to the executable.
-                auto candidate = resolver.from_search_path(*program, path->second.c_str());
+                const auto candidate = resolver.from_search_path(*program, path->second.c_str());
                 if (candidate.is_ok()) {
                     domain::Execution copy = execution;
                     copy.arguments.pop_front();

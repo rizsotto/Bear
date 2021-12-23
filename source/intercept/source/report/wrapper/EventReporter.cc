@@ -27,12 +27,12 @@ namespace wr {
     { }
 
     void EventReporter::report_start(ProcessId pid, const Execution &execution) {
-        auto event = event_factory.start(pid, getppid(), execution);
+        const auto &event = event_factory.start(pid, getppid(), execution);
         client.report(event);
     }
 
-    void EventReporter::report_wait(sys::ExitStatus exit_status) {
-        auto event = (exit_status.is_signaled())
+    void EventReporter::report_wait(const sys::ExitStatus exit_status) {
+        const auto event = (exit_status.is_signaled())
                 ? event_factory.signal(exit_status.signal().value())
                 : event_factory.terminate(exit_status.code().value());
         client.report(event);

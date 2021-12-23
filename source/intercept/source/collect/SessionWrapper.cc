@@ -193,16 +193,14 @@ namespace ic {
 
     sys::Process::Builder WrapperSession::supervise(const ic::Execution &execution) const
     {
-        auto result = sys::Process::Builder(execution.executable)
+        return sys::Process::Builder(execution.executable)
                 .add_arguments(execution.arguments.begin(), execution.arguments.end())
                 .set_environment(set_up(execution.environment));
-
-        return result;
     }
 
     rust::Result<fs::path> WrapperSession::resolve(const fs::path &name) const
     {
-        auto basename = name.filename();
+        const auto &basename = name.filename();
         if (auto candidate = mapping_.find(basename.string()); candidate != mapping_.end()) {
             return rust::Ok(candidate->second);
         }
@@ -218,11 +216,11 @@ namespace ic {
             it->second = remove_from_path(wrapper_dir_, it->second);
         }
         // remove verbose flag
-        if (auto it = copy.find(cmd::wrapper::KEY_VERBOSE); it != copy.end()) {
+        if (const auto it = copy.find(cmd::wrapper::KEY_VERBOSE); it != copy.end()) {
             copy.erase(it);
         }
         // remove destination
-        if (auto it = copy.find(cmd::wrapper::KEY_DESTINATION); it != copy.end()) {
+        if (const auto it = copy.find(cmd::wrapper::KEY_DESTINATION); it != copy.end()) {
             copy.erase(it);
         }
         // remove all implicits

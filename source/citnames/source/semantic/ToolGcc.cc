@@ -36,9 +36,9 @@ namespace {
     Arguments flags_from_environment(const std::map<std::string, std::string> &environment) {
         Arguments flags;
         // define util function to append the content of a defined variable
-        const auto inserter = [&flags](const std::string& value, const std::string& flag) {
+        const auto &inserter = [&flags](const std::string& value, const std::string& flag) {
             // the variable value is a colon separated directory list
-            for (const auto& path : sys::path::split(value)) {
+            for (const auto &path : sys::path::split(value)) {
                 // If the expression was ":/opt/thing", that will split into two
                 // entries. One which is an empty string and the path. Empty string
                 // refers the current working directory.
@@ -48,12 +48,12 @@ namespace {
             }
         };
         // check the environment for preprocessor influencing variables
-        for (auto env : { "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH" }) {
-            if (auto it = environment.find(env); it != environment.end()) {
+        for (const auto env : { "CPATH", "C_INCLUDE_PATH", "CPLUS_INCLUDE_PATH" }) {
+            if (const auto it = environment.find(env); it != environment.end()) {
                 inserter(it->second, "-I");
             }
         }
-        if (auto it = environment.find("OBJC_INCLUDE_PATH"); it != environment.end()) {
+        if (const auto it = environment.find("OBJC_INCLUDE_PATH"); it != environment.end()) {
             inserter(it->second, "-isystem");
         }
 
@@ -110,7 +110,7 @@ namespace {
         std::vector<fs::path> sources;
         std::optional<fs::path> output;
 
-        for (const auto& flag : flags) {
+        for (const auto &flag : flags) {
             switch (flag.type) {
                 case CompilerFlagType::SOURCE: {
                     auto candidate = fs::path(flag.arguments.front());
@@ -270,7 +270,7 @@ namespace cs::semantic {
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
-        auto const parser =
+        const auto &parser =
                 Repeat(
                         OneOf(
                                 FlagParser(flags),
@@ -279,7 +279,7 @@ namespace cs::semantic {
                         )
                 );
 
-        Arguments input_arguments = create_argument_list(execution);
+        const Arguments &input_arguments = create_argument_list(execution);
         return parse(parser, input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {

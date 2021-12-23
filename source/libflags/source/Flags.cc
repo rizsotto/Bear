@@ -314,7 +314,7 @@ namespace flags {
             });
     }
 
-    void Parser::print_help(const Parser *sub_command, std::ostream& os) const {
+    void Parser::print_help(const Parser *const sub_command, std::ostream& os) const {
         print_usage(sub_command, os);
 
         const Parser &parser = (sub_command != nullptr) ? *sub_command : *this;
@@ -336,7 +336,7 @@ namespace flags {
         }
     }
 
-    void Parser::print_usage(const Parser *sub_command, std::ostream& os) const {
+    void Parser::print_usage(const Parser *const sub_command, std::ostream& os) const {
         os << "Usage: " << name_;
         // check for the given command
         if (sub_command != nullptr) {

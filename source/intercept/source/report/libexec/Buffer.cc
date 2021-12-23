@@ -29,7 +29,7 @@ namespace el {
         if (input == nullptr)
             return nullptr;
 
-        auto input_end = el::array::end(input) + 1; // include the zero element
+        const auto input_end = el::array::end(input) + 1; // include the zero element
         auto top = el::array::copy(input, input_end, top_, end_);
         if (top != nullptr)
             std::swap(top_, top);

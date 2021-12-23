@@ -51,9 +51,9 @@ namespace {
             if (cwd.is_ok()) {
                 const fs::path& root = cwd.unwrap();
                 return cs::Content {
-                        .include_only_existing_source = run_checks,
-                        .paths_to_include = to_abspath(content.paths_to_include, root),
-                        .paths_to_exclude = to_abspath(content.paths_to_exclude, root)
+                        run_checks,
+                        to_abspath(content.paths_to_include, root),
+                        to_abspath(content.paths_to_exclude, root)
                 };
             } else {
                 spdlog::warn("Update configuration failed: {}", cwd.unwrap_err().what());
@@ -72,9 +72,9 @@ namespace {
                                 [&compiler](auto wrapper) { return wrapper.executable == compiler; });
             if (!already_in_wrappers) {
                 wrappers.emplace_back(cs::CompilerWrapper {
-                    .executable = compiler,
-                    .flags_to_add = {},
-                    .flags_to_remove = {}
+                    compiler,
+                    {},
+                    {}
                 });
             }
         }

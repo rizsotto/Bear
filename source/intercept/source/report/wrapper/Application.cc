@@ -77,7 +77,7 @@ namespace {
             const char** end = argv;
             while (*end != nullptr)
                 ++end;
-            return std::list<std::string>(argv, end);
+            return {argv, end};
         }
 
         rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept

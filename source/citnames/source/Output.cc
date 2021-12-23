@@ -78,7 +78,7 @@ namespace {
         }
 
     private:
-        cs::Content config;
+        const cs::Content config;
     };
 
     // Duplicate detection filter.
@@ -113,7 +113,7 @@ namespace {
             auto file = entry.file.string();
             std::reverse(file.begin(), file.end());
 
-            auto args = fmt::format(
+            const auto args = fmt::format(
                     "{}",
                     fmt::join(entry.arguments.rbegin(), std::prev(entry.arguments.rend()), ","));
             size_t args_hash = std::hash<std::string>{}(args);
@@ -198,8 +198,8 @@ namespace cs {
     }
 
     std::ostream &operator<<(std::ostream &os, const Entry &entry) {
-        Format format;
-        nlohmann::json json = to_json(entry, format);
+        const Format format;
+        const nlohmann::json &json = to_json(entry, format);
         os << json;
 
         return os;

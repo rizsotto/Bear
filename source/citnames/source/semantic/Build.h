@@ -36,7 +36,7 @@ namespace cs::semantic {
         explicit Build(Compilation cfg) noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const rpc::Event &event);
+        rust::Result<SemanticPtr> recognize(const rpc::Event &event) const;
 
         NON_DEFAULT_CONSTRUCTABLE(Build)
         NON_COPYABLE_NOR_MOVABLE(Build)

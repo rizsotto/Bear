@@ -171,7 +171,7 @@ namespace {
                 });
     }
 
-    rust::Result<sys::ExitStatus> wait_for(pid_t pid, bool request_for_signals)
+    rust::Result<sys::ExitStatus> wait_for(const pid_t pid, const bool request_for_signals)
     {
         errno = 0;
         const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
@@ -193,7 +193,7 @@ namespace {
         }
     }
 
-    rust::Result<int> send_signal(pid_t pid, int num)
+    rust::Result<int> send_signal(const pid_t pid, const int num)
     {
         errno = 0;
         if (const int result = ::kill(pid, num); 0 == result) {
@@ -243,7 +243,7 @@ namespace sys {
         return pid_;
     }
 
-    rust::Result<ExitStatus> Process::wait(bool request_for_signals)
+    rust::Result<ExitStatus> Process::wait(const bool request_for_signals)
     {
         spdlog::debug("Process wait requested. [pid: {}]", pid_);
         return wait_for(pid_, request_for_signals)
