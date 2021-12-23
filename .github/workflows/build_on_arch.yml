@@ -41,8 +41,9 @@ jobs:
             SOURCE_DIR: /work
             BUILD_DIR: /work/bear_build
             INSTALL_DIR: /work/bear_install
+            C_FLAGS: -Wall -Wextra -pedantic
+            CXX_FLAGS: -Wall -Wextra -pedantic
             CTEST_OUTPUT_ON_FAILURE: 1
-            VERBOSE: 1
 
           # Install some dependencies in the container. This speeds up builds if
           # you are also using githubToken. Any dependencies installed here will

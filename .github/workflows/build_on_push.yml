@@ -51,6 +51,8 @@ jobs:
       - name: Build
         env:
           CTEST_OUTPUT_ON_FAILURE: 1
+          C_FLAGS: -Wall -Wextra -pedantic
+          CXX_FLAGS: -Wall -Wextra -pedantic
           CMAKE_OPTIONS: -DENABLE_MULTILIB=${{ matrix.multilib }}
         run: |
           cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" $CMAKE_OPTIONS -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu
