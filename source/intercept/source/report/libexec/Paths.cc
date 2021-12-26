@@ -22,11 +22,9 @@
 
 namespace {
 
-    constexpr char PATH_SEPARATOR = ':';
-
     const char *next_path_separator(const char *const current, const char *const end) {
         auto it = current;
-        while ((it != end) && (*it != PATH_SEPARATOR)) {
+        while ((it != end) && (*it != OS_PATH_SEPARATOR)) {
             ++it;
         }
         return it;

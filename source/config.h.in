@@ -142,3 +142,6 @@ namespace cmd {
         constexpr char KEY_VERBOSE[] = "INTERCEPT_VERBOSE";
     }
 }
+
+constexpr char OS_DIR_SEPARATOR = '/';
+constexpr char OS_PATH_SEPARATOR = ':';

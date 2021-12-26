@@ -24,8 +24,6 @@
 
 namespace {
 
-    constexpr char OS_PATH_SEPARATOR = ':';
-
     std::list<fs::path> split_by(const std::string &input, const char sep)
     {
         std::list<fs::path> result;

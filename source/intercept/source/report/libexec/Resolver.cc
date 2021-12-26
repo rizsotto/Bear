@@ -32,10 +32,8 @@
 
 namespace {
 
-    constexpr char DIR_SEPARATOR = '/';
-
     bool contains_dir_separator(std::string_view const &candidate) {
-        return std::find(candidate.begin(), candidate.end(), DIR_SEPARATOR) != candidate.end();
+        return std::find(candidate.begin(), candidate.end(), OS_DIR_SEPARATOR) != candidate.end();
     }
 }
 
@@ -110,7 +108,7 @@ namespace el {
                     char *const candidate_begin = candidate;
                     char *const candidate_end = candidate + PATH_MAX;
                     auto it = el::array::copy(path.begin(), path.end(), candidate_begin, candidate_end);
-                    *it++ = DIR_SEPARATOR;
+                    *it++ = OS_DIR_SEPARATOR;
                     it = el::array::copy(file.begin(), file.end(), it, candidate_end);
                     *it = 0;
                 }
