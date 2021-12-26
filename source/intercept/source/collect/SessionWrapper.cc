@@ -100,7 +100,7 @@ namespace {
                 result.push_back(candidate.path());
             }
         }
-        return rust::Ok(result);
+        return rust::Ok(std::move(result));
     }
 }
 

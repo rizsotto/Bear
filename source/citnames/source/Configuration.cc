@@ -244,7 +244,7 @@ namespace cs {
             Configuration result;
             ::cs::from_json(in, result);
 
-            return rust::Ok(result);
+            return rust::Ok(std::move(result));
         } catch (const std::exception &error) {
             return rust::Err(std::runtime_error(error.what()));
         }

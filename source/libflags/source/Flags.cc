@@ -141,14 +141,14 @@ namespace flags {
     {
         if (auto values = parameters_.find(key); values != parameters_.end()) {
             return (values->second.size() == 1)
-                ? (rust::Ok(values->second.front()))
+                ? rust::Result<std::string_view>(
+                        rust::Ok(values->second.front()))
                 : rust::Result<std::string_view>(
-                    rust::Err(std::runtime_error(
-                        fmt::format("Parameter \"{0}\" is not a single string.", key))));
+                        rust::Err(std::runtime_error(
+                                fmt::format("Parameter \"{0}\" is not a single string.", key))));
         }
-        return rust::Result<std::string_view>(
-            rust::Err(std::runtime_error(
-                fmt::format("Parameter \"{0}\" is not available.", key))));
+        return rust::Err(std::runtime_error(
+                fmt::format("Parameter \"{0}\" is not available.", key)));
     }
 
     rust::Result<std::vector<std::string_view>> Arguments::as_string_list(const std::string_view& key) const
@@ -156,9 +156,8 @@ namespace flags {
         if (auto values = parameters_.find(key); values != parameters_.end()) {
             return rust::Ok(values->second);
         }
-        return rust::Result<std::vector<std::string_view>>(
-            rust::Err(std::runtime_error(
-                fmt::format("Parameter \"{0}\" is not available.", key))));
+        return rust::Err(std::runtime_error(
+                fmt::format("Parameter \"{0}\" is not available.", key)));
     }
 
     std::ostream& operator<<(std::ostream& os, const Arguments& args)

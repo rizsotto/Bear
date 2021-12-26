@@ -81,6 +81,6 @@ namespace sh {
                 }
             }
         }
-        return rust::Ok(words);
+        return rust::Ok(std::move(words));
     }
 }

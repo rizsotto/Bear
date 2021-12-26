@@ -42,19 +42,4 @@ namespace domain {
         }
         return os;
     }
-
-    bool operator==(const Run &lhs, const Run &rhs) {
-        return (lhs.execution == rhs.execution)
-               && (lhs.pid == rhs.pid)
-               && (lhs.ppid == rhs.ppid);
-    }
-
-    std::ostream &operator<<(std::ostream &os, const Run &rhs) {
-        os << std::boolalpha;
-        os << R"({"execution": })" << rhs.execution
-            << R"(, "pid": )" << rhs.pid
-            << R"(, "ppid": )" << rhs.ppid
-            << R"(})";
-        return os;
-    }
 }

@@ -84,11 +84,10 @@ namespace {
             char* const argv[],
             char* const envp[])>;
 
-    rust::Result<spawn_function_t> reference_spawn_function()
+    spawn_function_t reference_spawn_function()
     {
-        spawn_function_t result = [](const char* path,
-                                     char* const argv[],
-                                     char* const envp[]) -> rust::Result<pid_t> {
+        return [](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
+
             errno = 0;
             pid_t child;
             if (0 != ::posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
@@ -98,15 +97,12 @@ namespace {
                 return rust::Ok(child);
             }
         };
-        return rust::Ok(result);
     }
 
 #ifdef SUPPORT_PRELOAD
-    rust::Result<spawn_function_t> resolve_spawn_function()
+    spawn_function_t resolve_spawn_function()
     {
-        spawn_function_t fp = [](const char* path,
-                                 char* const argv[],
-                                 char* const envp[]) -> rust::Result<pid_t> {
+        return [](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
 
             void *handle = ::dlopen(LIBC_SO, RTLD_LAZY);
             if (handle == nullptr) {
@@ -133,7 +129,6 @@ namespace {
                 return rust::Ok(child);
             }
         };
-        return rust::Ok(fp);
     }
 #endif
 
@@ -306,19 +301,15 @@ namespace sys {
 
     rust::Result<Process> Process::Builder::spawn()
     {
-        return reference_spawn_function()
-            .and_then<Process>([this](auto fp) {
-                return spawn_process(fp, program_, parameters_, environment_);
-            });
+        auto fp = reference_spawn_function();
+        return spawn_process(fp, program_, parameters_, environment_);
     }
 
 #ifdef SUPPORT_PRELOAD
     rust::Result<Process> Process::Builder::spawn_with_preload()
     {
-        return resolve_spawn_function()
-            .and_then<Process>([this](auto fp) {
-                return spawn_process(fp, program_, parameters_, environment_);
-            });
+        auto fp = resolve_spawn_function();
+        return spawn_process(fp, program_, parameters_, environment_);
     }
 #endif
 }

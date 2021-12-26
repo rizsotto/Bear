@@ -44,10 +44,9 @@ namespace wr {
         grpc::ClientContext context;
         rpc::ResolveRequest request;
         rpc::ResolveResponse response;
-
         request.set_allocated_execution(new rpc::Execution(into(execution)));
-
         const grpc::Status status = supervisor_->Resolve(&context, request, &response);
+
         spdlog::debug("gRPC call [Resolve] finished: {}", status.ok());
         return status.ok()
                ? rust::Result<wr::Execution>(rust::Ok(from(response.execution())))
@@ -64,12 +63,11 @@ namespace wr {
 
         grpc::ClientContext context;
         google::protobuf::Empty response;
-
         const grpc::Status status = interceptor_->Register(&context, event, &response);
+
         spdlog::debug("gRPC call [Register] finished: {}", status.ok());
-        if (!status.ok()) {
-            return rust::Result<int>(rust::Err(create_error(status)));
-        }
-        return rust::Result<int>(rust::Ok(0));
+        return status.ok()
+                ? rust::Result<int>(rust::Ok(0))
+                : rust::Result<int>(rust::Err(create_error(status)));
     }
 }

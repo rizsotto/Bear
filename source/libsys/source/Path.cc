@@ -73,6 +73,6 @@ namespace sys::path {
         auto result = fs::current_path(error_code);
         return (error_code)
                ? rust::Result<fs::path>(rust::Err(std::runtime_error(error_code.message())))
-               : rust::Result<fs::path>(rust::Ok(result));
+               : rust::Result<fs::path>(rust::Ok(std::move(result)));
     }
 }

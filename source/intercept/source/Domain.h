@@ -43,14 +43,5 @@ namespace domain {
     bool operator==(const Execution& lhs, const Execution& rhs);
     std::ostream& operator<<(std::ostream&, const Execution&);
 
-    struct Run {
-        Execution execution;
-        ProcessId pid = 0u;
-        ProcessId ppid = 0u;
-    };
-
-    bool operator==(const Run& lhs, const Run& rhs);
-    std::ostream& operator<<(std::ostream&, const Run&);
-
     using SessionLocator = std::string;
 }
