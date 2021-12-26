@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "report/libexec/Resolver.h"
 
 #include "report/libexec/Array.h"
@@ -63,6 +62,9 @@ namespace el {
         return rust::Err(ENOENT);
     }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
+
     rust::Result<const char*, int> Resolver::from_path(std::string_view const &file, const char **envp) {
         if (contains_dir_separator(file)) {
             // the file contains a dir separator, it is treated as path.
@@ -84,6 +86,8 @@ namespace el {
             return rust::Err(ENOENT);
         }
     }
+
+#pragma GCC diagnostic pop
 
     rust::Result<const char*, int> Resolver::from_search_path(std::string_view const &file, const char *search_path) {
         if (contains_dir_separator(file)) {
