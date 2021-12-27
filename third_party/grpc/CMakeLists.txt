@@ -51,6 +51,7 @@ else ()
                 -DCMAKE_CXX_EXTENSIONS=${CMAKE_CXX_EXTENSIONS}
                 -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
                 -DCMAKE_CXX_COMPILER:STRING=${CMAKE_CXX_COMPILER}
+                -DCMAKE_EXE_LINKER_FLAGS:STRING=${CMAKE_EXE_LINKER_FLAGS}
             )
 
     include(GNUInstallDirs)
