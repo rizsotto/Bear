@@ -68,7 +68,7 @@ namespace el {
             return rust::Err(EINVAL);
         }
         auto result = fp(pid, path, file_actions, attrp, argv, envp);
-        return (result == -1)
+        return (result != 0)
             ? rust::Result<int, int>(rust::Err(errno))
             : rust::Result<int, int>(rust::Ok(result));
     }
