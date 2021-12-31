@@ -1,12 +1,17 @@
 name: continuous integration on arch
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
   build_on_arch:
     runs-on: ubuntu-20.04
-    name: Build on ${{ matrix.distro }} ${{ matrix.arch }}
-    continue-on-error: true
+    name: Build on ${{ matrix.distro }} for ${{ matrix.arch }}
 
     strategy:
       matrix:

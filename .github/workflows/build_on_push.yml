@@ -5,12 +5,15 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    name: Build on ${{ matrix.os }} with multilib ${{ matrix.multilib }}
+
     strategy:
-      fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
-        multilib: [true, false]
         include:
+          - os: ubuntu-20.04
+            multilib: true
+          - os: ubuntu-20.04
+            multilib: false
           - os: macos-10.15
             multilib: false
 
@@ -30,22 +33,20 @@ jobs:
           brew install cmake pkg-config fmt spdlog nlohmann-json grpc
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig" >> $GITHUB_ENV
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
+      - uses: actions/setup-python@v2
         with:
           python-version: '3.x'
-
-      - name: Install python test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install lit pex pycodestyle
+          cache: 'pip'
+          cache-dependency-path: '**/requirements.txt'
 
       - name: Prepare
         run: |
+          pip install -r test/requirements.txt
           mkdir "$HOME/work/bear_build"
           mkdir "$HOME/work/bear_install"
           echo "BUILD_DIR=$HOME/work/bear_build" >> $GITHUB_ENV
           echo "INSTALL_DIR=$HOME/work/bear_install" >> $GITHUB_ENV
+          echo "ZLIB_SRC_DIR=$HOME/work/zlib" >> $GITHUB_ENV
           echo "$HOME/work/bear_install/bin:$PATH" >> $GITHUB_PATH
 
       - name: Build
@@ -58,13 +59,9 @@ jobs:
           cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" $CMAKE_OPTIONS -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu
           cmake --build "$BUILD_DIR" --parallel 4 --target install
 
-      - name: Prepare [functional test]
+      - name: Run [functional test]
         run: |
-          echo "ZLIB_SRC_DIR=$HOME/work/zlib" >> $GITHUB_ENV
-          git clone https://github.com/madler/zlib.git $HOME/work/zlib -b v1.2.11
-
-      - name: Execute [functional test]
-        run: |
+          git clone https://github.com/madler/zlib.git $ZLIB_SRC_DIR -b v1.2.11
           mkdir $HOME/work/zlib_compilations && cd $HOME/work/zlib_compilations
           bear --help
           bear -- $ZLIB_SRC_DIR/configure
