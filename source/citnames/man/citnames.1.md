@@ -154,5 +154,5 @@ bear(1), intercept(1)
 
 # COPYRIGHT
 
-Copyright (C) 2012-2021 by László Nagy
+Copyright (C) 2012-2022 by László Nagy
 <https://github.com/rizsotto/Bear>
