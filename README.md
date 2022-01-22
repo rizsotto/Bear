@@ -40,6 +40,9 @@ For more options you can check the man page or pass `--help` parameter. Note
 that if you want to pass parameter to Bear, pass those _before_ the `--` sign,
 everything after that will be the build command. 
 
+Please be aware that some package manager still ship our old 2.4.x release. 
+In that case please omit the extra `--` sign or consult your local documentation.
+
 For more, read the man pages or [wiki][WIKI] of the project, which talks about
 limitations, known issues and platform specific usage. 
 
