@@ -5,20 +5,20 @@
 # RUN: %{make} -C %T -f %s clean
 # RUN: %{shell} -c "PATH=%T:$PATH %{bear} --verbose --output %t.json -- %{make} -C %T -f %s"
 # RUN: assert_compilation %t.json count -eq 2
-# RUN: assert_compilation %t.json contains -file %T/main.c -directory %T -arguments %{c_compiler} -S -o main.s main.c
-# RUN: assert_compilation %t.json contains -file %T/main.s -directory %T -arguments %{c_compiler} -c -o main.o main.s
+# RUN: assert_compilation %t.json contains -file %T/bug439.c -directory %T -arguments %{c_compiler} -S -o bug439.s bug439.c
+# RUN: assert_compilation %t.json contains -file %T/bug439.s -directory %T -arguments %{c_compiler} -c -o bug439.o bug439.s
 
-main: main.o
+bug439: bug439.o
 	$(CC) $< -o $@
 
-main.s: main.c
+bug439.s: bug439.c
 	$(CC) -S $< -o $@
 
-main.o: main.s
+bug439.o: bug439.s
 	$(CC) -c $< -o $@
 
-main.c:
+bug439.c:
 	echo "int main() { return 0; }" > $@
 
 clean:
-	rm -f main main.o main.s main.c
+	rm -f bug439 bug439.o bug439.s bug439.c
