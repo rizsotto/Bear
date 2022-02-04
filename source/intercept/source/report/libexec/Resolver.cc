@@ -29,6 +29,9 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 
 namespace {
 
@@ -48,6 +51,12 @@ namespace el {
     rust::Result<const char*, int> Resolver::from_current_directory(std::string_view const &file) {
         // copy the input to result.
         array::copy(file.begin(), file.end() + 1, result_, result_ + PATH_MAX);
+        // check if this is a file
+        struct stat sb {};
+        ::stat(result_, &sb);
+        if ((sb.st_mode & S_IFMT) != S_IFREG) {
+            return rust::Err(ENOENT);
+        }
         // check if it's okay to execute.
         if (0 == ::access(result_, X_OK)) {
             const char *ptr = result_;
