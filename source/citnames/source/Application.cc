@@ -162,22 +162,16 @@ namespace {
     }
 
     size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::Entry> &output) {
-        size_t count = 0;
-        for (auto event = events->next(); event.has_value(); event = events->next()) {
-            event.value()
-                    .and_then<cs::semantic::SemanticPtr>([&build](const auto &event) {
-                        return build.recognize(*event);
+        for (const auto &event : *events) {
+            const auto entries = build.recognize(event)
+                    .map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
+                        const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+                        return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
                     })
-                    .on_success([&output, &count](const auto &semantic) {
-                        auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                        if (candidate != nullptr) {
-                            auto entries = candidate->into_entries();
-                            count += entries.size();
-                            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
-                        }
-                    });
+                    .unwrap_or({});
+            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
         }
-        return count;
+        return output.size();
     }
 }
 

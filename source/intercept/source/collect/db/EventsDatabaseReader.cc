@@ -48,6 +48,13 @@ namespace ic::collect::db {
             , file_(std::move(file))
     { }
 
+    EventsDatabaseReader::Iterator EventsDatabaseReader::begin() noexcept {
+        return EventsDatabaseReader::Iterator(*this, false);
+    }
+
+    EventsDatabaseReader::Iterator EventsDatabaseReader::end() noexcept {
+        return EventsDatabaseReader::Iterator(*this, true);
+    }
 
     std::optional<rust::Result<EventPtr>> EventsDatabaseReader::next() noexcept {
         const auto line = next_line();
@@ -57,7 +64,7 @@ namespace ic::collect::db {
                         return from_json(line);
                     });
         }
-        return std::optional<rust::Result<EventPtr>>();
+        return {};
     }
 
     std::optional<rust::Result<std::string>> EventsDatabaseReader::next_line() noexcept {
@@ -87,5 +94,57 @@ namespace ic::collect::db {
             return rust::Err(std::runtime_error(message));
         }
         return rust::Ok(event);
+    }
+
+    EventsDatabaseReader::Iterator::Iterator(EventsDatabaseReader &reader, bool end) noexcept
+            : reader_(reader)
+    {
+        if (!end) {
+            auto candidate = reader_.next();
+            while (candidate) {
+                if (candidate.value().is_ok()) {
+                    current = candidate.value().unwrap();
+                    break;
+                }
+                candidate = reader_.next();
+            }
+        }
+    }
+
+    const EventsDatabaseReader::Iterator::value_type &EventsDatabaseReader::Iterator::operator*() const {
+        return current.operator*();
+    }
+
+    EventsDatabaseReader::Iterator::pointer EventsDatabaseReader::Iterator::operator->() const {
+        return current.operator->();
+    }
+
+    EventsDatabaseReader::Iterator &EventsDatabaseReader::Iterator::operator++() {
+        if (current) {
+            current = nullptr;
+            auto candidate = reader_.next();
+            while (candidate) {
+                if (candidate.value().is_ok()) {
+                    current = candidate.value().unwrap();
+                    break;
+                }
+                candidate = reader_.next();
+            }
+        }
+        return *this;
+    }
+
+    EventsDatabaseReader::Iterator EventsDatabaseReader::Iterator::operator++(int) {
+        auto result(*this);
+        this->operator++();
+        return result;
+    }
+
+    bool operator==(const EventsDatabaseReader::Iterator &lhs, const EventsDatabaseReader::Iterator &rhs) {
+        return (&lhs.reader_ == &rhs.reader_) && (lhs.current == rhs.current);
+    }
+
+    bool operator!=(const EventsDatabaseReader::Iterator &lhs, const EventsDatabaseReader::Iterator &rhs) {
+        return !(lhs == rhs);
     }
 }

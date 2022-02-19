@@ -36,14 +36,19 @@ namespace ic::collect::db {
 
     class EventsDatabaseReader {
     public:
+        class Iterator;
+        friend class Iterator;
+
         using Ptr = std::shared_ptr<EventsDatabaseReader>;
         using StreamPtr = std::unique_ptr<std::istream>;
 
         [[nodiscard]] static rust::Result<EventsDatabaseReader::Ptr> from(const fs::path &path);
 
-        [[nodiscard]] std::optional<rust::Result<EventPtr>> next() noexcept;
+        [[nodiscard]] Iterator begin() noexcept;
+        [[nodiscard]] Iterator end() noexcept;
 
     private:
+        [[nodiscard]] std::optional<rust::Result<EventPtr>> next() noexcept;
         [[nodiscard]] std::optional<rust::Result<std::string>> next_line() noexcept;
         [[nodiscard]] rust::Result<EventPtr> from_json(const std::string &) noexcept;
 
@@ -56,5 +61,31 @@ namespace ic::collect::db {
     private:
         fs::path path_;
         StreamPtr file_;
+    };
+
+    class EventsDatabaseReader::Iterator {
+    public:
+        using value_type = rpc::Event;
+        using difference_type = std::ptrdiff_t;
+        using reference = const value_type &;
+        using pointer = const value_type *;
+        using iterator_category = std::forward_iterator_tag;
+
+        explicit Iterator(EventsDatabaseReader &reader, bool end) noexcept;
+
+        reference operator*() const;
+        pointer operator->() const;
+
+        Iterator &operator++();
+        Iterator operator++(int);
+
+        NON_DEFAULT_CONSTRUCTABLE(Iterator)
+
+        friend bool operator==(const Iterator &lhs, const Iterator &rhs);
+        friend bool operator!=(const Iterator &lhs, const Iterator &rhs);
+
+    private:
+        EventsDatabaseReader &reader_;
+        EventPtr current;
     };
 }
