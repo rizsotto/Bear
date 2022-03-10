@@ -56,7 +56,7 @@ else ()
 
     include(GNUInstallDirs)
     list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/grpc_dependency")
-    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+    set(CMAKE_PREFIX_PATH ${PREFIX_PATH};${CMAKE_PREFIX_PATH}
             CACHE PATH "append gRPC libraries and binaries into the search path"
             FORCE)
 endif ()

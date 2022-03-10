@@ -30,7 +30,7 @@ else ()
 
     include(GNUInstallDirs)
     list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/nlohmann_json_dependency")
-    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+    set(CMAKE_PREFIX_PATH ${PREFIX_PATH};${CMAKE_PREFIX_PATH}
             CACHE PATH "append JSON library into the search path"
             FORCE)
 endif ()

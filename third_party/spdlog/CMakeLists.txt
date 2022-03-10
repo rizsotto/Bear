@@ -37,7 +37,7 @@ else ()
 
     include(GNUInstallDirs)
     list(APPEND PREFIX_PATH "${DEPENDENCIES_INSTALL_PREFIX}/spdlog_dependency")
-    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH};${PREFIX_PATH}
+    set(CMAKE_PREFIX_PATH ${PREFIX_PATH};${CMAKE_PREFIX_PATH}
             CACHE PATH "append spdlog library into the search path"
             FORCE)
 endif ()
