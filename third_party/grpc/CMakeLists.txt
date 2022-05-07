@@ -29,7 +29,7 @@ else ()
             GIT_REPOSITORY
                 https://github.com/grpc/grpc
             GIT_TAG
-                v1.41.1
+                v1.46.0
             GIT_SUBMODULES
             GIT_SHALLOW
                 1
