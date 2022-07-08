@@ -111,6 +111,7 @@ extern "C" void on_load()
     el::log::set(level);
 
     LOGGER.debug("on_load");
+    errno = 0;
 }
 
 /**
