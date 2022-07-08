@@ -12,9 +12,9 @@ else ()
     include(ExternalProject)
     ExternalProject_Add(googletest_dependency
             URL
-                https://github.com/google/googletest/archive/release-1.11.0.tar.gz
+                https://github.com/google/googletest/archive/release-1.12.1.tar.gz
             URL_HASH
-                MD5=e8a8df240b6938bb6384155d4c37d937
+                MD5=e82199374acdfda3f425331028eb4e2a
             DOWNLOAD_NO_PROGRESS
                 1
             UPDATE_COMMAND
