@@ -127,6 +127,7 @@ extern "C" void on_unload()
         return;
 
     LOGGER.debug("on_unload");
+    errno = 0;
 }
 
 extern "C" int execve(const char* path, char* const argv[], char* const envp[])
