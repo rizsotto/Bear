@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "config.h"
 #include "libmain/ApplicationLogConfig.h"
+#include "config.h"
 
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
+#include <spdlog/fmt/ranges.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 #ifdef HAVE_SYS_UTSNAME_H
@@ -30,22 +30,21 @@
 
 namespace {
 
-    struct PointerArray {
-        const char **values;
-    };
+    struct Array {
+        const char** ptr;
 
-    std::ostream &operator<<(std::ostream &os, const PointerArray &arguments) {
-        os << '[';
-        for (const char **it = arguments.values; *it != nullptr; ++it) {
-            if (it != arguments.values) {
-                os << ", ";
-            }
-            os << '"' << *it << '"';
+        const char** begin() const {
+            return ptr;
         }
-        os << ']';
 
-        return os;
-    }
+        const char** end() const {
+            const char** it = ptr;
+            while (*it != nullptr) {
+                ++it;
+            }
+            return it;
+        }
+    };
 }
 
 namespace ps {
@@ -72,8 +71,8 @@ namespace ps {
     void ApplicationLogConfig::record(const char** argv, const char** envp) const
     {
         spdlog::debug("{0}: {1}", name_, cmd::VERSION);
-        spdlog::debug("arguments: {0}", PointerArray { argv });
-        spdlog::debug("environment: {0}", PointerArray { envp });
+        spdlog::debug("arguments: {0}", Array { argv });
+        spdlog::debug("environment: {0}", Array { envp });
     }
 
     void ApplicationLogConfig::context() const {

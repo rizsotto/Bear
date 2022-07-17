@@ -45,30 +45,12 @@
 #endif
 
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
+#include <spdlog/fmt/ranges.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 namespace {
 
     constexpr char PATH_TO_SH[] = "/bin/sh";
-
-    struct Arguments {
-        const std::list<std::string>& value;
-    };
-
-    std::ostream& operator<<(std::ostream& os, const Arguments& arguments)
-    {
-        os << '[';
-        for (auto it = arguments.value.begin(); it != arguments.value.end(); ++it) {
-            if (it != arguments.value.begin()) {
-                os << ", ";
-            }
-            os << *it;
-        }
-        os << ']';
-
-        return os;
-    }
 
     using posix_spawn_t = int (*)(
         pid_t * pid,
@@ -158,8 +140,7 @@ namespace {
                     return sys::Process(pid);
                 })
                 .on_success([&parameters](const auto& process) {
-                    spdlog::debug("Process spawned. [pid: {}, command: {}]",
-                                  process.get_pid(), Arguments { parameters });
+                    spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), parameters);
                 })
                 .on_error([](const auto& error) {
                     spdlog::debug("Process spawn failed. {}", error.what());
