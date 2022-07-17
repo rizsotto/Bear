@@ -32,6 +32,10 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
+#ifdef FMT_NEEDS_OSTREAM_FORMATTER
+template <> struct fmt::formatter<domain::Execution> : ostream_formatter {};
+#endif
+
 namespace {
 
     std::shared_ptr<cs::semantic::Tool> from(cs::Compilation cfg) {

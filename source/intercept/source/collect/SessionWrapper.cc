@@ -25,6 +25,9 @@
 #include "libsys/Os.h"
 #include "libsys/Path.h"
 
+#ifdef HAVE_FMT_STD_H
+#include <fmt/std.h>
+#endif
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 #include <spdlog/fmt/ranges.h>

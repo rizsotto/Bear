@@ -37,6 +37,10 @@
 
 namespace fs = std::filesystem;
 
+#ifdef FMT_NEEDS_OSTREAM_FORMATTER
+template <> struct fmt::formatter<flags::Arguments> : ostream_formatter {};
+#endif
+
 namespace {
 
     struct ApplicationLogConfig : ps::ApplicationLogConfig {

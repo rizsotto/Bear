@@ -28,11 +28,18 @@
 
 #include <filesystem>
 
+#ifdef HAVE_FMT_STD_H
+#include <fmt/std.h>
+#endif
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
 namespace fs = std::filesystem;
 namespace db = ic::collect::db;
+
+#ifdef FMT_NEEDS_OSTREAM_FORMATTER
+template <> struct fmt::formatter<cs::Configuration> : ostream_formatter {};
+#endif
 
 namespace {
 

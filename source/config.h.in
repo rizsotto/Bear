@@ -61,6 +61,10 @@
 #cmakedefine HAVE_CS_GNU_LIBC_VERSION
 #cmakedefine HAVE_CS_GNU_LIBPTHREAD_VERSION
 
+// fmt version
+#cmakedefine HAVE_FMT_STD_H
+#cmakedefine FMT_NEEDS_OSTREAM_FORMATTER
+
 // macros to disable compiler generated methods
 #define NON_DEFAULT_CONSTRUCTABLE(T) \
     T() noexcept = delete;
