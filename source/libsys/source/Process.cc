@@ -44,8 +44,8 @@
 #  include "libsys/lib-names.h"
 #endif
 
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ranges.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 namespace {

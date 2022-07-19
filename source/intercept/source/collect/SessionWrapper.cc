@@ -28,9 +28,9 @@
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
 #endif
+#include <fmt/ostream.h>
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
-#include <spdlog/fmt/ranges.h>
 
 #include <algorithm>
 #include <iterator>

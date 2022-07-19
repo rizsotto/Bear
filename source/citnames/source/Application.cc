@@ -31,8 +31,8 @@
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
 #endif
+#include <fmt/ostream.h>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
 
 namespace fs = std::filesystem;
 namespace db = ic::collect::db;

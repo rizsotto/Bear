@@ -29,8 +29,8 @@
 #include <memory>
 #include <utility>
 
+#include <fmt/ostream.h>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ostr.h>
 
 #ifdef FMT_NEEDS_OSTREAM_FORMATTER
 template <> struct fmt::formatter<domain::Execution> : ostream_formatter {};

@@ -20,8 +20,8 @@
 #include "libmain/ApplicationLogConfig.h"
 #include "config.h"
 
+#include <fmt/ranges.h>
 #include <spdlog/spdlog.h>
-#include <spdlog/fmt/ranges.h>
 #include <spdlog/sinks/stdout_sinks.h>
 
 #ifdef HAVE_SYS_UTSNAME_H
