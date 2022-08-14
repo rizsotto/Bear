@@ -180,7 +180,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
             )
 elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(exec PROPERTIES
-            LINKER_LANGUAGE "C"
+            LINKER_LANGUAGE "CXX"
             OSX_ARCHITECTURES:STRING "i386;x86_64"
             MACOSX_RPATH:BOOL ON
             )
