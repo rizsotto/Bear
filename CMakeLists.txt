@@ -35,6 +35,11 @@ include(GNUInstallDirs)
 # Verify or install dependencies
 add_subdirectory(third_party)
 
+unset(CMAKE_CACHE_ARGS_EXTRA)
+if (CMAKE_PROJECT_INCLUDE AND NOT CMAKE_PROJECT_INCLUDE STREQUAL "")
+    set(CMAKE_CACHE_ARGS_EXTRA "-DCMAKE_PROJECT_INCLUDE:PATH=${CMAKE_PROJECT_INCLUDE}")
+endif()
+
 # Build the project itself
 ExternalProject_Add(BearSource
         SOURCE_DIR
@@ -69,6 +74,7 @@ ExternalProject_Add(BearSource
             -DCMAKE_INSTALL_LIBDIR:PATH=${CMAKE_INSTALL_LIBDIR}
             -DCMAKE_EXE_LINKER_FLAGS:STRING=${CMAKE_EXE_LINKER_FLAGS}
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+            ${CMAKE_CACHE_ARGS_EXTRA}
         TEST_BEFORE_INSTALL
             1
         TEST_COMMAND
