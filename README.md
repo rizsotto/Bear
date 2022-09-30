@@ -23,7 +23,7 @@ the JSON file during the build process.
 How to install
 --------------
 
-Bear is [packaged](https://repology.org/project/bear/versions) for many
+Bear is [packaged](https://repology.org/project/bear-clang/versions) for many
 distributions. Check out your package manager. Or [build it](INSTALL.md)
 from source.
 
