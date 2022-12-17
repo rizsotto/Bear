@@ -67,17 +67,17 @@ namespace sys {
         rust::Result<int> kill(int num);
 
     public:
-        explicit Process(pid_t pid);
-
         NON_DEFAULT_CONSTRUCTABLE(Process)
 
     private:
+        explicit Process(pid_t pid);
+
         const pid_t pid_;
     };
 
     class Process::Builder {
     public:
-        explicit Builder(fs::path program);
+        explicit Builder(fs::path program, bool with_preload = false);
         ~Builder() = default;
 
         Builder& add_argument(const char* param);
@@ -96,17 +96,14 @@ namespace sys {
         Builder& set_environment(std::map<std::string, std::string>&&);
         Builder& set_environment(const std::map<std::string, std::string>&);
 
-        rust::Result<Process> spawn();
-
-#ifdef SUPPORT_PRELOAD
-        rust::Result<Process> spawn_with_preload();
-#endif
+        rust::Result<Process> spawn() const;
 
     public:
         NON_DEFAULT_CONSTRUCTABLE(Builder)
 
     private:
-        fs::path program_;
+        const fs::path program_;
+        const bool with_preload_;
         std::list<std::string> parameters_;
         std::map<std::string, std::string> environment_;
     };

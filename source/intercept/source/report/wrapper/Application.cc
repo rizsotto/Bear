@@ -143,14 +143,10 @@ namespace wr {
 
         return supervisor_client.resolve(execution_)
                 .and_then<sys::Process>([&event_reporter](auto execution) {
-                    return sys::Process::Builder(execution.executable)
+                    return sys::Process::Builder(execution.executable, true)
                             .add_arguments(execution.arguments.begin(), execution.arguments.end())
                             .set_environment(execution.environment)
-#ifdef SUPPORT_PRELOAD
-                            .spawn_with_preload()
-#else
                             .spawn()
-#endif
                             .on_success([&event_reporter, &execution](auto &child) {
                                 event_reporter.report_start(child.get_pid(), execution);
                             });

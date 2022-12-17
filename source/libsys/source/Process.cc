@@ -60,26 +60,6 @@ namespace {
         char* const argv[],
         char* const envp[]);
 
-    using spawn_function_t = std::function<
-        rust::Result<pid_t>(
-            const char* path,
-            char* const argv[],
-            char* const envp[])>;
-
-    spawn_function_t into_spawn_function(posix_spawn_t fp) {
-        return [fp](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
-
-            errno = 0;
-            pid_t child;
-            if (0 != (fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-                return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
-            } else {
-                return rust::Ok(child);
-            }
-        };
-    }
-
 #ifdef SUPPORT_PRELOAD
     rust::Result<posix_spawn_t> resolve_spawn_function()
     {
@@ -101,8 +81,8 @@ namespace {
     }
 #endif
 
-    rust::Result<sys::Process> spawn_process(
-            spawn_function_t fp,
+    rust::Result<pid_t> spawn_process(
+            posix_spawn_t fp,
             const fs::path& program,
             const std::list<std::string>& parameters,
             const std::map<std::string, std::string>& environment)
@@ -116,21 +96,38 @@ namespace {
         // convert the environment into a c-style array
         sys::env::Guard env(environment);
 
-        return fp(program.c_str(), args.data(), const_cast<char**>(env.data()))
+        errno = 0;
+        pid_t child;
+        if (0 != (*fp)(&child, program.c_str(), nullptr, nullptr, const_cast<char**>(args.data()), const_cast<char**>(env.data()))) {
+            const auto message = fmt::format("System call \"posix_spawnp\" failed: {}", sys::error_string(errno));
+            return rust::Err(std::runtime_error(message));
+        } else {
+            return rust::Ok(child);
+        }
+    }
+
+
+    rust::Result<pid_t> spawn_process_with_retry(
+        posix_spawn_t fp,
+        const fs::path& program,
+        const std::list<std::string>& parameters,
+        const std::map<std::string, std::string>& environment)
+    {
+        return spawn_process(fp, program, parameters, environment)
                 // The file is accessible, but it is not an executable file.
                 // Invoke the shell to interpret it as a script.
                 .or_else([&](const std::runtime_error&) {
-                    args.insert(args.begin(), const_cast<char*>(PATH_TO_SH));
-                    return fp(PATH_TO_SH, args.data(), const_cast<char**>(env.data()));
+                    spdlog::debug("Process spawn failed. [will retry as shell]");
+
+                    std::list<std::string> args(parameters);
+                    args.insert(args.begin(), std::string(PATH_TO_SH));
+                    return spawn_process(fp, PATH_TO_SH, args, environment);
                 })
-                .map<sys::Process>([](const auto& pid) {
-                    return sys::Process(pid);
+                .on_success([&parameters](const auto& pid) {
+                    spdlog::debug("Process spawned. [pid: {}, command: {}]", pid, parameters);
                 })
-                .on_success([&parameters](const auto& process) {
-                    spdlog::debug("Process spawned. [pid: {}, command: {}]", process.get_pid(), parameters);
-                })
-                .on_error([](const auto& error) {
-                    spdlog::debug("Process spawn failed. {}", error.what());
+                .on_error([&parameters](const auto& error) {
+                    spdlog::debug("Process spawn failed. [error: {}, command: {}]", error.what(), parameters);
                 });
     }
 
@@ -230,8 +227,9 @@ namespace sys {
             });
     }
 
-    Process::Builder::Builder(fs::path program)
+    Process::Builder::Builder(fs::path program, bool with_preload)
         : program_(std::move(program))
+        , with_preload_(with_preload)
         , parameters_()
         , environment_()
     {
@@ -267,20 +265,22 @@ namespace sys {
         return *this;
     }
 
-    rust::Result<Process> Process::Builder::spawn()
+    rust::Result<Process> Process::Builder::spawn() const
     {
-        auto fp = into_spawn_function(&::posix_spawn);
-        return spawn_process(fp, program_, parameters_, environment_);
-    }
-
 #ifdef SUPPORT_PRELOAD
-    rust::Result<Process> Process::Builder::spawn_with_preload()
-    {
-        return resolve_spawn_function()
-            .map<spawn_function_t>(&into_spawn_function)
-            .and_then<Process>([this](auto fp) {
-                return spawn_process(fp, program_, parameters_, environment_);
+        const rust::Result<posix_spawn_t> fp = with_preload_
+            ? resolve_spawn_function()
+            : rust::Ok(&::posix_spawn);
+#else
+        const rust::Result<posix_spawn_t> fp = rust::Ok(&::posix_spawn);
+#endif
+
+        return fp
+            .and_then<pid_t>([this](auto fp) {
+                return spawn_process_with_retry(fp, program_, parameters_, environment_);
+            })
+            .map<Process>([](auto pid) {
+                return Process(pid);
             });
     }
-#endif
 }
