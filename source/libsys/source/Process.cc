@@ -66,13 +66,12 @@ namespace {
             char* const argv[],
             char* const envp[])>;
 
-    spawn_function_t reference_spawn_function()
-    {
-        return [](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
+    spawn_function_t into_spawn_function(posix_spawn_t fp) {
+        return [fp](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
 
             errno = 0;
             pid_t child;
-            if (0 != ::posix_spawnp(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
+            if (0 != (fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
                 return rust::Err(std::runtime_error(
                     fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
             } else {
@@ -82,35 +81,23 @@ namespace {
     }
 
 #ifdef SUPPORT_PRELOAD
-    spawn_function_t resolve_spawn_function()
+    rust::Result<posix_spawn_t> resolve_spawn_function()
     {
-        return [](const char* path, char* const argv[], char* const envp[]) -> rust::Result<pid_t> {
+        void *handle = ::dlopen(LIBC_SO, RTLD_LAZY);
+        if (handle == nullptr) {
+            return rust::Err(std::runtime_error(
+                fmt::format("System call \"dlopen\" failed: {}", sys::error_string(errno))));
+        }
+        ::dlerror();
 
-            void *handle = ::dlopen(LIBC_SO, RTLD_LAZY);
-            if (handle == nullptr) {
-                return rust::Err(std::runtime_error(
-                    fmt::format("System call \"dlopen\" failed: {}", sys::error_string(errno))));
-            }
-            ::dlerror();
+        auto fp = reinterpret_cast<posix_spawn_t>(::dlsym(handle, "posix_spawnp"));
+        if (fp == nullptr) {
+            return rust::Err(std::runtime_error(
+                fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
+        }
+        ::dlerror();
 
-            auto fp = reinterpret_cast<posix_spawn_t>(::dlsym(handle, "posix_spawnp"));
-            if (fp == nullptr) {
-                return rust::Err(std::runtime_error(
-                    fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
-            }
-            ::dlerror();
-
-            errno = 0;
-            pid_t child;
-            if (0 != (*fp)(&child, path, nullptr, nullptr, const_cast<char**>(argv), const_cast<char**>(envp))) {
-                ::dlclose(handle);
-                return rust::Err(std::runtime_error(
-                    fmt::format("System call \"posix_spawnp\" failed for {}: {}", path, sys::error_string(errno))));
-            } else {
-                ::dlclose(handle);
-                return rust::Ok(child);
-            }
-        };
+        return rust::Ok(fp);
     }
 #endif
 
@@ -130,7 +117,7 @@ namespace {
         sys::env::Guard env(environment);
 
         return fp(program.c_str(), args.data(), const_cast<char**>(env.data()))
-                // The file is accessible but it is not an executable file.
+                // The file is accessible, but it is not an executable file.
                 // Invoke the shell to interpret it as a script.
                 .or_else([&](const std::runtime_error&) {
                     args.insert(args.begin(), const_cast<char*>(PATH_TO_SH));
@@ -282,15 +269,18 @@ namespace sys {
 
     rust::Result<Process> Process::Builder::spawn()
     {
-        auto fp = reference_spawn_function();
+        auto fp = into_spawn_function(&::posix_spawn);
         return spawn_process(fp, program_, parameters_, environment_);
     }
 
 #ifdef SUPPORT_PRELOAD
     rust::Result<Process> Process::Builder::spawn_with_preload()
     {
-        auto fp = resolve_spawn_function();
-        return spawn_process(fp, program_, parameters_, environment_);
+        return resolve_spawn_function()
+            .map<spawn_function_t>(&into_spawn_function)
+            .and_then<Process>([this](auto fp) {
+                return spawn_process(fp, program_, parameters_, environment_);
+            });
     }
 #endif
 }
