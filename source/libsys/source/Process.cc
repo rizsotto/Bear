@@ -29,8 +29,14 @@
 #include <utility>
 #include <iostream>
 
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
 #endif
 #ifdef HAVE_SPAWN_H
 #include <spawn.h>
@@ -63,29 +69,40 @@ namespace {
 #ifdef SUPPORT_PRELOAD
     rust::Result<posix_spawn_t> resolve_spawn_function()
     {
+        errno = 0;
         void *handle = ::dlopen(LIBC_SO, RTLD_LAZY);
         if (handle == nullptr) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"dlopen\" failed: {}", sys::error_string(errno))));
+            const auto message = fmt::format("System call \"dlopen\" failed: {}", ::dlerror());
+            return rust::Err(std::runtime_error(message));
         }
-        ::dlerror();
 
+        errno = 0;
         auto fp = reinterpret_cast<posix_spawn_t>(::dlsym(handle, "posix_spawnp"));
         if (fp == nullptr) {
-            return rust::Err(std::runtime_error(
-                fmt::format("System call \"dlsym\" failed: {}", sys::error_string(errno))));
+            const auto message = fmt::format("System call \"dlsym\" failed: {}", ::dlerror());
+            return rust::Err(std::runtime_error(message));
         }
-        ::dlerror();
 
         return rust::Ok(fp);
     }
 #endif
 
+    bool is_open(int fd) {
+        struct stat stat_buf;
+
+        errno = 0;
+        if ((0 != fstat(fd, &stat_buf)) && (errno == EBADF)) {
+            return false;
+        }
+        return true;
+    }
+
     rust::Result<pid_t> spawn_process(
             posix_spawn_t fp,
             const fs::path& program,
             const std::list<std::string>& parameters,
-            const std::map<std::string, std::string>& environment)
+            const std::map<std::string, std::string>& environment,
+            const bool redirect_io)
     {
         // convert the arguments into a c-style array
         std::vector<char*> args;
@@ -95,13 +112,39 @@ namespace {
         args.push_back(nullptr);
         // convert the environment into a c-style array
         sys::env::Guard env(environment);
+        // deal with file handles
+        posix_spawn_file_actions_t file_actions;
+        posix_spawn_file_actions_t *file_actionsp = nullptr;
+        if (redirect_io) {
+            errno = 0;
+            if (0 != posix_spawn_file_actions_init(&file_actions)) {
+                const auto message = fmt::format("System call \"posix_spawn_file_actions_init\" failed: {}", sys::error_string(errno));
+                return rust::Err(std::runtime_error(message));
+            }
+            for (int fd = 0; fd < 3; ++fd) {
+                if (!is_open(fd)) {
+                    errno = 0;
+                    if (0 != posix_spawn_file_actions_addclose(&file_actions, fd)) {
+                        const auto message = fmt::format("System call \"posix_spawn_file_actions_addclose\" failed: {}", sys::error_string(errno));
+                        return rust::Err(std::runtime_error(message));
+                    }
+                }
+            }
+            file_actionsp = &file_actions;
+        }
 
-        errno = 0;
         pid_t child;
-        if (0 != (*fp)(&child, program.c_str(), nullptr, nullptr, const_cast<char**>(args.data()), const_cast<char**>(env.data()))) {
+        errno = 0;
+        if (0 != (*fp)(&child, program.c_str(), file_actionsp, nullptr, const_cast<char**>(args.data()), const_cast<char**>(env.data()))) {
             const auto message = fmt::format("System call \"posix_spawnp\" failed: {}", sys::error_string(errno));
+            if (redirect_io) {
+                posix_spawn_file_actions_destroy(&file_actions);
+            }
             return rust::Err(std::runtime_error(message));
         } else {
+            if (redirect_io) {
+                posix_spawn_file_actions_destroy(&file_actions);
+            }
             return rust::Ok(child);
         }
     }
@@ -111,9 +154,10 @@ namespace {
         posix_spawn_t fp,
         const fs::path& program,
         const std::list<std::string>& parameters,
-        const std::map<std::string, std::string>& environment)
+        const std::map<std::string, std::string>& environment,
+        const bool redirect_io)
     {
-        return spawn_process(fp, program, parameters, environment)
+        return spawn_process(fp, program, parameters, environment, redirect_io)
                 // The file is accessible, but it is not an executable file.
                 // Invoke the shell to interpret it as a script.
                 .or_else([&](const std::runtime_error&) {
@@ -121,7 +165,7 @@ namespace {
 
                     std::list<std::string> args(parameters);
                     args.insert(args.begin(), std::string(PATH_TO_SH));
-                    return spawn_process(fp, PATH_TO_SH, args, environment);
+                    return spawn_process(fp, PATH_TO_SH, args, environment, redirect_io);
                 })
                 .on_success([&parameters](const auto& pid) {
                     spdlog::debug("Process spawned. [pid: {}, command: {}]", pid, parameters);
@@ -133,8 +177,8 @@ namespace {
 
     rust::Result<sys::ExitStatus> wait_for(const pid_t pid, const bool request_for_signals)
     {
-        errno = 0;
         const int mask = request_for_signals ? (WUNTRACED | WCONTINUED) : 0;
+        errno = 0;
         if (int status; -1 != ::waitpid(pid, &status, mask)) {
             if (WIFEXITED(status)) {
                 return rust::Ok(sys::ExitStatus(true, WEXITSTATUS(status)));
@@ -232,6 +276,7 @@ namespace sys {
         , with_preload_(with_preload)
         , parameters_()
         , environment_()
+        , redirect_io_(false)
     {
     }
 
@@ -265,6 +310,11 @@ namespace sys {
         return *this;
     }
 
+    Process::Builder& Process::Builder::set_redirect_io() {
+        redirect_io_ = true;
+        return *this;
+    }
+
     rust::Result<Process> Process::Builder::spawn() const
     {
 #ifdef SUPPORT_PRELOAD
@@ -277,7 +327,7 @@ namespace sys {
 
         return fp
             .and_then<pid_t>([this](auto fp) {
-                return spawn_process_with_retry(fp, program_, parameters_, environment_);
+                return spawn_process_with_retry(fp, program_, parameters_, environment_, redirect_io_);
             })
             .map<Process>([](auto pid) {
                 return Process(pid);

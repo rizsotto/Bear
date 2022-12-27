@@ -96,6 +96,8 @@ namespace sys {
         Builder& set_environment(std::map<std::string, std::string>&&);
         Builder& set_environment(const std::map<std::string, std::string>&);
 
+        Builder& set_redirect_io();
+
         rust::Result<Process> spawn() const;
 
     public:
@@ -106,5 +108,6 @@ namespace sys {
         const bool with_preload_;
         std::list<std::string> parameters_;
         std::map<std::string, std::string> environment_;
+        bool redirect_io_;
     };
 }

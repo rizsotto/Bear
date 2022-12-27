@@ -146,6 +146,7 @@ namespace wr {
                     return sys::Process::Builder(execution.executable, true)
                             .add_arguments(execution.arguments.begin(), execution.arguments.end())
                             .set_environment(execution.environment)
+                            .set_redirect_io()
                             .spawn()
                             .on_success([&event_reporter, &execution](auto &child) {
                                 event_reporter.report_start(child.get_pid(), execution);
