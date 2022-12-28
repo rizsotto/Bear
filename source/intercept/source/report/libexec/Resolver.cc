@@ -82,14 +82,16 @@ namespace el {
             if (paths != nullptr) {
                 return from_search_path(file, paths);
             }
+#if defined HAVE_CS_PATH && defined HAVE_CONFSTR
             // fall back to `confstr` PATH value if the environment has no value.
-            const size_t search_path_length = confstr(_CS_PATH, nullptr, 0);
+            const size_t search_path_length = ::confstr(_CS_PATH, nullptr, 0);
             if (search_path_length != 0) {
                 char search_path[search_path_length];
                 if (::confstr(_CS_PATH, search_path, search_path_length) != 0) {
                     return from_search_path(file, search_path);
                 }
             }
+#endif
             return rust::Err(ENOENT);
         }
     }
