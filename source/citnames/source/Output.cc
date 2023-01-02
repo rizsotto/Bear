@@ -92,12 +92,13 @@ namespace {
     // maintains the hash sets). If an entry has no output attribute, then it switch to use
     // all attributes hashes.
     struct DuplicateFilter : public Filter {
-        DuplicateFilter()
-                : hashes()
+        DuplicateFilter(bool use_only_filename)
+                : hashes(), use_only_filename(use_only_filename)
         { }
 
         bool apply(const cs::Entry &entry) override {
-            if (const auto h2 = hash(entry); hashes.find(h2) == hashes.end()) {
+            const auto h2 = use_only_filename ? hash_filename(entry) : hash(entry);
+            if (hashes.find(h2) == hashes.end()) {
                 hashes.insert(h2);
                 return true;
             }
@@ -121,8 +122,15 @@ namespace {
             return fmt::format("{}:{}", args_hash, file);
         }
 
+        static std::string hash_filename(const cs::Entry &entry) {
+            auto file = entry.file.string();
+            std::reverse(file.begin(), file.end());
+            return file;
+        }
+
     private:
         std::set<std::string> hashes;
+        bool use_only_filename;
     };
 }
 
@@ -232,7 +240,7 @@ namespace cs {
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
             ContentFilter content_filter(content);
-            DuplicateFilter duplicate_filter;
+            DuplicateFilter duplicate_filter(false);
 
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();
