@@ -26,6 +26,8 @@
 #include "collect/db/EventsDatabaseReader.h"
 #include "libsys/Path.h"
 
+#include <algorithm>
+#include <execution>
 #include <filesystem>
 
 #ifdef HAVE_FMT_STD_H
@@ -169,15 +171,21 @@ namespace {
     }
 
     size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::Entry> &output) {
-        for (const auto &event : *events) {
-            const auto entries = build.recognize(event)
-                    .map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
-                        const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                        return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
-                    })
-                    .unwrap_or({});
-            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
-        }
+        std::mutex mutex;
+        std::for_each(std::execution::par,
+                      events->begin(), events->end(),
+                      [&output, &mutex, &build](const auto &event) {
+                          const auto entries = build.recognize(event)
+                                  .template map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
+                                      const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+                                      return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
+                                  })
+                                  .unwrap_or({});
+                          {
+                              const std::lock_guard<std::mutex> lock(mutex);
+                              std::copy(entries.begin(), entries.end(), std::back_inserter(output));
+                          }
+        });
         return output.size();
     }
 }
