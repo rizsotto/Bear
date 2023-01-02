@@ -98,14 +98,17 @@ namespace {
         auto output = args.as_string(cmd::citnames::FLAG_OUTPUT);
         auto append = args.as_bool(cmd::citnames::FLAG_APPEND)
                 .unwrap_or(false);
+        auto update = args.as_bool(cmd::citnames::FLAG_UPDATE)
+                .unwrap_or(false);
 
         return rust::merge(input, output)
-                .map<cs::Arguments>([&append](auto tuple) {
+                .map<cs::Arguments>([&append, &update](auto tuple) {
                     const auto&[input, output] = tuple;
                     return cs::Arguments{
                             fs::path(input),
                             fs::path(output),
                             append,
+                            update,
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
@@ -114,10 +117,15 @@ namespace {
                         return rust::Err(std::runtime_error(
                                 fmt::format("Missing input file: {}", arguments.input)));
                     }
+                    if (arguments.append && arguments.update) {
+                        return rust::Err(std::runtime_error(
+                                fmt::format("Cannot use both the {} and {} flags", cmd::citnames::FLAG_APPEND, cmd::citnames::FLAG_UPDATE)));
+                    }
                     return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
                             (arguments.append && is_exists(arguments.output)),
+                            (arguments.update && is_exists(arguments.output)),
                     });
                 });
     }
@@ -185,7 +193,7 @@ namespace {
 namespace cs {
 
     rust::Result<int> Command::execute() const {
-        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
+        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content, arguments_.update);
         std::list<cs::Entry> entries;
 
         // get current compilations from the input.
@@ -197,7 +205,7 @@ namespace cs {
                 .and_then<size_t>([this, &output, &entries](auto new_entries_count) {
                     spdlog::debug("compilation entries created. [size: {}]", new_entries_count);
                     // read back the current content and extend with the new elements.
-                    return (arguments_.append)
+                    return (arguments_.append || arguments_.update)
                         ? output.from_json(arguments_.output.c_str(), entries)
                                 .template map<size_t>([&new_entries_count](auto old_entries_count) {
                                     spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
@@ -233,6 +241,7 @@ namespace cs {
                 {cmd::citnames::FLAG_OUTPUT,     {1, false, "path of the result file",                   {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
                 {cmd::citnames::FLAG_CONFIG,     {1, false, "path of the config file",                   std::nullopt,                     std::nullopt}},
                 {cmd::citnames::FLAG_APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                     std::nullopt}},
+                {cmd::citnames::FLAG_UPDATE,     {0, false, "update output with new values",             std::nullopt,                     std::nullopt}},
                 {cmd::citnames::FLAG_RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                     std::nullopt}}
         });
         return parser.parse_or_exit(argc, const_cast<const char **>(argv));

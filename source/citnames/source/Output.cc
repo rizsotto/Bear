@@ -209,9 +209,10 @@ namespace cs {
         return os;
     }
 
-    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
+    CompilationDatabase::CompilationDatabase(Format _format, Content _content, bool _duplicate_by_filename)
             : format(_format)
             , content(std::move(_content))
+            , duplicate_by_filename(_duplicate_by_filename)
     { }
 
     rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &rhs) const {
@@ -236,7 +237,7 @@ namespace cs {
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
             ContentFilter content_filter(content);
-            DuplicateFilter duplicate_filter(false);
+            DuplicateFilter duplicate_filter(duplicate_by_filename);
 
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();

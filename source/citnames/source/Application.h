@@ -36,6 +36,7 @@ namespace cs {
         fs::path input;
         fs::path output;
         bool append;
+        bool update;
     };
 
     struct Command : ps::Command {
