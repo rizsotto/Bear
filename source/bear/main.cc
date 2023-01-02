@@ -86,10 +86,11 @@ namespace {
         auto output = arguments.as_string(cmd::citnames::FLAG_OUTPUT);
         auto config = arguments.as_string(cmd::citnames::FLAG_CONFIG);
         auto append = arguments.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
+        auto update = arguments.as_bool(cmd::citnames::FLAG_UPDATE).unwrap_or(false);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
 
         return rust::merge(program, output)
-                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto tuple) {
+                .map<sys::Process::Builder>([&environment, &input, &config, &append, &update, &verbose](auto tuple) {
                     const auto&[program, output] = tuple;
 
                     auto builder = sys::Process::Builder(program)
@@ -102,6 +103,9 @@ namespace {
                     if (append) {
                         builder.add_argument(cmd::citnames::FLAG_APPEND);
                     }
+                    if (update) {
+                        builder.add_argument(cmd::citnames::FLAG_UPDATE);
+                    }
                     if (config.is_ok()) {
                         builder.add_argument(cmd::citnames::FLAG_CONFIG).add_argument(config.unwrap());
                     }
@@ -109,6 +113,13 @@ namespace {
                         builder.add_argument(flags::VERBOSE);
                     }
                     return builder;
+                }).and_then<sys::Process::Builder>([&append, &update](auto builder) -> rust::Result<sys::Process::Builder> {
+                    // validate flags
+                    if (append && update) {
+                        return rust::Err(std::runtime_error(
+                                fmt::format("Cannot use both the {} and {} flags", cmd::citnames::FLAG_APPEND, cmd::citnames::FLAG_UPDATE)));
+                    }
+                    return rust::Ok(builder);
                 });
     }
 
@@ -170,6 +181,7 @@ namespace {
             const flags::Parser parser("bear", cmd::VERSION, {
                     {cmd::citnames::FLAG_OUTPUT,         {1,  false, "path of the result file",                  {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
                     {cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                     ADVANCED_GROUP}},
+                    {cmd::citnames::FLAG_UPDATE,         {0,  false, "update the output with the new results",   std::nullopt,                     ADVANCED_GROUP}},
                     {cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                     ADVANCED_GROUP}},
                     {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                     ADVANCED_GROUP}},
                     {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                     ADVANCED_GROUP}},
