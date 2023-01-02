@@ -23,7 +23,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <fstream>
-#include <set>
+#include <unordered_set>
 #include <utility>
 
 #include <fmt/format.h>
@@ -93,16 +93,12 @@ namespace {
     // all attributes hashes.
     struct DuplicateFilter : public Filter {
         DuplicateFilter(bool use_only_filename)
-                : hashes(), use_only_filename(use_only_filename)
+                : use_only_filename(use_only_filename)
         { }
 
         bool apply(const cs::Entry &entry) override {
             const auto h2 = use_only_filename ? hash_filename(entry) : hash(entry);
-            if (hashes.find(h2) == hashes.end()) {
-                hashes.insert(h2);
-                return true;
-            }
-            return false;
+            return hashes.emplace(std::move(h2)).second;
         }
 
     private:
@@ -129,7 +125,7 @@ namespace {
         }
 
     private:
-        std::set<std::string> hashes;
+        std::unordered_set<std::string> hashes;
         bool use_only_filename;
     };
 }
