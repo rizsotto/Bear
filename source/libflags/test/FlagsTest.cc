@@ -210,7 +210,9 @@ namespace {
         const Parser dump("dump", {
                 {OPTIONS,   {3,  false, "a flag with 3 values",  std::nullopt, std::nullopt}}
         });
-        const Parser sut("test", "version", { append, dump });
+        const Parser sut("test", "version", { append, dump }, {
+                {OPTION,    {1,  false, "a flag with a value",   std::nullopt, std::nullopt}}
+        });
         {
             const char *argv[] = {"executable", "append", OPTION, "0"};
             const int argc = sizeof(argv) / sizeof(const char *);
@@ -255,6 +257,29 @@ namespace {
                         auto options = params.as_string_list(OPTIONS);
                         EXPECT_TRUE(options.is_ok());
                         EXPECT_EQ(expected_options, options.unwrap_or({}));
+                    })
+                    .on_error([](auto) {
+                        EXPECT_FALSE(true);
+                    });
+        }
+        {
+            const char* argv[] = {"executable", OPTION, "0"};
+            const int argc = sizeof(argv) / sizeof(const char*);
+            const auto result = sut.parse(argc, argv);
+            EXPECT_TRUE(result.is_ok());
+            result.on_success([](auto params) {
+                        EXPECT_TRUE(params.as_bool(HELP).is_ok());
+                        EXPECT_FALSE(params.as_bool(HELP).unwrap_or(true));
+
+                        auto command = params.as_string(COMMAND);
+                        EXPECT_TRUE(command.is_err());
+
+                        auto option = params.as_string(OPTION);
+                        EXPECT_TRUE(option.is_ok());
+                        EXPECT_STREQ(option.unwrap_or("").data(), "0");
+
+                        auto options = params.as_string_list(OPTIONS);
+                        EXPECT_TRUE(options.is_err());
                     })
                     .on_error([](auto) {
                         EXPECT_FALSE(true);

@@ -202,10 +202,10 @@ namespace flags {
         options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
     }
 
-    Parser::Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands)
+    Parser::Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands, std::initializer_list<OptionValue> default_options)
             : name_(name)
             , version_(version)
-            , options_()
+            , options_(default_options)
             , commands_(commands)
     {
         options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
