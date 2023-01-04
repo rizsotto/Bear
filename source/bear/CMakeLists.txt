@@ -1,13 +1,25 @@
-# Create an executable from the sub projects.
-add_executable(bear
-        main.cc
+# Create a static library, which is used for unit tests and the final shared library.
+add_library(bear_a OBJECT)
+target_include_directories(bear_a PUBLIC source/)
+target_sources(bear_a
+        PRIVATE
+            source/Application.cc
+        INTERFACE
+            $<TARGET_OBJECTS:bear_a>
         )
-target_link_libraries(bear
+target_link_libraries(bear_a PUBLIC
         main_a
         sys_a
         flags_a
         fmt::fmt
         spdlog::spdlog)
+
+# Create an executable from the sub projects.
+add_executable(bear
+        main.cc
+        )
+target_link_libraries(bear
+        bear_a)
 
 include(GNUInstallDirs)
 install(TARGETS bear
