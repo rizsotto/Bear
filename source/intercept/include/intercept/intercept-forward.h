@@ -27,7 +27,8 @@ namespace ic {
     struct Intercept : ps::SubcommandFromArgs {
         Intercept(const ps::ApplicationLogConfig&) noexcept;
         rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
+
+        NON_DEFAULT_CONSTRUCTABLE(Intercept)
     };
 
-    NON_DEFAULT_CONSTRUCTABLE(Intercept)
 }

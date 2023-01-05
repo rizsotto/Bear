@@ -24,7 +24,6 @@
 #include <spdlog/sinks/stdout_sinks.h>
 
 #include <stdexcept>
-#include <iostream>
 
 #ifdef FMT_NEEDS_OSTREAM_FORMATTER
 template <> struct fmt::formatter<flags::Arguments> : ostream_formatter {};
