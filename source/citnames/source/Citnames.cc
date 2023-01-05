@@ -18,7 +18,7 @@
  */
 
 #include "config.h"
-#include "Application.h"
+#include "Citnames.h"
 #include "Configuration.h"
 #include "Output.h"
 #include "semantic/Build.h"
@@ -223,22 +223,11 @@ namespace cs {
             , configuration_(std::move(configuration))
     { }
 
-    Application::Application() noexcept
-            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("citnames", "cs"))
+    Citnames::Citnames(const ps::ApplicationLogConfig& log_config) noexcept
+            : ps::SubcommandFromArgs("citnames", log_config)
     { }
 
-    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
-        const flags::Parser parser("citnames", cmd::VERSION, {
-                {cmd::citnames::FLAG_INPUT,      {1, false, "path of the input file",                    {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
-                {cmd::citnames::FLAG_OUTPUT,     {1, false, "path of the result file",                   {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
-                {cmd::citnames::FLAG_CONFIG,     {1, false, "path of the config file",                   std::nullopt,                     std::nullopt}},
-                {cmd::citnames::FLAG_APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                     std::nullopt}},
-                {cmd::citnames::FLAG_RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                     std::nullopt}}
-        });
-        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
-    }
-
-    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
+    rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args, const char **envp) const {
         auto environment = sys::env::from(const_cast<const char **>(envp));
 
         auto arguments = into_arguments(args);

@@ -18,6 +18,8 @@
  */
 
 #include "Application.h"
+#include "citnames/citnames-forward.h"
+#include "intercept/intercept-forward.h"
 
 namespace {
 
@@ -177,6 +179,17 @@ namespace bear {
 
 	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const
 	{
+        if (args.as_string(flags::COMMAND).is_ok()) {
+            if (auto citnames = cs::Citnames(log_config_); citnames.matches(args)) {
+                return citnames.subcommand(args, envp);
+            }
+            if (auto intercept = ic::Intercept(log_config_); intercept.matches(args)) {
+                return intercept.subcommand(args, envp);
+            }
+
+            return rust::Err(std::runtime_error("Invalid subcommand"));
+        }
+
 		auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
 				.map<fs::path>([](const auto &output) {
 					return fs::path(output).replace_extension(".events.json");

@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "collect/Application.h"
+#include "collect/Intercept.h"
 #include "collect/Reporter.h"
 #include "collect/RpcServices.h"
 #include "collect/Session.h"
@@ -107,24 +107,11 @@ namespace ic {
         return result;
     }
 
-    Application::Application() noexcept
-            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("intercept", "ic"))
+    Intercept::Intercept(const ps::ApplicationLogConfig& log_config) noexcept
+            : ps::SubcommandFromArgs("intercept", log_config)
     { }
 
-    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const {
-        const flags::Parser parser("intercept", cmd::VERSION, {
-                {cmd::intercept::FLAG_OUTPUT,        {1,  false, "path of the result file",        {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
-                {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,                     DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,                     DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",    {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable", {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",  {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",             std::nullopt,                     std::nullopt}}
-        });
-        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
-    }
-
-    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const {
+    rust::Result<ps::CommandPtr> Intercept::command(const flags::Arguments &args, const char **envp) const {
         const auto execution = capture_execution(args, sys::env::from(envp));
         const auto session = Session::from(args, envp);
         const auto reporter = Reporter::from(args);

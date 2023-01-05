@@ -19,25 +19,29 @@
 
 #pragma once
 
-#include "config.h"
-#include "libmain/ApplicationFromArgs.h"
-#include "Session.h"
-#include "Reporter.h"
+#include "Output.h"
+#include "semantic/Tool.h"
+#include "libmain/SubcommandFromArgs.h"
+#include "libresult/Result.h"
+#include "libsys/Environment.h"
 
+#include <filesystem>
 #include <utility>
-#include <vector>
-#include <string_view>
 
-namespace ic {
+#include "citnames/citnames-forward.h"
+
+namespace fs = std::filesystem;
+
+namespace cs {
+
+    struct Arguments {
+        fs::path input;
+        fs::path output;
+        bool append;
+    };
 
     struct Command : ps::Command {
-
-        Command(Execution execution, Session::Ptr session, Reporter::Ptr reporter)
-                : ps::Command()
-                , execution_(std::move(execution))
-                , session_(std::move(session))
-                , reporter_(std::move(reporter))
-        { }
+        Command(Arguments arguments, cs::Configuration configuration) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
@@ -45,14 +49,7 @@ namespace ic {
         NON_COPYABLE_NOR_MOVABLE(Command)
 
     private:
-        Execution execution_;
-        Session::Ptr session_;
-        Reporter::Ptr reporter_;
-    };
-
-    struct Application : ps::ApplicationFromArgs {
-        Application() noexcept;
-        rust::Result<flags::Arguments> parse(int argc, const char **argv) const override;
-        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
+        Arguments arguments_;
+        cs::Configuration configuration_;
     };
 }
