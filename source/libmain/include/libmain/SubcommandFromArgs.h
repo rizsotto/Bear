@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2022 by László Nagy
+/*  Copyright (C) 2023 by Samu698
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -19,33 +19,27 @@
 
 #pragma once
 
+#include "config.h"
+#include "libmain/Application.h"
+#include "libmain/ApplicationLogConfig.h"
 #include "libresult/Result.h"
 #include "libflags/Flags.h"
-
-#include <memory>
+#include <string>
 
 namespace ps {
 
-    struct Command {
-        virtual ~Command() noexcept = default;
+    struct SubcommandFromArgs : Subcommand {
+        explicit SubcommandFromArgs(const char* name, const ApplicationLogConfig&) noexcept;
 
-        [[nodiscard]]
-        virtual rust::Result<int> execute() const = 0;
-    };
+        bool matches(const flags::Arguments &args);
+        rust::Result<CommandPtr> subcommand(const flags::Arguments &args, const char** envp) const override;
 
-    using CommandPtr = std::unique_ptr<Command>;
+        virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
 
-    struct Application {
-        virtual ~Application() noexcept = default;
+        NON_DEFAULT_CONSTRUCTABLE(SubcommandFromArgs)
 
-        [[nodiscard]]
-        virtual rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const = 0;
-    };
-
-    struct Subcommand {
-        virtual ~Subcommand() noexcept = default;
-
-        [[nodiscard]]
-        virtual rust::Result<CommandPtr> subcommand(const flags::Arguments &args, const char** envp) const = 0;
+    protected:
+		std::string name_;
+        ApplicationLogConfig log_config_;
     };
 }
