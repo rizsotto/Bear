@@ -28,7 +28,6 @@ namespace {
 
     rust::Result<sys::Process::Builder>
     prepare_intercept(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &output) {
-        auto program = arguments.as_string(cmd::bear::FLAG_INTERCEPT);
         auto command = arguments.as_string_list(cmd::intercept::FLAG_COMMAND);
         auto library = arguments.as_string(cmd::intercept::FLAG_LIBRARY);
         auto wrapper = arguments.as_string(cmd::intercept::FLAG_WRAPPER);
@@ -37,15 +36,16 @@ namespace {
         auto force_wrapper = arguments.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER).unwrap_or(false);
         auto force_preload = arguments.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD).unwrap_or(false);
 
-        return rust::merge(program, command, rust::merge(library, wrapper, wrapper_dir))
+        return rust::merge(command, rust::merge(library, wrapper, wrapper_dir))
                 .map<sys::Process::Builder>(
                         [&environment, &output, &verbose, &force_wrapper, &force_preload](auto tuple) {
-                            const auto&[program, command, pack] = tuple;
+                            const auto&[command, pack] = tuple;
                             const auto&[library, wrapper, wrapper_dir] = pack;
 
-                            auto builder = sys::Process::Builder(program)
+                            auto builder = sys::Process::Builder(cmd::bear::DEFAULT_PATH)
                                     .set_environment(environment)
-                                    .add_argument(program)
+                                    .add_argument(cmd::bear::DEFAULT_PATH)
+                                    .add_argument("intercept")
                                     .add_argument(cmd::intercept::FLAG_LIBRARY).add_argument(library)
                                     .add_argument(cmd::intercept::FLAG_WRAPPER).add_argument(wrapper)
                                     .add_argument(cmd::intercept::FLAG_WRAPPER_DIR).add_argument(wrapper_dir)
@@ -67,19 +67,16 @@ namespace {
 
     rust::Result<sys::Process::Builder>
     prepare_citnames(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &input) {
-        auto program = arguments.as_string(cmd::bear::FLAG_CITNAMES);
         auto output = arguments.as_string(cmd::citnames::FLAG_OUTPUT);
         auto config = arguments.as_string(cmd::citnames::FLAG_CONFIG);
         auto append = arguments.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
 
-        return rust::merge(program, output)
-                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto tuple) {
-                    const auto&[program, output] = tuple;
-
-                    auto builder = sys::Process::Builder(program)
+        return output.map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto output) {
+                    auto builder = sys::Process::Builder(cmd::bear::DEFAULT_PATH)
                             .set_environment(environment)
-                            .add_argument(program)
+                            .add_argument(cmd::bear::DEFAULT_PATH)
+                            .add_argument("citnames")
                             .add_argument(cmd::citnames::FLAG_INPUT).add_argument(input)
                             .add_argument(cmd::citnames::FLAG_OUTPUT).add_argument(output)
                             // can run the file checks, because we are on the host.
@@ -170,8 +167,6 @@ namespace bear {
 				{cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
 				{cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
 				{cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
-				{cmd::bear::FLAG_CITNAMES,           {1,  false, "path to the citnames executable",          {cmd::citnames::DEFAULT_PATH},    DEVELOPER_GROUP}},
-				{cmd::bear::FLAG_INTERCEPT,          {1,  false, "path to the intercept executable",         {cmd::intercept::DEFAULT_PATH},   DEVELOPER_GROUP}},
 				{cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                     std::nullopt}}
 		});
 		return parser.parse_or_exit(argc, const_cast<const char **>(argv));
