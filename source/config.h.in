@@ -81,6 +81,7 @@ namespace cmd {
 
     namespace bear {
         constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/bear";
+        constexpr char FLAG_BEAR[] = "--bear-path";
     }
 
     namespace citnames {

@@ -208,6 +208,9 @@ namespace flags {
             , options_(default_options)
             , commands_(commands)
     {
+        if (default_options.size() != 0) {
+            options_.insert({ VERBOSE, { 0, false, "run in verbose mode", std::nullopt, std::nullopt } });
+        }
         options_.insert({ HELP, { 0, false, "print help and exit", std::nullopt, { QUERY_GROUP } } });
         options_.insert({ VERSION, { 0, false, "print version and exit", std::nullopt, { QUERY_GROUP } } });
     }
