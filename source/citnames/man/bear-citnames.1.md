@@ -1,14 +1,14 @@
-% CITNAMES(1) Bear User Manuals
+% BEAR-CITNAMES(1) Bear User Manuals
 % László Nagy
 % Sep 04, 2021
 
 # NAME
 
-citnames - deduce command semantic
+bear-citnames - deduce command semantic
 
 # SYNOPSIS
 
-citnames [*options*] \--input \<file\> \--output \<file\>
+bear citnames [*options*] \--input \<file\> \--output \<file\>
 
 # DESCRIPTION
 
@@ -74,15 +74,15 @@ flag on the standard error. Otherwise, the command is silent.
 
 It's a JSON file, with the command execution history. (Plus some metadata, that
 is useful for debugging the application which was produced it.) This file can
-be produced by the `intercept` command, which records the process executions
+be produced by the `bear intercept` command, which records the process executions
 of a build.
 
-Read more about the syntax of the file in the `intercept` man page.
+Read more about the syntax of the file in the `bear-intercept(1)` man page.
 
 # OUTPUT FILE
 
 Currently, the only output format is the JSON compilation database.
-Read more about the syntax of that in the `bear` man page. 
+Read more about the syntax of that in the `bear(1)` man page. 
 
 # CONFIG FILE
 
@@ -150,7 +150,7 @@ the command line argument overrides the config file values.
 
 # SEE ALSO
 
-bear(1), intercept(1)
+`bear(1)`, `bear-intercept(1)`
 
 # COPYRIGHT
 

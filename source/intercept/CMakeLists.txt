@@ -56,13 +56,13 @@ target_link_libraries(intercept_a PUBLIC
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.
 #
-#   $ pandoc -s -t man intercept.1.md -o intercept.1
+#   $ pandoc -s -t man bear-intercept.1.md -o bear-intercept.1
 #
 # This is not automated, because pandoc has big dependencies on different OS
 # distributions and packaging would require to install those. Which might be
 # too much effort to generate a single text file.
 
-install(FILES man/intercept.1
+install(FILES man/bear-intercept.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 

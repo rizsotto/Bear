@@ -51,13 +51,13 @@ include(GNUInstallDirs)
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.
 #
-#   $ pandoc -s -t man citnames.1.md -o citnames.1
+#   $ pandoc -s -t man bear-citnames.1.md -o bear-citnames.1
 #
 # This is not automated, because pandoc has big dependencies on different OS
 # distributions and packaging would require to install those. Which might be
 # too much effort to generate a single text file.
 
-install(FILES man/citnames.1
+install(FILES man/bear-citnames.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 if (ENABLE_UNIT_TESTS)
