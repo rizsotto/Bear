@@ -38,8 +38,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-    constexpr std::optional<std::string_view> DEVELOPER_GROUP = { "developer options" };
-
     rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
     {
         const auto path = sys::os::get_path(environment);
