@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2022 by László Nagy
+/*  Copyright (C) 2023 by Samu698
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -17,10 +17,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "libmain/main.h"
-#include "Application.h"
+#pragma once
 
-int main(int argc, char* argv[], char* envp[])
-{
-    return ps::main<cs::Application>(argc, argv, envp);
+#include "config.h"
+#include "libmain/SubcommandFromArgs.h"
+
+namespace ic {
+
+    struct Intercept : ps::SubcommandFromArgs {
+        Intercept(const ps::ApplicationLogConfig&) noexcept;
+        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
+
+        NON_DEFAULT_CONSTRUCTABLE(Intercept)
+    };
+
 }

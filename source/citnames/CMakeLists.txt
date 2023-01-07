@@ -18,10 +18,10 @@ target_compile_options(citnames_json_a PRIVATE -fexceptions)
 
 # Create a static library, which is used for unit tests and the final shared library.
 add_library(citnames_a OBJECT)
-target_include_directories(citnames_a PUBLIC source/)
+target_include_directories(citnames_a PUBLIC source/ include/)
 target_sources(citnames_a
         PRIVATE
-            source/Application.cc
+            source/Citnames.cc
             source/semantic/Build.cc
             source/semantic/Parsers.cc
             source/semantic/Semantic.cc
@@ -46,28 +46,18 @@ target_link_libraries(citnames_a PUBLIC
         fmt::fmt
         spdlog::spdlog)
 
-# Create an executable from the sub projects.
-add_executable(citnames
-        main.cc
-        )
-target_link_libraries(citnames
-        citnames_a
-        citnames_json_a)
-
 include(GNUInstallDirs)
-install(TARGETS citnames
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.
 #
-#   $ pandoc -s -t man citnames.1.md -o citnames.1
+#   $ pandoc -s -t man bear-citnames.1.md -o bear-citnames.1
 #
 # This is not automated, because pandoc has big dependencies on different OS
 # distributions and packaging would require to install those. Which might be
 # too much effort to generate a single text file.
 
-install(FILES man/citnames.1
+install(FILES man/bear-citnames.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 if (ENABLE_UNIT_TESTS)

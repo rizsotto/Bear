@@ -17,9 +17,39 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "source/Application.h"
-#include "libmain/main.h"
+#pragma once
 
-int main(int argc, char *argv[], char *envp[]) {
-    return ps::main<bear::Application>(argc, argv, envp);
+#include "Output.h"
+#include "semantic/Tool.h"
+#include "libmain/SubcommandFromArgs.h"
+#include "libresult/Result.h"
+#include "libsys/Environment.h"
+
+#include <filesystem>
+#include <utility>
+
+#include "citnames/citnames-forward.h"
+
+namespace fs = std::filesystem;
+
+namespace cs {
+
+    struct Arguments {
+        fs::path input;
+        fs::path output;
+        bool append;
+    };
+
+    struct Command : ps::Command {
+        Command(Arguments arguments, cs::Configuration configuration) noexcept;
+
+        [[nodiscard]] rust::Result<int> execute() const override;
+
+        NON_DEFAULT_CONSTRUCTABLE(Command)
+        NON_COPYABLE_NOR_MOVABLE(Command)
+
+    private:
+        Arguments arguments_;
+        cs::Configuration configuration_;
+    };
 }

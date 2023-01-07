@@ -30,12 +30,12 @@ target_link_libraries(events_db_a PUBLIC
 
 # Intercept orchestrator code.
 add_library(intercept_a OBJECT)
-target_include_directories(intercept_a PRIVATE source/)
+target_include_directories(intercept_a PRIVATE source/ include/)
 if (SUPPORT_PRELOAD)
     target_sources(intercept_a PRIVATE source/collect/SessionLibrary.cc)
 endif()
 target_sources(intercept_a PRIVATE
-        source/collect/Application.cc
+        source/collect/Intercept.cc
         source/collect/Reporter.cc
         source/collect/RpcServices.cc
         source/collect/Session.cc
@@ -53,28 +53,16 @@ target_link_libraries(intercept_a PUBLIC
         result_a
         spdlog::spdlog)
 
-
-# Intercept orchestrator executable.
-add_executable(intercept
-        source/collect/main.cc)
-target_link_libraries(intercept
-        main_a
-        intercept_a)
-
-install(TARGETS intercept
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-
 # Markdown file is the source to the man file. Please modify that and generate
 # the man file from it with pandoc.
 #
-#   $ pandoc -s -t man intercept.1.md -o intercept.1
+#   $ pandoc -s -t man bear-intercept.1.md -o bear-intercept.1
 #
 # This is not automated, because pandoc has big dependencies on different OS
 # distributions and packaging would require to install those. Which might be
 # too much effort to generate a single text file.
 
-install(FILES man/intercept.1
+install(FILES man/bear-intercept.1
         DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
 
