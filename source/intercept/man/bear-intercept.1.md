@@ -1,14 +1,14 @@
-% INTERCEPT(1) Bear User Manuals
+% BEAR-INTERCEPT(1) Bear User Manuals
 % László Nagy
 % Sep 04, 2021
 
 # NAME
 
-intercept - intercept command executions in user space.
+bear-intercept - intercept command executions in user space.
 
 # SYNOPSIS
 
-intercept [*options*] \-\- [*build command*]
+bear intercept [*options*] \-\- [*build command*]
 
 # DESCRIPTION
 
@@ -89,7 +89,7 @@ with the project wiki page for known problems, before open a bug report.
 
 # SEE ALSO
 
-bear(1)
+`bear(1)`
 
 # COPYRIGHT
 

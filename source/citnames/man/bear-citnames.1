@@ -14,14 +14,14 @@
 . ftr VB CB
 . ftr VBI CBI
 .\}
-.TH "CITNAMES" "1" "Jan 02, 2023" "Bear User Manuals" ""
+.TH "BEAR-CITNAMES" "1" "Jan 02, 2023" "Bear User Manuals" ""
 .hy
 .SH NAME
 .PP
-citnames - deduce command semantic
+bear-citnames - deduce command semantic
 .SH SYNOPSIS
 .PP
-citnames [\f[I]options\f[R]] --input <file> --output <file>
+bear citnames [\f[I]options\f[R]] --input <file> --output <file>
 .SH DESCRIPTION
 .PP
 The name citnames comes from to reverse the word \[lq]semantic\[rq].
@@ -99,15 +99,15 @@ Otherwise, the command is silent.
 It\[cq]s a JSON file, with the command execution history.
 (Plus some metadata, that is useful for debugging the application which
 was produced it.)
-This file can be produced by the \f[V]intercept\f[R] command, which
+This file can be produced by the \f[V]bear intercept\f[R] command, which
 records the process executions of a build.
 .PP
-Read more about the syntax of the file in the \f[V]intercept\f[R] man
-page.
+Read more about the syntax of the file in the
+\f[V]bear-intercept(1)\f[R] man page.
 .SH OUTPUT FILE
 .PP
 Currently, the only output format is the JSON compilation database.
-Read more about the syntax of that in the \f[V]bear\f[R] man page.
+Read more about the syntax of that in the \f[V]bear(1)\f[R] man page.
 .SH CONFIG FILE
 .PP
 The config file influences the command recognition (by the section
@@ -186,7 +186,7 @@ The \f[V]drop_output_field\f[R] will disable the \f[V]output\f[R] field
 from the output.
 .SH SEE ALSO
 .PP
-bear(1), intercept(1)
+\f[V]bear(1)\f[R], \f[V]bear-intercept(1)\f[R]
 .SH COPYRIGHT
 .PP
 Copyright (C) 2012-2022 by L\['a]szl\['o] Nagy

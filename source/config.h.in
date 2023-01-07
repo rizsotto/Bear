@@ -80,14 +80,11 @@ namespace cmd {
     constexpr char VERSION[] = "@CMAKE_PROJECT_VERSION@";
 
     namespace bear {
-
-        constexpr char FLAG_CITNAMES[] = "--citnames";
-        constexpr char FLAG_INTERCEPT[] = "--interceptor";
+        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/bear";
+        constexpr char FLAG_BEAR[] = "--bear-path";
     }
 
     namespace citnames {
-        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/citnames";
-
         constexpr char FLAG_INPUT[] = "--input";
         constexpr char FLAG_OUTPUT[] = "--output";
         constexpr char FLAG_APPEND[] = "--append";
@@ -99,8 +96,6 @@ namespace cmd {
     }
 
     namespace intercept {
-        constexpr char DEFAULT_PATH[] = "@ROOT_INSTALL_PREFIX@/@CMAKE_INSTALL_BINDIR@/intercept";
-
         constexpr char FLAG_OUTPUT[] = "--output";
         constexpr char FLAG_LIBRARY[] = "--library";
         constexpr char FLAG_WRAPPER[] = "--wrapper";

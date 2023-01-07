@@ -40,10 +40,10 @@ compilation database.
 
 \--append
 :   Use previously generated output file and append the new entries to it.
-	This way you can run Bear continuously during work, and it keeps the
-	compilation database up to date. File deletion and addition are both
-	considered. But build process change (compiler flags change) might
-	cause duplicate entries.
+    This way you can run Bear continuously during work, and it keeps the
+    compilation database up to date. File deletion and addition are both
+    considered. But build process change (compiler flags change) might
+    cause duplicate entries.
 
 \--update
 :	Update the previously generated output with the new entries and flags.
@@ -61,16 +61,25 @@ compilation database.
 \--force-wrapper
 :   Force to use the compiler wrapper method of `intercept` command.
 
+# COMMANDS
+
+`bear-intercept(1)`
+:   Intercepts events that happend during the execution of the build
+    command.
+
+`bear-citnames(1)`
+:   Deduce the sematics of the commands captured by `bear-intercept(1)`.
+
 # OUTPUT
 
 The JSON compilation database definition changed over time. The current
 version of Bear generates entries where:
 
 `directory`
-:	has absolute path.
+:   has absolute path.
 
 `file`
-:	has absolute path.
+:   has absolute path.
 
 `output`
 :   has absolute path.
@@ -110,10 +119,6 @@ with Bear.
 
 There could be many reasons for any of these failures. It's better to consult
 with the project wiki page for known problems, before open a bug report.
-
-# SEE ALSO
-
-intercept(1), citnames(1)
 
 # COPYRIGHT
 

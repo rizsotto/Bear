@@ -117,7 +117,7 @@ namespace flags {
     public:
         Parser(std::string_view name, std::string_view version, std::initializer_list<OptionValue> options);
         Parser(std::string_view name, std::initializer_list<OptionValue> options);
-        Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands);
+        Parser(std::string_view name, std::string_view version, std::initializer_list<Parser> commands, std::initializer_list<OptionValue> default_options = {});
 
         ~Parser() = default;
 
