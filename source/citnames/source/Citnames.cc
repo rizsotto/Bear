@@ -110,11 +110,6 @@ namespace {
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
-                    // validate
-                    if (!is_exists(arguments.input)) {
-                        return rust::Err(std::runtime_error(
-                                fmt::format("Missing input file: {}", arguments.input)));
-                    }
                     return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
@@ -188,6 +183,12 @@ namespace cs {
     rust::Result<int> Command::execute() const {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
         std::list<cs::Entry> entries;
+
+        // validate file
+        if (!is_exists(arguments_.input)) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Missing input file: {}", arguments_.input)));
+        }
 
         // get current compilations from the input.
         return db::EventsDatabaseReader::from(arguments_.input)
