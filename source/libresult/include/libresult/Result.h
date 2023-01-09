@@ -111,6 +111,13 @@ namespace rust {
                 return *reinterpret_cast<U*>(&storage_);
             }
 
+            template <typename U>
+            U release()
+            {
+                initialized_ = false;
+                return U(std::move(get<U>()));
+            }
+
             void destroy_ok()
             {
                 if (initialized_) {
@@ -217,6 +224,7 @@ namespace rust {
         const Result<T, E>& on_success(std::function<void(const T&)> const& f) const;
         const Result<T, E>& on_error(std::function<void(const E&)> const& f) const;
 
+        T release();
     private:
         bool ok_;
         internals::Storage<T, E> storage_;
@@ -527,5 +535,10 @@ namespace rust {
             f(storage_.template get<E>());
         }
         return *this;
+    }
+
+    template <typename T, typename E>
+    T Result<T, E>::release() {
+        return storage_.template release<T>();
     }
 }
