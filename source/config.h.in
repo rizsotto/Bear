@@ -88,7 +88,6 @@ namespace cmd {
         constexpr char FLAG_INPUT[] = "--input";
         constexpr char FLAG_OUTPUT[] = "--output";
         constexpr char FLAG_APPEND[] = "--append";
-        constexpr char FLAG_UPDATE[] = "--update";
         constexpr char FLAG_RUN_CHECKS[] = "--run-checks";
         constexpr char FLAG_CONFIG[] = "--config";
 

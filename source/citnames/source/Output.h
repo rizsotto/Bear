@@ -66,7 +66,7 @@ namespace cs {
     struct CompilationDatabase {
         using Entries = std::list<Entry>;
 
-        CompilationDatabase(Format, Content, bool);
+        CompilationDatabase(Format, Content);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
@@ -79,6 +79,5 @@ namespace cs {
     private:
         Format format;
         Content content;
-        bool duplicate_by_filename;
     };
 }

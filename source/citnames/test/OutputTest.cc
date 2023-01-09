@@ -39,7 +39,7 @@ namespace {
             const std::list<cs::Entry>& expected,
             cs::Format format)
     {
-        cs::CompilationDatabase sut(format, NO_FILTER, false);
+        cs::CompilationDatabase sut(format, NO_FILTER);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, input);
@@ -112,7 +112,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER, false);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         std::list<cs::Entry> deserialized;
@@ -122,7 +122,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER, false);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         buffer << "[ { } ]";
@@ -134,7 +134,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER, false);
+        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";

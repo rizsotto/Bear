@@ -92,41 +92,40 @@ namespace {
     // maintains the hash sets). If an entry has no output attribute, then it switch to use
     // all attributes hashes.
     struct DuplicateFilter : public Filter {
-        DuplicateFilter(bool use_only_filename)
-                : use_only_filename(use_only_filename)
+        DuplicateFilter(bool strict_duplicate)
+                : strict_duplicate(strict_duplicate)
         { }
 
         bool apply(const cs::Entry &entry) override {
-            const auto h2 = use_only_filename ? hash_filename(entry) : hash(entry);
-            return hashes.emplace(std::move(h2)).second;
+            const auto h2 = hash(entry);
+            auto [_, new_entry] = hashes.emplace(std::move(h2));
+            return new_entry;
         }
 
     private:
-        // The hash function based on all attributes.
+        // The hash function
         //
+        // If strict_duplicate:
         // - It shall ignore the compiler name, but count all compiler flags in.
         // - Same compiler call semantic is detected by filter out the irrelevant flags.
-        static std::string hash(const cs::Entry &entry) {
+        // Otherwise:
+        // - It shall match only the filename
+        std::string hash(const cs::Entry &entry) {
             auto file = entry.file.string();
-            std::reverse(file.begin(), file.end());
+
+            if (!strict_duplicate) return file;
 
             const auto args = fmt::format(
                     "{}",
-                    fmt::join(entry.arguments.rbegin(), std::prev(entry.arguments.rend()), ","));
+                    fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
             size_t args_hash = std::hash<std::string>{}(args);
 
             return fmt::format("{}:{}", args_hash, file);
         }
 
-        static std::string hash_filename(const cs::Entry &entry) {
-            auto file = entry.file.string();
-            std::reverse(file.begin(), file.end());
-            return file;
-        }
-
     private:
         std::unordered_set<std::string> hashes;
-        bool use_only_filename;
+        bool strict_duplicate;
     };
 }
 
@@ -209,11 +208,11 @@ namespace cs {
         return os;
     }
 
-    CompilationDatabase::CompilationDatabase(Format _format, Content _content, bool _duplicate_by_filename)
+    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
             : format(_format)
             , content(std::move(_content))
-            , duplicate_by_filename(_duplicate_by_filename)
     { }
+
 
     rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &rhs) const {
         try {
@@ -237,7 +236,8 @@ namespace cs {
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
             ContentFilter content_filter(content);
-            DuplicateFilter duplicate_filter(duplicate_by_filename);
+            bool strict_duplicate = content.append_duplicate_mode == DUPLICATE_ALL;
+            DuplicateFilter duplicate_filter(strict_duplicate);
 
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();

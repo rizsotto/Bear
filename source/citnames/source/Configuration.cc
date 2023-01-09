@@ -48,11 +48,20 @@ namespace cs {
         if (j.contains("paths_to_exclude")) {
             j.at("paths_to_exclude").get_to(rhs.paths_to_exclude);
         }
+        if (j.contains("append_duplicate_mode")) {
+            auto mode = j.at("append_duplicate_mode").get<std::string>();
+            if (mode == DUPLICATE_FILE_NAME_ONLY) {
+                rhs.append_duplicate_mode = DUPLICATE_FILE_NAME_ONLY;
+            } else if (mode == DUPLICATE_ALL) {
+                rhs.append_duplicate_mode = DUPLICATE_ALL;
+            }
+        }
     }
 
     void to_json(nlohmann::json &j, const Content &rhs) {
         j = nlohmann::json{
-                {"include_only_existing_source",  rhs.include_only_existing_source},
+                {"include_only_existing_source", rhs.include_only_existing_source},
+                {"append_duplicate_mode", rhs.append_duplicate_mode},
         };
         if (!rhs.paths_to_include.empty()) {
             j["paths_to_include"] = rhs.paths_to_include;

@@ -52,13 +52,14 @@ namespace {
         return results;
     }
 
-    cs::Content update_content(cs::Content content, bool run_checks) {
+    cs::Content update_content(cs::Content content, bool run_checks, bool append) {
         if (run_checks) {
             auto cwd = sys::path::get_cwd();
             if (cwd.is_ok()) {
                 const fs::path& root = cwd.unwrap();
                 return cs::Content {
                         run_checks,
+                        append ? content.append_duplicate_mode : cs::DUPLICATE_ALL,
                         to_abspath(content.paths_to_include, root),
                         to_abspath(content.paths_to_exclude, root)
                 };
@@ -98,17 +99,14 @@ namespace {
         auto output = args.as_string(cmd::citnames::FLAG_OUTPUT);
         auto append = args.as_bool(cmd::citnames::FLAG_APPEND)
                 .unwrap_or(false);
-        auto update = args.as_bool(cmd::citnames::FLAG_UPDATE)
-                .unwrap_or(false);
 
         return rust::merge(input, output)
-                .map<cs::Arguments>([&append, &update](auto tuple) {
+                .map<cs::Arguments>([&append](auto tuple) {
                     const auto&[input, output] = tuple;
                     return cs::Arguments{
                             fs::path(input),
                             fs::path(output),
                             append,
-                            update,
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
@@ -117,15 +115,10 @@ namespace {
                         return rust::Err(std::runtime_error(
                                 fmt::format("Missing input file: {}", arguments.input)));
                     }
-                    if (arguments.append && arguments.update) {
-                        return rust::Err(std::runtime_error(
-                                fmt::format("Cannot use both the {} and {} flags", cmd::citnames::FLAG_APPEND, cmd::citnames::FLAG_UPDATE)));
-                    }
                     return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
                             (arguments.append && is_exists(arguments.output)),
-                            (arguments.update && is_exists(arguments.output)),
                     });
                 });
     }
@@ -160,8 +153,9 @@ namespace {
                     const auto run_checks = args
                             .as_bool(cmd::citnames::FLAG_RUN_CHECKS)
                             .unwrap_or(config.output.content.include_only_existing_source);
+                    const auto append = args.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
                     // update the content filter parameters according to the run_check outcome.
-                    config.output.content = update_content(config.output.content, run_checks);
+                    config.output.content = update_content(config.output.content, run_checks, append);
                     return config;
                 })
                 .map<cs::Configuration>([&environment](auto config) {
@@ -193,7 +187,7 @@ namespace {
 namespace cs {
 
     rust::Result<int> Command::execute() const {
-        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content, arguments_.update);
+        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
         std::list<cs::Entry> entries;
 
         // get current compilations from the input.
@@ -205,7 +199,7 @@ namespace cs {
                 .and_then<size_t>([this, &output, &entries](auto new_entries_count) {
                     spdlog::debug("compilation entries created. [size: {}]", new_entries_count);
                     // read back the current content and extend with the new elements.
-                    return (arguments_.append || arguments_.update)
+                    return (arguments_.append)
                         ? output.from_json(arguments_.output.c_str(), entries)
                                 .template map<size_t>([&new_entries_count](auto old_entries_count) {
                                     spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
