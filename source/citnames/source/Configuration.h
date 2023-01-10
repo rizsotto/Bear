@@ -34,6 +34,7 @@ namespace fs = std::filesystem;
 namespace cs {
 
     static const std::string DUPLICATE_FILENAME = "filename";
+    static const std::string DUPLICATE_FILENAME_OUTPUT = "filename_output";
     static const std::string DUPLICATE_ALL = "all";
 
     // Controls the output format.
@@ -54,7 +55,7 @@ namespace cs {
     // overridden by command line arguments.
     struct Content {
         bool include_only_existing_source = false;
-        std::string duplicate_filter = DUPLICATE_FILENAME;
+        std::string duplicate_filter = DUPLICATE_FILENAME_OUTPUT;
         std::list<fs::path> paths_to_include = {};
         std::list<fs::path> paths_to_exclude = {};
     };

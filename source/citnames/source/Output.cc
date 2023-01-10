@@ -146,6 +146,9 @@ namespace {
         if (filter == cs::DUPLICATE_ALL) {
             return std::make_unique<StrictDuplicateFilter>();
         }
+        if (filter == cs::DUPLICATE_FILENAME_OUTPUT) {
+            return std::make_unique<FilenameOutputDuplicateFilter>();
+        }
         if (filter == cs::DUPLICATE_FILENAME) {
             return std::make_unique<FilenameDuplicateFilter>();
         }
