@@ -98,7 +98,7 @@ namespace {
 
         bool apply(const cs::Entry &entry) override {
             const auto h2 = hash(entry);
-            auto [_, new_entry] = hashes.emplace(std::move(h2));
+            auto [_, new_entry] = hashes.emplace(h2);
             return new_entry;
         }
 
@@ -110,21 +110,23 @@ namespace {
         // - Same compiler call semantic is detected by filter out the irrelevant flags.
         // Otherwise:
         // - It shall match only the filename
-        std::string hash(const cs::Entry &entry) {
-            auto file = entry.file.string();
+        size_t hash(const cs::Entry &entry) {
+            auto string_hasher = std::hash<std::string>{};
 
-            if (!strict_duplicate) return file;
+            auto hash = string_hasher(entry.file.string());
+            if (!strict_duplicate) return hash;
 
-            const auto args = fmt::format(
-                    "{}",
-                    fmt::join(std::next(entry.arguments.begin()), entry.arguments.end(), ","));
-            size_t args_hash = std::hash<std::string>{}(args);
+            for (const auto& arg : entry.arguments) {
+                // Line copied from boost::hash_combine, combines multiple hashes into one.
+                hash ^= string_hasher(arg) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+            }
 
-            return fmt::format("{}:{}", args_hash, file);
+            return hash;
         }
 
+
     private:
-        std::unordered_set<std::string> hashes;
+        std::unordered_set<size_t> hashes;
         bool strict_duplicate;
     };
 }
