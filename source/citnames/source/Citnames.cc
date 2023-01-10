@@ -59,7 +59,7 @@ namespace {
                 const fs::path& root = cwd.unwrap();
                 return cs::Content {
                         run_checks,
-                        append ? content.append_duplicate_mode : cs::DUPLICATE_ALL,
+                        append ? content.duplicate_filter : cs::DUPLICATE_ALL,
                         to_abspath(content.paths_to_include, root),
                         to_abspath(content.paths_to_exclude, root)
                 };

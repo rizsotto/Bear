@@ -236,7 +236,7 @@ namespace cs {
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
             ContentFilter content_filter(content);
-            bool strict_duplicate = content.append_duplicate_mode == DUPLICATE_ALL;
+            bool strict_duplicate = content.duplicate_filter == DUPLICATE_ALL;
             DuplicateFilter duplicate_filter(strict_duplicate);
 
             size_t count = 0;

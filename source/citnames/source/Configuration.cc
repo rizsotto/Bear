@@ -48,12 +48,12 @@ namespace cs {
         if (j.contains("paths_to_exclude")) {
             j.at("paths_to_exclude").get_to(rhs.paths_to_exclude);
         }
-        if (j.contains("append_duplicate_mode")) {
+        if (j.contains("duplicate_filter")) {
             auto mode = j.at("append_duplicate_mode").get<std::string>();
-            if (mode == DUPLICATE_FILE_NAME_ONLY) {
-                rhs.append_duplicate_mode = DUPLICATE_FILE_NAME_ONLY;
+            if (mode == DUPLICATE_FILENAME) {
+                rhs.duplicate_filter = DUPLICATE_FILENAME;
             } else if (mode == DUPLICATE_ALL) {
-                rhs.append_duplicate_mode = DUPLICATE_ALL;
+                rhs.duplicate_filter = DUPLICATE_ALL;
             }
         }
     }
@@ -61,7 +61,7 @@ namespace cs {
     void to_json(nlohmann::json &j, const Content &rhs) {
         j = nlohmann::json{
                 {"include_only_existing_source", rhs.include_only_existing_source},
-                {"append_duplicate_mode", rhs.append_duplicate_mode},
+                {"duplicate_filter", rhs.duplicate_filter},
         };
         if (!rhs.paths_to_include.empty()) {
             j["paths_to_include"] = rhs.paths_to_include;
