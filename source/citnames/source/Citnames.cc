@@ -52,14 +52,14 @@ namespace {
         return results;
     }
 
-    cs::Content update_content(cs::Content content, bool run_checks, bool append) {
+    cs::Content update_content(cs::Content content, bool run_checks) {
         if (run_checks) {
             auto cwd = sys::path::get_cwd();
             if (cwd.is_ok()) {
                 const fs::path& root = cwd.unwrap();
                 return cs::Content {
                         run_checks,
-                        append ? content.duplicate_filter : cs::DUPLICATE_ALL,
+                        content.duplicate_filter,
                         to_abspath(content.paths_to_include, root),
                         to_abspath(content.paths_to_exclude, root)
                 };
@@ -153,9 +153,8 @@ namespace {
                     const auto run_checks = args
                             .as_bool(cmd::citnames::FLAG_RUN_CHECKS)
                             .unwrap_or(config.output.content.include_only_existing_source);
-                    const auto append = args.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
                     // update the content filter parameters according to the run_check outcome.
-                    config.output.content = update_content(config.output.content, run_checks, append);
+                    config.output.content = update_content(config.output.content, run_checks);
                     return config;
                 })
                 .map<cs::Configuration>([&environment](auto config) {
