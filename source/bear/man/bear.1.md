@@ -45,12 +45,6 @@ compilation database.
     considered. But build process change (compiler flags change) might
     cause duplicate entries.
 
-\--update
-:	Update the previously generated output with the new entries and flags.
-	This flag works similarly to the append flag but it also rewrites old
-	entries if the flags used to compile the file change, allowing for
-	build process changes
-
 \--config *file*
 :   Specify a configuration file. The configuration file captures how
     the output should be formatted and which entries it shall contain.

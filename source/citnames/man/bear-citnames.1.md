@@ -50,12 +50,6 @@ is currently the only output of the tool.)
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
 
-\--update
-:	Update the previously generated output with the new entries and flags.
-	This flag works similarly to the append flag but it also rewrites old
-	entries if the flags used to compile the file change, allowing for
-	build process changes.
-
 \--run-checks
 :   Allow the program to verify file location checks on the current machine
     it runs. (Default value provided. Run help to query it.) This is important
