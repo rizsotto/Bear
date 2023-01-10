@@ -100,21 +100,21 @@ namespace {
     };
 
 
-    struct FilenameDuplicateFilter : public DuplicateFilter {
+    struct InputDuplicateFilter : public DuplicateFilter {
         private:
             size_t hash(const cs::Entry &entry) override {
                 auto string_hasher = std::hash<std::string>{};
 
-                return string_hasher(entry.file.string());
+                return string_hasher(entry.file);
             }
     };
 
-    struct FilenameOutputDuplicateFilter : public DuplicateFilter {
+    struct InputOutputDuplicateFilter : public DuplicateFilter {
         private:
             size_t hash(const cs::Entry &entry) override {
                 auto string_hasher = std::hash<std::string>{};
 
-                auto hash = string_hasher(entry.file.string());
+                auto hash = string_hasher(entry.file);
 
                 if (entry.output) {
                     // Line copied from boost::hash_combine, combines multiple hashes into one.
@@ -130,7 +130,7 @@ namespace {
             size_t hash(const cs::Entry &entry) override {
                 auto string_hasher = std::hash<std::string>{};
 
-                auto hash = string_hasher(entry.file.string());
+                auto hash = string_hasher(entry.file);
 
                 for (const auto& arg : entry.arguments) {
                     // Line copied from boost::hash_combine, combines multiple hashes into one.
@@ -142,18 +142,19 @@ namespace {
     };
 
     DuplicateFilterPtr DuplicateFilter::from_content(const cs::Content& content) {
-        auto filter = content.duplicate_filter;
-        if (filter == cs::DUPLICATE_ALL) {
+        auto fields = content.duplicate_filter_fields;
+        if (fields == cs::DUPLICATE_ALL) {
             return std::make_unique<StrictDuplicateFilter>();
         }
-        if (filter == cs::DUPLICATE_FILENAME_OUTPUT) {
-            return std::make_unique<FilenameOutputDuplicateFilter>();
+        if (fields == cs::DUPLICATE_INPUT_OUTPUT) {
+            return std::make_unique<InputOutputDuplicateFilter>();
         }
-        if (filter == cs::DUPLICATE_FILENAME) {
-            return std::make_unique<FilenameDuplicateFilter>();
+        if (fields == cs::DUPLICATE_INPUT) {
+            return std::make_unique<InputDuplicateFilter>();
         }
 
-        return std::make_unique<StrictDuplicateFilter>();
+        // If the parameter is invalid use the default filter
+        return std::make_unique<InputOutputDuplicateFilter>();
     }
 
 }
