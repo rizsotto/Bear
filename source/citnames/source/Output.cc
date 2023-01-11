@@ -82,6 +82,11 @@ namespace {
         const cs::Content config;
     };
 
+    // Pure version of the boost::hash_combine function.
+    static size_t hash_combine(size_t hash, size_t to_combine) {
+        return hash ^ (to_combine + 0x9e3779b9 + (hash << 6) + (hash >> 2));
+    }
+
     using DuplicateFilterPtr = std::unique_ptr<struct DuplicateFilter>;
 
     struct DuplicateFilter : public Filter {
@@ -94,31 +99,30 @@ namespace {
         }
 
     private:
-        virtual size_t hash(const cs::Entry&) = 0;
+        virtual size_t hash(const cs::Entry&) const = 0;
 
         std::unordered_set<size_t> hashes;
     };
 
 
-    struct InputDuplicateFilter : public DuplicateFilter {
+    struct FileDuplicateFilter : public DuplicateFilter {
         private:
-            size_t hash(const cs::Entry &entry) override {
+            size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
 
                 return string_hasher(entry.file);
             }
     };
 
-    struct InputOutputDuplicateFilter : public DuplicateFilter {
+    struct FileOutputDuplicateFilter : public DuplicateFilter {
         private:
-            size_t hash(const cs::Entry &entry) override {
+            size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
 
                 auto hash = string_hasher(entry.file);
 
                 if (entry.output) {
-                    // Line copied from boost::hash_combine, combines multiple hashes into one.
-                    hash ^= string_hasher(*entry.output) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                    hash = hash_combine(hash, string_hasher(*entry.output));
                 }
 
                 return hash;
@@ -127,14 +131,17 @@ namespace {
 
     struct StrictDuplicateFilter : public DuplicateFilter {
         private:
-            size_t hash(const cs::Entry &entry) override {
+            size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
 
                 auto hash = string_hasher(entry.file);
 
+                if (entry.output) {
+                    hash = hash_combine(hash, string_hasher(*entry.output));
+                }
+
                 for (const auto& arg : entry.arguments) {
-                    // Line copied from boost::hash_combine, combines multiple hashes into one.
-                    hash ^= string_hasher(arg) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+                    hash = hash_combine(hash, string_hasher(arg));
                 }
 
                 return hash;
@@ -146,15 +153,15 @@ namespace {
         if (fields == cs::DUPLICATE_ALL) {
             return std::make_unique<StrictDuplicateFilter>();
         }
-        if (fields == cs::DUPLICATE_INPUT_OUTPUT) {
-            return std::make_unique<InputOutputDuplicateFilter>();
+        if (fields == cs::DUPLICATE_FILE_OUTPUT) {
+            return std::make_unique<FileOutputDuplicateFilter>();
         }
-        if (fields == cs::DUPLICATE_INPUT) {
-            return std::make_unique<InputDuplicateFilter>();
+        if (fields == cs::DUPLICATE_FILE) {
+            return std::make_unique<FileDuplicateFilter>();
         }
 
         // If the parameter is invalid use the default filter
-        return std::make_unique<InputOutputDuplicateFilter>();
+        return std::make_unique<FileOutputDuplicateFilter>();
     }
 
 }

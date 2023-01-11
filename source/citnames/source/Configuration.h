@@ -33,8 +33,8 @@ namespace fs = std::filesystem;
 
 namespace cs {
 
-    static const std::string DUPLICATE_INPUT = "input";
-    static const std::string DUPLICATE_INPUT_OUTPUT = "input_output";
+    static const std::string DUPLICATE_FILE = "file";
+    static const std::string DUPLICATE_FILE_OUTPUT = "file_output";
     static const std::string DUPLICATE_ALL = "all";
 
     // Controls the output format.
@@ -55,7 +55,7 @@ namespace cs {
     // overridden by command line arguments.
     struct Content {
         bool include_only_existing_source = false;
-        std::string duplicate_filter_fields = DUPLICATE_INPUT_OUTPUT;
+        std::string duplicate_filter_fields = DUPLICATE_FILE_OUTPUT;
         std::list<fs::path> paths_to_include = {};
         std::list<fs::path> paths_to_exclude = {};
     };
