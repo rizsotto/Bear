@@ -48,11 +48,15 @@ namespace cs {
         if (j.contains("paths_to_exclude")) {
             j.at("paths_to_exclude").get_to(rhs.paths_to_exclude);
         }
+        if (j.contains("duplicate_filter_fields")) {
+            j.at("duplicate_filter_fields").get_to(rhs.duplicate_filter_fields);
+        }
     }
 
     void to_json(nlohmann::json &j, const Content &rhs) {
         j = nlohmann::json{
-                {"include_only_existing_source",  rhs.include_only_existing_source},
+                {"include_only_existing_source", rhs.include_only_existing_source},
+                {"duplicate_filter_fields", rhs.duplicate_filter_fields},
         };
         if (!rhs.paths_to_include.empty()) {
             j["paths_to_include"] = rhs.paths_to_include;

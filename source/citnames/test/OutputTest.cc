@@ -30,16 +30,16 @@ namespace {
     constexpr cs::Format AS_ARGUMENTS_NO_OUTPUT { true, true };
     constexpr cs::Format AS_COMMAND_NO_OUTPUT { false, true };
 
-    cs::Content NO_FILTER {
-        false, {}, {}
-    };
+    cs::Content DEFAULT_CONTENT{};
 
     void value_serialized_and_read_back(
             const std::list<cs::Entry>& input,
             const std::list<cs::Entry>& expected,
-            cs::Format format)
+            cs::Format format,
+            cs::Content content = DEFAULT_CONTENT
+            )
     {
-        cs::CompilationDatabase sut(format, NO_FILTER);
+        cs::CompilationDatabase sut(format, content);
         std::stringstream buffer;
 
         auto serialized = sut.to_json(buffer, input);
@@ -110,9 +110,84 @@ namespace {
         value_serialized_and_read_back(input, expected, AS_COMMAND_NO_OUTPUT);
     }
 
+    TEST(compilation_database, duplicate_entries_file_read_back)
+    {
+        std::list<cs::Entry> input = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_one.c", "/path/to/changed", { "entry_one2.o" }, { "cc1", "-c", "-o", "entry_one2.o", "entry_one.c" } },
+                { "entry_two.c", "/path/to/changed", { "entry_two2.o" }, { "cc1", "-c", "-o", "entry_two2.o", "entry_two.c" } },
+        };
+        std::list<cs::Entry> expected = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+        };
+
+        cs::Content content;
+        content.duplicate_filter_fields = cs::DUPLICATE_FILE;
+        value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
+    }
+
+    TEST(compilation_database, duplicate_entries_file_output_read_back)
+    {
+        std::list<cs::Entry> input = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_one.c", "/path/to/changed", { "entry_one2.o" }, { "cc1", "-c", "-o", "entry_one2.o", "entry_one.c" } },
+                { "entry_two.c", "/path/to/changed", { "entry_two2.o" }, { "cc1", "-c", "-o", "entry_two2.o", "entry_two.c" } },
+                { "entry_one.c", "/path/to/changed", { "entry_one.o" }, { "cc1", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to/changed", { "entry_two.o" }, { "cc1", "-c", "entry_two.c" } },
+        };
+        std::list<cs::Entry> expected = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_one.c", "/path/to/changed", { "entry_one2.o" }, { "cc1", "-c", "-o", "entry_one2.o", "entry_one.c" } },
+                { "entry_two.c", "/path/to/changed", { "entry_two2.o" }, { "cc1", "-c", "-o", "entry_two2.o", "entry_two.c" } },
+        };
+
+        cs::Content content;
+        content.duplicate_filter_fields = cs::DUPLICATE_FILE_OUTPUT;
+        value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
+    }
+
+    TEST(compilation_database, duplicate_entries_all_read_back)
+    {
+        std::list<cs::Entry> input = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_three.c", "/path/to", { "entry_three.o" }, { "cc", "-c", "entry_three.c" } },
+
+                // Filename changed
+                { "entry_one.changed.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+
+                // Output changed
+                { "entry_two.c", "/path/to", { "entry_two_changed.o" }, { "cc", "-c", "entry_two.c" } },
+
+                // Flags changed
+                { "entry_three.c", "/path/to", { "entry_three.o" }, { "cc", "-DCHANGED", "-c", "entry_three.c" } },
+
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_three.c", "/path/to", { "entry_three.o" }, { "cc", "-c", "entry_three.c" } },
+        };
+        std::list<cs::Entry> expected = {
+                { "entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_three.c", "/path/to", { "entry_three.o" }, { "cc", "-c", "entry_three.c" } },
+                { "entry_one.changed.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+                { "entry_two.c", "/path/to", { "entry_two_changed.o" }, { "cc", "-c", "entry_two.c" } },
+                { "entry_three.c", "/path/to", { "entry_three.o" }, { "cc", "-DCHANGED", "-c", "entry_three.c" } },
+
+        };
+
+        cs::Content content;
+        content.duplicate_filter_fields = cs::DUPLICATE_ALL;
+        value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
+    }
+
     TEST(compilation_database, deserialize_fails_with_empty_stream)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, DEFAULT_CONTENT);
         std::stringstream buffer;
 
         std::list<cs::Entry> deserialized;
@@ -122,7 +197,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_missing_fields)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, DEFAULT_CONTENT);
         std::stringstream buffer;
 
         buffer << "[ { } ]";
@@ -134,7 +209,7 @@ namespace {
 
     TEST(compilation_database, deserialize_fails_with_empty_fields)
     {
-        cs::CompilationDatabase sut(AS_COMMAND, NO_FILTER);
+        cs::CompilationDatabase sut(AS_COMMAND, DEFAULT_CONTENT);
         std::stringstream buffer;
 
         buffer << R"#([ { "file": "file.c", "directory": "", "command": "cc -c file.c" } ])#";

@@ -23,7 +23,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <fstream>
-#include <set>
+#include <memory>
+#include <unordered_set>
 #include <utility>
 
 #include <fmt/format.h>
@@ -81,49 +82,88 @@ namespace {
         const cs::Content config;
     };
 
-    // Duplicate detection filter.
-    //
-    // Duplicate detection can be done two ways: first one is based on the `output` attribute,
-    // second is based on all attributes. The benefit to use the `output` attribute only is,
-    // that it faster and handles compiler flag changes better. The problem with it is, that
-    // it not present in every entries.
-    //
-    // Current implementation is starts with the output one, but computes both hashes (and
-    // maintains the hash sets). If an entry has no output attribute, then it switch to use
-    // all attributes hashes.
+    // Pure version of the boost::hash_combine function.
+    static size_t hash_combine(size_t hash, size_t to_combine) {
+        return hash ^ (to_combine + 0x9e3779b9 + (hash << 6) + (hash >> 2));
+    }
+
+    using DuplicateFilterPtr = std::unique_ptr<struct DuplicateFilter>;
+
     struct DuplicateFilter : public Filter {
-        DuplicateFilter()
-                : hashes()
-        { }
+        static DuplicateFilterPtr from_content(const cs::Content&);
 
         bool apply(const cs::Entry &entry) override {
-            if (const auto h2 = hash(entry); hashes.find(h2) == hashes.end()) {
-                hashes.insert(h2);
-                return true;
-            }
-            return false;
+            const auto h2 = hash(entry);
+            auto [_, new_entry] = hashes.emplace(h2);
+            return new_entry;
         }
 
     private:
-        // The hash function based on all attributes.
-        //
-        // - It shall ignore the compiler name, but count all compiler flags in.
-        // - Same compiler call semantic is detected by filter out the irrelevant flags.
-        static std::string hash(const cs::Entry &entry) {
-            auto file = entry.file.string();
-            std::reverse(file.begin(), file.end());
+        virtual size_t hash(const cs::Entry&) const = 0;
 
-            const auto args = fmt::format(
-                    "{}",
-                    fmt::join(entry.arguments.rbegin(), std::prev(entry.arguments.rend()), ","));
-            size_t args_hash = std::hash<std::string>{}(args);
-
-            return fmt::format("{}:{}", args_hash, file);
-        }
-
-    private:
-        std::set<std::string> hashes;
+        std::unordered_set<size_t> hashes;
     };
+
+
+    struct FileDuplicateFilter : public DuplicateFilter {
+        private:
+            size_t hash(const cs::Entry &entry) const override {
+                auto string_hasher = std::hash<std::string>{};
+
+                return string_hasher(entry.file);
+            }
+    };
+
+    struct FileOutputDuplicateFilter : public DuplicateFilter {
+        private:
+            size_t hash(const cs::Entry &entry) const override {
+                auto string_hasher = std::hash<std::string>{};
+
+                auto hash = string_hasher(entry.file);
+
+                if (entry.output) {
+                    hash = hash_combine(hash, string_hasher(*entry.output));
+                }
+
+                return hash;
+            }
+    };
+
+    struct StrictDuplicateFilter : public DuplicateFilter {
+        private:
+            size_t hash(const cs::Entry &entry) const override {
+                auto string_hasher = std::hash<std::string>{};
+
+                auto hash = string_hasher(entry.file);
+
+                if (entry.output) {
+                    hash = hash_combine(hash, string_hasher(*entry.output));
+                }
+
+                for (const auto& arg : entry.arguments) {
+                    hash = hash_combine(hash, string_hasher(arg));
+                }
+
+                return hash;
+            }
+    };
+
+    DuplicateFilterPtr DuplicateFilter::from_content(const cs::Content& content) {
+        auto fields = content.duplicate_filter_fields;
+        if (fields == cs::DUPLICATE_ALL) {
+            return std::make_unique<StrictDuplicateFilter>();
+        }
+        if (fields == cs::DUPLICATE_FILE_OUTPUT) {
+            return std::make_unique<FileOutputDuplicateFilter>();
+        }
+        if (fields == cs::DUPLICATE_FILE) {
+            return std::make_unique<FileDuplicateFilter>();
+        }
+
+        // If the parameter is invalid use the default filter
+        return std::make_unique<FileOutputDuplicateFilter>();
+    }
+
 }
 
 namespace cs {
@@ -210,6 +250,7 @@ namespace cs {
             , content(std::move(_content))
     { }
 
+
     rust::Result<size_t> CompilationDatabase::to_json(const fs::path &file, const Entries &rhs) const {
         try {
             std::ofstream target(file);
@@ -232,12 +273,12 @@ namespace cs {
     rust::Result<size_t> CompilationDatabase::to_json(std::ostream &ostream, const Entries &entries) const {
         try {
             ContentFilter content_filter(content);
-            DuplicateFilter duplicate_filter;
+            DuplicateFilterPtr duplicate_filter = DuplicateFilter::from_content(content);
 
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
-                if (content_filter.apply(entry) && duplicate_filter.apply(entry)) {
+                if (content_filter.apply(entry) && duplicate_filter->apply(entry)) {
                     auto json_entry = cs::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
                     ++count;

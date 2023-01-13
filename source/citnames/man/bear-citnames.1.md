@@ -1,6 +1,6 @@
 % BEAR-CITNAMES(1) Bear User Manuals
 % László Nagy
-% Sep 04, 2021
+% Jan 02, 2023
 
 # NAME
 

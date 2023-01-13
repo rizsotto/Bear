@@ -33,6 +33,10 @@ namespace fs = std::filesystem;
 
 namespace cs {
 
+    static const std::string DUPLICATE_FILE = "file";
+    static const std::string DUPLICATE_FILE_OUTPUT = "file_output";
+    static const std::string DUPLICATE_ALL = "all";
+
     // Controls the output format.
     //
     // The entries in the JSON compilation database can have different forms.
@@ -51,6 +55,7 @@ namespace cs {
     // overridden by command line arguments.
     struct Content {
         bool include_only_existing_source = false;
+        std::string duplicate_filter_fields = DUPLICATE_FILE_OUTPUT;
         std::list<fs::path> paths_to_include = {};
         std::list<fs::path> paths_to_exclude = {};
     };
