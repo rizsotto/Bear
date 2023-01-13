@@ -58,11 +58,11 @@ compilation database.
 # COMMANDS
 
 `bear-intercept(1)`
-:   Intercepts events that happend during the execution of the build
+:   Intercepts events that happened during the execution of the build
     command.
 
 `bear-citnames(1)`
-:   Deduce the sematics of the commands captured by `bear-intercept(1)`.
+:   Deduce the semantics of the commands captured by `bear-intercept(1)`.
 
 # OUTPUT
 
@@ -86,8 +86,9 @@ version of Bear generates entries where:
 
 # CONFIG FILE
 
-Read `citnames` man page for the content of this file. `bear` is not reading
-the content of this file, but passing the file name to `citnames`.
+Read `bear-citnames(1)` man page for the content of this file. `bear` is not
+reading the content of this file, but passing the file name to `bear citnames`
+command.
 
 # EXIT STATUS
 
@@ -107,9 +108,9 @@ commands.
 
 The other common cause for empty output is that the build has a "configure"
 step, which captures the compiler to build the project. In case of Bear is
-using the _wrapper_ mode (read `intercept` man page), it needs to run the
-configure step with Bear too (and discard that output), before run the build
-with Bear.
+using the _wrapper_ mode (read `bear-intercept(1)` man page), it needs to
+run the configure step with Bear too (and discard that output), before run
+the build with Bear.
 
 There could be many reasons for any of these failures. It's better to consult
 with the project wiki page for known problems, before open a bug report.

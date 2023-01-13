@@ -111,7 +111,8 @@ the command line argument overrides the config file values.
     "content": {
       "include_only_existing_source": true,
       "paths_to_include": [],
-      "paths_to_exclude": []
+      "paths_to_exclude": [],
+      "duplicate_filter_fields": "file_output"
     },
     "format": {
       "command_as_array": true,
@@ -141,7 +142,9 @@ the command line argument overrides the config file values.
     these directories. (Directory names can be absolute paths or relative to the
     current working directory if the `--run-checks` flag passed.)
     The `include_only_existing_source` allows or disables file check for the output.
-    The `--run-checks` flag overrides this config value.
+    The `--run-checks` flag overrides this config value. The `duplicate_filter_fields`
+    select the method how duplicate entries are detected in the output. The possible
+    values for this field are: `all`, `file` and `file_output`.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.

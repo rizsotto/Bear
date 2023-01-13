@@ -60,7 +60,7 @@ written into an output file.
 # EXIT STATUS
 
 The exit status of the program is the exit status of the build command.
-Except when the program itself crashes, then it sets to non zero.
+Except when the program itself crashes, then it sets to non-zero.
 
 # OUTPUT FILE
 
@@ -74,13 +74,13 @@ with the source code of this project.)
 # TROUBLESHOOTING
 
 The potential problems you can face with are: the build with and without the
-interception behaves differently (eg.: the build crash with the `intercept`
+interception behaves differently (eg.: the build crash with the intercept
 tool, but succeed otherwise). The output is empty, and it failed to intercept
 the children process execution by the build command.
 
 The most common cause for empty outputs is that the build command did not
 execute any commands. The reason for that could be, because incremental builds
-not running the compilers if everything is up-to-date. Remember, `intercept`
+not running the compilers if everything is up-to-date. Remember, this program
 does not understand the build file (eg.: makefile), but intercepts the executed
 commands.
 
