@@ -17,7 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "Configuration.h"
+#include "libconfig/Configuration.h"
 
 #include <iomanip>
 #include <fstream>

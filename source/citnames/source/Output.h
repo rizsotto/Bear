@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Configuration.h"
+#include "libconfig/Configuration.h"
 #include "libresult/Result.h"
 
 #include <filesystem>

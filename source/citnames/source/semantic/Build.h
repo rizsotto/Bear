@@ -20,9 +20,9 @@
 #pragma once
 
 #include "config.h"
-#include "Configuration.h"
 #include "semantic/Tool.h"
 #include "intercept.grpc.pb.h"
+#include "libconfig/Configuration.h"
 
 #include <memory>
 

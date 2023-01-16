@@ -19,12 +19,12 @@
 
 #include "config.h"
 #include "Citnames.h"
-#include "Configuration.h"
 #include "Output.h"
 #include "semantic/Build.h"
 #include "semantic/Tool.h"
 #include "collect/db/EventsDatabaseReader.h"
 #include "libsys/Path.h"
+#include "libconfig/Configuration.h"
 
 #include <filesystem>
 
