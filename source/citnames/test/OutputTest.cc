@@ -25,18 +25,18 @@
 
 namespace {
 
-    constexpr cs::Format AS_ARGUMENTS { true, false };
-    constexpr cs::Format AS_COMMAND { false, false };
-    constexpr cs::Format AS_ARGUMENTS_NO_OUTPUT { true, true };
-    constexpr cs::Format AS_COMMAND_NO_OUTPUT { false, true };
+    constexpr config::Format AS_ARGUMENTS { true, false };
+    constexpr config::Format AS_COMMAND { false, false };
+    constexpr config::Format AS_ARGUMENTS_NO_OUTPUT { true, true };
+    constexpr config::Format AS_COMMAND_NO_OUTPUT { false, true };
 
-    cs::Content DEFAULT_CONTENT{};
+    config::Content DEFAULT_CONTENT{};
 
     void value_serialized_and_read_back(
             const std::list<cs::Entry>& input,
             const std::list<cs::Entry>& expected,
-            cs::Format format,
-            cs::Content content = DEFAULT_CONTENT
+            config::Format format,
+            config::Content content = DEFAULT_CONTENT
             )
     {
         cs::CompilationDatabase sut(format, content);
@@ -123,8 +123,8 @@ namespace {
                 { "entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
         };
 
-        cs::Content content;
-        content.duplicate_filter_fields = cs::DUPLICATE_FILE;
+        config::Content content;
+        content.duplicate_filter_fields = config::DUPLICATE_FILE;
         value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
     }
 
@@ -145,8 +145,8 @@ namespace {
                 { "entry_two.c", "/path/to/changed", { "entry_two2.o" }, { "cc1", "-c", "-o", "entry_two2.o", "entry_two.c" } },
         };
 
-        cs::Content content;
-        content.duplicate_filter_fields = cs::DUPLICATE_FILE_OUTPUT;
+        config::Content content;
+        content.duplicate_filter_fields = config::DUPLICATE_FILE_OUTPUT;
         value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
     }
 
@@ -180,8 +180,8 @@ namespace {
 
         };
 
-        cs::Content content;
-        content.duplicate_filter_fields = cs::DUPLICATE_ALL;
+        config::Content content;
+        content.duplicate_filter_fields = config::DUPLICATE_ALL;
         value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
     }
 

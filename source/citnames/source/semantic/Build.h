@@ -33,7 +33,7 @@ namespace cs::semantic {
     // based on configuration.
     class Build {
     public:
-        explicit Build(Compilation cfg) noexcept;
+        explicit Build(config::Compilation cfg) noexcept;
 
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const rpc::Event &event) const;

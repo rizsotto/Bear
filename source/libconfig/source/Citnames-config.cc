@@ -1,26 +1,4 @@
-/*  Copyright (C) 2012-2022 by László Nagy
-    This file is part of Bear.
-
-    Bear is a tool to generate compilation database for clang tooling.
-
-    Bear is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    Bear is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include "libconfig/Configuration.h"
-
-#include <iomanip>
-#include <fstream>
+#include "libconfig/citnames-config.h"
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
@@ -119,7 +97,7 @@ namespace config {
         }
     }
 
-    void from_json(const nlohmann::json &j, Configuration &rhs) {
+    void from_json(const nlohmann::json &j, Citnames &rhs) {
         if (j.contains("output")) {
             j.at("output").get_to(rhs.output);
         }
@@ -128,7 +106,7 @@ namespace config {
         }
     }
 
-    void to_json(nlohmann::json &j, const Configuration &rhs) {
+    void to_json(nlohmann::json &j, const Citnames &rhs) {
         j = nlohmann::json{
                 {"output",  rhs.output},
                 {"compilation", rhs.compilation},
@@ -180,77 +158,12 @@ namespace config {
         return os;
     }
 
-    std::ostream &operator<<(std::ostream &os, const Configuration &value)
+    std::ostream &operator<<(std::ostream &os, const Citnames &value)
     {
         nlohmann::json payload;
         to_json(payload, value);
         os << payload;
 
         return os;
-    }
-
-    rust::Result<size_t> ConfigurationSerializer::to_json(const fs::path &file, const Configuration &rhs) const
-    {
-        try {
-            std::ofstream target(file);
-            return to_json(target, rhs)
-                    .map_err<std::runtime_error>([&file](auto error) {
-                        return std::runtime_error(
-                                fmt::format("Failed to write file: {}, cause: {}",
-                                            file.string(),
-                                            error.what()));
-                    });
-        } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(
-                    fmt::format("Failed to write file: {}, cause: {}",
-                                file.string(),
-                                error.what())));
-        }
-    }
-
-    rust::Result<size_t> ConfigurationSerializer::to_json(std::ostream &os, const Configuration &rhs) const
-    {
-        try {
-            nlohmann::json out = rhs;
-            os << std::setw(4) << out << std::endl;
-
-            return rust::Ok(size_t(1));
-        } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
-    }
-
-    rust::Result<Configuration> ConfigurationSerializer::from_json(const fs::path &file) const
-    {
-        try {
-            std::ifstream source(file);
-            return from_json(source)
-                    .map_err<std::runtime_error>([&file](auto error) {
-                        return std::runtime_error(
-                                fmt::format("Failed to read file: {}, cause: {}",
-                                            file.string(),
-                                            error.what()));
-                    });
-        } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(
-                    fmt::format("Failed to read file: {}, cause: {}",
-                                file.string(),
-                                error.what())));
-        }
-    }
-
-    rust::Result<Configuration> ConfigurationSerializer::from_json(std::istream &is) const
-    {
-        try {
-            nlohmann::json in;
-            is >> in;
-
-            Configuration result;
-            ::config::from_json(in, result);
-
-            return rust::Ok(std::move(result));
-        } catch (const std::exception &error) {
-            return rust::Err(std::runtime_error(error.what()));
-        }
     }
 }

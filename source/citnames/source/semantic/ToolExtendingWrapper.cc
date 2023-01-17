@@ -21,7 +21,7 @@
 
 namespace cs::semantic {
 
-    ToolExtendingWrapper::ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept
+    ToolExtendingWrapper::ToolExtendingWrapper(config::CompilerWrapper &&compilers_to_recognize) noexcept
             : compilers_to_recognize_(compilers_to_recognize)
     { }
 

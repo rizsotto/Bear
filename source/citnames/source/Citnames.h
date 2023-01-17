@@ -41,7 +41,7 @@ namespace cs {
     };
 
     struct Command : ps::Command {
-        Command(Arguments arguments, cs::Configuration configuration) noexcept;
+        Command(Arguments arguments, config::Configuration configuration) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
@@ -50,6 +50,6 @@ namespace cs {
 
     private:
         Arguments arguments_;
-        cs::Configuration configuration_;
+        config::Configuration configuration_;
     };
 }

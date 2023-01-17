@@ -38,7 +38,7 @@ namespace fs = std::filesystem;
 namespace db = ic::collect::db;
 
 #ifdef FMT_NEEDS_OSTREAM_FORMATTER
-template <> struct fmt::formatter<cs::Configuration> : ostream_formatter {};
+template <> struct fmt::formatter<config::Configuration> : ostream_formatter {};
 #endif
 
 namespace {
@@ -52,12 +52,12 @@ namespace {
         return results;
     }
 
-    cs::Content update_content(cs::Content content, bool run_checks) {
+    config::Content update_content(config::Content content, bool run_checks) {
         if (run_checks) {
             auto cwd = sys::path::get_cwd();
             if (cwd.is_ok()) {
                 const fs::path& root = cwd.unwrap();
-                return cs::Content {
+                return config::Content {
                         run_checks,
                         content.duplicate_filter_fields,
                         to_abspath(content.paths_to_include, root),
@@ -70,8 +70,8 @@ namespace {
         return content;
     }
 
-    std::list<cs::CompilerWrapper> update_compilers_to_recognize(
-            std::list<cs::CompilerWrapper> wrappers,
+    std::list<config::CompilerWrapper> update_compilers_to_recognize(
+            std::list<config::CompilerWrapper> wrappers,
             std::list<fs::path> compilers)
     {
         for (auto && compiler : compilers) {
@@ -79,7 +79,7 @@ namespace {
                     std::any_of(wrappers.begin(), wrappers.end(),
                                 [&compiler](auto wrapper) { return wrapper.executable == compiler; });
             if (!already_in_wrappers) {
-                wrappers.emplace_back(cs::CompilerWrapper {
+                wrappers.emplace_back(config::CompilerWrapper {
                     compiler,
                     {},
                     {}
@@ -137,18 +137,18 @@ namespace {
         return result;
     }
 
-    rust::Result<cs::Configuration>
+    rust::Result<config::Configuration>
     into_configuration(const flags::Arguments &args, const sys::env::Vars &environment) {
         auto config_arg = args.as_string(cmd::citnames::FLAG_CONFIG);
         auto config = config_arg.is_ok()
                       ? config_arg
-                              .and_then<cs::Configuration>([](auto candidate) {
-                                  return cs::ConfigurationSerializer().from_json(fs::path(candidate));
+                              .and_then<config::Configuration>([](auto candidate) {
+                                  return config::ConfigurationSerializer().from_json(fs::path(candidate));
                               })
-                      : rust::Ok(cs::Configuration());
+                      : rust::Ok(config::Configuration());
 
         return config
-                .map<cs::Configuration>([&args](auto config) {
+                .map<config::Configuration>([&args](auto config) {
                     // command line arguments overrides the default values or the configuration content.
                     const auto run_checks = args
                             .as_bool(cmd::citnames::FLAG_RUN_CHECKS)
@@ -157,7 +157,7 @@ namespace {
                     config.output.content = update_content(config.output.content, run_checks);
                     return config;
                 })
-                .map<cs::Configuration>([&environment](auto config) {
+                .map<config::Configuration>([&environment](auto config) {
                     // recognize compilers from known environment variables.
                     const auto env_compilers = compilers(environment);
                     config.compilation.compilers_to_recognize =
@@ -218,7 +218,7 @@ namespace cs {
                 });
     }
 
-    Command::Command(Arguments arguments, cs::Configuration configuration) noexcept
+    Command::Command(Arguments arguments, config::Configuration configuration) noexcept
             : ps::Command()
             , arguments_(std::move(arguments))
             , configuration_(std::move(configuration))
