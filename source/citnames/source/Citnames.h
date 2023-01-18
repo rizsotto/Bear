@@ -23,25 +23,16 @@
 #include "semantic/Tool.h"
 #include "libmain/SubcommandFromArgs.h"
 #include "libresult/Result.h"
-#include "libsys/Environment.h"
 
 #include <filesystem>
 #include <utility>
 
 #include "citnames/citnames-forward.h"
 
-namespace fs = std::filesystem;
-
 namespace cs {
 
-    struct Arguments {
-        fs::path input;
-        fs::path output;
-        bool append;
-    };
-
     struct Command : ps::Command {
-        Command(Arguments arguments, config::Configuration configuration) noexcept;
+        Command(config::Citnames configuration) noexcept;
 
         [[nodiscard]] rust::Result<int> execute() const override;
 
@@ -49,7 +40,6 @@ namespace cs {
         NON_COPYABLE_NOR_MOVABLE(Command)
 
     private:
-        Arguments arguments_;
-        config::Configuration configuration_;
+        config::Citnames configuration_;
     };
 }

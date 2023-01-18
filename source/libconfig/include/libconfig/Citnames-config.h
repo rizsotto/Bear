@@ -21,6 +21,7 @@
 
 
 #include <libresult/Result.h>
+#include <libflags/Flags.h>
 
 #include <filesystem>
 #include <iosfwd>
@@ -88,6 +89,11 @@ namespace config {
     struct Citnames {
         Output output;
         Compilation compilation;
+        fs::path input_file;
+        fs::path output_file = cmd::citnames::DEFAULT_OUTPUT;
+        bool append = false;
+
+        std::optional<std::runtime_error> update(const flags::Arguments& flags, const char **envp);
     };
 
     // Convenient methods for these types.

@@ -37,4 +37,5 @@ namespace sys::path {
     std::string join(const std::list<fs::path> &input);
 
     rust::Result<fs::path> get_cwd();
+    rust::Result<std::list<fs::path>> to_abspath(const std::list<fs::path> &paths);
 }

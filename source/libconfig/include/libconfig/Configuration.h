@@ -20,8 +20,8 @@
 #pragma once
 
 #include <libresult/Result.h>
+#include <libflags/Flags.h>
 
-#include <filesystem>
 #include <iosfwd>
 #include <list>
 #include <map>
@@ -29,83 +29,18 @@
 #include <optional>
 #include <utility>
 
-namespace fs = std::filesystem;
+#include "Citnames-config.h"
 
 namespace config {
 
-    static const std::string DUPLICATE_FILE = "file";
-    static const std::string DUPLICATE_FILE_OUTPUT = "file_output";
-    static const std::string DUPLICATE_ALL = "all";
-
-    // Controls the output format.
-    //
-    // The entries in the JSON compilation database can have different forms.
-    // One format element is how the command is represented: it can be an array
-    // of strings or a single string (shell escaping to protect white spaces).
-    // Another format element is if the output field is emitted or not.
-    struct Format {
-        bool command_as_array = true;
-        bool drop_output_field = false;
-    };
-
-    // Controls the content of the output.
-    //
-    // This will act as a filter on the output elements.
-    // These attributes can be read from the configuration file, and can be
-    // overridden by command line arguments.
-    struct Content {
-        bool include_only_existing_source = false;
-        std::string duplicate_filter_fields = DUPLICATE_FILE_OUTPUT;
-        std::list<fs::path> paths_to_include = {};
-        std::list<fs::path> paths_to_exclude = {};
-    };
-
-    // Groups together the output related configurations.
-    struct Output {
-        Format format;
-        Content content;
-    };
-
-    // Represents a compiler wrapper that the tool will recognize.
-    //
-    // When executable name matches it tries to parse the flags as it would
-    // be a known compiler, and append the additional flags to the output
-    // entry if the compiler is recognized.
-    struct CompilerWrapper {
-        fs::path executable;
-        std::list<std::string> flags_to_add;
-        std::list<std::string> flags_to_remove;
-    };
-
-    // Represents compiler related configuration.
-    struct Compilation {
-        std::list<CompilerWrapper> compilers_to_recognize;
-        std::list<fs::path> compilers_to_exclude;
-    };
-
     // Represents the application configuration.
     struct Configuration {
-        Output output;
-        Compilation compilation;
+        Citnames citnames;
+
+        static rust::Result<Configuration> load_config(const flags::Arguments& args);
+        //std::string to_json();
     };
 
     // Convenient methods for these types.
-    std::ostream& operator<<(std::ostream&, const Format&);
-    std::ostream& operator<<(std::ostream&, const Content&);
-    std::ostream& operator<<(std::ostream&, const Output&);
-    std::ostream& operator<<(std::ostream&, const CompilerWrapper&);
-    std::ostream& operator<<(std::ostream&, const Compilation&);
     std::ostream& operator<<(std::ostream&, const Configuration&);
-
-    // Utility class to persists configuration in JSON.
-    struct ConfigurationSerializer {
-        virtual ~ConfigurationSerializer() noexcept = default;
-
-        // Serialization methods with error mapping.
-        [[nodiscard]] virtual rust::Result<size_t> to_json(const fs::path &, const Configuration &rhs) const;
-        [[nodiscard]] virtual rust::Result<size_t> to_json(std::ostream &ostream, const Configuration &rhs) const;
-
-        [[nodiscard]] virtual rust::Result<Configuration> from_json(const fs::path &) const;
-        [[nodiscard]] virtual rust::Result<Configuration> from_json(std::istream &istream) const;
-    };
 }

@@ -28,18 +28,20 @@ EOF
 
 cat > "$TEST/config.json" << EOF
 {
-  "compilation": {
-    "compilers_to_exclude": [
-      "$CXX"
-    ]
-  },
-  "output": {
-    "content": {
-      "include_only_existing_source": true
+  "citnames": {
+    "compilation": {
+      "compilers_to_exclude": [
+        "$CXX"
+      ]
     },
-    "format": {
-      "command_as_array": true,
-      "drop_output_field": true
+    "output": {
+      "content": {
+        "include_only_existing_source": true
+      },
+      "format": {
+        "command_as_array": true,
+        "drop_output_field": true
+      }
     }
   }
 }

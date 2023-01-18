@@ -7,20 +7,22 @@
 
 cat > "$1.config.json" << EOF
 {
-  "compilation": {
-    "compilers_to_recognize": [
-      {
-        "executable": "/usr/bin/wrapper"
-      }
-    ]
-  },
-  "output": {
-    "content": {
-      "include_only_existing_source": false
+  "citnames": {
+    "compilation": {
+      "compilers_to_recognize": [
+        {
+          "executable": "/usr/bin/wrapper"
+        }
+      ]
     },
-    "format": {
-      "command_as_array": true,
-      "drop_output_field": false
+    "output": {
+      "content": {
+        "include_only_existing_source": false
+      },
+      "format": {
+        "command_as_array": true,
+        "drop_output_field": false
+      }
     }
   }
 }
