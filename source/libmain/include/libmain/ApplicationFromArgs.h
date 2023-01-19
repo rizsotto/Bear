@@ -30,10 +30,10 @@ namespace ps {
     struct ApplicationFromArgs : Application {
         explicit ApplicationFromArgs(const ApplicationLogConfig&) noexcept;
 
-        rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const override;
+        rust::Result<CommandPtr> command(int argc, const char** argv) const override;
 
         virtual rust::Result<flags::Arguments> parse(int argc, const char** argv) const = 0;
-        virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
+        virtual rust::Result<CommandPtr> command(const flags::Arguments &args) const = 0;
 
         NON_DEFAULT_CONSTRUCTABLE(ApplicationFromArgs)
 

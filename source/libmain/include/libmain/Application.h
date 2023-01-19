@@ -39,13 +39,13 @@ namespace ps {
         virtual ~Application() noexcept = default;
 
         [[nodiscard]]
-        virtual rust::Result<CommandPtr> command(int argc, const char** argv, const char** envp) const = 0;
+        virtual rust::Result<CommandPtr> command(int argc, const char** argv) const = 0;
     };
 
     struct Subcommand {
         virtual ~Subcommand() noexcept = default;
 
         [[nodiscard]]
-        virtual rust::Result<CommandPtr> subcommand(const flags::Arguments &args, const char** envp) const = 0;
+        virtual rust::Result<CommandPtr> subcommand(const flags::Arguments &argv) const = 0;
     };
 }

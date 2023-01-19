@@ -133,7 +133,7 @@ namespace config {
         };
     }
 
-    std::optional<std::runtime_error> Citnames::update(const flags::Arguments& args, const char **envp) {
+    std::optional<std::runtime_error> Citnames::update(const flags::Arguments& args) {
         auto input_arg = args.as_string(cmd::citnames::FLAG_INPUT);
         auto output_arg = args.as_string(cmd::citnames::FLAG_OUTPUT);
         auto append_arg = args.as_bool(cmd::citnames::FLAG_APPEND);
@@ -171,7 +171,7 @@ namespace config {
                 });
         }
 
-        auto enviroment = sys::env::from(envp);
+        auto enviroment = sys::env::get();
         std::list<std::string_view> compiler_enviroment_vars = { "CC", "CXX", "FC" };
         for (const auto &var : enviroment) {
 

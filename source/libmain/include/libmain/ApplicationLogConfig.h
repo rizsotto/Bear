@@ -30,7 +30,7 @@ namespace ps {
         virtual void initForSilent() const;
         virtual void initForVerbose() const;
 
-        void record(const char** argv, const char** envp) const;
+        void record(const char** argv) const;
         void context() const;
 
         NON_DEFAULT_CONSTRUCTABLE(ApplicationLogConfig)

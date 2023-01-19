@@ -39,7 +39,7 @@ namespace ic {
     class Session {
     public:
         using Ptr = std::shared_ptr<Session>;
-        static rust::Result<Session::Ptr> from(const flags::Arguments &args, const char **envp);
+        static rust::Result<Session::Ptr> from(const flags::Arguments &args);
 
     public:
         virtual ~Session() = default;

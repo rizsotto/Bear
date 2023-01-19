@@ -68,8 +68,9 @@ namespace {
 
     namespace Wrapper {
 
-        rust::Result<wr::SessionLocator> make_session(const sys::env::Vars &environment) noexcept
+        rust::Result<wr::SessionLocator> make_session() noexcept
         {
+            const auto& environment = sys::env::get();
             auto destination = environment.find(cmd::wrapper::KEY_DESTINATION);
             return (destination == environment.end())
                    ? rust::Result<wr::SessionLocator>(rust::Err(std::runtime_error("Unknown destination.")))
@@ -84,8 +85,9 @@ namespace {
             return {argv, end};
         }
 
-        rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
+        rust::Result<wr::Execution> make_execution(const char **argv) noexcept
         {
+            const auto& environment = sys::env::get();
             auto program = fs::path(argv[0]);
             auto arguments = from(argv);
 
@@ -105,7 +107,8 @@ namespace {
                     });
         }
 
-        rust::Result<wr::Execution> make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
+        rust::Result<wr::Execution> make_execution(const flags::Arguments &args) noexcept {
+            const auto& environment = sys::env::get();
             auto program = args.as_string(cmd::wrapper::FLAG_EXECUTE)
                     .map<fs::path>([](auto file) { return fs::path(file); });
             auto arguments = args.as_string_list(cmd::wrapper::FLAG_COMMAND)
@@ -176,34 +179,34 @@ namespace wr {
         log_config.initForSilent();
     }
 
-    rust::Result<ps::CommandPtr> Application::command(int argc, const char **argv, const char **envp) const {
+    rust::Result<ps::CommandPtr> Application::command(int argc, const char **argv) const {
         if (const bool wrapper = is_wrapper_call(argc, argv); wrapper) {
             if (const bool verbose = (nullptr != getenv(cmd::wrapper::KEY_VERBOSE)); verbose) {
                 log_config.initForVerbose();
             }
-            log_config.record(argv, envp);
+            log_config.record(argv);
 
-            return Application::from_envs(argc, argv, envp);
+            return Application::from_envs(argc, argv);
         } else {
             return Application::parse(argc, argv)
-                    .on_success([this, &argv, &envp](const auto& args) {
+                    .on_success([this, &argv](const auto& args) {
                         if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
                             log_config.initForVerbose();
                         }
-                        log_config.record(argv, envp);
+                        log_config.record(argv);
                         spdlog::debug("arguments parsed: {0}", args);
                     })
-                    .and_then<ps::CommandPtr>([&envp](auto args) {
+                    .and_then<ps::CommandPtr>([](auto args) {
                         // if parsing success, we create the main command and execute it.
-                        return Application::from_args(args, envp);
+                        return Application::from_args(args);
                     });
         }
     }
 
-    rust::Result<ps::CommandPtr> Application::from_envs(int, const char **argv, const char **envp) {
-        auto environment = sys::env::from(const_cast<const char **>(envp));
-        auto session = Wrapper::make_session(environment);
-        auto execution = Wrapper::make_execution(argv, std::move(environment));
+    rust::Result<ps::CommandPtr> Application::from_envs(int, const char **argv) {
+        auto environment = sys::env::get();
+        auto session = Wrapper::make_session();
+        auto execution = Wrapper::make_execution(argv);
 
         return rust::merge(session, execution)
                 .map<ps::CommandPtr>([](const auto &tuple) {
@@ -212,10 +215,10 @@ namespace wr {
                 });
     }
 
-    rust::Result<ps::CommandPtr> Application::from_args(const flags::Arguments &args, const char **envp) {
-        auto environment = sys::env::from(const_cast<const char **>(envp));
+    rust::Result<ps::CommandPtr> Application::from_args(const flags::Arguments &args) {
+        auto environment = sys::env::get();
         auto session = Supervisor::make_session(args);
-        auto execution = Supervisor::make_execution(args, std::move(environment));
+        auto execution = Supervisor::make_execution(args);
 
         return rust::merge(session, execution)
                 .map<ps::CommandPtr>([](const auto &tuple) {

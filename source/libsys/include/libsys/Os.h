@@ -27,5 +27,5 @@
 namespace sys::os {
 
     // Return PATH from environment and fall back to confstr default one.
-    [[nodiscard]] rust::Result<std::string> get_path(const sys::env::Vars& env);
+    [[nodiscard]] rust::Result<std::string> get_path();
 }

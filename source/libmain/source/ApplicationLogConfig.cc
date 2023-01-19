@@ -28,6 +28,8 @@
 #include <sys/utsname.h>
 #endif
 
+#include <unistd.h>
+
 namespace {
 
     struct Array {
@@ -68,11 +70,11 @@ namespace ps {
         spdlog::set_level(spdlog::level::debug);
     }
 
-    void ApplicationLogConfig::record(const char** argv, const char** envp) const
+    void ApplicationLogConfig::record(const char** argv) const
     {
         spdlog::debug("{0}: {1}", name_, cmd::VERSION);
         spdlog::debug("arguments: {0}", Array { argv });
-        spdlog::debug("environment: {0}", Array { envp });
+        spdlog::debug("environment: {0}", Array { const_cast<const char **>(environ) });
     }
 
     void ApplicationLogConfig::context() const {

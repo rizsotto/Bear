@@ -49,8 +49,9 @@ namespace sys::os {
     }
 #endif
 
-    rust::Result<std::string> get_path(const sys::env::Vars& environment)
+    rust::Result<std::string> get_path()
     {
+        const auto& environment = sys::env::get();
         if (auto candidate = environment.find("PATH"); candidate != environment.end()) {
             return rust::Ok(candidate->second);
         }

@@ -32,9 +32,9 @@ namespace ps {
         explicit SubcommandFromArgs(const char* name, const ApplicationLogConfig&) noexcept;
 
         bool matches(const flags::Arguments &args);
-        rust::Result<CommandPtr> subcommand(const flags::Arguments &args, const char** envp) const override;
+        rust::Result<CommandPtr> subcommand(const flags::Arguments &args) const override;
 
-        virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
+        virtual rust::Result<CommandPtr> command(const flags::Arguments &args) const = 0;
 
         NON_DEFAULT_CONSTRUCTABLE(SubcommandFromArgs)
 

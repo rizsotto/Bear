@@ -20,7 +20,7 @@
 #include "libmain/main.h"
 #include "report/wrapper/Application.h"
 
-int main(int argc, char* argv[], char* envp[])
+int main(int argc, char* argv[])
 {
-    return ps::main<wr::Application>(argc, argv, envp);
+    return ps::main<wr::Application>(argc, argv);
 }

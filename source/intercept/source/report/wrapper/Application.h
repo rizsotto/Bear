@@ -43,11 +43,11 @@ namespace wr {
 
     struct Application : ps::Application {
         Application() noexcept;
-        rust::Result<ps::CommandPtr> command(int argc, const char **argv, const char **envp) const override;
+        rust::Result<ps::CommandPtr> command(int argc, const char **argv) const override;
 
-        static rust::Result<ps::CommandPtr> from_envs(int argc, const char **argv, const char **envp);
-        static rust::Result<ps::CommandPtr> from_args(const flags::Arguments &args, const char **envp);
-        static rust::Result<flags::Arguments> parse(int argc, const char **argv) ;
+        static rust::Result<ps::CommandPtr> from_envs(int argc, const char **argv);
+        static rust::Result<ps::CommandPtr> from_args(const flags::Arguments &args);
+        static rust::Result<flags::Arguments> parse(int argc, const char **argv);
 
     private:
         ps::ApplicationLogConfig const &log_config;

@@ -26,13 +26,11 @@
 namespace ps {
 
     template <class App>
-    int main(int argc, char* argv[], char* envp[]) {
+    int main(int argc, char* argv[]) {
         App app;
         auto ptr = reinterpret_cast<ps::Application*>(&app);
 
-        return ptr->command(argc,
-                            const_cast<const char **>(argv),
-                            const_cast<const char **>(envp))
+        return ptr->command(argc, const_cast<const char **>(argv))
                 .and_then<int>([](const ps::CommandPtr &cmd) {
                     return cmd->execute();
                 })

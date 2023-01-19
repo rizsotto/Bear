@@ -22,6 +22,7 @@
 
 #include <cstring>
 #include <functional>
+#include <unistd.h>
 
 namespace {
 
@@ -72,19 +73,34 @@ namespace sys::env {
         return data_;
     }
 
-    Vars from(const char** const input)
+    Vars from(const char** value)
     {
         Vars result;
-        if (input == nullptr)
+
+        if (!value)
             return result;
 
-        for (const char** it = input; *it != nullptr; ++it) {
+        for (const char** it = value; *it != nullptr; ++it) {
             const auto end = *it + std::strlen(*it);
             const auto sep = std::find(*it, end, '=');
             const std::string key = (sep != end) ? std::string(*it, sep) : std::string(*it, end);
             const std::string value = (sep != end) ? std::string(sep + 1, end) : std::string();
             result.emplace(key, value);
         }
+
+        return result;
+    }
+
+    const Vars& get()
+    {
+        static Vars result;
+        static bool initialized = false;
+
+        if (!initialized) {
+            result = from(const_cast<const char **>(environ));
+            initialized = true;
+        }
+
         return result;
     }
 }

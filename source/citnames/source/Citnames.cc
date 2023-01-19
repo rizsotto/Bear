@@ -96,7 +96,7 @@ namespace cs {
             : ps::SubcommandFromArgs("citnames", log_config)
     { }
 
-    rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args, const char **envp) const {
+    rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args) const {
         auto config = config::Configuration::load_config(args);
 
         if (config.is_err()) {
@@ -105,7 +105,7 @@ namespace cs {
 
         auto citnames_config = config.unwrap().citnames;
 
-        if (auto error = citnames_config.update(args, envp); error.has_value()) {
+        if (auto error = citnames_config.update(args); error.has_value()) {
             return rust::Err(*error);
         }
 

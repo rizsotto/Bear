@@ -26,6 +26,10 @@ namespace sys::env {
 
     using Vars = std::map<std::string, std::string>;
 
-    // Convert an environment array into a map.
+    // Convert an enviroment array into a map.
+    // Used for testing
     Vars from(const char** value);
+
+    // Get enviroment variables form environ.
+    const Vars& get();
 }

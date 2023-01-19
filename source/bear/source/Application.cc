@@ -178,14 +178,14 @@ namespace bear {
 		return parser.parse_or_exit(argc, const_cast<const char **>(argv));
 	}
 
-	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const
+	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args) const
 	{
         if (args.as_string(flags::COMMAND).is_ok()) {
             if (auto citnames = cs::Citnames(log_config_); citnames.matches(args)) {
-                return citnames.subcommand(args, envp);
+                return citnames.subcommand(args);
             }
             if (auto intercept = ic::Intercept(log_config_); intercept.matches(args)) {
-                return intercept.subcommand(args, envp);
+                return intercept.subcommand(args);
             }
 
             return rust::Err(std::runtime_error("Invalid subcommand"));
@@ -197,7 +197,7 @@ namespace bear {
 				})
 				.unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
 
-		auto environment = sys::env::from(const_cast<const char **>(envp));
+		auto environment = sys::env::get();
 		auto intercept = prepare_intercept(args, environment, commands);
 		auto citnames = prepare_citnames(args, environment, commands);
 

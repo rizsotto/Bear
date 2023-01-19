@@ -32,11 +32,11 @@
 
 namespace ic {
 
-    rust::Result<Session::Ptr> Session::from(const flags::Arguments& args, const char **envp)
+    rust::Result<Session::Ptr> Session::from(const flags::Arguments& args)
 #ifdef SUPPORT_PRELOAD
     {
         if (args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER).unwrap_or(false))
-            return WrapperSession::from(args, envp);
+            return WrapperSession::from(args);
         if (args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD).unwrap_or(false))
             return LibraryPreloadSession::from(args);
 
@@ -44,7 +44,7 @@ namespace ic {
     }
 #else
     {
-        return WrapperSession::from(args, envp);
+        return WrapperSession::from(args);
     }
 #endif
 

@@ -19,7 +19,6 @@
 
 #pragma once
 
-
 #include <libresult/Result.h>
 #include <libflags/Flags.h>
 
@@ -93,7 +92,7 @@ namespace config {
         fs::path output_file = cmd::citnames::DEFAULT_OUTPUT;
         bool append = false;
 
-        std::optional<std::runtime_error> update(const flags::Arguments& flags, const char **envp);
+        std::optional<std::runtime_error> update(const flags::Arguments& args);
     };
 
     // Convenient methods for these types.

@@ -43,12 +43,12 @@ namespace ps {
         return args.as_string(flags::COMMAND).unwrap_or("") == name_;
     }
 
-	rust::Result<CommandPtr> SubcommandFromArgs::subcommand(const flags::Arguments &args, const char** envp) const {
+	rust::Result<CommandPtr> SubcommandFromArgs::subcommand(const flags::Arguments &args) const {
         if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
             log_config_.initForVerbose();
         }
 
-        return this->command(args, envp);
+        return this->command(args);
 	}
 
 }
