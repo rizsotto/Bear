@@ -209,7 +209,11 @@ namespace rust {
         Result<T, E> or_else(std::function<Result<T, E>(const E&)> const& f) const;
 
         const T& unwrap() const;
+        template <typename U>
+        void unwrap_to(U& reciver) const;
         const E& unwrap_err() const;
+        template <typename U>
+        void unwrap_err_to(U& reciver) const;
         const T& unwrap_or(const T& value) const;
 
         T unwrap_or_else(std::function<T(const E&)> const& provider) const;
@@ -486,9 +490,27 @@ namespace rust {
     }
 
     template <typename T, typename E>
+    template <typename U>
+    void Result<T, E>::unwrap_to(U &reciver) const
+    {
+        if (ok_) {
+            reciver = storage_.template get<T>();
+        }
+    }
+
+    template <typename T, typename E>
     const E& Result<T, E>::unwrap_err() const
     {
         return storage_.template get<E>();
+    }
+
+    template <typename T, typename E>
+    template <typename U>
+    void Result<T, E>::unwrap_err_to(U &reciver) const
+    {
+        if (!ok_) {
+            reciver = storage_.template get<E>();
+        }
     }
 
     template <typename T, typename E>
