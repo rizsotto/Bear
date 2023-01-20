@@ -120,31 +120,31 @@ namespace {
 
 namespace bear {
 
-	Command::Command(const sys::Process::Builder& intercept, const sys::Process::Builder& citnames, fs::path output) noexcept
-			: ps::Command()
-			, intercept_(intercept)
-			, citnames_(citnames)
-			, output_(std::move(output))
-	{ }
+    Command::Command(const sys::Process::Builder& intercept, const sys::Process::Builder& citnames, fs::path output) noexcept
+            : ps::Command()
+            , intercept_(intercept)
+            , citnames_(citnames)
+            , output_(std::move(output))
+    { }
 
-	[[nodiscard]] rust::Result<int> Command::execute() const
-	{
-		auto result = ::execute(intercept_, "intercept");
+    [[nodiscard]] rust::Result<int> Command::execute() const
+    {
+        auto result = ::execute(intercept_, "intercept");
 
-		std::error_code error_code;
-		if (fs::exists(output_, error_code)) {
-			::execute(citnames_, "citnames");
-			fs::remove(output_, error_code);
-		}
-		return result;
-	}
+        std::error_code error_code;
+        if (fs::exists(output_, error_code)) {
+            ::execute(citnames_, "citnames");
+            fs::remove(output_, error_code);
+        }
+        return result;
+    }
 
-	Application::Application()
-			: ps::ApplicationFromArgs(ps::ApplicationLogConfig("bear", "br"))
-	{ }
+    Application::Application()
+            : ps::ApplicationFromArgs(ps::ApplicationLogConfig("bear", "br"))
+    { }
 
-	rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const
-	{
+    rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const
+    {
         const flags::Parser intercept_parser("intercept", cmd::VERSION, {
                 {cmd::intercept::FLAG_OUTPUT,        {1,  false, "path of the result file",        {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
                 {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,                     DEVELOPER_GROUP}},
@@ -163,23 +163,23 @@ namespace bear {
                 {cmd::citnames::FLAG_RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                     std::nullopt}}
         });
 
-		const flags::Parser parser("bear", cmd::VERSION, {intercept_parser, citnames_parser}, {
-				{cmd::citnames::FLAG_OUTPUT,         {1,  false, "path of the result file",                  {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
-				{cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                     ADVANCED_GROUP}},
-				{cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                     ADVANCED_GROUP}},
-				{cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                     ADVANCED_GROUP}},
-				{cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                     ADVANCED_GROUP}},
-				{cmd::bear::FLAG_BEAR,               {1,  false, "path to the bear executable",              {cmd::bear::DEFAULT_PATH},        DEVELOPER_GROUP}},
-				{cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
-				{cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
-				{cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
-				{cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                     std::nullopt}}
-		});
-		return parser.parse_or_exit(argc, const_cast<const char **>(argv));
-	}
+        const flags::Parser parser("bear", cmd::VERSION, {intercept_parser, citnames_parser}, {
+                {cmd::citnames::FLAG_OUTPUT,         {1,  false, "path of the result file",                  {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
+                {cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                     ADVANCED_GROUP}},
+                {cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                     ADVANCED_GROUP}},
+                {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                     ADVANCED_GROUP}},
+                {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                     ADVANCED_GROUP}},
+                {cmd::bear::FLAG_BEAR,               {1,  false, "path to the bear executable",              {cmd::bear::DEFAULT_PATH},        DEVELOPER_GROUP}},
+                {cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
+                {cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
+                {cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
+                {cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                     std::nullopt}}
+        });
+        return parser.parse_or_exit(argc, const_cast<const char **>(argv));
+    }
 
-	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args) const
-	{
+    rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args) const
+    {
         auto configuration = config::Configuration::load_config(args);
 
         return configuration
@@ -211,5 +211,5 @@ namespace bear {
                                 return std::make_unique<Command>(intercept, citnames, commands);
                     });
                 });
-	}
+    }
 }
