@@ -25,9 +25,9 @@ namespace ic {
 
     class LibraryPreloadSession : public ic::Session {
     public:
-        LibraryPreloadSession(bool verbose, const std::string_view &library, const std::string_view &executor);
+        LibraryPreloadSession(bool verbose, const std::string &library, const std::string &executor);
 
-        static rust::Result<Session::Ptr> from(const flags::Arguments&);
+        static Session::Ptr from(const config::Intercept&);
 
         [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &execution) const override;
         [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;

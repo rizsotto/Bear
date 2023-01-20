@@ -92,20 +92,18 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments &args, const char **envp)
+    rust::Result<Session::Ptr> WrapperSession::from(const config::Intercept &config)
     {
-        const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto wrapper_dir = args.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
-        auto wrappers = wrapper_dir.and_then<std::list<fs::path>>(list_dir);
+        auto wrappers = list_dir(config.wrapper_dir);
 
         auto mapping = wrappers
-            .map<std::map<std::string, fs::path>>([&envp](auto wrappers) {
+            .map<std::map<std::string, fs::path>>([](auto wrappers) {
                 // Find the executables with the same name from the path.
                 std::map<std::string, fs::path> result;
                 el::Resolver resolver;
                 for (const auto& wrapper : wrappers) {
                     auto basename = wrapper.filename();
-                    auto candidate = resolver.from_path(basename.c_str(), envp);
+                    auto candidate = resolver.from_path(basename.c_str(), const_cast<const char **>(environ));
                     candidate.on_success([&result, &basename](auto candidate) {
                         result[basename] = fs::path(candidate);
                     });
@@ -113,21 +111,19 @@ namespace ic {
                 return result;
             });
 
-        return rust::merge(wrapper_dir, mapping)
-            .map<Session::Ptr>([&envp, &verbose](const auto &tuple) {
-                const auto& [wrapper_dir, const_mapping] = tuple;
-
+        return mapping
+            .map<Session::Ptr>([&config](const auto &const_mapping) {
                 std::map<std::string, fs::path> mapping(const_mapping);
                 std::map<std::string, fs::path> override;
                 el::Resolver resolver;
                 // check if any environment variable is naming the real compiler
                 for (auto implicit : IMPLICITS) {
                     // find any of the implicit defined in environment.
-                    if (auto env_value = el::env::get_env_value(envp, implicit.env); env_value != nullptr) {
+                    if (auto env_value = el::env::get_env_value(const_cast<const char **>(environ), implicit.env); env_value != nullptr) {
                         // FIXME: it would be more correct if we shell-split the `env_value->second`
                         //        and use only the program name, but not the argument. But then how
                         //        to deal with the errors?
-                        resolver.from_path(std::string_view(env_value), envp)
+                        resolver.from_path(std::string_view(env_value), const_cast<const char **>(environ))
                                 .on_success([&mapping, &implicit, &override](auto executable) {
                                     // find the current mapping for the program the user wants to run.
                                     // and replace the program what the wrapper will call.
@@ -141,7 +137,7 @@ namespace ic {
                                 });
                     }
                 }
-                return std::make_shared<WrapperSession>(verbose, std::string(wrapper_dir), std::move(mapping), std::move(override));
+                return std::make_shared<WrapperSession>(config.verbose, std::string(config.wrapper_dir), std::move(mapping), std::move(override));
             });
     }
 

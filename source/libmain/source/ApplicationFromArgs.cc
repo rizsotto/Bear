@@ -36,20 +36,20 @@ namespace ps {
         log_config_.initForSilent();
     }
 
-    rust::Result<CommandPtr> ApplicationFromArgs::command(int argc, const char** argv, const char** envp) const
+    rust::Result<CommandPtr> ApplicationFromArgs::command(int argc, const char** argv) const
     {
         return parse(argc, argv)
-            .on_success([this, &argv, &envp](const auto& args) {
+            .on_success([this, &argv](const auto& args) {
                 if (args.as_bool(flags::VERBOSE).unwrap_or(false)) {
                     log_config_.initForVerbose();
                 }
-                log_config_.record(argv, envp);
+                log_config_.record(argv);
                 log_config_.context();
                 spdlog::debug("arguments parsed: {0}", args);
             })
             // if parsing success, we create the main command and execute it.
-            .and_then<CommandPtr>([this, &envp](auto args) {
-                return this->command(args, envp);
+            .and_then<CommandPtr>([this](auto args) {
+                return this->command(args);
             });
     }
 }

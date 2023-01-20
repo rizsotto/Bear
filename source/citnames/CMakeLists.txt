@@ -2,12 +2,12 @@
 add_library(citnames_json_a OBJECT)
 target_sources(citnames_json_a
         PRIVATE
-            source/Configuration.cc
             source/Output.cc
         INTERFACE
             $<TARGET_OBJECTS:citnames_json_a>
         )
 target_link_libraries(citnames_json_a PUBLIC
+        config_a
         result_a
         shell_a
         sys_a
@@ -37,6 +37,7 @@ target_sources(citnames_a
 target_link_libraries(citnames_a PUBLIC
         main_a
         citnames_json_a
+        config_a
         events_db_a
         domain_a
         result_a

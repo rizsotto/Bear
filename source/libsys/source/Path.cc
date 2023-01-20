@@ -75,4 +75,18 @@ namespace sys::path {
                ? rust::Result<fs::path>(rust::Err(std::runtime_error(error_code.message())))
                : rust::Result<fs::path>(rust::Ok(std::move(result)));
     }
+
+    rust::Result<std::list<fs::path>> to_abspath(const std::list<fs::path> &paths)
+    {
+        auto root = get_cwd();
+        return root
+            .map<std::list<fs::path>>([paths](const auto& root){
+                std::list<fs::path> results;
+                for (const auto &path : paths) {
+                    auto result = path.is_absolute() ? path : root / path;
+                    results.emplace_back(result);
+                }
+                return results;
+            });
+    }
 }

@@ -20,6 +20,7 @@
 #pragma once
 
 #include <libresult/Result.h>
+#include <libflags/Flags.h>
 
 #include <filesystem>
 #include <iosfwd>
@@ -31,7 +32,7 @@
 
 namespace fs = std::filesystem;
 
-namespace cs {
+namespace config {
 
     static const std::string DUPLICATE_FILE = "file";
     static const std::string DUPLICATE_FILE_OUTPUT = "file_output";
@@ -84,9 +85,14 @@ namespace cs {
     };
 
     // Represents the application configuration.
-    struct Configuration {
+    struct Citnames {
         Output output;
         Compilation compilation;
+        fs::path input_file;
+        fs::path output_file = cmd::citnames::DEFAULT_OUTPUT;
+        bool append = false;
+
+        std::optional<std::runtime_error> update(const flags::Arguments& args);
     };
 
     // Convenient methods for these types.
@@ -95,17 +101,5 @@ namespace cs {
     std::ostream& operator<<(std::ostream&, const Output&);
     std::ostream& operator<<(std::ostream&, const CompilerWrapper&);
     std::ostream& operator<<(std::ostream&, const Compilation&);
-    std::ostream& operator<<(std::ostream&, const Configuration&);
-
-    // Utility class to persists configuration in JSON.
-    struct ConfigurationSerializer {
-        virtual ~ConfigurationSerializer() noexcept = default;
-
-        // Serialization methods with error mapping.
-        [[nodiscard]] virtual rust::Result<size_t> to_json(const fs::path &, const Configuration &rhs) const;
-        [[nodiscard]] virtual rust::Result<size_t> to_json(std::ostream &ostream, const Configuration &rhs) const;
-
-        [[nodiscard]] virtual rust::Result<Configuration> from_json(const fs::path &) const;
-        [[nodiscard]] virtual rust::Result<Configuration> from_json(std::istream &istream) const;
-    };
+    std::ostream& operator<<(std::ostream&, const Citnames&);
 }

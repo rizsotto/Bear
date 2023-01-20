@@ -19,7 +19,7 @@
 
 #pragma once
 
-#include "Configuration.h"
+#include "libconfig/Configuration.h"
 #include "libresult/Result.h"
 
 #include <filesystem>
@@ -66,7 +66,7 @@ namespace cs {
     struct CompilationDatabase {
         using Entries = std::list<Entry>;
 
-        CompilationDatabase(Format, Content);
+        CompilationDatabase(config::Format, config::Content);
         virtual ~CompilationDatabase() noexcept = default;
 
         // Serialization methods with error mapping.
@@ -77,7 +77,7 @@ namespace cs {
         [[nodiscard]] virtual rust::Result<size_t> from_json(std::istream &istream, Entries &entries) const;
 
     private:
-        Format format;
-        Content content;
+        config::Format format;
+        config::Content content;
     };
 }

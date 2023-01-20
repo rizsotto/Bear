@@ -28,19 +28,21 @@ EOF
 
 cat > "$TEST/config.json" << EOF
 {
-  "output": {
-    "content": {
-      "include_only_existing_source": true,
-      "paths_to_include": [
-        "$TEST"
-      ],
-      "paths_to_exclude": [
-        "$TEST/exclude"
-      ]
-    },
-    "format": {
-      "command_as_array": true,
-      "drop_output_field": true
+  "citnames": {
+    "output": {
+      "content": {
+        "include_only_existing_source": true,
+        "paths_to_include": [
+          "$TEST"
+        ],
+        "paths_to_exclude": [
+          "$TEST/exclude"
+        ]
+      },
+      "format": {
+        "command_as_array": true,
+        "drop_output_field": true
+      }
     }
   }
 }

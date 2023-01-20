@@ -57,6 +57,6 @@ namespace bear {
 
         rust::Result<flags::Arguments> parse(int argc, const char **argv) const override;
 
-        rust::Result<ps::CommandPtr> command(const flags::Arguments &args, const char **envp) const override;
+        rust::Result<ps::CommandPtr> command(const flags::Arguments &args) const override;
     };
 }

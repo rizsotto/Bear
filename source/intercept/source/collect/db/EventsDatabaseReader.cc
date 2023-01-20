@@ -36,6 +36,10 @@ namespace {
 namespace ic::collect::db {
 
     rust::Result<EventsDatabaseReader::Ptr> EventsDatabaseReader::from(const fs::path &path) {
+        std::error_code error_code;
+        if (!fs::exists(path, error_code)) {
+            return rust::Err(std::runtime_error(fmt::format("Cannot find input file: {}", path.c_str())));
+        }
         std::unique_ptr<std::istream> file =
                 std::make_unique<std::fstream>(path, std::ios::in);
         std::shared_ptr<EventsDatabaseReader> result =

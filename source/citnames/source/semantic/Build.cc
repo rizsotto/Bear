@@ -38,7 +38,7 @@ template <> struct fmt::formatter<domain::Execution> : ostream_formatter {};
 
 namespace {
 
-    std::shared_ptr<cs::semantic::Tool> from(cs::Compilation cfg) {
+    std::shared_ptr<cs::semantic::Tool> from(config::Compilation cfg) {
         cs::semantic::ToolAny::ToolPtrs tools = {
                 std::make_shared<cs::semantic::ToolGcc>(),
                 std::make_shared<cs::semantic::ToolClang>(),
@@ -57,7 +57,7 @@ namespace {
 
 namespace cs::semantic {
 
-    Build::Build(Compilation cfg) noexcept
+    Build::Build(config::Compilation cfg) noexcept
             : tools_(from(std::move(cfg)))
     { }
 

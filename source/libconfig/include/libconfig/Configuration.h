@@ -1,4 +1,4 @@
-/*  Copyright (C) 2023 by Samu698
+/*  Copyright (C) 2012-2022 by László Nagy
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -19,27 +19,30 @@
 
 #pragma once
 
-#include "config.h"
-#include "libmain/Application.h"
-#include "libmain/ApplicationLogConfig.h"
-#include "libresult/Result.h"
-#include "libflags/Flags.h"
+#include <libresult/Result.h>
+#include <libflags/Flags.h>
+
+#include <iosfwd>
+#include <list>
+#include <map>
 #include <string>
+#include <optional>
+#include <utility>
 
-namespace ps {
+#include "Citnames-config.h"
+#include "Intercept-config.h"
 
-    struct SubcommandFromArgs : Subcommand {
-        explicit SubcommandFromArgs(const char* name, const ApplicationLogConfig&) noexcept;
+namespace config {
 
-        bool matches(const flags::Arguments &args);
-        rust::Result<CommandPtr> subcommand(const flags::Arguments &args, const char** envp) const override;
+    // Represents the application configuration.
+    struct Configuration {
+        Citnames citnames;
+        Intercept intercept;
 
-        virtual rust::Result<CommandPtr> command(const flags::Arguments &args, const char** envp) const = 0;
-
-        NON_DEFAULT_CONSTRUCTABLE(SubcommandFromArgs)
-
-    protected:
-		std::string name_;
-        ApplicationLogConfig log_config_;
+        static rust::Result<Configuration> load_config(const flags::Arguments& args);
+        //std::string to_json();
     };
+
+    // Convenient methods for these types.
+    std::ostream& operator<<(std::ostream&, const Configuration&);
 }

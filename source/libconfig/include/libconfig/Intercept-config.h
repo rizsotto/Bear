@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2022 by László Nagy
+/*  Copyright (C) 2012-2023 by Samu698
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -19,23 +19,34 @@
 
 #pragma once
 
-#include "config.h"
-#include "libresult/Result.h"
+#include <libresult/Result.h>
+#include <libflags/Flags.h>
 
 #include <filesystem>
+#include <iosfwd>
 #include <list>
+#include <map>
 #include <string>
+#include <optional>
+#include <utility>
 
 namespace fs = std::filesystem;
 
-namespace sys::path {
+namespace config {
 
-    // PATH variable manipulation functions
-    //
-    // https://en.wikipedia.org/wiki/PATH_(variable)
-    std::list<fs::path> split(const std::string &input);
-    std::string join(const std::list<fs::path> &input);
+    struct Intercept {
+        fs::path output_file = cmd::intercept::DEFAULT_OUTPUT;
+        fs::path library = cmd::library::DEFAULT_PATH;
+        fs::path wrapper = cmd::wrapper::DEFAULT_PATH;
+        fs::path wrapper_dir = cmd::wrapper::DEFAULT_DIR_PATH;
+        std::list<std::string> command;
+        bool use_preload = true;
+        bool use_wrapper = true;
+        bool verbose = false;
 
-    rust::Result<fs::path> get_cwd();
-    rust::Result<std::list<fs::path>> to_abspath(const std::list<fs::path> &paths);
+        std::optional<std::runtime_error> update(const flags::Arguments& args);
+    };
+
+    // Convenient methods for these types.
+    std::ostream& operator<<(std::ostream&, const Intercept&);
 }

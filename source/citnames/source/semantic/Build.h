@@ -20,9 +20,9 @@
 #pragma once
 
 #include "config.h"
-#include "Configuration.h"
 #include "semantic/Tool.h"
 #include "intercept.grpc.pb.h"
+#include "libconfig/Configuration.h"
 
 #include <memory>
 
@@ -33,7 +33,7 @@ namespace cs::semantic {
     // based on configuration.
     class Build {
     public:
-        explicit Build(Compilation cfg) noexcept;
+        explicit Build(config::Compilation cfg) noexcept;
 
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const rpc::Event &event) const;

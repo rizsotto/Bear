@@ -25,7 +25,7 @@ namespace cs::semantic {
 
     struct ToolExtendingWrapper : public ToolGcc {
 
-        explicit ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept;
+        explicit ToolExtendingWrapper(config::CompilerWrapper &&compilers_to_recognize) noexcept;
 
         [[nodiscard]]
         bool is_compiler_call(const fs::path& program) const override;
@@ -34,6 +34,6 @@ namespace cs::semantic {
         rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
 
     private:
-        CompilerWrapper compilers_to_recognize_;
+        config::CompilerWrapper compilers_to_recognize_;
     };
 }

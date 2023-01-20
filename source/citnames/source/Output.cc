@@ -38,7 +38,7 @@ namespace {
     };
 
     struct ContentFilter : public Filter {
-        explicit ContentFilter(cs::Content config)
+        explicit ContentFilter(config::Content config)
                 : config(std::move(config))
         { }
 
@@ -79,7 +79,7 @@ namespace {
         }
 
     private:
-        const cs::Content config;
+        const config::Content config;
     };
 
     // Pure version of the boost::hash_combine function.
@@ -90,7 +90,7 @@ namespace {
     using DuplicateFilterPtr = std::unique_ptr<struct DuplicateFilter>;
 
     struct DuplicateFilter : public Filter {
-        static DuplicateFilterPtr from_content(const cs::Content&);
+        static DuplicateFilterPtr from_content(const config::Content&);
 
         bool apply(const cs::Entry &entry) override {
             const auto h2 = hash(entry);
@@ -148,15 +148,15 @@ namespace {
             }
     };
 
-    DuplicateFilterPtr DuplicateFilter::from_content(const cs::Content& content) {
+    DuplicateFilterPtr DuplicateFilter::from_content(const config::Content& content) {
         auto fields = content.duplicate_filter_fields;
-        if (fields == cs::DUPLICATE_ALL) {
+        if (fields == config::DUPLICATE_ALL) {
             return std::make_unique<StrictDuplicateFilter>();
         }
-        if (fields == cs::DUPLICATE_FILE_OUTPUT) {
+        if (fields == config::DUPLICATE_FILE_OUTPUT) {
             return std::make_unique<FileOutputDuplicateFilter>();
         }
-        if (fields == cs::DUPLICATE_FILE) {
+        if (fields == config::DUPLICATE_FILE) {
             return std::make_unique<FileDuplicateFilter>();
         }
 
@@ -183,7 +183,7 @@ namespace cs {
         }
     }
 
-    nlohmann::json to_json(const Entry &rhs, const Format &format) {
+    nlohmann::json to_json(const Entry &rhs, const config::Format &format) {
         nlohmann::json json;
 
         json["file"] = rhs.file;
@@ -238,14 +238,14 @@ namespace cs {
     }
 
     std::ostream &operator<<(std::ostream &os, const Entry &entry) {
-        const Format format;
+        const config::Format format;
         const nlohmann::json &json = to_json(entry, format);
         os << json;
 
         return os;
     }
 
-    CompilationDatabase::CompilationDatabase(Format _format, Content _content)
+    CompilationDatabase::CompilationDatabase(config::Format _format, config::Content _content)
             : format(_format)
             , content(std::move(_content))
     { }

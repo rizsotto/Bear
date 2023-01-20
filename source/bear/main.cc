@@ -20,6 +20,6 @@
 #include "source/Application.h"
 #include "libmain/main.h"
 
-int main(int argc, char *argv[], char *envp[]) {
-    return ps::main<bear::Application>(argc, argv, envp);
+int main(int argc, char *argv[]) {
+    return ps::main<bear::Application>(argc, argv);
 }
