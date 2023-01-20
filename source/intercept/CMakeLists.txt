@@ -47,6 +47,7 @@ target_link_libraries(intercept_a PUBLIC
         main_a
         events_db_a
         exec_a
+        config_a
         flags_a
         rpc_a
         sys_a

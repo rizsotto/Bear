@@ -30,16 +30,22 @@ namespace config {
     // Forward declarations
     void from_json(const nlohmann::json &j, Citnames &rhs);
     void to_json(nlohmann::json &j, const Citnames &rhs);
+    void from_json(const nlohmann::json &j, Intercept &rhs);
+    void to_json(nlohmann::json &j, const Intercept &rhs);
 
     void from_json(const nlohmann::json &j, Configuration &rhs) {
         if (j.contains("citnames")) {
             j.at("citnames").get_to(rhs.citnames);
+        }
+        if (j.contains("intercept")) {
+            j.at("intercept").get_to(rhs.intercept);
         }
     }
 
     void to_json(nlohmann::json &j, const Configuration &rhs) {
         j = nlohmann::json{
                 {"citnames",  rhs.citnames},
+                {"intercept",  rhs.intercept},
         };
     }
 

@@ -26,12 +26,8 @@
 
 namespace ic {
 
-    rust::Result<Reporter::Ptr> Reporter::from(const flags::Arguments& flags) {
-        return flags
-                .as_string(cmd::intercept::FLAG_OUTPUT)
-                .and_then<ic::collect::db::EventsDatabaseWriter::Ptr>([](auto file) {
-                    return ic::collect::db::EventsDatabaseWriter::create(file);
-                })
+    rust::Result<Reporter::Ptr> Reporter::from(const config::Intercept &config) {
+        return ic::collect::db::EventsDatabaseWriter::create(config.output_file)
                 .map<Reporter::Ptr>([](auto events) {
                     return std::make_shared<Reporter>(events);
                 });

@@ -32,19 +32,21 @@
 
 namespace ic {
 
-    rust::Result<Session::Ptr> Session::from(const flags::Arguments& args)
+    rust::Result<Session::Ptr> Session::from(const config::Intercept& config)
 #ifdef SUPPORT_PRELOAD
     {
-        if (args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER).unwrap_or(false))
-            return WrapperSession::from(args);
-        if (args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD).unwrap_or(false))
-            return LibraryPreloadSession::from(args);
+        if (config.use_preload) {
+            return rust::Ok(LibraryPreloadSession::from(config));
+        }
+        if (config.use_wrapper) {
+            return WrapperSession::from(config);
+        }
 
-        return LibraryPreloadSession::from(args);
+        return rust::Err(std::runtime_error("No interception methods selected"));
     }
 #else
     {
-        return WrapperSession::from(args);
+        return WrapperSession::from(config);
     }
 #endif
 

@@ -4,6 +4,7 @@ target_sources(config_a
         PRIVATE
             source/Configuration.cc
             source/Citnames-config.cc
+            source/Intercept-config.cc
         INTERFACE
             $<TARGET_OBJECTS:config_a>
         )

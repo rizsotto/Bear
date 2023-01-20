@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2022 by László Nagy
+/*  Copyright (C) 2012-2022 by Samu698
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.
@@ -22,6 +22,7 @@
 #include <libresult/Result.h>
 #include <libflags/Flags.h>
 
+#include <filesystem>
 #include <iosfwd>
 #include <list>
 #include <map>
@@ -29,20 +30,23 @@
 #include <optional>
 #include <utility>
 
-#include "Citnames-config.h"
-#include "Intercept-config.h"
+namespace fs = std::filesystem;
 
 namespace config {
 
-    // Represents the application configuration.
-    struct Configuration {
-        Citnames citnames;
-        Intercept intercept;
+    struct Intercept {
+        fs::path output_file = cmd::intercept::DEFAULT_OUTPUT;
+        fs::path library = cmd::library::DEFAULT_PATH;
+        fs::path wrapper = cmd::wrapper::DEFAULT_PATH;
+        fs::path wrapper_dir = cmd::wrapper::DEFAULT_DIR_PATH;
+        std::list<std::string> command;
+        bool use_preload = true;
+        bool use_wrapper = true;
+        bool verbose = false;
 
-        static rust::Result<Configuration> load_config(const flags::Arguments& args);
-        //std::string to_json();
+        std::optional<std::runtime_error> update(const flags::Arguments& args);
     };
 
     // Convenient methods for these types.
-    std::ostream& operator<<(std::ostream&, const Configuration&);
+    std::ostream& operator<<(std::ostream&, const Intercept&);
 }
