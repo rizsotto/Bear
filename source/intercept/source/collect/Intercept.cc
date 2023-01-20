@@ -97,29 +97,23 @@ namespace ic {
         return result;
     }
 
-    Intercept::Intercept(const ps::ApplicationLogConfig& log_config) noexcept
-            : ps::SubcommandFromArgs("intercept", log_config)
+    Intercept::Intercept(const config::Intercept &config, const ps::ApplicationLogConfig& log_config) noexcept
+            : ps::SubcommandFromConfig<config::Intercept>("intercept", log_config, config)
     { }
 
-    rust::Result<ps::CommandPtr> Intercept::command(const flags::Arguments &args) const {
-        auto config = config::Configuration::load_config(args);
-        if (config.is_err()) {
-            return rust::Err(config.unwrap_err());
-        }
-
-        auto intercept_config = config.unwrap().intercept;
-        if (auto error = intercept_config.update(args); error) {
-            return rust::Err(*error);
-        }
-
-        const auto execution = capture_execution(intercept_config);
-        const auto session = Session::from(intercept_config);
-        const auto reporter = Reporter::from(intercept_config);
+    rust::Result<ps::CommandPtr> Intercept::command(const config::Intercept &config) const {
+        const auto execution = capture_execution(config);
+        const auto session = Session::from(config);
+        const auto reporter = Reporter::from(config);
 
         return rust::merge(execution, session, reporter)
                 .map<ps::CommandPtr>([](auto tuple) {
                     const auto&[execution, session, reporter] = tuple;
                     return std::make_unique<Command>(execution, session, reporter);
                 });
+    }
+
+    std::optional<std::runtime_error> Intercept::update_config(const flags::Arguments &args) {
+        return config_.update(args);
     }
 }

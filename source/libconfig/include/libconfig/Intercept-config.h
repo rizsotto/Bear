@@ -1,4 +1,4 @@
-/*  Copyright (C) 2012-2022 by Samu698
+/*  Copyright (C) 2012-2023 by Samu698
     This file is part of Bear.
 
     Bear is a tool to generate compilation database for clang tooling.

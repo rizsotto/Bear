@@ -53,7 +53,7 @@ namespace config {
 		args.as_string(cmd::intercept::FLAG_LIBRARY).unwrap_to(library);
 		args.as_string(cmd::intercept::FLAG_WRAPPER).unwrap_to(wrapper);
 		args.as_string(cmd::intercept::FLAG_WRAPPER_DIR).unwrap_to(wrapper_dir);
-        args.as_bool(flags::VERBOSE).unwrap_to(verbose)
+        args.as_bool(flags::VERBOSE).unwrap_to(verbose);
 
 		auto force_preload = args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD);
 		auto force_wrapper = args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER);

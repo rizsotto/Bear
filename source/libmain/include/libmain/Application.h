@@ -46,6 +46,6 @@ namespace ps {
         virtual ~Subcommand() noexcept = default;
 
         [[nodiscard]]
-        virtual rust::Result<CommandPtr> subcommand(const flags::Arguments &argv) const = 0;
+        virtual rust::Result<CommandPtr> subcommand(const flags::Arguments &argv) = 0;
     };
 }

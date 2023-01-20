@@ -4,7 +4,6 @@ target_sources(main_a
         PRIVATE
             source/ApplicationLogConfig.cc
             source/ApplicationFromArgs.cc
-            source/SubcommandFromArgs.cc
         INTERFACE
             $<TARGET_OBJECTS:main_a>
         )

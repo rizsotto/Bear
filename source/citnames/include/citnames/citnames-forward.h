@@ -19,16 +19,22 @@
 
 #pragma once
 
-#include "libmain/SubcommandFromArgs.h"
+#include "libmain/SubcommandFromConfig.h"
 #include "libresult/Result.h"
+#include "libconfig/Configuration.h"
+
+#include <optional>
 
 namespace cs {
 
-    struct Citnames : ps::SubcommandFromArgs {
-        Citnames(const ps::ApplicationLogConfig&) noexcept;
+    struct Citnames : ps::SubcommandFromConfig<config::Citnames> {
+        Citnames(const config::Citnames &config, const ps::ApplicationLogConfig&) noexcept;
 
-        rust::Result<ps::CommandPtr> command(const flags::Arguments &args) const override;
+        rust::Result<ps::CommandPtr> command(const config::Citnames &config) const override;
 
         NON_DEFAULT_CONSTRUCTABLE(Citnames)
+
+    private:
+        std::optional<std::runtime_error> update_config(const flags::Arguments &args) override;
     };
 }

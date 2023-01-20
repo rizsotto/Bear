@@ -20,15 +20,19 @@
 #pragma once
 
 #include "config.h"
-#include "libmain/SubcommandFromArgs.h"
+#include "libmain/SubcommandFromConfig.h"
+#include "libconfig/Configuration.h"
 
 namespace ic {
 
-    struct Intercept : ps::SubcommandFromArgs {
-        Intercept(const ps::ApplicationLogConfig&) noexcept;
-        rust::Result<ps::CommandPtr> command(const flags::Arguments &args) const override;
+    struct Intercept : ps::SubcommandFromConfig<config::Intercept> {
+        Intercept(const config::Intercept& config, const ps::ApplicationLogConfig&) noexcept;
+        rust::Result<ps::CommandPtr> command(const config::Intercept &config) const override;
 
         NON_DEFAULT_CONSTRUCTABLE(Intercept)
+
+        private:
+            std::optional<std::runtime_error> update_config(const flags::Arguments &args) override;
     };
 
 }

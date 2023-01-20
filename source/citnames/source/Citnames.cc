@@ -92,23 +92,15 @@ namespace cs {
             , configuration_(std::move(configuration))
     { }
 
-    Citnames::Citnames(const ps::ApplicationLogConfig& log_config) noexcept
-            : ps::SubcommandFromArgs("citnames", log_config)
+    Citnames::Citnames(const config::Citnames &config, const ps::ApplicationLogConfig& log_config) noexcept
+            : ps::SubcommandFromConfig<config::Citnames>("citnames", log_config, config)
     { }
 
-    rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args) const {
-        auto config = config::Configuration::load_config(args);
+    rust::Result<ps::CommandPtr> Citnames::command(const config::Citnames &config) const {
+        return rust::Ok<ps::CommandPtr>(std::make_unique<Command>(config));
+    }
 
-        if (config.is_err()) {
-            return rust::Err(config.unwrap_err());
-        }
-
-        auto citnames_config = config.unwrap().citnames;
-
-        if (auto error = citnames_config.update(args); error.has_value()) {
-            return rust::Err(*error);
-        }
-
-        return rust::Ok<ps::CommandPtr>(std::make_unique<Command>(citnames_config));
+    std::optional<std::runtime_error> Citnames::update_config(const flags::Arguments &args) {
+        return config_.update(args);
     }
 }

@@ -180,32 +180,36 @@ namespace bear {
 
 	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args) const
 	{
-        if (args.as_string(flags::COMMAND).is_ok()) {
-            if (auto citnames = cs::Citnames(log_config_); citnames.matches(args)) {
-                return citnames.subcommand(args);
-            }
-            if (auto intercept = ic::Intercept(log_config_); intercept.matches(args)) {
-                return intercept.subcommand(args);
-            }
+        auto configuration = config::Configuration::load_config(args);
 
-            return rust::Err(std::runtime_error("Invalid subcommand"));
-        }
+        return configuration
+                .and_then<ps::CommandPtr>([this, &args](const auto& configuration) -> rust::Result<ps::CommandPtr> {
+                    if (auto citnames = cs::Citnames(configuration.citnames, log_config_); citnames.matches(args)) {
+                        return citnames.subcommand(args);
+                    }
+                    if (auto intercept = ic::Intercept(configuration.intercept, log_config_); intercept.matches(args)) {
+                        return intercept.subcommand(args);
+                    }
+                    if (args.as_string(flags::COMMAND).is_ok()) {
+                        return rust::Err(std::runtime_error("Invalid subcommand"));
+                    }
 
-		auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
-				.map<fs::path>([](const auto &output) {
-					return fs::path(output).replace_extension(".events.json");
-				})
-				.unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
+                    auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
+                            .map<fs::path>([](const auto &output) {
+                                return fs::path(output).replace_extension(".events.json");
+                            })
+                            .unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
 
-		auto environment = sys::env::get();
-		auto intercept = prepare_intercept(args, environment, commands);
-		auto citnames = prepare_citnames(args, environment, commands);
+                    auto environment = sys::env::get();
+                    auto intercept = prepare_intercept(args, environment, commands);
+                    auto citnames = prepare_citnames(args, environment, commands);
 
-		return rust::merge(intercept, citnames)
-				.map<ps::CommandPtr>([&commands](const auto &tuple) {
-					const auto&[intercept, citnames] = tuple;
+                    return rust::merge(intercept, citnames)
+                            .template map<ps::CommandPtr>([&commands](const auto &tuple) {
+                                const auto&[intercept, citnames] = tuple;
 
-					return std::make_unique<Command>(intercept, citnames, commands);
-				});
+                                return std::make_unique<Command>(intercept, citnames, commands);
+                    });
+                });
 	}
 }
