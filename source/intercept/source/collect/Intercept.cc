@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Configuration.h"
 #include "collect/Intercept.h"
 #include "collect/Reporter.h"
 #include "collect/RpcServices.h"
@@ -37,6 +38,49 @@
 namespace fs = std::filesystem;
 
 namespace {
+
+    rust::Result<ic::Configuration>
+    into_configuration(const flags::Arguments &args) {
+        auto output_file_arg = args.as_string(cmd::intercept::FLAG_OUTPUT);
+        auto library_arg = args.as_string(cmd::intercept::FLAG_LIBRARY);
+        auto wrapper_arg = args.as_string(cmd::intercept::FLAG_WRAPPER);
+        auto wrapper_dir_arg = args.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
+        auto verbose_arg = args.as_bool(flags::VERBOSE);
+        auto force_preload_arg = args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD);
+        auto force_wrapper_arg = args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER);
+        auto command_arg = args.as_string_list(cmd::intercept::FLAG_COMMAND);
+
+        ic::Configuration config;
+
+        if (output_file_arg.is_ok()) config.output_file = output_file_arg.unwrap();
+        if (library_arg.is_ok()) config.library = library_arg.unwrap();
+        if (wrapper_arg.is_ok()) config.wrapper = wrapper_arg.unwrap();
+        if (wrapper_dir_arg.is_ok()) config.wrapper_dir = wrapper_dir_arg.unwrap();
+        if (verbose_arg.is_ok()) config.verbose = verbose_arg.unwrap();
+        if (force_preload_arg.is_ok() && force_preload_arg.unwrap()) config.use_wrapper = false;
+        if (force_wrapper_arg.is_ok() && force_wrapper_arg.unwrap()) config.use_preload = false;
+        if (command_arg.is_ok()) {
+            config.command.clear();
+            for (const auto& cmd_part : command_arg.unwrap()) {
+                config.command.emplace_back(cmd_part);
+            }
+        }
+
+        // validation
+        if (!config.use_preload && !config.use_wrapper) {
+            return rust::Err(std::runtime_error("At least one interception method must be enabled"));
+        }
+
+        if (config.command.empty()) {
+            return rust::Err(std::runtime_error("Missing command to intercept"));
+        }
+
+        if (config.output_file.empty()) {
+            return rust::Err(std::runtime_error("Missing input file"));
+        }
+
+        return rust::Ok(std::move(config));
+    }
 
     rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
     {
