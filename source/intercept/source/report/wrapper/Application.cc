@@ -84,7 +84,7 @@ namespace {
             return {argv, end};
         }
 
-        rust::Result<wr::Execution> make_execution(const char **argv, sys::env::Vars &&environment) noexcept
+        rust::Result<wr::Execution> make_execution(const char **argv, const sys::env::Vars &environment) noexcept
         {
             auto program = fs::path(argv[0]);
             auto arguments = from(argv);
@@ -105,7 +105,7 @@ namespace {
                     });
         }
 
-        rust::Result<wr::Execution> make_execution(const flags::Arguments &args, sys::env::Vars &&environment) noexcept {
+        rust::Result<wr::Execution> make_execution(const flags::Arguments &args, const sys::env::Vars &environment) noexcept {
             auto program = args.as_string(cmd::wrapper::FLAG_EXECUTE)
                     .map<fs::path>([](auto file) { return fs::path(file); });
             auto arguments = args.as_string_list(cmd::wrapper::FLAG_COMMAND)
@@ -201,9 +201,9 @@ namespace wr {
     }
 
     rust::Result<ps::CommandPtr> Application::from_envs(int, const char **argv, const char **envp) {
-        auto environment = sys::env::from(const_cast<const char **>(envp));
+        const auto& environment = sys::env::get();
         auto session = Wrapper::make_session(environment);
-        auto execution = Wrapper::make_execution(argv, std::move(environment));
+        auto execution = Wrapper::make_execution(argv, environment);
 
         return rust::merge(session, execution)
                 .map<ps::CommandPtr>([](const auto &tuple) {
@@ -213,7 +213,7 @@ namespace wr {
     }
 
     rust::Result<ps::CommandPtr> Application::from_args(const flags::Arguments &args, const char **envp) {
-        auto environment = sys::env::from(const_cast<const char **>(envp));
+        const auto& environment = sys::env::get();
         auto session = Supervisor::make_session(args);
         auto execution = Supervisor::make_execution(args, std::move(environment));
 

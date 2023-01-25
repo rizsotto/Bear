@@ -229,7 +229,7 @@ namespace cs {
     { }
 
     rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args, const char **envp) const {
-        auto environment = sys::env::from(const_cast<const char **>(envp));
+        const auto& environment = sys::env::get();
 
         auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
