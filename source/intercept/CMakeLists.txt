@@ -28,6 +28,20 @@ target_link_libraries(events_db_a PUBLIC
         fmt::fmt)
 
 
+# Intercept json configuration code
+add_library(intercept_json_a OBJECT)
+target_sources(intercept_json_a
+        PRIVATE
+            source/Configuration.cc
+        INTERFACE
+            $<TARGET_OBJECTS:intercept_json_a>
+        )
+target_link_libraries(intercept_json_a PUBLIC
+        result_a
+        fmt::fmt
+        nlohmann_json::nlohmann_json)
+target_compile_options(intercept_json_a PRIVATE -fexceptions)
+
 # Intercept orchestrator code.
 add_library(intercept_a OBJECT)
 target_include_directories(intercept_a PRIVATE source/ include/)
@@ -43,6 +57,7 @@ target_sources(intercept_a PRIVATE
 target_sources(intercept_a
         INTERFACE $<TARGET_OBJECTS:intercept_a>)
 target_link_libraries(intercept_a PUBLIC
+        intercept_json_a
         domain_a
         main_a
         events_db_a
