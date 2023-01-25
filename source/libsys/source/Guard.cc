@@ -23,6 +23,12 @@
 #include <cstring>
 #include <functional>
 
+#ifdef HAVE_NSGETENVIRON
+#include <crt_externs.h>
+#else
+extern char **environ;
+#endif
+
 namespace {
 
     const char** to_c_array(const std::map<std::string, std::string>& entries)
@@ -86,5 +92,27 @@ namespace sys::env {
             result.emplace(key, value);
         }
         return result;
+    }
+
+    const char** get_envp()
+    {
+#ifdef HAVE_NSGETENVIRON
+        return const_cast<const char**>(*_NSGetEnviron());
+#else
+        return const_cast<const char**>(environ);
+#endif
+    }
+
+    const Vars& get()
+    {
+        static Vars environment;
+        static bool initialized = false;
+
+        if (!initialized) {
+            environment = from(get_envp());
+            initialized = true;
+        }
+
+        return environment;
     }
 }
