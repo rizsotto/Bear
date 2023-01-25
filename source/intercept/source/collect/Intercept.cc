@@ -82,22 +82,13 @@ namespace {
         return rust::Ok(std::move(config));
     }
 
-    rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
+    rust::Result<ic::Execution> capture_execution(const ic::Configuration& config, sys::env::Vars &&environment)
     {
         const auto path = sys::os::get_path(environment);
 
-        const auto command = args.as_string_list(cmd::intercept::FLAG_COMMAND)
-                .and_then<std::vector<std::string_view>>([](auto args) {
-                    using Result = rust::Result<std::vector<std::string_view>>;
-                    return (args.empty())
-                            ? Result(rust::Err(std::runtime_error("Command is empty.")))
-                            : Result(rust::Ok(args));
-                });
-
-        const auto executable = rust::merge(path, command)
-                .and_then<fs::path>([](auto tuple) {
-                    const auto&[path, command] = tuple;
-                    auto executable = command.front();
+        const auto executable = path
+                .and_then<fs::path>([&config](const auto& path) {
+                    auto executable = config.command.front();
 
                     el::Resolver resolver;
                     return resolver.from_search_path(executable, path.c_str())
@@ -110,12 +101,11 @@ namespace {
                             });
                 });
 
-        return rust::merge(executable, command)
-                .map<ic::Execution>([&environment](auto tuple) {
-                    const auto&[executable, command] = tuple;
+        return executable
+                .map<ic::Execution>([&environment, &config](const auto& executable) {
                     return ic::Execution{
                         executable,
-                        std::list<std::string>(command.begin(), command.end()),
+                        std::list<std::string>(config.command.begin(), config.command.end()),
                         fs::path("ignored"),
                         std::move(environment)
                     };
@@ -154,11 +144,14 @@ namespace ic {
     { }
 
     rust::Result<ps::CommandPtr> Intercept::command(const flags::Arguments &args, const char **envp) const {
-        const auto execution = capture_execution(args, sys::env::from(envp));
-        const auto session = Session::from(args, envp);
-        const auto reporter = Reporter::from(args);
+        return into_configuration(args)
+                .and_then<std::tuple<Execution, Session::Ptr, Reporter::Ptr>>([&envp](const auto& configuration) {
+                    const auto execution = capture_execution(configuration, sys::env::from(envp));
+                    const auto session = Session::from(configuration, envp);
+                    const auto reporter = Reporter::from(configuration);
 
-        return rust::merge(execution, session, reporter)
+                    return rust::merge(execution, session, reporter);
+                })
                 .map<ps::CommandPtr>([](auto tuple) {
                     const auto&[execution, session, reporter] = tuple;
                     return std::make_unique<Command>(execution, session, reporter);

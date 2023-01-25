@@ -31,7 +31,7 @@ namespace ic {
             std::map<std::string, fs::path> mapping,
             std::map<std::string, fs::path> override);
 
-        static rust::Result<Session::Ptr> from(const flags::Arguments &args, const char **envp);
+        static rust::Result<Session::Ptr> from(const Configuration &config, const char **envp);
 
         [[nodiscard]] rust::Result<ic::Execution> resolve(const ic::Execution &execution) const override;
         [[nodiscard]] sys::Process::Builder supervise(const ic::Execution &execution) const override;

@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "Configuration.h"
 #include "collect/db/EventsDatabaseWriter.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
@@ -33,7 +34,7 @@ namespace ic {
     class Reporter {
     public:
         using Ptr = std::shared_ptr<Reporter>;
-        static rust::Result<Reporter::Ptr> from(const flags::Arguments &flags);
+        static rust::Result<Reporter::Ptr> from(const ic::Configuration &config);
 
         void report(const rpc::Event &event);
 

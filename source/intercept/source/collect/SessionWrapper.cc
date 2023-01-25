@@ -92,13 +92,10 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::Ptr> WrapperSession::from(const flags::Arguments &args, const char **envp)
+    rust::Result<Session::Ptr> WrapperSession::from(const Configuration &config, const char **envp)
     {
-        const bool verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        auto wrapper_dir = args.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
-        auto wrappers = wrapper_dir.and_then<std::list<fs::path>>(list_dir);
-
-        auto mapping = wrappers
+        return
+            list_dir(config.wrapper_dir)
             .map<std::map<std::string, fs::path>>([&envp](auto wrappers) {
                 // Find the executables with the same name from the path.
                 std::map<std::string, fs::path> result;
@@ -111,11 +108,8 @@ namespace ic {
                     });
                 }
                 return result;
-            });
-
-        return rust::merge(wrapper_dir, mapping)
-            .map<Session::Ptr>([&envp, &verbose](const auto &tuple) {
-                const auto& [wrapper_dir, const_mapping] = tuple;
+            })
+            .map<Session::Ptr>([&envp, &config](const auto &const_mapping) {
 
                 std::map<std::string, fs::path> mapping(const_mapping);
                 std::map<std::string, fs::path> override;
@@ -141,7 +135,7 @@ namespace ic {
                                 });
                     }
                 }
-                return std::make_shared<WrapperSession>(verbose, std::string(wrapper_dir), std::move(mapping), std::move(override));
+                return std::make_shared<WrapperSession>(config.verbose, std::string(config.wrapper_dir), std::move(mapping), std::move(override));
             });
     }
 

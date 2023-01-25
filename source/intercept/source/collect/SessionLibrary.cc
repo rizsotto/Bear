@@ -51,23 +51,15 @@ namespace {
 
 namespace ic {
 
-    rust::Result<Session::Ptr> LibraryPreloadSession::from(const flags::Arguments& args)
+    Session::Ptr LibraryPreloadSession::from(const Configuration& config)
     {
-        auto verbose = args.as_bool(flags::VERBOSE).unwrap_or(false);
-        const auto library = args.as_string(cmd::intercept::FLAG_LIBRARY);
-        const auto wrapper = args.as_string(cmd::intercept::FLAG_WRAPPER);
-
-        return merge(library, wrapper)
-            .map<Session::Ptr>([&verbose](auto tuple) {
-                const auto& [library, wrapper] = tuple;
-                return std::make_shared<LibraryPreloadSession>(verbose, library, wrapper);
-            });
+        return std::make_shared<LibraryPreloadSession>(config.verbose, config.library.c_str(), config.wrapper.c_str());
     }
 
     LibraryPreloadSession::LibraryPreloadSession(
         bool verbose,
-        const std::string_view &library,
-        const std::string_view &executor)
+        std::string_view library,
+        std::string_view executor)
             : Session()
             , verbose_(verbose)
             , library_(library)
