@@ -48,7 +48,7 @@ namespace {
 namespace ic::collect::db {
 
     rust::Result<EventsDatabaseWriter::Ptr> EventsDatabaseWriter::create(const fs::path &file) {
-        int fd = open(file.c_str(), O_WRONLY | O_CREAT, 00644);
+        int fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 00644);
         if (fd == -1) {
             auto message = fmt::format("Events db open failed (file {}): {}", file.string(), sys::error_string(errno));
             return rust::Err(std::runtime_error(message));
