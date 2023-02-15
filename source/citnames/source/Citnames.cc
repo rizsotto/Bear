@@ -94,6 +94,12 @@ namespace {
         return fs::exists(path, error_code);
     }
 
+    bool rename_file(const fs::path &from, const fs::path &to) {
+        std::error_code error_code;
+        fs::rename(from, to, error_code);
+        return error_code.value() == 0;
+    }
+
     rust::Result<cs::Arguments> into_arguments(const flags::Arguments &args) {
         auto input = args.as_string(cmd::citnames::FLAG_INPUT);
         auto output = args.as_string(cmd::citnames::FLAG_OUTPUT);
@@ -199,7 +205,7 @@ namespace cs {
                     spdlog::debug("compilation entries created. [size: {}]", new_entries_count);
                     // read back the current content and extend with the new elements.
                     return (arguments_.append)
-                        ? output.from_json(arguments_.output.c_str(), entries)
+                        ? output.from_json(arguments_.output, entries)
                                 .template map<size_t>([&new_entries_count](auto old_entries_count) {
                                     spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
                                     return new_entries_count + old_entries_count;
@@ -209,7 +215,12 @@ namespace cs {
                 .and_then<size_t>([this, &output, &entries](const size_t & size) {
                     // write the entries into the output file.
                     spdlog::debug("compilation entries to output. [size: {}]", size);
-                    return output.to_json(arguments_.output.c_str(), entries);
+
+                    const fs::path temporary_file(arguments_.output.string() + ".tmp");
+                    auto result = output.to_json(temporary_file, entries);
+                    return rename_file(temporary_file, arguments_.output)
+                        ? result
+                        : rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", arguments_.output)));
                 })
                 .map<int>([](auto size) {
                     // just map to success exit code if it was successful.
