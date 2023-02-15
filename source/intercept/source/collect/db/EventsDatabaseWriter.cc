@@ -89,16 +89,23 @@ namespace ic::collect::db {
         return rust::Ok(std::move(json));
     }
 
-    rust::Result<int> EventsDatabaseWriter::write_to_file(const std::string &content) noexcept {
-        if (-1 == write(file_, content.c_str(), content.size())) {
-            auto message = fmt::format(
-                    "Events db write failed (to file {}): {}",
-                    path_.string(),
-                    sys::error_string(errno)
-            );
-            errno = 0;
-            return rust::Result<int>(rust::Err(std::runtime_error(message)));
+    rust::Result<int> EventsDatabaseWriter::write_to_file(const std::string& content) noexcept {
+        const char* content_ptr = content.c_str();
+        size_t content_length = content.size();
+        while (content_length) {
+            const int written_length = write(file_, content_ptr, content_length);
+            if (written_length == -1) {
+                auto message = fmt::format(
+                        "Events db write failed (to file {}): {}",
+                        path_.string(),
+                        sys::error_string(errno)
+                );
+                errno = 0;
+                return rust::Err(std::runtime_error(message));
+            }
+            content_length -= written_length;
+            content_ptr += written_length;
         }
-        return rust::Result<int>(rust::Ok(1));
+        return rust::Ok(1);
     }
 }
