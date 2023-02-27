@@ -329,7 +329,7 @@ def intercept_build():
     # an existing compilation database from a previous run.
     if args.append and os.path.isfile(args.cdb):
         previous = CompilationDatabase.load(args.cdb, tools)
-        entries = iter(set(itertools.chain(previous, current)))
+        entries = iter(list(itertools.chain(previous, current)))
         CompilationDatabase.save(entries, args.cdb, args.ldb, args.field_output, args.override_db)
     else:
         CompilationDatabase.save(current, args.cdb, args.ldb, args.field_output, args.override_db)
@@ -355,7 +355,7 @@ def capture(args, tools):
         current = compilations(safe_calls, tools, flags_filter)
         # filter out not desired entries
         include_filter = include(args.include, args.exclude)
-        filtered = set(entry for entry in current if include_filter(entry))
+        filtered = list(entry for entry in current if include_filter(entry))
         return exit_code, iter(filtered)
 
 
