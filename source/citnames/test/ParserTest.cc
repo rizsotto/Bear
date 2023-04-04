@@ -320,4 +320,25 @@ namespace {
             EXPECT_TRUE(flags.is_err());
         }
     }
+
+    TEST(Parser, parse_flags_with_several_suitable_prefixes) {
+        const FlagsByName flags_by_name = {
+                {"-l", {MatchInstruction::PREFIX, CompilerFlagType::LINKER}},
+                {"-language", {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,  CompilerFlagType::OTHER}},
+                {"-linker", {MatchInstruction::PREFIX_WITH_2_OPTS, CompilerFlagType::OTHER}},
+        };
+        const auto sut = Repeat(FlagParser(flags_by_name));
+
+        {
+            const Arguments input = {"compiler", "-lin", "-language", "s", "-linkeriasds", "opt1", "opt2"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{slice(input, 1), CompilerFlagType::LINKER},
+                    CompilerFlag{slice(input, 2, 4), CompilerFlagType::OTHER},
+                    CompilerFlag{slice(input, 4, 7), CompilerFlagType::OTHER},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+    }
 }
