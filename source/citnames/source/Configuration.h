@@ -58,6 +58,9 @@ namespace cs {
         std::string duplicate_filter_fields = DUPLICATE_FILE_OUTPUT;
         std::list<fs::path> paths_to_include = {};
         std::list<fs::path> paths_to_exclude = {};
+
+        bool without_duplicate_filter = false;
+        bool without_existence_check = false;
     };
 
     // Groups together the output related configurations.

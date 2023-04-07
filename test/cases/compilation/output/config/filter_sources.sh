@@ -2,7 +2,7 @@
 
 # REQUIRES: shell
 # RUN: %{shell} %s %t
-# RUN: cd %T; %{bear} --verbose --output %t.json --config %t/config.json -- %{shell} %t/build.sh
+# RUN: cd %T; %{bear} --verbose --output-compile %t.json --config %t/config.json -- %{shell} %t/build.sh
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %t/source_1.c -directory %T -arguments %{c_compiler} -c %t/source_1.c
 # RUN: assert_compilation %t.json contains -file %t/source_2.c -directory %T -arguments %{c_compiler} -c %t/source_2.c

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell, cuda
-# RUN: cd %T; env CC=%{cuda} %{bear} --verbose --output %t.json -- %{shell} %s
+# RUN: cd %T; env CC=%{cuda} %{bear} --verbose --output-compile %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %T/successful_build_1.cu -directory %T
 # RUN: assert_compilation %t.json contains -file %T/successful_build_2.cu -directory %T

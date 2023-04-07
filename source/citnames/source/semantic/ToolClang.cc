@@ -184,9 +184,20 @@ namespace cs::semantic {
             : flag_definition(clang_flags(ToolGcc::FLAG_DEFINITION))
     { }
 
-    rust::Result<SemanticPtr> ToolClang::recognize(const Execution &execution) const {
-        if (is_compiler_call(execution.executable)) {
-            return ToolGcc::compilation(ToolClang::flag_definition, execution);
+    rust::Result<SemanticPtr> ToolClang::recognize(const Execution &execution, const BuildTarget target) const {
+        switch (target) {
+            case BuildTarget::COMPILER: {
+                if (is_compiler_call(execution.executable)) {
+                    return ToolGcc::compilation(ToolClang::flag_definition, execution);
+                }
+                break;
+            }
+            case BuildTarget::LINKER: {
+                if (is_linker_call(execution.executable)){
+                    return ToolGcc::linking(ToolClang::flag_definition, execution);
+                }
+                break;
+            }
         }
         return rust::Ok(SemanticPtr());
     }

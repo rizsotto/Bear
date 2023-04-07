@@ -53,7 +53,7 @@ namespace {
 
         ToolGcc sut;
 
-        EXPECT_TRUE(Tool::not_recognized(sut.recognize(input)));
+        EXPECT_TRUE(Tool::not_recognized(sut.recognize(input, BuildTarget::COMPILER)));
     }
 
     TEST(ToolGcc, simple) {
@@ -69,12 +69,14 @@ namespace {
                         input.executable,
                         {"-c"},
                         {fs::path("source.c")},
-                        {fs::path("source.o")})
+                        {fs::path("source.o")},
+                        false
+                )
         );
 
         ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
@@ -92,13 +94,14 @@ namespace {
                         input.executable,
                         {"-c"},
                         {fs::path("source.c")},
-                        {fs::path("exe")}
+                        {fs::path("exe")},
+                        true
                 )
         );
 
         ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
@@ -114,7 +117,7 @@ namespace {
 
         ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(result.is_ok());
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }
@@ -139,13 +142,14 @@ namespace {
                                 "-I", "/usr/include/path3",
                         },
                         {fs::path("source.c")},
-                        std::nullopt
+                        std::nullopt,
+                        false
                 )
         );
 
         ToolGcc sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_PRED2([](auto lhs, auto rhs) { return lhs->operator==(*rhs); }, expected, result.unwrap());
     }

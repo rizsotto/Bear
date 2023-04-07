@@ -46,6 +46,7 @@ namespace cs {
     // really a database with keys.
     struct Entry {
         fs::path file;
+        std::list<fs::path> files;
         fs::path directory;
         std::optional<fs::path> output;
         std::list<std::string> arguments;

@@ -62,14 +62,14 @@ namespace cs::semantic {
     { }
 
     [[nodiscard]]
-    rust::Result<SemanticPtr> Build::recognize(const rpc::Event &event) const {
+    rust::Result<SemanticPtr> Build::recognize(const rpc::Event &event, const BuildTarget target) const {
         if (event.has_started()) {
             auto execution = domain::from(event.started().execution());
             auto pid = event.started().pid();
 
             spdlog::debug("[pid: {}] execution: {}", pid, execution);
 
-            auto result = tools_->recognize(execution);
+            auto result = tools_->recognize(execution, target);
             if (Tool::recognized_ok(result)) {
                 spdlog::debug("[pid: {}] recognized.", pid);
             } else if (Tool::recognized_with_error(result)) {

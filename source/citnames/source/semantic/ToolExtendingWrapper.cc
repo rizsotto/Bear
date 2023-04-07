@@ -31,8 +31,8 @@ namespace cs::semantic {
         return compilers_to_recognize_.executable == program;
     }
 
-    rust::Result<SemanticPtr> ToolExtendingWrapper::recognize(const Execution &execution) const {
-        return ToolGcc::recognize(execution)
+    rust::Result<SemanticPtr> ToolExtendingWrapper::recognize(const Execution &execution, const BuildTarget target) const {
+        return ToolGcc::recognize(execution, target)
                 .map<cs::semantic::SemanticPtr>([this](auto semantic) {
                     if (auto* ptr = dynamic_cast<Compile*>(semantic.get()); ptr != nullptr) {
                         // remove flags which were asked to be removed.

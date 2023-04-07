@@ -32,7 +32,7 @@ namespace cs::semantic {
 
     struct ToolWrapper : public ToolGcc {
         [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution, const BuildTarget target) const override;
 
     // visible for testing
     public:

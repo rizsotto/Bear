@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-# RUN: %{bear} --verbose --output %t.json -- %{true}
+# RUN: %{bear} --verbose --output-compile %t.json -- %{true}

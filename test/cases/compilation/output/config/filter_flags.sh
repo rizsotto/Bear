@@ -2,12 +2,12 @@
 
 # REQUIRES: shell
 # RUN: %{shell} %s %t
-# RUN: cd %T; env CC=%t/wrapper %{bear} --verbose --output %t.json --config %t/config.json -- %{shell} %t/build.sh
+# RUN: cd %T; env CC=%t/wrapper %{bear} --verbose --output-compile %t.json --config %t/config.json -- %{shell} %t/build.sh
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %t/source_1.c -directory %T -arguments %t/wrapper -c -I. %t/source_1.c
 # RUN: assert_compilation %t.json contains -file %t/source_2.c -directory %T -arguments %t/wrapper -c -Werror -I. %t/source_2.c
 
-# RUN: cd %T; env CC=%t/wrapper %{bear} --verbose --output %t.json --config %t/config.json --force-wrapper -- %{shell} %t/build.sh
+# RUN: cd %T; env CC=%t/wrapper %{bear} --verbose --output-compile %t.json --config %t/config.json --force-wrapper -- %{shell} %t/build.sh
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %t/source_1.c -directory %T -arguments %t/wrapper -c -I. %t/source_1.c
 # RUN: assert_compilation %t.json contains -file %t/source_2.c -directory %T -arguments %t/wrapper -c -Werror -I. %t/source_2.c

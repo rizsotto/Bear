@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell
-# RUN: cd %T; %{bear} --verbose --output %t.json -- %{shell} %s
+# RUN: cd %T; %{bear} --verbose --output-compile %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 0
 
 touch empty_argument_1.c empty_argument_2.c

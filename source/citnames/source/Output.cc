@@ -32,6 +32,28 @@
 
 namespace {
 
+    void validate_files(const cs::Entry &entry) {
+        if (entry.file.empty() && (entry.files.empty())) {
+            throw std::runtime_error("Fields 'file' and 'files' have not values.");
+        }
+        if (std::any_of(entry.files.begin(), entry.files.end(), [](const auto& file) { return file.empty(); })) {
+            throw std::runtime_error("Field 'files' has empty paths.");
+        }
+    }
+
+    void validate(const cs::Entry &entry) {
+        validate_files(entry);
+        if (entry.directory.empty()) {
+            throw std::runtime_error("Field 'directory' is empty string.");
+        }
+        if (entry.output.has_value() && entry.output.value().empty()) {
+            throw std::runtime_error("Field 'output' is empty string.");
+        }
+        if (entry.arguments.empty()) {
+            throw std::runtime_error("Field 'arguments' is empty list.");
+        }
+    }
+
     struct Filter {
         virtual ~Filter() noexcept = default;
         virtual bool apply(const cs::Entry &) = 0;
@@ -43,11 +65,21 @@ namespace {
         { }
 
         bool apply(const cs::Entry &entry) override {
-            const auto &file = entry.file;
-            return exists(file) && to_include(file) && !to_exclude(file);
+            validate_files(entry);
+            if (not entry.file.empty()) {
+                return check(entry.file);
+            }
+            if (not entry.files.empty()) {
+                return std::all_of(entry.files.begin(), entry.files.end(), [&](const auto &file){ return check(file); });
+            }
+            return false;
         }
 
     private:
+        [[nodiscard]] inline bool check(const fs::path &file) const {
+            return (config.without_existence_check || exists(file)) && to_include(file) && !to_exclude(file);
+        }
+
         [[nodiscard]] inline bool exists(const fs::path &file) const {
             const auto &to_check = config.include_only_existing_source;
             return (!to_check) || (to_check && does_exist(file));
@@ -104,12 +136,10 @@ namespace {
         std::unordered_set<size_t> hashes;
     };
 
-
     struct FileDuplicateFilter : public DuplicateFilter {
         private:
             size_t hash(const cs::Entry &entry) const override {
                 auto string_hasher = std::hash<std::string>{};
-
                 return string_hasher(entry.file);
             }
     };
@@ -120,11 +150,9 @@ namespace {
                 auto string_hasher = std::hash<std::string>{};
 
                 auto hash = string_hasher(entry.file);
-
                 if (entry.output) {
                     hash = hash_combine(hash, string_hasher(*entry.output));
                 }
-
                 return hash;
             }
     };
@@ -135,15 +163,12 @@ namespace {
                 auto string_hasher = std::hash<std::string>{};
 
                 auto hash = string_hasher(entry.file);
-
                 if (entry.output) {
                     hash = hash_combine(hash, string_hasher(*entry.output));
                 }
-
                 for (const auto& arg : entry.arguments) {
                     hash = hash_combine(hash, string_hasher(arg));
                 }
-
                 return hash;
             }
     };
@@ -163,30 +188,16 @@ namespace {
         // If the parameter is invalid use the default filter
         return std::make_unique<FileOutputDuplicateFilter>();
     }
-
 }
 
 namespace cs {
 
-    void validate(const Entry &entry) {
-        if (entry.file.empty()) {
-            throw std::runtime_error("Field 'file' is empty string.");
-        }
-        if (entry.directory.empty()) {
-            throw std::runtime_error("Field 'directory' is empty string.");
-        }
-        if (entry.output.has_value() && entry.output.value().empty()) {
-            throw std::runtime_error("Field 'output' is empty string.");
-        }
-        if (entry.arguments.empty()) {
-            throw std::runtime_error("Field 'arguments' is empty list.");
-        }
-    }
-
     nlohmann::json to_json(const Entry &rhs, const Format &format) {
         nlohmann::json json;
+        validate_files(rhs);
 
         json["file"] = rhs.file;
+        json["files"] = rhs.files;
         json["directory"] = rhs.directory;
         if (!format.drop_output_field && rhs.output.has_value()) {
             json["output"] = rhs.output.value();
@@ -202,12 +213,19 @@ namespace cs {
 
     void from_json(const nlohmann::json &j, Entry &entry) {
         j.at("file").get_to(entry.file);
+
+        std::list<fs::path> files;
+        j.at("files").get_to(files);
+        entry.files.swap(files);
+
         j.at("directory").get_to(entry.directory);
+
         if (j.contains("output")) {
             std::string output;
             j.at("output").get_to(output);
             entry.output.emplace(output);
         }
+
         if (j.contains("arguments")) {
             std::list<std::string> arguments;
             j.at("arguments").get_to(arguments);
@@ -232,6 +250,7 @@ namespace cs {
 
     bool operator==(const Entry &lhs, const Entry &rhs) {
         return (lhs.file == rhs.file)
+               && (lhs.files == rhs.files)
                && (lhs.directory == rhs.directory)
                && (lhs.output == rhs.output)
                && (lhs.arguments == rhs.arguments);
@@ -278,7 +297,8 @@ namespace cs {
             size_t count = 0;
             nlohmann::json json = nlohmann::json::array();
             for (const auto &entry : entries) {
-                if (content_filter.apply(entry) && duplicate_filter->apply(entry)) {
+                const auto filter = content_filter.apply(entry) && (content.without_duplicate_filter || duplicate_filter->apply(entry));
+                if (filter) {
                     auto json_entry = cs::to_json(entry, format);
                     json.emplace_back(std::move(json_entry));
                     ++count;

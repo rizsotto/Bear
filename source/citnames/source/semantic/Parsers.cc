@@ -21,6 +21,8 @@
 
 #include <set>
 
+#include <iostream>
+
 namespace {
 
     std::string_view take_extension(const std::string_view &file) {

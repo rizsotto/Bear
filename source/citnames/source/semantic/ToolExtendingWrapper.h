@@ -31,7 +31,7 @@ namespace cs::semantic {
         bool is_compiler_call(const fs::path& program) const override;
 
         [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution, const BuildTarget target) const override;
 
     private:
         CompilerWrapper compilers_to_recognize_;

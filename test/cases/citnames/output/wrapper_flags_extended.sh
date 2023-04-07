@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # RUN: cd %T; %{shell} %s %t
-# RUN: %{citnames} --verbose --input %t.commands.json --output %t.compilations.json --config %t.config.json
+# RUN: %{citnames} --verbose --input %t.commands.json --output-compile %t.compilations.json --config %t.config.json
 # RUN: assert_compilation %t.compilations.json count -eq 1
 # RUN: assert_compilation %t.compilations.json contains -file /home/user/broken_build.c -directory /home/user -arguments /usr/bin/wrapper -c -Dwrapper -o broken_build.o broken_build.c
 

@@ -40,16 +40,34 @@ namespace {
 
 namespace cs::semantic {
 
-    rust::Result<SemanticPtr> ToolWrapper::recognize(const Execution &execution) const {
-        if (is_ccache_call(execution.executable)) {
-            return is_ccache_query(execution.arguments)
+    rust::Result<SemanticPtr> ToolWrapper::recognize(const Execution &execution, const BuildTarget target) const {
+        switch (target) {
+        case BuildTarget::COMPILER: {
+            if (is_ccache_call(execution.executable)) {
+                return is_ccache_query(execution.arguments)
                     ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
                     : compilation(remove_wrapper(execution));
+            }
+            if (is_distcc_call(execution.executable)) {
+                return is_distcc_query(execution.arguments)
+                    ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
+                    : compilation(remove_wrapper(execution));
+            }
+            break;
         }
-        if (is_distcc_call(execution.executable)) {
-            return is_distcc_query(execution.arguments)
+        case BuildTarget::LINKER: {
+            if (is_ccache_call(execution.executable)) {
+                return is_ccache_query(execution.arguments)
                     ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
-                    : compilation(remove_wrapper(execution));
+                    : linking(remove_wrapper(execution));
+            }
+            if (is_distcc_call(execution.executable)) {
+                return is_distcc_query(execution.arguments)
+                    ? rust::Ok<SemanticPtr>(std::make_shared<QueryCompiler>())
+                    : linking(remove_wrapper(execution));
+            }
+            break;
+        }
         }
         return rust::Ok(SemanticPtr());
     }
