@@ -8,6 +8,7 @@
 #include "config.h"
 
 #if defined HAVE_UNISTD_H
+#define _GNU_SOURCE
 #include <unistd.h>
 #endif
 
