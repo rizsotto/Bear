@@ -94,13 +94,6 @@ namespace {
         });
     }
 
-    bool is_linker(const CompilerFlags& flags)
-    {
-        return std::any_of(flags.begin(), flags.end(), [](const auto& flag) {
-            return (flag.type == CompilerFlagType::LINKER_OBJECT_FILE);
-        });
-    }
-
     bool has_linker(const CompilerFlags& flags)
     {
         return std::none_of(flags.begin(), flags.end(), [](auto flag) {
@@ -111,42 +104,78 @@ namespace {
     std::tuple<
             Arguments,
             std::list<fs::path>,
-            std::optional<fs::path>,
-            std::list<fs::path>
-    > split(const CompilerFlags &flags) {
+            std::list<fs::path>,
+            std::optional<fs::path>
+    > split_compile(const CompilerFlags &flags) {
         Arguments arguments;
         std::list<fs::path> sources;
+        std::list<fs::path> dependencies;
         std::optional<fs::path> output;
-        std::list<fs::path> object_files;
 
         for (const auto &flag : flags) {
             switch (flag.type) {
-                case CompilerFlagType::SOURCE: {
-                    auto candidate = fs::path(flag.arguments.front());
-                    sources.emplace_back(std::move(candidate));
-                    break;
-                }
                 case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
                     auto candidate = fs::path(flag.arguments.back());
                     output = std::make_optional(std::move(candidate));
-                    break;
+                    continue;
                 }
-                case CompilerFlagType::LINKER_OBJECT_FILE: {
+                case CompilerFlagType::SOURCE: {
                     auto candidate = fs::path(flag.arguments.front());
-                    object_files.emplace_back(std::move(candidate));
+                    sources.emplace_back(std::move(candidate));
+                    continue;
+                }
+                case CompilerFlagType::LIBRARY:
+                case CompilerFlagType::OBJECT_FILE: {
+                    auto candidate = fs::path(flag.arguments.front());
+                    dependencies.emplace_back(candidate);
                     break;
                 }
-                case CompilerFlagType::LINKER:
-                case CompilerFlagType::PREPROCESSOR_MAKE:
-                case CompilerFlagType::DIRECTORY_SEARCH_LINKER:
-                    break;
                 default: {
-                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
                     break;
                 }
             }
+            std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
         }
-        return std::make_tuple(arguments, sources, output, object_files);
+        return std::make_tuple(arguments, sources, dependencies, output);
+    }
+
+    std::tuple<
+            Arguments,
+            std::list<fs::path>,
+            std::optional<fs::path>,
+            size_t
+    > split_link_with_updating_sources(const CompilerFlags &flags) {
+        Arguments arguments;
+        std::list<fs::path> files;
+        std::optional<fs::path> output;
+        size_t sources_count = 0;
+
+        for (const auto &flag : flags) {
+            switch (flag.type) {
+                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
+                    auto candidate = fs::path(flag.arguments.back());
+                    output = std::make_optional(std::move(candidate));
+                    continue;
+                }
+                case CompilerFlagType::SOURCE: {
+                    sources_count++;
+                    const auto source_after_compilation = flag.arguments.front() + ".o";
+                    arguments.push_back(source_after_compilation);
+                    files.emplace_back(source_after_compilation);
+                    break;
+                }
+                case CompilerFlagType::LIBRARY:
+                case CompilerFlagType::OBJECT_FILE: {
+                    arguments.push_back(flag.arguments.front());
+                    files.emplace_back(flag.arguments.front());
+                    break;
+                }
+                default: {
+                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
+                }
+            }
+        }
+        return std::make_tuple(arguments, files, output, sources_count);
     }
 }
 
@@ -291,7 +320,7 @@ namespace cs::semantic {
     }
 
     bool ToolGcc::is_linker_call(const fs::path& program) const {
-        static const auto pattern = std::regex(R"((ld|lld|gold|ar)*)");
+        static const auto pattern = std::regex(R"(^(ld|lld|gold|ar)\S*$)");
         std::cmatch m;
         return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
@@ -300,18 +329,21 @@ namespace cs::semantic {
         return compilation(FLAG_DEFINITION, execution);
     }
 
-    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
-        const auto &parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(flags),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
+    auto get_parser(const FlagsByName &flags) {
+        return Repeat(
+                    OneOf(
+                        FlagParser(flags),
+                        SourceMatcher(),
+                        ObjectFileMatcher(),
+                        LibraryMatcher(),
+                        EverythingElseFlagMatcher()
+                    )
+        );
+    }
 
+    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
         const Arguments &input_arguments = create_argument_list(execution);
-        return parse(parser, input_arguments)
+        return parse(get_parser(flags), input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();
@@ -322,12 +354,10 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    auto[arguments, sources, output, object_files] = split(flags);
+                    // arguments contains everything except output and sources
+                    auto[arguments, sources, dependencies, output] = split_compile(flags);
                     if (sources.empty()) {
                         return rust::Err(std::runtime_error("Source files not found for compilation."));
-                    }
-                    if (not object_files.empty()) {
-                        return rust::Err(std::runtime_error("Linker object files found for compilation."));
                     }
 
                     bool with_linking;
@@ -344,6 +374,7 @@ namespace cs::semantic {
                         execution.executable,
                         std::move(arguments),
                         std::move(sources),
+                        std::move(dependencies),
                         std::move(output),
                         with_linking
                     );
@@ -356,17 +387,8 @@ namespace cs::semantic {
     }
 
     rust::Result<SemanticPtr> ToolGcc::linking(const FlagsByName &flags, const Execution &execution) {
-        const auto &parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(flags),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
-
         const Arguments &input_arguments = create_argument_list(execution);
-        return parse(parser, input_arguments)
+        return parse(get_parser(flags), input_arguments)
                 .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
                     if (is_compiler_query(flags)) {
                         SemanticPtr result = std::make_shared<QueryCompiler>();
@@ -377,37 +399,20 @@ namespace cs::semantic {
                         return rust::Ok(std::move(result));
                     }
 
-                    auto[arguments, sources, output, object_files] = split(flags);
-
-                    if (is_linker(flags)) {
-                        if (not sources.empty()) {
-                            return rust::Err(std::runtime_error("Source files found for linking."));
-                        }
-
-                        SemanticPtr result = std::make_shared<Link>(
-                            execution.working_dir,
-                            execution.executable,
-                            std::move(arguments),
-                            std::move(object_files),
-                            std::move(output),
-                            false
-                        );
-                        return rust::Ok(std::move(result));
+                    // arguments contains everything except output
+                    auto[arguments, files, output, sources_count] = split_link_with_updating_sources(flags);
+                    if (sources_count != 0 && !has_linker(flags)) {
+                        return rust::Err(std::runtime_error("Without linking."));
                     }
 
-                    if (has_linker(flags)) {
-                        SemanticPtr result = std::make_shared<Link>(
-                            execution.working_dir,
-                            execution.executable,
-                            std::move(arguments),
-                            std::move(sources),
-                            std::move(output),
-                            true
-                        );
-                        return rust::Ok(std::move(result));
-                    }
-
-                    return rust::Ok(SemanticPtr());
+                    SemanticPtr result = std::make_shared<Link>(
+                        execution.working_dir,
+                        execution.executable,
+                        std::move(arguments),
+                        std::move(files),
+                        std::move(output)
+                    );
+                    return rust::Ok(std::move(result));
                 });
     }
 }

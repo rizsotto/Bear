@@ -14,4 +14,4 @@ int main() {
 }
 EOF
 
-$CC '-DMESSAGE="Hello World\n"' -o define_with_escaped_quote define_with_escaped_quote.c;
+$CC '-DMESSAGE="Hello World\n"' define_with_escaped_quote.c -o define_with_escaped_quote;

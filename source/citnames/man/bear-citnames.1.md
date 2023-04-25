@@ -19,8 +19,8 @@ execution is just a thing to achieve your goal. This program takes
 the command which was executed, and try to find out what the intent
 was to run that command. It deduces the semantic of the command.
 
-This is useful to generate a compilation database. Citnames get a
-list of commands, and it creates a JSON compilation database. (This
+This is useful to generate a compilation and linking databases. Citnames get a
+list of commands, and it creates a JSON compilation and linking databases. (This
 is currently the only output of the tool.)
 
 # OPTIONS
@@ -39,9 +39,17 @@ is currently the only output of the tool.)
     command execution list, with some extra information. The syntax
     is detailed in a separate section.
 
-\--output *file*
-:   Specify output file. (Default file name provided.) The output is
+\--with-link
+:   Use if you want to generate a linking database.
+
+\--output-compile *file*
+:   Specify output compile file. (Default file name provided.) The output is
     currently a JSON compilation database.
+
+\--output-link *file*
+:   Specify output link file. (Default file name provided.) The output is
+    currently a JSON linking database. 
+    Used only if --with-link is used, ignored otherwise.
 
 \--append
 :   Use previously generated output file and append the new entries to it.
@@ -49,6 +57,8 @@ is currently the only output of the tool.)
 	compilation database up to date. File deletion and addition are both
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
+    When used with --with-link, requires the existence of both database files. 
+    Otherwise, overwrites existing data.
 
 \--run-checks
 :   Allow the program to verify file location checks on the current machine
@@ -79,10 +89,14 @@ of a build.
 
 Read more about the syntax of the file in the `bear-intercept(1)` man page.
 
-# OUTPUT FILE
+# OUTPUT COMPILE FILE
 
-Currently, the only output format is the JSON compilation database.
+Currently, the output format is the JSON compilation database.
 Read more about the syntax of that in the `bear(1)` man page. 
+
+# OUTPUT LINK FILE
+
+JSON linking database.
 
 # CONFIG FILE
 
@@ -145,6 +159,9 @@ the command line argument overrides the config file values.
     The `--run-checks` flag overrides this config value. The `duplicate_filter_fields`
     select the method how duplicate entries are detected in the output. The possible
     values for this field are: `all`, `file` and `file_output`.
+    `without_duplicate_filter` is intended to disable the filtering of duplicate entries when generating a database.
+    `without_existence_check` is intended to disable existence check for sources/object files when generating a database.
+    In this version `without_duplicate_filter=true` and `without_existence_check=true`, only when used `--with-link`.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.

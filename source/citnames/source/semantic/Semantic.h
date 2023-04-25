@@ -87,6 +87,7 @@ namespace cs::semantic {
                 fs::path compiler,
                 std::list<std::string> flags,
                 std::list<fs::path> sources,
+                std::list<fs::path> dependencies,
                 std::optional<fs::path> output,
                 bool with_linking);
 
@@ -100,6 +101,7 @@ namespace cs::semantic {
         fs::path compiler;
         std::list<std::string> flags;
         std::list<fs::path> sources;
+        std::list<fs::path> dependencies;
         std::optional<fs::path> output;
         bool with_linking;
     };
@@ -110,9 +112,8 @@ namespace cs::semantic {
         Link(fs::path working_dir,
              fs::path compiler,
              std::list<std::string> flags,
-             std::list<fs::path> sources,
-             std::optional<fs::path> output,
-             bool with_compilation);
+             std::list<fs::path> files,
+             std::optional<fs::path> output);
 
         bool operator==(Semantic const&) const override;
         std::ostream& operator<<(std::ostream&) const override;
@@ -123,8 +124,7 @@ namespace cs::semantic {
         fs::path working_dir;
         fs::path compiler;
         std::list<std::string> flags;
-        std::list<fs::path> object_files;
+        std::list<fs::path> files;
         std::optional<fs::path> output;
-        bool with_compilation;
     };
 }

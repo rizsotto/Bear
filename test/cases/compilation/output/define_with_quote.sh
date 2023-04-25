@@ -17,4 +17,4 @@ int main() {
 }
 EOF
 
-$CXX -DEXPORT="extern \"C\"" -o define_with_quote define_with_quote.c;
+$CXX define_with_quote.c -DEXPORT="extern \"C\"" -o define_with_quote;

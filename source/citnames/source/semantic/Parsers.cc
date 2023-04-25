@@ -301,6 +301,51 @@ namespace cs::semantic {
         return rust::Err(input);
     }
 
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> ObjectFileMatcher::parse(const ArgumentsView &input) {
+        if (input.empty()) {
+            return rust::Err(input);
+        }
+        const auto &candidate = input.front();
+        const auto &extension = take_extension(candidate);
+        if (".o" == extension) {
+            const auto &[arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { arguments, CompilerFlagType::OBJECT_FILE };
+            return rust::Ok(std::make_pair(flag, remainder));
+        }
+        return rust::Err(input);
+    }
+
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> LibraryMatcher::parse(const ArgumentsView &input) {
+        static const std::set<std::string_view> extensions = {
+                // unix
+                ".so", ".a", ".la",
+                // macos
+                ".dylib",
+                // windows
+                ".dll", ".DLL", ".ocx", ".OCX", ".lib", ".LIB",
+                // amigaOS
+                ".library"
+        };
+
+        if (input.empty()) {
+            return rust::Err(input);
+        }
+        const auto &candidate = input.front();
+        const auto &extension = take_extension(candidate);
+        if (extensions.find(extension) != extensions.end() || candidate.find(".so.") != std::string::npos) {
+            const auto &[arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { arguments, CompilerFlagType::LIBRARY };
+            return rust::Ok(std::make_pair(flag, remainder));
+        }
+        return rust::Err(input);
+    }
+
     rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> EverythingElseFlagMatcher::parse(const ArgumentsView &input) {
         if (input.empty()) {
             return rust::Err(input);
@@ -310,7 +355,7 @@ namespace cs::semantic {
             if (arguments.empty()) {
                 return rust::Err(input);
             }
-            auto flag = CompilerFlag { arguments, CompilerFlagType::LINKER_OBJECT_FILE };
+            auto flag = CompilerFlag { arguments, CompilerFlagType::UNKNOWN };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);

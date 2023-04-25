@@ -44,16 +44,6 @@ namespace {
         }
         return files_with_abspath;
     }
-
-    std::list<fs::path> get_object_files(const std::list<fs::path>& files)
-    {
-        std::list<fs::path> object_files;
-        for (const auto& file : files) {
-            object_files.emplace_back(file.string() + ".o");
-        }
-
-        return object_files;
-    }
 }
 
 namespace fmt {
@@ -100,12 +90,14 @@ namespace cs::semantic {
                      fs::path compiler,
                      std::list<std::string> flags,
                      std::list<fs::path> sources,
+                     std::list<fs::path> dependencies,
                      std::optional<fs::path> output,
                      bool with_linking)
             : working_dir(std::move(working_dir))
             , compiler(std::move(compiler))
             , flags(std::move(flags))
             , sources(std::move(sources))
+            , dependencies(std::move(dependencies))
             , output(std::move(output))
             , with_linking(with_linking)
     { }
@@ -117,9 +109,10 @@ namespace cs::semantic {
         if (const auto *const ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
             return (working_dir == ptr->working_dir)
                 && (compiler == ptr->compiler)
-                && (output == ptr->output)
-                && (sources == ptr->sources)
                 && (flags == ptr->flags)
+                && (sources == ptr->sources)
+                && (dependencies == ptr->dependencies)
+                && (output == ptr->output)
                 && (with_linking == ptr->with_linking);
         }
         return false;
@@ -130,6 +123,7 @@ namespace cs::semantic {
             << ", compiler: " << compiler
             << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
             << ", sources: " << fmt::format("[{}]", fmt::join(sources.begin(), sources.end(), ", "))
+            << ", dependencies: " << fmt::format("[{}]", fmt::join(dependencies.begin(), dependencies.end(), ", "))
             << ", output: " << (output ? output.value().string() : "")
             << ", with_linking: " << with_linking
             << " }";
@@ -137,6 +131,7 @@ namespace cs::semantic {
     }
 
     std::list<cs::Entry> Compile::into_entries() const {
+        const auto dependencies_abspath = abspath(dependencies, working_dir);
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
             const fs::path real_output = (output && !with_linking)
@@ -145,12 +140,13 @@ namespace cs::semantic {
 
             cs::Entry result {
                 abspath(source, working_dir),
-                std::list<fs::path>(),
+                dependencies_abspath,
                 working_dir,
                 abspath(real_output, working_dir),
                 { compiler.string() }
             };
 
+            // flags contains everything except output and sources
             std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
             if (output) {
                 result.arguments.emplace_back("-o");
@@ -166,15 +162,13 @@ namespace cs::semantic {
     Link::Link(fs::path working_dir,
                fs::path compiler,
                std::list<std::string> flags,
-               std::list<fs::path> object_files,
-               std::optional<fs::path> output,
-               bool with_compilation)
+               std::list<fs::path> files,
+               std::optional<fs::path> output)
             : working_dir(std::move(working_dir))
             , compiler(std::move(compiler))
             , flags(std::move(flags))
-            , object_files(std::move(object_files))
+            , files(std::move(files))
             , output(std::move(output))
-            , with_compilation(with_compilation)
     { }
 
     bool Link::operator==(const Semantic &rhs) const {
@@ -184,10 +178,9 @@ namespace cs::semantic {
         if (const auto *const ptr = dynamic_cast<Link const*>(&rhs); ptr != nullptr) {
             return (working_dir == ptr->working_dir)
                 && (compiler == ptr->compiler)
-                && (output == ptr->output)
-                && (object_files == ptr->object_files)
                 && (flags == ptr->flags)
-                && (with_compilation == ptr->with_compilation);
+                && (files == ptr->files)
+                && (output == ptr->output);
         }
         return false;
     }
@@ -196,32 +189,27 @@ namespace cs::semantic {
         os  << "Link { working_dir: " << working_dir
             << ", compiler: " << compiler
             << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
-            << ", files: " << fmt::format("[{}]", fmt::join(object_files.begin(), object_files.end(), ", "))
+            << ", files: " << fmt::format("[{}]", fmt::join(files.begin(), files.end(), ", "))
             << ", output: " << (output ? output.value().string() : "")
-            << ", with compilation: " << with_compilation
             << " }";
         return os;
     }
 
     std::list<cs::Entry> Link::into_entries() const {
-        const auto real_object_files = (with_compilation)
-            ? get_object_files(object_files)
-            : object_files;
-
         cs::Entry result {
             fs::path(),
-            abspath(real_object_files, working_dir),
+            abspath(files, working_dir),
             working_dir,
             output ? std::optional(abspath(output.value(), working_dir)) : std::nullopt,
             { compiler.string() }
         };
 
+        // flags contains everything except output
         std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
         if (output) {
             result.arguments.emplace_back("-o");
             result.arguments.push_back(output.value().string());
         }
-        std::copy(real_object_files.begin(), real_object_files.end(), std::back_inserter(result.arguments));
 
         return std::list{result};
     }

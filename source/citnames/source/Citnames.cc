@@ -27,6 +27,7 @@
 #include "libsys/Path.h"
 
 #include <filesystem>
+#include <set>
 
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
@@ -193,14 +194,33 @@ namespace {
                 });
     }
 
-    size_t transform(
+    rust::Result<size_t> transform(
         cs::semantic::Build &build,
         const db::EventsDatabaseReader::Ptr& events,
         std::list<cs::Entry> &output_compile,
         std::list<cs::Entry> &output_link,
         const bool with_link
     ) {
-        for (const auto &event : *events) {
+        std::set<size_t> all_ppid;
+        std::set<size_t> writed_command_pids;
+
+        for (const rpc::Event &event : *events) {
+            const size_t pid = event.started().pid();
+            const size_t ppid = event.started().ppid();
+            if (pid == 0 && ppid == 0) {
+                continue;
+            }
+
+            if (all_ppid.find(pid) != all_ppid.end()) {
+                return rust::Err(std::runtime_error("Processes in events database are not sorted!"));
+            }
+            all_ppid.insert(ppid);
+
+            if (writed_command_pids.find(ppid) != writed_command_pids.end()) {
+                writed_command_pids.insert(pid);
+                continue;
+            }
+
             const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
                 const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
                 return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
@@ -208,15 +228,21 @@ namespace {
 
             const auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER)
                 .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
-            std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
+            if (!entries_compile.empty()) {
+                writed_command_pids.insert(pid);
+                std::copy(entries_compile.begin(), entries_compile.end(), std::back_inserter(output_compile));
+            }
 
             if (with_link) {
                 const auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER)
                     .map<std::list<cs::Entry>>(get_entries).unwrap_or({});
-                std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+                if (!entries_link.empty()) {
+                    writed_command_pids.insert(pid);
+                    std::copy(entries_link.begin(), entries_link.end(), std::back_inserter(output_link));
+                }
             }
         }
-        return output_compile.size() + output_link.size();
+        return rust::Ok(output_compile.size() + output_link.size());
     }
 
     rust::Result<size_t> complete_entries_from_json(
@@ -234,7 +260,7 @@ namespace {
                     return new_entries_counts + old_entries_count;
                 });
         }
-        return rust::Result<size_t>(rust::Ok(new_entries_counts));
+        return rust::Ok(new_entries_counts);
     }
 
     rust::Result<size_t> write_entries(
@@ -260,7 +286,7 @@ namespace cs {
         std::list<cs::Entry> entries_link;
 
         return db::EventsDatabaseReader::from(arguments_.input)
-            .map<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
+            .and_then<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
                 cs::semantic::Build build(configuration_.compilation);
                 return transform(build, commands, entries_compile, entries_link, arguments_.with_link);
             })

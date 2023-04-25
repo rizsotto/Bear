@@ -169,6 +169,7 @@ namespace {
             {"-Xassembler",       {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
             {"-Xclang",           {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
             {"-Xpreprocessor",    {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
+            {"-main-file-name",   {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
     };
 
     FlagsByName clang_flags(const FlagsByName &base) {

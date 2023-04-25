@@ -22,6 +22,7 @@ def main():
     count_parser.add_argument('-le', dest='le', type=int)
     entry_parser = subparsers.add_parser('contains')
     entry_parser.add_argument('-file')
+    entry_parser.add_argument('-files', nargs='*')
     entry_parser.add_argument('-output')
     entry_parser.add_argument('-directory')
     entry_parser.add_argument('-arguments', nargs=argparse.REMAINDER)
@@ -65,6 +66,7 @@ def filter_from(args):
         p1 = True if args.file is None else entry['file'] == args.file
         p2 = True if args.output is None else entry['output'] == args.output
         p3 = True if args.directory is None else entry['directory'] == args.directory
+
         if args.arguments is not None:
             if 'arguments' in entry:
                 p4 = entry['arguments'] == args.arguments
@@ -72,17 +74,20 @@ def filter_from(args):
                 p4 = shlex.split(entry['command']) == args.arguments
         else:
             p4 = True
-        return p1 and p2 and p3 and p4
+
+        p5 = True if args.files is None else entry['files'] == args.files
+        return p1 and p2 and p3 and p4 and p5
 
     return test
 
 
 def to_string(args):
     p1 = '' if args.file is None else '-file {}'.format(args.file)
-    p2 = '' if args.output is None else '-output {}'.format(args.output)
-    p3 = '' if args.directory is None else '-directory {}'.format(args.directory)
-    p4 = '' if args.arguments is None else ' '.join(['-arguments'] + args.arguments)
-    return ' '.join([p1, p2, p3, p4])
+    p2 = '' if args.files is None else ' '.join(['-files'] + args.files)
+    p3 = '' if args.output is None else '-output {}'.format(args.output)
+    p4 = '' if args.directory is None else '-directory {}'.format(args.directory)
+    p5 = '' if args.arguments is None else ' '.join(['-arguments'] + args.arguments)
+    return ' '.join([p1, p2, p3, p4, p5])
 
 
 if __name__ == "__main__":
