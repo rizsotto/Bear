@@ -29,7 +29,7 @@ find_package(spdlog REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(gRPC REQUIRED IMPORTED_TARGET protobuf grpc++)
 
-if (fmt_VERSION_MAJOR EQUAL 9)
+if (fmt_VERSION_MAJOR GREATER_EQUAL 9)
     set(FMT_NEEDS_OSTREAM_FORMATTER 1)
     set(HAVE_FMT_STD_H 1) # FIXME: this should be done with `check_include_file`
 endif ()
