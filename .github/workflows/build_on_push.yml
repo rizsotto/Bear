@@ -10,11 +10,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             multilib: true
-          - os: ubuntu-20.04
+          - os: ubuntu-latest
             multilib: false
-          - os: macos-10.15
+          - os: macos-latest
             multilib: false
 
     steps:
