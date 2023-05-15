@@ -27,6 +27,9 @@
 #include <functional>
 #include <set>
 #include <string_view>
+#include <numeric>
+
+#include <spdlog/spdlog.h>
 
 using namespace cs::semantic;
 
@@ -177,6 +180,18 @@ namespace {
         }
         return std::make_tuple(arguments, files, output, sources_count);
     }
+
+    auto get_parser(const FlagsByName &flags) {
+        return Repeat(
+                    OneOf(
+                        FlagParser(flags),
+                        SourceMatcher(),
+                        ObjectFileMatcher(),
+                        LibraryMatcher(),
+                        EverythingElseFlagMatcher()
+                    )
+        );
+    }
 }
 
 namespace cs::semantic {
@@ -320,25 +335,13 @@ namespace cs::semantic {
     }
 
     bool ToolGcc::is_linker_call(const fs::path& program) const {
-        static const auto pattern = std::regex(R"(^(ld|lld|gold|ar)\S*$)");
+        static const auto pattern = std::regex(R"(^(ld|lld)\S*$)");
         std::cmatch m;
         return is_compiler_call(program) || std::regex_match(program.filename().c_str(), m, pattern);
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const Execution &execution) const {
         return compilation(FLAG_DEFINITION, execution);
-    }
-
-    auto get_parser(const FlagsByName &flags) {
-        return Repeat(
-                    OneOf(
-                        FlagParser(flags),
-                        SourceMatcher(),
-                        ObjectFileMatcher(),
-                        LibraryMatcher(),
-                        EverythingElseFlagMatcher()
-                    )
-        );
     }
 
     rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
@@ -403,6 +406,17 @@ namespace cs::semantic {
                     auto[arguments, files, output, sources_count] = split_link_with_updating_sources(flags);
                     if (sources_count != 0 && !has_linker(flags)) {
                         return rust::Err(std::runtime_error("Without linking."));
+                    }
+                    if (files.empty()) {
+                        spdlog::debug("Files not found for linking in command: {}", std::accumulate(
+                            std::next(arguments.begin()),
+                            arguments.end(),
+                            arguments.front(),
+                            [](std::string res, std::string flag) {
+                                return std::move(res) + " " + std::move(flag);
+                            }
+                        ));
+                        return rust::Err(std::runtime_error("Files not found for linking."));
                     }
 
                     SemanticPtr result = std::make_shared<Link>(

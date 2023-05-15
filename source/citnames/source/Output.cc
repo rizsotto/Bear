@@ -33,9 +33,6 @@
 namespace {
 
     void validate_files(const cs::Entry &entry) {
-        if (entry.file.empty() && (entry.files.empty())) {
-            throw std::runtime_error("Fields 'file' and 'files' have not values.");
-        }
         if (std::any_of(entry.files.begin(), entry.files.end(), [](const auto& file) { return file.empty(); })) {
             throw std::runtime_error("Field 'files' has empty paths.");
         }
@@ -66,13 +63,19 @@ namespace {
 
         bool apply(const cs::Entry &entry) override {
             validate_files(entry);
+
+            bool checking_result = true;
             if (not entry.file.empty()) {
-                return check(entry.file);
+                checking_result = checking_result && check(entry.file);
             }
             if (not entry.files.empty()) {
-                return std::all_of(entry.files.begin(), entry.files.end(), [&](const auto &file){ return check(file); });
+                checking_result = checking_result && std::all_of(
+                    entry.files.begin(),
+                    entry.files.end(),
+                    [&](const auto &file){ return check(file); }
+                );
             }
-            return false;
+            return checking_result;
         }
 
     private:

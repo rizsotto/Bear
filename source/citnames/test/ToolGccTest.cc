@@ -297,7 +297,7 @@ namespace {
         EXPECT_TRUE(sut.is_linker_call("fortran"));
         EXPECT_TRUE(sut.is_linker_call("ld"));
         EXPECT_TRUE(sut.is_linker_call("lld"));
-        EXPECT_TRUE(sut.is_linker_call("ar"));
+        EXPECT_FALSE(sut.is_linker_call("ar"));
     }
 
     TEST(ToolGcc, linking_fails_on_empty) {

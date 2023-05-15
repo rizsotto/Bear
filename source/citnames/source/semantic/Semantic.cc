@@ -18,6 +18,7 @@
  */
 
 #include "semantic/Semantic.h"
+#include "ToolAr.h"
 
 #include <fmt/format.h>
 
@@ -206,7 +207,7 @@ namespace cs::semantic {
 
         // flags contains everything except output
         std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
-        if (output) {
+        if (output && !ToolAr::is_linker_call(compiler.string())) {
             result.arguments.emplace_back("-o");
             result.arguments.push_back(output.value().string());
         }

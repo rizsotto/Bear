@@ -24,6 +24,7 @@
 #include "ToolCuda.h"
 #include "ToolWrapper.h"
 #include "ToolExtendingWrapper.h"
+#include "ToolAr.h"
 #include "Convert.h"
 
 #include <memory>
@@ -44,6 +45,7 @@ namespace {
                 std::make_shared<cs::semantic::ToolClang>(),
                 std::make_shared<cs::semantic::ToolWrapper>(),
                 std::make_shared<cs::semantic::ToolCuda>(),
+                std::make_shared<cs::semantic::ToolAr>(),
         };
         for (auto && compiler : cfg.compilers_to_recognize) {
             tools.emplace_front(std::make_shared<cs::semantic::ToolExtendingWrapper>(std::move(compiler)));

@@ -31,6 +31,7 @@ target_sources(citnames_a
             source/semantic/ToolGcc.cc
             source/semantic/ToolWrapper.cc
             source/semantic/ToolExtendingWrapper.cc
+            source/semantic/ToolAr.cc
         INTERFACE
             $<TARGET_OBJECTS:citnames_a>
         )
@@ -67,6 +68,7 @@ if (ENABLE_UNIT_TESTS)
             test/ToolClangTest.cc
             test/ToolGccTest.cc
             test/ToolWrapperTest.cc
+            test/ToolArTest.cc
             )
 
     target_link_libraries(citnames_unit_test citnames_a)
