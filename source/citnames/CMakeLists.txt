@@ -66,7 +66,8 @@ if (ENABLE_UNIT_TESTS)
             test/OutputTest.cc
             test/ParserTest.cc
             test/ToolClangTest.cc
-            test/ToolGccTest.cc
+            test/ToolGccCompileTest.cc
+            test/ToolGccLinkTest.cc
             test/ToolWrapperTest.cc
             test/ToolArTest.cc
             )

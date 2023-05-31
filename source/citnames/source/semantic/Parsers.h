@@ -106,7 +106,6 @@ namespace cs::semantic {
         PREPROCESSOR_MAKE,
         LINKER,
         DIRECTORY_SEARCH,
-        DIRECTORY_SEARCH_LINKER,
         OTHER,
         STATIC_ANALYZER,
         UNKNOWN,
@@ -116,6 +115,11 @@ namespace cs::semantic {
         LIBRARY,
 
         KIND_OF_OUTPUT_OUTPUT,
+
+        DIRECTORY_SEARCH_LIBRARY,
+        LINKER_LIBRARY_FLAG,
+        LINKER_LIBRARY_STATIC,
+        LINKER_OPTIONS_FLAG,
     };
 
     struct CompilerFlag {

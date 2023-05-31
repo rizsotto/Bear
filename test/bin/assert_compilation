@@ -82,11 +82,11 @@ def filter_from(args):
 
 
 def to_string(args):
-    p1 = '' if args.file is None else '-file {}'.format(args.file)
-    p2 = '' if args.files is None else ' '.join(['-files'] + args.files)
-    p3 = '' if args.output is None else '-output {}'.format(args.output)
-    p4 = '' if args.directory is None else '-directory {}'.format(args.directory)
-    p5 = '' if args.arguments is None else ' '.join(['-arguments'] + args.arguments)
+    p1 = '' if args.file is None else '\n-file {}'.format(args.file)
+    p2 = '' if args.files is None else ' '.join(['\n-files'] + args.files)
+    p3 = '' if args.output is None else '\n-output {}'.format(args.output)
+    p4 = '' if args.directory is None else '\n-directory {}'.format(args.directory)
+    p5 = '' if args.arguments is None else ' '.join(['\n-arguments'] + args.arguments)
     return ' '.join([p1, p2, p3, p4, p5])
 
 
