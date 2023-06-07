@@ -19,6 +19,8 @@
 
 #include "ToolAny.h"
 
+#include <algorithm>
+
 namespace cs::semantic {
 
     ToolAny::ToolAny(ToolAny::ToolPtrs &&tools, std::list<fs::path> &&to_exclude) noexcept

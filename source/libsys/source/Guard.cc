@@ -20,6 +20,7 @@
 #include "Guard.h"
 #include "libsys/Environment.h"
 
+#include <algorithm>
 #include <cstring>
 #include <functional>
 
