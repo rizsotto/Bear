@@ -19,6 +19,7 @@
 
 #include "libflags/Flags.h"
 
+#include <algorithm>
 #include <cstring>
 #include <iostream>
 #include <optional>

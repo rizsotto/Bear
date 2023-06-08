@@ -22,6 +22,7 @@
 #include "libsys/Errors.h"
 #include "Guard.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>

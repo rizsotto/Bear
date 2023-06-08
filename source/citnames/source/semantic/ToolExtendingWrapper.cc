@@ -19,6 +19,8 @@
 
 #include "ToolExtendingWrapper.h"
 
+#include <algorithm>
+
 namespace cs::semantic {
 
     ToolExtendingWrapper::ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept
