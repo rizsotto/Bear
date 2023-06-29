@@ -55,12 +55,14 @@ namespace {
                 input.executable,
                 {"-c"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -75,14 +77,16 @@ namespace {
         const Compile expected(
                 input.working_dir,
                 input.executable,
-                {"-c"},
+                {"-c", "-L.", "-lthing"},
                 {fs::path("source.c")},
-                {fs::path("exe")}
+                {},
+                {fs::path("exe")},
+                true
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -98,7 +102,7 @@ namespace {
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -125,12 +129,14 @@ namespace {
                 input.executable,
                 {"-c", "-Xclang", "-load", "-Xclang", "/path/to/LLVMHello.so"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -159,12 +165,14 @@ namespace {
                 input.executable,
                 {"-c", "-Xarch_arg1", "arg2", "-Xarch_device", "device1", "-Xarch_host", "host1"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -191,12 +199,14 @@ namespace {
                 input.executable,
                 {"-c", "-Xcuda-fatbinary", "arg1", "-Xcuda-ptxas", "arg2"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -223,12 +233,14 @@ namespace {
                 input.executable,
                 {"-c", "-Xopenmp-target", "arg1", "-Xopenmp-target=arg1", "arg2"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
@@ -255,12 +267,14 @@ namespace {
                 input.executable,
                 {"-c", "-Z", "arg1", "-aargs", "--analyze"},
                 {fs::path("source.c")},
-                {fs::path("source.o")}
+                {},
+                {fs::path("source.o")},
+                false
         );
 
         ToolClang sut({});
 
-        auto result = sut.recognize(input);
+        auto result = sut.recognize(input, BuildTarget::COMPILER);
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }

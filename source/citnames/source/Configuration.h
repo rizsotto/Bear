@@ -58,6 +58,9 @@ namespace cs {
         std::string duplicate_filter_fields = DUPLICATE_FILE_OUTPUT;
         std::list<fs::path> paths_to_include = {};
         std::list<fs::path> paths_to_exclude = {};
+
+        bool without_duplicate_filter = false;
+        bool without_existence_check = false;
     };
 
     // Groups together the output related configurations.
@@ -83,10 +86,16 @@ namespace cs {
         std::list<fs::path> compilers_to_exclude;
     };
 
+    // Represents the configuration related creating a linking database.
+    struct Linking {
+        std::string filename;
+    };
+
     // Represents the application configuration.
     struct Configuration {
         Output output;
         Compilation compilation;
+        std::optional<Linking> linking;
     };
 
     // Convenient methods for these types.
@@ -95,6 +104,7 @@ namespace cs {
     std::ostream& operator<<(std::ostream&, const Output&);
     std::ostream& operator<<(std::ostream&, const CompilerWrapper&);
     std::ostream& operator<<(std::ostream&, const Compilation&);
+    std::ostream& operator<<(std::ostream&, const Linking&);
     std::ostream& operator<<(std::ostream&, const Configuration&);
 
     // Utility class to persists configuration in JSON.

@@ -18,8 +18,34 @@
  */
 
 #include "semantic/Semantic.h"
+#include "ToolAr.h"
 
 #include <fmt/format.h>
+
+namespace {
+    fs::path abspath(const fs::path &path, const fs::path &working_dir) {
+        auto candidate = (path.is_absolute()) ? path : working_dir / path;
+        // Create canonical path without checking of file existence.
+        fs::path result;
+        for (const auto& part : candidate) {
+            if (part == ".")
+                continue;
+            if (part == "..")
+                result = result.parent_path();
+            else
+                result = result / part;
+        }
+        return result;
+    }
+
+    std::list<fs::path> abspath(const std::list<fs::path> &files, const fs::path &working_dir) {
+        std::list<fs::path> files_with_abspath;
+        for (const auto& file : files) {
+            files_with_abspath.push_back(abspath(file, working_dir));
+        }
+        return files_with_abspath;
+    }
+}
 
 namespace fmt {
 
@@ -64,13 +90,17 @@ namespace cs::semantic {
     Compile::Compile(fs::path working_dir,
                      fs::path compiler,
                      std::list<std::string> flags,
-                     std::vector<fs::path> sources,
-                     std::optional<fs::path> output)
+                     std::list<fs::path> sources,
+                     std::list<fs::path> dependencies,
+                     std::optional<fs::path> output,
+                     bool with_linking)
             : working_dir(std::move(working_dir))
             , compiler(std::move(compiler))
             , flags(std::move(flags))
             , sources(std::move(sources))
+            , dependencies(std::move(dependencies))
             , output(std::move(output))
+            , with_linking(with_linking)
     { }
 
     bool Compile::operator==(const Semantic &rhs) const {
@@ -80,9 +110,11 @@ namespace cs::semantic {
         if (const auto *const ptr = dynamic_cast<Compile const*>(&rhs); ptr != nullptr) {
             return (working_dir == ptr->working_dir)
                 && (compiler == ptr->compiler)
-                && (output == ptr->output)
+                && (flags == ptr->flags)
                 && (sources == ptr->sources)
-                && (flags == ptr->flags);
+                && (dependencies == ptr->dependencies)
+                && (output == ptr->output)
+                && (with_linking == ptr->with_linking);
         }
         return false;
     }
@@ -92,42 +124,94 @@ namespace cs::semantic {
             << ", compiler: " << compiler
             << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
             << ", sources: " << fmt::format("[{}]", fmt::join(sources.begin(), sources.end(), ", "))
+            << ", dependencies: " << fmt::format("[{}]", fmt::join(dependencies.begin(), dependencies.end(), ", "))
             << ", output: " << (output ? output.value().string() : "")
+            << ", with_linking: " << with_linking
             << " }";
         return os;
     }
 
     std::list<cs::Entry> Compile::into_entries() const {
-        const auto abspath = [this](const fs::path &path) -> fs::path {
-            auto candidate = (path.is_absolute()) ? path : working_dir / path;
-            // Create canonical path without checking of file existence.
-            fs::path result;
-            for (const auto& part : candidate) {
-                if (part == ".")
-                    continue;
-                if (part == "..")
-                    result = result.parent_path();
-                else
-                    result = result / part;
-            }
-            return result;
-        };
+        const auto dependencies_abspath = abspath(dependencies, working_dir);
         std::list<cs::Entry> results;
         for (const auto& source : sources) {
+            const fs::path real_output = (output && !with_linking)
+                ? output.value()
+                : fs::path(source.string() + ".o");
+
             cs::Entry result {
-                abspath(source),
+                abspath(source, working_dir),
+                dependencies_abspath,
                 working_dir,
-                output ? std::optional(abspath(output.value())) : std::nullopt,
+                abspath(real_output, working_dir),
                 { compiler.string() }
             };
+
+            // flags contains everything except output and sources
             std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
             if (output) {
                 result.arguments.emplace_back("-o");
-                result.arguments.push_back(output.value().string());
+                result.arguments.push_back(real_output);
             }
             result.arguments.push_back(source);
+
             results.emplace_back(std::move(result));
         }
         return results;
+    }
+
+    Link::Link(fs::path working_dir,
+               fs::path compiler,
+               std::list<std::string> flags,
+               std::list<fs::path> files,
+               std::optional<fs::path> output)
+            : working_dir(std::move(working_dir))
+            , compiler(std::move(compiler))
+            , flags(std::move(flags))
+            , files(std::move(files))
+            , output(std::move(output))
+    { }
+
+    bool Link::operator==(const Semantic &rhs) const {
+        if (this == &rhs)
+            return true;
+
+        if (const auto *const ptr = dynamic_cast<Link const*>(&rhs); ptr != nullptr) {
+            return (working_dir == ptr->working_dir)
+                && (compiler == ptr->compiler)
+                && (flags == ptr->flags)
+                && (files == ptr->files)
+                && (output == ptr->output);
+        }
+        return false;
+    }
+
+    std::ostream &Link::operator<<(std::ostream &os) const {
+        os  << "Link { working_dir: " << working_dir
+            << ", compiler: " << compiler
+            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << ", files: " << fmt::format("[{}]", fmt::join(files.begin(), files.end(), ", "))
+            << ", output: " << (output ? output.value().string() : "")
+            << " }";
+        return os;
+    }
+
+    std::list<cs::Entry> Link::into_entries() const {
+        cs::Entry result {
+            fs::path(),
+            abspath(files, working_dir),
+            working_dir,
+            output ? std::optional(abspath(output.value(), working_dir)) : std::nullopt,
+            { compiler.string() }
+        };
+
+        // flags contains everything except output
+        std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
+        if (output && !ToolAr::is_linker_call(compiler.string())) {
+            result.arguments.emplace_back("-o");
+            result.arguments.push_back(output.value().string());
+        }
+
+        return std::list{result};
     }
 }

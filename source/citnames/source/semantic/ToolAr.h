@@ -19,21 +19,24 @@
 
 #pragma once
 
-#include "ToolGcc.h"
+#include "Tool.h"
+#include "Parsers.h"
 
 namespace cs::semantic {
 
-    struct ToolExtendingWrapper : public ToolGcc {
-
-        explicit ToolExtendingWrapper(CompilerWrapper &&compilers_to_recognize) noexcept;
-
-        [[nodiscard]]
-        bool is_compiler_call(const fs::path& program) const override;
+    struct ToolAr : public Tool {
 
         [[nodiscard]]
         rust::Result<SemanticPtr> recognize(const Execution &execution, const BuildTarget target) const override;
 
-    private:
-        CompilerWrapper compilers_to_recognize_;
+        [[nodiscard]]
+        static bool is_linker_call(const fs::path& program);
+
+    protected:
+
+        [[nodiscard]]
+        static rust::Result<SemanticPtr> linking(const FlagsByName &flags, const Execution &execution);
+
+        static const FlagsByName FLAG_DEFINITION;
     };
 }

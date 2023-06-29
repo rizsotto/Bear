@@ -28,14 +28,14 @@ namespace cs::semantic {
             , to_exclude_(to_exclude)
     { }
 
-    rust::Result<SemanticPtr> ToolAny::recognize(const domain::Execution &execution) const {
+    rust::Result<SemanticPtr> ToolAny::recognize(const domain::Execution &execution, const BuildTarget target) const {
         // do different things if the execution is matching one of the nominated compilers.
         if (to_exclude_.end() != std::find(to_exclude_.begin(), to_exclude_.end(), execution.executable)) {
             return rust::Err(std::runtime_error("The tool is on the exclude list from configuration."));
         } else {
             // check if any tool can recognize the execution.
             for (const auto &tool : tools_) {
-                auto result = tool->recognize(execution);
+                auto result = tool->recognize(execution, target);
                 // return if it recognized in any way.
                 if (Tool::recognized_ok(result) || Tool::recognized_with_error(result)) {
                     return result;

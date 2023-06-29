@@ -27,6 +27,8 @@
 #include "libsys/Path.h"
 
 #include <filesystem>
+#include <set>
+#include <map>
 
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
@@ -42,6 +44,11 @@ template <> struct fmt::formatter<cs::Configuration> : ostream_formatter {};
 #endif
 
 namespace {
+
+    struct EventEntries {
+        std::list<cs::Entry> compile;
+        std::list<cs::Entry> link;
+    };
 
     std::list<fs::path> to_abspath(const std::list<fs::path> &paths, const fs::path &root) {
         std::list<fs::path> results;
@@ -124,7 +131,7 @@ namespace {
                     return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
-                            (arguments.append && is_exists(arguments.output)),
+                            arguments.append && is_exists(arguments.output),
                     });
                 });
     }
@@ -141,6 +148,13 @@ namespace {
             result.emplace_back(it->second);
         }
         return result;
+    }
+
+    void customize_configuration(cs::Configuration& configuration) {
+        if (configuration.linking.has_value()) {
+            configuration.output.content.without_existence_check = true;
+            configuration.output.content.without_duplicate_filter = true;
+        }
     }
 
     rust::Result<cs::Configuration>
@@ -170,63 +184,183 @@ namespace {
                             update_compilers_to_recognize(config.compilation.compilers_to_recognize, env_compilers);
                     return config;
                 })
+                .map<cs::Configuration>([](auto config) {
+                    customize_configuration(config);
+                    return config;
+                })
                 .on_success([](const auto &config) {
                     spdlog::debug("Configuration: {}", config);
                 });
     }
 
-    size_t transform(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::Entry> &output) {
-        for (const auto &event : *events) {
-            const auto entries = build.recognize(event)
-                    .map<std::list<cs::Entry>>([](const auto &semantic) -> std::list<cs::Entry> {
-                        const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
-                        return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
-                    })
-                    .unwrap_or({});
-            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
+    bool transform_event(
+        const cs::semantic::Build &build,
+        const rpc::Event &event,
+        std::map<size_t, EventEntries> &pid_entries,
+        const bool with_link
+    ) {
+        const auto get_entries = [](const auto &semantic) -> std::list<cs::Entry> {
+            const auto candidate = dynamic_cast<const cs::semantic::CompilerCall *>(semantic.get());
+            return (candidate != nullptr) ? candidate->into_entries() : std::list<cs::Entry>();
+        };
+
+        const size_t pid = event.started().pid();
+        bool is_written = false;
+
+        auto entries_compile = build.recognize(event, cs::semantic::BuildTarget::COMPILER).map<std::list<cs::Entry>>(get_entries).unwrap_or({});
+        if (!entries_compile.empty()) {
+            is_written = true;
+            std::move(entries_compile.begin(), entries_compile.end(), std::back_inserter(pid_entries[pid].compile));
         }
-        return output.size();
+        if (with_link) {
+            auto entries_link = build.recognize(event, cs::semantic::BuildTarget::LINKER).map<std::list<cs::Entry>>(get_entries).unwrap_or({});
+            if (!entries_link.empty()) {
+                is_written = true;
+                std::move(entries_link.begin(), entries_link.end(), std::back_inserter(pid_entries[pid].link));
+            }
+        }
+
+        return is_written;
+    }
+
+    size_t transform(
+        const cs::semantic::Build &build,
+        const db::EventsDatabaseReader::Ptr& events,
+        std::list<cs::Entry> &output_compile,
+        std::list<cs::Entry> &output_link,
+        const bool with_link
+    ) {
+        std::set<size_t> writed_event_pids;
+        std::map<size_t, std::set<size_t>> pid_children;
+        std::set<size_t> pids_without_parent;
+        std::set<size_t> pids_with_parent;
+
+        std::map<size_t, EventEntries> pid_entries;
+
+        for (const rpc::Event &event : *events) {
+            const size_t pid = event.started().pid();
+            const size_t ppid = event.started().ppid();
+            if (pid == 0 && ppid == 0) {
+                continue;
+            }
+
+            pid_children[ppid].insert(pid);
+            pids_without_parent.erase(pid);
+            pids_with_parent.insert(pid);
+            if (pids_with_parent.find(ppid) == pids_with_parent.end()) {
+                pids_without_parent.insert(ppid);
+            }
+
+            if (writed_event_pids.find(ppid) != writed_event_pids.end()) {
+                writed_event_pids.insert(pid);
+            }
+            else if (transform_event(build, event, pid_entries, with_link)) {
+                writed_event_pids.insert(pid);
+            }
+        }
+
+        for (const auto &p : pids_without_parent) {
+            std::vector<size_t> pids;
+            std::copy(pid_children[p].rbegin(), pid_children[p].rend(), std::back_inserter(pids));
+
+            while (!pids.empty()) {
+                const auto cur_pid = pids.back();
+                pids.pop_back();
+
+                auto entries_iter = pid_entries.find(cur_pid);
+                // tree before meaningful event
+                if (entries_iter == pid_entries.end()) {
+                    std::copy(pid_children[cur_pid].rbegin(), pid_children[cur_pid].rend(), std::back_inserter(pids));
+                }
+                // meaningful event, children should not be written
+                else {
+                    std::move(entries_iter->second.compile.begin(), entries_iter->second.compile.end(), std::back_inserter(output_compile));
+                    std::move(entries_iter->second.link.begin(), entries_iter->second.link.end(), std::back_inserter(output_link));
+                }
+            }
+        }
+
+        return output_compile.size() + output_link.size();
+    }
+
+    rust::Result<size_t> complete_entries_from_json(
+        cs::CompilationDatabase& output,
+        const fs::path& output_file,
+        std::list<cs::Entry>& entries,
+        size_t new_entries_counts,
+        bool append
+    ) {
+        // read back the current content and extend with the new elements.
+        if (append) {
+            return output.from_json(output_file, entries)
+                .template map<size_t>([&new_entries_counts](auto old_entries_count) {
+                    spdlog::debug("entries have read. [size: {}]", old_entries_count);
+                    return new_entries_counts + old_entries_count;
+                });
+        }
+        return rust::Ok(new_entries_counts);
+    }
+
+    rust::Result<size_t> write_entries(
+        cs::CompilationDatabase& output,
+        const fs::path& output_file,
+        std::list<cs::Entry>& entries
+    ) {
+        // write the entries into the output file.
+        const fs::path temporary_output_file(output_file.string() + ".tmp");
+        auto result = output.to_json(temporary_output_file, entries);
+        return not rename_file(temporary_output_file, output_file)
+            ? rust::Result<size_t>(rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", output_file))))
+            : result;
     }
 }
 
 namespace cs {
 
     rust::Result<int> Command::execute() const {
-        cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
-        std::list<cs::Entry> entries;
+        cs::CompilationDatabase output_compile(configuration_.output.format, configuration_.output.content);
+        cs::CompilationDatabase output_link(configuration_.output.format, configuration_.output.content);
+        std::list<cs::Entry> entries_compile;
+        std::list<cs::Entry> entries_link;
 
-        // get current compilations from the input.
+        const bool with_link = configuration_.linking.has_value();
+        const bool append = arguments_.append && (!with_link || is_exists(configuration_.linking.value().filename));
+
         return db::EventsDatabaseReader::from(arguments_.input)
-                .map<size_t>([this, &entries](const auto &commands) {
-                    cs::semantic::Build build(configuration_.compilation);
-                    return transform(build, commands, entries);
-                })
-                .and_then<size_t>([this, &output, &entries](auto new_entries_count) {
-                    spdlog::debug("compilation entries created. [size: {}]", new_entries_count);
-                    // read back the current content and extend with the new elements.
-                    return (arguments_.append)
-                        ? output.from_json(arguments_.output, entries)
-                                .template map<size_t>([&new_entries_count](auto old_entries_count) {
-                                    spdlog::debug("compilation entries have read. [size: {}]", old_entries_count);
-                                    return new_entries_count + old_entries_count;
-                                })
-                        : rust::Result<size_t>(rust::Ok(new_entries_count));
-                })
-                .and_then<size_t>([this, &output, &entries](const size_t & size) {
-                    // write the entries into the output file.
-                    spdlog::debug("compilation entries to output. [size: {}]", size);
-
-                    const fs::path temporary_file(arguments_.output.string() + ".tmp");
-                    auto result = output.to_json(temporary_file, entries);
-                    return rename_file(temporary_file, arguments_.output)
-                        ? result
-                        : rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", arguments_.output)));
-                })
-                .map<int>([](auto size) {
-                    // just map to success exit code if it was successful.
-                    spdlog::debug("compilation entries written. [size: {}]", size);
-                    return EXIT_SUCCESS;
-                });
+            .map<size_t>([this, &entries_compile, &entries_link, with_link](const auto &commands) {
+                cs::semantic::Build build(configuration_.compilation);
+                return transform(build, commands, entries_compile, entries_link, with_link);
+            })
+            .and_then<size_t>([this, &output_compile, &entries_compile, append](size_t new_entries_count) {
+                spdlog::debug("entries created. [size: {}]", new_entries_count);
+                return complete_entries_from_json(output_compile, arguments_.output,
+                    entries_compile, new_entries_count, append);
+            })
+            .and_then<size_t>([this, &output_link, &entries_link, with_link, append](size_t new_entries_count) {
+                if (with_link) {
+                    return complete_entries_from_json(output_link, configuration_.linking.value().filename,
+                        entries_link, new_entries_count, append);
+                }
+                return rust::Result<size_t>(rust::Ok(new_entries_count));
+            })
+            .and_then<size_t>([this, &output_compile, &entries_compile](const auto entries_count_to_output) {
+                spdlog::debug("entries to output. [size: {}]", entries_count_to_output);
+                return write_entries(output_compile, arguments_.output, entries_compile);
+            })
+            .and_then<size_t>([this, &output_link, &entries_link, with_link](const auto compile_entries_wrote) {
+                if (with_link) {
+                    const auto result_link = write_entries(output_link, configuration_.linking.value().filename, entries_link);
+                    return (result_link.is_err())
+                           ? result_link
+                           : rust::Ok(result_link.unwrap() + compile_entries_wrote);
+                }
+                return rust::Result<size_t>(rust::Ok(compile_entries_wrote));
+            })
+            .map<int>([](auto size) {
+                // just map to success exit code if it was successful.
+                spdlog::debug("entries written. [size: {}]", size);
+                return EXIT_SUCCESS;
+            });
     }
 
     Command::Command(Arguments arguments, cs::Configuration configuration) noexcept
@@ -242,8 +376,8 @@ namespace cs {
     rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args, const char **envp) const {
         auto environment = sys::env::from(const_cast<const char **>(envp));
 
-        auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
+        auto arguments = into_arguments(args);
 
         return rust::merge(arguments, configuration)
                 .map<ps::CommandPtr>([](auto tuples) {

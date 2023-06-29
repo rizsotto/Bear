@@ -56,10 +56,10 @@ namespace {
         const auto flags = parse(sut, input);
         EXPECT_TRUE(flags.is_ok());
         const CompilerFlags expected = {
-                CompilerFlag{slice(input, 1), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 2), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 3), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 4), CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 1), CompilerFlagType::UNKNOWN},
+                CompilerFlag{slice(input, 2), CompilerFlagType::UNKNOWN},
+                CompilerFlag{slice(input, 3), CompilerFlagType::UNKNOWN},
+                CompilerFlag{slice(input, 4), CompilerFlagType::UNKNOWN},
         };
         EXPECT_EQ(expected, flags.unwrap());
     }
@@ -89,6 +89,50 @@ namespace {
             };
             EXPECT_EQ(expected, flags.unwrap());
         }
+    }
+
+    TEST(Parser, ObjectFileMatcher) {
+        const auto sut = Repeat(ObjectFileMatcher());
+
+        const Arguments input = {"compiler", "source1.o", "source2.o"};
+        const auto flags = parse(sut, input);
+        EXPECT_TRUE(flags.is_ok());
+        const CompilerFlags expected = {
+                CompilerFlag{slice(input, 1), CompilerFlagType::OBJECT_FILE},
+                CompilerFlag{slice(input, 2), CompilerFlagType::OBJECT_FILE},
+        };
+        EXPECT_EQ(expected, flags.unwrap());
+    }
+
+    TEST(Parser, LibraryMatcher) {
+        const auto sut = Repeat(LibraryMatcher());
+
+        const Arguments input = {
+            "compiler",
+            "lib.a",
+            "lib.so",
+            "lib.la",
+            "lib.dylib",
+            "lib.library",
+            "lib.DLL",
+            "lib.lib",
+            "lib.ocx",
+            "lib.so.2.13.9746.adhfj.9"
+        };
+        const auto flags = parse(sut, input);
+        EXPECT_TRUE(flags.is_ok());
+        const CompilerFlags expected = {
+                CompilerFlag{slice(input, 1), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 2), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 3), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 4), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 5), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 6), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 7), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 8), CompilerFlagType::LIBRARY},
+                CompilerFlag{slice(input, 9), CompilerFlagType::LIBRARY},
+        };
+        EXPECT_EQ(expected, flags.unwrap());
     }
 
     TEST(Parser, parse_flags_with_separate_options) {

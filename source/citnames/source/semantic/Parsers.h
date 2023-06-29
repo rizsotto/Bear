@@ -102,16 +102,24 @@ namespace cs::semantic {
         KIND_OF_OUTPUT,
         KIND_OF_OUTPUT_NO_LINKING,
         KIND_OF_OUTPUT_INFO,
-        KIND_OF_OUTPUT_OUTPUT,
         PREPROCESSOR,
         PREPROCESSOR_MAKE,
         LINKER,
-        LINKER_OBJECT_FILE,
         DIRECTORY_SEARCH,
-        DIRECTORY_SEARCH_LINKER,
-        SOURCE,
         OTHER,
         STATIC_ANALYZER,
+        UNKNOWN,
+
+        SOURCE,
+        OBJECT_FILE,
+        LIBRARY,
+
+        KIND_OF_OUTPUT_OUTPUT,
+
+        DIRECTORY_SEARCH_LIBRARY,
+        LINKER_LIBRARY_FLAG,
+        LINKER_LIBRARY_STATIC,
+        LINKER_OPTIONS_FLAG,
     };
 
     struct CompilerFlag {
@@ -173,6 +181,16 @@ namespace cs::semantic {
 
     // Parser combinator which recognize source files as a single argument of a compiler call.
     struct SourceMatcher {
+        [[nodiscard]]
+        static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
+    };
+
+    struct ObjectFileMatcher {
+        [[nodiscard]]
+        static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
+    };
+
+    struct LibraryMatcher {
         [[nodiscard]]
         static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
     };

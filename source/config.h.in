@@ -92,6 +92,7 @@ namespace cmd {
         constexpr char FLAG_CONFIG[] = "--config";
 
         constexpr char DEFAULT_OUTPUT[] = "compile_commands.json";
+        constexpr char DEFAULT_OUTPUT_LINK[] = "link_commands.json";
     }
 
     namespace intercept {

@@ -43,6 +43,7 @@ cat > "$1.compilations.json" << EOF
     ],
     "directory": "/home/user",
     "file": "/home/user/broken_build.c",
+    "files": [],
     "output": "/home/user/broken_build.o"
   }
 ]

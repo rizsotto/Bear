@@ -26,6 +26,11 @@
 
 namespace cs::semantic {
 
+    enum class BuildTarget {
+        COMPILER,
+        LINKER
+    };
+
     // Represents a program, which can recognize the intent of the execution
     // and return the semantic of that. It can be a compiler or any other
     // program participating in a build process.
@@ -34,7 +39,7 @@ namespace cs::semantic {
 
         // Returns the semantic of a command execution.
         [[nodiscard]]
-        virtual rust::Result<SemanticPtr> recognize(const Execution &) const = 0;
+        virtual rust::Result<SemanticPtr> recognize(const Execution &, const BuildTarget target) const = 0;
 
         // Helper methods to evaluate the recognize method result.
         static bool recognized_ok(const rust::Result<SemanticPtr> &result) noexcept;

@@ -86,8 +86,10 @@ namespace cs::semantic {
         Compile(fs::path working_dir,
                 fs::path compiler,
                 std::list<std::string> flags,
-                std::vector<fs::path> sources,
-                std::optional<fs::path> output);
+                std::list<fs::path> sources,
+                std::list<fs::path> dependencies,
+                std::optional<fs::path> output,
+                bool with_linking);
 
         bool operator==(Semantic const&) const override;
         std::ostream& operator<<(std::ostream&) const override;
@@ -98,7 +100,31 @@ namespace cs::semantic {
         fs::path working_dir;
         fs::path compiler;
         std::list<std::string> flags;
-        std::vector<fs::path> sources;
+        std::list<fs::path> sources;
+        std::list<fs::path> dependencies;
+        std::optional<fs::path> output;
+        bool with_linking;
+    };
+
+    // Then, perhaps, it is better to change to inheritance from Semantic,
+    // because into_entries() returns only one Entry.
+    struct Link : public CompilerCall {
+        Link(fs::path working_dir,
+             fs::path compiler,
+             std::list<std::string> flags,
+             std::list<fs::path> files,
+             std::optional<fs::path> output);
+
+        bool operator==(Semantic const&) const override;
+        std::ostream& operator<<(std::ostream&) const override;
+
+        [[nodiscard]] std::list<cs::Entry> into_entries() const override;
+
+    public:
+        fs::path working_dir;
+        fs::path compiler;
+        std::list<std::string> flags;
+        std::list<fs::path> files;
         std::optional<fs::path> output;
     };
 }

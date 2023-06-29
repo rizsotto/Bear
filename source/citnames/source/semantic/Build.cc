@@ -24,6 +24,7 @@
 #include "ToolCuda.h"
 #include "ToolWrapper.h"
 #include "ToolExtendingWrapper.h"
+#include "ToolAr.h"
 #include "Convert.h"
 
 #include <memory>
@@ -44,6 +45,7 @@ namespace {
                 std::make_shared<cs::semantic::ToolClang>(),
                 std::make_shared<cs::semantic::ToolWrapper>(),
                 std::make_shared<cs::semantic::ToolCuda>(),
+                std::make_shared<cs::semantic::ToolAr>(),
         };
         for (auto && compiler : cfg.compilers_to_recognize) {
             tools.emplace_front(std::make_shared<cs::semantic::ToolExtendingWrapper>(std::move(compiler)));
@@ -62,14 +64,14 @@ namespace cs::semantic {
     { }
 
     [[nodiscard]]
-    rust::Result<SemanticPtr> Build::recognize(const rpc::Event &event) const {
+    rust::Result<SemanticPtr> Build::recognize(const rpc::Event &event, const BuildTarget target) const {
         if (event.has_started()) {
             auto execution = domain::from(event.started().execution());
             auto pid = event.started().pid();
 
             spdlog::debug("[pid: {}] execution: {}", pid, execution);
 
-            auto result = tools_->recognize(execution);
+            auto result = tools_->recognize(execution, target);
             if (Tool::recognized_ok(result)) {
                 spdlog::debug("[pid: {}] recognized.", pid);
             } else if (Tool::recognized_with_error(result)) {

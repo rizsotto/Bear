@@ -195,7 +195,7 @@ namespace bear {
 				.map<fs::path>([](const auto &output) {
 					return fs::path(output).replace_extension(".events.json");
 				})
-				.unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
+				.unwrap_or(fs::path(cmd::intercept::DEFAULT_OUTPUT));
 
 		auto environment = sys::env::from(const_cast<const char **>(envp));
 		auto intercept = prepare_intercept(args, environment, commands);

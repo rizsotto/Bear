@@ -19,8 +19,8 @@ execution is just a thing to achieve your goal. This program takes
 the command which was executed, and try to find out what the intent
 was to run that command. It deduces the semantic of the command.
 
-This is useful to generate a compilation database. Citnames get a
-list of commands, and it creates a JSON compilation database. (This
+This is useful to generate a compilation and linking databases. Citnames get a
+list of commands, and it creates a JSON compilation and linking databases. (This
 is currently the only output of the tool.)
 
 # OPTIONS
@@ -49,6 +49,8 @@ is currently the only output of the tool.)
 	compilation database up to date. File deletion and addition are both
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
+    When creating a database using linking, both database files are required. 
+    Otherwise, overwrites existing data.
 
 \--run-checks
 :   Allow the program to verify file location checks on the current machine
@@ -86,8 +88,9 @@ Read more about the syntax of that in the `bear(1)` man page.
 
 # CONFIG FILE
 
-The config file influences the command recognition (by the section "compilation")
-and the output format (by the section "output").
+The config file influences the command recognition (by the section "compilation"), 
+the output format (by the section "output") and the setting for creating a linking database
+(by the section "linking").
 
 The config file is optional. The program will use default values, which can be
 dumped with the `--verbose` flags.
@@ -118,6 +121,9 @@ the command line argument overrides the config file values.
       "command_as_array": true,
       "drop_output_field": false
     }
+  },
+  "linking": {
+    "filename": "link.json"
   }
 }
 ```
@@ -145,11 +151,18 @@ the command line argument overrides the config file values.
     The `--run-checks` flag overrides this config value. The `duplicate_filter_fields`
     select the method how duplicate entries are detected in the output. The possible
     values for this field are: `all`, `file` and `file_output`.
+    `without_duplicate_filter` is intended to disable the filtering of duplicate entries when generating a database.
+    `without_existence_check` is intended to disable existence check for sources/object files when generating a database.
+    In this version `without_duplicate_filter=true` and `without_existence_check=true`, only when used ``.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.
     True produces `arguments`, false produces `command` field. The `drop_output_field`
     will disable the `output` field from the output.
+
+`linking`
+:   Specifies the creation of a linking database. Can contain optional field `filename`, 
+    which contains the name of the file that will be used to create the database.
 
 # SEE ALSO
 

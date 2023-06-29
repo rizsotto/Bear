@@ -28,7 +28,7 @@ namespace cs::semantic {
         ToolClang() noexcept;
 
         [[nodiscard]]
-        rust::Result<SemanticPtr> recognize(const Execution &execution) const override;
+        rust::Result<SemanticPtr> recognize(const Execution &execution, const BuildTarget target) const override;
 
     protected:
         [[nodiscard]]
