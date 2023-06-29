@@ -119,7 +119,7 @@ namespace {
                     return cs::Arguments{
                             fs::path(input),
                             fs::path(output),
-                            append
+                            append,
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
@@ -131,9 +131,7 @@ namespace {
                     return rust::Ok(cs::Arguments{
                             arguments.input,
                             arguments.output,
-                            arguments.append && is_exists(arguments.output)
-//                            (arguments.append && is_exists(arguments.output)
-//                                && (!arguments.with_link || is_exists(arguments.output_link)))
+                            arguments.append && is_exists(arguments.output),
                     });
                 });
     }
