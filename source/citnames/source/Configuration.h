@@ -86,10 +86,16 @@ namespace cs {
         std::list<fs::path> compilers_to_exclude;
     };
 
+    // Represents the configuration related creating a linking database.
+    struct Linking {
+        std::string filename;
+    };
+
     // Represents the application configuration.
     struct Configuration {
         Output output;
         Compilation compilation;
+        std::optional<Linking> linking;
     };
 
     // Convenient methods for these types.
@@ -98,6 +104,7 @@ namespace cs {
     std::ostream& operator<<(std::ostream&, const Output&);
     std::ostream& operator<<(std::ostream&, const CompilerWrapper&);
     std::ostream& operator<<(std::ostream&, const Compilation&);
+    std::ostream& operator<<(std::ostream&, const Linking&);
     std::ostream& operator<<(std::ostream&, const Configuration&);
 
     // Utility class to persists configuration in JSON.

@@ -86,14 +86,12 @@ namespace cmd {
 
     namespace citnames {
         constexpr char FLAG_INPUT[] = "--input";
-        constexpr char FLAG_OUTPUT_COMPILE[] = "--output-compile";
-        constexpr char FLAG_WITH_LINK[] = "--with-link";
-        constexpr char FLAG_OUTPUT_LINK[] = "--output-link";
+        constexpr char FLAG_OUTPUT[] = "--output";
         constexpr char FLAG_APPEND[] = "--append";
         constexpr char FLAG_RUN_CHECKS[] = "--run-checks";
         constexpr char FLAG_CONFIG[] = "--config";
 
-        constexpr char DEFAULT_OUTPUT_COMPILE[] = "compile_commands.json";
+        constexpr char DEFAULT_OUTPUT[] = "compile_commands.json";
         constexpr char DEFAULT_OUTPUT_LINK[] = "link_commands.json";
     }
 

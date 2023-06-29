@@ -34,17 +34,9 @@ compilation and linking databases.
 \--verbose
 :   Enable verbose logging.
 
-\--with-link
-:   Use if you want to generate a linking database.
-
-\--output-compile *file*
-:   Specify output compile file. (Default file name provided.) The output is
-    currently a JSON compilation database.
-
-\--output-link *file*
-:   Specify output link file. (Default file name provided.) The output is
-    currently a JSON linking database. 
-    Used only if --with-link is used, ignored otherwise.
+\--output *file*
+:   Specify output file. (Default file name provided.) The output is
+    a JSON compilation database.
 
 \--append
 :   Use previously generated output file and append the new entries to it.
@@ -52,7 +44,7 @@ compilation and linking databases.
     compilation database up to date. File deletion and addition are both
     considered. But build process change (compiler flags change) might
     cause duplicate entries.
-    When used with --with-link, requires the existence of both database files. 
+    When creating a database using linking, both database files are required.
     Otherwise, overwrites existing data.
 
 \--config *file*

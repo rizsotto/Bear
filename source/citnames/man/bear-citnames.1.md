@@ -39,17 +39,9 @@ is currently the only output of the tool.)
     command execution list, with some extra information. The syntax
     is detailed in a separate section.
 
-\--with-link
-:   Use if you want to generate a linking database.
-
-\--output-compile *file*
-:   Specify output compile file. (Default file name provided.) The output is
+\--output *file*
+:   Specify output file. (Default file name provided.) The output is
     currently a JSON compilation database.
-
-\--output-link *file*
-:   Specify output link file. (Default file name provided.) The output is
-    currently a JSON linking database. 
-    Used only if --with-link is used, ignored otherwise.
 
 \--append
 :   Use previously generated output file and append the new entries to it.
@@ -57,7 +49,7 @@ is currently the only output of the tool.)
 	compilation database up to date. File deletion and addition are both
 	considered. But build process change (compiler flags change) might
 	cause duplicate entries.
-    When used with --with-link, requires the existence of both database files. 
+    When creating a database using linking, both database files are required. 
     Otherwise, overwrites existing data.
 
 \--run-checks
@@ -89,19 +81,16 @@ of a build.
 
 Read more about the syntax of the file in the `bear-intercept(1)` man page.
 
-# OUTPUT COMPILE FILE
+# OUTPUT FILE
 
-Currently, the output format is the JSON compilation database.
+Currently, the only output format is the JSON compilation database.
 Read more about the syntax of that in the `bear(1)` man page. 
-
-# OUTPUT LINK FILE
-
-JSON linking database.
 
 # CONFIG FILE
 
-The config file influences the command recognition (by the section "compilation")
-and the output format (by the section "output").
+The config file influences the command recognition (by the section "compilation"), 
+the output format (by the section "output") and the setting for creating a linking database
+(by the section "linking").
 
 The config file is optional. The program will use default values, which can be
 dumped with the `--verbose` flags.
@@ -132,6 +121,9 @@ the command line argument overrides the config file values.
       "command_as_array": true,
       "drop_output_field": false
     }
+  },
+  "linking": {
+    "filename": "link.json"
   }
 }
 ```
@@ -161,12 +153,16 @@ the command line argument overrides the config file values.
     values for this field are: `all`, `file` and `file_output`.
     `without_duplicate_filter` is intended to disable the filtering of duplicate entries when generating a database.
     `without_existence_check` is intended to disable existence check for sources/object files when generating a database.
-    In this version `without_duplicate_filter=true` and `without_existence_check=true`, only when used `--with-link`.
+    In this version `without_duplicate_filter=true` and `without_existence_check=true`, only when used ``.
 
 `output.format`
 :   The `command_as_array` controls which command field is emitted in the output.
     True produces `arguments`, false produces `command` field. The `drop_output_field`
     will disable the `output` field from the output.
+
+`linking`
+:   Specifies the creation of a linking database. Can contain optional field `filename`, 
+    which contains the name of the file that will be used to create the database.
 
 # SEE ALSO
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
 # RUN: cd %T; %{shell} %s %t
-# RUN: %{citnames} --verbose --input %t.commands.json --output-compile %t.compilations.json
+# RUN: %{citnames} --verbose --input %t.commands.json --output %t.compilations.json
 # RUN: assert_compilation %t.compilations.json count -eq 1
 
 cat << EOF > "$1.commands.json"

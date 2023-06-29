@@ -109,20 +109,17 @@ namespace {
 
     rust::Result<cs::Arguments> into_arguments(const flags::Arguments &args) {
         auto input = args.as_string(cmd::citnames::FLAG_INPUT);
-        auto output_compile = args.as_string(cmd::citnames::FLAG_OUTPUT_COMPILE);
-        auto output_link = args.as_string(cmd::citnames::FLAG_OUTPUT_LINK);
-        auto append = args.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
-        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
+        auto output = args.as_string(cmd::citnames::FLAG_OUTPUT);
+        auto append = args.as_bool(cmd::citnames::FLAG_APPEND)
+                .unwrap_or(false);
 
-        return rust::merge(input, output_compile, output_link)
-                .map<cs::Arguments>([&append, &with_link](auto tuple) {
-                    const auto&[input, output_compile, output_link] = tuple;
+        return rust::merge(input, output)
+                .map<cs::Arguments>([&append](auto tuple) {
+                    const auto&[input, output] = tuple;
                     return cs::Arguments{
                             fs::path(input),
-                            fs::path(output_compile),
-                            fs::path(output_link),
-                            append,
-                            with_link
+                            fs::path(output),
+                            append
                     };
                 })
                 .and_then<cs::Arguments>([](auto arguments) -> rust::Result<cs::Arguments> {
@@ -133,11 +130,10 @@ namespace {
                     }
                     return rust::Ok(cs::Arguments{
                             arguments.input,
-                            arguments.output_compile,
-                            arguments.output_link,
-                            (arguments.append && is_exists(arguments.output_compile)
-                                && (!arguments.with_link || is_exists(arguments.output_link))),
-                            arguments.with_link
+                            arguments.output,
+                            arguments.append && is_exists(arguments.output)
+//                            (arguments.append && is_exists(arguments.output)
+//                                && (!arguments.with_link || is_exists(arguments.output_link)))
                     });
                 });
     }
@@ -156,9 +152,8 @@ namespace {
         return result;
     }
 
-    void customize_configuration(cs::Configuration& configuration, const flags::Arguments &args) {
-        auto with_link = args.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
-        if (with_link) {
+    void customize_configuration(cs::Configuration& configuration) {
+        if (configuration.linking.has_value()) {
             configuration.output.content.without_existence_check = true;
             configuration.output.content.without_duplicate_filter = true;
         }
@@ -191,8 +186,8 @@ namespace {
                             update_compilers_to_recognize(config.compilation.compilers_to_recognize, env_compilers);
                     return config;
                 })
-                .map<cs::Configuration>([&args](auto config) {
-                    customize_configuration(config, args);
+                .map<cs::Configuration>([](auto config) {
+                    customize_configuration(config);
                     return config;
                 })
                 .on_success([](const auto &config) {
@@ -291,7 +286,7 @@ namespace {
     }
 
     rust::Result<size_t> complete_entries_from_json(
-    cs::CompilationDatabase& output,
+        cs::CompilationDatabase& output,
         const fs::path& output_file,
         std::list<cs::Entry>& entries,
         size_t new_entries_counts,
@@ -330,30 +325,33 @@ namespace cs {
         std::list<cs::Entry> entries_compile;
         std::list<cs::Entry> entries_link;
 
+        const bool with_link = configuration_.linking.has_value();
+        const bool append = arguments_.append && (!with_link || is_exists(configuration_.linking.value().filename));
+
         return db::EventsDatabaseReader::from(arguments_.input)
-            .map<size_t>([this, &entries_compile, &entries_link](const auto &commands) {
+            .map<size_t>([this, &entries_compile, &entries_link, with_link](const auto &commands) {
                 cs::semantic::Build build(configuration_.compilation);
-                return transform(build, commands, entries_compile, entries_link, arguments_.with_link);
+                return transform(build, commands, entries_compile, entries_link, with_link);
             })
-            .and_then<size_t>([this, &output_compile, &entries_compile](size_t new_entries_count) {
+            .and_then<size_t>([this, &output_compile, &entries_compile, append](size_t new_entries_count) {
                 spdlog::debug("entries created. [size: {}]", new_entries_count);
-                return complete_entries_from_json(output_compile, arguments_.output_compile,
-                    entries_compile, new_entries_count, arguments_.append);
+                return complete_entries_from_json(output_compile, arguments_.output,
+                    entries_compile, new_entries_count, append);
             })
-            .and_then<size_t>([this, &output_link, &entries_link](size_t new_entries_count) {
-                if (arguments_.with_link) {
-                    return complete_entries_from_json(output_link, arguments_.output_link,
-                        entries_link, new_entries_count, arguments_.append);
+            .and_then<size_t>([this, &output_link, &entries_link, with_link, append](size_t new_entries_count) {
+                if (with_link) {
+                    return complete_entries_from_json(output_link, configuration_.linking.value().filename,
+                        entries_link, new_entries_count, append);
                 }
                 return rust::Result<size_t>(rust::Ok(new_entries_count));
             })
             .and_then<size_t>([this, &output_compile, &entries_compile](const auto entries_count_to_output) {
                 spdlog::debug("entries to output. [size: {}]", entries_count_to_output);
-                return write_entries(output_compile, arguments_.output_compile, entries_compile);
+                return write_entries(output_compile, arguments_.output, entries_compile);
             })
-            .and_then<size_t>([this, &output_link, &entries_link](const auto compile_entries_wrote) {
-                if (arguments_.with_link) {
-                    const auto result_link = write_entries(output_link, arguments_.output_link, entries_link);
+            .and_then<size_t>([this, &output_link, &entries_link, with_link](const auto compile_entries_wrote) {
+                if (with_link) {
+                    const auto result_link = write_entries(output_link, configuration_.linking.value().filename, entries_link);
                     return (result_link.is_err())
                            ? result_link
                            : rust::Ok(result_link.unwrap() + compile_entries_wrote);
@@ -380,8 +378,8 @@ namespace cs {
     rust::Result<ps::CommandPtr> Citnames::command(const flags::Arguments &args, const char **envp) const {
         auto environment = sys::env::from(const_cast<const char **>(envp));
 
-        auto arguments = into_arguments(args);
         auto configuration = into_configuration(args, environment);
+        auto arguments = into_arguments(args);
 
         return rust::merge(arguments, configuration)
                 .map<ps::CommandPtr>([](auto tuples) {

@@ -2,7 +2,7 @@
 
 # UNSUPPORTED: true
 # RUN: cd %T; %{shell} %s %t.commands.json
-# RUN: %{citnames} --verbose --input %t.commands.json --output-compile %t.compilations.json
+# RUN: %{citnames} --verbose --input %t.commands.json --output %t.compilations.json
 # RUN: assert_compilation %t.compilations.json count -eq 0
 
 cat > $1 << EOF

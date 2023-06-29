@@ -36,10 +36,8 @@ namespace cs {
 
     struct Arguments {
         fs::path input;
-        fs::path output_compile;
-        fs::path output_link;
+        fs::path output;
         bool append;
-        bool with_link;
     };
 
     struct Command : ps::Command {

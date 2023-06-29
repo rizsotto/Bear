@@ -1,12 +1,12 @@
 #!/usr/bin/env sh
 
 # REQUIRES: shell
-# RUN: cd %T; %{bear} --verbose --output-compile %t.json -- %{shell} %s
+# RUN: cd %T; %{bear} --verbose --output %t.json -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %T/wrapper_1.c -directory %T -arguments %{c_compiler} -c -o wrapper_1.o wrapper_1.c
 # RUN: assert_compilation %t.json contains -file %T/wrapper_2.c -directory %T -arguments %{c_compiler} -c -o wrapper_2.o wrapper_2.c
 
-# RUN: cd %T; %{bear} --verbose --output-compile %t.json --force-wrapper -- %{shell} %s
+# RUN: cd %T; %{bear} --verbose --output %t.json --force-wrapper -- %{shell} %s
 # RUN: assert_compilation %t.json count -eq 2
 # RUN: assert_compilation %t.json contains -file %T/wrapper_1.c -directory %T -arguments %{c_compiler} -c -o wrapper_1.o wrapper_1.c
 # RUN: assert_compilation %t.json contains -file %T/wrapper_2.c -directory %T -arguments %{c_compiler} -c -o wrapper_2.o wrapper_2.c

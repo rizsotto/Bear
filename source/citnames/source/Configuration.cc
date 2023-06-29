@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
 #include "Configuration.h"
 
 #include <iomanip>
@@ -119,6 +120,19 @@ namespace cs {
         }
     }
 
+    void from_json(const nlohmann::json &j, Linking &rhs) {
+        if (j.contains("filename")) {
+            j.at("filename").get_to(rhs.filename);
+        }
+        else {
+            rhs.filename = cmd::citnames::DEFAULT_OUTPUT_LINK;
+        }
+    }
+
+    void to_json(nlohmann::json &j, const Linking &rhs) {
+        j["filename"] = rhs.filename;
+    }
+
     void from_json(const nlohmann::json &j, Configuration &rhs) {
         if (j.contains("output")) {
             j.at("output").get_to(rhs.output);
@@ -126,13 +140,27 @@ namespace cs {
         if (j.contains("compilation")) {
             j.at("compilation").get_to(rhs.compilation);
         }
+        if (j.contains("linking")) {
+            Linking linking;
+            j.at("linking").get_to(linking);
+            rhs.linking.emplace(linking);
+        }
     }
 
     void to_json(nlohmann::json &j, const Configuration &rhs) {
-        j = nlohmann::json{
+        if (rhs.linking.has_value()) {
+            j = nlohmann::json{
                 {"output",  rhs.output},
                 {"compilation", rhs.compilation},
-        };
+                {"linking", rhs.linking.value()},
+            };
+        }
+        else {
+            j = nlohmann::json{
+                {"output",  rhs.output},
+                {"compilation", rhs.compilation},
+            };
+        }
     }
 
     std::ostream &operator<<(std::ostream &os, const Format &value)
@@ -172,6 +200,15 @@ namespace cs {
     }
 
     std::ostream &operator<<(std::ostream &os, const Compilation &value)
+    {
+        nlohmann::json payload;
+        to_json(payload, value);
+        os << payload;
+
+        return os;
+    }
+
+    std::ostream &operator<<(std::ostream &os, const Linking &value)
     {
         nlohmann::json payload;
         to_json(payload, value);

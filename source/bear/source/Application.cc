@@ -69,31 +69,25 @@ namespace {
     rust::Result<sys::Process::Builder>
     prepare_citnames(const flags::Arguments &arguments, const sys::env::Vars &environment, const fs::path &input) {
         auto program = arguments.as_string(cmd::bear::FLAG_BEAR);
-        auto with_link = arguments.as_bool(cmd::citnames::FLAG_WITH_LINK).unwrap_or(false);
-        auto output_compile = arguments.as_string(cmd::citnames::FLAG_OUTPUT_COMPILE);
-        auto output_link = arguments.as_string(cmd::citnames::FLAG_OUTPUT_LINK);
+        auto output = arguments.as_string(cmd::citnames::FLAG_OUTPUT);
         auto config = arguments.as_string(cmd::citnames::FLAG_CONFIG);
         auto append = arguments.as_bool(cmd::citnames::FLAG_APPEND).unwrap_or(false);
         auto verbose = arguments.as_bool(flags::VERBOSE).unwrap_or(false);
 
-        return rust::merge(program, output_compile, output_link)
-                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose, &with_link](auto tuple) {
-                    const auto&[program, output_compile, output_link] = tuple;
+        return rust::merge(program, output)
+                .map<sys::Process::Builder>([&environment, &input, &config, &append, &verbose](auto tuple) {
+                    const auto&[program, output] = tuple;
 
                     auto builder = sys::Process::Builder(program)
                             .set_environment(environment)
                             .add_argument(program)
                             .add_argument("citnames")
                             .add_argument(cmd::citnames::FLAG_INPUT).add_argument(input)
-                            .add_argument(cmd::citnames::FLAG_OUTPUT_COMPILE).add_argument(output_compile)
-                            .add_argument(cmd::citnames::FLAG_OUTPUT_LINK).add_argument(output_link)
+                            .add_argument(cmd::citnames::FLAG_OUTPUT).add_argument(output)
                             // can run the file checks, because we are on the host.
                             .add_argument(cmd::citnames::FLAG_RUN_CHECKS);
                     if (append) {
                         builder.add_argument(cmd::citnames::FLAG_APPEND);
-                    }
-                    if (with_link) {
-                        builder.add_argument(cmd::citnames::FLAG_WITH_LINK);
                     }
                     if (config.is_ok()) {
                         builder.add_argument(cmd::citnames::FLAG_CONFIG).add_argument(config.unwrap());
@@ -151,7 +145,7 @@ namespace bear {
 
 	rust::Result<flags::Arguments> Application::parse(int argc, const char **argv) const
 	{
-            const flags::Parser intercept_parser("intercept", cmd::VERSION, {
+        const flags::Parser intercept_parser("intercept", cmd::VERSION, {
                 {cmd::intercept::FLAG_OUTPUT,        {1,  false, "path of the result file",        {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
                 {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",   std::nullopt,                     DEVELOPER_GROUP}},
                 {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers", std::nullopt,                     DEVELOPER_GROUP}},
@@ -159,65 +153,59 @@ namespace bear {
                 {cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable", {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
                 {cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",  {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
                 {cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",             std::nullopt,                     std::nullopt}}
-            });
+        });
 
-            const flags::Parser citnames_parser("citnames", cmd::VERSION, {
-                {cmd::citnames::FLAG_INPUT,          {1, false, "path of the input file",                    {cmd::intercept::DEFAULT_OUTPUT},        std::nullopt}},
-                {cmd::citnames::FLAG_WITH_LINK,      {0, false, "whether to create a link base",             std::nullopt,                            std::nullopt}},
-                {cmd::citnames::FLAG_OUTPUT_COMPILE, {1, false, "path of the result compile file",           {cmd::citnames::DEFAULT_OUTPUT_COMPILE}, std::nullopt}},
-                {cmd::citnames::FLAG_OUTPUT_LINK,    {1, false, "path of the result link file",              {cmd::citnames::DEFAULT_OUTPUT_LINK},    std::nullopt}},
-                {cmd::citnames::FLAG_CONFIG,         {1, false, "path of the config file",                   std::nullopt,                            std::nullopt}},
-                {cmd::citnames::FLAG_APPEND,         {0, false, "append to output, instead of overwrite it", std::nullopt,                            std::nullopt}},
-                {cmd::citnames::FLAG_RUN_CHECKS,     {0, false, "can run checks on the current host",        std::nullopt,                            std::nullopt}}
-            });
+        const flags::Parser citnames_parser("citnames", cmd::VERSION, {
+                {cmd::citnames::FLAG_INPUT,      {1, false, "path of the input file",                    {cmd::intercept::DEFAULT_OUTPUT}, std::nullopt}},
+                {cmd::citnames::FLAG_OUTPUT,     {1, false, "path of the result file",                   {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
+                {cmd::citnames::FLAG_CONFIG,     {1, false, "path of the config file",                   std::nullopt,                     std::nullopt}},
+                {cmd::citnames::FLAG_APPEND,     {0, false, "append to output, instead of overwrite it", std::nullopt,                     std::nullopt}},
+                {cmd::citnames::FLAG_RUN_CHECKS, {0, false, "can run checks on the current host",        std::nullopt,                     std::nullopt}}
+        });
 
-            const flags::Parser parser("bear", cmd::VERSION, {intercept_parser, citnames_parser}, {
-                {cmd::citnames::FLAG_WITH_LINK,      {0, false, "whether to create a link base",             std::nullopt,                            std::nullopt}},
-                {cmd::citnames::FLAG_OUTPUT_COMPILE, {1,  false, "path of the result compile file",          {cmd::citnames::DEFAULT_OUTPUT_COMPILE}, std::nullopt}},
-                {cmd::citnames::FLAG_OUTPUT_LINK,    {1,  false, "path of the result link file",             {cmd::citnames::DEFAULT_OUTPUT_LINK},    std::nullopt}},
-                {cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                            ADVANCED_GROUP}},
-                {cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                            ADVANCED_GROUP}},
-                {cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                            ADVANCED_GROUP}},
-                {cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                            ADVANCED_GROUP}},
-                {cmd::bear::FLAG_BEAR,               {1,  false, "path to the bear executable",              {cmd::bear::DEFAULT_PATH},               DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},            DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},            DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH},        DEVELOPER_GROUP}},
-                {cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                            std::nullopt}}
-            });
-            return parser.parse_or_exit(argc, const_cast<const char **>(argv));
+		const flags::Parser parser("bear", cmd::VERSION, {intercept_parser, citnames_parser}, {
+				{cmd::citnames::FLAG_OUTPUT,         {1,  false, "path of the result file",                  {cmd::citnames::DEFAULT_OUTPUT},  std::nullopt}},
+				{cmd::citnames::FLAG_APPEND,         {0,  false, "append result to an existing output file", std::nullopt,                     ADVANCED_GROUP}},
+				{cmd::citnames::FLAG_CONFIG,         {1,  false, "path of the config file",                  std::nullopt,                     ADVANCED_GROUP}},
+				{cmd::intercept::FLAG_FORCE_PRELOAD, {0,  false, "force to use library preload",             std::nullopt,                     ADVANCED_GROUP}},
+				{cmd::intercept::FLAG_FORCE_WRAPPER, {0,  false, "force to use compiler wrappers",           std::nullopt,                     ADVANCED_GROUP}},
+				{cmd::bear::FLAG_BEAR,               {1,  false, "path to the bear executable",              {cmd::bear::DEFAULT_PATH},        DEVELOPER_GROUP}},
+				{cmd::intercept::FLAG_LIBRARY,       {1,  false, "path to the preload library",              {cmd::library::DEFAULT_PATH},     DEVELOPER_GROUP}},
+				{cmd::intercept::FLAG_WRAPPER,       {1,  false, "path to the wrapper executable",           {cmd::wrapper::DEFAULT_PATH},     DEVELOPER_GROUP}},
+				{cmd::intercept::FLAG_WRAPPER_DIR,   {1,  false, "path to the wrapper directory",            {cmd::wrapper::DEFAULT_DIR_PATH}, DEVELOPER_GROUP}},
+				{cmd::intercept::FLAG_COMMAND,       {-1, true,  "command to execute",                       std::nullopt,                     std::nullopt}}
+		});
+		return parser.parse_or_exit(argc, const_cast<const char **>(argv));
 	}
 
 	rust::Result<ps::CommandPtr> Application::command(const flags::Arguments &args, const char **envp) const
 	{
-            if (args.as_string(flags::COMMAND).is_ok()) {
-                if (auto citnames = cs::Citnames(log_config_); citnames.matches(args)) {
-                    return citnames.subcommand(args, envp);
-                }
-                if (auto intercept = ic::Intercept(log_config_); intercept.matches(args)) {
-                    return intercept.subcommand(args, envp);
-                }
-
-                return rust::Err(std::runtime_error("Invalid subcommand"));
+        if (args.as_string(flags::COMMAND).is_ok()) {
+            if (auto citnames = cs::Citnames(log_config_); citnames.matches(args)) {
+                return citnames.subcommand(args, envp);
+            }
+            if (auto intercept = ic::Intercept(log_config_); intercept.matches(args)) {
+                return intercept.subcommand(args, envp);
             }
 
-            // now only the name of the compile file is used
-            // to generate the name of the intermediate file (events)
-            auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT_COMPILE)
-                .map<fs::path>([](const auto &output) {
-                        return fs::path(output).replace_extension(".events.json");
-                })
-                .unwrap_or(fs::path(cmd::intercept::DEFAULT_OUTPUT));
+            return rust::Err(std::runtime_error("Invalid subcommand"));
+        }
 
-            auto environment = sys::env::from(const_cast<const char **>(envp));
-            auto intercept = prepare_intercept(args, environment, commands);
-            auto citnames = prepare_citnames(args, environment, commands);
+		auto commands = args.as_string(cmd::citnames::FLAG_OUTPUT)
+				.map<fs::path>([](const auto &output) {
+					return fs::path(output).replace_extension(".events.json");
+				})
+				.unwrap_or(fs::path(cmd::intercept::DEFAULT_OUTPUT));
 
-            return rust::merge(intercept, citnames)
-                .map<ps::CommandPtr>([&commands](const auto &tuple) {
-                        const auto&[intercept, citnames] = tuple;
+		auto environment = sys::env::from(const_cast<const char **>(envp));
+		auto intercept = prepare_intercept(args, environment, commands);
+		auto citnames = prepare_citnames(args, environment, commands);
 
-                        return std::make_unique<Command>(intercept, citnames, commands);
-                });
+		return rust::merge(intercept, citnames)
+				.map<ps::CommandPtr>([&commands](const auto &tuple) {
+					const auto&[intercept, citnames] = tuple;
+
+					return std::make_unique<Command>(intercept, citnames, commands);
+				});
 	}
 }
