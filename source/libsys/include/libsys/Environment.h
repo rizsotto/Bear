@@ -26,6 +26,12 @@ namespace sys::env {
 
     using Vars = std::map<std::string, std::string>;
 
+    // Get environment variables
+    const Vars& get();
+
+    // Get environment variables as C-Style array
+    const char** get_envp();
+
     // Convert an environment array into a map.
     Vars from(const char** value);
 }

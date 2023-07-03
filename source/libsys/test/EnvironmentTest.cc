@@ -112,4 +112,11 @@ namespace {
         EXPECT_STREQ(sut.data()[1], "sky=blue");
         EXPECT_TRUE(sut.data()[2] == nullptr);
     }
+    
+    TEST(environment, env_get) {
+        auto result = sys::env::get();
+        auto reference = sys::env::from(sys::env::get_envp());
+
+        EXPECT_EQ(result, reference);
+    }
 }

@@ -38,7 +38,7 @@ namespace fs = std::filesystem;
 
 namespace {
 
-    rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
+    rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, const sys::env::Vars &environment)
     {
         const auto path = sys::os::get_path(environment);
 
@@ -110,7 +110,7 @@ namespace ic {
     { }
 
     rust::Result<ps::CommandPtr> Intercept::command(const flags::Arguments &args, const char **envp) const {
-        const auto execution = capture_execution(args, sys::env::from(envp));
+        const auto execution = capture_execution(args, sys::env::get());
         const auto session = Session::from(args, envp);
         const auto reporter = Reporter::from(args);
 

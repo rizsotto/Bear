@@ -197,7 +197,7 @@ namespace bear {
 				})
 				.unwrap_or(fs::path(cmd::citnames::DEFAULT_OUTPUT));
 
-		auto environment = sys::env::from(const_cast<const char **>(envp));
+		const auto& environment = sys::env::get();
 		auto intercept = prepare_intercept(args, environment, commands);
 		auto citnames = prepare_citnames(args, environment, commands);
 
