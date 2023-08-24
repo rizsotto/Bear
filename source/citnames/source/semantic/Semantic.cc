@@ -20,12 +20,7 @@
 #include "semantic/Semantic.h"
 
 #include <fmt/format.h>
-
-namespace fmt {
-
-    template <>
-    struct formatter<fs::path> : formatter<std::string> {};
-}
+#include <fmt/std.h>
 
 namespace cs::semantic {
 
