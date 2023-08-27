@@ -74,7 +74,7 @@ namespace {
                 const auto [end, nothing] = std::mismatch(directory.begin(), directory.end(), file.begin());
                 // the file is contained in the directory if all path elements are
                 // in the file paths too.
-                return (end == directory.end());
+                return (end == directory.end()) || (*end == "");
             });
         }
 

@@ -218,4 +218,27 @@ namespace {
         auto count = sut.from_json(buffer, deserialized);
         EXPECT_FALSE(count.is_ok());
     }
+
+    TEST(compilation_database, include_filter_works_with_trailing_slash)
+    {
+        std::list<cs::Entry> input = {
+            { "/home/user/project/build/source/entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+            { "/home/user/project/build/source/entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+            { "/home/user/project/build/test/entry_one_test.c", "/path/to", { "entry_one_test.o" }, { "cc", "-c", "entry_one.c" } },
+            { "/home/user/project/build/test/entry_two_test.c", "/path/to", { "entry_two_test.o" }, { "cc", "-c", "entry_two.c" } },
+        };
+        std::list<cs::Entry> expected = {
+            { "/home/user/project/build/source/entry_one.c", "/path/to", { "entry_one.o" }, { "cc", "-c", "entry_one.c" } },
+            { "/home/user/project/build/source/entry_two.c", "/path/to", { "entry_two.o" }, { "cc", "-c", "entry_two.c" } },
+        };
+
+        cs::Content content;
+        content.paths_to_include = { fs::path("/home/user/project/build/source") };
+        content.paths_to_exclude = { fs::path("/home/user/project/build/test") };
+        value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
+
+        content.paths_to_include = { fs::path("/home/user/project/build/source/") };
+        content.paths_to_exclude = { fs::path("/home/user/project/build/test/") };
+        value_serialized_and_read_back(input, expected, AS_ARGUMENTS, content);
+    }
 }
