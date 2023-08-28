@@ -16,8 +16,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: armv7
-            distro: archarm_latest
           - arch: aarch64
             distro: alpine_latest
           - arch: s390x
@@ -27,7 +25,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - uses: uraimo/run-on-arch-action@v2.1.1
+      - uses: uraimo/run-on-arch-action@v2
         name: Build
         id: build
         with:
