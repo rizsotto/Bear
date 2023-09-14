@@ -105,6 +105,8 @@ COMPILER_PATTERNS_CC = (
     re.compile(r'^(|i)cc$'),
     re.compile(r'^(g|)xlc$'),
     re.compile(r'^([^-]*-)*ar$'),
+    re.compile(r'^([^-]*-)*ld$'),
+    re.compile(r'^ld\.lld$'),
 )
 
 # Known C++ compiler executable name patterns.
@@ -116,10 +118,14 @@ COMPILER_PATTERNS_CXX = (
     re.compile(r'^nvcc$'),
     re.compile(r'^(g|)xl(C|c\+\+)$'),
     re.compile(r'^([^-]*-)*ar$'),
+    re.compile(r'^([^-]*-)*ld$'),
+    re.compile(r'^ld\.lld$'),
 )
 
 ARCHIVER_PATTERNS = (
     re.compile(r'^([^-]*-)*ar$'),
+    re.compile(r'^([^-]*-)*ld$'),
+    re.compile(r'^ld\.lld$'),
 )
 
 # Known Fortran compiler executable name patterns
