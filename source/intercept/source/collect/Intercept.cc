@@ -62,7 +62,7 @@ namespace {
                             })
                             .template map_err<std::runtime_error>([&executable](auto error) {
                                 return std::runtime_error(
-                                        fmt::format("Could not found: {}: {}", executable, sys::error_string(error)));
+                                        fmt::format("Could not find: {}: {}", executable, sys::error_string(error)));
                             });
                 });
 
