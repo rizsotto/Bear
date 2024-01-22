@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "Configuration.h"
 #include "libflags/Flags.h"
 #include "libresult/Result.h"
 #include "libsys/Os.h"
@@ -39,7 +40,7 @@ namespace ic {
     class Session {
     public:
         using Ptr = std::shared_ptr<Session>;
-        static rust::Result<Session::Ptr> from(const flags::Arguments &args, const char **envp);
+        static rust::Result<Session::Ptr> from(const ic::Configuration &config, const char **envp);
 
     public:
         virtual ~Session() = default;

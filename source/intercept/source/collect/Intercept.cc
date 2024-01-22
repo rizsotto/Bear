@@ -17,6 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Configuration.h"
 #include "collect/Intercept.h"
 #include "collect/Reporter.h"
 #include "collect/RpcServices.h"
@@ -38,22 +39,56 @@ namespace fs = std::filesystem;
 
 namespace {
 
-    rust::Result<ic::Execution> capture_execution(const flags::Arguments& args, sys::env::Vars &&environment)
+    rust::Result<ic::Configuration>
+    into_configuration(const flags::Arguments &args) {
+        auto output_file_arg = args.as_string(cmd::intercept::FLAG_OUTPUT);
+        auto library_arg = args.as_string(cmd::intercept::FLAG_LIBRARY);
+        auto wrapper_arg = args.as_string(cmd::intercept::FLAG_WRAPPER);
+        auto wrapper_dir_arg = args.as_string(cmd::intercept::FLAG_WRAPPER_DIR);
+        auto verbose_arg = args.as_bool(flags::VERBOSE);
+        auto force_preload_arg = args.as_bool(cmd::intercept::FLAG_FORCE_PRELOAD);
+        auto force_wrapper_arg = args.as_bool(cmd::intercept::FLAG_FORCE_WRAPPER);
+        auto command_arg = args.as_string_list(cmd::intercept::FLAG_COMMAND);
+
+        ic::Configuration config;
+
+        if (output_file_arg.is_ok()) config.output_file = output_file_arg.unwrap();
+        if (library_arg.is_ok()) config.library = library_arg.unwrap();
+        if (wrapper_arg.is_ok()) config.wrapper = wrapper_arg.unwrap();
+        if (wrapper_dir_arg.is_ok()) config.wrapper_dir = wrapper_dir_arg.unwrap();
+        if (verbose_arg.is_ok()) config.verbose = verbose_arg.unwrap();
+        if (force_preload_arg.is_ok() && force_preload_arg.unwrap()) config.use_wrapper = false;
+        if (force_wrapper_arg.is_ok() && force_wrapper_arg.unwrap()) config.use_preload = false;
+        if (command_arg.is_ok()) {
+            config.command.clear();
+            for (const auto& cmd_part : command_arg.unwrap()) {
+                config.command.emplace_back(cmd_part);
+            }
+        }
+
+        // validation
+        if (!config.use_preload && !config.use_wrapper) {
+            return rust::Err(std::runtime_error("At least one interception method must be enabled"));
+        }
+
+        if (config.command.empty()) {
+            return rust::Err(std::runtime_error("Missing command to intercept"));
+        }
+
+        if (config.output_file.empty()) {
+            return rust::Err(std::runtime_error("Missing input file"));
+        }
+
+        return rust::Ok(std::move(config));
+    }
+
+    rust::Result<ic::Execution> capture_execution(const ic::Configuration& config, sys::env::Vars &&environment)
     {
         const auto path = sys::os::get_path(environment);
 
-        const auto command = args.as_string_list(cmd::intercept::FLAG_COMMAND)
-                .and_then<std::vector<std::string_view>>([](auto args) {
-                    using Result = rust::Result<std::vector<std::string_view>>;
-                    return (args.empty())
-                            ? Result(rust::Err(std::runtime_error("Command is empty.")))
-                            : Result(rust::Ok(args));
-                });
-
-        const auto executable = rust::merge(path, command)
-                .and_then<fs::path>([](auto tuple) {
-                    const auto&[path, command] = tuple;
-                    auto executable = command.front();
+        const auto executable = path
+                .and_then<fs::path>([&config](const auto& path) {
+                    auto executable = config.command.front();
 
                     el::Resolver resolver;
                     return resolver.from_search_path(executable, path.c_str())
@@ -66,12 +101,11 @@ namespace {
                             });
                 });
 
-        return rust::merge(executable, command)
-                .map<ic::Execution>([&environment](auto tuple) {
-                    const auto&[executable, command] = tuple;
+        return executable
+                .map<ic::Execution>([&environment, &config](const auto& executable) {
                     return ic::Execution{
                         executable,
-                        std::list<std::string>(command.begin(), command.end()),
+                        std::list<std::string>(config.command.begin(), config.command.end()),
                         fs::path("ignored"),
                         std::move(environment)
                     };
@@ -110,11 +144,14 @@ namespace ic {
     { }
 
     rust::Result<ps::CommandPtr> Intercept::command(const flags::Arguments &args, const char **envp) const {
-        const auto execution = capture_execution(args, sys::env::from(envp));
-        const auto session = Session::from(args, envp);
-        const auto reporter = Reporter::from(args);
+        return into_configuration(args)
+                .and_then<std::tuple<Execution, Session::Ptr, Reporter::Ptr>>([&envp](const auto& configuration) {
+                    const auto execution = capture_execution(configuration, sys::env::from(envp));
+                    const auto session = Session::from(configuration, envp);
+                    const auto reporter = Reporter::from(configuration);
 
-        return rust::merge(execution, session, reporter)
+                    return rust::merge(execution, session, reporter);
+                })
                 .map<ps::CommandPtr>([](auto tuple) {
                     const auto&[execution, session, reporter] = tuple;
                     return std::make_unique<Command>(execution, session, reporter);
