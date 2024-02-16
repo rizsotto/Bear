@@ -22,5 +22,14 @@ crossbeam-channel = "0.5"
 rand = "0.8.5"
 chrono = "0.4.33"
 
+[lib]
+name = "intercept"
+path = "src/lib.rs"
+
 [[bin]]
 name = "intercept"
+path = "src/main.rs"
+
+[[bin]]
+name = "wrapper"
+path = "src/wrapper/main.rs"
