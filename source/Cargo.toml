@@ -1,5 +1,0 @@
-[workspace]
-members = [
-  "citnames_rs",
-  "intercept_rs"
-]
