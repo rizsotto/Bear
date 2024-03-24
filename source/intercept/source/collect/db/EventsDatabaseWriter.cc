@@ -36,7 +36,6 @@ namespace {
     JsonPrintOptions create_print_options() {
         JsonPrintOptions print_options;
         print_options.add_whitespace = false;
-        print_options.always_print_primitive_fields = true;
         print_options.preserve_proto_field_names = true;
         print_options.always_print_enums_as_ints = false;
         return print_options;
