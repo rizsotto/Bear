@@ -21,6 +21,8 @@
 #include "libsys/Errors.h"
 
 #include <google/protobuf/util/json_util.h>
+#include <google/protobuf/stubs/common.h>
+
 #include <fmt/format.h>
 
 #include <sys/types.h>
@@ -36,7 +38,9 @@ namespace {
     JsonPrintOptions create_print_options() {
         JsonPrintOptions print_options;
         print_options.add_whitespace = false;
-        print_options.always_print_primitive_fields = true;
+#if GOOGLE_PROTOBUF_VERSION < 5026000
+            print_options.always_print_primitive_fields = true;
+#endif
         print_options.preserve_proto_field_names = true;
         print_options.always_print_enums_as_ints = false;
         return print_options;
