@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install package dependencies
         if:  startsWith( matrix.os, 'ubuntu' )
@@ -33,7 +33,7 @@ jobs:
           brew install cmake pkg-config fmt spdlog nlohmann-json grpc
           echo "PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig" >> $GITHUB_ENV
 
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
           cache: 'pip'
@@ -57,7 +57,7 @@ jobs:
           CMAKE_OPTIONS: -DENABLE_MULTILIB=${{ matrix.multilib }}
         run: |
           cmake -B "$BUILD_DIR" -S "$GITHUB_WORKSPACE" $CMAKE_OPTIONS -DCMAKE_INSTALL_PREFIX:PATH="$INSTALL_DIR" -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu
-          cmake --build "$BUILD_DIR" --parallel 4 --target install
+          cmake --build "$BUILD_DIR" --parallel 1 --target install
 
       - name: Run [functional test]
         run: |
