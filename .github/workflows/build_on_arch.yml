@@ -10,21 +10,21 @@ on:
 
 jobs:
   build_on_arch:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: Build on ${{ matrix.distro }} for ${{ matrix.arch }}
 
     strategy:
       matrix:
         include:
           - arch: aarch64
-            distro: alpine_latest
+            distro: fedora_latest
           - arch: s390x
-            distro: fedora_latest
+            distro: alpine_latest
           - arch: ppc64le
-            distro: fedora_latest
+            distro: alpine_latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: uraimo/run-on-arch-action@v2
         name: Build
         id: build
