@@ -117,5 +117,5 @@ with the project wiki page for known problems, before open a bug report.
 
 # COPYRIGHT
 
-Copyright (C) 2012-2023 by László Nagy
+Copyright (C) 2012-2024 by László Nagy
 <https://github.com/rizsotto/Bear>
