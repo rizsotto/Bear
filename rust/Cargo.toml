@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "semantic",
+  "intercept"
+]
+resolver = "2"

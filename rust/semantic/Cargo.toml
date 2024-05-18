@@ -1,0 +1,26 @@
+[package]
+name = "citnames"
+version = "4.0.0"
+authors = ["László Nagy <rizsotto at gmail dot com>"]
+description = "Rust crate to detect semantic of commands."
+keywords = ["clang", "clang-tooling", "compilation-database"]
+repository = "https://github.com/rizsotto/Bear"
+homepage = "https://github.com/rizsotto/Bear"
+license = "GPL-3"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+lazy_static = "1.4"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+path-absolutize = "3.1"
+json_compilation_db = "1.0"
+log = "0.4"
+simple_logger = { version = "4.2", default-features = false, features = ["timestamps"]}
+clap = { version = "4.4", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
+nom = "7.1"
+regex = "1.9"
+
+[[bin]]
+name = "citnames"
