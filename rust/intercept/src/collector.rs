@@ -21,8 +21,12 @@ use std::net::{TcpListener, TcpStream};
 
 use crossbeam::channel::{Receiver, Sender};
 use crossbeam_channel::bounded;
+use serde::{Deserialize, Serialize};
 
-use super::ipc::{Envelope, SessionLocator};
+use super::ipc::Envelope;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct SessionLocator(pub String);
 
 pub trait EventCollector {
     fn address(&self) -> Result<SessionLocator, anyhow::Error>;

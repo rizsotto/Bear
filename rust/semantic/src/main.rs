@@ -29,15 +29,14 @@ use json_compilation_db::Entry;
 use log::LevelFilter;
 use serde_json::Error;
 use simple_logger::SimpleLogger;
+use intercept::ipc::Execution;
 
 use crate::configuration::Configuration;
-use crate::execution::Execution;
 use crate::filter::EntryPredicate;
 use crate::tools::{RecognitionResult, Semantic, Tool};
 
 mod configuration;
 mod events;
-mod execution;
 mod compilation;
 mod tools;
 mod filter;

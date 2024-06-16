@@ -21,7 +21,7 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use crate::execution::Execution;
+use intercept::ipc::Execution;
 use crate::tools::{RecognitionResult, Semantic, Tool};
 use crate::tools::gcc::internal::Argument;
 

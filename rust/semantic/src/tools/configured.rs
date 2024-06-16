@@ -20,8 +20,8 @@
 use std::path::PathBuf;
 use std::vec;
 
+use intercept::ipc::Execution;
 use crate::configuration::CompilerToRecognize;
-use crate::execution::Execution;
 use crate::tools::{CompilerPass, Semantic};
 use crate::tools::{Any, RecognitionResult, Tool};
 use crate::tools::matchers::source::looks_like_a_source_file;

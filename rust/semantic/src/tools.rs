@@ -19,8 +19,8 @@
 
 use std::path::PathBuf;
 
+use intercept::ipc::Execution;
 use crate::configuration::Compilation;
-use crate::execution::Execution;
 use crate::tools::build::Build;
 use crate::tools::configured::Configured;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};

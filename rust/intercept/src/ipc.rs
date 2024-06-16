@@ -24,9 +24,6 @@ use std::path::PathBuf;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct SessionLocator(pub String);
-
 // Reporter id is a unique identifier for a reporter.
 //
 // It is used to identify the process that sends the execution report.

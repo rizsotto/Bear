@@ -22,7 +22,7 @@ use std::path::Path;
 
 use lazy_static::lazy_static;
 
-use crate::execution::Execution;
+use intercept::ipc::Execution;
 use crate::tools::{RecognitionResult, Semantic, Tool};
 
 pub(crate) struct Unix {}

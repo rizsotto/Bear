@@ -19,7 +19,7 @@
 
 use std::path::PathBuf;
 
-use crate::execution::Execution;
+use intercept::ipc::Execution;
 use crate::tools::{CompilerPass, RecognitionResult, Semantic, Tool};
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};

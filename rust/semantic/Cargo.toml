@@ -10,6 +10,7 @@ license = "GPL-3"
 edition = "2021"
 
 [dependencies]
+intercept = { path = "../intercept" }
 anyhow = "1.0"
 lazy_static = "1.4"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
