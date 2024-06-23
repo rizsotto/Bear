@@ -24,7 +24,7 @@ use std::io::{BufReader, BufWriter, Read, stdin, stdout};
 use std::path::Path;
 
 use anyhow::{anyhow, Context, Result};
-use clap::{arg, ArgAction, command};
+use clap::{arg, command, ArgAction, Command, ArgMatches};
 use json_compilation_db::Entry;
 use log::LevelFilter;
 use serde_json::Error;
@@ -43,13 +43,31 @@ mod filter;
 mod fixtures;
 
 fn main() -> Result<()> {
-    let arguments = Arguments::parse()?;
+    let matches = cli().get_matches();
+    let arguments = Arguments::from_matches(matches)?;
     prepare_logging(arguments.verbose)?;
 
     let application = Application::configure(arguments)?;
     application.run()?;
 
     Ok(())
+}
+
+fn cli() -> Command {
+    command!()
+        .args(&[
+            arg!(-i --input <FILE> "Path of the event file")
+                .default_value("commands.json")
+                .hide_default_value(false),
+            arg!(-o --output <FILE> "Path of the result file")
+                .default_value("compile_commands.json")
+                .hide_default_value(false),
+            arg!(-c --config <FILE> "Path of the config file"),
+            arg!(-a --append "Append result to an existing output file")
+                .action(ArgAction::SetTrue),
+            arg!(-v --verbose ... "Sets the level of verbosity")
+                .action(ArgAction::Count),
+        ])
 }
 
 #[derive(Debug, PartialEq)]
@@ -62,23 +80,7 @@ struct Arguments {
 }
 
 impl Arguments {
-    fn parse() -> Result<Self> {
-        let matches = command!()
-            .args(&[
-                arg!(-i --input <FILE> "Path of the event file")
-                    .default_value("commands.json")
-                    .hide_default_value(false),
-                arg!(-o --output <FILE> "Path of the result file")
-                    .default_value("compile_commands.json")
-                    .hide_default_value(false),
-                arg!(-c --config <FILE> "Path of the config file"),
-                arg!(-a --append "Append result to an existing output file")
-                    .action(ArgAction::SetTrue),
-                arg!(-v --verbose ... "Sets the level of verbosity")
-                    .action(ArgAction::Count),
-            ])
-            .get_matches();
-
+    fn from_matches(matches: ArgMatches) -> Result<Self> {
         Arguments {
             input: matches.get_one::<String>("input")
                 .expect("input is defaulted")
