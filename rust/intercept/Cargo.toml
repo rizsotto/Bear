@@ -15,8 +15,8 @@ lazy_static = "1.4"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 log = "0.4"
-simple_logger = { version = "4.2", default-features = false, features = ["timestamps"]}
-clap = { version = "4.4", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
+simple_logger = { version = "5.0", default-features = false, features = ["timestamps"]}
+clap = { version = "4.5", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
 crossbeam = "0.8"
 crossbeam-channel = "0.5"
 rand = "0.8.5"

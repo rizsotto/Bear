@@ -1,5 +1,5 @@
 [package]
-name = "citnames"
+name = "semantic"
 version = "4.0.0"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 description = "Rust crate to detect semantic of commands."
@@ -18,10 +18,10 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 path-absolutize = "3.1"
 json_compilation_db = "1.0"
 log = "0.4"
-simple_logger = { version = "4.2", default-features = false, features = ["timestamps"]}
-clap = { version = "4.4", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
+simple_logger = { version = "5.0", default-features = false, features = ["timestamps"]}
+clap = { version = "4.5", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
 nom = "7.1"
 regex = "1.9"
 
 [[bin]]
-name = "citnames"
+name = "semantic"
