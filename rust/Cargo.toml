@@ -1,7 +1,33 @@
 [workspace]
 members = [
-  "semantic",
+  "bear",
   "intercept",
-  "bear"
+  "semantic",
 ]
 resolver = "2"
+
+[workspace.dependencies]
+thiserror = "1.0"
+anyhow = "1.0"
+lazy_static = "1.4"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["std"] }
+clap = { version = "4.5", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
+chrono = "0.4.33"
+log = "0.4"
+simple_logger = { version = "5.0", default-features = false, features = ["timestamps"]}
+crossbeam = "0.8"
+crossbeam-channel = "0.5"
+rand = "0.8.5"
+path-absolutize = "3.1"
+json_compilation_db = "1.0"
+nom = "7.1"
+regex = "1.9"
+
+[workspace.package]
+version = "4.0.0"
+authors = ["László Nagy <rizsotto at gmail dot com>"]
+repository = "https://github.com/rizsotto/Bear"
+homepage = "https://github.com/rizsotto/Bear"
+license = "GPL-3"
+edition = "2021"
