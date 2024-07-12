@@ -109,6 +109,7 @@ install(CODE "
         COMMAND ln -sf ../wrapper clang
         COMMAND ln -sf ../wrapper clang++
         COMMAND ln -sf ../wrapper f77
+        COMMAND ln -sf ../wrapper gfortran
         COMMAND ln -sf ../wrapper m2c
         COMMAND ln -sf ../wrapper pc
         COMMAND ln -sf ../wrapper lex
