@@ -30,6 +30,7 @@
 #include <optional>
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 namespace cs::semantic {
 
