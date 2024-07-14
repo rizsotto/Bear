@@ -16,9 +16,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+use std::path::PathBuf;
+use std::process::ExitCode;
 use log::{debug, LevelFilter};
 use simple_logger::SimpleLogger;
+use crate::command::{Arguments, Mode};
+use crate::configuration::Configuration;
 
 mod command;
 mod configuration;
@@ -26,14 +29,45 @@ mod fixtures;
 
 
 /// Driver function of the application.
-fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<ExitCode> {
+    // Parse the command line arguments.
     let matches = command::cli().get_matches();
     let arguments = command::Arguments::try_from(matches)?;
+    // Initialize the logging system.
     prepare_logging(arguments.verbose)?;
 
+    // Get the package name and version from Cargo
+    let pkg_name = env!("CARGO_PKG_NAME");
+    let pkg_version = env!("CARGO_PKG_VERSION");
+    debug!("{} v{}", pkg_name, pkg_version);
+    // Print the arguments.
     debug!("Arguments: {:?}", arguments);
+    // Load the configuration.
+    let configuration = load_configuration(&arguments.config)?;
+    debug!("Configuration: {:?}", configuration);
 
-    return Ok(());
+    // Run the application.
+    let result = match arguments.mode {
+        Mode::Intercept { input, output } => ExitCode::SUCCESS,
+        Mode::Semantic { input, output } => ExitCode::FAILURE,
+        Mode::All { input, output } => ExitCode::from(100),
+    };
+
+    return Ok(result);
+}
+
+/// Loads the configuration from the specified source.
+fn load_configuration(file: &Option<String>) -> anyhow::Result<Configuration> {
+    let result = match file.as_deref() {
+        None => Configuration::default(),
+        Some("-") => Configuration::from_stdin()?,
+        Some(path) => {
+            let config_file_path = PathBuf::from(path);
+            Configuration::from_file(config_file_path.as_path())?
+        },
+    };
+
+    Ok(result)
 }
 
 /// Initializes the logging system.
