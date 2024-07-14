@@ -21,6 +21,7 @@
 #include "semantic/Semantic.h"
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #ifdef HAVE_FMT_STD_H
 #include <fmt/std.h>
 #else
