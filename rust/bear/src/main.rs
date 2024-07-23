@@ -43,6 +43,8 @@ fn main() -> anyhow::Result<ExitCode> {
     // Print the arguments.
     debug!("Arguments: {:?}", arguments);
     // Load the configuration.
+    // TODO: implement hierarchical configuration loading.
+    //       (search in the current directory, then in the home directory, then in /etc.)
     let configuration = load_configuration(&arguments.config)?;
     debug!("Configuration: {:?}", configuration);
 

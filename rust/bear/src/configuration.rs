@@ -24,6 +24,9 @@ use anyhow::{Context, Result};
 use serde_json::de::Read;
 
 const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
+const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
+const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
+
 
 /// Represents the application configuration.
 ///
@@ -34,26 +37,34 @@ const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
 ///   mode: wrapper
 ///   directory: /tmp
 ///   compilers:
-///     - /usr/bin/gcc
-///     - /usr/bin/g++
-/// semantic:
-///   compilers_to_recognize:
-///     - path: /usr/bin/gcc
-///       flags_to_remove:
-///         - -Wall
-///       flags_to_add:
-///         - -DDEBUG
-/// filter:
-///   include_only_existing_source: true
-///   duplicate_filter_fields: file
-///   paths_to_include:
-///     - sources
-///   paths_to_exclude:
-///     - tests
+///     - /usr/bin/cc
+///     - /usr/bin/c++
 /// output:
-///   format: clang
-///   command_as_array: true
-///   drop_output_field: false
+///   specification: clang
+///   transform:
+///     arguments_to_remove:
+///       - -Wall
+///     arguments_to_add:
+///       - -DDEBUG
+///   filter:
+///     compilers:
+///       with_arguments:
+///         - -###
+///       with_paths:
+///         - /usr/local/bin/cc
+///         - /usr/local/bin/c++
+///     source:
+///       include_only_existing_files: true
+///       paths_to_include:
+///         - sources
+///       paths_to_exclude:
+///         - tests
+///     duplicate_filter_fields:
+///       - file
+///       - directory
+///   format:
+///     command_as_array: true
+///     drop_output_field: false
 /// ```
 ///
 /// ```yaml
@@ -61,32 +72,24 @@ const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
 ///
 /// intercept:
 ///   mode: preload
-/// semantic:
-///   compilers_to_recognize:
-///     - path: /usr/bin/gcc
-///     - path: /usr/bin/g++
-///   compilers_to_ignore:
-///     - path: /usr/bin/clang
-///       with_flags:
-///         - -###
-///     - path: /usr/bin/clang++
-/// filter:
-///   include_only_existing_source: true
 /// output:
-///   format: semantic
+///   specification: bear
+///   filter:
+///     compilers:
+///       with_paths:
+///         - /usr/local/bin/cc
+///         - /usr/local/bin/c++
+///     source:
+///       include_only_existing_files: true
 /// ```
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Configuration {
+    #[serde(deserialize_with = "validate_schema_version")]
+    pub schema: String,
     #[serde(default)]
     pub intercept: Intercept,
     #[serde(default)]
-    pub semantic: Semantic,
-    #[serde(default)]
-    pub filter: Filter,
-    #[serde(default)]
     pub output: Output,
-    #[serde(deserialize_with = "validate_schema_version")]
-    pub schema: String,
 }
 
 impl Configuration {
@@ -121,8 +124,6 @@ impl Default for Configuration {
     fn default() -> Self {
         Configuration {
             intercept: Intercept::default(),
-            semantic: Semantic::default(),
-            filter: Filter::default(),
             output: Output::default(),
             schema: String::from(SUPPORTED_SCHEMA_VERSION),
         }
@@ -142,6 +143,8 @@ impl Default for Configuration {
 pub enum Intercept {
     #[serde(rename = "wrapper")]
     Wrapper {
+        #[serde(default = "default_wrapper_executable")]
+        path: PathBuf,
         #[serde(default = "default_wrapper_directory")]
         directory: PathBuf,
         compilers: Vec<PathBuf>,
@@ -165,91 +168,9 @@ impl Default for Intercept {
     #[cfg(not(target_os = "linux"))]
     fn default() -> Self {
         Intercept::Wrapper {
+            path: default_wrapper_executable(),
             directory: default_wrapper_directory(),
             compilers: vec![],
-        }
-    }
-}
-
-/// Semantic configuration is used to recognize the compiler calls.
-///
-/// Allow to customize the semantic analysis of the compiler calls.
-#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
-pub struct Semantic {
-    #[serde(default)]
-    pub compilers_to_recognize: Vec<CompilerToRecognize>,
-    #[serde(default)]
-    pub compilers_to_ignore: Vec<CompilerToIgnore>,
-}
-
-/// Represents a compiler to recognize.
-///
-/// The compiler is identified by its path. And allow to customize the flags to add or remove from
-/// the compiler call.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct CompilerToRecognize {
-    pub path: PathBuf,
-    #[serde(default)]
-    pub flags_to_add: Vec<String>,
-    #[serde(default)]
-    pub flags_to_remove: Vec<String>,
-}
-
-/// Represents a compiler to ignore.
-///
-/// The compiler is identified by its path and if the compiler is called with specific flags.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct CompilerToIgnore {
-    pub path: PathBuf,
-    #[serde(default)]
-    pub with_flags: Vec<String>,
-}
-
-/// Filter configuration is used to filter the compiler calls.
-///
-/// Allow to customize the filtering of the compiler calls.
-///
-/// - Filter the compiler calls based on the source file location and existence.
-/// - Filter the compiler calls based on removing the duplicate entries from the output.
-#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
-pub struct Filter {
-    #[serde(default = "default_enabled")]
-    pub include_only_existing_source: bool,
-    #[serde(default)]
-    pub paths_to_include: Vec<PathBuf>,
-    #[serde(default)]
-    pub paths_to_exclude: Vec<PathBuf>,
-    #[serde(default)]
-    pub duplicate_filter_fields: DuplicateFilterFields,
-}
-
-/// Represents how the duplicate filtering detects duplicate entries.
-///
-/// - FileOnly: Detects duplicates based on the source file.
-/// - FileAndOutputOnly: Detects duplicates based on the source file and the output.
-/// - All: Detects duplicates based on all arguments.
-#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
-#[serde(try_from = "String")]
-pub enum DuplicateFilterFields {
-    FileOnly,
-    #[default]
-    FileAndOutputOnly,
-    All,
-}
-
-impl TryFrom<String> for DuplicateFilterFields {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "file" =>
-                Ok(DuplicateFilterFields::FileOnly),
-            "file_output" =>
-                Ok(DuplicateFilterFields::FileAndOutputOnly),
-            "all" =>
-                Ok(DuplicateFilterFields::All),
-            _ =>
-                Err(format!(r#"Unknown value "{value}" for duplicate filter"#)),
         }
     }
 }
@@ -262,27 +183,129 @@ impl TryFrom<String> for DuplicateFilterFields {
 /// format. (The format is used by clang tooling and other tools based on that library.)
 /// - Semantic: Output the compiler calls in the semantic format. (The format is not defined yet.)
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-#[serde(tag = "format")]
+#[serde(tag = "specification")]
 pub enum Output {
     #[serde(rename = "clang")]
     Clang {
-        #[serde(default = "default_enabled")]
-        command_as_array: bool,
-        #[serde(default = "default_disabled")]
-        drop_output_field: bool,
+        #[serde(default)]
+        transform: Transform,
+        #[serde(default)]
+        filter: Filter,
+        #[serde(default)]
+        format: Format,
     },
-    #[serde(rename = "semantic")]
-    Semantic,
+    #[serde(rename = "bear")]
+    Semantic {
+        #[serde(default)]
+        filter: Filter  // FIXME: should have its own type and limit the filtering options
+    }
 }
 
 /// The default output is the clang format.
 impl Default for Output {
     fn default() -> Self {
         Output::Clang {
-            command_as_array: true,
-            drop_output_field: false,
+            transform: Transform::default(),
+            filter: Filter::default(),
+            format: Format::default(),
         }
     }
+}
+
+/// Transform configuration is used to transform the compiler calls.
+///
+/// Allow to customize the transformation of the compiler calls.
+///
+/// - Add or remove arguments from the compiler calls.
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct Transform {
+    #[serde(default)]
+    pub arguments_to_add: Vec<String>,
+    #[serde(default)]
+    pub arguments_to_remove: Vec<String>,
+}
+
+/// Filter configuration is used to filter the compiler calls.
+///
+/// Allow to filter the compiler calls based on the compiler, source files, and duplicate fields.
+///
+/// - Compilers: Filter the compiler calls based on the compiler path and arguments.
+/// - Source: Filter the compiler calls based on the source file location.
+/// - Duplicate fields: Filter the compiler calls based on the output fields.
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub struct Filter {
+    #[serde(default)]
+    pub compilers: CompilerFilter,
+    #[serde(default)]
+    pub source: SourceFilter,
+    #[serde(default)]
+    pub duplicate_filter_fields: Vec<OutputFields>,
+}
+
+impl Default for Filter {
+    fn default() -> Self {
+        Filter {
+            compilers: CompilerFilter::default(),
+            source: SourceFilter::default(),
+            duplicate_filter_fields: vec![OutputFields::File],
+        }
+    }
+}
+
+/// Compiler filter configuration is used to filter the compiler calls based on the compiler.
+///
+/// Allow to filter the compiler calls based on the compiler path and arguments.
+///
+/// - With paths: Filter the compiler calls based on the compiler path.
+/// - With arguments: Filter the compiler calls based on the compiler arguments present.
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct CompilerFilter {
+    #[serde(default)]
+    pub with_paths: Vec<PathBuf>,
+    #[serde(default)]
+    pub with_arguments: Vec<String>,
+}
+
+/// Source filter configuration is used to filter the compiler calls based on the source files.
+///
+/// Allow to filter the compiler calls based on the source files.
+///
+/// - Include only existing files: can be true or false.
+/// - Paths to include: Only include the compiler calls that compiles source files from this path.
+/// - Paths to exclude: Exclude the compiler calls that compiles source files from this path.
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct SourceFilter {
+    #[serde(default = "default_disabled")]
+    pub include_only_existing_files: bool,
+    #[serde(default)]
+    pub paths_to_include: Vec<PathBuf>,
+    #[serde(default)]
+    pub paths_to_exclude: Vec<PathBuf>,
+}
+
+/// Represent the fields of the JSON compilation database record.
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
+pub enum OutputFields {
+    #[serde(rename = "directory")]
+    Directory,
+    #[serde(rename = "file")]
+    File,
+    #[serde(rename = "arguments")]
+    Arguments,
+    #[serde(rename = "command")]
+    Command,
+    #[serde(rename = "output")]
+    Output,
+}
+
+/// Format configuration of the JSON compilation database.
+#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
+struct Format {
+    #[serde(default = "default_enabled")]
+    command_as_array: bool,
+    #[serde(default = "default_disabled")]
+    drop_output_field: bool,
+    // TODO: add support to customize the paths (absolute, relative or original)
 }
 
 fn default_disabled() -> bool {
@@ -302,9 +325,14 @@ fn default_wrapper_directory() -> PathBuf {
     std::env::temp_dir()
 }
 
+/// The default path to the wrapper executable.
+fn default_wrapper_executable() -> PathBuf {
+    PathBuf::from(PRELOAD_LIBRARY_PATH)
+}
+
 /// The default path to the shared library that will be preloaded.
 fn default_preload_library() -> PathBuf {
-    PathBuf::from("/usr/lib/libexec.so")
+    PathBuf::from(WRAPPER_EXECUTABLE_PATH)
 }
 
 // Custom deserialization function to validate the schema version
@@ -338,54 +366,65 @@ mod test {
           mode: wrapper
           directory: /tmp
           compilers:
-            - /usr/bin/gcc
-            - /usr/bin/g++
-        semantic:
-          compilers_to_recognize:
-            - path: /usr/bin/gcc
-              flags_to_remove:
-                - -Wall
-              flags_to_add:
-                - -DDEBUG
-        filter:
-          include_only_existing_source: true
-          duplicate_filter_fields: file
-          paths_to_include:
-            - sources
-          paths_to_exclude:
-            - tests
+            - /usr/bin/cc
+            - /usr/bin/c++
         output:
-          format: clang
-          command_as_array: true
-          drop_output_field: false
+          specification: clang
+          transform:
+            arguments_to_remove:
+              - -Wall
+            arguments_to_add:
+              - -DDEBUG
+          filter:
+            compilers:
+              with_arguments:
+                - -###
+              with_paths:
+                - /usr/local/bin/cc
+                - /usr/local/bin/c++
+            source:
+              include_only_existing_files: true
+              paths_to_include:
+                - sources
+              paths_to_exclude:
+                - tests
+            duplicate_filter_fields:
+              - file
+              - directory
+          format:
+            command_as_array: true
+            drop_output_field: false
         "#;
 
         let result = Configuration::from_reader(content).unwrap();
 
         let expected = Configuration {
             intercept: Intercept::Wrapper {
+                path: default_wrapper_executable(),
                 directory: PathBuf::from("/tmp"),
-                compilers: vec_of_pathbuf!["/usr/bin/gcc", "/usr/bin/g++"],
-            },
-            semantic: Semantic {
-                compilers_to_recognize: vec![
-                    CompilerToRecognize {
-                        path: PathBuf::from("/usr/bin/gcc"),
-                        flags_to_add: vec_of_strings!["-DDEBUG"],
-                        flags_to_remove: vec_of_strings!["-Wall"],
-                    },
-                ],
-                compilers_to_ignore: vec![],
-            },
-            filter: Filter {
-                include_only_existing_source: true,
-                paths_to_include: vec_of_pathbuf!["sources"],
-                paths_to_exclude: vec_of_pathbuf!["tests"],
-                duplicate_filter_fields: DuplicateFilterFields::FileOnly,
+                compilers: vec_of_pathbuf!["/usr/bin/cc", "/usr/bin/c++"],
             },
             output: Output::Clang {
-                command_as_array: true,
-                drop_output_field: false,
+                transform: Transform {
+                    arguments_to_add: vec_of_strings!["-DDEBUG"],
+                    arguments_to_remove: vec_of_strings!["-Wall"],
+                },
+                filter: Filter {
+                    compilers: CompilerFilter {
+                        with_paths: vec_of_pathbuf!["/usr/local/bin/cc", "/usr/local/bin/c++"],
+                        with_arguments: vec_of_strings!["-###"],
+                    },
+                    source: SourceFilter {
+                        include_only_existing_files: true,
+                        paths_to_include: vec_of_pathbuf!["sources"],
+                        paths_to_exclude: vec_of_pathbuf!["tests"],
+                    },
+                    duplicate_filter_fields: vec![OutputFields::File, OutputFields::Directory],
+                },
+                format: Format {
+                    command_as_array: true,
+                    drop_output_field: false,
+                },
             },
             schema: String::from("4.0"),
         };
@@ -401,19 +440,15 @@ mod test {
         intercept:
           mode: preload
           path: /usr/local/lib/libexec.so
-        semantic:
-          compilers_to_recognize:
-            - path: /usr/bin/gcc
-            - path: /usr/bin/g++
-          compilers_to_ignore:
-            - path: /usr/bin/clang
-              with_flags:
-                - -###
-            - path: /usr/bin/clang++
-        filter:
-          include_only_existing_source: true
         output:
-          format: semantic
+          specification: bear
+          filter:
+            compilers:
+              with_paths:
+                - /usr/local/bin/cc
+                - /usr/local/bin/c++
+            source:
+              include_only_existing_files: true
         "#;
 
         let result = Configuration::from_reader(content).unwrap();
@@ -422,37 +457,20 @@ mod test {
             intercept: Intercept::Preload {
                 path: PathBuf::from("/usr/local/lib/libexec.so"),
             },
-            semantic: Semantic {
-                compilers_to_recognize: vec![
-                    CompilerToRecognize {
-                        path: PathBuf::from("/usr/bin/gcc"),
-                        flags_to_add: vec![],
-                        flags_to_remove: vec![],
+            output: Output::Semantic {
+                filter: Filter {
+                    compilers: CompilerFilter {
+                        with_paths: vec_of_pathbuf!["/usr/local/bin/cc", "/usr/local/bin/c++"],
+                        with_arguments: vec![],
                     },
-                    CompilerToRecognize {
-                        path: PathBuf::from("/usr/bin/g++"),
-                        flags_to_add: vec![],
-                        flags_to_remove: vec![],
+                    source: SourceFilter {
+                        include_only_existing_files: true,
+                        paths_to_include: vec![],
+                        paths_to_exclude: vec![],
                     },
-                ],
-                compilers_to_ignore: vec![
-                    CompilerToIgnore {
-                        path: PathBuf::from("/usr/bin/clang"),
-                        with_flags: vec_of_strings!["-###"],
-                    },
-                    CompilerToIgnore {
-                        path: PathBuf::from("/usr/bin/clang++"),
-                        with_flags: vec![],
-                    },
-                ],
+                    duplicate_filter_fields: vec![],
+                },
             },
-            filter: Filter {
-                include_only_existing_source: true,
-                paths_to_include: vec![],
-                paths_to_exclude: vec![],
-                duplicate_filter_fields: DuplicateFilterFields::FileAndOutputOnly,
-            },
-            output: Output::Semantic,
             schema: String::from("4.0"),
         };
 
@@ -463,24 +481,12 @@ mod test {
     fn test_default_config() {
         let result = Configuration::default();
 
-        #[cfg(target_os = "linux")]
         let expected = Configuration {
-            intercept: Intercept::Preload {
-                path: PathBuf::from("/usr/lib/libexec.so"),
-            },
-            semantic: Semantic {
-                compilers_to_recognize: vec![],
-                compilers_to_ignore: vec![],
-            },
-            filter: Filter {
-                include_only_existing_source: false,
-                duplicate_filter_fields: DuplicateFilterFields::FileAndOutputOnly,
-                paths_to_include: vec![],
-                paths_to_exclude: vec![],
-            },
+            intercept: Intercept::default(),
             output: Output::Clang {
-                command_as_array: true,
-                drop_output_field: false,
+                transform: Transform::default(),
+                filter: Filter::default(),
+                format: Format::default(),
             },
             schema: String::from(SUPPORTED_SCHEMA_VERSION),
         };
@@ -499,8 +505,6 @@ mod test {
           compilers:
             - /usr/bin/gcc
             - /usr/bin/g++
-        semantic:
-          compilers_to_recognize:
         "#;
 
         let result: serde_yml::Result<Configuration> = Configuration::from_reader(content);
