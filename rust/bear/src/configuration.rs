@@ -19,9 +19,10 @@
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use anyhow::{Context, Result};
-use serde_json::de::Read;
+use directories::{BaseDirs, ProjectDirs};
+use log::{debug, info};
+use serde::{Deserialize, Serialize};
 
 const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
 const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
@@ -93,24 +94,74 @@ pub struct Configuration {
 }
 
 impl Configuration {
+    /// Loads the configuration from the specified file or the default locations.
+    ///
+    /// If the configuration file is specified, it will be used. Otherwise, the default locations
+    /// will be searched for the configuration file. If the configuration file is not found, the
+    /// default configuration will be returned.
+    pub fn load(file: &Option<String>) -> Result<Self> {
+        if let Some(path) = file {
+            // If the configuration file is specified, use it.
+            let config_file_path = PathBuf::from(path);
+            return Self::from_file(config_file_path.as_path());
+        } else {
+            // Otherwise, try to find the configuration file in the default locations.
+            let locations = Self::file_locations();
+            for location in locations {
+                debug!("Checking configuration file: {}", location.display());
+                if location.exists() {
+                    return Self::from_file(location.as_path());
+                }
+            }
+            // If the configuration file is not found, return the default configuration.
+            debug!("Configuration file not found. Using the default configuration.");
+            Ok(Self::default())
+        }
+    }
+
+    /// The default locations where the configuration file can be found.
+    ///
+    /// The locations are searched in the following order:
+    /// - The current working directory.
+    /// - The local configuration directory of the user.
+    /// - The configuration directory of the user.
+    /// - The local configuration directory of the application.
+    /// - The configuration directory of the application.
+    fn file_locations() -> Vec<PathBuf> {
+        let mut locations = Vec::new();
+
+        if let Ok(current_dir) = std::env::current_dir() {
+            locations.push(current_dir);
+        }
+        if let Some(base_dirs) = BaseDirs::new() {
+            locations.push(base_dirs.config_local_dir().to_path_buf());
+            locations.push(base_dirs.config_dir().to_path_buf());
+        }
+
+        if let Some(proj_dirs) = ProjectDirs::from("com.github", "rizsotto", "Bear") {
+            locations.push(proj_dirs.config_local_dir().to_path_buf());
+            locations.push(proj_dirs.config_dir().to_path_buf());
+        }
+        // filter out duplicate elements from the list
+        locations.dedup();
+        // append the default configuration file name to the locations
+        locations.iter().map(|p| p.join("bear.yml")).collect()
+    }
+
+    /// Loads the configuration from the specified file.
     pub fn from_file(file: &Path) -> Result<Self> {
+        info!("Loading configuration file: {}", file.display());
+
         let reader = OpenOptions::new().read(true).open(file)
             .with_context(|| format!("Failed to open configuration file: {:?}", file))?;
 
-        let content = Configuration::from_reader(reader)
+        let content = Self::from_reader(reader)
             .with_context(|| format!("Failed to parse configuration from file: {:?}", file))?;
 
         Ok(content)
     }
 
-    pub fn from_stdin() -> Result<Self> {
-        let reader = std::io::stdin();
-        let content = Configuration::from_reader(reader)
-            .context("Failed to parse configuration from stdin")?;
-
-        Ok(content)
-    }
-
+    /// Define the deserialization format of the config file.
     fn from_reader<R, T>(rdr: R) -> serde_yml::Result<T>
     where
         R: std::io::Read,
@@ -198,7 +249,7 @@ pub enum Output {
     Semantic {
         #[serde(default)]
         filter: Filter  // FIXME: should have its own type and limit the filtering options
-    }
+    },
 }
 
 /// The default output is the clang format.
@@ -300,7 +351,7 @@ pub enum OutputFields {
 
 /// Format configuration of the JSON compilation database.
 #[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
-struct Format {
+pub struct Format {
     #[serde(default = "default_enabled")]
     command_as_array: bool,
     #[serde(default = "default_disabled")]
@@ -314,10 +365,6 @@ fn default_disabled() -> bool {
 
 fn default_enabled() -> bool {
     true
-}
-
-fn default_schema_version() -> String {
-    String::from(SUPPORTED_SCHEMA_VERSION)
 }
 
 /// The default directory where the wrapper executables will be stored.

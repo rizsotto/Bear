@@ -16,11 +16,10 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use std::path::PathBuf;
 use std::process::ExitCode;
 use log::{debug, LevelFilter};
 use simple_logger::SimpleLogger;
-use crate::command::{Arguments, Mode};
+use crate::command::Mode;
 use crate::configuration::Configuration;
 
 mod command;
@@ -43,9 +42,7 @@ fn main() -> anyhow::Result<ExitCode> {
     // Print the arguments.
     debug!("Arguments: {:?}", arguments);
     // Load the configuration.
-    // TODO: implement hierarchical configuration loading.
-    //       (search in the current directory, then in the home directory, then in /etc.)
-    let configuration = load_configuration(&arguments.config)?;
+    let configuration = Configuration::load(&arguments.config)?;
     debug!("Configuration: {:?}", configuration);
 
     // Run the application.
@@ -56,20 +53,6 @@ fn main() -> anyhow::Result<ExitCode> {
     };
 
     return Ok(result);
-}
-
-/// Loads the configuration from the specified source.
-fn load_configuration(file: &Option<String>) -> anyhow::Result<Configuration> {
-    let result = match file.as_deref() {
-        None => Configuration::default(),
-        Some("-") => Configuration::from_stdin()?,
-        Some(path) => {
-            let config_file_path = PathBuf::from(path);
-            Configuration::from_file(config_file_path.as_path())?
-        },
-    };
-
-    Ok(result)
 }
 
 /// Initializes the logging system.
