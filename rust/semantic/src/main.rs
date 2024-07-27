@@ -145,6 +145,17 @@ fn read_configuration(file: &Option<String>) -> Result<Configuration> {
     Ok(configuration)
 }
 
+// impl From<&Content> for EntryPredicate {
+//     fn from(val: &Content) -> Self {
+//         let source_check = EntryPredicateBuilder::source_check(val.include_only_existing_source);
+//         let paths_to_include = EntryPredicateBuilder::contains(val.paths_to_include.as_slice());
+//         let paths_to_exclude = EntryPredicateBuilder::contains(val.paths_to_exclude.as_slice());
+//         let duplicates = EntryPredicateBuilder::duplicates(&val.duplicate_filter_fields);
+//
+//         (!paths_to_exclude & paths_to_include & source_check & duplicates).build()
+//     }
+// }
+
 #[derive(Debug, PartialEq)]
 struct Application {
     input: String,
@@ -168,11 +179,11 @@ impl Application {
     }
 
     fn run(self) -> Result<()> {
-        let filter: EntryPredicate = (&self.configuration.output.content).into();
-        let entries = self.create_entries()?
-            .inspect(|entry| log::debug!("{:?}", entry))
-            .filter(filter);
-        self.write_entries(entries)?;
+        // let filter: EntryPredicate = (&self.configuration.output.content).into();
+        // let entries = self.create_entries()?
+        //     .inspect(|entry| log::debug!("{:?}", entry))
+        //     .filter(filter);
+        // self.write_entries(entries)?;
 
         Ok(())
     }
