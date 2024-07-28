@@ -17,35 +17,29 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::vec;
 
 use intercept::ipc::Execution;
-use crate::configuration::CompilerToRecognize;
 use crate::tools::{CompilerPass, Semantic};
 use crate::tools::{Any, RecognitionResult, Tool};
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 
-pub(crate) struct Configured {
+pub struct Configured {
     pub executable: PathBuf,
-    pub flags_to_add: Vec<String>,
-    pub flags_to_remove: Vec<String>,
 }
 
 impl Configured {
-    pub(crate) fn new(config: &CompilerToRecognize) -> Box<dyn Tool> {
-        Box::new(
-            Configured {
-                executable: config.executable.clone(),
-                flags_to_add: config.flags_to_add.clone(),
-                flags_to_remove: config.flags_to_remove.clone(),
-            }
-        )
+    pub fn new(compiler: &Path) -> Box<dyn Tool> {
+        Box::new(Self { executable: compiler.to_path_buf() })
     }
 
-    pub(crate) fn from(configs: &[CompilerToRecognize]) -> Box<dyn Tool> {
-        Any::new(configs.iter().map(Configured::new).collect())
+    pub fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+        let tools = compilers.iter()
+            .map(|compiler| Self::new(compiler.as_path()))
+            .collect();
+        Any::new(tools)
     }
 }
 
@@ -58,17 +52,11 @@ impl Tool for Configured {
 
             // find sources and filter out requested flags.
             for argument in x.arguments.iter().skip(1) {
-                if self.flags_to_remove.contains(argument) {
-                    continue;
-                } else if looks_like_a_source_file(argument.as_str()) {
+                if looks_like_a_source_file(argument.as_str()) {
                     sources.push(PathBuf::from(argument));
                 } else {
                     flags.push(argument.clone());
                 }
-            }
-            // extend flags with requested flags.
-            for flag in &self.flags_to_add {
-                flags.push(flag.clone());
             }
 
             if sources.is_empty() {
@@ -122,7 +110,7 @@ mod test {
             working_dir: PathBuf::from("/home/user"),
             passes: vec![
                 CompilerPass::Compile {
-                    flags: vec_of_strings!["-Dthis=that", "-o", "source.c.o", "-Wall"],
+                    flags: vec_of_strings!["-Dthis=that", "-I.", "-o", "source.c.o"],
                     source: PathBuf::from("source.c"),
                     output: None,
                 }
@@ -159,8 +147,6 @@ mod test {
     lazy_static! {
         static ref SUT: Configured = Configured {
             executable: PathBuf::from("/usr/bin/something"),
-            flags_to_remove: vec_of_strings!["-I."],
-            flags_to_add: vec_of_strings!["-Wall"],
         };
     }
 }

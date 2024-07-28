@@ -21,7 +21,7 @@ extern crate core;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter, Read, stdin, stdout};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use clap::{arg, command, ArgAction, Command, ArgMatches};
@@ -189,7 +189,14 @@ impl Application {
     }
 
     fn create_entries(&self) -> Result<Box<dyn Iterator<Item=Entry>>> {
-        let tool: Box<dyn Tool> = (&self.configuration.compilation).into();
+        let compilers_to_recognize: Vec<PathBuf> =
+            self.configuration.compilation.compilers_to_recognize.iter()
+                .map(|entry| entry.executable.clone())
+                .collect();
+        let tool: Box<dyn Tool> = tools::from(
+            &compilers_to_recognize,
+            &self.configuration.compilation.compilers_to_exclude,
+        );
         let from_events = entries_from_execution_events(self.input.as_str(), tool)?;
         // Based on the append flag, we should read the existing compilation database too.
         if self.append {
