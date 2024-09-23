@@ -17,7 +17,7 @@ jobs:
       matrix:
         include:
           - arch: aarch64
-            distro: fedora_latest
+            distro: alpine_latest
           - arch: s390x
             distro: alpine_latest
           - arch: ppc64le
