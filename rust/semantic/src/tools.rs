@@ -20,7 +20,6 @@
 use std::path::PathBuf;
 
 use intercept::ipc::Execution;
-use crate::configuration::Compilation;
 use crate::tools::build::Build;
 use crate::tools::configured::Configured;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};
@@ -35,21 +34,42 @@ mod build;
 mod gcc;
 
 /// This abstraction is representing a tool which is known by us.
-pub(crate) trait Tool: Send {
+pub trait Tool: Send {
     /// A tool has a potential to recognize a command execution and identify
     /// the semantic of that command.
     fn recognize(&self, _: &Execution) -> RecognitionResult;
 }
 
+pub fn from(compilers_to_recognize: &[PathBuf], compilers_to_exclude: &[PathBuf]) -> Box<dyn Tool> {
+    // Build the list of known compilers we will recognize by default.
+    let mut tools = vec![
+        Unix::new(),
+        Build::new(),
+        Wrapper::new(),
+    ];
+
+    // The hinted tools should be the first to recognize.
+    if !compilers_to_recognize.is_empty() {
+        let configured = Configured::from(compilers_to_recognize);
+        tools.insert(0, configured)
+    }
+    // Excluded compiler check should be done before anything.
+    if compilers_to_exclude.is_empty() {
+        Any::new(tools)
+    } else {
+        ExcludeOr::new(&compilers_to_exclude, tools)
+    }
+}
+
 #[derive(Debug, PartialEq)]
-pub(crate) enum RecognitionResult {
+pub enum RecognitionResult {
     Recognized(Result<Semantic, String>),
     NotRecognized,
 }
 
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
-pub(crate) enum Semantic {
+pub enum Semantic {
     UnixCommand,
     BuildCommand,
     Compiler {
@@ -61,7 +81,7 @@ pub(crate) enum Semantic {
 
 /// Represents a compiler call.
 #[derive(Debug, PartialEq)]
-pub(crate) enum CompilerPass {
+pub enum CompilerPass {
     Preprocess,
     Compile {
         source: PathBuf,
@@ -123,29 +143,6 @@ impl Tool for ExcludeOr {
             }
         }
         self.or.recognize(x)
-    }
-}
-
-impl From<&Compilation> for Box<dyn Tool> {
-    fn from(value: &Compilation) -> Self {
-        // Build the list of known compilers we will recognize by default.
-        let mut tools = vec![
-            Unix::new(),
-            Build::new(),
-            Wrapper::new(),
-        ];
-
-        // The hinted tools should be the first to recognize.
-        if !value.compilers_to_recognize.is_empty() {
-            let configured = Configured::from(&value.compilers_to_recognize);
-            tools.insert(0, configured)
-        }
-        // Excluded compiler check should be done before anything.
-        if value.compilers_to_exclude.is_empty() {
-            Any::new(tools)
-        } else {
-            ExcludeOr::new(&value.compilers_to_exclude, tools)
-        }
     }
 }
 

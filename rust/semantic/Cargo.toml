@@ -13,11 +13,6 @@ publish = false
 name = "semantic"
 path = "src/lib.rs"
 
-# TODO: remove this when bear implements the entry point
-[[bin]]
-name = "semantic"
-path = "src/main.rs"
-
 [dependencies]
 intercept = { path = "../intercept" }
 anyhow.workspace = true

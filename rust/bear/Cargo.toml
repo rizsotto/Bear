@@ -16,12 +16,15 @@ path = "src/main.rs"
 [dependencies]
 intercept = { path = "../intercept" }
 semantic = { path = "../semantic" }
+json_compilation_db.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 lazy_static.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yml.workspace = true
 clap.workspace = true
+directories.workspace = true
 chrono.workspace = true
 log.workspace = true
 simple_logger.workspace = true

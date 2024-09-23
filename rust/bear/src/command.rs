@@ -76,13 +76,13 @@ pub(crate) struct BuildCommand {
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct BuildSemantic {
-    file_name: String,
-    append: bool,
+    pub file_name: String,
+    pub append: bool,
 }
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct BuildEvents {
-    file_name: String,
+    pub file_name: String,
 }
 
 
