@@ -357,13 +357,22 @@ pub enum OutputFields {
 }
 
 /// Format configuration of the JSON compilation database.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Format {
     #[serde(default = "default_enabled")]
     command_as_array: bool,
     #[serde(default = "default_disabled")]
     drop_output_field: bool,
     // TODO: add support to customize the paths (absolute, relative or original)
+}
+
+impl Default for Format {
+    fn default() -> Self {
+        Format {
+            command_as_array: true,
+            drop_output_field: false,
+        }
+    }
 }
 
 fn default_disabled() -> bool {
