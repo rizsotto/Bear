@@ -173,10 +173,12 @@ impl Application {
                 semantic_transform,
                 output_writer,
             } => {
+                // Set up the pipeline of compilation database entries.
                 let entries = event_source
                     .generate()
                     .flat_map(|execution| semantic_recognition.recognize(execution))
                     .flat_map(|semantic| semantic_transform.into_entries(semantic));
+                // Consume the entries and write them to the output file.
                 // The exit code is based on the result of the output writer.
                 match output_writer.run(entries) {
                     Ok(_) => ExitCode::SUCCESS,
@@ -202,7 +204,6 @@ impl Application {
 /// Here we only handle the file opening and the error handling.
 struct EventFileReader {
     reader: BufReader<File>,
-    file_name: PathBuf,
 }
 
 impl TryFrom<BuildEvents> for EventFileReader {
@@ -216,10 +217,10 @@ impl TryFrom<BuildEvents> for EventFileReader {
         let file = OpenOptions::new()
             .read(true)
             .open(file_name.as_path())
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
+            .with_context(|| format!("Failed to open input file: {:?}", file_name))?;
         let reader = BufReader::new(file);
 
-        Ok(EventFileReader { reader, file_name })
+        Ok(EventFileReader { reader })
     }
 }
 
@@ -235,8 +236,7 @@ impl EventFileReader {
             .flat_map(|candidate| match candidate {
                 Ok(execution) => Some(execution),
                 Err(error) => {
-                    // FIXME: write the file name to the log.
-                    log::warn!("Failed to read entry: {}", error);
+                    log::warn!("Failed to read entry from input: {}", error);
                     None
                 }
             })
