@@ -15,9 +15,9 @@ path = "src/lib.rs"
 
 [dependencies]
 intercept = { path = "../intercept" }
+json_compilation_db = { path = "../json_compilation_db" }
 anyhow.workspace = true
 path-absolutize.workspace = true
-json_compilation_db.workspace = true
 nom.workspace = true
 regex.workspace = true
 serde.workspace = true

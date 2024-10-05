@@ -16,7 +16,7 @@ path = "src/main.rs"
 [dependencies]
 intercept = { path = "../intercept" }
 semantic = { path = "../semantic" }
-json_compilation_db.workspace = true
+json_compilation_db = { path = "../json_compilation_db" }
 thiserror.workspace = true
 anyhow.workspace = true
 lazy_static.workspace = true
