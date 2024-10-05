@@ -70,7 +70,7 @@ mod internal {
     use nom::{error::ErrorKind, IResult};
     use regex::Regex;
 
-    use crate::tools::CompilerPass;
+    use crate::result::CompilerPass;
     use crate::tools::matchers::source::looks_like_a_source_file;
 
     #[derive(Debug, PartialEq)]

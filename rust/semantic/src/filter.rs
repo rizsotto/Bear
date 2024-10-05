@@ -18,7 +18,6 @@
  */
 
 use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 
 use json_compilation_db::Entry;
@@ -171,6 +170,7 @@ impl EntryPredicateBuilder {
 
 #[cfg(test)]
 mod test {
+    use std::hash::{Hash, Hasher};
     use crate::{vec_of_pathbuf, vec_of_strings};
     use super::*;
 

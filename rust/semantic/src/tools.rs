@@ -20,9 +20,9 @@
 use std::path::PathBuf;
 
 use intercept::ipc::Execution;
+use crate::result::{RecognitionResult, Semantic};
 use crate::tools::build::Build;
 use crate::tools::configured::Configured;
-use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 use crate::tools::unix::Unix;
 use crate::tools::wrapper::Wrapper;
 
@@ -61,35 +61,6 @@ pub fn from(compilers_to_recognize: &[PathBuf], compilers_to_exclude: &[PathBuf]
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum RecognitionResult {
-    Recognized(Result<Semantic, String>),
-    NotRecognized,
-}
-
-/// Represents an executed command semantic.
-#[derive(Debug, PartialEq)]
-pub enum Semantic {
-    UnixCommand,
-    BuildCommand,
-    Compiler {
-        compiler: PathBuf,
-        working_dir: PathBuf,
-        passes: Vec<CompilerPass>,
-    },
-}
-
-/// Represents a compiler call.
-#[derive(Debug, PartialEq)]
-pub enum CompilerPass {
-    Preprocess,
-    Compile {
-        source: PathBuf,
-        output: Option<PathBuf>,
-        flags: Vec<String>,
-    },
-}
-
 
 struct Any {
     tools: Vec<Box<dyn Tool>>,
@@ -106,12 +77,12 @@ impl Tool for Any {
     fn recognize(&self, x: &Execution) -> RecognitionResult {
         for tool in &self.tools {
             match tool.recognize(x) {
-                Recognized(result) =>
-                    return Recognized(result),
+                RecognitionResult::Recognized(result) =>
+                    return RecognitionResult::Recognized(result),
                 _ => continue,
             }
         }
-        NotRecognized
+        RecognitionResult::NotRecognized
     }
 }
 
@@ -139,7 +110,7 @@ impl Tool for ExcludeOr {
     fn recognize(&self, x: &Execution) -> RecognitionResult {
         for exclude in &self.excludes {
             if &x.executable == exclude {
-                return NotRecognized;
+                return RecognitionResult::NotRecognized;
             }
         }
         self.or.recognize(x)
@@ -151,7 +122,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use crate::vec_of_pathbuf;
+    use crate::{result, vec_of_pathbuf};
 
     use super::*;
 
@@ -168,7 +139,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            NotRecognized => assert!(true),
+            RecognitionResult::NotRecognized => assert!(true),
             _ => assert!(false),
         }
     }
@@ -186,7 +157,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognized(Ok(_)) => assert!(true),
+            RecognitionResult::Recognized(Ok(_)) => assert!(true),
             _ => assert!(false)
         }
     }
@@ -205,7 +176,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognized(Err(_)) => assert!(true),
+            RecognitionResult::Recognized(Err(_)) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -225,7 +196,7 @@ mod test {
         };
 
         match sut.recognize(&input) {
-            NotRecognized => assert!(true),
+            RecognitionResult::NotRecognized => assert!(true),
             _ => assert!(false)
         }
     }
@@ -240,7 +211,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognized(Ok(_)) => assert!(true),
+            RecognitionResult::Recognized(Ok(_)) => assert!(true),
             _ => assert!(false)
         }
     }
@@ -255,11 +226,11 @@ mod test {
         fn recognize(&self, _: &Execution) -> RecognitionResult {
             match self {
                 MockTool::Recognize =>
-                    Recognized(Ok(Semantic::UnixCommand)),
+                    RecognitionResult::Recognized(Ok(Semantic::UnixCommand)),
                 MockTool::RecognizeFailed =>
-                    Recognized(Err(String::from("problem"))),
+                    RecognitionResult::Recognized(Err(String::from("problem"))),
                 MockTool::NotRecognize =>
-                    NotRecognized,
+                    RecognitionResult::NotRecognized,
             }
         }
     }

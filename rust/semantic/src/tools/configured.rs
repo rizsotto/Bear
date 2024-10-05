@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::vec;
 
 use intercept::ipc::Execution;
-use crate::tools::{CompilerPass, Semantic};
+use crate::result::{CompilerPass, Semantic};
 use crate::tools::{Any, RecognitionResult, Tool};
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};

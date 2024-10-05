@@ -23,7 +23,7 @@ use anyhow::{anyhow, Result};
 use json_compilation_db::Entry;
 use path_absolutize::Absolutize;
 
-use crate::tools::{CompilerPass, Semantic};
+use crate::result::{CompilerPass, Semantic};
 
 impl TryFrom<Semantic> for Vec<Entry> {
     type Error = anyhow::Error;

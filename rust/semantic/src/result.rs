@@ -17,9 +17,34 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod compilation;
-pub mod events;
-pub mod filter;
-pub mod tools;
-pub mod result;
-mod fixtures;
+use std::path::PathBuf;
+
+/// Represents a semantic recognition result.
+#[derive(Debug, PartialEq)]
+pub enum RecognitionResult {
+    Recognized(Result<Semantic, String>),
+    NotRecognized,
+}
+
+/// Represents an executed command semantic.
+#[derive(Debug, PartialEq)]
+pub enum Semantic {
+    UnixCommand,
+    BuildCommand,
+    Compiler {
+        compiler: PathBuf,
+        working_dir: PathBuf,
+        passes: Vec<CompilerPass>,
+    },
+}
+
+/// Represents a compiler call.
+#[derive(Debug, PartialEq)]
+pub enum CompilerPass {
+    Preprocess,
+    Compile {
+        source: PathBuf,
+        output: Option<PathBuf>,
+        flags: Vec<String>,
+    },
+}

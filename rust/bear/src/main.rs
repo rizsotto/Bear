@@ -23,6 +23,7 @@ use log;
 use semantic::events;
 use semantic::filter;
 use semantic::tools;
+use semantic::result;
 use serde_json::Error;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
@@ -251,17 +252,17 @@ impl TryFrom<&config::Main> for SemanticRecognition {
 }
 
 impl SemanticRecognition {
-    fn recognize(&self, execution: Execution) -> Option<tools::Semantic> {
+    fn recognize(&self, execution: Execution) -> Option<result::Semantic> {
         match self.tool.recognize(&execution) {
-            tools::RecognitionResult::Recognized(Ok(tools::Semantic::UnixCommand)) => {
+            result::RecognitionResult::Recognized(Ok(result::Semantic::UnixCommand)) => {
                 log::debug!("execution recognized as unix command: {:?}", execution);
                 None
             }
-            tools::RecognitionResult::Recognized(Ok(tools::Semantic::BuildCommand)) => {
+            result::RecognitionResult::Recognized(Ok(result::Semantic::BuildCommand)) => {
                 log::debug!("execution recognized as build command: {:?}", execution);
                 None
             }
-            tools::RecognitionResult::Recognized(Ok(semantic)) => {
+            result::RecognitionResult::Recognized(Ok(semantic)) => {
                 log::debug!(
                     "execution recognized as compiler call, {:?} : {:?}",
                     semantic,
@@ -269,7 +270,7 @@ impl SemanticRecognition {
                 );
                 Some(semantic)
             }
-            tools::RecognitionResult::Recognized(Err(reason)) => {
+            result::RecognitionResult::Recognized(Err(reason)) => {
                 log::debug!(
                     "execution recognized with failure, {:?} : {:?}",
                     reason,
@@ -277,7 +278,7 @@ impl SemanticRecognition {
                 );
                 None
             }
-            tools::RecognitionResult::NotRecognized => {
+            result::RecognitionResult::NotRecognized => {
                 log::debug!("execution not recognized: {:?}", execution);
                 None
             }
@@ -317,7 +318,7 @@ impl From<&config::Output> for SemanticTransform {
 }
 
 impl SemanticTransform {
-    fn into_entries(&self, semantic: tools::Semantic) -> Vec<Entry> {
+    fn into_entries(&self, semantic: result::Semantic) -> Vec<Entry> {
         let transformed = self.transform_semantic(semantic);
         let entries: Result<Vec<Entry>, anyhow::Error> = transformed.try_into();
         entries.unwrap_or_else(|error| {
@@ -329,9 +330,9 @@ impl SemanticTransform {
         })
     }
 
-    fn transform_semantic(&self, input: tools::Semantic) -> tools::Semantic {
+    fn transform_semantic(&self, input: result::Semantic) -> result::Semantic {
         match input {
-            tools::Semantic::Compiler {
+            result::Semantic::Compiler {
                 compiler,
                 working_dir,
                 passes,
@@ -341,7 +342,7 @@ impl SemanticTransform {
                     .map(|pass| self.transform_pass(pass))
                     .collect();
 
-                tools::Semantic::Compiler {
+                result::Semantic::Compiler {
                     compiler,
                     working_dir,
                     passes: passes_transformed,
@@ -351,9 +352,9 @@ impl SemanticTransform {
         }
     }
 
-    fn transform_pass(&self, pass: tools::CompilerPass) -> tools::CompilerPass {
+    fn transform_pass(&self, pass: result::CompilerPass) -> result::CompilerPass {
         match pass {
-            tools::CompilerPass::Compile {
+            result::CompilerPass::Compile {
                 source,
                 output,
                 flags,
@@ -367,7 +368,7 @@ impl SemanticTransform {
                         .filter(|flag| !arguments_to_remove.contains(flag))
                         .chain(arguments_to_add.iter().cloned())
                         .collect();
-                    tools::CompilerPass::Compile {
+                    result::CompilerPass::Compile {
                         source,
                         output,
                         flags: flags_transformed,
