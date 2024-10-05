@@ -37,7 +37,7 @@ impl Tool for Unix {
     fn recognize(&self, execution: &Execution) -> RecognitionResult {
         let executable = execution.executable.as_path();
         if COREUTILS_FILES.contains(executable) {
-            RecognitionResult::Recognized(Ok(Semantic::UnixCommand))
+            RecognitionResult::Recognized(Ok(Semantic::Ignored))
         } else {
             RecognitionResult::NotRecognized
         }
@@ -151,6 +151,8 @@ lazy_static! {
 			"/usr/bin/who",
 			"/usr/bin/whoami",
 			"/usr/bin/yes",
+			"/usr/bin/make",
+			"/usr/bin/gmake",
 		]
 			.iter()
 			.map(Path::new);
@@ -178,7 +180,7 @@ mod test {
         };
 
 		assert_eq!(
-			RecognitionResult::Recognized(Ok(Semantic::UnixCommand)),
+			RecognitionResult::Recognized(Ok(Semantic::Ignored)),
 			SUT.recognize(&input)
 		)
     }

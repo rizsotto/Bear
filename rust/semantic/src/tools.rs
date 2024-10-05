@@ -21,7 +21,6 @@ use std::path::PathBuf;
 
 use intercept::ipc::Execution;
 use crate::result::{RecognitionResult, Semantic};
-use crate::tools::build::Build;
 use crate::tools::configured::Configured;
 use crate::tools::unix::Unix;
 use crate::tools::wrapper::Wrapper;
@@ -30,7 +29,6 @@ mod configured;
 mod wrapper;
 mod matchers;
 mod unix;
-mod build;
 mod gcc;
 
 /// This abstraction is representing a tool which is known by us.
@@ -44,7 +42,6 @@ pub fn from(compilers_to_recognize: &[PathBuf], compilers_to_exclude: &[PathBuf]
     // Build the list of known compilers we will recognize by default.
     let mut tools = vec![
         Unix::new(),
-        Build::new(),
         Wrapper::new(),
     ];
 
@@ -226,7 +223,7 @@ mod test {
         fn recognize(&self, _: &Execution) -> RecognitionResult {
             match self {
                 MockTool::Recognize =>
-                    RecognitionResult::Recognized(Ok(Semantic::UnixCommand)),
+                    RecognitionResult::Recognized(Ok(Semantic::Ignored)),
                 MockTool::RecognizeFailed =>
                     RecognitionResult::Recognized(Err(String::from("problem"))),
                 MockTool::NotRecognize =>

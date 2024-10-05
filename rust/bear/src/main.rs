@@ -254,12 +254,8 @@ impl TryFrom<&config::Main> for SemanticRecognition {
 impl SemanticRecognition {
     fn recognize(&self, execution: Execution) -> Option<result::Semantic> {
         match self.tool.recognize(&execution) {
-            result::RecognitionResult::Recognized(Ok(result::Semantic::UnixCommand)) => {
-                log::debug!("execution recognized as unix command: {:?}", execution);
-                None
-            }
-            result::RecognitionResult::Recognized(Ok(result::Semantic::BuildCommand)) => {
-                log::debug!("execution recognized as build command: {:?}", execution);
+            result::RecognitionResult::Recognized(Ok(result::Semantic::Ignored)) => {
+                log::debug!("execution recognized, but ignored: {:?}", execution);
                 None
             }
             result::RecognitionResult::Recognized(Ok(semantic)) => {

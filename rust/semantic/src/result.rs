@@ -29,13 +29,14 @@ pub enum RecognitionResult {
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
 pub enum Semantic {
-    UnixCommand,
-    BuildCommand,
+    /// This is a compiler call.
     Compiler {
         compiler: PathBuf,
         working_dir: PathBuf,
         passes: Vec<CompilerPass>,
     },
+    /// This is something else we recognised, but not interested to fully specify.
+    Ignored,
 }
 
 /// Represents a compiler call.

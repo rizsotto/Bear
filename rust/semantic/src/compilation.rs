@@ -108,9 +108,7 @@ mod test {
     fn test_non_compilations() -> Result<()> {
         let empty: Vec<Entry> = vec![];
 
-        let result: Vec<Entry> = Semantic::UnixCommand.try_into()?;
-        assert_eq!(empty, result);
-        let result: Vec<Entry> = Semantic::BuildCommand.try_into()?;
+        let result: Vec<Entry> = Semantic::Ignored.try_into()?;
         assert_eq!(empty, result);
 
         let input = Semantic::Compiler {
