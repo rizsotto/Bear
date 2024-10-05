@@ -25,7 +25,6 @@ use semantic::events;
 use semantic::filter;
 use semantic::tools;
 use serde_json::Error;
-use simple_logger::SimpleLogger;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
@@ -40,11 +39,11 @@ mod fixtures;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {
+    // Initialize the logging system.
+    env_logger::init();
     // Parse the command line arguments.
     let matches = command::cli().get_matches();
     let arguments = command::Arguments::try_from(matches)?;
-    // Initialize the logging system.
-    prepare_logging(arguments.verbose)?;
 
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
@@ -62,26 +61,6 @@ fn main() -> anyhow::Result<ExitCode> {
     log::debug!("Exit code: {:?}", result);
 
     Ok(result)
-}
-
-/// Initializes the logging system.
-///
-/// Failure when the downstream library fails to initialize the logging system.
-fn prepare_logging(level: u8) -> anyhow::Result<()> {
-    let level = match level {
-        0 => log::LevelFilter::Error,
-        1 => log::LevelFilter::Warn,
-        2 => log::LevelFilter::Info,
-        3 => log::LevelFilter::Debug,
-        _ => log::LevelFilter::Trace,
-    };
-    let mut logger = SimpleLogger::new().with_level(level);
-    if level <= log::LevelFilter::Debug {
-        logger = logger.with_local_timestamps()
-    }
-    logger.init()?;
-
-    Ok(())
 }
 
 /// Represent the application state.

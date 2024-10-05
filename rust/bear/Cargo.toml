@@ -27,4 +27,4 @@ clap.workspace = true
 directories.workspace = true
 chrono.workspace = true
 log.workspace = true
-simple_logger.workspace = true
+env_logger.workspace = true

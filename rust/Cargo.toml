@@ -9,21 +9,21 @@ resolver = "2"
 [workspace.dependencies]
 thiserror = "1.0"
 anyhow = "1.0"
-lazy_static = "1.4"
+lazy_static = { version = "1.5", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde_yml = "0.0"
 clap = { version = "4.5", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
-chrono = "0.4.33"
-log = "0.4"
-simple_logger = { version = "5.0", default-features = false, features = ["timestamps"]}
+chrono = {  version = "0.4", default-features = false, features = ["std", "clock"] }
+log = { version = "0.4", default-features = false, features = ["std"] }
+env_logger = { version = "0.11", default-features = false, features = ["humantime"]}
 crossbeam = "0.8"
 crossbeam-channel = "0.5"
-rand = "0.8.5"
+rand = { version = "0.8" }
 path-absolutize = "3.1"
 directories = "5.0"
 json_compilation_db = "1.0"
-nom = "7.1"
+nom = { version = "7.1", default-features = false, features = ["std"] }
 regex = "1.9"
 
 [workspace.package]
