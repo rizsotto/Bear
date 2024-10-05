@@ -25,35 +25,31 @@ use path_absolutize::Absolutize;
 
 use crate::result::{CompilerPass, Semantic};
 
-impl TryFrom<Semantic> for Vec<Entry> {
-    type Error = anyhow::Error;
+pub fn into_entries(value: Semantic) -> Result<Vec<Entry>, anyhow::Error> {
+    match value {
+        Semantic::Compiler { compiler, working_dir, passes } => {
+            let entries = passes.iter()
+                .flat_map(|pass| -> Result<Entry, anyhow::Error> {
+                    match pass {
+                        CompilerPass::Preprocess =>
+                            Err(anyhow!("preprocess pass should not show up in results")),
+                        CompilerPass::Compile { source, output, flags } =>
+                            Ok(
+                                Entry {
+                                    file: into_abspath(source.clone(), working_dir.as_path())?,
+                                    directory: working_dir.clone(),
+                                    output: into_abspath_opt(output.clone(), working_dir.as_path())?,
+                                    arguments: into_arguments(&compiler, source, output, flags)?,
+                                }
+                            )
+                    }
+                })
+                .collect();
 
-    fn try_from(value: Semantic) -> Result<Self, Self::Error> {
-        match value {
-            Semantic::Compiler { compiler, working_dir, passes } => {
-                let entries = passes.iter()
-                    .flat_map(|pass| -> Result<Entry, Self::Error> {
-                        match pass {
-                            CompilerPass::Preprocess =>
-                                Err(anyhow!("preprocess pass should not show up in results")),
-                            CompilerPass::Compile { source, output, flags } =>
-                                Ok(
-                                    Entry {
-                                        file: into_abspath(source.clone(), working_dir.as_path())?,
-                                        directory: working_dir.clone(),
-                                        output: into_abspath_opt(output.clone(), working_dir.as_path())?,
-                                        arguments: into_arguments(&compiler, source, output, flags)?,
-                                    }
-                                )
-                        }
-                    })
-                    .collect();
-
-                Ok(entries)
-            }
-            _ =>
-                Ok(vec![]),
+            Ok(entries)
         }
+        _ =>
+            Ok(vec![]),
     }
 }
 
@@ -101,14 +97,13 @@ fn into_string(path: &Path) -> Result<String> {
 #[cfg(test)]
 mod test {
     use crate::vec_of_strings;
-
     use super::*;
 
     #[test]
     fn test_non_compilations() -> Result<()> {
         let empty: Vec<Entry> = vec![];
 
-        let result: Vec<Entry> = Semantic::Ignored.try_into()?;
+        let result: Vec<Entry> = into_entries(Semantic::Ignored)?;
         assert_eq!(empty, result);
 
         let input = Semantic::Compiler {
@@ -116,7 +111,7 @@ mod test {
             working_dir: PathBuf::from("/home/user"),
             passes: vec![],
         };
-        let result: Vec<Entry> = input.try_into()?;
+        let result: Vec<Entry> = into_entries(input)?;
         assert_eq!(empty, result);
 
         Ok(())
@@ -145,7 +140,7 @@ mod test {
             }
         ];
 
-        let result: Vec<Entry> = input.try_into()?;
+        let result: Vec<Entry> = into_entries(input)?;
 
         assert_eq!(expected, result);
 
@@ -187,7 +182,7 @@ mod test {
             },
         ];
 
-        let result: Vec<Entry> = input.try_into()?;
+        let result: Vec<Entry> = into_entries(input)?;
 
         assert_eq!(expected, result);
 

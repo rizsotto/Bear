@@ -17,9 +17,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod compilation;
 pub mod events;
-pub mod filter;
 pub mod tools;
 pub mod result;
 mod fixtures;

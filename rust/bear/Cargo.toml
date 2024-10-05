@@ -28,3 +28,4 @@ directories.workspace = true
 chrono.workspace = true
 log.workspace = true
 env_logger.workspace = true
+path-absolutize.workspace = true

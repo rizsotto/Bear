@@ -21,7 +21,6 @@ use intercept::ipc::Execution;
 use json_compilation_db::Entry;
 use log;
 use semantic::events;
-use semantic::filter;
 use semantic::tools;
 use semantic::result;
 use serde_json::Error;
@@ -32,10 +31,13 @@ use std::hash::{Hash, Hasher};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use crate::compilation::into_entries;
 
 mod args;
 mod config;
 mod fixtures;
+mod filter;
+mod compilation;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {
@@ -316,7 +318,7 @@ impl From<&config::Output> for SemanticTransform {
 impl SemanticTransform {
     fn into_entries(&self, semantic: result::Semantic) -> Vec<Entry> {
         let transformed = self.transform_semantic(semantic);
-        let entries: Result<Vec<Entry>, anyhow::Error> = transformed.try_into();
+        let entries: Result<Vec<Entry>, anyhow::Error> = into_entries(transformed);
         entries.unwrap_or_else(|error| {
             log::debug!(
                 "compiler call failed to convert to compilation db entry: {}",
