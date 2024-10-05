@@ -43,8 +43,6 @@ const DEFAULT_EVENT_FILE: &str = "events.json";
 /// Represents the command line arguments of the application.
 #[derive(Debug, PartialEq)]
 pub(crate) struct Arguments {
-    // The verbosity level of the application.
-    pub verbose: u8,
     // The path of the configuration file.
     pub config: Option<String>,
     // The mode of the application.
@@ -90,7 +88,6 @@ impl TryFrom<ArgMatches> for Arguments {
     type Error = anyhow::Error;
 
     fn try_from(matches: ArgMatches) -> Result<Self, Self::Error> {
-        let verbose = matches.get_count("verbose");
         let config = matches.get_one::<String>("config")
             .map(String::to_string);
 
@@ -103,7 +100,7 @@ impl TryFrom<ArgMatches> for Arguments {
 
                 // let output = BuildEvents::try_from(intercept_matches)?;
                 let mode = Mode::Intercept { input, output: BuildEvents { file_name: output } };
-                let arguments = Arguments { verbose, config, mode };
+                let arguments = Arguments { config, mode };
                 Ok(arguments)
             }
             Some((MODE_SEMANTIC_SUBCOMMAND, semantic_matches)) => {
@@ -113,14 +110,14 @@ impl TryFrom<ArgMatches> for Arguments {
 
                 let output = BuildSemantic::try_from(semantic_matches)?;
                 let mode = Mode::Semantic { input: BuildEvents { file_name: input }, output };
-                let arguments = Arguments { verbose, config, mode };
+                let arguments = Arguments { config, mode };
                 Ok(arguments)
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
                 let output = BuildSemantic::try_from(&matches)?;
                 let mode = Mode::All { input, output };
-                let arguments = Arguments { verbose, config, mode };
+                let arguments = Arguments { config, mode };
                 Ok(arguments)
             }
             _ => {
@@ -226,13 +223,12 @@ mod test {
 
     #[test]
     fn test_intercept_call() {
-        let execution = vec!["bear", "-vvv", "-c", "~/bear.yaml", "intercept", "-o", "custom.json", "--", "make", "all"];
+        let execution = vec!["bear", "-c", "~/bear.yaml", "intercept", "-o", "custom.json", "--", "make", "all"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 3,
             config: Some("~/bear.yaml".to_string()),
             mode: Mode::Intercept {
                 input: BuildCommand { arguments: vec_of_strings!["make", "all"] },
@@ -249,7 +245,6 @@ mod test {
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 0,
             config: None,
             mode: Mode::Intercept {
                 input: BuildCommand { arguments: vec_of_strings!["make", "all"] },
@@ -260,13 +255,12 @@ mod test {
 
     #[test]
     fn test_semantic_call() {
-        let execution = vec!["bear", "-vvv", "-c", "~/bear.yaml", "semantic", "-i", "custom.json", "-o", "result.json", "-a"];
+        let execution = vec!["bear", "-c", "~/bear.yaml", "semantic", "-i", "custom.json", "-o", "result.json", "-a"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 3,
             config: Some("~/bear.yaml".to_string()),
             mode: Mode::Semantic {
                 input: BuildEvents { file_name: "custom.json".to_string() },
@@ -283,7 +277,6 @@ mod test {
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 0,
             config: None,
             mode: Mode::Semantic {
                 input: BuildEvents { file_name: "events.json".to_string() },
@@ -294,13 +287,12 @@ mod test {
 
     #[test]
     fn test_all_call() {
-        let execution = vec!["bear", "-vvv", "-c", "~/bear.yaml", "-o", "result.json", "-a", "--", "make", "all"];
+        let execution = vec!["bear", "-c", "~/bear.yaml", "-o", "result.json", "-a", "--", "make", "all"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 3,
             config: Some("~/bear.yaml".to_string()),
             mode: Mode::All {
                 input: BuildCommand { arguments: vec_of_strings!["make", "all"] },
@@ -317,7 +309,6 @@ mod test {
         let arguments = Arguments::try_from(matches).unwrap();
 
         assert_eq!(arguments, Arguments {
-            verbose: 0,
             config: None,
             mode: Mode::All {
                 input: BuildCommand { arguments: vec_of_strings!["make", "all"] },

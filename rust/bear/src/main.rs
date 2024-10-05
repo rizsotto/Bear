@@ -16,7 +16,6 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use crate::command::{BuildCommand, BuildEvents, BuildSemantic, Mode};
 use anyhow::Context;
 use intercept::ipc::Execution;
 use json_compilation_db::Entry;
@@ -33,7 +32,7 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-mod command;
+mod args;
 mod configuration;
 mod fixtures;
 
@@ -41,14 +40,15 @@ mod fixtures;
 fn main() -> anyhow::Result<ExitCode> {
     // Initialize the logging system.
     env_logger::init();
-    // Parse the command line arguments.
-    let matches = command::cli().get_matches();
-    let arguments = command::Arguments::try_from(matches)?;
-
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");
     log::debug!("{} v{}", pkg_name, pkg_version);
+
+    // Parse the command line arguments.
+    let matches = args::cli().get_matches();
+    let arguments = args::Arguments::try_from(matches)?;
+
     // Print the arguments.
     log::debug!("Arguments: {:?}", arguments);
     // Load the configuration.
@@ -67,8 +67,8 @@ fn main() -> anyhow::Result<ExitCode> {
 enum Application {
     /// The intercept mode we are only capturing the build commands.
     Intercept {
-        input: BuildCommand,
-        output: BuildEvents,
+        input: args::BuildCommand,
+        output: args::BuildEvents,
         intercept_config: configuration::Intercept,
     },
     /// The semantic mode we are deduct the semantic meaning of the
@@ -81,8 +81,8 @@ enum Application {
     },
     /// The all model is combining the intercept and semantic modes.
     All {
-        input: BuildCommand,
-        output: BuildSemantic,
+        input: args::BuildCommand,
+        output: args::BuildSemantic,
         intercept_config: configuration::Intercept,
         output_config: configuration::Output,
     },
@@ -95,11 +95,11 @@ impl Application {
     /// state that will be used by the `run` method. Trying to catch problems early before
     /// the actual execution of the application.
     fn configure(
-        arguments: command::Arguments,
+        arguments: args::Arguments,
         configuration: configuration::Configuration,
     ) -> anyhow::Result<Self> {
         match arguments.mode {
-            Mode::Intercept { input, output } => {
+            args::Mode::Intercept { input, output } => {
                 let intercept_config = configuration.intercept;
                 let result = Application::Intercept {
                     input,
@@ -108,7 +108,7 @@ impl Application {
                 };
                 Ok(result)
             }
-            Mode::Semantic { input, output } => {
+            args::Mode::Semantic { input, output } => {
                 let event_source = EventFileReader::try_from(input)?;
                 let semantic_recognition = SemanticRecognition::try_from(&configuration)?;
                 let semantic_transform = SemanticTransform::from(&configuration.output);
@@ -121,7 +121,7 @@ impl Application {
                 };
                 Ok(result)
             }
-            Mode::All { input, output } => {
+            args::Mode::All { input, output } => {
                 let intercept_config = configuration.intercept;
                 let output_config = configuration.output;
                 let result = Application::All {
@@ -185,13 +185,13 @@ struct EventFileReader {
     reader: BufReader<File>,
 }
 
-impl TryFrom<BuildEvents> for EventFileReader {
+impl TryFrom<args::BuildEvents> for EventFileReader {
     type Error = anyhow::Error;
 
     /// Open the file and create a new instance of the event file reader.
     ///
     /// If the file cannot be opened, the error will be logged and escalated.
-    fn try_from(value: BuildEvents) -> Result<Self, Self::Error> {
+    fn try_from(value: args::BuildEvents) -> Result<Self, Self::Error> {
         let file_name = PathBuf::from(value.file_name);
         let file = OpenOptions::new()
             .read(true)
@@ -400,7 +400,7 @@ struct OutputWriter {
 
 impl OutputWriter {
     /// Create a new instance of the output writer.
-    pub fn configure(value: &BuildSemantic, configuration: &configuration::Output) -> Self {
+    pub fn configure(value: &args::BuildSemantic, configuration: &configuration::Output) -> Self {
         match configuration {
             configuration::Output::Clang { format, filter, .. } => OutputWriter {
                 output: PathBuf::from(&value.file_name),
