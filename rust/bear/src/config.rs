@@ -78,7 +78,7 @@ const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 ///   specification: bear
 /// ```
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
-pub struct Configuration {
+pub struct Main {
     #[serde(deserialize_with = "validate_schema_version")]
     pub schema: String,
     #[serde(default)]
@@ -87,7 +87,7 @@ pub struct Configuration {
     pub output: Output,
 }
 
-impl Configuration {
+impl Main {
     /// Loads the configuration from the specified file or the default locations.
     ///
     /// If the configuration file is specified, it will be used. Otherwise, the default locations
@@ -165,9 +165,9 @@ impl Configuration {
     }
 }
 
-impl Default for Configuration {
+impl Default for Main {
     fn default() -> Self {
-        Configuration {
+        Main {
             intercept: Intercept::default(),
             output: Output::default(),
             schema: String::from(SUPPORTED_SCHEMA_VERSION),
@@ -460,9 +460,9 @@ mod test {
             drop_output_field: false
         "#;
 
-        let result = Configuration::from_reader(content).unwrap();
+        let result = Main::from_reader(content).unwrap();
 
-        let expected = Configuration {
+        let expected = Main {
             intercept: Intercept::Wrapper {
                 path: default_wrapper_executable(),
                 directory: PathBuf::from("/tmp"),
@@ -510,9 +510,9 @@ mod test {
           specification: bear
         "#;
 
-        let result = Configuration::from_reader(content).unwrap();
+        let result = Main::from_reader(content).unwrap();
 
-        let expected = Configuration {
+        let expected = Main {
             intercept: Intercept::Preload {
                 path: PathBuf::from("/usr/local/lib/libexec.so"),
             },
@@ -526,9 +526,9 @@ mod test {
 
     #[test]
     fn test_default_config() {
-        let result = Configuration::default();
+        let result = Main::default();
 
-        let expected = Configuration {
+        let expected = Main {
             intercept: Intercept::default(),
             output: Output::Clang {
                 transform: Transform::default(),
@@ -554,7 +554,7 @@ mod test {
             - /usr/bin/g++
         "#;
 
-        let result: serde_yml::Result<Configuration> = Configuration::from_reader(content);
+        let result: serde_yml::Result<Main> = Main::from_reader(content);
 
         assert!(result.is_err());
 
@@ -575,7 +575,7 @@ mod test {
             }
         }"#;
 
-        let result: serde_yml::Result<Configuration> = Configuration::from_reader(content);
+        let result: serde_yml::Result<Main> = Main::from_reader(content);
 
         assert!(result.is_err());
     }

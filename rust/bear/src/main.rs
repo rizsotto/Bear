@@ -33,7 +33,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 mod args;
-mod configuration;
+mod config;
 mod fixtures;
 
 /// Driver function of the application.
@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<ExitCode> {
     // Print the arguments.
     log::debug!("Arguments: {:?}", arguments);
     // Load the configuration.
-    let configuration = configuration::Configuration::load(&arguments.config)?;
+    let configuration = config::Main::load(&arguments.config)?;
     log::debug!("Configuration: {:?}", configuration);
 
     // Run the application.
@@ -69,7 +69,7 @@ enum Application {
     Intercept {
         input: args::BuildCommand,
         output: args::BuildEvents,
-        intercept_config: configuration::Intercept,
+        intercept_config: config::Intercept,
     },
     /// The semantic mode we are deduct the semantic meaning of the
     /// executed commands from the build process.
@@ -83,8 +83,8 @@ enum Application {
     All {
         input: args::BuildCommand,
         output: args::BuildSemantic,
-        intercept_config: configuration::Intercept,
-        output_config: configuration::Output,
+        intercept_config: config::Intercept,
+        output_config: config::Output,
     },
 }
 
@@ -95,12 +95,12 @@ impl Application {
     /// state that will be used by the `run` method. Trying to catch problems early before
     /// the actual execution of the application.
     fn configure(
-        arguments: args::Arguments,
-        configuration: configuration::Configuration,
+        args: args::Arguments,
+        config: config::Main,
     ) -> anyhow::Result<Self> {
-        match arguments.mode {
+        match args.mode {
             args::Mode::Intercept { input, output } => {
-                let intercept_config = configuration.intercept;
+                let intercept_config = config.intercept;
                 let result = Application::Intercept {
                     input,
                     output,
@@ -110,9 +110,9 @@ impl Application {
             }
             args::Mode::Semantic { input, output } => {
                 let event_source = EventFileReader::try_from(input)?;
-                let semantic_recognition = SemanticRecognition::try_from(&configuration)?;
-                let semantic_transform = SemanticTransform::from(&configuration.output);
-                let output_writer = OutputWriter::configure(&output, &configuration.output);
+                let semantic_recognition = SemanticRecognition::try_from(&config)?;
+                let semantic_transform = SemanticTransform::from(&config.output);
+                let output_writer = OutputWriter::configure(&output, &config.output);
                 let result = Application::Semantic {
                     event_source,
                     semantic_recognition,
@@ -122,8 +122,8 @@ impl Application {
                 Ok(result)
             }
             args::Mode::All { input, output } => {
-                let intercept_config = configuration.intercept;
-                let output_config = configuration.output;
+                let intercept_config = config.intercept;
+                let output_config = config.output;
                 let result = Application::All {
                     input,
                     output,
@@ -230,21 +230,17 @@ struct SemanticRecognition {
     tool: Box<dyn tools::Tool>,
 }
 
-impl TryFrom<&configuration::Configuration> for SemanticRecognition {
+impl TryFrom<&config::Main> for SemanticRecognition {
     type Error = anyhow::Error;
 
-    fn try_from(value: &configuration::Configuration) -> Result<Self, Self::Error> {
-        let compilers_to_include = match &value.intercept {
-            configuration::Intercept::Wrapper { executables, .. } => executables.clone(),
-            _ => {
-                vec![]
-            }
+    fn try_from(config: &config::Main) -> Result<Self, Self::Error> {
+        let compilers_to_include = match &config.intercept {
+            config::Intercept::Wrapper { executables, .. } => executables.clone(),
+            _ => vec![],
         };
-        let compilers_to_exclude = match &value.output {
-            configuration::Output::Clang { filter, .. } => filter.compilers.with_paths.clone(),
-            _ => {
-                vec![]
-            }
+        let compilers_to_exclude = match &config.output {
+            config::Output::Clang { filter, .. } => filter.compilers.with_paths.clone(),
+            _ => vec![],
         };
         let tool = tools::from(
             compilers_to_include.as_slice(),
@@ -301,10 +297,10 @@ enum SemanticTransform {
     },
 }
 
-impl From<&configuration::Output> for SemanticTransform {
-    fn from(config: &configuration::Output) -> Self {
+impl From<&config::Output> for SemanticTransform {
+    fn from(config: &config::Output) -> Self {
         match config {
-            configuration::Output::Clang { transform, .. } => {
+            config::Output::Clang { transform, .. } => {
                 if transform.arguments_to_add.is_empty() && transform.arguments_to_remove.is_empty()
                 {
                     SemanticTransform::NoTransform
@@ -315,7 +311,7 @@ impl From<&configuration::Output> for SemanticTransform {
                     }
                 }
             }
-            configuration::Output::Semantic { .. } => SemanticTransform::NoTransform,
+            config::Output::Semantic { .. } => SemanticTransform::NoTransform,
         }
     }
 }
@@ -394,21 +390,21 @@ impl SemanticTransform {
 struct OutputWriter {
     output: PathBuf,
     append: bool,
-    filter: configuration::Filter,
-    format: configuration::Format,
+    filter: config::Filter,
+    format: config::Format,
 }
 
 impl OutputWriter {
     /// Create a new instance of the output writer.
-    pub fn configure(value: &args::BuildSemantic, configuration: &configuration::Output) -> Self {
-        match configuration {
-            configuration::Output::Clang { format, filter, .. } => OutputWriter {
+    pub fn configure(value: &args::BuildSemantic, config: &config::Output) -> Self {
+        match config {
+            config::Output::Clang { format, filter, .. } => OutputWriter {
                 output: PathBuf::from(&value.file_name),
                 append: value.append,
                 filter: Self::validate_filter(filter),
                 format: format.clone(),
             },
-            configuration::Output::Semantic { .. } => {
+            config::Output::Semantic { .. } => {
                 todo!("implement this case")
             }
         }
@@ -417,7 +413,7 @@ impl OutputWriter {
     /// Validate the configuration of the output writer.
     ///
     /// Validation is always successful, but it may modify the configuration values.
-    fn validate_filter(filter: &configuration::Filter) -> configuration::Filter {
+    fn validate_filter(filter: &config::Filter) -> config::Filter {
         let mut result = filter.clone();
         result.duplicates.by_fields =
             Self::validate_duplicates_by_fields(filter.duplicates.by_fields.as_slice());
@@ -428,8 +424,8 @@ impl OutputWriter {
     ///
     /// Removes the duplicates from the list of fields.
     fn validate_duplicates_by_fields(
-        fields: &[configuration::OutputFields],
-    ) -> Vec<configuration::OutputFields> {
+        fields: &[config::OutputFields],
+    ) -> Vec<config::OutputFields> {
         fields
             .into_iter()
             .map(|field| field.clone())
@@ -515,11 +511,11 @@ impl OutputWriter {
     }
 }
 
-impl TryFrom<&configuration::Filter> for filter::EntryPredicate {
+impl TryFrom<&config::Filter> for filter::EntryPredicate {
     type Error = anyhow::Error;
 
     /// Create a filter from the configuration.
-    fn try_from(config: &configuration::Filter) -> Result<Self, Self::Error> {
+    fn try_from(config: &config::Filter) -> Result<Self, Self::Error> {
         // - Check if the source file exists
         // - Check if the source file is not in the exclude list of the configuration
         // - Check if the source file is in the include list of the configuration
@@ -550,15 +546,15 @@ impl TryFrom<&configuration::Filter> for filter::EntryPredicate {
     }
 }
 
-fn create_hash(fields: Vec<configuration::OutputFields>) -> impl Fn(&Entry) -> u64 + 'static {
+fn create_hash(fields: Vec<config::OutputFields>) -> impl Fn(&Entry) -> u64 + 'static {
     move |entry: &Entry| {
         let mut hasher = DefaultHasher::new();
         for field in &fields {
             match field {
-                configuration::OutputFields::Directory => entry.directory.hash(&mut hasher),
-                configuration::OutputFields::File => entry.file.hash(&mut hasher),
-                configuration::OutputFields::Arguments => entry.arguments.hash(&mut hasher),
-                configuration::OutputFields::Output => entry.output.hash(&mut hasher),
+                config::OutputFields::Directory => entry.directory.hash(&mut hasher),
+                config::OutputFields::File => entry.file.hash(&mut hasher),
+                config::OutputFields::Arguments => entry.arguments.hash(&mut hasher),
+                config::OutputFields::Output => entry.output.hash(&mut hasher),
             }
         }
         hasher.finish()
