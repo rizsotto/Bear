@@ -20,7 +20,6 @@ use anyhow::Context;
 use intercept::ipc::Execution;
 use json_compilation_db::Entry;
 use log;
-use semantic::events;
 use semantic::tools;
 use semantic::result;
 use serde_json::Error;
@@ -38,6 +37,7 @@ mod config;
 mod fixtures;
 mod filter;
 mod compilation;
+pub mod events;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {

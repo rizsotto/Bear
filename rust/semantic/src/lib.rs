@@ -17,7 +17,6 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod events;
-pub mod tools;
 pub mod result;
+pub mod tools;
 mod fixtures;
