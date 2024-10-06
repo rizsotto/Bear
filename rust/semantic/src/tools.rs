@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use intercept::ipc::Execution;
 use crate::{RecognitionResult, Meaning, Tool};
 use crate::tools::configured::Configured;
+use crate::tools::ignore::{IgnoreByArgs, IgnoreByPath};
 use crate::tools::unix::Unix;
 use crate::tools::wrapper::Wrapper;
 
@@ -30,24 +31,50 @@ mod wrapper;
 mod matchers;
 mod unix;
 mod gcc;
+mod ignore;
 
-pub fn from(compilers_to_recognize: &[PathBuf], compilers_to_exclude: &[PathBuf]) -> Box<dyn Tool> {
-    // Build the list of known compilers we will recognize by default.
-    let mut tools = vec![
-        Unix::new(),
-        Wrapper::new(),
-    ];
 
-    // The hinted tools should be the first to recognize.
-    if !compilers_to_recognize.is_empty() {
-        let configured = Configured::from(compilers_to_recognize);
-        tools.insert(0, configured)
+pub struct Builder {
+    tools: Vec<Box<dyn Tool>>,
+}
+
+// TODO: write unit test for this!!!
+impl Builder {
+    pub fn new() -> Self {
+        Builder { tools: vec![Unix::new(), Wrapper::new()] }
     }
-    // Excluded compiler check should be done before anything.
-    if compilers_to_exclude.is_empty() {
-        Any::new(tools)
-    } else {
-        ExcludeOr::new(&compilers_to_exclude, tools)
+
+    pub fn build(self) -> impl Tool {
+        Any::new(self.tools)
+    }
+
+    pub fn compilers_to_recognize(mut self, compilers: &[PathBuf]) -> Self {
+        if !compilers.is_empty() {
+            // Add the new compilers at the end of the tools.
+            for compiler in compilers {
+                let tool = Configured::new(compiler);
+                self.tools.push(tool);
+            }
+        }
+        self
+    }
+
+    pub fn compilers_to_exclude(mut self, compilers: &[PathBuf]) -> Self {
+        if !compilers.is_empty() {
+            // Add these new compilers at the front of the tools.
+            let tool = IgnoreByPath::new(compilers);
+            self.tools.insert(0, tool);
+        }
+        self
+    }
+
+    pub fn compilers_to_exclude_by_arguments(mut self, args: &[String]) -> Self {
+        if !args.is_empty() {
+            // Add these new compilers at the front of the tools.
+            let tool = IgnoreByArgs::new(args);
+            self.tools.insert(0, tool);
+        }
+        self
     }
 }
 
@@ -57,8 +84,8 @@ struct Any {
 }
 
 impl Any {
-    fn new(tools: Vec<Box<dyn Tool>>) -> Box<dyn Tool> {
-        Box::new(Any { tools })
+    fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
+        Any { tools }
     }
 }
 
@@ -73,37 +100,6 @@ impl Tool for Any {
             }
         }
         RecognitionResult::NotRecognized
-    }
-}
-
-
-struct ExcludeOr {
-    excludes: Vec<PathBuf>,
-    or: Box<dyn Tool>,
-}
-
-impl ExcludeOr {
-    fn new(excludes: &[PathBuf], tools: Vec<Box<dyn Tool>>) -> Box<dyn Tool> {
-        Box::new(
-            ExcludeOr {
-                // exclude the executables are explicitly mentioned in the config file.
-                excludes: Vec::from(excludes),
-                or: Any::new(tools),
-            }
-        )
-    }
-}
-
-impl Tool for ExcludeOr {
-    /// Check if the executable is on the exclude list, return as not recognized.
-    /// Otherwise delegate the recognition to the tool given.
-    fn recognize(&self, x: &Execution) -> RecognitionResult {
-        for exclude in &self.excludes {
-            if &x.executable == exclude {
-                return RecognitionResult::NotRecognized;
-            }
-        }
-        self.or.recognize(x)
     }
 }
 
@@ -168,41 +164,6 @@ mod test {
         match sut.recognize(&input) {
             RecognitionResult::Recognized(Err(_)) => assert!(true),
             _ => assert!(false),
-        }
-    }
-
-    #[test]
-    fn test_exclude_when_match() {
-        let sut = ExcludeOr {
-            excludes: vec_of_pathbuf!["/usr/bin/something"],
-            or: Box::new(MockTool::Recognize),
-        };
-
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/something"),
-            arguments: vec![],
-            working_dir: PathBuf::new(),
-            environment: HashMap::new(),
-        };
-
-        match sut.recognize(&input) {
-            RecognitionResult::NotRecognized => assert!(true),
-            _ => assert!(false)
-        }
-    }
-
-    #[test]
-    fn test_exclude_when_no_match() {
-        let sut = ExcludeOr {
-            excludes: vec_of_pathbuf!["/usr/bin/something"],
-            or: Box::new(MockTool::Recognize),
-        };
-
-        let input = any_execution();
-
-        match sut.recognize(&input) {
-            RecognitionResult::Recognized(Ok(_)) => assert!(true),
-            _ => assert!(false)
         }
     }
 

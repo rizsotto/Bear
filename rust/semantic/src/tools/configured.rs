@@ -22,7 +22,6 @@ use std::vec;
 
 use intercept::ipc::Execution;
 use crate::{RecognitionResult, CompilerPass, Meaning, Tool};
-use crate::tools::Any;
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 
@@ -33,13 +32,6 @@ pub struct Configured {
 impl Configured {
     pub fn new(compiler: &Path) -> Box<dyn Tool> {
         Box::new(Self { executable: compiler.to_path_buf() })
-    }
-
-    pub fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
-        let tools = compilers.iter()
-            .map(|compiler| Self::new(compiler.as_path()))
-            .collect();
-        Any::new(tools)
     }
 }
 

@@ -244,11 +244,17 @@ impl TryFrom<&config::Main> for SemanticRecognition {
             config::Output::Clang { filter, .. } => filter.compilers.with_paths.clone(),
             _ => vec![],
         };
-        let tool = semantic::tools::from(
-            compilers_to_include.as_slice(),
-            compilers_to_exclude.as_slice(),
-        );
-        Ok(SemanticRecognition { tool })
+        let arguments_to_exclude = match &config.output {
+            config::Output::Clang { filter, .. } => filter.compilers.with_arguments.clone(),
+            _ => vec![],
+        };
+        let tool = semantic::tools::Builder::new()
+            .compilers_to_recognize(compilers_to_include.as_slice())
+            .compilers_to_exclude(compilers_to_exclude.as_slice())
+            .compilers_to_exclude_by_arguments(arguments_to_exclude.as_slice())
+            .build();
+
+        Ok(SemanticRecognition { tool: Box::new(tool) })
     }
 }
 
