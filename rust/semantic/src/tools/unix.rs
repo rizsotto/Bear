@@ -18,12 +18,12 @@
  */
 
 use std::collections::HashSet;
-use std::path::Path;
+use std::ffi::OsString;
 
 use lazy_static::lazy_static;
 
+use super::super::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
-use crate::tools::{RecognitionResult, Meaning, Tool};
 
 pub(crate) struct Unix {}
 
@@ -35,127 +35,127 @@ impl Unix {
 
 impl Tool for Unix {
     fn recognize(&self, execution: &Execution) -> RecognitionResult {
-        let executable = execution.executable.as_path();
-        if COREUTILS_FILES.contains(executable) {
-            RecognitionResult::Recognized(Ok(Meaning::Ignored))
-        } else {
-            RecognitionResult::NotRecognized
+        if let Some(executable) = execution.executable.file_name() {
+            if COREUTILS_FILES.contains(executable) {
+                return RecognitionResult::Recognized(Ok(Meaning::Ignored));
+            }
         }
+        RecognitionResult::NotRecognized
     }
 }
 
 lazy_static! {
-    static ref COREUTILS_FILES: HashSet<&'static Path> = {
-		let files_paths = [
-			"/usr/bin/[",
-			"/usr/bin/arch",
-			"/usr/bin/b2sum",
-			"/usr/bin/base32",
-			"/usr/bin/base64",
-			"/usr/bin/basename",
-			"/usr/bin/basenc",
-			"/usr/bin/cat",
-			"/usr/bin/chcon",
-			"/usr/bin/chgrp",
-			"/usr/bin/chmod",
-			"/usr/bin/chown",
-			"/usr/bin/cksum",
-			"/usr/bin/comm",
-			"/usr/bin/cp",
-			"/usr/bin/csplit",
-			"/usr/bin/cut",
-			"/usr/bin/date",
-			"/usr/bin/dd",
-			"/usr/bin/df",
-			"/usr/bin/dir",
-			"/usr/bin/dircolors",
-			"/usr/bin/dirname",
-			"/usr/bin/du",
-			"/usr/bin/echo",
-			"/usr/bin/env",
-			"/usr/bin/expand",
-			"/usr/bin/expr",
-			"/usr/bin/factor",
-			"/usr/bin/false",
-			"/usr/bin/fmt",
-			"/usr/bin/fold",
-			"/usr/bin/groups",
-			"/usr/bin/head",
-			"/usr/bin/hostid",
-			"/usr/bin/id",
-			"/usr/bin/install",
-			"/usr/bin/join",
-			"/usr/bin/link",
-			"/usr/bin/ln",
-			"/usr/bin/logname",
-			"/usr/bin/ls",
-			"/usr/bin/md5sum",
-			"/usr/bin/mkdir",
-			"/usr/bin/mkfifo",
-			"/usr/bin/mknod",
-			"/usr/bin/mktemp",
-			"/usr/bin/mv",
-			"/usr/bin/nice",
-			"/usr/bin/nl",
-			"/usr/bin/nohup",
-			"/usr/bin/nproc",
-			"/usr/bin/numfmt",
-			"/usr/bin/od",
-			"/usr/bin/paste",
-			"/usr/bin/pathchk",
-			"/usr/bin/pinky",
-			"/usr/bin/pr",
-			"/usr/bin/printenv",
-			"/usr/bin/printf",
-			"/usr/bin/ptx",
-			"/usr/bin/pwd",
-			"/usr/bin/readlink",
-			"/usr/bin/realpath",
-			"/usr/bin/rm",
-			"/usr/bin/rmdir",
-			"/usr/bin/runcon",
-			"/usr/bin/seq",
-			"/usr/bin/sha1sum",
-			"/usr/bin/sha224sum",
-			"/usr/bin/sha256sum",
-			"/usr/bin/sha384sum",
-			"/usr/bin/sha512sum",
-			"/usr/bin/shred",
-			"/usr/bin/shuf",
-			"/usr/bin/sleep",
-			"/usr/bin/sort",
-			"/usr/bin/split",
-			"/usr/bin/stat",
-			"/usr/bin/stdbuf",
-			"/usr/bin/stty",
-			"/usr/bin/sum",
-			"/usr/bin/sync",
-			"/usr/bin/tac",
-			"/usr/bin/tail",
-			"/usr/bin/tee",
-			"/usr/bin/test",
-			"/usr/bin/timeout",
-			"/usr/bin/touch",
-			"/usr/bin/tr",
-			"/usr/bin/true",
-			"/usr/bin/truncate",
-			"/usr/bin/tsort",
-			"/usr/bin/tty",
-			"/usr/bin/uname",
-			"/usr/bin/unexpand",
-			"/usr/bin/uniq",
-			"/usr/bin/unlink",
-			"/usr/bin/users",
-			"/usr/bin/vdir",
-			"/usr/bin/wc",
-			"/usr/bin/who",
-			"/usr/bin/whoami",
-			"/usr/bin/yes",
-			"/usr/bin/make",
-			"/usr/bin/gmake",
-		]
-			.iter()
-			.map(Path::new);
+    static ref COREUTILS_FILES: HashSet<OsString> = {
+        let files_paths = [
+            "[",
+            "arch",
+            "b2sum",
+            "base32",
+            "base64",
+            "basename",
+            "basenc",
+            "cat",
+            "chcon",
+            "chgrp",
+            "chmod",
+            "chown",
+            "cksum",
+            "comm",
+            "cp",
+            "csplit",
+            "cut",
+            "date",
+            "dd",
+            "df",
+            "dir",
+            "dircolors",
+            "dirname",
+            "du",
+            "echo",
+            "env",
+            "expand",
+            "expr",
+            "factor",
+            "false",
+            "fmt",
+            "fold",
+            "groups",
+            "head",
+            "hostid",
+            "id",
+            "install",
+            "join",
+            "link",
+            "ln",
+            "logname",
+            "ls",
+            "md5sum",
+            "mkdir",
+            "mkfifo",
+            "mknod",
+            "mktemp",
+            "mv",
+            "nice",
+            "nl",
+            "nohup",
+            "nproc",
+            "numfmt",
+            "od",
+            "paste",
+            "pathchk",
+            "pinky",
+            "pr",
+            "printenv",
+            "printf",
+            "ptx",
+            "pwd",
+            "readlink",
+            "realpath",
+            "rm",
+            "rmdir",
+            "runcon",
+            "seq",
+            "sha1sum",
+            "sha224sum",
+            "sha256sum",
+            "sha384sum",
+            "sha512sum",
+            "shred",
+            "shuf",
+            "sleep",
+            "sort",
+            "split",
+            "stat",
+            "stdbuf",
+            "stty",
+            "sum",
+            "sync",
+            "tac",
+            "tail",
+            "tee",
+            "test",
+            "timeout",
+            "touch",
+            "tr",
+            "true",
+            "truncate",
+            "tsort",
+            "tty",
+            "uname",
+            "unexpand",
+            "uniq",
+            "unlink",
+            "users",
+            "vdir",
+            "wc",
+            "who",
+            "whoami",
+            "yes",
+            "make",
+            "gmake",
+        ]
+        .iter()
+        .map(OsString::from);
 
         HashSet::from_iter(files_paths)
     };
@@ -163,14 +163,14 @@ lazy_static! {
 
 #[cfg(test)]
 mod test {
-	use std::collections::HashMap;
-	use std::path::PathBuf;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
 
-	use crate::vec_of_strings;
+    use crate::vec_of_strings;
 
-	use super::*;
+    use super::*;
 
-	#[test]
+    #[test]
     fn test_unix_tools_are_recognized() {
         let input = Execution {
             executable: PathBuf::from("/usr/bin/ls"),
@@ -179,13 +179,25 @@ mod test {
             environment: HashMap::new(),
         };
 
-		assert_eq!(
+        assert_eq!(
             RecognitionResult::Recognized(Ok(Meaning::Ignored)),
             SUT.recognize(&input)
-		)
+        )
     }
 
-	lazy_static! {
+    #[test]
+    fn test_not_known_executables_are_not_recognized() {
+        let input = Execution {
+            executable: PathBuf::from("/usr/bin/bear"),
+            arguments: vec_of_strings!["bear", "--", "make"],
+            working_dir: PathBuf::from("/home/user"),
+            environment: HashMap::new(),
+        };
+
+        assert_eq!(RecognitionResult::NotRecognized, SUT.recognize(&input))
+    }
+
+    lazy_static! {
         static ref SUT: Unix = Unix {};
     }
 }

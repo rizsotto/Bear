@@ -21,9 +21,9 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
+use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
+use super::gcc::internal::Argument;
 use intercept::ipc::Execution;
-use crate::tools::{RecognitionResult, Meaning, Tool};
-use crate::tools::gcc::internal::Argument;
 
 pub(crate) struct Gcc {}
 
@@ -46,15 +46,11 @@ impl Tool for Gcc {
                 let flags = result.1;
                 let passes = Argument::passes(flags.as_slice());
 
-                RecognitionResult::Recognized(
-                    Ok(
-                        Meaning::Compiler {
-                            compiler: execution.executable.clone(),
-                            working_dir: execution.working_dir.clone(),
-                            passes,
-                        }
-                    )
-                )
+                RecognitionResult::Recognized(Ok(Meaning::Compiler {
+                    compiler: execution.executable.clone(),
+                    working_dir: execution.working_dir.clone(),
+                    passes,
+                }))
             }
             Err(error) => {
                 log::debug!("Gcc failed to parse it: {error}.");
@@ -65,13 +61,13 @@ impl Tool for Gcc {
 }
 
 mod internal {
-    use std::path::PathBuf;
     use lazy_static::lazy_static;
     use nom::{error::ErrorKind, IResult};
     use regex::Regex;
+    use std::path::PathBuf;
 
-    use crate::CompilerPass;
     use crate::tools::matchers::source::looks_like_a_source_file;
+    use crate::CompilerPass;
 
     #[derive(Debug, PartialEq)]
     enum Language {
@@ -125,23 +121,27 @@ mod internal {
 
             for flag in flags {
                 match flag.meaning {
-                    Meaning::ControlKindOfOutput { stop_before: Some(Pass::Compiler) } => {
+                    Meaning::ControlKindOfOutput {
+                        stop_before: Some(Pass::Compiler),
+                    } => {
                         pass = Pass::Preprocessor;
                         args.extend(flag.arguments.into_iter().map(String::to_owned));
                     }
-                    Meaning::ControlKindOfOutput { stop_before: Some(Pass::Linker) } => {
+                    Meaning::ControlKindOfOutput {
+                        stop_before: Some(Pass::Linker),
+                    } => {
                         pass = Pass::Compiler;
                         args.extend(flag.arguments.into_iter().map(String::to_owned));
                     }
-                    Meaning::ControlKindOfOutput { .. } |
-                    Meaning::ControlLanguage(_) |
-                    Meaning::ControlPass(Pass::Preprocessor) |
-                    Meaning::ControlPass(Pass::Compiler) |
-                    Meaning::Diagnostic |
-                    Meaning::Debug |
-                    Meaning::Optimize |
-                    Meaning::Instrumentation |
-                    Meaning::DirectorySearch(None) => {
+                    Meaning::ControlKindOfOutput { .. }
+                    | Meaning::ControlLanguage(_)
+                    | Meaning::ControlPass(Pass::Preprocessor)
+                    | Meaning::ControlPass(Pass::Compiler)
+                    | Meaning::Diagnostic
+                    | Meaning::Debug
+                    | Meaning::Optimize
+                    | Meaning::Instrumentation
+                    | Meaning::DirectorySearch(None) => {
                         args.extend(flag.arguments.into_iter().map(String::to_owned));
                     }
                     Meaning::Input(_) => {
@@ -163,18 +163,14 @@ mod internal {
                 Pass::Preprocessor => {
                     vec![CompilerPass::Preprocess]
                 }
-                Pass::Compiler |
-                Pass::Linker => {
-                    inputs.into_iter()
-                        .map(|source| {
-                            CompilerPass::Compile {
-                                source: PathBuf::from(source),
-                                output: output.as_ref().map(PathBuf::from),
-                                flags: args.clone(),
-                            }
-                        })
-                        .collect()
-                }
+                Pass::Compiler | Pass::Linker => inputs
+                    .into_iter()
+                    .map(|source| CompilerPass::Compile {
+                        source: PathBuf::from(source),
+                        output: output.as_ref().map(PathBuf::from),
+                        flags: args.clone(),
+                    })
+                    .collect(),
             }
         }
     }
@@ -183,7 +179,13 @@ mod internal {
         let candidate = &i[0];
         if COMPILER_REGEX.is_match(candidate) {
             const MEANING: Meaning = Meaning::Compiler;
-            Ok((&i[1..], Argument { arguments: &i[..0], meaning: MEANING }))
+            Ok((
+                &i[1..],
+                Argument {
+                    arguments: &i[..0],
+                    meaning: MEANING,
+                },
+            ))
         } else {
             // Declare it as a non-recoverable error, so argument processing will stop after this.
             Err(nom::Err::Failure(nom::error::Error::new(i, ErrorKind::Tag)))
@@ -194,7 +196,13 @@ mod internal {
         let candidate = &i[0];
         if looks_like_a_source_file(candidate.as_str()) {
             const MEANING: Meaning = Meaning::Input(Pass::Preprocessor);
-            Ok((&i[1..], Argument { arguments: &i[..0], meaning: MEANING }))
+            Ok((
+                &i[1..],
+                Argument {
+                    arguments: &i[..0],
+                    meaning: MEANING,
+                },
+            ))
         } else {
             Err(nom::Err::Error(nom::error::Error::new(i, ErrorKind::Tag)))
         }

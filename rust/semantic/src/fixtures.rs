@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod fixtures {
     #[macro_export]

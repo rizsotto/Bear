@@ -19,10 +19,9 @@
 
 use std::path::PathBuf;
 
+use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
+use super::matchers::source::looks_like_a_source_file;
 use intercept::ipc::Execution;
-use crate::{CompilerPass, RecognitionResult, Meaning, Tool};
-use crate::tools::matchers::source::looks_like_a_source_file;
-use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 
 pub(crate) struct Wrapper {}
 
@@ -49,28 +48,23 @@ impl Tool for Wrapper {
             }
 
             if sources.is_empty() {
-                Recognized(Err(String::from("source file is not found")))
+                RecognitionResult::Recognized(Err(String::from("source file is not found")))
             } else {
-                Recognized(
-                    Ok(
-                        Meaning::Compiler {
-                            compiler: x.executable.clone(),
-                            working_dir: x.working_dir.clone(),
-                            passes: sources.iter()
-                                .map(|source| {
-                                    CompilerPass::Compile {
-                                        source: source.clone(),
-                                        output: None,
-                                        flags: flags.clone(),
-                                    }
-                                })
-                                .collect(),
-                        }
-                    )
-                )
+                RecognitionResult::Recognized(Ok(Meaning::Compiler {
+                    compiler: x.executable.clone(),
+                    working_dir: x.working_dir.clone(),
+                    passes: sources
+                        .iter()
+                        .map(|source| CompilerPass::Compile {
+                            source: source.clone(),
+                            output: None,
+                            flags: flags.clone(),
+                        })
+                        .collect(),
+                }))
             }
         } else {
-            NotRecognized
+            RecognitionResult::NotRecognized
         }
     }
 }

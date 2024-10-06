@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::collections::HashSet;
 use lazy_static::lazy_static;
+use std::collections::HashSet;
 
 #[cfg(target_family = "unix")]
 pub fn looks_like_a_source_file(argument: &str) -> bool {

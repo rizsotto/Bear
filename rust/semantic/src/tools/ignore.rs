@@ -17,10 +17,9 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
+use super::super::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
-use crate::{RecognitionResult, Meaning, Tool};
-
+use std::path::PathBuf;
 
 pub struct IgnoreByPath {
     executables: Vec<PathBuf>,
@@ -28,9 +27,7 @@ pub struct IgnoreByPath {
 
 impl IgnoreByPath {
     pub fn new(compilers: &[PathBuf]) -> Box<dyn Tool> {
-        let executables = compilers.iter()
-            .map(|compiler| compiler.clone())
-            .collect();
+        let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
         Box::new(Self { executables })
     }
 }
@@ -45,7 +42,6 @@ impl Tool for IgnoreByPath {
     }
 }
 
-
 pub struct IgnoreByArgs {
     args: Vec<String>,
 }
@@ -59,7 +55,11 @@ impl IgnoreByArgs {
 
 impl Tool for IgnoreByArgs {
     fn recognize(&self, execution: &Execution) -> RecognitionResult {
-        if execution.arguments.iter().any(|arg| self.args.contains(arg)) {
+        if execution
+            .arguments
+            .iter()
+            .any(|arg| self.args.contains(arg))
+        {
             RecognitionResult::Recognized(Ok(Meaning::Ignored))
         } else {
             RecognitionResult::NotRecognized

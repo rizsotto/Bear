@@ -17,11 +17,11 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub mod tools;
 mod fixtures;
+pub mod tools;
 
-use std::path::PathBuf;
 use intercept::ipc::Execution;
+use std::path::PathBuf;
 
 /// Represents a semantic recognition result.
 #[derive(Debug, PartialEq)]

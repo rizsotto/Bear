@@ -19,20 +19,19 @@
 
 use std::path::PathBuf;
 
+use super::tools::configured::Configured;
+use super::tools::ignore::{IgnoreByArgs, IgnoreByPath};
+use super::tools::unix::Unix;
+use super::tools::wrapper::Wrapper;
+use super::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
-use crate::{RecognitionResult, Meaning, Tool};
-use crate::tools::configured::Configured;
-use crate::tools::ignore::{IgnoreByArgs, IgnoreByPath};
-use crate::tools::unix::Unix;
-use crate::tools::wrapper::Wrapper;
 
 mod configured;
-mod wrapper;
-mod matchers;
-mod unix;
 mod gcc;
 mod ignore;
-
+mod matchers;
+mod unix;
+mod wrapper;
 
 pub struct Builder {
     tools: Vec<Box<dyn Tool>>,
@@ -41,7 +40,9 @@ pub struct Builder {
 // TODO: write unit test for this!!!
 impl Builder {
     pub fn new() -> Self {
-        Builder { tools: vec![Unix::new(), Wrapper::new()] }
+        Builder {
+            tools: vec![Unix::new(), Wrapper::new()],
+        }
     }
 
     pub fn build(self) -> impl Tool {
@@ -78,7 +79,6 @@ impl Builder {
     }
 }
 
-
 struct Any {
     tools: Vec<Box<dyn Tool>>,
 }
@@ -94,8 +94,9 @@ impl Tool for Any {
     fn recognize(&self, x: &Execution) -> RecognitionResult {
         for tool in &self.tools {
             match tool.recognize(x) {
-                RecognitionResult::Recognized(result) =>
-                    return RecognitionResult::Recognized(result),
+                RecognitionResult::Recognized(result) => {
+                    return RecognitionResult::Recognized(result)
+                }
                 _ => continue,
             }
         }
@@ -119,7 +120,7 @@ mod test {
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::NotRecognize),
-            ]
+            ],
         };
 
         let input = any_execution();
@@ -137,14 +138,14 @@ mod test {
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::Recognize),
                 Box::new(MockTool::NotRecognize),
-            ]
+            ],
         };
 
         let input = any_execution();
 
         match sut.recognize(&input) {
             RecognitionResult::Recognized(Ok(_)) => assert!(true),
-            _ => assert!(false)
+            _ => assert!(false),
         }
     }
 
@@ -156,7 +157,7 @@ mod test {
                 Box::new(MockTool::RecognizeFailed),
                 Box::new(MockTool::Recognize),
                 Box::new(MockTool::NotRecognize),
-            ]
+            ],
         };
 
         let input = any_execution();
@@ -176,12 +177,11 @@ mod test {
     impl Tool for MockTool {
         fn recognize(&self, _: &Execution) -> RecognitionResult {
             match self {
-                MockTool::Recognize =>
-                    RecognitionResult::Recognized(Ok(Meaning::Ignored)),
-                MockTool::RecognizeFailed =>
-                    RecognitionResult::Recognized(Err(String::from("problem"))),
-                MockTool::NotRecognize =>
-                    RecognitionResult::NotRecognized,
+                MockTool::Recognize => RecognitionResult::Recognized(Ok(Meaning::Ignored)),
+                MockTool::RecognizeFailed => {
+                    RecognitionResult::Recognized(Err(String::from("problem")))
+                }
+                MockTool::NotRecognize => RecognitionResult::NotRecognized,
             }
         }
     }
