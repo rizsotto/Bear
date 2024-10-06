@@ -21,8 +21,8 @@ use std::path::{Path, PathBuf};
 use std::vec;
 
 use intercept::ipc::Execution;
-use crate::result::{CompilerPass, Semantic};
-use crate::tools::{Any, RecognitionResult, Tool};
+use crate::{RecognitionResult, CompilerPass, Meaning, Tool};
+use crate::tools::Any;
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 
@@ -64,7 +64,7 @@ impl Tool for Configured {
             } else {
                 Recognized(
                     Ok(
-                        Semantic::Compiler {
+                        Meaning::Compiler {
                             compiler: x.executable.clone(),
                             working_dir: x.working_dir.clone(),
                             passes: sources.iter()
@@ -105,7 +105,7 @@ mod test {
             environment: HashMap::new(),
         };
 
-        let expected = Semantic::Compiler {
+        let expected = Meaning::Compiler {
             compiler: PathBuf::from("/usr/bin/something"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![

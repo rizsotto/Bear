@@ -23,11 +23,11 @@ use anyhow::{anyhow, Result};
 use json_compilation_db::Entry;
 use path_absolutize::Absolutize;
 
-use crate::result::{CompilerPass, Semantic};
+use semantic::{CompilerPass, Meaning};
 
-pub fn into_entries(value: Semantic) -> Result<Vec<Entry>, anyhow::Error> {
+pub fn into_entries(value: Meaning) -> Result<Vec<Entry>, anyhow::Error> {
     match value {
-        Semantic::Compiler { compiler, working_dir, passes } => {
+        Meaning::Compiler { compiler, working_dir, passes } => {
             let entries = passes.iter()
                 .flat_map(|pass| -> Result<Entry, anyhow::Error> {
                     match pass {
@@ -103,10 +103,10 @@ mod test {
     fn test_non_compilations() -> Result<()> {
         let empty: Vec<Entry> = vec![];
 
-        let result: Vec<Entry> = into_entries(Semantic::Ignored)?;
+        let result: Vec<Entry> = into_entries(Meaning::Ignored)?;
         assert_eq!(empty, result);
 
-        let input = Semantic::Compiler {
+        let input = Meaning::Compiler {
             compiler: PathBuf::from("/usr/bin/cc"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![],
@@ -119,7 +119,7 @@ mod test {
 
     #[test]
     fn test_single_source_compilation() -> Result<()> {
-        let input = Semantic::Compiler {
+        let input = Meaning::Compiler {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![
@@ -149,7 +149,7 @@ mod test {
 
     #[test]
     fn test_multiple_sources_compilation() -> Result<()> {
-        let input = Semantic::Compiler {
+        let input = Meaning::Compiler {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![

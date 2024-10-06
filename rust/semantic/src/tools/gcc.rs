@@ -22,7 +22,7 @@ use nom::multi::many1;
 use nom::sequence::preceded;
 
 use intercept::ipc::Execution;
-use crate::tools::{RecognitionResult, Semantic, Tool};
+use crate::tools::{RecognitionResult, Meaning, Tool};
 use crate::tools::gcc::internal::Argument;
 
 pub(crate) struct Gcc {}
@@ -48,7 +48,7 @@ impl Tool for Gcc {
 
                 RecognitionResult::Recognized(
                     Ok(
-                        Semantic::Compiler {
+                        Meaning::Compiler {
                             compiler: execution.executable.clone(),
                             working_dir: execution.working_dir.clone(),
                             passes,
@@ -70,7 +70,7 @@ mod internal {
     use nom::{error::ErrorKind, IResult};
     use regex::Regex;
 
-    use crate::result::CompilerPass;
+    use crate::CompilerPass;
     use crate::tools::matchers::source::looks_like_a_source_file;
 
     #[derive(Debug, PartialEq)]

@@ -20,8 +20,7 @@
 use std::path::PathBuf;
 
 use intercept::ipc::Execution;
-use crate::result::{CompilerPass, RecognitionResult, Semantic};
-use crate::tools::Tool;
+use crate::{CompilerPass, RecognitionResult, Meaning, Tool};
 use crate::tools::matchers::source::looks_like_a_source_file;
 use crate::tools::RecognitionResult::{NotRecognized, Recognized};
 
@@ -54,7 +53,7 @@ impl Tool for Wrapper {
             } else {
                 Recognized(
                     Ok(
-                        Semantic::Compiler {
+                        Meaning::Compiler {
                             compiler: x.executable.clone(),
                             working_dir: x.working_dir.clone(),
                             passes: sources.iter()

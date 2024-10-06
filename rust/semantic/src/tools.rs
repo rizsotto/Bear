@@ -20,7 +20,7 @@
 use std::path::PathBuf;
 
 use intercept::ipc::Execution;
-use crate::result::{RecognitionResult, Semantic};
+use crate::{RecognitionResult, Meaning, Tool};
 use crate::tools::configured::Configured;
 use crate::tools::unix::Unix;
 use crate::tools::wrapper::Wrapper;
@@ -30,13 +30,6 @@ mod wrapper;
 mod matchers;
 mod unix;
 mod gcc;
-
-/// This abstraction is representing a tool which is known by us.
-pub trait Tool: Send {
-    /// A tool has a potential to recognize a command execution and identify
-    /// the semantic of that command.
-    fn recognize(&self, _: &Execution) -> RecognitionResult;
-}
 
 pub fn from(compilers_to_recognize: &[PathBuf], compilers_to_exclude: &[PathBuf]) -> Box<dyn Tool> {
     // Build the list of known compilers we will recognize by default.
@@ -119,7 +112,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use crate::{result, vec_of_pathbuf};
+    use crate::vec_of_pathbuf;
 
     use super::*;
 
@@ -223,7 +216,7 @@ mod test {
         fn recognize(&self, _: &Execution) -> RecognitionResult {
             match self {
                 MockTool::Recognize =>
-                    RecognitionResult::Recognized(Ok(Semantic::Ignored)),
+                    RecognitionResult::Recognized(Ok(Meaning::Ignored)),
                 MockTool::RecognizeFailed =>
                     RecognitionResult::Recognized(Err(String::from("problem"))),
                 MockTool::NotRecognize =>

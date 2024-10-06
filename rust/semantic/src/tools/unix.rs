@@ -23,7 +23,7 @@ use std::path::Path;
 use lazy_static::lazy_static;
 
 use intercept::ipc::Execution;
-use crate::tools::{RecognitionResult, Semantic, Tool};
+use crate::tools::{RecognitionResult, Meaning, Tool};
 
 pub(crate) struct Unix {}
 
@@ -37,7 +37,7 @@ impl Tool for Unix {
     fn recognize(&self, execution: &Execution) -> RecognitionResult {
         let executable = execution.executable.as_path();
         if COREUTILS_FILES.contains(executable) {
-            RecognitionResult::Recognized(Ok(Semantic::Ignored))
+            RecognitionResult::Recognized(Ok(Meaning::Ignored))
         } else {
             RecognitionResult::NotRecognized
         }
@@ -180,8 +180,8 @@ mod test {
         };
 
 		assert_eq!(
-			RecognitionResult::Recognized(Ok(Semantic::Ignored)),
-			SUT.recognize(&input)
+            RecognitionResult::Recognized(Ok(Meaning::Ignored)),
+            SUT.recognize(&input)
 		)
     }
 

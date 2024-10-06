@@ -20,8 +20,7 @@ use anyhow::Context;
 use intercept::ipc::Execution;
 use json_compilation_db::Entry;
 use log;
-use semantic::tools;
-use semantic::result;
+use semantic;
 use serde_json::Error;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashSet;
@@ -230,7 +229,7 @@ impl EventFileReader {
 /// The recognition logic is implemented in the `tools` module. Here we only handle
 /// the errors and logging them to the console.
 struct SemanticRecognition {
-    tool: Box<dyn tools::Tool>,
+    tool: Box<dyn semantic::Tool>,
 }
 
 impl TryFrom<&config::Main> for SemanticRecognition {
@@ -245,7 +244,7 @@ impl TryFrom<&config::Main> for SemanticRecognition {
             config::Output::Clang { filter, .. } => filter.compilers.with_paths.clone(),
             _ => vec![],
         };
-        let tool = tools::from(
+        let tool = semantic::tools::from(
             compilers_to_include.as_slice(),
             compilers_to_exclude.as_slice(),
         );
@@ -254,13 +253,13 @@ impl TryFrom<&config::Main> for SemanticRecognition {
 }
 
 impl SemanticRecognition {
-    fn recognize(&self, execution: Execution) -> Option<result::Semantic> {
+    fn recognize(&self, execution: Execution) -> Option<semantic::Meaning> {
         match self.tool.recognize(&execution) {
-            result::RecognitionResult::Recognized(Ok(result::Semantic::Ignored)) => {
+            semantic::RecognitionResult::Recognized(Ok(semantic::Meaning::Ignored)) => {
                 log::debug!("execution recognized, but ignored: {:?}", execution);
                 None
             }
-            result::RecognitionResult::Recognized(Ok(semantic)) => {
+            semantic::RecognitionResult::Recognized(Ok(semantic)) => {
                 log::debug!(
                     "execution recognized as compiler call, {:?} : {:?}",
                     semantic,
@@ -268,7 +267,7 @@ impl SemanticRecognition {
                 );
                 Some(semantic)
             }
-            result::RecognitionResult::Recognized(Err(reason)) => {
+            semantic::RecognitionResult::Recognized(Err(reason)) => {
                 log::debug!(
                     "execution recognized with failure, {:?} : {:?}",
                     reason,
@@ -276,7 +275,7 @@ impl SemanticRecognition {
                 );
                 None
             }
-            result::RecognitionResult::NotRecognized => {
+            semantic::RecognitionResult::NotRecognized => {
                 log::debug!("execution not recognized: {:?}", execution);
                 None
             }
@@ -316,7 +315,7 @@ impl From<&config::Output> for SemanticTransform {
 }
 
 impl SemanticTransform {
-    fn into_entries(&self, semantic: result::Semantic) -> Vec<Entry> {
+    fn into_entries(&self, semantic: semantic::Meaning) -> Vec<Entry> {
         let transformed = self.transform_semantic(semantic);
         let entries: Result<Vec<Entry>, anyhow::Error> = into_entries(transformed);
         entries.unwrap_or_else(|error| {
@@ -328,9 +327,9 @@ impl SemanticTransform {
         })
     }
 
-    fn transform_semantic(&self, input: result::Semantic) -> result::Semantic {
+    fn transform_semantic(&self, input: semantic::Meaning) -> semantic::Meaning {
         match input {
-            result::Semantic::Compiler {
+            semantic::Meaning::Compiler {
                 compiler,
                 working_dir,
                 passes,
@@ -340,7 +339,7 @@ impl SemanticTransform {
                     .map(|pass| self.transform_pass(pass))
                     .collect();
 
-                result::Semantic::Compiler {
+                semantic::Meaning::Compiler {
                     compiler,
                     working_dir,
                     passes: passes_transformed,
@@ -350,9 +349,9 @@ impl SemanticTransform {
         }
     }
 
-    fn transform_pass(&self, pass: result::CompilerPass) -> result::CompilerPass {
+    fn transform_pass(&self, pass: semantic::CompilerPass) -> semantic::CompilerPass {
         match pass {
-            result::CompilerPass::Compile {
+            semantic::CompilerPass::Compile {
                 source,
                 output,
                 flags,
@@ -366,7 +365,7 @@ impl SemanticTransform {
                         .filter(|flag| !arguments_to_remove.contains(flag))
                         .chain(arguments_to_add.iter().cloned())
                         .collect();
-                    result::CompilerPass::Compile {
+                    semantic::CompilerPass::Compile {
                         source,
                         output,
                         flags: flags_transformed,
