@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use super::super::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
 
+/// A tool to ignore a command execution by executable name.
 pub struct IgnoreByPath {
     executables: HashSet<PathBuf>,
 }
@@ -39,6 +40,7 @@ impl IgnoreByPath {
     }
 }
 
+/// A tool to ignore a command execution by arguments.
 impl Tool for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> RecognitionResult {
         if self.executables.contains(&execution.executable) {
@@ -193,7 +195,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_unix_tools_are_recognized() {
+    fn test_executions_are_ignored_by_executable_name() {
         let input = Execution {
             executable: PathBuf::from("/usr/bin/ls"),
             arguments: vec_of_strings!["ls", "/home/user/build"],
@@ -221,5 +223,20 @@ mod test {
         assert_eq!(RecognitionResult::NotRecognized, sut.recognize(&input))
     }
 
-    // TODO: implement test cases for args
+    #[test]
+    fn test_executions_are_ignored_by_args() {
+        let input = Execution {
+            executable: PathBuf::from("/usr/bin/ls"),
+            arguments: vec_of_strings!["ls", "-l", "/home/user/build"],
+            working_dir: PathBuf::from("/home/user"),
+            environment: HashMap::new(),
+        };
+        // let sut = IgnoreByArgs::new(&["-l".to_string()]);
+        let sut = IgnoreByArgs::new(&vec_of_strings!("-l"));
+
+        assert_eq!(
+            RecognitionResult::Recognized(Ok(Meaning::Ignored)),
+            sut.recognize(&input)
+        )
+    }
 }

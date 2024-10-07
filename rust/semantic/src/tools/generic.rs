@@ -16,30 +16,33 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 use std::vec;
 
 use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
 use super::matchers::source::looks_like_a_source_file;
 use intercept::ipc::Execution;
 
+/// A tool to recognize a compiler by executable name.
 pub struct Generic {
-    pub executable: PathBuf,
+    executables: HashSet<PathBuf>,
 }
 
 impl Generic {
-    pub fn new(compiler: &Path) -> Box<dyn Tool> {
-        Box::new(Self {
-            executable: compiler.to_path_buf(),
-        })
+    pub fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+        let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
+        Box::new(Self { executables })
     }
 }
 
 impl Tool for Generic {
-    /// Any of the tool recognize the semantic, will be returned as result.
+    /// This tool is a naive implementation only considering:
+    /// - the executable name,
+    /// - one of the arguments is a source file,
+    /// - the rest of the arguments are flags.
     fn recognize(&self, x: &Execution) -> RecognitionResult {
-        if x.executable == self.executable {
+        if self.executables.contains(&x.executable) {
             let mut flags = vec![];
             let mut sources = vec![];
 
@@ -80,7 +83,7 @@ mod test {
 
     use lazy_static::lazy_static;
 
-    use crate::vec_of_strings;
+    use crate::{vec_of_pathbuf, vec_of_strings};
 
     use super::*;
 
@@ -145,7 +148,7 @@ mod test {
 
     lazy_static! {
         static ref SUT: Generic = Generic {
-            executable: PathBuf::from("/usr/bin/something"),
+            executables: vec_of_pathbuf!["/usr/bin/something"].into_iter().collect()
         };
     }
 }
