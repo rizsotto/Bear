@@ -21,14 +21,14 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
+use super::super::{Meaning, RecognitionResult, Tool};
 use super::gcc::internal::Argument;
 use intercept::ipc::Execution;
 
-pub(crate) struct Gcc {}
+pub struct Gcc {}
 
 impl Gcc {
-    pub(crate) fn new() -> Box<dyn Tool> {
+    pub fn new() -> Box<dyn Tool> {
         Box::new(Gcc {})
     }
 }
@@ -42,7 +42,7 @@ impl Tool for Gcc {
 
         match parser(execution.arguments.as_slice()) {
             Ok(result) => {
-                // todo: append flags from environment
+                // TODO: append flags from environment
                 let flags = result.1;
                 let passes = Argument::passes(flags.as_slice());
 

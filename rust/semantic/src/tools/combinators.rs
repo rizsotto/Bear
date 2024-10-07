@@ -17,74 +17,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::path::PathBuf;
-
-use super::tools::configured::Configured;
-use super::tools::ignore::{IgnoreByArgs, IgnoreByPath};
-use super::tools::unix::Unix;
-use super::tools::wrapper::Wrapper;
-use super::{Meaning, RecognitionResult, Tool};
+use crate::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
 
-mod configured;
-mod gcc;
-mod ignore;
-mod matchers;
-mod unix;
-mod wrapper;
-
-pub struct Builder {
-    tools: Vec<Box<dyn Tool>>,
-}
-
-// TODO: write unit test for this!!!
-impl Builder {
-    pub fn new() -> Self {
-        Builder {
-            tools: vec![Unix::new(), Wrapper::new()],
-        }
-    }
-
-    pub fn build(self) -> impl Tool {
-        Any::new(self.tools)
-    }
-
-    pub fn compilers_to_recognize(mut self, compilers: &[PathBuf]) -> Self {
-        if !compilers.is_empty() {
-            // Add the new compilers at the end of the tools.
-            for compiler in compilers {
-                let tool = Configured::new(compiler);
-                self.tools.push(tool);
-            }
-        }
-        self
-    }
-
-    pub fn compilers_to_exclude(mut self, compilers: &[PathBuf]) -> Self {
-        if !compilers.is_empty() {
-            // Add these new compilers at the front of the tools.
-            let tool = IgnoreByPath::new(compilers);
-            self.tools.insert(0, tool);
-        }
-        self
-    }
-
-    pub fn compilers_to_exclude_by_arguments(mut self, args: &[String]) -> Self {
-        if !args.is_empty() {
-            // Add these new compilers at the front of the tools.
-            let tool = IgnoreByArgs::new(args);
-            self.tools.insert(0, tool);
-        }
-        self
-    }
-}
-
-struct Any {
+pub struct Any {
     tools: Vec<Box<dyn Tool>>,
 }
 
 impl Any {
-    fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
+    pub fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
         Any { tools }
     }
 }
@@ -108,8 +49,6 @@ impl Tool for Any {
 mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
-
-    use crate::vec_of_pathbuf;
 
     use super::*;
 

@@ -24,11 +24,11 @@ use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
 use super::matchers::source::looks_like_a_source_file;
 use intercept::ipc::Execution;
 
-pub struct Configured {
+pub struct Generic {
     pub executable: PathBuf,
 }
 
-impl Configured {
+impl Generic {
     pub fn new(compiler: &Path) -> Box<dyn Tool> {
         Box::new(Self {
             executable: compiler.to_path_buf(),
@@ -36,7 +36,7 @@ impl Configured {
     }
 }
 
-impl Tool for Configured {
+impl Tool for Generic {
     /// Any of the tool recognize the semantic, will be returned as result.
     fn recognize(&self, x: &Execution) -> RecognitionResult {
         if x.executable == self.executable {
@@ -144,7 +144,7 @@ mod test {
     }
 
     lazy_static! {
-        static ref SUT: Configured = Configured {
+        static ref SUT: Generic = Generic {
             executable: PathBuf::from("/usr/bin/something"),
         };
     }
