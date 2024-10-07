@@ -20,6 +20,9 @@
 use crate::{Meaning, RecognitionResult, Tool};
 use intercept::ipc::Execution;
 
+/// Represents a set of tools, where any of them can recognize the semantic.
+/// The evaluation is done in the order of the tools. The first one which
+/// recognizes the semantic will be returned as result.
 pub struct Any {
     tools: Vec<Box<dyn Tool>>,
 }
@@ -31,7 +34,6 @@ impl Any {
 }
 
 impl Tool for Any {
-    /// Any of the tool recognize the semantic, will be returned as result.
     fn recognize(&self, x: &Execution) -> RecognitionResult {
         for tool in &self.tools {
             match tool.recognize(x) {
