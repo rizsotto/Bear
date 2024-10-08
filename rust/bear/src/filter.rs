@@ -18,8 +18,10 @@
  */
 
 use std::collections::HashSet;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
+use crate::config;
 use json_compilation_db::Entry;
 
 /// A predicate that can be used to filter compilation database entries.
@@ -165,6 +167,56 @@ impl EntryPredicateBuilder {
                 false
             }
         })
+    }
+}
+
+impl TryFrom<&config::Filter> for EntryPredicate {
+    type Error = anyhow::Error;
+
+    /// Create a filter from the configuration.
+    fn try_from(config: &config::Filter) -> Result<Self, Self::Error> {
+        // - Check if the source file exists
+        // - Check if the source file is not in the exclude list of the configuration
+        // - Check if the source file is in the include list of the configuration
+        let source_exist_check = EntryPredicateBuilder::filter_by_source_existence(
+            config.source.include_only_existing_files,
+        );
+        let source_paths_to_exclude = EntryPredicateBuilder::filter_by_source_paths(
+            config.source.paths_to_exclude.clone(),
+        );
+        let source_paths_to_include = EntryPredicateBuilder::filter_by_source_paths(
+            config.source.paths_to_include.clone(),
+        );
+        let source_checks = source_exist_check & !source_paths_to_exclude & source_paths_to_include;
+        // - Check if the compiler path is not in the list of the configuration
+        // - Check if the compiler arguments are not in the list of the configuration
+        let compiler_with_path = EntryPredicateBuilder::filter_by_compiler_paths(
+            config.compilers.with_paths.clone(),
+        );
+        let compiler_with_argument = EntryPredicateBuilder::filter_by_compiler_arguments(
+            config.compilers.with_arguments.clone(),
+        );
+        let compiler_checks = !compiler_with_path & !compiler_with_argument;
+        // - Check if the entry is not a duplicate based on the fields of the configuration
+        let hash_function = create_hash(config.duplicates.by_fields.clone());
+        let duplicates = EntryPredicateBuilder::filter_duplicate_entries(hash_function);
+
+        Ok((source_checks & compiler_checks & duplicates).build())
+    }
+}
+
+fn create_hash(fields: Vec<config::OutputFields>) -> impl Fn(&Entry) -> u64 + 'static {
+    move |entry: &Entry| {
+        let mut hasher = DefaultHasher::new();
+        for field in &fields {
+            match field {
+                config::OutputFields::Directory => entry.directory.hash(&mut hasher),
+                config::OutputFields::File => entry.file.hash(&mut hasher),
+                config::OutputFields::Arguments => entry.arguments.hash(&mut hasher),
+                config::OutputFields::Output => entry.output.hash(&mut hasher),
+            }
+        }
+        hasher.finish()
     }
 }
 

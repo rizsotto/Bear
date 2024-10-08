@@ -18,7 +18,6 @@
  */
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
@@ -26,7 +25,7 @@ use crate::{args, config, filter};
 use anyhow::{anyhow, Context, Result};
 use json_compilation_db::Entry;
 use path_absolutize::Absolutize;
-use semantic::{CompilerPass, Meaning};
+use semantic;
 use serde_json::Error;
 
 /// Responsible for writing the final compilation database file.
@@ -85,7 +84,7 @@ impl OutputWriter {
     fn write_into_compilation_db(
         &self,
         entries: impl Iterator<Item = Entry>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         // Filter out the entries as per the configuration.
         let filter: filter::EntryPredicate = TryFrom::try_from(&self.filter)?;
         let filtered_entries = entries.filter(filter);
@@ -172,59 +171,9 @@ fn validate_duplicates_by_fields(fields: &[config::OutputFields]) -> Vec<config:
         .collect()
 }
 
-impl TryFrom<&config::Filter> for filter::EntryPredicate {
-    type Error = anyhow::Error;
-
-    /// Create a filter from the configuration.
-    fn try_from(config: &config::Filter) -> std::result::Result<Self, Self::Error> {
-        // - Check if the source file exists
-        // - Check if the source file is not in the exclude list of the configuration
-        // - Check if the source file is in the include list of the configuration
-        let source_exist_check = filter::EntryPredicateBuilder::filter_by_source_existence(
-            config.source.include_only_existing_files,
-        );
-        let source_paths_to_exclude = filter::EntryPredicateBuilder::filter_by_source_paths(
-            config.source.paths_to_exclude.clone(),
-        );
-        let source_paths_to_include = filter::EntryPredicateBuilder::filter_by_source_paths(
-            config.source.paths_to_include.clone(),
-        );
-        let source_checks = source_exist_check & !source_paths_to_exclude & source_paths_to_include;
-        // - Check if the compiler path is not in the list of the configuration
-        // - Check if the compiler arguments are not in the list of the configuration
-        let compiler_with_path = filter::EntryPredicateBuilder::filter_by_compiler_paths(
-            config.compilers.with_paths.clone(),
-        );
-        let compiler_with_argument = filter::EntryPredicateBuilder::filter_by_compiler_arguments(
-            config.compilers.with_arguments.clone(),
-        );
-        let compiler_checks = !compiler_with_path & !compiler_with_argument;
-        // - Check if the entry is not a duplicate based on the fields of the configuration
-        let hash_function = create_hash(config.duplicates.by_fields.clone());
-        let duplicates = filter::EntryPredicateBuilder::filter_duplicate_entries(hash_function);
-
-        Ok((source_checks & compiler_checks & duplicates).build())
-    }
-}
-
-fn create_hash(fields: Vec<config::OutputFields>) -> impl Fn(&Entry) -> u64 + 'static {
-    move |entry: &Entry| {
-        let mut hasher = DefaultHasher::new();
-        for field in &fields {
-            match field {
-                config::OutputFields::Directory => entry.directory.hash(&mut hasher),
-                config::OutputFields::File => entry.file.hash(&mut hasher),
-                config::OutputFields::Arguments => entry.arguments.hash(&mut hasher),
-                config::OutputFields::Output => entry.output.hash(&mut hasher),
-            }
-        }
-        hasher.finish()
-    }
-}
-
-pub fn into_entries(value: Meaning) -> Result<Vec<Entry>, anyhow::Error> {
+pub fn into_entries(value: semantic::Meaning) -> Result<Vec<Entry>, anyhow::Error> {
     match value {
-        Meaning::Compiler {
+        semantic::Meaning::Compiler {
             compiler,
             working_dir,
             passes,
@@ -233,10 +182,10 @@ pub fn into_entries(value: Meaning) -> Result<Vec<Entry>, anyhow::Error> {
                 .iter()
                 .flat_map(|pass| -> Result<Entry, anyhow::Error> {
                     match pass {
-                        CompilerPass::Preprocess => {
+                        semantic::CompilerPass::Preprocess => {
                             Err(anyhow!("preprocess pass should not show up in results"))
                         }
-                        CompilerPass::Compile {
+                        semantic::CompilerPass::Compile {
                             source,
                             output,
                             flags,
@@ -305,10 +254,10 @@ mod test {
     fn test_non_compilations() -> Result<()> {
         let empty: Vec<Entry> = vec![];
 
-        let result: Vec<Entry> = into_entries(Meaning::Ignored)?;
+        let result: Vec<Entry> = into_entries(semantic::Meaning::Ignored)?;
         assert_eq!(empty, result);
 
-        let input = Meaning::Compiler {
+        let input = semantic::Meaning::Compiler {
             compiler: PathBuf::from("/usr/bin/cc"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![],
@@ -321,10 +270,10 @@ mod test {
 
     #[test]
     fn test_single_source_compilation() -> Result<()> {
-        let input = Meaning::Compiler {
+        let input = semantic::Meaning::Compiler {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
-            passes: vec![CompilerPass::Compile {
+            passes: vec![semantic::CompilerPass::Compile {
                 source: PathBuf::from("source.c"),
                 output: Some(PathBuf::from("source.o")),
                 flags: vec_of_strings!["-Wall"],
@@ -347,17 +296,17 @@ mod test {
 
     #[test]
     fn test_multiple_sources_compilation() -> Result<()> {
-        let input = Meaning::Compiler {
+        let input = semantic::Meaning::Compiler {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![
-                CompilerPass::Preprocess,
-                CompilerPass::Compile {
+                semantic::CompilerPass::Preprocess,
+                semantic::CompilerPass::Compile {
                     source: PathBuf::from("/tmp/source1.c"),
                     output: None,
                     flags: vec_of_strings!["-Wall"],
                 },
-                CompilerPass::Compile {
+                semantic::CompilerPass::Compile {
                     source: PathBuf::from("../source2.c"),
                     output: None,
                     flags: vec_of_strings!["-Wall"],
