@@ -22,7 +22,7 @@ use std::vec;
 
 use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
 use super::matchers::source::looks_like_a_source_file;
-use intercept::ipc::Execution;
+use intercept::Execution;
 
 /// A tool to recognize a compiler by executable name.
 pub struct Generic {

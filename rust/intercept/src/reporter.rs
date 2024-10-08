@@ -21,7 +21,7 @@ use std::net::TcpStream;
 
 use rand::random;
 
-use crate::ipc::{Envelope, Event, ReporterId};
+use super::{Envelope, Event, ReporterId};
 
 impl ReporterId {
     pub fn new() -> Self {

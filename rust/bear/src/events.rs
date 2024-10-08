@@ -22,7 +22,7 @@ use std::path::PathBuf;
 
 use serde_json::{Deserializer, Error, Value};
 
-use intercept::ipc::Execution;
+use intercept::Execution;
 
 // Based on stream serializer from `serde_json` crate.
 //

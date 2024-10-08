@@ -21,7 +21,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use super::super::{Meaning, RecognitionResult, Tool};
-use intercept::ipc::Execution;
+use intercept::Execution;
 
 /// A tool to ignore a command execution by executable name.
 pub struct IgnoreByPath {

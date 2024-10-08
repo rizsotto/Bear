@@ -21,8 +21,6 @@ extern crate core;
 
 use anyhow::Result;
 
-use intercept::ipc::{Envelope, Event, ReporterId};
-
 fn main() -> Result<()> {
     Ok(())
 }

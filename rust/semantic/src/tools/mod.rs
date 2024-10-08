@@ -94,7 +94,7 @@ mod test {
     use super::super::{vec_of_pathbuf, vec_of_strings};
     use super::super::{Meaning, RecognitionResult};
     use super::*;
-    use intercept::ipc::Execution;
+    use intercept::Execution;
 
     #[test]
     fn test_builder() {

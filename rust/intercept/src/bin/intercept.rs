@@ -25,7 +25,7 @@ use anyhow::Result;
 use clap::{arg, ArgAction, command};
 use crossbeam_channel::bounded;
 
-use intercept::ipc::{Envelope, Event, ReporterId};
+use intercept::{Envelope, Event, ReporterId};
 use intercept::collector::{EventCollector, EventCollectorOnTcp};
 
 #[derive(Debug, PartialEq)]
