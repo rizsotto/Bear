@@ -28,7 +28,6 @@ const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
 const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
 const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 
-
 /// Represents the application configuration.
 ///
 /// ```yaml
@@ -146,7 +145,9 @@ impl Main {
     pub fn from_file(file: &Path) -> Result<Self> {
         info!("Loading configuration file: {}", file.display());
 
-        let reader = OpenOptions::new().read(true).open(file)
+        let reader = OpenOptions::new()
+            .read(true)
+            .open(file)
             .with_context(|| format!("Failed to open configuration file: {:?}", file))?;
 
         let content = Self::from_reader(reader)
@@ -216,7 +217,7 @@ impl Default for Intercept {
         Intercept::Wrapper {
             path: default_wrapper_executable(),
             directory: default_wrapper_directory(),
-            executables: vec![],  // FIXME: better default value
+            executables: vec![], // FIXME: better default value
         }
     }
 }
@@ -241,8 +242,7 @@ pub enum Output {
         format: Format,
     },
     #[serde(rename = "bear")]
-    Semantic {
-    },
+    Semantic {},
 }
 
 /// The default output is the clang format.
@@ -276,7 +276,7 @@ pub struct Transform {
 /// - Compilers: Specify on the compiler path and arguments.
 /// - Source: Specify the source file location.
 /// - Duplicates: Specify the fields of the JSON compilation database record to detect duplicates.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Filter {
     #[serde(default)]
     pub compilers: CompilerFilter,
@@ -330,7 +330,7 @@ pub struct SourceFilter {
 /// Duplicate filter configuration is used to filter the duplicate compiler calls.
 ///
 /// - By fields: Specify the fields of the JSON compilation database record to detect duplicates.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct DuplicateFilter {
     pub by_fields: Vec<OutputFields>,
 }
@@ -417,8 +417,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::{vec_of_pathbuf, vec_of_strings};
     use super::*;
+    use crate::{vec_of_pathbuf, vec_of_strings};
 
     #[test]
     fn test_wrapper_config() {
@@ -485,7 +485,7 @@ mod test {
                     },
                     duplicates: DuplicateFilter {
                         by_fields: vec![OutputFields::File, OutputFields::Directory],
-                    }
+                    },
                 },
                 format: Format {
                     command_as_array: true,
@@ -516,8 +516,7 @@ mod test {
             intercept: Intercept::Preload {
                 path: PathBuf::from("/usr/local/lib/libexec.so"),
             },
-            output: Output::Semantic {
-            },
+            output: Output::Semantic {},
             schema: String::from("4.0"),
         };
 
@@ -559,7 +558,10 @@ mod test {
         assert!(result.is_err());
 
         let message = result.unwrap_err().to_string();
-        assert_eq!("Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 9", message);
+        assert_eq!(
+            "Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 9",
+            message
+        );
     }
 
     #[test]
