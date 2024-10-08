@@ -157,8 +157,8 @@ impl Application {
                 // Set up the pipeline of compilation database entries.
                 let entries = event_source
                     .generate()
-                    .flat_map(|execution| semantic_recognition.recognize(execution))
-                    .flat_map(|semantic| semantic_transform.into_entries(semantic));
+                    .flat_map(|execution| semantic_recognition.apply(execution))
+                    .map(|semantic| semantic_transform.apply(semantic));
                 // Consume the entries and write them to the output file.
                 // The exit code is based on the result of the output writer.
                 match output_writer.run(entries) {
@@ -259,7 +259,7 @@ impl TryFrom<&config::Main> for SemanticRecognition {
 }
 
 impl SemanticRecognition {
-    fn recognize(&self, execution: Execution) -> Option<semantic::Meaning> {
+    fn apply(&self, execution: Execution) -> Option<semantic::Meaning> {
         match self.tool.recognize(&execution) {
             semantic::RecognitionResult::Recognized(Ok(semantic::Meaning::Ignored)) => {
                 log::debug!("execution recognized, but ignored: {:?}", execution);
@@ -321,19 +321,7 @@ impl From<&config::Output> for SemanticTransform {
 }
 
 impl SemanticTransform {
-    fn into_entries(&self, semantic: semantic::Meaning) -> Vec<Entry> {
-        let transformed = self.transform_semantic(semantic);
-        let entries: Result<Vec<Entry>, anyhow::Error> = into_entries(transformed);
-        entries.unwrap_or_else(|error| {
-            log::debug!(
-                "compiler call failed to convert to compilation db entry: {}",
-                error
-            );
-            vec![]
-        })
-    }
-
-    fn transform_semantic(&self, input: semantic::Meaning) -> semantic::Meaning {
+    fn apply(&self, input: semantic::Meaning) -> semantic::Meaning {
         match input {
             semantic::Meaning::Compiler {
                 compiler,
@@ -439,7 +427,11 @@ impl OutputWriter {
     }
 
     /// Implements the main logic of the output writer.
-    pub fn run(&self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+    pub fn run(&self, meanings: impl Iterator<Item = semantic::Meaning>) -> anyhow::Result<()> {
+        let entries = meanings.flat_map(|value| into_entries(value).unwrap_or_else(|error| {
+            log::error!("Failed to convert semantic meaning to compilation database entries: {}", error);
+            vec![]
+        }));
         if self.append && self.output.exists() {
             let from_db = Self::read_from_compilation_db(Path::new(&self.output))?;
             let final_entries = entries.chain(from_db);
