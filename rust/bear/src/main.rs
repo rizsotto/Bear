@@ -16,19 +16,17 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::process::ExitCode;
+
+use crate::input::EventFileReader;
 use crate::output::OutputWriter;
-use anyhow::Context;
 use intercept::Execution;
 use log;
 use semantic;
-use std::fs::{File, OpenOptions};
-use std::io::BufReader;
-use std::path::PathBuf;
-use std::process::ExitCode;
 
 mod args;
 mod config;
-pub mod events;
+mod input;
 mod filter;
 mod fixtures;
 mod output;
@@ -168,51 +166,6 @@ impl Application {
                 ExitCode::FAILURE
             }
         }
-    }
-}
-
-/// Responsible for reading the build events from the intercept mode.
-///
-/// The file syntax is defined by the `events` module, and the parsing logic is implemented there.
-/// Here we only handle the file opening and the error handling.
-struct EventFileReader {
-    reader: BufReader<File>,
-}
-
-impl TryFrom<args::BuildEvents> for EventFileReader {
-    type Error = anyhow::Error;
-
-    /// Open the file and create a new instance of the event file reader.
-    ///
-    /// If the file cannot be opened, the error will be logged and escalated.
-    fn try_from(value: args::BuildEvents) -> Result<Self, Self::Error> {
-        let file_name = PathBuf::from(value.file_name);
-        let file = OpenOptions::new()
-            .read(true)
-            .open(file_name.as_path())
-            .with_context(|| format!("Failed to open input file: {:?}", file_name))?;
-        let reader = BufReader::new(file);
-
-        Ok(EventFileReader { reader })
-    }
-}
-
-impl EventFileReader {
-    /// Generate the build events from the file.
-    ///
-    /// Returns an iterator over the build events. Any error during the reading
-    /// of the file will be logged and the failed entries will be skipped.
-    fn generate(self) -> impl Iterator<Item = Execution> {
-        // Process the file line by line.
-        events::from_reader(self.reader)
-            // Log the errors and skip the failed entries.
-            .flat_map(|candidate| match candidate {
-                Ok(execution) => Some(execution),
-                Err(error) => {
-                    log::warn!("Failed to read entry from input: {}", error);
-                    None
-                }
-            })
     }
 }
 
