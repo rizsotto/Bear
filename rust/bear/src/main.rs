@@ -18,7 +18,7 @@
  */
 use crate::output::OutputWriter;
 use anyhow::Context;
-use intercept::ipc::Execution;
+use intercept::Execution;
 use log;
 use semantic;
 use std::fs::{File, OpenOptions};

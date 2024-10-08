@@ -20,7 +20,7 @@
 mod fixtures;
 pub mod tools;
 
-use intercept::ipc::Execution;
+use intercept::Execution;
 use std::path::PathBuf;
 
 /// Represents a semantic recognition result.

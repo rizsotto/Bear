@@ -17,8 +17,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use crate::{Meaning, RecognitionResult, Tool};
-use intercept::ipc::Execution;
+use crate::{RecognitionResult, Tool};
+use intercept::Execution;
 
 /// Represents a set of tools, where any of them can recognize the semantic.
 /// The evaluation is done in the order of the tools. The first one which
@@ -52,6 +52,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
+    use super::super::super::Meaning;
     use super::*;
 
     #[test]

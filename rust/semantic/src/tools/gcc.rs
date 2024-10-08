@@ -23,7 +23,7 @@ use nom::sequence::preceded;
 
 use super::super::{Meaning, RecognitionResult, Tool};
 use super::gcc::internal::Argument;
-use intercept::ipc::Execution;
+use intercept::Execution;
 
 pub struct Gcc {}
 

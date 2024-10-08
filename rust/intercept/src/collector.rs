@@ -23,7 +23,7 @@ use crossbeam::channel::{Receiver, Sender};
 use crossbeam_channel::bounded;
 use serde::{Deserialize, Serialize};
 
-use super::ipc::Envelope;
+use super::Envelope;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct SessionLocator(pub String);
