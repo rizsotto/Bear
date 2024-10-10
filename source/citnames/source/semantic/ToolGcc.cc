@@ -251,14 +251,13 @@ namespace cs::semantic {
 
     bool ToolGcc::is_compiler_call(const fs::path& program) const {
         static const auto pattern = std::regex(
-                // - cc
-                // - c++
                 // - cxx
                 // - CC
-                // - mcc, gcc, m++, g++, gfortran, fortran
+                // - cc, mcc, gcc, c++, m++, g++, gfortran, fortran
                 //   - with prefixes like: arm-none-eabi-
                 //   - with postfixes like: -7.0 or 6.4.0
-            R"(^(cc|c\+\+|cxx|CC|(([^-]*-)*([mg](cc|\+\+)|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)"
+                // - (excluding cc1)
+            R"(^(cxx|CC|(([^-]*-)*(cc(?!1(?![\d\.]))|[mg]cc|[cmg]\+\+|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)"
         );
 
         std::cmatch m;
