@@ -34,10 +34,13 @@ namespace {
 
         EXPECT_TRUE(sut.is_compiler_call("cc"));
         EXPECT_TRUE(sut.is_compiler_call("/usr/bin/cc"));
+        EXPECT_TRUE(sut.is_compiler_call("x86_64-pc-linux-gnu-cc"));
+        EXPECT_FALSE(sut.is_compiler_call("cc1"));
         EXPECT_TRUE(sut.is_compiler_call("gcc"));
         EXPECT_TRUE(sut.is_compiler_call("/usr/bin/gcc"));
         EXPECT_TRUE(sut.is_compiler_call("c++"));
         EXPECT_TRUE(sut.is_compiler_call("/usr/bin/c++"));
+        EXPECT_TRUE(sut.is_compiler_call("x86_64-pc-linux-gnu-c++"));
         EXPECT_TRUE(sut.is_compiler_call("g++"));
         EXPECT_TRUE(sut.is_compiler_call("/usr/bin/g++"));
         EXPECT_TRUE(sut.is_compiler_call("arm-none-eabi-g++"));
