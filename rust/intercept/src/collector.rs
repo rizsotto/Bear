@@ -45,7 +45,11 @@ impl EventCollectorOnTcp {
         let (control_input, control_output) = bounded(0);
         let listener = TcpListener::bind("127.0.0.1:0")?;
 
-        let result = EventCollectorOnTcp { control_input, control_output, listener };
+        let result = EventCollectorOnTcp {
+            control_input,
+            control_output,
+            listener,
+        };
 
         Ok(result)
     }

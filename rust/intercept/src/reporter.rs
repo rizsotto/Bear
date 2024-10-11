@@ -49,7 +49,11 @@ impl TcpReporter {
     pub fn new(destination: String) -> Result<Self, anyhow::Error> {
         let socket = TcpStream::connect(destination.clone())?;
         let reporter_id = ReporterId::new();
-        let result = TcpReporter { socket, destination, reporter_id };
+        let result = TcpReporter {
+            socket,
+            destination,
+            reporter_id,
+        };
         Ok(result)
     }
 }

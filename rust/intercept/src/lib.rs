@@ -23,8 +23,8 @@ use std::path::PathBuf;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
-pub mod reporter;
 pub mod collector;
+pub mod reporter;
 
 // Reporter id is a unique identifier for a reporter.
 //
@@ -59,7 +59,7 @@ pub enum Event {
         execution: Execution,
     },
     Terminated {
-        status: i64
+        status: i64,
     },
     Signaled {
         signal: i32,
@@ -76,10 +76,14 @@ pub struct Envelope {
 impl Envelope {
     pub fn new(rid: &ReporterId, event: Event) -> Self {
         let timestamp = Utc::now().timestamp_millis() as u64;
-        Envelope { rid: rid.clone(), timestamp, event }
+        Envelope {
+            rid: rid.clone(),
+            timestamp,
+            event,
+        }
     }
 
-    pub fn read_from(mut reader: impl Read) -> Result<Self, anyhow::Error> {
+    pub fn read_from(reader: &mut impl Read) -> Result<Self, anyhow::Error> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -91,7 +95,7 @@ impl Envelope {
         Ok(envelope)
     }
 
-    pub fn write_into(&self, mut writer: impl Write) -> Result<u32, anyhow::Error> {
+    pub fn write_into(&self, writer: &mut impl Write) -> Result<u32, anyhow::Error> {
         let serialized_envelope = serde_json::to_string(&self)?;
         let bytes = serialized_envelope.into_bytes();
         let length = bytes.len() as u32;
@@ -100,5 +104,57 @@ impl Envelope {
         writer.write_all(&bytes)?;
 
         Ok(length)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use lazy_static::lazy_static;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_write_works() {
+        let mut writer = Cursor::new(vec![0; 1024]);
+        for envelope in ENVELOPES.iter() {
+            let result = Envelope::write_into(envelope, &mut writer);
+            assert!(result.is_ok());
+        }
+
+        let mut reader = Cursor::new(writer.get_ref());
+        for envelope in ENVELOPES.iter() {
+            let result = Envelope::read_from(&mut reader);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), *envelope.clone());
+        }
+    }
+
+    lazy_static! {
+        static ref ENVELOPES: Vec<Envelope> = vec![
+            Envelope {
+                rid: ReporterId(1),
+                timestamp: 0,
+                event: Event::Started {
+                    pid: ProcessId(1),
+                    ppid: ProcessId(0),
+                    execution: Execution {
+                        executable: PathBuf::from("/usr/bin/ls"),
+                        arguments: vec!["-l".to_string()],
+                        working_dir: PathBuf::from("/tmp"),
+                        environment: HashMap::new(),
+                    },
+                },
+            },
+            Envelope {
+                rid: ReporterId(1),
+                timestamp: 0,
+                event: Event::Terminated { status: 0 },
+            },
+            Envelope {
+                rid: ReporterId(1),
+                timestamp: 0,
+                event: Event::Signaled { signal: 15 },
+            },
+        ];
     }
 }

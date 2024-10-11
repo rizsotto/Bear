@@ -18,11 +18,6 @@ wrapper = []
 name = "intercept"
 path = "src/lib.rs"
 
-# TODO: remove this when bear implements the entry point
-[[bin]]
-name = "intercept"
-path = "src/bin/intercept.rs"
-
 # TODO: create this as a separate crate
 [[bin]]
 name = "wrapper"
