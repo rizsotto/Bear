@@ -22,11 +22,12 @@ use std::path::{Path, PathBuf};
 
 use super::{args, config};
 use anyhow::{anyhow, Context, Result};
-use json_compilation_db::Entry;
+use clang::Entry;
 use path_absolutize::Absolutize;
 use semantic;
 use serde_json::Error;
 
+pub mod clang;
 mod filter;
 
 /// Responsible for writing the final compilation database file.
@@ -113,7 +114,7 @@ impl OutputWriter {
         let file = File::create(&file_name)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
         // Write the entries to the file.
-        json_compilation_db::write(BufWriter::new(file), entries)?;
+        clang::write(BufWriter::new(file), entries)?;
         // Return the temporary file name.
         Ok(file_name)
     }
@@ -124,8 +125,7 @@ impl OutputWriter {
             .read(true)
             .open(source)
             .with_context(|| format!("Failed to open file: {:?}", source))?;
-        let entries = json_compilation_db::read(BufReader::new(file))
-            .flat_map(Self::failed_entry_read_logged);
+        let entries = clang::read(BufReader::new(file)).flat_map(Self::failed_entry_read_logged);
 
         Ok(entries)
     }

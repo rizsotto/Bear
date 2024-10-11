@@ -1,9 +1,9 @@
 use std::io::{Cursor, Seek, SeekFrom};
 
-use serde_json::{Error, json, Value};
 use serde_json::error::Category;
+use serde_json::{json, Error, Value};
 
-use json_compilation_db::*;
+use bear::output::clang::*;
 
 mod failures {
     use super::*;
@@ -43,7 +43,8 @@ mod failures {
                 "file": "./file_a.c",
                 "command": "cc -Dvalue=\"this"
             }
-        ]).to_string();
+        ])
+        .to_string();
         let mut result = read(content.as_bytes());
 
         assert_semantic_error!(result.next());
@@ -59,7 +60,8 @@ mod failures {
                 "command": "cc source.c",
                 "arguments": ["cc", "source.c"],
             }
-        ]).to_string();
+        ])
+        .to_string();
         let mut result = read(content.as_bytes());
 
         assert_semantic_error!(result.next());

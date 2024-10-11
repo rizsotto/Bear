@@ -1,11 +1,11 @@
-use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
-use crate::Entry;
+use super::Entry;
 
 impl Serialize for Entry {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         let size = if self.output.is_some() { 4 } else { 3 };
         let mut state = serializer.serialize_struct("Entry", size)?;

@@ -1,27 +1,20 @@
-/*!
-This crate provides support for reading and writing JSON compilation database files.
+//! This crate provides support for reading and writing JSON compilation database files.
+//!
+//! A compilation database is a set of records which describe the compilation of the
+//! source files in a given project. It describes the compiler invocation command to
+//! compile a source module to an object file.
+//!
+//! This database can have many forms. One well known and supported format is the JSON
+//! compilation database, which is a simple JSON file having the list of compilation
+//! as an array. The definition of the JSON compilation database files is done in the
+//! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
-A compilation database is a set of records which describe the compilation of the
-source files in a given project. It describes the compiler invocation command to
-compile a source module to an object file.
-
-This database can have many forms. One well known and supported format is the JSON
-compilation database, which is a simple JSON file having the list of compilation
-as an array. The definition of the JSON compilation database files is done in the
-LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
- */
-
-extern crate core;
-
-use serde::ser::{Serializer, SerializeSeq};
+use serde::ser::{SerializeSeq, Serializer};
 use serde_json::Error;
 
+mod iterator;
 mod type_de;
 mod type_ser;
-mod iterator;
-
-/// The conventional name for a compilation database file which tools are looking for.
-pub const DEFAULT_FILE_NAME: &str = "compile_commands.json";
 
 /// Represents an entry of the compilation database.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -43,7 +36,10 @@ pub struct Entry {
     pub output: Option<std::path::PathBuf>,
 }
 
-pub fn write(writer: impl std::io::Write, entries: impl Iterator<Item=Entry>) -> Result<(), Error> {
+pub fn write(
+    writer: impl std::io::Write,
+    entries: impl Iterator<Item = Entry>,
+) -> Result<(), Error> {
     let mut ser = serde_json::Serializer::new(writer);
     let mut seq = ser.serialize_seq(None)?;
     for entry in entries {
@@ -52,6 +48,6 @@ pub fn write(writer: impl std::io::Write, entries: impl Iterator<Item=Entry>) ->
     seq.end()
 }
 
-pub fn read(reader: impl std::io::Read) -> impl Iterator<Item=Result<Entry, Error>> {
+pub fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, Error>> {
     iterator::iter_json_array(reader)
 }

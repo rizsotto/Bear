@@ -2,8 +2,7 @@
 members = [
   "bear",
   "intercept",
-  "semantic",
-  "json_compilation_db"
+  "semantic"
 ]
 resolver = "2"
 

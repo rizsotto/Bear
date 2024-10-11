@@ -9,14 +9,17 @@ homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 
+[lib]
+name = "bear"
+path = "src/lib.rs"
+
 [[bin]]
 name = "bear"
-path = "src/main.rs"
+path = "src/bin/main.rs"
 
 [dependencies]
 intercept = { path = "../intercept" }
 semantic = { path = "../semantic" }
-json_compilation_db = { path = "../json_compilation_db" }
 thiserror.workspace = true
 anyhow.workspace = true
 lazy_static.workspace = true
@@ -29,3 +32,4 @@ chrono.workspace = true
 log.workspace = true
 env_logger.workspace = true
 path-absolutize.workspace = true
+shell-words.workspace = true

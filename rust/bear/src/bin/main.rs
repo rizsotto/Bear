@@ -18,17 +18,12 @@
  */
 use std::process::ExitCode;
 
-use crate::input::EventFileReader;
-use crate::output::OutputWriter;
+use bear::input::EventFileReader;
+use bear::output::OutputWriter;
+use bear::{args, config};
 use intercept::Execution;
 use log;
 use semantic;
-
-mod args;
-mod config;
-mod input;
-mod fixtures;
-mod output;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {

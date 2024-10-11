@@ -5,10 +5,10 @@ use std::io::{self, Read};
 use serde::de::DeserializeOwned;
 use serde_json::{Deserializer, Error, Result};
 
-pub fn iter_json_array<T, R>(mut reader: R) -> impl Iterator<Item=Result<T>>
-    where
-        T: DeserializeOwned,
-        R: io::Read,
+pub fn iter_json_array<T, R>(mut reader: R) -> impl Iterator<Item = Result<T>>
+where
+    T: DeserializeOwned,
+    R: io::Read,
 {
     let mut at_start = State::AtStart;
     std::iter::from_fn(move || yield_next_obj(&mut reader, &mut at_start).transpose())
@@ -22,9 +22,9 @@ enum State {
 }
 
 fn yield_next_obj<T, R>(mut reader: R, state: &mut State) -> Result<Option<T>>
-    where
-        T: DeserializeOwned,
-        R: io::Read,
+where
+    T: DeserializeOwned,
+    R: io::Read,
 {
     match state {
         State::AtStart => {
@@ -42,39 +42,32 @@ fn yield_next_obj<T, R>(mut reader: R, state: &mut State) -> Result<Option<T>>
                 *state = State::Failed;
                 Err(serde::de::Error::custom("expected `[`"))
             }
-        },
-        State::AtMiddle => {
-            match read_skipping_ws(&mut reader)? {
-                b',' =>
-                    deserialize_single(reader).map(Some),
-                b']' => {
-                    *state = State::Finished;
-                    Ok(None)
-                },
-                _ => {
-                    *state = State::Failed;
-                    Err(serde::de::Error::custom("expected `,` or `]`"))
-                },
+        }
+        State::AtMiddle => match read_skipping_ws(&mut reader)? {
+            b',' => deserialize_single(reader).map(Some),
+            b']' => {
+                *state = State::Finished;
+                Ok(None)
+            }
+            _ => {
+                *state = State::Failed;
+                Err(serde::de::Error::custom("expected `,` or `]`"))
             }
         },
-        State::Finished =>
-            Ok(None),
-        State::Failed =>
-            Ok(None),
+        State::Finished => Ok(None),
+        State::Failed => Ok(None),
     }
 }
 
 fn deserialize_single<T, R>(reader: R) -> Result<T>
-    where
-        T: DeserializeOwned,
-        R: io::Read,
+where
+    T: DeserializeOwned,
+    R: io::Read,
 {
     let next_obj = Deserializer::from_reader(reader).into_iter::<T>().next();
     match next_obj {
-        Some(result) =>
-            result,
-        None =>
-            Err(serde::de::Error::custom("premature EOF")),
+        Some(result) => result,
+        None => Err(serde::de::Error::custom("premature EOF")),
     }
 }
 

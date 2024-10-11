@@ -20,10 +20,10 @@
 use std::hash::Hash;
 use std::path::PathBuf;
 
+use super::clang::Entry;
 use super::config;
 use builder::create_hash;
 use builder::EntryPredicateBuilder as Builder;
-use json_compilation_db::Entry;
 
 /// A predicate that can be used to filter compilation database entries.
 ///
