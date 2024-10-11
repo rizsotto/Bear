@@ -16,6 +16,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -286,6 +287,17 @@ pub struct Filter {
     pub duplicates: DuplicateFilter,
 }
 
+impl Filter {
+    /// Validate the configuration of the output writer.
+    pub fn validate(&self) -> Self {
+        Self {
+            source: self.source.clone(),
+            compilers: self.compilers.clone(),
+            duplicates: self.duplicates.validate(),
+        }
+    }
+}
+
 impl Default for Filter {
     fn default() -> Self {
         Filter {
@@ -333,6 +345,20 @@ pub struct SourceFilter {
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct DuplicateFilter {
     pub by_fields: Vec<OutputFields>,
+}
+
+impl DuplicateFilter {
+    /// Deduplicate the fields of the fields vector.
+    pub fn validate(&self) -> Self {
+        Self {
+            by_fields: (&self.by_fields)
+                .into_iter()
+                .map(|field| field.clone())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect(),
+        }
+    }
 }
 
 impl Default for DuplicateFilter {

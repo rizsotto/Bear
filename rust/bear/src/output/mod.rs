@@ -16,7 +16,6 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
@@ -51,7 +50,7 @@ impl OutputWriter {
             config::Output::Clang { format, filter, .. } => OutputWriter {
                 output: PathBuf::from(&args.file_name),
                 append: args.append,
-                filter: validate_filter(filter),
+                filter: filter.validate(),
                 format: format.clone(),
             },
             config::Output::Semantic { .. } => {
@@ -141,31 +140,6 @@ impl OutputWriter {
             }
         }
     }
-}
-
-/// Validate the configuration of the output writer.
-///
-/// Validation is always successful, but it may modify the configuration values.
-fn validate_filter(filter: &config::Filter) -> config::Filter {
-    config::Filter {
-        source: filter.source.clone(),
-        compilers: filter.compilers.clone(),
-        duplicates: config::DuplicateFilter {
-            by_fields: validate_duplicates_by_fields(filter.duplicates.by_fields.as_slice()),
-        },
-    }
-}
-
-/// Validate the fields of the configuration.
-///
-/// Removes the duplicates from the list of fields.
-fn validate_duplicates_by_fields(fields: &[config::OutputFields]) -> Vec<config::OutputFields> {
-    fields
-        .into_iter()
-        .map(|field| field.clone())
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect()
 }
 
 pub fn into_entries(value: semantic::Meaning) -> Result<Vec<Entry>, anyhow::Error> {
