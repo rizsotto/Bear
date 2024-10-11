@@ -24,17 +24,17 @@ use super::super::{Meaning, RecognitionResult, Tool};
 use intercept::Execution;
 
 /// A tool to ignore a command execution by executable name.
-pub struct IgnoreByPath {
+pub(super) struct IgnoreByPath {
     executables: HashSet<PathBuf>,
 }
 
 impl IgnoreByPath {
-    pub fn new() -> Box<dyn Tool> {
+    pub(super) fn new() -> Box<dyn Tool> {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
         Box::new(Self { executables })
     }
 
-    pub fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
         let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
         Box::new(Self { executables })
     }
@@ -51,12 +51,12 @@ impl Tool for IgnoreByPath {
     }
 }
 
-pub struct IgnoreByArgs {
+pub(super) struct IgnoreByArgs {
     args: Vec<String>,
 }
 
 impl IgnoreByArgs {
-    pub fn new(args: &[String]) -> Box<dyn Tool> {
+    pub(super) fn new(args: &[String]) -> Box<dyn Tool> {
         let clones = args.iter().map(|arg| arg.clone()).collect();
         Box::new(Self { args: clones })
     }

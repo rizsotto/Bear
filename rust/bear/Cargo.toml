@@ -19,7 +19,6 @@ path = "src/bin/main.rs"
 
 [dependencies]
 intercept = { path = "../intercept" }
-semantic = { path = "../semantic" }
 thiserror.workspace = true
 anyhow.workspace = true
 lazy_static.workspace = true
@@ -33,3 +32,5 @@ log.workspace = true
 env_logger.workspace = true
 path-absolutize.workspace = true
 shell-words.workspace = true
+nom.workspace = true
+regex.workspace = true

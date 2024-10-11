@@ -17,18 +17,18 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use crate::{RecognitionResult, Tool};
+use super::super::{RecognitionResult, Tool};
 use intercept::Execution;
 
 /// Represents a set of tools, where any of them can recognize the semantic.
 /// The evaluation is done in the order of the tools. The first one which
 /// recognizes the semantic will be returned as result.
-pub struct Any {
+pub(super) struct Any {
     tools: Vec<Box<dyn Tool>>,
 }
 
 impl Any {
-    pub fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
+    pub(super) fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
         Any { tools }
     }
 }

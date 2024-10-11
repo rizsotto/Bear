@@ -1,8 +1,7 @@
 [workspace]
 members = [
   "bear",
-  "intercept",
-  "semantic"
+  "intercept"
 ]
 resolver = "2"
 

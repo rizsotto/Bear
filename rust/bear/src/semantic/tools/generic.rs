@@ -25,12 +25,12 @@ use super::matchers::source::looks_like_a_source_file;
 use intercept::Execution;
 
 /// A tool to recognize a compiler by executable name.
-pub struct Generic {
+pub(super) struct Generic {
     executables: HashSet<PathBuf>,
 }
 
 impl Generic {
-    pub fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
         let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
         Box::new(Self { executables })
     }

@@ -20,11 +20,10 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
-use super::{args, config};
+use super::{args, config, semantic};
 use anyhow::{anyhow, Context, Result};
 use clang::Entry;
 use path_absolutize::Absolutize;
-use semantic;
 use serde_json::Error;
 
 pub mod clang;

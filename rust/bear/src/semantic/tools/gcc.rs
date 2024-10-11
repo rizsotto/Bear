@@ -22,13 +22,13 @@ use nom::multi::many1;
 use nom::sequence::preceded;
 
 use super::super::{Meaning, RecognitionResult, Tool};
-use super::gcc::internal::Argument;
+use internal::Argument;
 use intercept::Execution;
 
-pub struct Gcc {}
+pub(super) struct Gcc {}
 
 impl Gcc {
-    pub fn new() -> Box<dyn Tool> {
+    pub(super) fn new() -> Box<dyn Tool> {
         Box::new(Gcc {})
     }
 }
@@ -66,8 +66,8 @@ mod internal {
     use regex::Regex;
     use std::path::PathBuf;
 
-    use crate::tools::matchers::source::looks_like_a_source_file;
-    use crate::CompilerPass;
+    use super::super::super::CompilerPass;
+    use super::super::matchers::source::looks_like_a_source_file;
 
     #[derive(Debug, PartialEq)]
     enum Language {

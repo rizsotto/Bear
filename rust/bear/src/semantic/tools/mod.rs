@@ -91,9 +91,9 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::{vec_of_pathbuf, vec_of_strings};
     use super::super::{Meaning, RecognitionResult};
     use super::*;
+    use crate::{vec_of_pathbuf, vec_of_strings};
     use intercept::Execution;
 
     #[test]

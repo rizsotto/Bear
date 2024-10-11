@@ -20,10 +20,9 @@ use std::process::ExitCode;
 
 use bear::input::EventFileReader;
 use bear::output::OutputWriter;
-use bear::{args, config};
+use bear::{args, config, semantic};
 use intercept::Execution;
 use log;
-use semantic;
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {

@@ -17,4 +17,4 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-pub(crate) mod source;
+pub(super) mod source;

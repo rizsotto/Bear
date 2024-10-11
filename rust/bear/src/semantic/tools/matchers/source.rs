@@ -80,7 +80,7 @@ lazy_static! {
 
 #[cfg(test)]
 mod test {
-    use crate::tools::matchers::source::looks_like_a_source_file;
+    use super::*;
 
     #[test]
     fn test_filenames() {
