@@ -27,7 +27,6 @@ use semantic;
 mod args;
 mod config;
 mod input;
-mod filter;
 mod fixtures;
 mod output;
 

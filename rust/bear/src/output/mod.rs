@@ -21,12 +21,14 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
-use crate::{args, config, filter};
+use super::{args, config};
 use anyhow::{anyhow, Context, Result};
 use json_compilation_db::Entry;
 use path_absolutize::Absolutize;
 use semantic;
 use serde_json::Error;
+
+mod filter;
 
 /// Responsible for writing the final compilation database file.
 ///
@@ -81,10 +83,7 @@ impl OutputWriter {
         }
     }
 
-    fn write_into_compilation_db(
-        &self,
-        entries: impl Iterator<Item = Entry>,
-    ) -> Result<()> {
+    fn write_into_compilation_db(&self, entries: impl Iterator<Item = Entry>) -> Result<()> {
         // Filter out the entries as per the configuration.
         let filter: filter::EntryPredicate = TryFrom::try_from(&self.filter)?;
         let filtered_entries = entries.filter(filter);
@@ -152,9 +151,7 @@ fn validate_filter(filter: &config::Filter) -> config::Filter {
         source: filter.source.clone(),
         compilers: filter.compilers.clone(),
         duplicates: config::DuplicateFilter {
-            by_fields: validate_duplicates_by_fields(
-                filter.duplicates.by_fields.as_slice(),
-            ),
+            by_fields: validate_duplicates_by_fields(filter.duplicates.by_fields.as_slice()),
         },
     }
 }
