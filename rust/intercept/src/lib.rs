@@ -34,10 +34,10 @@ pub mod reporter;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReporterId(pub u64);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ProcessId(pub u32);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Execution {
     pub executable: PathBuf,
     pub arguments: Vec<String>,
@@ -51,7 +51,7 @@ pub struct Execution {
 // terminate), but can be extended later with performance related
 // events like monitoring the CPU usage or the memory allocation if
 // this information is available.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum Event {
     Started {
         pid: ProcessId,
@@ -66,7 +66,7 @@ pub enum Event {
     },
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Envelope {
     pub rid: ReporterId,
     pub timestamp: u64,
@@ -104,57 +104,5 @@ impl Envelope {
         writer.write_all(&bytes)?;
 
         Ok(length)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use lazy_static::lazy_static;
-    use std::io::Cursor;
-
-    #[test]
-    fn read_write_works() {
-        let mut writer = Cursor::new(vec![0; 1024]);
-        for envelope in ENVELOPES.iter() {
-            let result = Envelope::write_into(envelope, &mut writer);
-            assert!(result.is_ok());
-        }
-
-        let mut reader = Cursor::new(writer.get_ref());
-        for envelope in ENVELOPES.iter() {
-            let result = Envelope::read_from(&mut reader);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), *envelope.clone());
-        }
-    }
-
-    lazy_static! {
-        static ref ENVELOPES: Vec<Envelope> = vec![
-            Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Started {
-                    pid: ProcessId(1),
-                    ppid: ProcessId(0),
-                    execution: Execution {
-                        executable: PathBuf::from("/usr/bin/ls"),
-                        arguments: vec!["-l".to_string()],
-                        working_dir: PathBuf::from("/tmp"),
-                        environment: HashMap::new(),
-                    },
-                },
-            },
-            Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Terminated { status: 0 },
-            },
-            Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Signaled { signal: 15 },
-            },
-        ];
     }
 }

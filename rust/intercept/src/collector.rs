@@ -17,11 +17,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use crossbeam::channel::{Receiver, Sender};
-use crossbeam_channel::bounded;
+use crossbeam::channel::Sender;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use super::Envelope;
 
@@ -29,26 +30,27 @@ use super::Envelope;
 pub struct SessionLocator(pub String);
 
 pub trait EventCollector {
-    fn address(&self) -> Result<SessionLocator, anyhow::Error>;
+    fn address(&self) -> SessionLocator;
     fn collect(&self, destination: Sender<Envelope>) -> Result<(), anyhow::Error>;
     fn stop(&self) -> Result<(), anyhow::Error>;
 }
 
 pub struct EventCollectorOnTcp {
-    control_input: Sender<bool>,
-    control_output: Receiver<bool>,
+    shutdown: Arc<AtomicBool>,
     listener: TcpListener,
+    address: SocketAddr,
 }
 
 impl EventCollectorOnTcp {
     pub fn new() -> Result<Self, anyhow::Error> {
-        let (control_input, control_output) = bounded(0);
+        let shutdown = Arc::new(AtomicBool::new(false));
         let listener = TcpListener::bind("127.0.0.1:0")?;
+        let address = listener.local_addr()?;
 
         let result = EventCollectorOnTcp {
-            control_input,
-            control_output,
+            shutdown,
             listener,
+            address,
         };
 
         Ok(result)
@@ -67,25 +69,20 @@ impl EventCollectorOnTcp {
 }
 
 impl EventCollector for EventCollectorOnTcp {
-    fn address(&self) -> Result<SessionLocator, anyhow::Error> {
-        let local_addr = self.listener.local_addr()?;
-        let locator = SessionLocator(local_addr.to_string());
-        Ok(locator)
+    fn address(&self) -> SessionLocator {
+        SessionLocator(self.address.to_string())
     }
 
     fn collect(&self, destination: Sender<Envelope>) -> Result<(), anyhow::Error> {
-        loop {
-            if let Ok(shutdown) = self.control_output.try_recv() {
-                if shutdown {
-                    break;
-                }
+        for stream in self.listener.incoming() {
+            if self.shutdown.load(Ordering::Relaxed) {
+                break;
             }
 
-            match self.listener.accept() {
-                Ok((stream, _)) => {
-                    println!("Got a connection");
+            match stream {
+                Ok(connection) => {
                     // ... (process the connection in a separate thread or task)
-                    self.send(stream, destination.clone())?;
+                    self.send(connection, destination.clone())?;
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     // No new connection available, continue checking for shutdown
@@ -97,13 +94,12 @@ impl EventCollector for EventCollectorOnTcp {
                 }
             }
         }
-
-        println!("Server shutting down");
         Ok(())
     }
 
     fn stop(&self) -> Result<(), anyhow::Error> {
-        self.control_input.send(true)?;
+        self.shutdown.store(true, Ordering::Relaxed);
+        let _ = TcpStream::connect(self.address)?;
         Ok(())
     }
 }

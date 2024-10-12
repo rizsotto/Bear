@@ -36,21 +36,18 @@ impl ReporterId {
 // supervisor processes). The events are collected in a common place
 // in order to reconstruct of final report of a build process.
 pub trait Reporter {
-    fn report(&mut self, event: Event) -> Result<(), anyhow::Error>;
+    fn report(&self, event: Event) -> Result<(), anyhow::Error>;
 }
 
-struct TcpReporter {
-    socket: TcpStream,
+pub struct TcpReporter {
     destination: String,
     reporter_id: ReporterId,
 }
 
 impl TcpReporter {
     pub fn new(destination: String) -> Result<Self, anyhow::Error> {
-        let socket = TcpStream::connect(destination.clone())?;
         let reporter_id = ReporterId::new();
         let result = TcpReporter {
-            socket,
             destination,
             reporter_id,
         };
@@ -59,9 +56,10 @@ impl TcpReporter {
 }
 
 impl Reporter for TcpReporter {
-    fn report(&mut self, event: Event) -> Result<(), anyhow::Error> {
+    fn report(&self, event: Event) -> Result<(), anyhow::Error> {
         let envelope = Envelope::new(&self.reporter_id, event);
-        envelope.write_into(&mut self.socket)?;
+        let mut socket = TcpStream::connect(self.destination.clone())?;
+        envelope.write_into(&mut socket)?;
 
         Ok(())
     }
