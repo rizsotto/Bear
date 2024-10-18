@@ -60,7 +60,6 @@ fn report_execution(path_buf: &PathBuf) {
     // Report the execution
     let execution = intercept::Event::Started {
         pid: intercept::ProcessId(std::process::id() as u32),
-        ppid: intercept::ProcessId(std::os::unix::process::parent_id() as u32), // FIXME: This is Unix specific
         execution: intercept::Execution {
             executable: path_buf.clone(),
             arguments: std::env::args().collect(),

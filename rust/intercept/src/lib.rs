@@ -55,7 +55,6 @@ pub struct Execution {
 pub enum Event {
     Started {
         pid: ProcessId,
-        ppid: ProcessId,
         execution: Execution,
     },
     Terminated {

@@ -82,7 +82,6 @@ mod test {
                 timestamp: 0,
                 event: Event::Started {
                     pid: ProcessId(1),
-                    ppid: ProcessId(0),
                     execution: Execution {
                         executable: PathBuf::from("/usr/bin/ls"),
                         arguments: vec!["ls".to_string(), "-l".to_string()],
