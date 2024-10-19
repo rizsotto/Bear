@@ -19,57 +19,76 @@
 
 extern crate core;
 
-use std::path::PathBuf;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use intercept::reporter::{Reporter, TcpReporter};
+use intercept::KEY_DESTINATION;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<()> {
+    env_logger::init();
     // Find out what is the executable name the execution was started with
     let executable = std::env::args().next().unwrap();
+    log::info!("Executable as called: {:?}", executable);
     // Read the PATH variable and find the next executable with the same name
-    let real_executable = std::env::var("PATH")?
-        .split(':')
-        .map(|dir| std::path::Path::new(dir).join(&executable))
-        .filter(|path| path.exists())
-        .nth(1)
-        .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))?;
-    // TODO: ^ This is a very naive way to find the real executable.
-    //        Make sure we don't call ourselves.
+    let real_executable = next_in_path(&executable)?;
+    log::info!("Executable to call: {:?}", real_executable);
 
     // Report the execution with the real executable
-    report_execution(&real_executable);
+    match into_execution(&real_executable).and_then(report) {
+        Ok(_) => log::info!("Execution reported"),
+        Err(e) => log::error!("Execution reporting failed: {}", e),
+    }
 
     // Execute the real executable with the same arguments
     let status = std::process::Command::new(real_executable)
         .args(std::env::args().skip(1))
         .status()?;
+    log::info!("Execution finished with status: {:?}", status);
     // Return the status code
     std::process::exit(status.code().unwrap_or(1));
 }
 
-// TODO: Current error handling is very basic, it just panics on any error.
-//      More sophisticated error handling can be: logging the error and return.
-fn report_execution(path_buf: &PathBuf) {
-    // Get the reporter address from the environment
-    let reporter_address = std::env::var(INTERCEPT_REPORTER_ADDRESS)
-        .expect(format!("${} is not set", INTERCEPT_REPORTER_ADDRESS).as_str());
-    // Create a new reporter
-    let reporter = TcpReporter::new(reporter_address)
-        .expect("Cannot create reporter");
+/// Find the next executable in the PATH variable.
+///
+/// The function reads the PATH variable and tries to find the next executable
+/// with the same name as the given executable. It returns the path to the
+/// executable.
+fn next_in_path(executable: &String) -> Result<PathBuf> {
+    let path = std::env::var("PATH")?;
+    let current_exe = std::env::current_exe()?;
 
-    // Report the execution
-    let execution = intercept::Event {
-        pid: intercept::ProcessId(std::process::id() as u32),
-        execution: intercept::Execution {
-            executable: path_buf.clone(),
-            arguments: std::env::args().collect(),
-            working_dir: std::env::current_dir().expect("Cannot get current directory"),
-            environment: std::env::vars().collect(),
-        },
-    };
-    reporter.report(execution)
-        .expect("Cannot report execution");
+    path.split(':')
+        .map(|dir| Path::new(dir).join(&executable))
+        .filter(|path| path.is_file())// TODO: check if it is executable
+        .filter(|path| path != &current_exe)
+        .nth(0)
+        .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
 }
 
-// declare a const string for the INTERCEPT_REPORTER_ADDRESS environment name
-const INTERCEPT_REPORTER_ADDRESS: &str = "INTERCEPT_REPORTER_ADDRESS";
+fn report(execution: intercept::Execution) -> Result<()> {
+    let event = intercept::Event {
+        pid: intercept::ProcessId(std::process::id() as u32),
+        execution,
+    };
+
+    // Get the reporter address from the environment
+    std::env::var(KEY_DESTINATION)
+        .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
+        // Create a new reporter
+        .and_then(|reporter_address| TcpReporter::new(reporter_address))
+        .with_context(|| "Cannot create TCP execution reporter")
+        // Report the execution
+        .and_then(|reporter| reporter.report(event))
+        .with_context(|| "Sending execution failed")
+}
+
+fn into_execution(path_buf: &Path) -> Result<intercept::Execution> {
+    std::env::current_dir()
+        .with_context(|| "Cannot get current directory")
+        .map(|working_dir| intercept::Execution {
+            executable: path_buf.to_path_buf(),
+            arguments: std::env::args().collect(),
+            working_dir,
+            environment: std::env::vars().collect(),
+        })
+}

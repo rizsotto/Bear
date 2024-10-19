@@ -21,6 +21,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 
 use chrono::Utc;
+use rand::random;
 use serde::{Deserialize, Serialize};
 
 pub mod collector;
@@ -33,6 +34,13 @@ pub mod reporter;
 /// recycled), we need to use a new unique identifier to identify the process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReporterId(pub u64);
+
+impl ReporterId {
+    pub fn new() -> Self {
+        let id = random::<u64>();
+        ReporterId(id)
+    }
+}
 
 /// Process id is a OS identifier for a process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -113,3 +121,6 @@ impl Envelope {
         Ok(length)
     }
 }
+
+/// Declare the environment variable name for the reporter address.
+pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";

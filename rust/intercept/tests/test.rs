@@ -23,7 +23,7 @@ mod test {
     #[test]
     fn tcp_reporter_and_collectors_work() {
         let collector = EventCollectorOnTcp::new().unwrap();
-        let reporter = TcpReporter::new(collector.address().0).unwrap();
+        let reporter = TcpReporter::new(collector.address()).unwrap();
 
         // Create wrapper to share the collector across threads.
         let thread_collector = Arc::new(collector);

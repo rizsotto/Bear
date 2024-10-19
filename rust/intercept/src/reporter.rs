@@ -19,22 +19,11 @@
 
 use std::net::TcpStream;
 
-use rand::random;
-
 use super::{Envelope, Event, ReporterId};
 
-impl ReporterId {
-    pub fn new() -> Self {
-        let id = random::<u64>();
-        ReporterId(id)
-    }
-}
-
-// Represents the remote sink of supervised process events.
-//
-// Events from a process execution can be sent from many actors (mostly
-// supervisor processes). The events are collected in a common place
-// in order to reconstruct of final report of a build process.
+/// Represents the remote sink of supervised process events.
+///
+/// This allows the reporters to send events to a remote collector.
 pub trait Reporter {
     fn report(&self, event: Event) -> Result<(), anyhow::Error>;
 }
@@ -45,6 +34,10 @@ pub struct TcpReporter {
 }
 
 impl TcpReporter {
+    /// Creates a new TCP reporter instance.
+    ///
+    /// It does not open the TCP connection yet. Stores the destination
+    /// address and creates a unique reporter id.
     pub fn new(destination: String) -> Result<Self, anyhow::Error> {
         let reporter_id = ReporterId::new();
         let result = TcpReporter {
@@ -56,6 +49,10 @@ impl TcpReporter {
 }
 
 impl Reporter for TcpReporter {
+    /// Sends an event to the remote collector.
+    ///
+    /// The event is wrapped in an envelope and sent to the remote collector.
+    /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), anyhow::Error> {
         let envelope = Envelope::new(&self.reporter_id, event);
         let mut socket = TcpStream::connect(self.destination.clone())?;
