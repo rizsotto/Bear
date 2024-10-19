@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 fn main() -> Result<()> {
     env_logger::init();
     // Find out what is the executable name the execution was started with
-    let executable = std::env::args().next().unwrap();
+    let executable = file_name_from_arguments()?;
     log::info!("Executable as called: {:?}", executable);
     // Read the PATH variable and find the next executable with the same name
     let real_executable = next_in_path(&executable)?;
@@ -48,19 +48,43 @@ fn main() -> Result<()> {
     std::process::exit(status.code().unwrap_or(1));
 }
 
+/// Get the file name of the executable from the arguments.
+///
+/// Since the executable will be called via soft link, the first argument
+/// will be the name of the soft link. This function returns the file name
+/// of the soft link.
+fn file_name_from_arguments() -> Result<PathBuf> {
+    std::env::args().next()
+        .ok_or_else(|| anyhow::anyhow!("Cannot get first argument"))
+        .and_then(|arg| match PathBuf::from(arg).file_name() {
+            Some(file_name) => Ok(PathBuf::from(file_name)),
+            None => Err(anyhow::anyhow!("Cannot get the file name from the argument")),
+        })
+}
+
 /// Find the next executable in the PATH variable.
 ///
 /// The function reads the PATH variable and tries to find the next executable
 /// with the same name as the given executable. It returns the path to the
 /// executable.
-fn next_in_path(executable: &String) -> Result<PathBuf> {
+fn next_in_path(target: &Path) -> Result<PathBuf> {
     let path = std::env::var("PATH")?;
+    log::debug!("PATH: {}", path);
+    // The `current_exe` is a canonical path to the current executable.
     let current_exe = std::env::current_exe()?;
 
     path.split(':')
-        .map(|dir| Path::new(dir).join(&executable))
-        .filter(|path| path.is_file())// TODO: check if it is executable
-        .filter(|path| path != &current_exe)
+        .map(|dir| Path::new(dir).join(target))
+        .filter(|path| path.is_file()) // TODO: check if it is executable
+        .filter(|path| {
+            // We need to compare it with the real path of the candidate executable to avoid
+            // calling the same executable again.
+            let real_path = match path.canonicalize() {
+                Ok(path) => path,
+                Err(_) => return false,
+            };
+            real_path != current_exe
+        })
         .nth(0)
         .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
 }
