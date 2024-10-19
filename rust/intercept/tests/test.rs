@@ -78,29 +78,75 @@ mod test {
     lazy_static! {
         static ref ENVELOPES: Vec<Envelope> = vec![
             Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Started {
-                    pid: ProcessId(1),
+                rid: ReporterId::new(),
+                timestamp: fixtures::timestamp(),
+                event: Event {
+                    pid: fixtures::pid(),
                     execution: Execution {
                         executable: PathBuf::from("/usr/bin/ls"),
-                        arguments: vec!["ls".to_string(), "-l".to_string()],
+                        arguments: vec_of_strings!["ls", "-l"],
                         working_dir: PathBuf::from("/tmp"),
                         environment: HashMap::new(),
                     },
                 },
             },
             Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Terminated { status: 0 },
+                rid: ReporterId::new(),
+                timestamp: fixtures::timestamp(),
+                event: Event {
+                    pid: fixtures::pid(),
+                    execution: Execution {
+                        executable: PathBuf::from("/usr/bin/cc"),
+                        arguments: vec_of_strings!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
+                        working_dir: PathBuf::from("/home/user"),
+                        environment: map_of_strings! {
+                            "PATH" => "/usr/bin:/bin",
+                            "HOME" => "/home/user",
+                        },
+                    },
+                },
             },
             Envelope {
-                rid: ReporterId(1),
-                timestamp: 0,
-                event: Event::Signaled { signal: 15 },
+                rid: ReporterId::new(),
+                timestamp: fixtures::timestamp(),
+                event: Event {
+                    pid: fixtures::pid(),
+                    execution: Execution {
+                        executable: PathBuf::from("/usr/bin/ld"),
+                        arguments: vec_of_strings!["ld", "-o", "./file_a", "./file_a.o"],
+                        working_dir: PathBuf::from("/opt/project"),
+                        environment: map_of_strings! {
+                            "PATH" => "/usr/bin:/bin",
+                            "LD_LIBRARY_PATH" => "/usr/lib:/lib",
+                        },
+                    },
+                },
             },
         ];
         static ref EVENTS: Vec<Event> = ENVELOPES.iter().map(|e| e.event.clone()).collect();
+    }
+}
+
+mod fixtures {
+    use intercept::ProcessId;
+
+    pub fn timestamp() -> u64 {
+        rand::random::<u64>()
+    }
+
+    pub fn pid() -> ProcessId {
+        ProcessId(rand::random::<u32>())
+    }
+
+    #[macro_export]
+    macro_rules! vec_of_strings {
+        ($($x:expr),*) => (vec![$($x.to_string()),*]);
+    }
+
+    #[macro_export]
+    macro_rules! map_of_strings {
+        ($($k:expr => $v:expr),* $(,)?) => {{
+            core::convert::From::from([$(($k.to_string(), $v.to_string()),)*])
+        }};
     }
 }

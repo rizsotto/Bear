@@ -26,17 +26,23 @@ use serde::{Deserialize, Serialize};
 pub mod collector;
 pub mod reporter;
 
-// Reporter id is a unique identifier for a reporter.
-//
-// It is used to identify the process that sends the execution report.
-// Because the OS PID is not unique across a single build (PIDs are
-// recycled), we need to use a new unique identifier to identify the process.
+/// Reporter id is a unique identifier for a reporter.
+///
+/// It is used to identify the process that sends the execution report.
+/// Because the OS PID is not unique across a single build (PIDs are
+/// recycled), we need to use a new unique identifier to identify the process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ReporterId(pub u64);
 
+/// Process id is a OS identifier for a process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ProcessId(pub u32);
 
+/// Execution is a representation of a process execution.
+///
+/// It does not contain information about the outcome of the execution,
+/// like the exit code or the duration of the execution. It only contains
+/// the information that is necessary to reproduce the execution.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Execution {
     pub executable: PathBuf,
@@ -45,26 +51,20 @@ pub struct Execution {
     pub environment: HashMap<String, String>,
 }
 
-// Represent a relevant life cycle event of a process.
-//
-// Currently, it's only the process life cycle events (start, signal,
-// terminate), but can be extended later with performance related
-// events like monitoring the CPU usage or the memory allocation if
-// this information is available.
+/// Represent a relevant life cycle event of a process.
+///
+/// In the current implementation, we only have one event, the `Started` event.
+/// This event is sent when a process is started. It contains the process id
+/// and the execution information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum Event {
-    Started {
-        pid: ProcessId,
-        execution: Execution,
-    },
-    Terminated {
-        status: i64,
-    },
-    Signaled {
-        signal: i32,
-    },
+pub struct Event {
+    pub pid: ProcessId,
+    pub execution: Execution,
 }
 
+/// Envelope is a wrapper around the event.
+///
+/// It contains the reporter id, the timestamp of the event and the event itself.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Envelope {
     pub rid: ReporterId,
@@ -82,6 +82,10 @@ impl Envelope {
         }
     }
 
+    /// Read an envelope from a reader using TLV format.
+    ///
+    /// The envelope is serialized using JSON and the length of the JSON
+    /// is written as a 4 byte big-endian integer before the JSON.
     pub fn read_from(reader: &mut impl Read) -> Result<Self, anyhow::Error> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
@@ -94,6 +98,10 @@ impl Envelope {
         Ok(envelope)
     }
 
+    /// Write an envelope to a writer using TLV format.
+    ///
+    /// The envelope is serialized using JSON and the length of the JSON
+    /// is written as a 4 byte big-endian integer before the JSON.
     pub fn write_into(&self, writer: &mut impl Write) -> Result<u32, anyhow::Error> {
         let serialized_envelope = serde_json::to_string(&self)?;
         let bytes = serialized_envelope.into_bytes();

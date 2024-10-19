@@ -58,7 +58,7 @@ fn report_execution(path_buf: &PathBuf) {
         .expect("Cannot create reporter");
 
     // Report the execution
-    let execution = intercept::Event::Started {
+    let execution = intercept::Event {
         pid: intercept::ProcessId(std::process::id() as u32),
         execution: intercept::Execution {
             executable: path_buf.clone(),
