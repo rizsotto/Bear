@@ -5,8 +5,8 @@ use nom::multi::many1;
 use nom::sequence::preceded;
 
 use super::super::{Meaning, RecognitionResult, Tool};
-use internal::Argument;
 use intercept::Execution;
+use internal::Argument;
 
 pub(super) struct Gcc {}
 

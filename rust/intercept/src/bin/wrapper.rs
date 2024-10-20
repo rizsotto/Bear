@@ -59,11 +59,14 @@ fn main() -> Result<()> {
 /// will be the name of the soft link. This function returns the file name
 /// of the soft link.
 fn file_name_from_arguments() -> Result<PathBuf> {
-    std::env::args().next()
+    std::env::args()
+        .next()
         .ok_or_else(|| anyhow::anyhow!("Cannot get first argument"))
         .and_then(|arg| match PathBuf::from(arg).file_name() {
             Some(file_name) => Ok(PathBuf::from(file_name)),
-            None => Err(anyhow::anyhow!("Cannot get the file name from the argument")),
+            None => Err(anyhow::anyhow!(
+                "Cannot get the file name from the argument"
+            )),
         })
 }
 
