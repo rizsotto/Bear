@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//! Implements deserialization of the `Entry` struct.
+
 use std::fmt;
 use std::path;
 

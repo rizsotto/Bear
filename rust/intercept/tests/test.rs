@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 use intercept::collector::{EventCollector, EventCollectorOnTcp};
 use intercept::reporter::{Reporter, TcpReporter};
 use intercept::*;
