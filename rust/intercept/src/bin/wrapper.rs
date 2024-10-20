@@ -17,6 +17,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! This module implements a wrapper around an arbitrary executable.
+//!
+//! The wrapper is used to intercept the execution of the executable and
+//! report it to a remote server. The wrapper is named after the executable
+//! via a soft link (or a hard copy on platforms where soft links are not
+//! supported). The wrapper process is called instead of the original executable.
+//! This is arranged by the process that supervise the build process.
+//! The build supervisor creates a directory with soft links and place
+//! that directory at the beginning of the PATH variable. Which guarantees
+//! that the wrapper is called instead of the original executable.
+//!
+//! The wrapper reads the PATH variable and finds the next executable with
+//! the same name as the wrapper. It reports the execution of the real
+//! executable and then calls the real executable with the same arguments.
+
 extern crate core;
 
 use anyhow::{Context, Result};
@@ -24,6 +39,12 @@ use intercept::reporter::{Reporter, TcpReporter};
 use intercept::KEY_DESTINATION;
 use std::path::{Path, PathBuf};
 
+/// Implementation of the wrapper process.
+///
+/// The process exit code is the same as the executed process exit code.
+/// Besides the functionality described in the module documentation, the
+/// wrapper process logs the execution and the relevant steps leading to
+/// the execution.
 fn main() -> Result<()> {
     env_logger::init();
     // Find out what is the executable name the execution was started with
@@ -33,18 +54,19 @@ fn main() -> Result<()> {
     let real_executable = next_in_path(&executable)?;
     log::info!("Executable to call: {:?}", real_executable);
 
-    // Report the execution with the real executable
+    // Reporting failures shall not fail the execution.
     match into_execution(&real_executable).and_then(report) {
         Ok(_) => log::info!("Execution reported"),
         Err(e) => log::error!("Execution reporting failed: {}", e),
     }
 
     // Execute the real executable with the same arguments
+    // TODO: handle signals and forward them to the child process.
     let status = std::process::Command::new(real_executable)
         .args(std::env::args().skip(1))
         .status()?;
     log::info!("Execution finished with status: {:?}", status);
-    // Return the status code
+    // Return the child process status code
     std::process::exit(status.code().unwrap_or(1));
 }
 
@@ -75,7 +97,8 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
 
     path.split(':')
         .map(|dir| Path::new(dir).join(target))
-        .filter(|path| path.is_file()) // TODO: check if it is executable
+        // FIXME: check if it is executable
+        .filter(|path| path.is_file())
         .filter(|path| {
             // We need to compare it with the real path of the candidate executable to avoid
             // calling the same executable again.
@@ -111,6 +134,7 @@ fn into_execution(path_buf: &Path) -> Result<intercept::Execution> {
         .with_context(|| "Cannot get current directory")
         .map(|working_dir| intercept::Execution {
             executable: path_buf.to_path_buf(),
+            // FIXME: substitute the executable name on the first position
             arguments: std::env::args().collect(),
             working_dir,
             environment: std::env::vars().collect(),
