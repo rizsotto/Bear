@@ -26,18 +26,26 @@ const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 ///     - /usr/bin/c++
 /// output:
 ///   specification: clang
-///   transform:
-///     arguments_to_remove:
-///       - -Wall
-///     arguments_to_add:
-///       - -DDEBUG
+///   compilers:
+///     - path: /usr/local/bin/cc
+///       ignore: always
+///     - path: /usr/local/bin/c++
+///       ignore: conditional
+///       arguments:
+///         match:
+///           - -###
+///     - path: /usr/local/bin/clang
+///       ignore: never
+///       arguments:
+///         add:
+///           - -DDEBUG
+///         remove:
+///           - -Wall
+///     - path: /usr/local/bin/clang++
+///       arguments:
+///         remove:
+///           - -Wall
 ///   filter:
-///     compilers:
-///       with_arguments:
-///         - -###
-///       with_paths:
-///         - /usr/local/bin/cc
-///         - /usr/local/bin/c++
 ///     source:
 ///       include_only_existing_files: true
 ///       paths_to_include:
@@ -135,10 +143,10 @@ impl Main {
             .open(file)
             .with_context(|| format!("Failed to open configuration file: {:?}", file))?;
 
-        let content = Self::from_reader(reader)
+        let content: Self = Self::from_reader(reader)
             .with_context(|| format!("Failed to parse configuration from file: {:?}", file))?;
 
-        Ok(content)
+        content.validate()
     }
 
     /// Define the deserialization format of the config file.
@@ -154,10 +162,24 @@ impl Main {
 impl Default for Main {
     fn default() -> Self {
         Main {
+            schema: String::from(SUPPORTED_SCHEMA_VERSION),
             intercept: Intercept::default(),
             output: Output::default(),
-            schema: String::from(SUPPORTED_SCHEMA_VERSION),
         }
+    }
+}
+
+impl Validate for Main {
+    /// Validate the configuration of the main configuration.
+    fn validate(self) -> Result<Self> {
+        let intercept = self.intercept.validate()?;
+        let output = self.output.validate()?;
+
+        Ok(Main {
+            schema: self.schema,
+            intercept,
+            output,
+        })
     }
 }
 
@@ -184,7 +206,6 @@ pub enum Intercept {
     Preload {
         #[serde(default = "default_preload_library")]
         path: PathBuf,
-        // TODO: add support for executables to recognize (as compiler)
     },
 }
 
@@ -207,6 +228,40 @@ impl Default for Intercept {
     }
 }
 
+impl Validate for Intercept {
+    /// Validate the configuration of the intercept mode.
+    fn validate(self) -> Result<Self> {
+        match self {
+            Intercept::Wrapper {
+                path,
+                directory,
+                executables,
+            } => {
+                if is_empty_path(&path) {
+                    anyhow::bail!("The wrapper path cannot be empty.");
+                }
+                if is_empty_path(&directory) {
+                    anyhow::bail!("The wrapper directory cannot be empty.");
+                }
+                if executables.is_empty() {
+                    anyhow::bail!("The list of executables to wrap cannot be empty.");
+                }
+                Ok(Intercept::Wrapper {
+                    path,
+                    directory,
+                    executables,
+                })
+            }
+            Intercept::Preload { path } => {
+                if is_empty_path(&path) {
+                    anyhow::bail!("The preload library path cannot be empty.");
+                }
+                Ok(Intercept::Preload { path })
+            }
+        }
+    }
+}
+
 /// Output configuration is used to customize the output format.
 ///
 /// Allow to customize the output format of the compiler calls.
@@ -220,7 +275,7 @@ pub enum Output {
     #[serde(rename = "clang")]
     Clang {
         #[serde(default)]
-        transform: Transform,
+        compilers: Vec<Compiler>,
         #[serde(default)]
         filter: Filter,
         #[serde(default)]
@@ -234,24 +289,124 @@ pub enum Output {
 impl Default for Output {
     fn default() -> Self {
         Output::Clang {
-            transform: Transform::default(),
+            compilers: vec![],
             filter: Filter::default(),
             format: Format::default(),
         }
     }
 }
 
-/// Transform configuration is used to transform the compiler calls.
+impl Validate for Output {
+    /// Validate the configuration of the output writer.
+    fn validate(self) -> Result<Self> {
+        match self {
+            Output::Clang {
+                compilers,
+                filter,
+                format,
+            } => {
+                let compilers = compilers.validate()?;
+                let filter = filter.validate()?;
+                Ok(Output::Clang {
+                    compilers,
+                    filter,
+                    format,
+                })
+            }
+            Output::Semantic {} => Ok(Output::Semantic {}),
+        }
+    }
+}
+
+/// Represents instructions to transform the compiler calls.
 ///
-/// Allow to customize the transformation of the compiler calls.
+/// Allow to transform the compiler calls by adding or removing arguments.
+/// It also can instruct to filter out the compiler call from the output.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct Compiler {
+    pub path: PathBuf,
+    #[serde(default = "default_ignore_compiler")]
+    pub ignore: Ignore, // FIXME: change this to bool
+    #[serde(default)]
+    pub arguments: Arguments,
+}
+
+impl Validate for Vec<Compiler> {
+    /// Validate the configuration of the compiler list.
+    ///
+    /// Duplicate entries are allowed in the list. The reason behind this is
+    /// that the same compiler can be ignored with some arguments and not
+    /// ignored (but transformed) with other arguments.
+    // TODO: check for duplicate entries
+    // TODO: check if a match argument is used after an always or never
+    fn validate(self) -> Result<Self> {
+        self.into_iter()
+            .map(|compiler| compiler.validate())
+            .collect::<Result<Vec<_>>>()
+    }
+}
+
+impl Validate for Compiler {
+    /// Validate the configuration of the compiler.
+    fn validate(self) -> Result<Self> {
+        match self.ignore {
+            Ignore::Always if self.arguments != Arguments::default() => {
+                anyhow::bail!(
+                    "All arguments must be empty in always ignore mode. {:?}",
+                    self.path
+                );
+            }
+            Ignore::Conditional if self.arguments.match_.is_empty() => {
+                anyhow::bail!(
+                    "The match arguments cannot be empty in conditional ignore mode. {:?}",
+                    self.path
+                );
+            }
+            Ignore::Never if !self.arguments.match_.is_empty() => {
+                anyhow::bail!(
+                    "The arguments must be empty in never ignore mode. {:?}",
+                    self.path
+                );
+            }
+            _ if is_empty_path(&self.path) => {
+                anyhow::bail!("The compiler path cannot be empty.");
+            }
+            _ => Ok(self),
+        }
+    }
+}
+
+/// Represents instructions to ignore the compiler call.
 ///
-/// - Add or remove arguments from the compiler calls.
-#[derive(Debug, Default, PartialEq, Deserialize, Serialize)]
-pub struct Transform {
+/// The meaning of the possible values are:
+/// - Always: Always ignore the compiler call.
+/// - Conditional: Ignore the compiler call if the arguments match.
+/// - Never: Never ignore the compiler call. (Default)
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum Ignore {
+    #[serde(rename = "always")]
+    Always,
+    #[serde(rename = "conditional")]
+    Conditional,
+    #[serde(rename = "never")]
+    Never,
+}
+
+/// Argument lists to match, add or remove.
+///
+/// The `match` field is used to specify the arguments to match. Can be used only with the
+/// conditional ignore mode.
+///
+/// The `add` or `remove` fields are used to specify the arguments to add or remove. These can be
+/// used with the conditional or never ignore mode.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct Arguments {
+    #[serde(default, rename = "match")]
+    pub match_: Vec<String>,
     #[serde(default)]
-    pub arguments_to_add: Vec<String>,
+    pub add: Vec<String>,
     #[serde(default)]
-    pub arguments_to_remove: Vec<String>,
+    pub remove: Vec<String>,
 }
 
 /// Filter configuration is used to filter the compiler calls.
@@ -261,49 +416,22 @@ pub struct Transform {
 /// - Compilers: Specify on the compiler path and arguments.
 /// - Source: Specify the source file location.
 /// - Duplicates: Specify the fields of the JSON compilation database record to detect duplicates.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Filter {
-    #[serde(default)]
-    pub compilers: CompilerFilter,
     #[serde(default)]
     pub source: SourceFilter,
     #[serde(default)]
     pub duplicates: DuplicateFilter,
 }
 
-impl Filter {
+impl Validate for Filter {
     /// Validate the configuration of the output writer.
-    pub fn validate(&self) -> Self {
-        Self {
-            source: self.source.clone(),
-            compilers: self.compilers.clone(),
-            duplicates: self.duplicates.validate(),
-        }
+    fn validate(self) -> Result<Self> {
+        self.duplicates.validate().map(|duplicates| Filter {
+            source: self.source,
+            duplicates,
+        })
     }
-}
-
-impl Default for Filter {
-    fn default() -> Self {
-        Filter {
-            compilers: CompilerFilter::default(),
-            source: SourceFilter::default(),
-            duplicates: DuplicateFilter::default(),
-        }
-    }
-}
-
-/// Compiler filter configuration is used to filter the compiler calls based on the compiler.
-///
-/// Allow to filter the compiler calls based on the compiler path and arguments.
-///
-/// - With paths: Filter the compiler calls based on the compiler path.
-/// - With arguments: Filter the compiler calls based on the compiler arguments present.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
-pub struct CompilerFilter {
-    #[serde(default)]
-    pub with_paths: Vec<PathBuf>,
-    #[serde(default)]
-    pub with_arguments: Vec<String>,
 }
 
 /// Source filter configuration is used to filter the compiler calls based on the source files.
@@ -326,22 +454,23 @@ pub struct SourceFilter {
 /// Duplicate filter configuration is used to filter the duplicate compiler calls.
 ///
 /// - By fields: Specify the fields of the JSON compilation database record to detect duplicates.
-#[derive(Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct DuplicateFilter {
     pub by_fields: Vec<OutputFields>,
 }
 
-impl DuplicateFilter {
+impl Validate for DuplicateFilter {
     /// Deduplicate the fields of the fields vector.
-    pub fn validate(&self) -> Self {
-        Self {
+    fn validate(self) -> Result<Self> {
+        let result = Self {
             by_fields: (&self.by_fields)
                 .into_iter()
                 .map(|field| field.clone())
                 .collect::<HashSet<_>>()
                 .into_iter()
                 .collect(),
-        }
+        };
+        Ok(result)
     }
 }
 
@@ -373,7 +502,6 @@ pub struct Format {
     command_as_array: bool,
     #[serde(default = "default_disabled")]
     drop_output_field: bool,
-    // TODO: add support to customize the paths (absolute, relative or original)
 }
 
 impl Default for Format {
@@ -408,6 +536,11 @@ fn default_preload_library() -> PathBuf {
     PathBuf::from(WRAPPER_EXECUTABLE_PATH)
 }
 
+/// The default don't ignore the compiler.
+fn default_ignore_compiler() -> Ignore {
+    Ignore::Never
+}
+
 // Custom deserialization function to validate the schema version
 fn validate_schema_version<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
 where
@@ -423,6 +556,17 @@ where
     } else {
         Ok(schema)
     }
+}
+
+/// A trait to validate the configuration and return a valid instance.
+pub trait Validate {
+    fn validate(self) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+fn is_empty_path(path: &Path) -> bool {
+    path.to_str().map_or(false, |p| p.is_empty())
 }
 
 #[cfg(test)]
@@ -443,18 +587,26 @@ mod test {
             - /usr/bin/c++
         output:
           specification: clang
-          transform:
-            arguments_to_remove:
-              - -Wall
-            arguments_to_add:
-              - -DDEBUG
+          compilers:
+            - path: /usr/local/bin/cc
+              ignore: always
+            - path: /usr/local/bin/c++
+              ignore: conditional
+              arguments:
+                match:
+                  - -###
+            - path: /usr/local/bin/clang
+              ignore: never
+              arguments:
+                add:
+                  - -DDEBUG
+                remove:
+                  - -Wall
+            - path: /usr/local/bin/clang++
+              arguments:
+                remove:
+                  - -Wall
           filter:
-            compilers:
-              with_arguments:
-                - -###
-              with_paths:
-                - /usr/local/bin/cc
-                - /usr/local/bin/c++
             source:
               include_only_existing_files: true
               paths_to_include:
@@ -479,15 +631,39 @@ mod test {
                 executables: vec_of_pathbuf!["/usr/bin/cc", "/usr/bin/c++"],
             },
             output: Output::Clang {
-                transform: Transform {
-                    arguments_to_add: vec_of_strings!["-DDEBUG"],
-                    arguments_to_remove: vec_of_strings!["-Wall"],
-                },
-                filter: Filter {
-                    compilers: CompilerFilter {
-                        with_paths: vec_of_pathbuf!["/usr/local/bin/cc", "/usr/local/bin/c++"],
-                        with_arguments: vec_of_strings!["-###"],
+                compilers: vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/cc"),
+                        ignore: Ignore::Always,
+                        arguments: Arguments::default(),
                     },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/c++"),
+                        ignore: Ignore::Conditional,
+                        arguments: Arguments {
+                            match_: vec_of_strings!["-###"],
+                            ..Default::default()
+                        },
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/clang"),
+                        ignore: Ignore::Never,
+                        arguments: Arguments {
+                            add: vec_of_strings!["-DDEBUG"],
+                            remove: vec_of_strings!["-Wall"],
+                            ..Default::default()
+                        },
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/clang++"),
+                        ignore: Ignore::Never,
+                        arguments: Arguments {
+                            remove: vec_of_strings!["-Wall"],
+                            ..Default::default()
+                        },
+                    },
+                ],
+                filter: Filter {
                     source: SourceFilter {
                         include_only_existing_files: true,
                         paths_to_include: vec_of_pathbuf!["sources"],
@@ -540,7 +716,7 @@ mod test {
         let expected = Main {
             intercept: Intercept::default(),
             output: Output::Clang {
-                transform: Transform::default(),
+                compilers: vec![],
                 filter: Filter::default(),
                 format: Format::default(),
             },

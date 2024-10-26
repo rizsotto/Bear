@@ -28,14 +28,17 @@ pub struct OutputWriter {
 
 impl OutputWriter {
     /// Create a new instance of the output writer.
-    pub fn configure(args: &args::BuildSemantic, config: &config::Output) -> Self {
+    pub fn configure(args: &args::BuildSemantic, config: &config::Output) -> Result<Self> {
         match config {
-            config::Output::Clang { format, filter, .. } => OutputWriter {
-                output: PathBuf::from(&args.file_name),
-                append: args.append,
-                filter: filter.validate(),
-                format: format.clone(),
-            },
+            config::Output::Clang { format, filter, .. } => {
+                let result = OutputWriter {
+                    output: PathBuf::from(&args.file_name),
+                    append: args.append,
+                    filter: filter.clone(),
+                    format: format.clone(),
+                };
+                Ok(result)
+            }
             config::Output::Semantic { .. } => {
                 todo!("implement this case")
             }

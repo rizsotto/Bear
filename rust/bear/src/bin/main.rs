@@ -80,7 +80,7 @@ impl Application {
                 let event_source = EventFileReader::try_from(input)?;
                 let semantic_recognition = SemanticRecognition::try_from(&config)?;
                 let semantic_transform = SemanticTransform::from(&config.output);
-                let output_writer = OutputWriter::configure(&output, &config.output);
+                let output_writer = OutputWriter::configure(&output, &config.output)?;
                 let result = Application::Semantic {
                     event_source,
                     semantic_recognition,
@@ -124,7 +124,7 @@ impl Application {
                 let entries = event_source
                     .generate()
                     .flat_map(|execution| semantic_recognition.apply(execution))
-                    .map(|semantic| semantic_transform.apply(semantic));
+                    .flat_map(|semantic| semantic_transform.apply(semantic));
                 // Consume the entries and write them to the output file.
                 // The exit code is based on the result of the output writer.
                 match output_writer.run(entries) {
@@ -162,17 +162,16 @@ impl TryFrom<&config::Main> for SemanticRecognition {
             _ => vec![],
         };
         let compilers_to_exclude = match &config.output {
-            config::Output::Clang { filter, .. } => filter.compilers.with_paths.clone(),
-            _ => vec![],
-        };
-        let arguments_to_exclude = match &config.output {
-            config::Output::Clang { filter, .. } => filter.compilers.with_arguments.clone(),
+            config::Output::Clang { compilers, .. } => compilers
+                .into_iter()
+                .filter(|compiler| compiler.ignore == config::Ignore::Always)
+                .map(|compiler| compiler.path.clone())
+                .collect(),
             _ => vec![],
         };
         let tool = semantic::tools::Builder::new()
             .compilers_to_recognize(compilers_to_include.as_slice())
             .compilers_to_exclude(compilers_to_exclude.as_slice())
-            .compilers_to_exclude_by_arguments(arguments_to_exclude.as_slice())
             .build();
 
         Ok(SemanticRecognition {
@@ -218,24 +217,18 @@ impl SemanticRecognition {
 /// Modifies the compiler flags based on the configuration. Ignores non-compiler calls.
 enum SemanticTransform {
     NoTransform,
-    Transform {
-        arguments_to_add: Vec<String>,
-        arguments_to_remove: Vec<String>,
-    },
+    Transform { compilers: Vec<config::Compiler> },
 }
 
 impl From<&config::Output> for SemanticTransform {
     fn from(config: &config::Output) -> Self {
         match config {
-            config::Output::Clang { transform, .. } => {
-                if transform.arguments_to_add.is_empty() && transform.arguments_to_remove.is_empty()
-                {
+            config::Output::Clang { compilers, .. } => {
+                if compilers.is_empty() {
                     SemanticTransform::NoTransform
                 } else {
-                    SemanticTransform::Transform {
-                        arguments_to_add: transform.arguments_to_add.clone(),
-                        arguments_to_remove: transform.arguments_to_remove.clone(),
-                    }
+                    let compilers = compilers.clone();
+                    SemanticTransform::Transform { compilers }
                 }
             }
             config::Output::Semantic { .. } => SemanticTransform::NoTransform,
@@ -244,53 +237,95 @@ impl From<&config::Output> for SemanticTransform {
 }
 
 impl SemanticTransform {
-    fn apply(&self, input: semantic::Meaning) -> semantic::Meaning {
-        match input {
+    fn apply(&self, input: semantic::Meaning) -> Option<semantic::Meaning> {
+        match &input {
             semantic::Meaning::Compiler {
                 compiler,
-                working_dir,
                 passes,
-            } if matches!(self, SemanticTransform::Transform { .. }) => {
-                let passes_transformed = passes
-                    .into_iter()
-                    .map(|pass| self.transform_pass(pass))
-                    .collect();
-
-                semantic::Meaning::Compiler {
-                    compiler,
-                    working_dir,
-                    passes: passes_transformed,
+                working_dir,
+            } => match self.lookup(&compiler) {
+                Some(config::Compiler {
+                    ignore: config::Ignore::Always,
+                    ..
+                }) => None,
+                Some(config::Compiler {
+                    ignore: config::Ignore::Conditional,
+                    arguments,
+                    ..
+                }) => {
+                    if Self::filter(arguments, passes) {
+                        None
+                    } else {
+                        Some(input)
+                    }
                 }
-            }
-            _ => input,
+                Some(config::Compiler {
+                    ignore: config::Ignore::Never,
+                    arguments,
+                    ..
+                }) => {
+                    let new_passes = SemanticTransform::execute(arguments, passes);
+                    Some(semantic::Meaning::Compiler {
+                        compiler: compiler.clone(),
+                        working_dir: working_dir.clone(),
+                        passes: new_passes,
+                    })
+                }
+                None => Some(input),
+            },
+            _ => Some(input),
         }
     }
 
-    fn transform_pass(&self, pass: semantic::CompilerPass) -> semantic::CompilerPass {
-        match pass {
-            semantic::CompilerPass::Compile {
-                source,
-                output,
-                flags,
-            } => match self {
-                SemanticTransform::Transform {
-                    arguments_to_add,
-                    arguments_to_remove,
-                } => {
-                    let flags_transformed = flags
-                        .into_iter()
-                        .filter(|flag| !arguments_to_remove.contains(flag))
-                        .chain(arguments_to_add.iter().cloned())
-                        .collect();
-                    semantic::CompilerPass::Compile {
-                        source,
-                        output,
-                        flags: flags_transformed,
-                    }
-                }
-                _ => panic!("This is a bug! Please report it to the developers."),
-            },
-            _ => pass,
+    // TODO: allow multiple matches for the same compiler
+    fn lookup(&self, compiler: &std::path::Path) -> Option<&config::Compiler> {
+        match self {
+            SemanticTransform::Transform { compilers } => {
+                compilers.iter().find(|c| c.path == compiler)
+            }
+            _ => None,
         }
+    }
+
+    fn filter(arguments: &config::Arguments, passes: &[semantic::CompilerPass]) -> bool {
+        let match_flags = arguments.match_.as_slice();
+        passes.iter().any(|pass| match pass {
+            semantic::CompilerPass::Compile { flags, .. } => {
+                flags.iter().any(|flag| match_flags.contains(flag))
+            }
+            _ => false,
+        })
+    }
+
+    fn execute(
+        arguments: &config::Arguments,
+        passes: &[semantic::CompilerPass],
+    ) -> Vec<semantic::CompilerPass> {
+        let arguments_to_remove = arguments.remove.as_slice();
+        let arguments_to_add = arguments.add.as_slice();
+
+        let mut new_passes = Vec::with_capacity(passes.len());
+        for pass in passes {
+            match pass {
+                semantic::CompilerPass::Compile {
+                    source,
+                    output,
+                    flags,
+                } => {
+                    let mut new_flags = flags.clone();
+                    new_flags.retain(|flag| !arguments_to_remove.contains(flag));
+                    new_flags.extend(arguments_to_add.iter().cloned());
+                    new_passes.push(semantic::CompilerPass::Compile {
+                        source: source.clone(),
+                        output: output.clone(),
+                        flags: new_flags,
+                    });
+                }
+                semantic::CompilerPass::Preprocess => {
+                    new_passes.push(semantic::CompilerPass::Preprocess)
+                }
+            }
+        }
+        new_passes
     }
 }

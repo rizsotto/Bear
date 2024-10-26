@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use super::tools::combinators::Any;
 use super::tools::generic::Generic;
-use super::tools::ignore::{IgnoreByArgs, IgnoreByPath};
+use super::tools::ignore::IgnoreByPath;
 use super::Tool;
 
 mod combinators;
@@ -57,16 +57,6 @@ impl Builder {
         }
         self
     }
-
-    /// Adds new tools to recognize as non-compilers by arguments.
-    pub fn compilers_to_exclude_by_arguments(mut self, args: &[String]) -> Self {
-        if !args.is_empty() {
-            // Add these new compilers at the front of the tools.
-            let tool = IgnoreByArgs::new(args);
-            self.tools.insert(0, tool);
-        }
-        self
-    }
 }
 
 #[cfg(test)]
@@ -94,20 +84,6 @@ mod test {
     fn test_builder_with_compilers_to_exclude() {
         let compilers = vec_of_pathbuf!["/usr/bin/g++"];
         let sut = Builder::new().compilers_to_exclude(&compilers).build();
-
-        let input = any_execution();
-        match sut.recognize(&input) {
-            RecognitionResult::Recognized(Ok(Meaning::Ignored)) => assert!(true),
-            _ => assert!(false),
-        }
-    }
-
-    #[test]
-    fn test_builder_with_compilers_to_exclude_by_arguments() {
-        let args = vec_of_strings!["-c"];
-        let sut = Builder::new()
-            .compilers_to_exclude_by_arguments(&args)
-            .build();
 
         let input = any_execution();
         match sut.recognize(&input) {

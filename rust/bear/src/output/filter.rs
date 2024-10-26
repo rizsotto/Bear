@@ -28,17 +28,11 @@ impl TryFrom<&config::Filter> for EntryPredicate {
         let source_paths_to_include =
             Builder::filter_by_source_paths(&config.source.paths_to_include);
         let source_checks = source_exist_check & !source_paths_to_exclude & source_paths_to_include;
-        // - Check if the compiler path is not in the list of the configuration
-        // - Check if the compiler arguments are not in the list of the configuration
-        let compiler_with_path = Builder::filter_by_compiler_paths(&config.compilers.with_paths);
-        let compiler_with_argument =
-            Builder::filter_by_compiler_arguments(&config.compilers.with_arguments);
-        let compiler_checks = !compiler_with_path & !compiler_with_argument;
         // - Check if the entry is not a duplicate based on the fields of the configuration
         let hash_function = create_hash(&config.duplicates.by_fields);
         let duplicates = Builder::filter_duplicate_entries(hash_function);
 
-        Ok((source_checks & compiler_checks & duplicates).build())
+        Ok((source_checks & duplicates).build())
     }
 }
 
@@ -75,36 +69,6 @@ mod builder {
         {
             Self {
                 candidate: Some(Box::new(predicate)),
-            }
-        }
-
-        /// Create a predicate that filters out entries
-        /// that are using one of the given compilers.
-        pub(super) fn filter_by_compiler_paths(paths: &[PathBuf]) -> Self {
-            if paths.is_empty() {
-                Self::new()
-            } else {
-                let owned_paths: Vec<PathBuf> = paths.iter().cloned().collect();
-                Self::from(move |entry| {
-                    let compiler = PathBuf::from(entry.arguments[0].as_str());
-                    // return true if none of the paths are a prefix of the compiler path.
-                    owned_paths.iter().any(|path| !compiler.starts_with(path))
-                })
-            }
-        }
-
-        /// Create a predicate that filters out entries
-        /// that are using one of the given compiler arguments.
-        pub(super) fn filter_by_compiler_arguments(flags: &[String]) -> Self {
-            if flags.is_empty() {
-                Self::new()
-            } else {
-                let owned_flags: HashSet<String> = flags.iter().cloned().collect();
-                Self::from(move |entry| {
-                    let mut arguments = entry.arguments.iter().skip(1);
-                    // return true if none of the flags are in the arguments.
-                    arguments.all(|argument| !owned_flags.contains(argument))
-                })
             }
         }
 
@@ -209,69 +173,6 @@ mod builder {
         use super::*;
         use crate::{vec_of_pathbuf, vec_of_strings};
         use std::hash::{Hash, Hasher};
-
-        #[test]
-        fn test_filter_by_compiler_paths() {
-            let input: Vec<Entry> = vec![
-                Entry {
-                    file: PathBuf::from("/home/user/project/source.c"),
-                    arguments: vec_of_strings!["cc", "-c", "source.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-                Entry {
-                    file: PathBuf::from("/home/user/project/source.c++"),
-                    arguments: vec_of_strings!["c++", "-c", "source.c++"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-                Entry {
-                    file: PathBuf::from("/home/user/project/test.c"),
-                    arguments: vec_of_strings!["cc", "-c", "test.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-            ];
-
-            let expected: Vec<Entry> = vec![input[0].clone(), input[2].clone()];
-
-            let sut: EntryPredicate =
-                EntryPredicateBuilder::filter_by_compiler_paths(&vec_of_pathbuf!["c++"]).build();
-            let result: Vec<Entry> = input.into_iter().filter(sut).collect();
-            assert_eq!(result, expected);
-        }
-
-        #[test]
-        fn test_filter_by_compiler_arguments() {
-            let input: Vec<Entry> = vec![
-                Entry {
-                    file: PathBuf::from("/home/user/project/source.c"),
-                    arguments: vec_of_strings!["cc", "-c", "source.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-                Entry {
-                    file: PathBuf::from("/home/user/project/source.c"),
-                    arguments: vec_of_strings!["cc", "-cc1", "source.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-                Entry {
-                    file: PathBuf::from("/home/user/project/test.c"),
-                    arguments: vec_of_strings!["cc", "-c", "test.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-            ];
-
-            let expected: Vec<Entry> = vec![input[0].clone(), input[2].clone()];
-
-            let sut: EntryPredicate =
-                EntryPredicateBuilder::filter_by_compiler_arguments(&vec_of_strings!["-cc1"])
-                    .build();
-            let result: Vec<Entry> = input.into_iter().filter(sut).collect();
-            assert_eq!(result, expected);
-        }
 
         #[test]
         fn test_filter_by_source_paths() {

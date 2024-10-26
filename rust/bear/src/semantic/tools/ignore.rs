@@ -34,31 +34,6 @@ impl Tool for IgnoreByPath {
     }
 }
 
-pub(super) struct IgnoreByArgs {
-    args: Vec<String>,
-}
-
-impl IgnoreByArgs {
-    pub(super) fn new(args: &[String]) -> Box<dyn Tool> {
-        let clones = args.iter().map(|arg| arg.clone()).collect();
-        Box::new(Self { args: clones })
-    }
-}
-
-impl Tool for IgnoreByArgs {
-    fn recognize(&self, execution: &Execution) -> RecognitionResult {
-        if execution
-            .arguments
-            .iter()
-            .any(|arg| self.args.contains(arg))
-        {
-            RecognitionResult::Recognized(Ok(Meaning::Ignored))
-        } else {
-            RecognitionResult::NotRecognized
-        }
-    }
-}
-
 static COREUTILS_FILES: [&str; 106] = [
     "/usr/bin/[",
     "/usr/bin/arch",
@@ -204,22 +179,5 @@ mod test {
         let sut = IgnoreByPath::new();
 
         assert_eq!(RecognitionResult::NotRecognized, sut.recognize(&input))
-    }
-
-    #[test]
-    fn test_executions_are_ignored_by_args() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/ls"),
-            arguments: vec_of_strings!["ls", "-l", "/home/user/build"],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
-        // let sut = IgnoreByArgs::new(&["-l".to_string()]);
-        let sut = IgnoreByArgs::new(&vec_of_strings!("-l"));
-
-        assert_eq!(
-            RecognitionResult::Recognized(Ok(Meaning::Ignored)),
-            sut.recognize(&input)
-        )
     }
 }
