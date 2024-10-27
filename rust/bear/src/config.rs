@@ -325,8 +325,8 @@ impl Validate for Output {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Compiler {
     pub path: PathBuf,
-    #[serde(default = "default_ignore_compiler")]
-    pub ignore: Ignore, // FIXME: change this to bool
+    #[serde(default = "default_never_ignore")]
+    pub ignore: Ignore,
     #[serde(default)]
     pub arguments: Arguments,
 }
@@ -528,16 +528,16 @@ fn default_wrapper_directory() -> PathBuf {
 
 /// The default path to the wrapper executable.
 fn default_wrapper_executable() -> PathBuf {
-    PathBuf::from(PRELOAD_LIBRARY_PATH)
+    PathBuf::from(WRAPPER_EXECUTABLE_PATH)
 }
 
 /// The default path to the shared library that will be preloaded.
 fn default_preload_library() -> PathBuf {
-    PathBuf::from(WRAPPER_EXECUTABLE_PATH)
+    PathBuf::from(PRELOAD_LIBRARY_PATH)
 }
 
 /// The default don't ignore the compiler.
-fn default_ignore_compiler() -> Ignore {
+fn default_never_ignore() -> Ignore {
     Ignore::Never
 }
 
@@ -685,6 +685,60 @@ mod test {
     }
 
     #[test]
+    fn test_incomplete_wrapper_config() {
+        let content: &[u8] = br#"
+        schema: 4.0
+
+        intercept:
+          mode: wrapper
+          executables:
+            - /usr/bin/cc
+            - /usr/bin/c++
+        output:
+          specification: clang
+          filter:
+            source:
+              include_only_existing_files: true
+            duplicates:
+              by_fields:
+                - file
+                - directory
+          format:
+            command_as_array: true
+        "#;
+
+        let result = Main::from_reader(content).unwrap();
+
+        let expected = Main {
+            intercept: Intercept::Wrapper {
+                path: default_wrapper_executable(),
+                directory: default_wrapper_directory(),
+                executables: vec_of_pathbuf!["/usr/bin/cc", "/usr/bin/c++"],
+            },
+            output: Output::Clang {
+                compilers: vec![],
+                filter: Filter {
+                    source: SourceFilter {
+                        include_only_existing_files: true,
+                        paths_to_include: vec_of_pathbuf![],
+                        paths_to_exclude: vec_of_pathbuf![],
+                    },
+                    duplicates: DuplicateFilter {
+                        by_fields: vec![OutputFields::File, OutputFields::Directory],
+                    },
+                },
+                format: Format {
+                    command_as_array: true,
+                    drop_output_field: false,
+                },
+            },
+            schema: String::from("4.0"),
+        };
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
     fn test_preload_config() {
         let content: &[u8] = br#"
         schema: 4.0
@@ -703,6 +757,83 @@ mod test {
                 path: PathBuf::from("/usr/local/lib/libexec.so"),
             },
             output: Output::Semantic {},
+            schema: String::from("4.0"),
+        };
+
+        assert_eq!(expected, result);
+    }
+
+    #[test]
+    fn test_incomplete_preload_config() {
+        let content: &[u8] = br#"
+        schema: 4.0
+
+        intercept:
+          mode: preload
+        output:
+          specification: clang
+          compilers:
+            - path: /usr/local/bin/cc
+            - path: /usr/local/bin/c++
+            - path: /usr/local/bin/clang
+              ignore: always
+            - path: /usr/local/bin/clang++
+              ignore: always
+          filter:
+            source:
+              include_only_existing_files: false
+            duplicates:
+              by_fields:
+                - file
+          format:
+            command_as_array: true
+            drop_output_field: false
+        "#;
+
+        let result = Main::from_reader(content).unwrap();
+
+        let expected = Main {
+            intercept: Intercept::Preload {
+                path: default_preload_library(),
+            },
+            output: Output::Clang {
+                compilers: vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/cc"),
+                        ignore: Ignore::Never,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/c++"),
+                        ignore: Ignore::Never,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/clang"),
+                        ignore: Ignore::Always,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/clang++"),
+                        ignore: Ignore::Always,
+                        arguments: Arguments::default(),
+                    },
+                ],
+                filter: Filter {
+                    source: SourceFilter {
+                        include_only_existing_files: false,
+                        paths_to_include: vec_of_pathbuf![],
+                        paths_to_exclude: vec_of_pathbuf![],
+                    },
+                    duplicates: DuplicateFilter {
+                        by_fields: vec![OutputFields::File],
+                    },
+                },
+                format: Format {
+                    command_as_array: true,
+                    drop_output_field: false,
+                },
+            },
             schema: String::from("4.0"),
         };
 
