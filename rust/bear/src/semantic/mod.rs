@@ -5,13 +5,6 @@ pub mod tools;
 use intercept::Execution;
 use std::path::PathBuf;
 
-/// Represents a semantic recognition result.
-#[derive(Debug, PartialEq)]
-pub enum RecognitionResult {
-    Recognized(Result<Meaning, String>),
-    NotRecognized,
-}
-
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
 pub enum Meaning {
@@ -25,7 +18,7 @@ pub enum Meaning {
     Ignored,
 }
 
-/// Represents a compiler call.
+/// Represents a compiler call pass.
 #[derive(Debug, PartialEq)]
 pub enum CompilerPass {
     Preprocess,
@@ -43,5 +36,13 @@ pub enum CompilerPass {
 /// represent a set of tools, and the recognition process can be distributed
 /// amongst the tools.
 pub trait Tool: Send {
-    fn recognize(&self, _: &Execution) -> RecognitionResult;
+    fn recognize(&self, _: &Execution) -> Recognition<Meaning>;
+}
+
+/// Represents a semantic recognition result.
+#[derive(Debug, PartialEq)]
+pub enum Recognition<T> {
+    Success(T),
+    Error(String),
+    Unknown,
 }

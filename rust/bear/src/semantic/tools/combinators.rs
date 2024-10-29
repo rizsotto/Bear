@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{RecognitionResult, Tool};
+use super::super::{Meaning, Recognition, Tool};
 use intercept::Execution;
 
 /// Represents a set of tools, where any of them can recognize the semantic.
@@ -17,16 +17,14 @@ impl Any {
 }
 
 impl Tool for Any {
-    fn recognize(&self, x: &Execution) -> RecognitionResult {
+    fn recognize(&self, x: &Execution) -> Recognition<Meaning> {
         for tool in &self.tools {
             match tool.recognize(x) {
-                RecognitionResult::Recognized(result) => {
-                    return RecognitionResult::Recognized(result)
-                }
-                _ => continue,
+                Recognition::Unknown => continue,
+                result => return result,
             }
         }
-        RecognitionResult::NotRecognized
+        Recognition::Unknown
     }
 }
 
@@ -51,7 +49,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            RecognitionResult::NotRecognized => assert!(true),
+            Recognition::Unknown => assert!(true),
             _ => assert!(false),
         }
     }
@@ -69,7 +67,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            RecognitionResult::Recognized(Ok(_)) => assert!(true),
+            Recognition::Success(_) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -88,7 +86,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            RecognitionResult::Recognized(Err(_)) => assert!(true),
+            Recognition::Error(_) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -100,13 +98,11 @@ mod test {
     }
 
     impl Tool for MockTool {
-        fn recognize(&self, _: &Execution) -> RecognitionResult {
+        fn recognize(&self, _: &Execution) -> Recognition<Meaning> {
             match self {
-                MockTool::Recognize => RecognitionResult::Recognized(Ok(Meaning::Ignored)),
-                MockTool::RecognizeFailed => {
-                    RecognitionResult::Recognized(Err(String::from("problem")))
-                }
-                MockTool::NotRecognize => RecognitionResult::NotRecognized,
+                MockTool::Recognize => Recognition::Success(Meaning::Ignored),
+                MockTool::RecognizeFailed => Recognition::Error(String::from("problem")),
+                MockTool::NotRecognize => Recognition::Unknown,
             }
         }
     }

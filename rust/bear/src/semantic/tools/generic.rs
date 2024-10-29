@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
-use super::super::{CompilerPass, Meaning, RecognitionResult, Tool};
+use super::super::{CompilerPass, Meaning, Recognition, Tool};
 use super::matchers::source::looks_like_a_source_file;
 use intercept::Execution;
 
@@ -25,7 +25,7 @@ impl Tool for Generic {
     /// - the executable name,
     /// - one of the arguments is a source file,
     /// - the rest of the arguments are flags.
-    fn recognize(&self, x: &Execution) -> RecognitionResult {
+    fn recognize(&self, x: &Execution) -> Recognition<Meaning> {
         if self.executables.contains(&x.executable) {
             let mut flags = vec![];
             let mut sources = vec![];
@@ -40,9 +40,9 @@ impl Tool for Generic {
             }
 
             if sources.is_empty() {
-                RecognitionResult::Recognized(Err(String::from("source file is not found")))
+                Recognition::Error(String::from("source file is not found"))
             } else {
-                RecognitionResult::Recognized(Ok(Meaning::Compiler {
+                Recognition::Success(Meaning::Compiler {
                     compiler: x.executable.clone(),
                     working_dir: x.working_dir.clone(),
                     passes: sources
@@ -53,10 +53,10 @@ impl Tool for Generic {
                             flags: flags.clone(),
                         })
                         .collect(),
-                }))
+                })
             }
         } else {
-            RecognitionResult::NotRecognized
+            Recognition::Unknown
         }
     }
 }
@@ -97,10 +97,7 @@ mod test {
             }],
         };
 
-        assert_eq!(
-            RecognitionResult::Recognized(Ok(expected)),
-            SUT.recognize(&input)
-        );
+        assert_eq!(Recognition::Success(expected), SUT.recognize(&input));
     }
 
     #[test]
@@ -113,7 +110,7 @@ mod test {
         };
 
         assert_eq!(
-            RecognitionResult::Recognized(Err(String::from("source file is not found"))),
+            Recognition::Error(String::from("source file is not found")),
             SUT.recognize(&input)
         );
     }
@@ -127,7 +124,7 @@ mod test {
             environment: HashMap::new(),
         };
 
-        assert_eq!(RecognitionResult::NotRecognized, SUT.recognize(&input));
+        assert_eq!(Recognition::Unknown, SUT.recognize(&input));
     }
 
     lazy_static! {

@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use super::super::{Meaning, RecognitionResult, Tool};
+use super::super::{Meaning, Recognition, Tool};
 use intercept::Execution;
 use internal::Argument;
 
@@ -17,7 +17,7 @@ impl Gcc {
 }
 
 impl Tool for Gcc {
-    fn recognize(&self, execution: &Execution) -> RecognitionResult {
+    fn recognize(&self, execution: &Execution) -> Recognition<Meaning> {
         let mut parser = preceded(
             internal::compiler,
             many1(alt((internal::flag, internal::source))),
@@ -29,15 +29,15 @@ impl Tool for Gcc {
                 let flags = result.1;
                 let passes = Argument::passes(flags.as_slice());
 
-                RecognitionResult::Recognized(Ok(Meaning::Compiler {
+                Recognition::Success(Meaning::Compiler {
                     compiler: execution.executable.clone(),
                     working_dir: execution.working_dir.clone(),
                     passes,
-                }))
+                })
             }
             Err(error) => {
                 log::debug!("Gcc failed to parse it: {error}.");
-                RecognitionResult::NotRecognized
+                Recognition::Unknown
             }
         }
     }

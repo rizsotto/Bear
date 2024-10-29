@@ -41,11 +41,11 @@ impl TryFrom<&config::Main> for Recognition {
 impl Recognition {
     pub fn apply(&self, execution: Execution) -> Option<semantic::Meaning> {
         match self.tool.recognize(&execution) {
-            semantic::RecognitionResult::Recognized(Ok(semantic::Meaning::Ignored)) => {
+            semantic::Recognition::Success(semantic::Meaning::Ignored) => {
                 log::debug!("execution recognized, but ignored: {:?}", execution);
                 None
             }
-            semantic::RecognitionResult::Recognized(Ok(semantic)) => {
+            semantic::Recognition::Success(semantic) => {
                 log::debug!(
                     "execution recognized as compiler call, {:?} : {:?}",
                     semantic,
@@ -53,7 +53,7 @@ impl Recognition {
                 );
                 Some(semantic)
             }
-            semantic::RecognitionResult::Recognized(Err(reason)) => {
+            semantic::Recognition::Error(reason) => {
                 log::debug!(
                     "execution recognized with failure, {:?} : {:?}",
                     reason,
@@ -61,7 +61,7 @@ impl Recognition {
                 );
                 None
             }
-            semantic::RecognitionResult::NotRecognized => {
+            semantic::Recognition::Unknown => {
                 log::debug!("execution not recognized: {:?}", execution);
                 None
             }
