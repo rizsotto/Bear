@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pub mod tools;
+pub mod interpreters;
 
 use intercept::Execution;
 use std::path::PathBuf;
@@ -33,9 +33,9 @@ pub enum CompilerPass {
 ///
 /// A single tool has a potential to recognize a command execution and
 /// identify the semantic of that command. This abstraction is also can
-/// represent a set of tools, and the recognition process can be distributed
-/// amongst the tools.
-pub trait Tool: Send {
+/// represent a set of interpreters, and the recognition process can be
+/// distributed amongst the interpreters.
+pub trait Interpreter: Send {
     fn recognize(&self, _: &Execution) -> Recognition<Meaning>;
 }
 

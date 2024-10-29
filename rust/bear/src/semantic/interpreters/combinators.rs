@@ -1,24 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{Meaning, Recognition, Tool};
+use super::super::{Interpreter, Meaning, Recognition};
 use intercept::Execution;
 
-/// Represents a set of tools, where any of them can recognize the semantic.
-/// The evaluation is done in the order of the tools. The first one which
+/// Represents a set of interpreters, where any of them can recognize the semantic.
+/// The evaluation is done in the order of the interpreters. The first one which
 /// recognizes the semantic will be returned as result.
 pub(super) struct Any {
-    tools: Vec<Box<dyn Tool>>,
+    interpreters: Vec<Box<dyn Interpreter>>,
 }
 
 impl Any {
-    pub(super) fn new(tools: Vec<Box<dyn Tool>>) -> impl Tool {
-        Any { tools }
+    pub(super) fn new(tools: Vec<Box<dyn Interpreter>>) -> impl Interpreter {
+        Any {
+            interpreters: tools,
+        }
     }
 }
 
-impl Tool for Any {
+impl Interpreter for Any {
     fn recognize(&self, x: &Execution) -> Recognition<Meaning> {
-        for tool in &self.tools {
+        for tool in &self.interpreters {
             match tool.recognize(x) {
                 Recognition::Unknown => continue,
                 result => return result,
@@ -39,7 +41,7 @@ mod test {
     #[test]
     fn test_any_when_no_match() {
         let sut = Any {
-            tools: vec![
+            interpreters: vec![
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::NotRecognize),
@@ -57,7 +59,7 @@ mod test {
     #[test]
     fn test_any_when_match() {
         let sut = Any {
-            tools: vec![
+            interpreters: vec![
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::Recognize),
                 Box::new(MockTool::NotRecognize),
@@ -75,7 +77,7 @@ mod test {
     #[test]
     fn test_any_when_match_fails() {
         let sut = Any {
-            tools: vec![
+            interpreters: vec![
                 Box::new(MockTool::NotRecognize),
                 Box::new(MockTool::RecognizeFailed),
                 Box::new(MockTool::Recognize),
@@ -97,7 +99,7 @@ mod test {
         NotRecognize,
     }
 
-    impl Tool for MockTool {
+    impl Interpreter for MockTool {
         fn recognize(&self, _: &Execution) -> Recognition<Meaning> {
             match self {
                 MockTool::Recognize => Recognition::Success(Meaning::Ignored),

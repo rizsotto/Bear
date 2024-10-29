@@ -4,19 +4,19 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use super::super::{Meaning, Recognition, Tool};
+use super::super::{Interpreter, Meaning, Recognition};
 use intercept::Execution;
 use internal::Argument;
 
 pub(super) struct Gcc {}
 
 impl Gcc {
-    pub(super) fn new() -> Box<dyn Tool> {
+    pub(super) fn new() -> Box<dyn Interpreter> {
         Box::new(Gcc {})
     }
 }
 
-impl Tool for Gcc {
+impl Interpreter for Gcc {
     fn recognize(&self, execution: &Execution) -> Recognition<Meaning> {
         let mut parser = preceded(
             internal::compiler,

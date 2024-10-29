@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
-use super::tools::combinators::Any;
-use super::tools::generic::Generic;
-use super::tools::ignore::IgnoreByPath;
-use super::Tool;
+use super::interpreters::combinators::Any;
+use super::interpreters::generic::Generic;
+use super::interpreters::ignore::IgnoreByPath;
+use super::Interpreter;
 
 mod combinators;
 mod gcc;
@@ -16,7 +16,7 @@ mod matchers;
 /// A builder for creating a tool which can recognize the semantic of a compiler,
 /// or ignore known non-compilers.
 pub struct Builder {
-    tools: Vec<Box<dyn Tool>>,
+    interpreters: Vec<Box<dyn Interpreter>>,
 }
 
 impl Builder {
@@ -24,7 +24,7 @@ impl Builder {
     pub fn new() -> Self {
         // FIXME: replace generic with gcc, when it's implemented
         Builder {
-            tools: vec![
+            interpreters: vec![
                 // ignore executables which are not compilers,
                 IgnoreByPath::new(),
                 // recognize default compiler
@@ -34,26 +34,26 @@ impl Builder {
     }
 
     /// Factory method to create a new tool from the builder.
-    pub fn build(self) -> impl Tool {
-        Any::new(self.tools)
+    pub fn build(self) -> impl Interpreter {
+        Any::new(self.interpreters)
     }
 
-    /// Adds new tools to recognize as compilers by executable name.
+    /// Adds new interpreters to recognize as compilers by executable name.
     pub fn compilers_to_recognize(mut self, compilers: &[PathBuf]) -> Self {
         if !compilers.is_empty() {
-            // Add the new compilers at the end of the tools.
+            // Add the new compilers at the end of the interpreters.
             let tool = Generic::from(compilers);
-            self.tools.push(tool);
+            self.interpreters.push(tool);
         }
         self
     }
 
-    /// Adds new tools to recognize as non-compilers by executable names.
+    /// Adds new interpreters to recognize as non-compilers by executable names.
     pub fn compilers_to_exclude(mut self, compilers: &[PathBuf]) -> Self {
         if !compilers.is_empty() {
-            // Add these new compilers at the front of the tools.
+            // Add these new compilers at the front of the interpreters.
             let tool = IgnoreByPath::from(compilers);
-            self.tools.insert(0, tool);
+            self.interpreters.insert(0, tool);
         }
         self
     }

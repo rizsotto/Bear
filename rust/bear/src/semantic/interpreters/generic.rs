@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
-use super::super::{CompilerPass, Meaning, Recognition, Tool};
+use super::super::{CompilerPass, Interpreter, Meaning, Recognition};
 use super::matchers::source::looks_like_a_source_file;
 use intercept::Execution;
 
@@ -14,13 +14,13 @@ pub(super) struct Generic {
 }
 
 impl Generic {
-    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Interpreter> {
         let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
         Box::new(Self { executables })
     }
 }
 
-impl Tool for Generic {
+impl Interpreter for Generic {
     /// This tool is a naive implementation only considering:
     /// - the executable name,
     /// - one of the arguments is a source file,

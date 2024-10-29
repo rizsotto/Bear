@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::super::{Meaning, Recognition, Tool};
+use super::super::{Interpreter, Meaning, Recognition};
 use intercept::Execution;
 
 /// A tool to ignore a command execution by executable name.
@@ -12,19 +12,19 @@ pub(super) struct IgnoreByPath {
 }
 
 impl IgnoreByPath {
-    pub(super) fn new() -> Box<dyn Tool> {
+    pub(super) fn new() -> Box<dyn Interpreter> {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
         Box::new(Self { executables })
     }
 
-    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Tool> {
+    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Interpreter> {
         let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
         Box::new(Self { executables })
     }
 }
 
 /// A tool to ignore a command execution by arguments.
-impl Tool for IgnoreByPath {
+impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> Recognition<Meaning> {
         if self.executables.contains(&execution.executable) {
             Recognition::Success(Meaning::Ignored)

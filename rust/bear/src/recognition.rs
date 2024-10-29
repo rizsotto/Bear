@@ -5,10 +5,10 @@ use std::convert::TryFrom;
 
 /// Responsible for recognizing the semantic meaning of the executed commands.
 ///
-/// The recognition logic is implemented in the `tools` module. Here we only handle
+/// The recognition logic is implemented in the `interpreters` module. Here we only handle
 /// the errors and logging them to the console.
 pub struct Recognition {
-    tool: Box<dyn semantic::Tool>,
+    interpreter: Box<dyn semantic::Interpreter>,
 }
 
 impl TryFrom<&config::Main> for Recognition {
@@ -27,20 +27,20 @@ impl TryFrom<&config::Main> for Recognition {
                 .collect(),
             _ => vec![],
         };
-        let tool = semantic::tools::Builder::new()
+        let interpreter = semantic::interpreters::Builder::new()
             .compilers_to_recognize(compilers_to_include.as_slice())
             .compilers_to_exclude(compilers_to_exclude.as_slice())
             .build();
 
         Ok(Recognition {
-            tool: Box::new(tool),
+            interpreter: Box::new(interpreter),
         })
     }
 }
 
 impl Recognition {
     pub fn apply(&self, execution: Execution) -> Option<semantic::Meaning> {
-        match self.tool.recognize(&execution) {
+        match self.interpreter.recognize(&execution) {
             semantic::Recognition::Success(semantic::Meaning::Ignored) => {
                 log::debug!("execution recognized, but ignored: {:?}", execution);
                 None
