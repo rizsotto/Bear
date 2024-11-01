@@ -26,6 +26,23 @@ impl ReporterId {
     }
 }
 
+/// Provides a default implementation for `ReporterId`.
+///
+/// This implementation returns a new instance of `ReporterId` by calling the `new` method.
+///
+/// # Examples
+///
+/// ```
+/// use intercept::ReporterId;
+///
+/// let default_reporter_id = ReporterId::default();
+/// ```
+impl Default for ReporterId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Process id is a OS identifier for a process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ProcessId(pub u32);
