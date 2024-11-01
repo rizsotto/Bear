@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Responsible for transforming the compiler calls.
+//!
+//! It conditionally removes compiler calls based on compiler names or flags.
+//! It can also alter the compiler flags of the compiler calls. The actions
+//! are defined in the configuration this module is given.
+
 use super::{config, semantic};
 
-/// Responsible for transforming the semantic meaning of the compiler calls.
-///
-/// It conditionally removes compiler calls based on compiler names or flags.
-/// It can also add or remove flags from the compiler calls.
 pub enum Transformation {
     None,
     Config(Vec<config::Compiler>),

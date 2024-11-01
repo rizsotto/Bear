@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! This module is defining the semantic of executed commands.
+//!
+//! The semantic identifies the intent of the execution. It not only
+//! recognizes the compiler calls, but also identifies the compiler
+//! passes that are executed.
+//!
+//! A compilation of a source file can be divided into multiple passes.
+//! We are interested in the compiler passes, because those are the
+//! ones that are relevant to build a JSON compilation database.
+
 pub mod interpreters;
 
 use intercept::Execution;
@@ -29,17 +39,24 @@ pub enum CompilerPass {
     },
 }
 
-/// This abstraction is representing a tool which semantic we are aware of.
+/// Responsible to recognize the semantic of an executed command.
 ///
-/// A single tool has a potential to recognize a command execution and
-/// identify the semantic of that command. This abstraction is also can
-/// represent a set of interpreters, and the recognition process can be
-/// distributed amongst the interpreters.
+/// The implementation can be responsible for a single compiler,
+/// a set of compilers, or a set of commands that are not compilers.
+///
+/// The benefit to recognize a non-compiler command, is to not
+/// spend more time to try to recognize with other interpreters.
+/// Or classify the recognition as ignored to not be further processed
+/// later on.
 pub trait Interpreter: Send {
     fn recognize(&self, _: &Execution) -> Recognition<Meaning>;
 }
 
 /// Represents a semantic recognition result.
+///
+/// The unknown recognition is used when the interpreter is not
+/// able to recognize the command. This can signal the search process
+/// to continue with the next interpreter.
 #[derive(Debug, PartialEq)]
 pub enum Recognition<T> {
     Success(T),

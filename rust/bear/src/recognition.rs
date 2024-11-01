@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+//! Responsible for recognizing the semantic meaning of the executed commands.
+//!
+//! The recognition logic is implemented in the `interpreters` module.
+//! Here we only handle the errors and logging them to the console.
+
 use super::{config, semantic};
 use intercept::Execution;
 use std::convert::TryFrom;
 
-/// Responsible for recognizing the semantic meaning of the executed commands.
-///
-/// The recognition logic is implemented in the `interpreters` module. Here we only handle
-/// the errors and logging them to the console.
 pub struct Recognition {
     interpreter: Box<dyn semantic::Interpreter>,
 }
@@ -14,6 +16,14 @@ pub struct Recognition {
 impl TryFrom<&config::Main> for Recognition {
     type Error = anyhow::Error;
 
+    /// Creates an interpreter to recognize the compiler calls.
+    ///
+    /// Using the configuration we can define which compilers to include and exclude.
+    /// Also read the environment variables to detect the compiler to include (and
+    /// make sure those are not excluded either).
+    // TODO: Use the CC or CXX environment variables to detect the compiler to include.
+    //       Use the CC or CXX environment variables and make sure those are not excluded.
+    //       Make sure the environment variables are passed to the method.
     fn try_from(config: &config::Main) -> Result<Self, Self::Error> {
         let compilers_to_include = match &config.intercept {
             config::Intercept::Wrapper { executables, .. } => executables.clone(),
@@ -39,6 +49,8 @@ impl TryFrom<&config::Main> for Recognition {
 }
 
 impl Recognition {
+    /// Simple call the semantic module to recognize the execution.
+    /// Forward only the compiler calls, and log each recognition result.
     pub fn apply(&self, execution: Execution) -> Option<semantic::Meaning> {
         match self.interpreter.recognize(&execution) {
             semantic::Recognition::Success(semantic::Meaning::Ignored) => {

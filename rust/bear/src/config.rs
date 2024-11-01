@@ -1,5 +1,80 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! This module defines the configuration of the application.
+//!
+//! The configuration is either loaded from a file or used with the default
+//! values, which are defined in the code. The configuration exposes the main
+//! logical steps that the application will follow.
+//!
+//! The configuration file syntax is based on the YAML format.
+//! The default configuration file name is `bear.yml`.
+//!
+//! The configuration file location is searched in the following order:
+//! - The current working directory.
+//! - The local configuration directory of the user.
+//! - The configuration directory of the user.
+//! - The local configuration directory of the application.
+//! - The configuration directory of the application.
+//!
+//! The configuration file content is validated against the schema version,
+//! syntax and semantic constraints. If the configuration file is invalid,
+//! the application will exit with an error message explaining the issue.
+//!
+//! ```yaml
+//! schema: 4.0
+//!
+//! intercept:
+//!   mode: wrapper
+//!   directory: /tmp
+//!   executables:
+//!     - /usr/bin/cc
+//!     - /usr/bin/c++
+//! output:
+//!   specification: clang
+//!   compilers:
+//!     - path: /usr/local/bin/cc
+//!       ignore: always
+//!     - path: /usr/local/bin/c++
+//!       ignore: conditional
+//!       arguments:
+//!         match:
+//!           - -###
+//!     - path: /usr/local/bin/clang
+//!       ignore: never
+//!       arguments:
+//!         add:
+//!           - -DDEBUG
+//!         remove:
+//!           - -Wall
+//!     - path: /usr/local/bin/clang++
+//!       arguments:
+//!         remove:
+//!           - -Wall
+//!   filter:
+//!     source:
+//!       include_only_existing_files: true
+//!       paths_to_include:
+//!         - sources
+//!       paths_to_exclude:
+//!         - tests
+//!     duplicates:
+//!       by_fields:
+//!         - file
+//!         - directory
+//!   format:
+//!     command_as_array: true
+//!     drop_output_field: false
+//! ```
+//!
+//! ```yaml
+//! schema: 4.0
+//!
+//! intercept:
+//!   mode: preload
+//! output:
+//!   specification: bear
+//! ```
+
 use std::collections::HashSet;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -14,61 +89,6 @@ const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
 const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 
 /// Represents the application configuration.
-///
-/// ```yaml
-/// schema: 4.0
-///
-/// intercept:
-///   mode: wrapper
-///   directory: /tmp
-///   executables:
-///     - /usr/bin/cc
-///     - /usr/bin/c++
-/// output:
-///   specification: clang
-///   compilers:
-///     - path: /usr/local/bin/cc
-///       ignore: always
-///     - path: /usr/local/bin/c++
-///       ignore: conditional
-///       arguments:
-///         match:
-///           - -###
-///     - path: /usr/local/bin/clang
-///       ignore: never
-///       arguments:
-///         add:
-///           - -DDEBUG
-///         remove:
-///           - -Wall
-///     - path: /usr/local/bin/clang++
-///       arguments:
-///         remove:
-///           - -Wall
-///   filter:
-///     source:
-///       include_only_existing_files: true
-///       paths_to_include:
-///         - sources
-///       paths_to_exclude:
-///         - tests
-///     duplicates:
-///       by_fields:
-///         - file
-///         - directory
-///   format:
-///     command_as_array: true
-///     drop_output_field: false
-/// ```
-///
-/// ```yaml
-/// schema: 4.0
-///
-/// intercept:
-///   mode: preload
-/// output:
-///   specification: bear
-/// ```
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 pub struct Main {
     #[serde(deserialize_with = "validate_schema_version")]
