@@ -8,7 +8,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 
 use super::args;
-use intercept::Execution;
+use super::intercept::Execution;
 
 /// Responsible for reading the build events from the intercept mode.
 ///

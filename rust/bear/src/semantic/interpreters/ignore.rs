@@ -3,8 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::super::{CompilerCall, Interpreter, Recognition};
-use intercept::Execution;
+use super::super::{CompilerCall, Execution, Interpreter, Recognition};
 
 /// A tool to ignore a command execution by executable name.
 pub(super) struct IgnoreByPath {

@@ -2,8 +2,7 @@
 
 [workspace]
 members = [
-  "bear",
-  "intercept"
+  "bear"
 ]
 resolver = "2"
 

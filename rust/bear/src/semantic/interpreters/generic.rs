@@ -4,9 +4,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
-use super::super::{CompilerCall, CompilerPass, Interpreter, Recognition};
+use super::super::{CompilerCall, CompilerPass, Execution, Interpreter, Recognition};
 use super::matchers::source::looks_like_a_source_file;
-use intercept::Execution;
 
 /// A tool to recognize a compiler by executable name.
 pub(super) struct Generic {

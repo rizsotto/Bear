@@ -4,6 +4,7 @@ pub mod args;
 pub mod config;
 mod fixtures;
 pub mod input;
+pub mod intercept;
 pub mod output;
 pub mod recognition;
 pub mod semantic;

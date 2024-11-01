@@ -17,10 +17,13 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "bear"
-path = "src/bin/main.rs"
+path = "src/bin/bear.rs"
+
+[[bin]]
+name = "wrapper"
+path = "src/bin/wrapper.rs"
 
 [dependencies]
-intercept = { path = "../intercept" }
 thiserror.workspace = true
 anyhow.workspace = true
 lazy_static.workspace = true
@@ -36,3 +39,6 @@ path-absolutize.workspace = true
 shell-words.workspace = true
 nom.workspace = true
 regex.workspace = true
+crossbeam.workspace = true
+crossbeam-channel.workspace = true
+rand.workspace = true

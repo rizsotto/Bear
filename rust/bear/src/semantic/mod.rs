@@ -12,7 +12,7 @@
 
 pub mod interpreters;
 
-use intercept::Execution;
+use super::intercept::Execution;
 use std::path::PathBuf;
 
 /// Represents an executed command semantic.

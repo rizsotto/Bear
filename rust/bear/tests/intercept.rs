@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use intercept::collector::{EventCollector, EventCollectorOnTcp};
-use intercept::reporter::{Reporter, TcpReporter};
-use intercept::*;
+use bear::intercept::collector::{EventCollector, EventCollectorOnTcp};
+use bear::intercept::reporter::{Reporter, TcpReporter};
+use bear::intercept::*;
 
 mod test {
     use super::*;
@@ -130,7 +130,7 @@ mod test {
 }
 
 mod fixtures {
-    use intercept::ProcessId;
+    use bear::intercept::ProcessId;
 
     pub fn timestamp() -> u64 {
         rand::random::<u64>()

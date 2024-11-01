@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{CompilerCall, Interpreter, Recognition};
-use intercept::Execution;
+use super::super::{CompilerCall, Execution, Interpreter, Recognition};
 
 /// Represents a set of interpreters, where any of them can recognize the semantic.
 /// The evaluation is done in the order of the interpreters. The first one which

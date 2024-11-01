@@ -18,8 +18,8 @@
 extern crate core;
 
 use anyhow::{Context, Result};
-use intercept::reporter::{Reporter, TcpReporter};
-use intercept::KEY_DESTINATION;
+use bear::intercept::reporter::{Reporter, TcpReporter};
+use bear::intercept::{Event, Execution, ProcessId, KEY_DESTINATION};
 use std::path::{Path, PathBuf};
 
 /// Implementation of the wrapper process.
@@ -98,9 +98,9 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
         .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
 }
 
-fn report(execution: intercept::Execution) -> Result<()> {
-    let event = intercept::Event {
-        pid: intercept::ProcessId(std::process::id() as u32),
+fn report(execution: Execution) -> Result<()> {
+    let event = Event {
+        pid: ProcessId(std::process::id() as u32),
         execution,
     };
 
@@ -115,10 +115,10 @@ fn report(execution: intercept::Execution) -> Result<()> {
         .with_context(|| "Sending execution failed")
 }
 
-fn into_execution(path_buf: &Path) -> Result<intercept::Execution> {
+fn into_execution(path_buf: &Path) -> Result<Execution> {
     std::env::current_dir()
         .with_context(|| "Cannot get current directory")
-        .map(|working_dir| intercept::Execution {
+        .map(|working_dir| Execution {
             executable: path_buf.to_path_buf(),
             // FIXME: substitute the executable name on the first position
             arguments: std::env::args().collect(),

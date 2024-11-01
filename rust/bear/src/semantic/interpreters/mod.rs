@@ -64,10 +64,9 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::{CompilerCall, Recognition};
+    use super::super::{CompilerCall, Execution, Recognition};
     use super::*;
     use crate::{vec_of_pathbuf, vec_of_strings};
-    use intercept::Execution;
 
     #[test]
     fn test_builder() {

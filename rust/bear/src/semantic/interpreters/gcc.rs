@@ -4,8 +4,7 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use super::super::{CompilerCall, Interpreter, Recognition};
-use intercept::Execution;
+use super::super::{CompilerCall, Execution, Interpreter, Recognition};
 use internal::Argument;
 
 pub(super) struct Gcc {}
