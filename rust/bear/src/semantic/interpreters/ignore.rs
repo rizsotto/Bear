@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::super::{Interpreter, Meaning, Recognition};
+use super::super::{CompilerCall, Interpreter, Recognition};
 use intercept::Execution;
 
 /// A tool to ignore a command execution by executable name.
@@ -25,9 +25,9 @@ impl IgnoreByPath {
 
 /// A tool to ignore a command execution by arguments.
 impl Interpreter for IgnoreByPath {
-    fn recognize(&self, execution: &Execution) -> Recognition<Meaning> {
+    fn recognize(&self, execution: &Execution) -> Recognition<CompilerCall> {
         if self.executables.contains(&execution.executable) {
-            Recognition::Success(Meaning::Ignored)
+            Recognition::Ignored
         } else {
             Recognition::Unknown
         }
@@ -162,10 +162,7 @@ mod test {
         };
         let sut = IgnoreByPath::new();
 
-        assert_eq!(
-            Recognition::Success(Meaning::Ignored),
-            sut.recognize(&input)
-        )
+        assert_eq!(Recognition::Ignored, sut.recognize(&input))
     }
 
     #[test]

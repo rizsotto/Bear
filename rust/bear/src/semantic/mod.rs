@@ -17,15 +17,10 @@ use std::path::PathBuf;
 
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
-pub enum Meaning {
-    /// This is a compiler call.
-    Compiler {
-        compiler: PathBuf,
-        working_dir: PathBuf,
-        passes: Vec<CompilerPass>,
-    },
-    /// This is something else we recognised, but not interested to fully specify.
-    Ignored,
+pub struct CompilerCall {
+    pub compiler: PathBuf,
+    pub working_dir: PathBuf,
+    pub passes: Vec<CompilerPass>,
 }
 
 /// Represents a compiler call pass.
@@ -49,7 +44,7 @@ pub enum CompilerPass {
 /// Or classify the recognition as ignored to not be further processed
 /// later on.
 pub trait Interpreter: Send {
-    fn recognize(&self, _: &Execution) -> Recognition<Meaning>;
+    fn recognize(&self, _: &Execution) -> Recognition<CompilerCall>;
 }
 
 /// Represents a semantic recognition result.
@@ -59,7 +54,12 @@ pub trait Interpreter: Send {
 /// to continue with the next interpreter.
 #[derive(Debug, PartialEq)]
 pub enum Recognition<T> {
+    /// The command was recognized and the semantic was identified.
     Success(T),
+    /// The command was recognized, but the semantic was ignored.
+    Ignored,
+    /// The command was recognized, but the semantic was broken.
     Error(String),
+    /// The command was not recognized.
     Unknown,
 }

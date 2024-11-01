@@ -30,43 +30,41 @@ impl From<&config::Output> for Transformation {
 }
 
 impl Transformation {
-    pub fn apply(&self, input: semantic::Meaning) -> Option<semantic::Meaning> {
-        match &input {
-            semantic::Meaning::Compiler {
-                compiler,
-                passes,
-                working_dir,
-            } => match self.lookup(&compiler) {
-                Some(config::Compiler {
-                    ignore: config::Ignore::Always,
-                    ..
-                }) => None,
-                Some(config::Compiler {
-                    ignore: config::Ignore::Conditional,
-                    arguments,
-                    ..
-                }) => {
-                    if Self::filter(arguments, passes) {
-                        None
-                    } else {
-                        Some(input)
-                    }
+    pub fn apply(&self, input: semantic::CompilerCall) -> Option<semantic::CompilerCall> {
+        let semantic::CompilerCall {
+            compiler,
+            passes,
+            working_dir,
+        } = &input;
+        match self.lookup(&compiler) {
+            Some(config::Compiler {
+                ignore: config::Ignore::Always,
+                ..
+            }) => None,
+            Some(config::Compiler {
+                ignore: config::Ignore::Conditional,
+                arguments,
+                ..
+            }) => {
+                if Self::filter(arguments, passes) {
+                    None
+                } else {
+                    Some(input)
                 }
-                Some(config::Compiler {
-                    ignore: config::Ignore::Never,
-                    arguments,
-                    ..
-                }) => {
-                    let new_passes = Transformation::execute(arguments, passes);
-                    Some(semantic::Meaning::Compiler {
-                        compiler: compiler.clone(),
-                        working_dir: working_dir.clone(),
-                        passes: new_passes,
-                    })
-                }
-                None => Some(input),
-            },
-            _ => Some(input),
+            }
+            Some(config::Compiler {
+                ignore: config::Ignore::Never,
+                arguments,
+                ..
+            }) => {
+                let new_passes = Transformation::execute(arguments, passes);
+                Some(semantic::CompilerCall {
+                    compiler: compiler.clone(),
+                    working_dir: working_dir.clone(),
+                    passes: new_passes,
+                })
+            }
+            None => Some(input),
         }
     }
 

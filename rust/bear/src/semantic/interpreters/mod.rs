@@ -64,7 +64,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::{Meaning, Recognition};
+    use super::super::{CompilerCall, Recognition};
     use super::*;
     use crate::{vec_of_pathbuf, vec_of_strings};
     use intercept::Execution;
@@ -75,7 +75,7 @@ mod test {
 
         let input = any_execution();
         match sut.recognize(&input) {
-            Recognition::Success(Meaning::Compiler { .. }) => assert!(true),
+            Recognition::Success(CompilerCall { .. }) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -87,7 +87,7 @@ mod test {
 
         let input = any_execution();
         match sut.recognize(&input) {
-            Recognition::Success(Meaning::Ignored) => assert!(true),
+            Recognition::Ignored => assert!(true),
             _ => assert!(false),
         }
     }

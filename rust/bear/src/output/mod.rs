@@ -46,7 +46,10 @@ impl OutputWriter {
     }
 
     /// Implements the main logic of the output writer.
-    pub fn run(&self, meanings: impl Iterator<Item = semantic::Meaning>) -> anyhow::Result<()> {
+    pub fn run(
+        &self,
+        meanings: impl Iterator<Item = semantic::CompilerCall>,
+    ) -> anyhow::Result<()> {
         let entries = meanings.flat_map(|value| {
             into_entries(value).unwrap_or_else(|error| {
                 log::error!(
@@ -127,38 +130,34 @@ impl OutputWriter {
     }
 }
 
-pub fn into_entries(value: semantic::Meaning) -> Result<Vec<Entry>, anyhow::Error> {
-    match value {
-        semantic::Meaning::Compiler {
-            compiler,
-            working_dir,
-            passes,
-        } => {
-            let entries = passes
-                .iter()
-                .flat_map(|pass| -> Result<Entry, anyhow::Error> {
-                    match pass {
-                        semantic::CompilerPass::Preprocess => {
-                            Err(anyhow!("preprocess pass should not show up in results"))
-                        }
-                        semantic::CompilerPass::Compile {
-                            source,
-                            output,
-                            flags,
-                        } => Ok(Entry {
-                            file: into_abspath(source.clone(), working_dir.as_path())?,
-                            directory: working_dir.clone(),
-                            output: into_abspath_opt(output.clone(), working_dir.as_path())?,
-                            arguments: into_arguments(&compiler, source, output, flags)?,
-                        }),
-                    }
-                })
-                .collect();
+pub fn into_entries(value: semantic::CompilerCall) -> Result<Vec<Entry>, anyhow::Error> {
+    let semantic::CompilerCall {
+        compiler,
+        working_dir,
+        passes,
+    } = value;
+    let entries = passes
+        .iter()
+        .flat_map(|pass| -> Result<Entry, anyhow::Error> {
+            match pass {
+                semantic::CompilerPass::Preprocess => {
+                    Err(anyhow!("preprocess pass should not show up in results"))
+                }
+                semantic::CompilerPass::Compile {
+                    source,
+                    output,
+                    flags,
+                } => Ok(Entry {
+                    file: into_abspath(source.clone(), working_dir.as_path())?,
+                    directory: working_dir.clone(),
+                    output: into_abspath_opt(output.clone(), working_dir.as_path())?,
+                    arguments: into_arguments(&compiler, source, output, flags)?,
+                }),
+            }
+        })
+        .collect();
 
-            Ok(entries)
-        }
-        _ => Ok(vec![]),
-    }
+    Ok(entries)
 }
 
 fn into_arguments(
@@ -210,10 +209,7 @@ mod test {
     fn test_non_compilations() -> Result<()> {
         let empty: Vec<Entry> = vec![];
 
-        let result: Vec<Entry> = into_entries(semantic::Meaning::Ignored)?;
-        assert_eq!(empty, result);
-
-        let input = semantic::Meaning::Compiler {
+        let input = semantic::CompilerCall {
             compiler: PathBuf::from("/usr/bin/cc"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![],
@@ -226,7 +222,7 @@ mod test {
 
     #[test]
     fn test_single_source_compilation() -> Result<()> {
-        let input = semantic::Meaning::Compiler {
+        let input = semantic::CompilerCall {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![semantic::CompilerPass::Compile {
@@ -252,7 +248,7 @@ mod test {
 
     #[test]
     fn test_multiple_sources_compilation() -> Result<()> {
-        let input = semantic::Meaning::Compiler {
+        let input = semantic::CompilerCall {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![

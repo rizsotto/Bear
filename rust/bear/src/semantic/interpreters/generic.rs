@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
-use super::super::{CompilerPass, Interpreter, Meaning, Recognition};
+use super::super::{CompilerCall, CompilerPass, Interpreter, Recognition};
 use super::matchers::source::looks_like_a_source_file;
 use intercept::Execution;
 
@@ -25,7 +25,7 @@ impl Interpreter for Generic {
     /// - the executable name,
     /// - one of the arguments is a source file,
     /// - the rest of the arguments are flags.
-    fn recognize(&self, x: &Execution) -> Recognition<Meaning> {
+    fn recognize(&self, x: &Execution) -> Recognition<CompilerCall> {
         if self.executables.contains(&x.executable) {
             let mut flags = vec![];
             let mut sources = vec![];
@@ -42,7 +42,7 @@ impl Interpreter for Generic {
             if sources.is_empty() {
                 Recognition::Error(String::from("source file is not found"))
             } else {
-                Recognition::Success(Meaning::Compiler {
+                Recognition::Success(CompilerCall {
                     compiler: x.executable.clone(),
                     working_dir: x.working_dir.clone(),
                     passes: sources
@@ -87,7 +87,7 @@ mod test {
             environment: HashMap::new(),
         };
 
-        let expected = Meaning::Compiler {
+        let expected = CompilerCall {
             compiler: PathBuf::from("/usr/bin/something"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![CompilerPass::Compile {

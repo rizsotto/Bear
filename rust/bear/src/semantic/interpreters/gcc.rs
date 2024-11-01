@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::multi::many1;
 use nom::sequence::preceded;
 
-use super::super::{Interpreter, Meaning, Recognition};
+use super::super::{CompilerCall, Interpreter, Recognition};
 use intercept::Execution;
 use internal::Argument;
 
@@ -17,7 +17,7 @@ impl Gcc {
 }
 
 impl Interpreter for Gcc {
-    fn recognize(&self, execution: &Execution) -> Recognition<Meaning> {
+    fn recognize(&self, execution: &Execution) -> Recognition<CompilerCall> {
         let mut parser = preceded(
             internal::compiler,
             many1(alt((internal::flag, internal::source))),
@@ -29,7 +29,7 @@ impl Interpreter for Gcc {
                 let flags = result.1;
                 let passes = Argument::passes(flags.as_slice());
 
-                Recognition::Success(Meaning::Compiler {
+                Recognition::Success(CompilerCall {
                     compiler: execution.executable.clone(),
                     working_dir: execution.working_dir.clone(),
                     passes,

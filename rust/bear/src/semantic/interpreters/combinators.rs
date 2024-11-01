@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{Interpreter, Meaning, Recognition};
+use super::super::{CompilerCall, Interpreter, Recognition};
 use intercept::Execution;
 
 /// Represents a set of interpreters, where any of them can recognize the semantic.
@@ -19,7 +19,7 @@ impl Any {
 }
 
 impl Interpreter for Any {
-    fn recognize(&self, x: &Execution) -> Recognition<Meaning> {
+    fn recognize(&self, x: &Execution) -> Recognition<CompilerCall> {
         for tool in &self.interpreters {
             match tool.recognize(x) {
                 Recognition::Unknown => continue,
@@ -35,7 +35,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::super::Meaning;
+    use super::super::super::CompilerCall;
     use super::*;
 
     #[test]
@@ -57,7 +57,7 @@ mod test {
     }
 
     #[test]
-    fn test_any_when_match() {
+    fn test_any_when_success() {
         let sut = Any {
             interpreters: vec![
                 Box::new(MockTool::NotRecognize),
@@ -70,6 +70,24 @@ mod test {
 
         match sut.recognize(&input) {
             Recognition::Success(_) => assert!(true),
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_any_when_ignored() {
+        let sut = Any {
+            interpreters: vec![
+                Box::new(MockTool::NotRecognize),
+                Box::new(MockTool::RecognizeIgnored),
+                Box::new(MockTool::Recognize),
+            ],
+        };
+
+        let input = any_execution();
+
+        match sut.recognize(&input) {
+            Recognition::Ignored => assert!(true),
             _ => assert!(false),
         }
     }
@@ -95,14 +113,16 @@ mod test {
 
     enum MockTool {
         Recognize,
+        RecognizeIgnored,
         RecognizeFailed,
         NotRecognize,
     }
 
     impl Interpreter for MockTool {
-        fn recognize(&self, _: &Execution) -> Recognition<Meaning> {
+        fn recognize(&self, _: &Execution) -> Recognition<CompilerCall> {
             match self {
-                MockTool::Recognize => Recognition::Success(Meaning::Ignored),
+                MockTool::Recognize => Recognition::Success(any_compiler_call()),
+                MockTool::RecognizeIgnored => Recognition::Ignored,
                 MockTool::RecognizeFailed => Recognition::Error(String::from("problem")),
                 MockTool::NotRecognize => Recognition::Unknown,
             }
@@ -115,6 +135,14 @@ mod test {
             arguments: vec![],
             working_dir: PathBuf::new(),
             environment: HashMap::new(),
+        }
+    }
+
+    fn any_compiler_call() -> CompilerCall {
+        CompilerCall {
+            compiler: PathBuf::new(),
+            working_dir: PathBuf::new(),
+            passes: vec![],
         }
     }
 }

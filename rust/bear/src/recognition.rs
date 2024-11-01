@@ -51,12 +51,8 @@ impl TryFrom<&config::Main> for Recognition {
 impl Recognition {
     /// Simple call the semantic module to recognize the execution.
     /// Forward only the compiler calls, and log each recognition result.
-    pub fn apply(&self, execution: Execution) -> Option<semantic::Meaning> {
+    pub fn apply(&self, execution: Execution) -> Option<semantic::CompilerCall> {
         match self.interpreter.recognize(&execution) {
-            semantic::Recognition::Success(semantic::Meaning::Ignored) => {
-                log::debug!("execution recognized, but ignored: {:?}", execution);
-                None
-            }
             semantic::Recognition::Success(semantic) => {
                 log::debug!(
                     "execution recognized as compiler call, {:?} : {:?}",
@@ -64,6 +60,10 @@ impl Recognition {
                     execution
                 );
                 Some(semantic)
+            }
+            semantic::Recognition::Ignored => {
+                log::debug!("execution recognized, but ignored: {:?}", execution);
+                None
             }
             semantic::Recognition::Error(reason) => {
                 log::debug!(
