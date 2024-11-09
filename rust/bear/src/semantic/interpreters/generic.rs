@@ -64,8 +64,6 @@ impl Interpreter for Generic {
 mod test {
     use std::collections::HashMap;
 
-    use lazy_static::lazy_static;
-
     use crate::{vec_of_pathbuf, vec_of_strings};
 
     use super::*;
@@ -126,9 +124,7 @@ mod test {
         assert_eq!(Recognition::Unknown, SUT.recognize(&input));
     }
 
-    lazy_static! {
-        static ref SUT: Generic = Generic {
-            executables: vec_of_pathbuf!["/usr/bin/something"].into_iter().collect()
-        };
-    }
+    static SUT: std::sync::LazyLock<Generic> = std::sync::LazyLock::new(|| Generic {
+        executables: vec_of_pathbuf!["/usr/bin/something"].into_iter().collect(),
+    });
 }

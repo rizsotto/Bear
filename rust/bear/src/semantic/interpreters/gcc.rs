@@ -43,7 +43,6 @@ impl Interpreter for Gcc {
 }
 
 mod internal {
-    use lazy_static::lazy_static;
     use nom::{error::ErrorKind, IResult};
     use regex::Regex;
     use std::path::PathBuf;
@@ -194,7 +193,7 @@ mod internal {
         todo!()
     }
 
-    lazy_static! {
+    static COMPILER_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
         // - cc
         // - c++
         // - cxx
@@ -202,8 +201,9 @@ mod internal {
         // - mcc, gcc, m++, g++, gfortran, fortran
         //   - with prefixes like: arm-none-eabi-
         //   - with postfixes like: -7.0 or 6.4.0
-        static ref COMPILER_REGEX: Regex = Regex::new(
-            r"(^(cc|c\+\+|cxx|CC|(([^-]*-)*([mg](cc|\+\+)|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)"
-        ).unwrap();
-    }
+        Regex::new(
+            r"(^(cc|c\+\+|cxx|CC|(([^-]*-)*([mg](cc|\+\+)|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)",
+        )
+        .unwrap()
+    });
 }
