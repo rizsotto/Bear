@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-use std::process::ExitCode;
 
 use bear::input::EventFileReader;
+use bear::intercept::collector::{EventCollector, EventCollectorOnTcp};
+use bear::intercept::{Envelope, KEY_DESTINATION, KEY_PRELOAD_PATH};
 use bear::output::OutputWriter;
 use bear::recognition::Recognition;
 use bear::transformation::Transformation;
 use bear::{args, config};
+use crossbeam_channel::{bounded, Receiver};
 use log;
+use std::path::{Path, PathBuf};
+use std::process::{Command, ExitCode};
+use std::sync::Arc;
+use std::{env, thread};
 
 /// Driver function of the application.
 fn main() -> anyhow::Result<ExitCode> {
@@ -41,7 +47,7 @@ enum Application {
     Intercept {
         input: args::BuildCommand,
         output: args::BuildEvents,
-        intercept_config: config::Intercept,
+        config: config::Intercept,
     },
     /// The semantic mode we are deduct the semantic meaning of the
     /// executed commands from the build process.
@@ -73,7 +79,7 @@ impl Application {
                 let result = Application::Intercept {
                     input,
                     output,
-                    intercept_config,
+                    config: intercept_config,
                 };
                 Ok(result)
             }
@@ -110,10 +116,38 @@ impl Application {
             Application::Intercept {
                 input,
                 output,
-                intercept_config,
+                config,
             } => {
-                // TODO: Implement the intercept mode.
-                ExitCode::FAILURE
+                match &config {
+                    config::Intercept::Wrapper { .. } => {
+                        let service = InterceptService::new()
+                            .expect("Failed to create the intercept service");
+                        let environment = InterceptEnvironment::new(&config, service.address())
+                            .expect("Failed to create the intercept environment");
+
+                        // start writer thread
+                        let writer_thread = thread::spawn(move || {
+                            let mut writer = std::fs::File::create(output.file_name)
+                                .expect("Failed to create the output file");
+                            for envelope in service.receiver().iter() {
+                                envelope
+                                    .write_into(&mut writer)
+                                    .expect("Failed to write the envelope");
+                            }
+                        });
+
+                        let status = environment.execute_build_command(input);
+
+                        writer_thread
+                            .join()
+                            .expect("Failed to join the writer thread");
+
+                        status.unwrap_or(ExitCode::FAILURE)
+                    }
+                    config::Intercept::Preload { .. } => {
+                        todo!()
+                    }
+                }
             }
             Application::Semantic {
                 event_source,
@@ -143,5 +177,137 @@ impl Application {
                 ExitCode::FAILURE
             }
         }
+    }
+}
+
+struct InterceptService {
+    collector: Arc<EventCollectorOnTcp>,
+    receiver: Receiver<Envelope>,
+    collector_thread: Option<thread::JoinHandle<()>>,
+}
+
+impl InterceptService {
+    pub fn new() -> anyhow::Result<Self> {
+        let collector = EventCollectorOnTcp::new()?;
+        let collector_arc = Arc::new(collector);
+        let (sender, receiver) = bounded(32);
+
+        let collector_in_thread = collector_arc.clone();
+        let collector_thread = thread::spawn(move || {
+            collector_in_thread.collect(sender).unwrap();
+        });
+
+        Ok(InterceptService {
+            collector: collector_arc,
+            receiver,
+            collector_thread: Some(collector_thread),
+        })
+    }
+
+    pub fn receiver(&self) -> Receiver<Envelope> {
+        self.receiver.clone()
+    }
+
+    pub fn address(&self) -> String {
+        self.collector.address()
+    }
+}
+
+impl Drop for InterceptService {
+    fn drop(&mut self) {
+        self.collector.stop().expect("Failed to stop the collector");
+        if let Some(thread) = self.collector_thread.take() {
+            thread.join().expect("Failed to join the collector thread");
+        }
+    }
+}
+
+enum InterceptEnvironment {
+    Wrapper {
+        bin_dir: tempfile::TempDir,
+        address: String,
+    },
+    Preload {
+        path: PathBuf,
+        address: String,
+    },
+}
+
+impl InterceptEnvironment {
+    pub fn new(config: &config::Intercept, address: String) -> anyhow::Result<Self> {
+        let result = match config {
+            config::Intercept::Wrapper {
+                path,
+                directory,
+                executables,
+            } => {
+                // Create a temporary directory and populate it with the executables.
+                let bin_dir = tempfile::TempDir::with_prefix_in(directory, "bear-")?;
+                for executable in executables {
+                    std::fs::hard_link(&executable, &path)?;
+                }
+                InterceptEnvironment::Wrapper { bin_dir, address }
+            }
+            config::Intercept::Preload { path } => InterceptEnvironment::Preload {
+                path: path.clone(),
+                address,
+            },
+        };
+        Ok(result)
+    }
+
+    pub fn execute_build_command(self, input: args::BuildCommand) -> anyhow::Result<ExitCode> {
+        let environment = self.environment();
+        let mut child = Command::new(input.arguments[0].clone())
+            .args(input.arguments)
+            .envs(environment)
+            .spawn()?;
+
+        let result = child.wait()?;
+
+        if result.success() {
+            Ok(ExitCode::SUCCESS)
+        } else {
+            result
+                .code()
+                .map_or(Ok(ExitCode::FAILURE), |code| Ok(ExitCode::from(code as u8)))
+        }
+    }
+
+    fn environment(&self) -> Vec<(String, String)> {
+        match self {
+            InterceptEnvironment::Wrapper {
+                bin_dir, address, ..
+            } => {
+                let path_original = env::var("PATH").unwrap_or_else(|_| String::new());
+                let path_updated = InterceptEnvironment::insert_to_path(
+                    &path_original,
+                    Self::to_string(bin_dir.path()),
+                );
+                vec![
+                    ("PATH".to_string(), path_updated),
+                    (KEY_DESTINATION.to_string(), address.clone()),
+                ]
+            }
+            InterceptEnvironment::Preload { path, address, .. } => {
+                let path_original = env::var(KEY_PRELOAD_PATH).unwrap_or_else(|_| String::new());
+                let path_updated =
+                    InterceptEnvironment::insert_to_path(&path_original, Self::to_string(path));
+                vec![
+                    (KEY_PRELOAD_PATH.to_string(), path_updated),
+                    (KEY_DESTINATION.to_string(), address.clone()),
+                ]
+            }
+        }
+    }
+
+    fn insert_to_path(original: &str, first: String) -> String {
+        let mut paths: Vec<_> = original.split(':').filter(|it| it != &first).collect();
+        paths.insert(0, first.as_str());
+        paths.join(":")
+    }
+
+    fn to_string(path: &Path) -> String {
+        path.to_str().unwrap_or("").to_string()
     }
 }

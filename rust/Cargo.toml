@@ -24,6 +24,7 @@ directories = "5.0"
 nom = { version = "7.1", default-features = false, features = ["std"] }
 regex = "1.9"
 shell-words = "1.1"
+tempfile = "3.13"
 
 [workspace.package]
 version = "4.0.0"

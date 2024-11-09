@@ -108,3 +108,4 @@ impl Envelope {
 
 /// Declare the environment variable name for the reporter address.
 pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
+pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";

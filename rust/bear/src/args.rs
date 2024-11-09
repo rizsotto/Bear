@@ -45,7 +45,7 @@ pub enum Mode {
 /// Represents the execution of a command.
 #[derive(Debug, PartialEq)]
 pub struct BuildCommand {
-    arguments: Vec<String>,
+    pub arguments: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
