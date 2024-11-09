@@ -7,7 +7,6 @@ use bear::intercept::*;
 mod test {
     use super::*;
     use crossbeam_channel::bounded;
-    use lazy_static::lazy_static;
     use std::collections::HashMap;
     use std::io::Cursor;
     use std::path::PathBuf;
@@ -77,8 +76,8 @@ mod test {
         }
     }
 
-    lazy_static! {
-        static ref ENVELOPES: Vec<Envelope> = vec![
+    static ENVELOPES: std::sync::LazyLock<Vec<Envelope>> = std::sync::LazyLock::new(|| {
+        vec![
             Envelope {
                 rid: ReporterId::new(),
                 timestamp: fixtures::timestamp(),
@@ -124,9 +123,11 @@ mod test {
                     },
                 },
             },
-        ];
-        static ref EVENTS: Vec<Event> = ENVELOPES.iter().map(|e| e.event.clone()).collect();
-    }
+        ]
+    });
+
+    static EVENTS: std::sync::LazyLock<Vec<Event>> =
+        std::sync::LazyLock::new(|| ENVELOPES.iter().map(|e| e.event.clone()).collect());
 }
 
 mod fixtures {
