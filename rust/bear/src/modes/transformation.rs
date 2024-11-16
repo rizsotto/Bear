@@ -6,7 +6,8 @@
 //! It can also alter the compiler flags of the compiler calls. The actions
 //! are defined in the configuration this module is given.
 
-use super::{config, semantic};
+use super::super::semantic;
+use super::config;
 
 pub enum Transformation {
     None,

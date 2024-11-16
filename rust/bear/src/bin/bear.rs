@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use bear::input::EventFileReader;
+use bear::modes::recognition::Recognition;
+use bear::modes::transformation::Transformation;
 use bear::modes::{All, Intercept, Mode, Semantic};
 use bear::output::OutputWriter;
-use bear::recognition::Recognition;
-use bear::transformation::Transformation;
 use bear::{args, config};
 use log;
 use std::env;

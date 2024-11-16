@@ -5,7 +5,9 @@
 //! The recognition logic is implemented in the `interpreters` module.
 //! Here we only handle the errors and logging them to the console.
 
-use super::{config, intercept, semantic};
+use super::super::intercept;
+use super::super::semantic;
+use super::config;
 use std::convert::TryFrom;
 
 pub struct Recognition {

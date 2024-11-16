@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod intercept;
+pub mod recognition;
+pub mod transformation;
 
 use crate::input::EventFileReader;
 use crate::output::OutputWriter;
-use crate::recognition::Recognition;
-use crate::transformation::Transformation;
 use crate::{args, config};
 use intercept::{InterceptEnvironment, InterceptService};
+use recognition::Recognition;
 use std::process::ExitCode;
 use std::thread;
+use transformation::Transformation;
 
 /// The mode trait is used to run the application in different modes.
 pub trait Mode {
