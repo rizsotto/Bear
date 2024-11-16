@@ -5,14 +5,15 @@ pub mod recognition;
 pub mod transformation;
 
 use crate::input::EventFileReader;
+use crate::intercept::Envelope;
 use crate::output::OutputWriter;
 use crate::{args, config};
 use anyhow::Context;
+use crossbeam_channel::Receiver;
 use intercept::{InterceptEnvironment, InterceptService};
 use recognition::Recognition;
 use std::io::BufWriter;
 use std::process::ExitCode;
-use std::thread;
 use transformation::Transformation;
 
 /// The mode trait is used to run the application in different modes.
@@ -56,43 +57,38 @@ impl Intercept {
             config,
         }
     }
+
+    fn write_to_file(
+        output_file_name: String,
+        envelopes: Receiver<Envelope>,
+    ) -> anyhow::Result<()> {
+        let mut writer = std::fs::File::create(&output_file_name)
+            .map(BufWriter::new)
+            .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
+        for envelope in envelopes.iter() {
+            envelope
+                .write_into(&mut writer)
+                .with_context(|| "Failed to write the envelope")?;
+        }
+        Ok(())
+    }
 }
 
 impl Mode for Intercept {
     fn run(self) -> anyhow::Result<ExitCode> {
-        match &self.config {
-            config::Intercept::Wrapper { .. } => {
-                let service = InterceptService::new()
-                    .with_context(|| "Failed to create the intercept service")?;
-                let environment = InterceptEnvironment::new(&self.config, service.address())
-                    .with_context(|| "Failed to create the intercept environment")?;
+        let output_file_name = self.output.file_name.clone();
+        let service = InterceptService::new(move |envelopes| {
+            Self::write_to_file(output_file_name, envelopes)
+        })
+        .with_context(|| "Failed to create the intercept service")?;
+        let environment = InterceptEnvironment::new(&self.config, service.address())
+            .with_context(|| "Failed to create the intercept environment")?;
 
-                // start writer thread
-                let writer_thread = thread::spawn(move || {
-                    let file = std::fs::File::create(&self.output.file_name).expect(
-                        format!("Failed to create output file: {:?}", self.output.file_name)
-                            .as_str(),
-                    );
-                    let mut writer = BufWriter::new(file);
-                    for envelope in service.receiver().iter() {
-                        envelope
-                            .write_into(&mut writer)
-                            .expect("Failed to write the envelope");
-                    }
-                });
+        let status = environment
+            .execute_build_command(self.command)
+            .with_context(|| "Failed to execute the build command")?;
 
-                let status = environment.execute_build_command(self.command);
-
-                writer_thread
-                    .join()
-                    .expect("Failed to join the writer thread");
-
-                status
-            }
-            config::Intercept::Preload { .. } => {
-                todo!()
-            }
-        }
+        Ok(status)
     }
 }
 

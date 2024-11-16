@@ -9,14 +9,18 @@ use std::process::{Command, ExitCode};
 use std::sync::Arc;
 use std::{env, thread};
 
-pub(crate) struct InterceptService {
+pub(super) struct InterceptService {
     collector: Arc<EventCollectorOnTcp>,
-    receiver: Receiver<Envelope>,
-    collector_thread: Option<thread::JoinHandle<()>>,
+    network_thread: Option<thread::JoinHandle<()>>,
+    output_thread: Option<thread::JoinHandle<()>>,
 }
 
 impl InterceptService {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new<F>(consumer: F) -> anyhow::Result<Self>
+    where
+        F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
+        F: Send + 'static,
+    {
         let collector = EventCollectorOnTcp::new()?;
         let collector_arc = Arc::new(collector);
         let (sender, receiver) = bounded(32);
@@ -25,16 +29,16 @@ impl InterceptService {
         let collector_thread = thread::spawn(move || {
             collector_in_thread.collect(sender).unwrap();
         });
+        let receiver_in_thread = receiver.clone();
+        let output_thread = thread::spawn(move || {
+            consumer(receiver_in_thread).unwrap();
+        });
 
         Ok(InterceptService {
             collector: collector_arc,
-            receiver,
-            collector_thread: Some(collector_thread),
+            network_thread: Some(collector_thread),
+            output_thread: Some(output_thread),
         })
-    }
-
-    pub fn receiver(&self) -> Receiver<Envelope> {
-        self.receiver.clone()
     }
 
     pub fn address(&self) -> String {
@@ -45,13 +49,16 @@ impl InterceptService {
 impl Drop for InterceptService {
     fn drop(&mut self) {
         self.collector.stop().expect("Failed to stop the collector");
-        if let Some(thread) = self.collector_thread.take() {
+        if let Some(thread) = self.network_thread.take() {
             thread.join().expect("Failed to join the collector thread");
+        }
+        if let Some(thread) = self.output_thread.take() {
+            thread.join().expect("Failed to join the output thread");
         }
     }
 }
 
-pub(crate) enum InterceptEnvironment {
+pub(super) enum InterceptEnvironment {
     Wrapper {
         bin_dir: tempfile::TempDir,
         address: String,
