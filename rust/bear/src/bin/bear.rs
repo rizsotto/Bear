@@ -80,10 +80,11 @@ impl Application {
     }
 
     fn run(self) -> ExitCode {
-        match self {
+        let status = match self {
             Application::Intercept(intercept) => intercept.run(),
             Application::Semantic(semantic) => semantic.run(),
             Application::All(all) => all.run(),
-        }
+        };
+        status.unwrap_or_else(|_| ExitCode::FAILURE)
     }
 }

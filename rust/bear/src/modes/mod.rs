@@ -7,20 +7,22 @@ pub mod transformation;
 use crate::input::EventFileReader;
 use crate::output::OutputWriter;
 use crate::{args, config};
+use anyhow::Context;
 use intercept::{InterceptEnvironment, InterceptService};
 use recognition::Recognition;
+use std::io::BufWriter;
 use std::process::ExitCode;
 use std::thread;
 use transformation::Transformation;
 
 /// The mode trait is used to run the application in different modes.
 pub trait Mode {
-    fn run(self) -> ExitCode;
+    fn run(self) -> anyhow::Result<ExitCode>;
 }
 
 /// The intercept mode we are only capturing the build commands.
 pub struct Intercept {
-    input: args::BuildCommand,
+    command: args::BuildCommand,
     output: args::BuildEvents,
     config: config::Intercept,
 }
@@ -49,7 +51,7 @@ impl Intercept {
         config: config::Intercept,
     ) -> Self {
         Self {
-            input,
+            command: input,
             output,
             config,
         }
@@ -57,18 +59,21 @@ impl Intercept {
 }
 
 impl Mode for Intercept {
-    fn run(self) -> ExitCode {
+    fn run(self) -> anyhow::Result<ExitCode> {
         match &self.config {
             config::Intercept::Wrapper { .. } => {
-                let service =
-                    InterceptService::new().expect("Failed to create the intercept service");
+                let service = InterceptService::new()
+                    .with_context(|| "Failed to create the intercept service")?;
                 let environment = InterceptEnvironment::new(&self.config, service.address())
-                    .expect("Failed to create the intercept environment");
+                    .with_context(|| "Failed to create the intercept environment")?;
 
                 // start writer thread
                 let writer_thread = thread::spawn(move || {
-                    let mut writer = std::fs::File::create(self.output.file_name)
-                        .expect("Failed to create the output file");
+                    let file = std::fs::File::create(&self.output.file_name).expect(
+                        format!("Failed to create output file: {:?}", self.output.file_name)
+                            .as_str(),
+                    );
+                    let mut writer = BufWriter::new(file);
                     for envelope in service.receiver().iter() {
                         envelope
                             .write_into(&mut writer)
@@ -76,13 +81,13 @@ impl Mode for Intercept {
                     }
                 });
 
-                let status = environment.execute_build_command(self.input);
+                let status = environment.execute_build_command(self.command);
 
                 writer_thread
                     .join()
                     .expect("Failed to join the writer thread");
 
-                status.unwrap_or(ExitCode::FAILURE)
+                status
             }
             config::Intercept::Preload { .. } => {
                 todo!()
@@ -108,7 +113,7 @@ impl Semantic {
 }
 
 impl Mode for Semantic {
-    fn run(self) -> ExitCode {
+    fn run(self) -> anyhow::Result<ExitCode> {
         // Set up the pipeline of compilation database entries.
         let entries = self
             .event_source
@@ -118,8 +123,8 @@ impl Mode for Semantic {
         // Consume the entries and write them to the output file.
         // The exit code is based on the result of the output writer.
         match self.output_writer.run(entries) {
-            Ok(_) => ExitCode::SUCCESS,
-            Err(_) => ExitCode::FAILURE,
+            Ok(_) => Ok(ExitCode::SUCCESS),
+            Err(_) => Ok(ExitCode::FAILURE),
         }
     }
 }
@@ -141,8 +146,8 @@ impl All {
 }
 
 impl Mode for All {
-    fn run(self) -> ExitCode {
+    fn run(self) -> anyhow::Result<ExitCode> {
         // TODO: Implement the all mode.
-        ExitCode::FAILURE
+        Ok(ExitCode::FAILURE)
     }
 }
