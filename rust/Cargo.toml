@@ -13,10 +13,10 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde_yml = "0.0"
 clap = { version = "4.5", default-features = false, features = ["std", "cargo", "help", "usage", "suggestions"] }
-chrono = {  version = "0.4", default-features = false, features = ["std", "clock"] }
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 log = { version = "0.4", default-features = false, features = ["std"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime"]}
-rand = { version = "0.8" }
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
 path-absolutize = "3.1"
 directories = "5.0"
 nom = { version = "7.1", default-features = false, features = ["std"] }
