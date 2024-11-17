@@ -38,7 +38,11 @@ path-absolutize.workspace = true
 shell-words.workspace = true
 nom.workspace = true
 regex.workspace = true
-crossbeam.workspace = true
-crossbeam-channel.workspace = true
 rand.workspace = true
 tempfile.workspace = true
+
+[profile.release]
+strip = true
+lto = true
+opt-level = 3
+codegen-units = 1

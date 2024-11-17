@@ -9,7 +9,6 @@ use crate::intercept::Envelope;
 use crate::output::OutputWriter;
 use crate::{args, config};
 use anyhow::Context;
-use crossbeam_channel::Receiver;
 use intercept::{InterceptEnvironment, InterceptService};
 use recognition::Recognition;
 use std::io::BufWriter;
@@ -61,12 +60,12 @@ impl Intercept {
     /// Write the envelopes into the output file.
     fn write_to_file(
         output_file_name: String,
-        envelopes: Receiver<Envelope>,
+        envelopes: impl IntoIterator<Item=Envelope>,
     ) -> anyhow::Result<()> {
         let mut writer = std::fs::File::create(&output_file_name)
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
-        for envelope in envelopes.iter() {
+        for envelope in envelopes {
             envelope
                 .write_into(&mut writer)
                 .with_context(|| "Failed to write the envelope")?;

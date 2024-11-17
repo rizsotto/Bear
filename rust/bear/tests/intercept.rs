@@ -6,7 +6,7 @@ use bear::intercept::*;
 
 mod test {
     use super::*;
-    use crossbeam_channel::bounded;
+    use std::sync::mpsc::channel;
     use std::collections::HashMap;
     use std::io::Cursor;
     use std::path::PathBuf;
@@ -31,7 +31,7 @@ mod test {
         let main_collector = thread_collector.clone();
 
         // Start the collector in a separate thread.
-        let (input, output) = bounded(EVENTS.len());
+        let (input, output) = channel();
         let receiver_thread = thread::spawn(move || {
             thread_collector.collect(input).unwrap();
         });

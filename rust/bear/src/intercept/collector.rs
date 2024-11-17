@@ -2,7 +2,7 @@
 
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use crossbeam::channel::Sender;
+use std::sync::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 

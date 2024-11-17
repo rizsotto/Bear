@@ -3,7 +3,8 @@
 use crate::intercept::collector::{EventCollector, EventCollectorOnTcp};
 use crate::intercept::{Envelope, KEY_DESTINATION, KEY_PRELOAD_PATH};
 use crate::{args, config};
-use crossbeam_channel::{bounded, Receiver};
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::channel;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::Arc;
@@ -36,17 +37,16 @@ impl InterceptService {
     {
         let collector = EventCollectorOnTcp::new()?;
         let collector_arc = Arc::new(collector);
-        let (sender, receiver) = bounded(32);
+        let (sender, receiver) = channel();
 
         let collector_in_thread = collector_arc.clone();
         let collector_thread = thread::spawn(move || {
             // TODO: log failures
             collector_in_thread.collect(sender).unwrap();
         });
-        let receiver_in_thread = receiver.clone();
         let output_thread = thread::spawn(move || {
             // TODO: log failures
-            consumer(receiver_in_thread).unwrap();
+            consumer(receiver).unwrap();
         });
 
         // TODO: log the address of the service
