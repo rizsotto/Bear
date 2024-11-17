@@ -58,6 +58,7 @@ impl Intercept {
         }
     }
 
+    /// Write the envelopes into the output file.
     fn write_to_file(
         output_file_name: String,
         envelopes: Receiver<Envelope>,
@@ -76,6 +77,7 @@ impl Intercept {
 
 impl Mode for Intercept {
     fn run(self) -> anyhow::Result<ExitCode> {
+        // TODO: log failures with the right context
         let output_file_name = self.output.file_name.clone();
         let service = InterceptService::new(move |envelopes| {
             Self::write_to_file(output_file_name, envelopes)

@@ -85,6 +85,7 @@ impl Application {
             Application::Semantic(semantic) => semantic.run(),
             Application::All(all) => all.run(),
         };
+        // TODO: log the status
         status.unwrap_or_else(|_| ExitCode::FAILURE)
     }
 }
