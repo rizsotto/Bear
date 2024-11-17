@@ -37,7 +37,7 @@ impl Transformation {
             passes,
             working_dir,
         } = &input;
-        match self.lookup(&compiler) {
+        match self.lookup(compiler) {
             Some(config::Compiler {
                 ignore: config::Ignore::Always,
                 ..

@@ -88,13 +88,13 @@ mod internal {
     }
 
     /// Compiler flags are varies the number of arguments, but means one thing.
-    pub(crate) struct Argument<'a> {
+    pub(super) struct Argument<'a> {
         arguments: &'a [String],
         meaning: Meaning,
     }
 
     impl<'a> Argument<'a> {
-        pub(crate) fn passes(flags: &[Argument]) -> Vec<CompilerPass> {
+        pub(super) fn passes(flags: &[Argument]) -> Vec<CompilerPass> {
             let mut pass: Pass = Pass::Linker;
             let mut inputs: Vec<String> = vec![];
             let mut output: Option<String> = None;
@@ -106,13 +106,13 @@ mod internal {
                         stop_before: Some(Pass::Compiler),
                     } => {
                         pass = Pass::Preprocessor;
-                        args.extend(flag.arguments.into_iter().map(String::to_owned));
+                        args.extend(flag.arguments.iter().map(String::to_owned));
                     }
                     Meaning::ControlKindOfOutput {
                         stop_before: Some(Pass::Linker),
                     } => {
                         pass = Pass::Compiler;
-                        args.extend(flag.arguments.into_iter().map(String::to_owned));
+                        args.extend(flag.arguments.iter().map(String::to_owned));
                     }
                     Meaning::ControlKindOfOutput { .. }
                     | Meaning::ControlLanguage(_)
@@ -123,7 +123,7 @@ mod internal {
                     | Meaning::Optimize
                     | Meaning::Instrumentation
                     | Meaning::DirectorySearch(None) => {
-                        args.extend(flag.arguments.into_iter().map(String::to_owned));
+                        args.extend(flag.arguments.iter().map(String::to_owned));
                     }
                     Meaning::Input(_) => {
                         assert_eq!(flag.arguments.len(), 1);
@@ -156,7 +156,7 @@ mod internal {
         }
     }
 
-    pub(crate) fn compiler(i: &[String]) -> IResult<&[String], Argument> {
+    pub(super) fn compiler(i: &[String]) -> IResult<&[String], Argument> {
         let candidate = &i[0];
         if COMPILER_REGEX.is_match(candidate) {
             const MEANING: Meaning = Meaning::Compiler;
@@ -173,7 +173,7 @@ mod internal {
         }
     }
 
-    pub(crate) fn source(i: &[String]) -> IResult<&[String], Argument> {
+    pub(super) fn source(i: &[String]) -> IResult<&[String], Argument> {
         let candidate = &i[0];
         if looks_like_a_source_file(candidate.as_str()) {
             const MEANING: Meaning = Meaning::Input(Pass::Preprocessor);
@@ -189,7 +189,7 @@ mod internal {
         }
     }
 
-    pub(crate) fn flag(i: &[String]) -> IResult<&[String], Argument> {
+    pub(super) fn flag(_i: &[String]) -> IResult<&[String], Argument> {
         todo!()
     }
 

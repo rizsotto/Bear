@@ -78,7 +78,7 @@ mod builder {
             if paths.is_empty() {
                 Self::new()
             } else {
-                let owned_paths: Vec<PathBuf> = paths.iter().cloned().collect();
+                let owned_paths: Vec<PathBuf> = paths.to_vec();
                 Self::from(move |entry| owned_paths.iter().any(|path| entry.file.starts_with(path)))
             }
         }
@@ -153,7 +153,7 @@ mod builder {
     // FIXME: write unit tests for the hash function.
     /// Create a hash function that is using the given fields to calculate the hash of an entry.
     pub(super) fn create_hash(fields: &[config::OutputFields]) -> impl Fn(&Entry) -> u64 + 'static {
-        let owned_fields: Vec<config::OutputFields> = fields.iter().cloned().collect();
+        let owned_fields: Vec<config::OutputFields> = fields.to_vec();
         move |entry: &Entry| {
             let mut hasher = DefaultHasher::new();
             for field in &owned_fields {

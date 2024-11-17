@@ -115,7 +115,7 @@ impl InterceptEnvironment {
                 // Create a temporary directory and populate it with the executables.
                 let bin_dir = tempfile::TempDir::with_prefix_in(directory, "bear-")?;
                 for executable in executables {
-                    std::fs::hard_link(&executable, &path)?;
+                    std::fs::hard_link(executable, path)?;
                 }
                 InterceptEnvironment::Wrapper { bin_dir, address }
             }

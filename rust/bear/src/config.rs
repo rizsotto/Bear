@@ -287,7 +287,7 @@ impl Validate for Intercept {
 /// Allow to customize the output format of the compiler calls.
 ///
 /// - Clang: Output the compiler calls in the clang project defined "JSON compilation database"
-/// format. (The format is used by clang tooling and other tools based on that library.)
+///   format. (The format is used by clang tooling and other tools based on that library.)
 /// - Semantic: Output the compiler calls in the semantic format. (The format is not defined yet.)
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "specification")]
@@ -484,8 +484,8 @@ impl Validate for DuplicateFilter {
     fn validate(self) -> Result<Self> {
         let result = Self {
             by_fields: (&self.by_fields)
-                .into_iter()
-                .map(|field| field.clone())
+                .iter()
+                .cloned()
                 .collect::<HashSet<_>>()
                 .into_iter()
                 .collect(),

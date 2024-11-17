@@ -14,7 +14,7 @@ pub(super) struct Generic {
 
 impl Generic {
     pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Interpreter> {
-        let executables = compilers.iter().map(|compiler| compiler.clone()).collect();
+        let executables = compilers.iter().cloned().collect();
         Box::new(Self { executables })
     }
 }

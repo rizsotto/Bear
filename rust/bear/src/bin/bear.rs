@@ -6,7 +6,6 @@ use bear::modes::transformation::Transformation;
 use bear::modes::{All, Intercept, Mode, Semantic};
 use bear::output::OutputWriter;
 use bear::{args, config};
-use log;
 use std::env;
 use std::process::ExitCode;
 
@@ -86,6 +85,6 @@ impl Application {
             Application::All(all) => all.run(),
         };
         // TODO: log the status
-        status.unwrap_or_else(|_| ExitCode::FAILURE)
+        status.unwrap_or(ExitCode::FAILURE)
     }
 }

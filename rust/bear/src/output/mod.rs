@@ -161,14 +161,14 @@ pub fn into_entries(value: semantic::CompilerCall) -> Result<Vec<Entry>, anyhow:
 }
 
 fn into_arguments(
-    compiler: &PathBuf,
-    source: &PathBuf,
+    compiler: &Path,
+    source: &Path,
     output: &Option<PathBuf>,
     flags: &Vec<String>,
 ) -> Result<Vec<String>, anyhow::Error> {
     let mut arguments: Vec<String> = vec![];
     // Assemble the arguments as it would be for a single source file.
-    arguments.push(into_string(&compiler)?);
+    arguments.push(into_string(compiler)?);
     for flag in flags {
         arguments.push(flag.clone());
     }

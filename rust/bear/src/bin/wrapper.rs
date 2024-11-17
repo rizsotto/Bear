@@ -94,13 +94,13 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
             };
             real_path != current_exe
         })
-        .nth(0)
+        .next()
         .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
 }
 
 fn report(execution: Execution) -> Result<()> {
     let event = Event {
-        pid: ProcessId(std::process::id() as u32),
+        pid: ProcessId(std::process::id()),
         execution,
     };
 
@@ -108,7 +108,7 @@ fn report(execution: Execution) -> Result<()> {
     std::env::var(KEY_DESTINATION)
         .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
         // Create a new reporter
-        .and_then(|reporter_address| TcpReporter::new(reporter_address))
+        .and_then(TcpReporter::new)
         .with_context(|| "Cannot create TCP execution reporter")
         // Report the execution
         .and_then(|reporter| reporter.report(event))

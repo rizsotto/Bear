@@ -32,7 +32,7 @@ impl TryFrom<&config::Main> for Recognition {
         };
         let compilers_to_exclude = match &config.output {
             config::Output::Clang { compilers, .. } => compilers
-                .into_iter()
+                .iter()
                 .filter(|compiler| compiler.ignore == config::Ignore::Always)
                 .map(|compiler| compiler.path.clone())
                 .collect(),
