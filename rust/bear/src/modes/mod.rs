@@ -38,10 +38,11 @@ pub struct Semantic {
 
 /// The all model is combining the intercept and semantic modes.
 pub struct All {
-    input: args::BuildCommand,
-    output: args::BuildSemantic,
+    command: args::BuildCommand,
     intercept_config: config::Intercept,
-    output_config: config::Output,
+    semantic_recognition: Recognition,
+    semantic_transform: Transformation,
+    output_writer: OutputWriter,
 }
 
 impl Intercept {
@@ -60,15 +61,15 @@ impl Intercept {
     /// Write the envelopes into the output file.
     fn write_to_file(
         output_file_name: String,
-        envelopes: impl IntoIterator<Item=Envelope>,
+        envelopes: impl IntoIterator<Item = Envelope>,
     ) -> anyhow::Result<()> {
         let mut writer = std::fs::File::create(&output_file_name)
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
         for envelope in envelopes {
-            envelope
-                .write_into(&mut writer)
-                .with_context(|| "Failed to write the envelope")?;
+            envelope.write_into(&mut writer).with_context(|| {
+                format!("Failed to write execution report: {:?}", &output_file_name)
+            })?;
         }
         Ok(())
     }
@@ -76,7 +77,6 @@ impl Intercept {
 
 impl Mode for Intercept {
     fn run(self) -> anyhow::Result<ExitCode> {
-        // TODO: log failures with the right context
         let output_file_name = self.output.file_name.clone();
         let service = InterceptService::new(move |envelopes| {
             Self::write_to_file(output_file_name, envelopes)
@@ -128,23 +128,58 @@ impl Mode for Semantic {
 
 impl All {
     pub fn new(
-        input: args::BuildCommand,
-        output: args::BuildSemantic,
+        command: args::BuildCommand,
         intercept_config: config::Intercept,
-        output_config: config::Output,
+        semantic_recognition: Recognition,
+        semantic_transform: Transformation,
+        output_writer: OutputWriter,
     ) -> Self {
         Self {
-            input,
-            output,
+            command,
             intercept_config,
-            output_config,
+            semantic_recognition,
+            semantic_transform,
+            output_writer,
         }
+    }
+
+    fn consume_for_analysis(
+        semantic_recognition: Recognition,
+        semantic_transform: Transformation,
+        output_writer: OutputWriter,
+        envelopes: impl IntoIterator<Item = Envelope>,
+    ) -> anyhow::Result<()> {
+        let entries = envelopes
+            .into_iter()
+            .map(|envelope| envelope.event.execution)
+            .flat_map(|execution| semantic_recognition.apply(execution))
+            .flat_map(|semantic| semantic_transform.apply(semantic));
+
+        output_writer.run(entries)
     }
 }
 
 impl Mode for All {
     fn run(self) -> anyhow::Result<ExitCode> {
-        // TODO: Implement the all mode.
-        Ok(ExitCode::FAILURE)
+        let semantic_recognition = self.semantic_recognition;
+        let semantic_transform = self.semantic_transform;
+        let output_writer = self.output_writer;
+        let service = InterceptService::new(move |envelopes| {
+            Self::consume_for_analysis(
+                semantic_recognition,
+                semantic_transform,
+                output_writer,
+                envelopes,
+            )
+        })
+        .with_context(|| "Failed to create the intercept service")?;
+        let environment = InterceptEnvironment::new(&self.intercept_config, service.address())
+            .with_context(|| "Failed to create the intercept environment")?;
+
+        let status = environment
+            .execute_build_command(self.command)
+            .with_context(|| "Failed to execute the build command")?;
+
+        Ok(status)
     }
 }

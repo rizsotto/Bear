@@ -6,10 +6,10 @@ use bear::intercept::*;
 
 mod test {
     use super::*;
-    use std::sync::mpsc::channel;
     use std::collections::HashMap;
     use std::io::Cursor;
     use std::path::PathBuf;
+    use std::sync::mpsc::channel;
     use std::sync::Arc;
     use std::thread;
     use std::time::Duration;

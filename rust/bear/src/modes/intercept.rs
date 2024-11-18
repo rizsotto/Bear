@@ -3,10 +3,10 @@
 use crate::intercept::collector::{EventCollector, EventCollectorOnTcp};
 use crate::intercept::{Envelope, KEY_DESTINATION, KEY_PRELOAD_PATH};
 use crate::{args, config};
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::channel;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::{env, thread};
 

@@ -2,8 +2,8 @@
 
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
-use std::sync::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
 use super::Envelope;

@@ -52,11 +52,13 @@ impl Application {
     fn configure(args: args::Arguments, config: config::Main) -> anyhow::Result<Self> {
         match args.mode {
             args::Mode::Intercept { input, output } => {
+                log::debug!("Mode: intercept");
                 let intercept_config = config.intercept;
                 let mode = Intercept::new(input, output, intercept_config);
                 Ok(Application::Intercept(mode))
             }
             args::Mode::Semantic { input, output } => {
+                log::debug!("Mode: semantic analysis");
                 let event_source = EventFileReader::try_from(input)?;
                 let semantic_recognition = Recognition::try_from(&config)?;
                 let semantic_transform = Transformation::from(&config.output);
@@ -70,9 +72,18 @@ impl Application {
                 Ok(Application::Semantic(mode))
             }
             args::Mode::All { input, output } => {
+                log::debug!("Mode: intercept and semantic analysis");
+                let semantic_recognition = Recognition::try_from(&config)?;
+                let semantic_transform = Transformation::from(&config.output);
+                let output_writer = OutputWriter::configure(&output, &config.output)?;
                 let intercept_config = config.intercept;
-                let output_config = config.output;
-                let mode = All::new(input, output, intercept_config, output_config);
+                let mode = All::new(
+                    input,
+                    intercept_config,
+                    semantic_recognition,
+                    semantic_transform,
+                    output_writer,
+                );
                 Ok(Application::All(mode))
             }
         }
@@ -84,7 +95,12 @@ impl Application {
             Application::Semantic(semantic) => semantic.run(),
             Application::All(all) => all.run(),
         };
-        // TODO: log the status
-        status.unwrap_or(ExitCode::FAILURE)
+        match status {
+            Ok(code) => code,
+            Err(error) => {
+                log::error!("Run failed: {}", error);
+                ExitCode::FAILURE
+            }
+        }
     }
 }
