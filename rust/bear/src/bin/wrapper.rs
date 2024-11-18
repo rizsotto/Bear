@@ -18,8 +18,10 @@
 extern crate core;
 
 use anyhow::{Context, Result};
-use bear::intercept::reporter::{Reporter, TcpReporter};
-use bear::intercept::{Event, Execution, ProcessId, KEY_DESTINATION};
+use bear::ipc::tcp::ReporterOnTcp;
+use bear::ipc::Reporter;
+use bear::ipc::{Event, Execution, ProcessId};
+use bear::modes::intercept::KEY_DESTINATION;
 use std::path::{Path, PathBuf};
 
 /// Implementation of the wrapper process.
@@ -108,7 +110,7 @@ fn report(execution: Execution) -> Result<()> {
     std::env::var(KEY_DESTINATION)
         .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
         // Create a new reporter
-        .and_then(TcpReporter::new)
+        .and_then(ReporterOnTcp::new)
         .with_context(|| "Cannot create TCP execution reporter")
         // Report the execution
         .and_then(|reporter| reporter.report(event))

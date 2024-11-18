@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::intercept::collector::{EventCollector, EventCollectorOnTcp};
-use crate::intercept::{Envelope, KEY_DESTINATION, KEY_PRELOAD_PATH};
+use crate::ipc::tcp::CollectorOnTcp;
+use crate::ipc::{Collector, Envelope};
 use crate::{args, config};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -9,6 +9,10 @@ use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::{env, thread};
+
+/// Declare the environment variable name for the reporter address.
+pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
+pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 
 /// The service is responsible for collecting the events from the supervised processes.
 ///
@@ -19,14 +23,14 @@ use std::{env, thread};
 /// The consumer is a function that receives the events from the service and processes them.
 /// It also runs in a separate thread. The reason for having two threads is to avoid blocking
 /// the main thread of the application and decouple the collection from the processing.
-pub(super) struct InterceptService {
-    collector: Arc<EventCollectorOnTcp>,
+pub(super) struct CollectorService {
+    collector: Arc<dyn Collector>,
     network_thread: Option<thread::JoinHandle<()>>,
     output_thread: Option<thread::JoinHandle<()>>,
 }
 
-impl InterceptService {
-    /// Creates a new intercept service.
+impl CollectorService {
+    /// Creates a new ipc service.
     ///
     /// The `consumer` is a function that receives the events and processes them.
     /// The function is executed in a separate thread.
@@ -35,22 +39,26 @@ impl InterceptService {
         F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
-        let collector = EventCollectorOnTcp::new()?;
+        let collector = CollectorOnTcp::new()?;
         let collector_arc = Arc::new(collector);
         let (sender, receiver) = channel();
 
         let collector_in_thread = collector_arc.clone();
         let collector_thread = thread::spawn(move || {
-            // TODO: log failures
-            collector_in_thread.collect(sender).unwrap();
+            let result = collector_in_thread.collect(sender);
+            if let Err(e) = result {
+                log::error!("Failed to collect events: {}", e);
+            }
         });
         let output_thread = thread::spawn(move || {
-            // TODO: log failures
-            consumer(receiver).unwrap();
+            let result = consumer(receiver);
+            if let Err(e) = result {
+                log::error!("Failed to process events: {}", e);
+            }
         });
 
-        // TODO: log the address of the service
-        Ok(InterceptService {
+        log::debug!("Collector service started at {}", collector_arc.address());
+        Ok(CollectorService {
             collector: collector_arc,
             network_thread: Some(collector_thread),
             output_thread: Some(output_thread),
@@ -63,7 +71,7 @@ impl InterceptService {
     }
 }
 
-impl Drop for InterceptService {
+impl Drop for CollectorService {
     /// Shuts down the service.
     fn drop(&mut self) {
         // TODO: log the shutdown of the service and any errors
@@ -103,7 +111,7 @@ impl InterceptEnvironment {
     /// Creates a new intercept environment.
     ///
     /// The `config` is the intercept configuration that specifies the mode and the
-    /// required parameters for the mode. The `address` is the address of the intercept
+    /// required parameters for the mode. The `address` is the address of the ipc
     /// service that will be used to collect the events.
     pub fn new(config: &config::Intercept, address: String) -> anyhow::Result<Self> {
         let result = match config {
@@ -158,7 +166,7 @@ impl InterceptEnvironment {
     ///
     /// The environment variables are different for each intercept mode.
     /// It does not change the original environment variables, but creates
-    /// the environment variables that are required for the intercept mode.
+    /// the environment variables that are required for the ipc mode.
     fn environment(&self) -> Vec<(String, String)> {
         match self {
             InterceptEnvironment::Wrapper {

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-mod intercept;
+pub mod intercept;
 pub mod recognition;
 pub mod transformation;
 
 use crate::input::EventFileReader;
-use crate::intercept::Envelope;
+use crate::ipc::Envelope;
 use crate::output::OutputWriter;
 use crate::{args, config};
 use anyhow::Context;
-use intercept::{InterceptEnvironment, InterceptService};
+use intercept::{CollectorService, InterceptEnvironment};
 use recognition::Recognition;
 use std::io::BufWriter;
 use std::process::ExitCode;
@@ -78,12 +78,12 @@ impl Intercept {
 impl Mode for Intercept {
     fn run(self) -> anyhow::Result<ExitCode> {
         let output_file_name = self.output.file_name.clone();
-        let service = InterceptService::new(move |envelopes| {
+        let service = CollectorService::new(move |envelopes| {
             Self::write_to_file(output_file_name, envelopes)
         })
-        .with_context(|| "Failed to create the intercept service")?;
+        .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.config, service.address())
-            .with_context(|| "Failed to create the intercept environment")?;
+            .with_context(|| "Failed to create the ipc environment")?;
 
         let status = environment
             .execute_build_command(self.command)
@@ -164,7 +164,7 @@ impl Mode for All {
         let semantic_recognition = self.semantic_recognition;
         let semantic_transform = self.semantic_transform;
         let output_writer = self.output_writer;
-        let service = InterceptService::new(move |envelopes| {
+        let service = CollectorService::new(move |envelopes| {
             Self::consume_for_analysis(
                 semantic_recognition,
                 semantic_transform,
@@ -172,9 +172,9 @@ impl Mode for All {
                 envelopes,
             )
         })
-        .with_context(|| "Failed to create the intercept service")?;
+        .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.intercept_config, service.address())
-            .with_context(|| "Failed to create the intercept environment")?;
+            .with_context(|| "Failed to create the ipc environment")?;
 
         let status = environment
             .execute_build_command(self.command)

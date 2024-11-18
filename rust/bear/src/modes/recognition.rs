@@ -5,7 +5,7 @@
 //! The recognition logic is implemented in the `interpreters` module.
 //! Here we only handle the errors and logging them to the console.
 
-use super::super::intercept;
+use super::super::ipc;
 use super::super::semantic;
 use super::config;
 use std::convert::TryFrom;
@@ -52,7 +52,7 @@ impl TryFrom<&config::Main> for Recognition {
 impl Recognition {
     /// Simple call the semantic module to recognize the execution.
     /// Forward only the compiler calls, and log each recognition result.
-    pub fn apply(&self, execution: intercept::Execution) -> Option<semantic::CompilerCall> {
+    pub fn apply(&self, execution: ipc::Execution) -> Option<semantic::CompilerCall> {
         match self.interpreter.recognize(&execution) {
             semantic::Recognition::Success(semantic) => {
                 log::debug!(
