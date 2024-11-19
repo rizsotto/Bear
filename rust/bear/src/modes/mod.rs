@@ -20,45 +20,29 @@ pub trait Mode {
     fn run(self) -> anyhow::Result<ExitCode>;
 }
 
-/// The intercept mode we are only capturing the build commands.
+/// The intercept mode we are only capturing the build commands
+/// and write it into the output file.
 pub struct Intercept {
     command: args::BuildCommand,
     output: args::BuildEvents,
     config: config::Intercept,
 }
 
-/// The semantic mode we are deduct the semantic meaning of the
-/// executed commands from the build process.
-pub struct Semantic {
-    event_source: EventFileReader,
-    semantic_recognition: Recognition,
-    semantic_transform: Transformation,
-    output_writer: OutputWriter,
-}
-
-/// The all model is combining the intercept and semantic modes.
-pub struct All {
-    command: args::BuildCommand,
-    intercept_config: config::Intercept,
-    semantic_recognition: Recognition,
-    semantic_transform: Transformation,
-    output_writer: OutputWriter,
-}
-
 impl Intercept {
+    /// Create a new intercept mode instance.
     pub fn new(
-        input: args::BuildCommand,
+        command: args::BuildCommand,
         output: args::BuildEvents,
         config: config::Intercept,
     ) -> Self {
         Self {
-            command: input,
+            command,
             output,
             config,
         }
     }
 
-    /// Write the envelopes into the output file.
+    /// Consume events and write them into the output file.
     fn write_to_file(
         output_file_name: String,
         envelopes: impl IntoIterator<Item = Envelope>,
@@ -76,6 +60,11 @@ impl Intercept {
 }
 
 impl Mode for Intercept {
+    /// Run the intercept mode by setting up the collector service and
+    /// the intercept environment. The build command is executed in the
+    /// intercept environment.
+    ///
+    /// The exit code is based on the result of the build command.
     fn run(self) -> anyhow::Result<ExitCode> {
         let output_file_name = self.output.file_name.clone();
         let service = CollectorService::new(move |envelopes| {
@@ -93,7 +82,17 @@ impl Mode for Intercept {
     }
 }
 
+/// The semantic mode we are deduct the semantic meaning of the
+/// executed commands from the build process.
+pub struct Semantic {
+    event_source: EventFileReader,
+    semantic_recognition: Recognition,
+    semantic_transform: Transformation,
+    output_writer: OutputWriter,
+}
+
 impl Semantic {
+    /// Create a new semantic mode instance.
     pub fn new(
         event_source: EventFileReader,
         semantic_recognition: Recognition,
@@ -110,6 +109,11 @@ impl Semantic {
 }
 
 impl Mode for Semantic {
+    /// Run the semantic mode by generating the compilation database entries
+    /// from the event source. The entries are then processed by the semantic
+    /// recognition and transformation. The result is written to the output file.
+    ///
+    /// The exit code is based on the result of the output writer.
     fn run(self) -> anyhow::Result<ExitCode> {
         // Set up the pipeline of compilation database entries.
         let entries = self
@@ -126,7 +130,17 @@ impl Mode for Semantic {
     }
 }
 
+/// The all model is combining the intercept and semantic modes.
+pub struct All {
+    command: args::BuildCommand,
+    intercept_config: config::Intercept,
+    semantic_recognition: Recognition,
+    semantic_transform: Transformation,
+    output_writer: OutputWriter,
+}
+
 impl All {
+    /// Create a new all mode instance.
     pub fn new(
         command: args::BuildCommand,
         intercept_config: config::Intercept,
@@ -143,6 +157,8 @@ impl All {
         }
     }
 
+    /// Consumer the envelopes for analysis and write the result to the output file.
+    /// This implements the pipeline of the semantic analysis. Same as the `Semantic` mode.
     fn consume_for_analysis(
         semantic_recognition: Recognition,
         semantic_transform: Transformation,
@@ -160,6 +176,12 @@ impl All {
 }
 
 impl Mode for All {
+    /// Run the all mode by setting up the collector service and the intercept environment.
+    /// The build command is executed in the intercept environment. The collected events are
+    /// then processed by the semantic recognition and transformation. The result is written
+    /// to the output file.
+    ///
+    /// The exit code is based on the result of the build command.
     fn run(self) -> anyhow::Result<ExitCode> {
         let semantic_recognition = self.semantic_recognition;
         let semantic_transform = self.semantic_transform;
