@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Provides an iterator over a JSON array of objects.
 //!
 //! from https://github.com/serde-rs/json/issues/404#issuecomment-892957228

@@ -1,14 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::io::{Cursor, Seek, SeekFrom};
-
-use serde_json::error::Category;
-use serde_json::{json, Error, Value};
-
-use bear::output::clang::*;
-
+#[cfg(test)]
 mod failures {
-    use super::*;
+    use super::super::*;
+    use serde_json::error::Category;
+    use serde_json::json;
 
     macro_rules! assert_semantic_error {
         ($x:expr) => {
@@ -71,8 +67,10 @@ mod failures {
     }
 }
 
+#[cfg(test)]
 mod success {
-    use super::*;
+    use super::super::*;
+    use serde_json::json;
 
     mod empty {
         use super::*;
@@ -89,6 +87,9 @@ mod success {
 
     mod basic {
         use super::*;
+        use crate::vec_of_strings;
+        use serde_json::Value;
+        use std::io::{Cursor, Seek, SeekFrom};
 
         fn expected_values() -> Vec<Entry> {
             vec![
@@ -180,6 +181,9 @@ mod success {
 
     mod quoted {
         use super::*;
+        use crate::vec_of_strings;
+        use serde_json::Value;
+        use std::io::{Cursor, Seek, SeekFrom};
 
         fn expected_values() -> Vec<Entry> {
             vec![
@@ -256,12 +260,5 @@ mod success {
 
             Ok(())
         }
-    }
-}
-
-mod fixtures {
-    #[macro_export]
-    macro_rules! vec_of_strings {
-        ($($x:expr),*) => (vec![$($x.to_string()),*]);
     }
 }

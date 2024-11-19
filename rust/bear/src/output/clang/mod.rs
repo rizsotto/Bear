@@ -15,6 +15,7 @@ use serde::ser::{SerializeSeq, Serializer};
 use serde_json::Error;
 
 mod iterator;
+mod tests;
 mod type_de;
 mod type_ser;
 

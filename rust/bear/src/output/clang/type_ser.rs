@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 //! Implements serialization of the `Entry` struct.
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
