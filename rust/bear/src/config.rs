@@ -519,9 +519,9 @@ pub enum OutputFields {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Format {
     #[serde(default = "default_enabled")]
-    command_as_array: bool,
+    pub command_as_array: bool,
     #[serde(default = "default_disabled")]
-    drop_output_field: bool,
+    pub drop_output_field: bool,
 }
 
 impl Default for Format {

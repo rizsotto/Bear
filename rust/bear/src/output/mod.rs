@@ -94,7 +94,7 @@ impl OutputWriter {
         &self,
         entries: impl Iterator<Item = Entry>,
     ) -> anyhow::Result<PathBuf> {
-        // FIXME: Implement entry formatting.
+        // FIXME: Implement entry formatting. (dropping the output field before this function)
 
         // Generate a temporary file name.
         let file_name = self.output.with_extension("tmp");
@@ -102,7 +102,11 @@ impl OutputWriter {
         let file = File::create(&file_name)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
         // Write the entries to the file.
-        clang::write(BufWriter::new(file), entries)?;
+        if self.format.command_as_array {
+            clang::write_with_arguments(BufWriter::new(file), entries)?
+        } else {
+            clang::write_with_command(BufWriter::new(file), entries)?
+        }
         // Return the temporary file name.
         Ok(file_name)
     }

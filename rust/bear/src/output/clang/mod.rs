@@ -39,11 +39,14 @@ pub struct Entry {
     pub output: Option<std::path::PathBuf>,
 }
 
-pub fn write(
+/// Serialize entries from an iterator into a JSON array.
+///
+/// It uses the `arguments` field of the `Entry` struct to serialize the array of strings.
+pub fn write_with_arguments(
     writer: impl std::io::Write,
     entries: impl Iterator<Item = Entry>,
 ) -> Result<(), Error> {
-    let mut ser = serde_json::Serializer::new(writer);
+    let mut ser = serde_json::Serializer::pretty(writer);
     let mut seq = ser.serialize_seq(None)?;
     for entry in entries {
         seq.serialize_element(&entry)?;
@@ -51,6 +54,23 @@ pub fn write(
     seq.end()
 }
 
+/// Serialize entries from an iterator into a JSON array.
+///
+/// It uses the `arguments` field of the `Entry` struct to serialize the array of strings.
+pub fn write_with_command(
+    writer: impl std::io::Write,
+    entries: impl Iterator<Item = Entry>,
+) -> Result<(), Error> {
+    let mut ser = serde_json::Serializer::pretty(writer);
+    let mut seq = ser.serialize_seq(None)?;
+    for entry in entries {
+        let entry = type_ser::EntryWithCommand::from(entry);
+        seq.serialize_element(&entry)?;
+    }
+    seq.end()
+}
+
+/// Deserialize entries from a JSON array into an iterator.
 pub fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, Error>> {
     iterator::iter_json_array(reader)
 }

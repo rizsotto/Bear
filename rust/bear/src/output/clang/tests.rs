@@ -88,7 +88,6 @@ mod success {
     mod basic {
         use super::*;
         use crate::vec_of_strings;
-        use serde_json::Value;
         use std::io::{Cursor, Seek, SeekFrom};
 
         fn expected_values() -> Vec<Entry> {
@@ -166,14 +165,32 @@ mod success {
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());
-            let result = write(&mut buffer, input.into_iter());
+            let result = write_with_arguments(&mut buffer, input.into_iter());
             assert!(result.is_ok());
 
             // Use the fake "file" as input
             buffer.seek(SeekFrom::Start(0)).unwrap();
-            let content: Value = serde_json::from_reader(&mut buffer)?;
+            let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_with_array_syntax(), content);
+
+            Ok(())
+        }
+
+        #[test]
+        fn save_with_string_command_syntax() -> Result<(), Error> {
+            let input = expected_values();
+
+            // Create fake "file"
+            let mut buffer = Cursor::new(Vec::new());
+            let result = write_with_command(&mut buffer, input.into_iter());
+            assert!(result.is_ok());
+
+            // Use the fake "file" as input
+            buffer.seek(SeekFrom::Start(0)).unwrap();
+            let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
+
+            assert_eq!(expected_with_string_syntax(), content);
 
             Ok(())
         }
@@ -233,6 +250,21 @@ mod success {
             ])
         }
 
+        fn expected_with_string_syntax() -> serde_json::Value {
+            json!([
+                {
+                    "directory": "/home/user",
+                    "file": "./file_a.c",
+                    "command": r#"cc -c -D 'name=\"me\"' ./file_a.c -o ./file_a.o"#
+                },
+                {
+                    "directory": "/home/user",
+                    "file": "./file_b.c",
+                    "command": r#"cc -c -D 'name="me"' ./file_b.c -o ./file_b.o"#
+                }
+            ])
+        }
+
         #[test]
         fn load_content_with_array_command_syntax() {
             let content = expected_with_array_syntax().to_string();
@@ -249,7 +281,7 @@ mod success {
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());
-            let result = write(&mut buffer, input.into_iter());
+            let result = write_with_arguments(&mut buffer, input.into_iter());
             assert!(result.is_ok());
 
             // Use the fake "file" as input
@@ -257,6 +289,24 @@ mod success {
             let content: Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_with_array_syntax(), content);
+
+            Ok(())
+        }
+
+        #[test]
+        fn save_with_string_command_syntax() -> Result<(), Error> {
+            let input = expected_values();
+
+            // Create fake "file"
+            let mut buffer = Cursor::new(Vec::new());
+            let result = write_with_command(&mut buffer, input.into_iter());
+            assert!(result.is_ok());
+
+            // Use the fake "file" as input
+            buffer.seek(SeekFrom::Start(0)).unwrap();
+            let content: Value = serde_json::from_reader(&mut buffer)?;
+
+            assert_eq!(expected_with_string_syntax(), content);
 
             Ok(())
         }
