@@ -483,7 +483,8 @@ impl Validate for DuplicateFilter {
     /// Deduplicate the fields of the fields vector.
     fn validate(self) -> Result<Self> {
         let result = Self {
-            by_fields: (&self.by_fields)
+            by_fields: self
+                .by_fields
                 .iter()
                 .cloned()
                 .collect::<HashSet<_>>()
