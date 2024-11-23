@@ -87,7 +87,7 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
         .map(|dir| Path::new(dir).join(target))
         // FIXME: check if it is executable
         .filter(|path| path.is_file())
-        .filter(|path| {
+        .find(|path| {
             // We need to compare it with the real path of the candidate executable to avoid
             // calling the same executable again.
             let real_path = match path.canonicalize() {
@@ -96,7 +96,6 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
             };
             real_path != current_exe
         })
-        .next()
         .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
 }
 

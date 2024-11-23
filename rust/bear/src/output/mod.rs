@@ -132,8 +132,9 @@ impl config::Format {
         } else {
             clang::write_with_command
         };
-        let result = method(writer, entries)?;
-        Ok(result)
+        method(writer, entries)?;
+
+        Ok(())
     }
 
     /// Convert the compiler calls into entries.
@@ -182,7 +183,7 @@ impl config::Format {
                     file: into_fully_qualified_path(source.clone(), working_dir)?,
                     directory: working_dir.to_path_buf(),
                     output: self.try_convert_to_output(output, working_dir)?,
-                    arguments: Self::try_convert_into_arguments(&compiler, source, output, flags)?,
+                    arguments: Self::try_convert_into_arguments(compiler, source, output, flags)?,
                 };
                 Ok(entry)
             }

@@ -11,14 +11,14 @@ pub(super) struct IgnoreByPath {
 }
 
 impl IgnoreByPath {
-    pub(super) fn new() -> Box<dyn Interpreter> {
+    pub(super) fn new() -> Self {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
-        Box::new(Self { executables })
+        Self { executables }
     }
 
-    pub(super) fn from(compilers: &[PathBuf]) -> Box<dyn Interpreter> {
+    pub(super) fn from(compilers: &[PathBuf]) -> Self {
         let executables = compilers.iter().cloned().collect();
-        Box::new(Self { executables })
+        Self { executables }
     }
 }
 

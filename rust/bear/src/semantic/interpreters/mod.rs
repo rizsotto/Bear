@@ -26,9 +26,9 @@ impl Builder {
         Builder {
             interpreters: vec![
                 // ignore executables which are not compilers,
-                IgnoreByPath::new(),
+                Box::new(IgnoreByPath::new()),
                 // recognize default compiler
-                Generic::from(&[PathBuf::from("/usr/bin/g++")]),
+                Box::new(Generic::from(&[PathBuf::from("/usr/bin/g++")])),
             ],
         }
     }
@@ -43,7 +43,7 @@ impl Builder {
         if !compilers.is_empty() {
             // Add the new compilers at the end of the interpreters.
             let tool = Generic::from(compilers);
-            self.interpreters.push(tool);
+            self.interpreters.push(Box::new(tool));
         }
         self
     }
@@ -53,9 +53,15 @@ impl Builder {
         if !compilers.is_empty() {
             // Add these new compilers at the front of the interpreters.
             let tool = IgnoreByPath::from(compilers);
-            self.interpreters.insert(0, tool);
+            self.interpreters.insert(0, Box::new(tool));
         }
         self
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Builder::new()
     }
 }
 

@@ -10,8 +10,8 @@ use internal::Argument;
 pub(super) struct Gcc {}
 
 impl Gcc {
-    pub(super) fn new() -> Box<dyn Interpreter> {
-        Box::new(Gcc {})
+    pub(super) fn new() -> Self {
+        Gcc {}
     }
 }
 

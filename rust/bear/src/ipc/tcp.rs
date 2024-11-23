@@ -57,7 +57,7 @@ impl Envelope {
 
 /// Implements convenient methods for the `ReporterId` type.
 impl ReporterId {
-    pub fn new() -> Self {
+    pub fn generate() -> Self {
         let id = random::<u64>();
         ReporterId(id)
     }
@@ -160,7 +160,7 @@ impl ReporterOnTcp {
     /// It does not open the TCP connection yet. Stores the destination
     /// address and creates a unique reporter id.
     pub fn new(destination: String) -> Result<Self, anyhow::Error> {
-        let reporter_id = ReporterId::new();
+        let reporter_id = ReporterId::generate();
         let result = ReporterOnTcp {
             destination,
             reporter_id,
@@ -265,7 +265,7 @@ mod tests {
             std::sync::LazyLock::new(|| {
                 vec![
                     Envelope {
-                        rid: ReporterId::new(),
+                        rid: ReporterId::generate(),
                         timestamp: timestamp(),
                         event: Event {
                             pid: pid(),
@@ -278,7 +278,7 @@ mod tests {
                         },
                     },
                     Envelope {
-                        rid: ReporterId::new(),
+                        rid: ReporterId::generate(),
                         timestamp: timestamp(),
                         event: Event {
                             pid: pid(),
@@ -300,7 +300,7 @@ mod tests {
                         },
                     },
                     Envelope {
-                        rid: ReporterId::new(),
+                        rid: ReporterId::generate(),
                         timestamp: timestamp(),
                         event: Event {
                             pid: pid(),

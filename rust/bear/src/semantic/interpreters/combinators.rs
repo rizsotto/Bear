@@ -10,8 +10,8 @@ pub(super) struct Any {
 }
 
 impl Any {
-    pub(super) fn new(tools: Vec<Box<dyn Interpreter>>) -> impl Interpreter {
-        Any {
+    pub(super) fn new(tools: Vec<Box<dyn Interpreter>>) -> Self {
+        Self {
             interpreters: tools,
         }
     }
