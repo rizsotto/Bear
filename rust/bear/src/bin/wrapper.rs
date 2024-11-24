@@ -21,7 +21,7 @@ use anyhow::{Context, Result};
 use bear::ipc::tcp::ReporterOnTcp;
 use bear::ipc::Reporter;
 use bear::ipc::{Event, Execution, ProcessId};
-use bear::modes::intercept::KEY_DESTINATION;
+use bear::modes::KEY_DESTINATION;
 use std::path::{Path, PathBuf};
 
 /// Implementation of the wrapper process.

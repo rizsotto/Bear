@@ -1,19 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-pub mod intercept;
-pub mod recognition;
-pub mod transformation;
+mod input;
+mod intercept;
+mod recognition;
+mod transformation;
 
-use crate::input::EventFileReader;
 use crate::ipc::Envelope;
 use crate::output::OutputWriter;
 use crate::{args, config};
 use anyhow::Context;
+use input::EventFileReader;
 use intercept::{CollectorService, InterceptEnvironment};
 use recognition::Recognition;
 use std::io::BufWriter;
 use std::process::ExitCode;
 use transformation::Transformation;
+
+/// Declare the environment variables used by the intercept mode.
+pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
+pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 
 /// The mode trait is used to run the application in different modes.
 pub trait Mode {
@@ -30,16 +35,16 @@ pub struct Intercept {
 
 impl Intercept {
     /// Create a new intercept mode instance.
-    pub fn new(
+    pub fn from(
         command: args::BuildCommand,
         output: args::BuildEvents,
-        config: config::Intercept,
-    ) -> Self {
-        Self {
+        config: config::Main,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
             command,
             output,
-            config,
-        }
+            config: config.intercept,
+        })
     }
 
     /// Consume events and write them into the output file.
@@ -51,9 +56,10 @@ impl Intercept {
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
         for envelope in envelopes {
-            envelope.write_into(&mut writer).with_context(|| {
+            serde_json::to_writer(&mut writer, &envelope).with_context(|| {
                 format!("Failed to write execution report: {:?}", &output_file_name)
             })?;
+            // TODO: add a newline character to separate the entries
         }
         Ok(())
     }
@@ -93,18 +99,22 @@ pub struct Semantic {
 
 impl Semantic {
     /// Create a new semantic mode instance.
-    pub fn new(
-        event_source: EventFileReader,
-        semantic_recognition: Recognition,
-        semantic_transform: Transformation,
-        output_writer: OutputWriter,
-    ) -> Self {
-        Self {
+    pub fn from(
+        input: args::BuildEvents,
+        output: args::BuildSemantic,
+        config: config::Main,
+    ) -> anyhow::Result<Self> {
+        let event_source = EventFileReader::try_from(input)?;
+        let semantic_recognition = Recognition::try_from(&config)?;
+        let semantic_transform = Transformation::from(&config.output);
+        let output_writer = OutputWriter::configure(&output, &config.output)?;
+
+        Ok(Self {
             event_source,
             semantic_recognition,
             semantic_transform,
             output_writer,
-        }
+        })
     }
 }
 
@@ -141,20 +151,23 @@ pub struct All {
 
 impl All {
     /// Create a new all mode instance.
-    pub fn new(
+    pub fn from(
         command: args::BuildCommand,
-        intercept_config: config::Intercept,
-        semantic_recognition: Recognition,
-        semantic_transform: Transformation,
-        output_writer: OutputWriter,
-    ) -> Self {
-        Self {
+        output: args::BuildSemantic,
+        config: config::Main,
+    ) -> anyhow::Result<Self> {
+        let semantic_recognition = Recognition::try_from(&config)?;
+        let semantic_transform = Transformation::from(&config.output);
+        let output_writer = OutputWriter::configure(&output, &config.output)?;
+        let intercept_config = config.intercept;
+
+        Ok(Self {
             command,
             intercept_config,
             semantic_recognition,
             semantic_transform,
             output_writer,
-        }
+        })
     }
 
     /// Consumer the envelopes for analysis and write the result to the output file.

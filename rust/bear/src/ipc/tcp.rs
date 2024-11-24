@@ -14,7 +14,7 @@ use rand::random;
 
 /// Implements convenient methods for the `Envelope` type.
 impl Envelope {
-    pub fn new(rid: &ReporterId, event: Event) -> Self {
+    fn new(rid: &ReporterId, event: Event) -> Self {
         let timestamp = Utc::now().timestamp_millis() as u64;
         Envelope {
             rid: rid.clone(),
@@ -27,7 +27,7 @@ impl Envelope {
     ///
     /// The envelope is serialized using JSON and the length of the JSON
     /// is written as a 4 byte big-endian integer before the JSON.
-    pub fn read_from(reader: &mut impl Read) -> Result<Self, anyhow::Error> {
+    fn read_from(reader: &mut impl Read) -> Result<Self, anyhow::Error> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -43,7 +43,7 @@ impl Envelope {
     ///
     /// The envelope is serialized using JSON and the length of the JSON
     /// is written as a 4 byte big-endian integer before the JSON.
-    pub fn write_into(&self, writer: &mut impl Write) -> Result<u32, anyhow::Error> {
+    fn write_into(&self, writer: &mut impl Write) -> Result<u32, anyhow::Error> {
         let serialized_envelope = serde_json::to_string(&self)?;
         let bytes = serialized_envelope.into_bytes();
         let length = bytes.len() as u32;

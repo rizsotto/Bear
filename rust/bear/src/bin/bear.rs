@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::input::EventFileReader;
-use bear::modes::recognition::Recognition;
-use bear::modes::transformation::Transformation;
 use bear::modes::{All, Intercept, Mode, Semantic};
-use bear::output::OutputWriter;
 use bear::{args, config};
 use std::env;
 use std::process::ExitCode;
@@ -53,38 +49,15 @@ impl Application {
         match args.mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept");
-                let intercept_config = config.intercept;
-                let mode = Intercept::new(input, output, intercept_config);
-                Ok(Application::Intercept(mode))
+                Intercept::from(input, output, config).map(Application::Intercept)
             }
             args::Mode::Semantic { input, output } => {
                 log::debug!("Mode: semantic analysis");
-                let event_source = EventFileReader::try_from(input)?;
-                let semantic_recognition = Recognition::try_from(&config)?;
-                let semantic_transform = Transformation::from(&config.output);
-                let output_writer = OutputWriter::configure(&output, &config.output)?;
-                let mode = Semantic::new(
-                    event_source,
-                    semantic_recognition,
-                    semantic_transform,
-                    output_writer,
-                );
-                Ok(Application::Semantic(mode))
+                Semantic::from(input, output, config).map(Application::Semantic)
             }
             args::Mode::All { input, output } => {
                 log::debug!("Mode: intercept and semantic analysis");
-                let semantic_recognition = Recognition::try_from(&config)?;
-                let semantic_transform = Transformation::from(&config.output);
-                let output_writer = OutputWriter::configure(&output, &config.output)?;
-                let intercept_config = config.intercept;
-                let mode = All::new(
-                    input,
-                    intercept_config,
-                    semantic_recognition,
-                    semantic_transform,
-                    output_writer,
-                );
-                Ok(Application::All(mode))
+                All::from(input, output, config).map(Application::All)
             }
         }
     }

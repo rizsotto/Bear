@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::{KEY_DESTINATION, KEY_PRELOAD_PATH};
 use crate::ipc::tcp::CollectorOnTcp;
 use crate::ipc::{Collector, Envelope};
 use crate::{args, config};
@@ -9,10 +10,6 @@ use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::{env, thread};
-
-/// Declare the environment variable name for the reporter address.
-pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
-pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 
 /// The service is responsible for collecting the events from the supervised processes.
 ///
