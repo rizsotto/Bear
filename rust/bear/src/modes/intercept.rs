@@ -1,15 +1,84 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{KEY_DESTINATION, KEY_PRELOAD_PATH};
+use super::Mode;
 use crate::ipc::tcp::CollectorOnTcp;
 use crate::ipc::{Collector, Envelope};
 use crate::{args, config};
+use anyhow::Context;
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::mpsc::channel;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::{env, thread};
+
+/// Declare the environment variables used by the intercept mode.
+pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
+pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
+
+/// The intercept mode we are only capturing the build commands
+/// and write it into the output file.
+pub struct Intercept {
+    command: args::BuildCommand,
+    output: args::BuildEvents,
+    config: config::Intercept,
+}
+
+impl Intercept {
+    /// Create a new intercept mode instance.
+    pub fn from(
+        command: args::BuildCommand,
+        output: args::BuildEvents,
+        config: config::Main,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            command,
+            output,
+            config: config.intercept,
+        })
+    }
+
+    /// Consume events and write them into the output file.
+    fn write_to_file(
+        output_file_name: String,
+        envelopes: impl IntoIterator<Item = Envelope>,
+    ) -> anyhow::Result<()> {
+        let mut writer = std::fs::File::create(&output_file_name)
+            .map(BufWriter::new)
+            .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
+        for envelope in envelopes {
+            serde_json::to_writer(&mut writer, &envelope).with_context(|| {
+                format!("Failed to write execution report: {:?}", &output_file_name)
+            })?;
+            // TODO: add a newline character to separate the entries
+        }
+        Ok(())
+    }
+}
+
+impl Mode for Intercept {
+    /// Run the intercept mode by setting up the collector service and
+    /// the intercept environment. The build command is executed in the
+    /// intercept environment.
+    ///
+    /// The exit code is based on the result of the build command.
+    fn run(self) -> anyhow::Result<ExitCode> {
+        let output_file_name = self.output.file_name.clone();
+        let service = CollectorService::new(move |envelopes| {
+            Self::write_to_file(output_file_name, envelopes)
+        })
+            .with_context(|| "Failed to create the ipc service")?;
+        let environment = InterceptEnvironment::new(&self.config, service.address())
+            .with_context(|| "Failed to create the ipc environment")?;
+
+        let status = environment
+            .execute_build_command(self.command)
+            .with_context(|| "Failed to execute the build command")?;
+
+        Ok(status)
+    }
+}
 
 /// The service is responsible for collecting the events from the supervised processes.
 ///

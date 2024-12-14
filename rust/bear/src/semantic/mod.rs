@@ -15,7 +15,6 @@ pub mod transformation;
 
 use super::ipc::Execution;
 use std::path::PathBuf;
-use crate::semantic;
 
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
@@ -64,6 +63,18 @@ pub enum Recognition<T> {
     Error(String),
     /// The command was not recognized.
     Unknown,
+}
+
+impl <T> IntoIterator for Recognition<T> {
+    type Item = T;
+    type IntoIter = std::option::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Recognition::Success(value) => Some(value).into_iter(),
+            _ => None.into_iter(),
+        }
+    }
 }
 
 /// Responsible to transform the semantic of an executed command.

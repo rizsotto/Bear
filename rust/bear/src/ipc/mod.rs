@@ -11,6 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
@@ -79,6 +80,17 @@ pub struct Execution {
     pub arguments: Vec<String>,
     pub working_dir: PathBuf,
     pub environment: HashMap<String, String>,
+}
+
+impl fmt::Display for Execution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Execution path={}, args=[{}]",
+            self.executable.display(),
+            self.arguments.join(",")
+        )
+    }
 }
 
 /// Reporter id is a unique identifier for a reporter.

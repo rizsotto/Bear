@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::modes::{Combined, Intercept, Mode, Semantic};
+use bear::modes::Mode;
+use bear::modes::intercept::Intercept;
+use bear::modes::semantic::Semantic;
+use bear::modes::combined::Combined;
 use bear::{args, config};
 use std::env;
 use std::process::ExitCode;
@@ -68,12 +71,9 @@ impl Application {
             Application::Semantic(semantic) => semantic.run(),
             Application::Combined(all) => all.run(),
         };
-        match status {
-            Ok(code) => code,
-            Err(error) => {
-                log::error!("Run failed: {}", error);
-                ExitCode::FAILURE
-            }
-        }
+        status.unwrap_or_else(|error| {
+            log::error!("Bear: {}", error);
+            ExitCode::FAILURE
+        })
     }
 }
