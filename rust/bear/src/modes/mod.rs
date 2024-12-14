@@ -3,7 +3,6 @@
 mod input;
 mod intercept;
 mod recognition;
-mod transformation;
 
 use crate::ipc::Envelope;
 use crate::output::OutputWriter;
@@ -14,7 +13,8 @@ use intercept::{CollectorService, InterceptEnvironment};
 use recognition::Recognition;
 use std::io::BufWriter;
 use std::process::ExitCode;
-use transformation::Transformation;
+use crate::semantic::Transform;
+use crate::semantic::transformation::Transformation;
 
 /// Declare the environment variables used by the intercept mode.
 pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";

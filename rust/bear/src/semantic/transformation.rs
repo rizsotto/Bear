@@ -6,8 +6,9 @@
 //! It can also alter the compiler flags of the compiler calls. The actions
 //! are defined in the configuration this module is given.
 
-use super::super::semantic;
-use super::config;
+use crate::semantic;
+use crate::config;
+use crate::semantic::Transform;
 
 pub enum Transformation {
     None,
@@ -30,8 +31,8 @@ impl From<&config::Output> for Transformation {
     }
 }
 
-impl Transformation {
-    pub fn apply(&self, input: semantic::CompilerCall) -> Option<semantic::CompilerCall> {
+impl Transform for Transformation {
+    fn apply(&self, input: semantic::CompilerCall) -> Option<semantic::CompilerCall> {
         let semantic::CompilerCall {
             compiler,
             passes,
@@ -39,14 +40,14 @@ impl Transformation {
         } = &input;
         match self.lookup(compiler) {
             Some(config::Compiler {
-                ignore: config::Ignore::Always,
-                ..
-            }) => None,
+                     ignore: config::Ignore::Always,
+                     ..
+                 }) => None,
             Some(config::Compiler {
-                ignore: config::Ignore::Conditional,
-                arguments,
-                ..
-            }) => {
+                     ignore: config::Ignore::Conditional,
+                     arguments,
+                     ..
+                 }) => {
                 if Self::filter(arguments, passes) {
                     None
                 } else {
@@ -54,10 +55,10 @@ impl Transformation {
                 }
             }
             Some(config::Compiler {
-                ignore: config::Ignore::Never,
-                arguments,
-                ..
-            }) => {
+                     ignore: config::Ignore::Never,
+                     arguments,
+                     ..
+                 }) => {
                 let new_passes = Transformation::execute(arguments, passes);
                 Some(semantic::CompilerCall {
                     compiler: compiler.clone(),
@@ -68,7 +69,9 @@ impl Transformation {
             None => Some(input),
         }
     }
+}
 
+impl Transformation {
     // TODO: allow multiple matches for the same compiler
     fn lookup(&self, compiler: &std::path::Path) -> Option<&config::Compiler> {
         match self {

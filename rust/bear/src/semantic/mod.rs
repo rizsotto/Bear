@@ -11,9 +11,11 @@
 //! ones that are relevant to build a JSON compilation database.
 
 pub mod interpreters;
+pub mod transformation;
 
 use super::ipc::Execution;
 use std::path::PathBuf;
+use crate::semantic;
 
 /// Represents an executed command semantic.
 #[derive(Debug, PartialEq)]
@@ -62,4 +64,13 @@ pub enum Recognition<T> {
     Error(String),
     /// The command was not recognized.
     Unknown,
+}
+
+/// Responsible to transform the semantic of an executed command.
+///
+/// It conditionally removes compiler calls based on compiler names or flags.
+/// It can also alter the compiler flags of the compiler calls. The actions
+/// are defined in the configuration this module is given.
+pub trait Transform {
+    fn apply(&self, _: CompilerCall) -> Option<CompilerCall>;
 }
