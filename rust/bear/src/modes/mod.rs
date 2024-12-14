@@ -141,7 +141,7 @@ impl Mode for Semantic {
 }
 
 /// The all model is combining the intercept and semantic modes.
-pub struct All {
+pub struct Combined {
     command: args::BuildCommand,
     intercept_config: config::Intercept,
     semantic_recognition: Recognition,
@@ -149,7 +149,7 @@ pub struct All {
     output_writer: OutputWriter,
 }
 
-impl All {
+impl Combined {
     /// Create a new all mode instance.
     pub fn from(
         command: args::BuildCommand,
@@ -188,7 +188,7 @@ impl All {
     }
 }
 
-impl Mode for All {
+impl Mode for Combined {
     /// Run the all mode by setting up the collector service and the intercept environment.
     /// The build command is executed in the intercept environment. The collected events are
     /// then processed by the semantic recognition and transformation. The result is written

@@ -36,7 +36,7 @@ pub enum Mode {
         input: BuildEvents,
         output: BuildSemantic,
     },
-    All {
+    Combined {
         input: BuildCommand,
         output: BuildSemantic,
     },
@@ -98,7 +98,7 @@ impl TryFrom<ArgMatches> for Arguments {
             None => {
                 let input = BuildCommand::try_from(&matches)?;
                 let output = BuildSemantic::try_from(&matches)?;
-                let mode = Mode::All { input, output };
+                let mode = Mode::Combined { input, output };
                 let arguments = Arguments { config, mode };
                 Ok(arguments)
             }
@@ -334,7 +334,7 @@ mod test {
             arguments,
             Arguments {
                 config: Some("~/bear.yaml".to_string()),
-                mode: Mode::All {
+                mode: Mode::Combined {
                     input: BuildCommand {
                         arguments: vec_of_strings!["make", "all"]
                     },
@@ -358,7 +358,7 @@ mod test {
             arguments,
             Arguments {
                 config: None,
-                mode: Mode::All {
+                mode: Mode::Combined {
                     input: BuildCommand {
                         arguments: vec_of_strings!["make", "all"]
                     },

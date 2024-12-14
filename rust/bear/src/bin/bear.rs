@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::modes::{All, Intercept, Mode, Semantic};
+use bear::modes::{Combined, Intercept, Mode, Semantic};
 use bear::{args, config};
 use std::env;
 use std::process::ExitCode;
@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<ExitCode> {
 enum Application {
     Intercept(Intercept),
     Semantic(Semantic),
-    All(All),
+    Combined(Combined),
 }
 
 impl Application {
@@ -55,9 +55,9 @@ impl Application {
                 log::debug!("Mode: semantic analysis");
                 Semantic::from(input, output, config).map(Application::Semantic)
             }
-            args::Mode::All { input, output } => {
+            args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept and semantic analysis");
-                All::from(input, output, config).map(Application::All)
+                Combined::from(input, output, config).map(Application::Combined)
             }
         }
     }
@@ -66,7 +66,7 @@ impl Application {
         let status = match self {
             Application::Intercept(intercept) => intercept.run(),
             Application::Semantic(semantic) => semantic.run(),
-            Application::All(all) => all.run(),
+            Application::Combined(all) => all.run(),
         };
         match status {
             Ok(code) => code,
