@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::ipc;
 use super::super::semantic;
 use crate::ipc::{Envelope, Execution};
 use crate::modes::Mode;
@@ -21,7 +20,7 @@ use std::process::ExitCode;
 /// executed commands from the build process.
 pub struct Semantic {
     event_source: EventFileReader,
-    semantic_recognition: Recognition,
+    interpreter: Box<dyn semantic::Interpreter>,
     semantic_transform: Transformation,
     output_writer: OutputWriterImpl,
 }
@@ -34,54 +33,17 @@ impl Semantic {
         config: config::Main,
     ) -> anyhow::Result<Self> {
         let event_source = EventFileReader::try_from(input)?;
-        let semantic_recognition = Recognition::try_from(&config)?;
+        let interpreter = Self::interpreter(&config)?;
         let semantic_transform = Transformation::from(&config.output);
         let output_writer = OutputWriterImpl::create(&output, &config.output)?;
 
         Ok(Self {
             event_source,
-            semantic_recognition,
+            interpreter,
             semantic_transform,
             output_writer,
         })
     }
-}
-
-impl Mode for Semantic {
-    /// Run the semantic mode by generating the compilation database entries
-    /// from the event source. The entries are then processed by the semantic
-    /// recognition and transformation. The result is written to the output file.
-    ///
-    /// The exit code is based on the result of the output writer.
-    fn run(self) -> anyhow::Result<ExitCode> {
-        // Set up the pipeline of compilation database entries.
-        let entries = self
-            .event_source
-            .generate()
-            .inspect(|execution| log::debug!("execution: {}", execution))
-            .flat_map(|execution| self.semantic_recognition.apply(execution))
-            .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
-            .flat_map(|semantic| self.semantic_transform.apply(semantic));
-        // Consume the entries and write them to the output file.
-        // The exit code is based on the result of the output writer.
-        match self.output_writer.run(entries) {
-            Ok(_) => Ok(ExitCode::SUCCESS),
-            Err(_) => Ok(ExitCode::FAILURE),
-        }
-    }
-}
-
-/// Responsible for recognizing the semantic meaning of the executed commands.
-///
-/// The recognition logic is implemented in the `interpreters` module.
-/// Here we only handle the errors and logging them to the console.
-
-pub struct Recognition {
-    interpreter: Box<dyn semantic::Interpreter>,
-}
-
-impl TryFrom<&config::Main> for Recognition {
-    type Error = anyhow::Error;
 
     /// Creates an interpreter to recognize the compiler calls.
     ///
@@ -91,7 +53,7 @@ impl TryFrom<&config::Main> for Recognition {
     // TODO: Use the CC or CXX environment variables to detect the compiler to include.
     //       Use the CC or CXX environment variables and make sure those are not excluded.
     //       Make sure the environment variables are passed to the method.
-    fn try_from(config: &config::Main) -> Result<Self, Self::Error> {
+    pub fn interpreter(config: &config::Main) -> anyhow::Result<Box<dyn semantic::Interpreter>> {
         let compilers_to_include = match &config.intercept {
             config::Intercept::Wrapper { executables, .. } => executables.clone(),
             _ => vec![],
@@ -109,20 +71,31 @@ impl TryFrom<&config::Main> for Recognition {
             .compilers_to_exclude(compilers_to_exclude.as_slice())
             .build();
 
-        Ok(Recognition {
-            interpreter: Box::new(interpreter),
-        })
+        Ok(Box::new(interpreter))
     }
 }
 
-impl Recognition {
-    /// Simple call the semantic module to recognize the execution.
-    /// Forward only the compiler calls, and log each recognition result.
-    pub fn apply(
-        &self,
-        execution: ipc::Execution,
-    ) -> semantic::Recognition<semantic::CompilerCall> {
-        self.interpreter.recognize(&execution)
+impl Mode for Semantic {
+    /// Run the semantic mode by generating the compilation database entries
+    /// from the event source. The entries are then processed by the semantic
+    /// recognition and transformation. The result is written to the output file.
+    ///
+    /// The exit code is based on the result of the output writer.
+    fn run(self) -> anyhow::Result<ExitCode> {
+        // Set up the pipeline of compilation database entries.
+        let entries = self
+            .event_source
+            .generate()
+            .inspect(|execution| log::debug!("execution: {}", execution))
+            .flat_map(|execution| self.interpreter.recognize(&execution))
+            .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
+            .flat_map(|semantic| self.semantic_transform.apply(semantic));
+        // Consume the entries and write them to the output file.
+        // The exit code is based on the result of the output writer.
+        match self.output_writer.run(entries) {
+            Ok(_) => Ok(ExitCode::SUCCESS),
+            Err(_) => Ok(ExitCode::FAILURE),
+        }
     }
 }
 

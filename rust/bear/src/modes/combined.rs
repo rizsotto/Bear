@@ -2,12 +2,12 @@
 
 use crate::ipc::Envelope;
 use crate::modes::intercept::{CollectorService, InterceptEnvironment};
-use crate::modes::semantic::Recognition;
+use crate::modes::semantic::Semantic;
 use crate::modes::Mode;
 use crate::output::{OutputWriter, OutputWriterImpl};
 use crate::semantic::transformation::Transformation;
 use crate::semantic::Transform;
-use crate::{args, config};
+use crate::{args, config, semantic};
 use anyhow::Context;
 use std::process::ExitCode;
 
@@ -15,7 +15,7 @@ use std::process::ExitCode;
 pub struct Combined {
     command: args::BuildCommand,
     intercept_config: config::Intercept,
-    semantic_recognition: Recognition,
+    interpreter: Box<dyn semantic::Interpreter>,
     semantic_transform: Transformation,
     output_writer: OutputWriterImpl,
 }
@@ -27,7 +27,7 @@ impl Combined {
         output: args::BuildSemantic,
         config: config::Main,
     ) -> anyhow::Result<Self> {
-        let semantic_recognition = Recognition::try_from(&config)?;
+        let interpreter = Semantic::interpreter(&config)?;
         let semantic_transform = Transformation::from(&config.output);
         let output_writer = OutputWriterImpl::create(&output, &config.output)?;
         let intercept_config = config.intercept;
@@ -35,7 +35,7 @@ impl Combined {
         Ok(Self {
             command,
             intercept_config,
-            semantic_recognition,
+            interpreter,
             semantic_transform,
             output_writer,
         })
@@ -44,7 +44,7 @@ impl Combined {
     /// Consumer the envelopes for analysis and write the result to the output file.
     /// This implements the pipeline of the semantic analysis. Same as the `Semantic` mode.
     fn consume_for_analysis(
-        semantic_recognition: Recognition,
+        interpreter: Box<dyn semantic::Interpreter>,
         semantic_transform: Transformation,
         output_writer: OutputWriterImpl,
         envelopes: impl IntoIterator<Item = Envelope>,
@@ -53,7 +53,7 @@ impl Combined {
             .into_iter()
             .map(|envelope| envelope.event.execution)
             .inspect(|execution| log::debug!("execution: {}", execution))
-            .flat_map(|execution| semantic_recognition.apply(execution))
+            .flat_map(|execution| interpreter.recognize(&execution))
             .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
             .flat_map(|semantic| semantic_transform.apply(semantic));
 
@@ -69,16 +69,11 @@ impl Mode for Combined {
     ///
     /// The exit code is based on the result of the build command.
     fn run(self) -> anyhow::Result<ExitCode> {
-        let semantic_recognition = self.semantic_recognition;
+        let interpreter = self.interpreter;
         let semantic_transform = self.semantic_transform;
         let output_writer = self.output_writer;
         let service = CollectorService::new(move |envelopes| {
-            Self::consume_for_analysis(
-                semantic_recognition,
-                semantic_transform,
-                output_writer,
-                envelopes,
-            )
+            Self::consume_for_analysis(interpreter, semantic_transform, output_writer, envelopes)
         })
         .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.intercept_config, service.address())
