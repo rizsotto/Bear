@@ -7,7 +7,7 @@ use crate::output::event::write;
 use crate::{args, config};
 use anyhow::Context;
 use std::fs::OpenOptions;
-use std::io::BufWriter;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::mpsc::channel;
@@ -23,8 +23,7 @@ pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 /// and write it into the output file.
 pub struct Intercept {
     command: args::BuildCommand,
-    output: args::BuildEvents,
-    config: config::Intercept,
+    interceptor: Interceptor,
 }
 
 impl Intercept {
@@ -34,29 +33,22 @@ impl Intercept {
         output: args::BuildEvents,
         config: config::Main,
     ) -> anyhow::Result<Self> {
-        Ok(Self {
-            command,
-            output,
-            config: config.intercept,
-        })
-    }
-
-    /// Consume events and write them into the output file.
-    fn write_to_file(
-        output_file_name: PathBuf,
-        envelopes: impl IntoIterator<Item = Envelope>,
-    ) -> anyhow::Result<()> {
-        let file = OpenOptions::new()
+        let file_name = output.file_name.as_str();
+        let output_file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(output_file_name.as_path())
-            .map(BufWriter::new)
-            .with_context(|| format!("Failed to open file: {:?}", output_file_name))?;
+            .open(file_name)
+            .map(io::BufWriter::new)
+            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
 
-        write(file, envelopes)?;
+        let interceptor: Interceptor =
+            Interceptor::new(config, move |envelopes| write(output_file, envelopes))?;
 
-        Ok(())
+        Ok(Self {
+            command,
+            interceptor,
+        })
     }
 }
 
@@ -67,18 +59,37 @@ impl Mode for Intercept {
     ///
     /// The exit code is based on the result of the build command.
     fn run(self) -> anyhow::Result<ExitCode> {
-        let output_file = PathBuf::from(self.output.file_name);
+        self.interceptor.run_build_command(self.command)
+    }
+}
+
+pub(super) struct Interceptor {
+    service: CollectorService,
+    environment: InterceptEnvironment,
+}
+
+impl Interceptor {
+    pub(super) fn new<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
+    where
+        F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
+        F: Send + 'static,
+    {
         let service =
-            CollectorService::new(move |envelopes| Self::write_to_file(output_file, envelopes))
-                .with_context(|| "Failed to create the ipc service")?;
-        let environment = InterceptEnvironment::new(&self.config, service.address())
-            .with_context(|| "Failed to create the ipc environment")?;
+            CollectorService::new(consumer).with_context(|| "Failed to create the ipc service")?;
 
-        let status = environment
-            .execute_build_command(self.command)
-            .with_context(|| "Failed to execute the build command")?;
+        let environment = InterceptEnvironment::new(&config.intercept, service.address())
+            .with_context(|| "Failed to create the intercept environment")?;
 
-        Ok(status)
+        Ok(Self {
+            service,
+            environment,
+        })
+    }
+
+    pub(super) fn run_build_command(self, command: args::BuildCommand) -> anyhow::Result<ExitCode> {
+        self.environment
+            .execute_build_command(command)
+            .with_context(|| "Failed to execute the build command")
     }
 }
 
@@ -208,7 +219,7 @@ impl InterceptEnvironment {
     /// The method is blocking and waits for the build command to finish.
     /// The method returns the exit code of the build command. Result failure
     /// indicates that the build command failed to start.
-    pub fn execute_build_command(self, input: args::BuildCommand) -> anyhow::Result<ExitCode> {
+    pub fn execute_build_command(&self, input: args::BuildCommand) -> anyhow::Result<ExitCode> {
         // TODO: record the execution of the build command
 
         let environment = self.environment();
