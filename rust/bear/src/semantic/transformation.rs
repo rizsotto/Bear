@@ -6,8 +6,8 @@
 //! It can also alter the compiler flags of the compiler calls. The actions
 //! are defined in the configuration this module is given.
 
-use crate::semantic;
 use crate::config;
+use crate::semantic;
 use crate::semantic::Transform;
 
 pub enum Transformation {
@@ -40,14 +40,14 @@ impl Transform for Transformation {
         } = &input;
         match self.lookup(compiler) {
             Some(config::Compiler {
-                     ignore: config::Ignore::Always,
-                     ..
-                 }) => None,
+                ignore: config::Ignore::Always,
+                ..
+            }) => None,
             Some(config::Compiler {
-                     ignore: config::Ignore::Conditional,
-                     arguments,
-                     ..
-                 }) => {
+                ignore: config::Ignore::Conditional,
+                arguments,
+                ..
+            }) => {
                 if Self::filter(arguments, passes) {
                     None
                 } else {
@@ -55,10 +55,10 @@ impl Transform for Transformation {
                 }
             }
             Some(config::Compiler {
-                     ignore: config::Ignore::Never,
-                     arguments,
-                     ..
-                 }) => {
+                ignore: config::Ignore::Never,
+                arguments,
+                ..
+            }) => {
                 let new_passes = Transformation::execute(arguments, passes);
                 Some(semantic::CompilerCall {
                     compiler: compiler.clone(),

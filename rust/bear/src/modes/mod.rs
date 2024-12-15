@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+pub mod combined;
 pub mod intercept;
 pub mod semantic;
-pub mod combined;
 
 use std::process::ExitCode;
 

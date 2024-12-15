@@ -68,7 +68,7 @@ impl Mode for Intercept {
         let service = CollectorService::new(move |envelopes| {
             Self::write_to_file(output_file_name, envelopes)
         })
-            .with_context(|| "Failed to create the ipc service")?;
+        .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.config, service.address())
             .with_context(|| "Failed to create the ipc environment")?;
 

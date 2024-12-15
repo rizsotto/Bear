@@ -65,7 +65,7 @@ pub enum Recognition<T> {
     Unknown,
 }
 
-impl <T> IntoIterator for Recognition<T> {
+impl<T> IntoIterator for Recognition<T> {
     type Item = T;
     type IntoIter = std::option::IntoIter<T>;
 
