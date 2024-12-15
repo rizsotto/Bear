@@ -11,6 +11,67 @@ use path_absolutize::Absolutize;
 mod clang;
 mod filter;
 
+/// The output writer trait is responsible for writing output file.
+pub(crate) trait OutputWriter {
+    /// Running the writer means to consume the compiler calls
+    /// and write the entries to the output file.
+    fn run(&self, _: impl Iterator<Item = semantic::CompilerCall>) -> Result<()>;
+}
+
+/// The output writer implementation.
+///
+/// This is a workaround for the lack of trait object support for generic arguments.
+/// https://doc.rust-lang.org/reference/items/traits.html#object-safety.
+pub(crate) enum OutputWriterImpl {
+    Clang(ClangOutputWriter),
+    Semantic(SemanticOutputWriter),
+}
+
+impl OutputWriter for OutputWriterImpl {
+    fn run(&self, compiler_calls: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
+        match self {
+            OutputWriterImpl::Clang(writer) => writer.run(compiler_calls),
+            OutputWriterImpl::Semantic(writer) => writer.run(compiler_calls),
+        }
+    }
+}
+
+impl OutputWriterImpl {
+    /// Create a new instance of the output writer.
+    pub(crate) fn create(
+        args: &args::BuildSemantic,
+        config: &config::Output,
+    ) -> Result<OutputWriterImpl> {
+        match config {
+            config::Output::Clang { format, filter, .. } => {
+                let result = ClangOutputWriter {
+                    output: PathBuf::from(&args.file_name),
+                    append: args.append,
+                    filter: filter.clone(),
+                    format: format.clone(),
+                };
+                Ok(OutputWriterImpl::Clang(result))
+            }
+            config::Output::Semantic { .. } => {
+                let result = SemanticOutputWriter {
+                    output: PathBuf::from(&args.file_name),
+                };
+                Ok(OutputWriterImpl::Semantic(result))
+            }
+        }
+    }
+}
+
+struct SemanticOutputWriter {
+    output: PathBuf,
+}
+
+impl OutputWriter for SemanticOutputWriter {
+    fn run(&self, _: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
+        todo!("implement this method")
+    }
+}
+
 /// Responsible for writing the final compilation database file.
 ///
 /// Implements filtering, formatting and atomic file writing.
@@ -18,34 +79,16 @@ mod filter;
 ///
 /// Filtering is implemented by the `filter` module, and the formatting is implemented by the
 /// `json_compilation_db` module.
-pub struct OutputWriter {
+struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
     filter: config::Filter,
     format: config::Format,
 }
 
-impl OutputWriter {
-    /// Create a new instance of the output writer.
-    pub fn configure(args: &args::BuildSemantic, config: &config::Output) -> Result<Self> {
-        match config {
-            config::Output::Clang { format, filter, .. } => {
-                let result = OutputWriter {
-                    output: PathBuf::from(&args.file_name),
-                    append: args.append,
-                    filter: filter.clone(),
-                    format: format.clone(),
-                };
-                Ok(result)
-            }
-            config::Output::Semantic { .. } => {
-                todo!("implement this case")
-            }
-        }
-    }
-
+impl OutputWriter for ClangOutputWriter {
     /// Implements the main logic of the output writer.
-    pub fn run(&self, compiler_calls: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
+    fn run(&self, compiler_calls: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
         let entries = compiler_calls
             .flat_map(|compiler_call| self.format.convert_into_entries(compiler_call));
         if self.append && self.output.exists() {
@@ -59,7 +102,9 @@ impl OutputWriter {
             self.write_into_compilation_db(entries)
         }
     }
+}
 
+impl ClangOutputWriter {
     fn write_into_compilation_db(&self, entries: impl Iterator<Item = clang::Entry>) -> Result<()> {
         // Filter out the entries as per the configuration.
         let filter: filter::EntryPredicate = TryFrom::try_from(&self.filter)?;

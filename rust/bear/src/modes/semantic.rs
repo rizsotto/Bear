@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::modes::Mode;
-use crate::output::OutputWriter;
-use crate::semantic::transformation::Transformation;
-use crate::semantic::Transform;
-use crate::{args, config};
 use super::super::ipc;
 use super::super::semantic;
 use crate::ipc::{Envelope, Execution};
-use std::process::ExitCode;
+use crate::modes::Mode;
+use crate::output::{OutputWriter, OutputWriterImpl};
+use crate::semantic::transformation::Transformation;
+use crate::semantic::Transform;
+use crate::{args, config};
+use anyhow::Context;
 use serde_json::de::IoRead;
 use serde_json::{Error, StreamDeserializer};
 use std::convert::TryFrom;
 use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::path::PathBuf;
-use anyhow::Context;
+use std::process::ExitCode;
 
 /// The semantic mode we are deduct the semantic meaning of the
 /// executed commands from the build process.
@@ -23,7 +23,7 @@ pub struct Semantic {
     event_source: EventFileReader,
     semantic_recognition: Recognition,
     semantic_transform: Transformation,
-    output_writer: OutputWriter,
+    output_writer: OutputWriterImpl,
 }
 
 impl Semantic {
@@ -36,7 +36,7 @@ impl Semantic {
         let event_source = EventFileReader::try_from(input)?;
         let semantic_recognition = Recognition::try_from(&config)?;
         let semantic_transform = Transformation::from(&config.output);
-        let output_writer = OutputWriter::configure(&output, &config.output)?;
+        let output_writer = OutputWriterImpl::create(&output, &config.output)?;
 
         Ok(Self {
             event_source,
@@ -118,7 +118,10 @@ impl TryFrom<&config::Main> for Recognition {
 impl Recognition {
     /// Simple call the semantic module to recognize the execution.
     /// Forward only the compiler calls, and log each recognition result.
-    pub fn apply(&self, execution: ipc::Execution) -> semantic::Recognition<semantic::CompilerCall> {
+    pub fn apply(
+        &self,
+        execution: ipc::Execution,
+    ) -> semantic::Recognition<semantic::CompilerCall> {
         self.interpreter.recognize(&execution)
     }
 }

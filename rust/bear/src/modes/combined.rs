@@ -4,7 +4,7 @@ use crate::ipc::Envelope;
 use crate::modes::intercept::{CollectorService, InterceptEnvironment};
 use crate::modes::semantic::Recognition;
 use crate::modes::Mode;
-use crate::output::OutputWriter;
+use crate::output::{OutputWriter, OutputWriterImpl};
 use crate::semantic::transformation::Transformation;
 use crate::semantic::Transform;
 use crate::{args, config};
@@ -17,7 +17,7 @@ pub struct Combined {
     intercept_config: config::Intercept,
     semantic_recognition: Recognition,
     semantic_transform: Transformation,
-    output_writer: OutputWriter,
+    output_writer: OutputWriterImpl,
 }
 
 impl Combined {
@@ -29,7 +29,7 @@ impl Combined {
     ) -> anyhow::Result<Self> {
         let semantic_recognition = Recognition::try_from(&config)?;
         let semantic_transform = Transformation::from(&config.output);
-        let output_writer = OutputWriter::configure(&output, &config.output)?;
+        let output_writer = OutputWriterImpl::create(&output, &config.output)?;
         let intercept_config = config.intercept;
 
         Ok(Self {
@@ -46,13 +46,15 @@ impl Combined {
     fn consume_for_analysis(
         semantic_recognition: Recognition,
         semantic_transform: Transformation,
-        output_writer: OutputWriter,
+        output_writer: OutputWriterImpl,
         envelopes: impl IntoIterator<Item = Envelope>,
     ) -> anyhow::Result<()> {
         let entries = envelopes
             .into_iter()
             .map(|envelope| envelope.event.execution)
+            .inspect(|execution| log::debug!("execution: {}", execution))
             .flat_map(|execution| semantic_recognition.apply(execution))
+            .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
             .flat_map(|semantic| semantic_transform.apply(semantic));
 
         output_writer.run(entries)
@@ -78,7 +80,7 @@ impl Mode for Combined {
                 envelopes,
             )
         })
-            .with_context(|| "Failed to create the ipc service")?;
+        .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.intercept_config, service.address())
             .with_context(|| "Failed to create the ipc environment")?;
 
