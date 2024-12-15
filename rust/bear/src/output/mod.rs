@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context, Result};
 use path_absolutize::Absolutize;
 
 mod clang;
+pub mod event;
 mod filter;
 
 /// The output writer trait is responsible for writing output file.
@@ -69,7 +70,7 @@ pub(crate) struct SemanticOutputWriter {
 impl OutputWriter for SemanticOutputWriter {
     fn run(&self, entries: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
         let file_name = &self.output;
-        let file = File::create(&file_name)
+        let file = File::create(file_name)
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
 

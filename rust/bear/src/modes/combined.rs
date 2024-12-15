@@ -76,10 +76,9 @@ impl Mode for Combined {
             Self::consume_for_analysis(interpreter, semantic_transform, output_writer, envelopes)
         })
         .with_context(|| "Failed to create the ipc service")?;
-        let environment = InterceptEnvironment::new(&self.intercept_config, service.address())
-            .with_context(|| "Failed to create the ipc environment")?;
 
-        let status = environment
+        let status = InterceptEnvironment::new(&self.intercept_config, service.address())
+            .with_context(|| "Failed to create the ipc environment")?
             .execute_build_command(self.command)
             .with_context(|| "Failed to execute the build command")?;
 

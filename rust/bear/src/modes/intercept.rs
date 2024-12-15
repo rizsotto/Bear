@@ -3,8 +3,10 @@
 use super::Mode;
 use crate::ipc::tcp::CollectorOnTcp;
 use crate::ipc::{Collector, Envelope};
+use crate::output::event::write;
 use crate::{args, config};
 use anyhow::Context;
+use std::fs::OpenOptions;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -41,18 +43,19 @@ impl Intercept {
 
     /// Consume events and write them into the output file.
     fn write_to_file(
-        output_file_name: String,
+        output_file_name: PathBuf,
         envelopes: impl IntoIterator<Item = Envelope>,
     ) -> anyhow::Result<()> {
-        let mut writer = std::fs::File::create(&output_file_name)
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(output_file_name.as_path())
             .map(BufWriter::new)
-            .with_context(|| format!("Failed to create output file: {:?}", &output_file_name))?;
-        for envelope in envelopes {
-            serde_json::to_writer(&mut writer, &envelope).with_context(|| {
-                format!("Failed to write execution report: {:?}", &output_file_name)
-            })?;
-            // TODO: add a newline character to separate the entries
-        }
+            .with_context(|| format!("Failed to open file: {:?}", output_file_name))?;
+
+        write(file, envelopes)?;
+
         Ok(())
     }
 }
@@ -64,11 +67,10 @@ impl Mode for Intercept {
     ///
     /// The exit code is based on the result of the build command.
     fn run(self) -> anyhow::Result<ExitCode> {
-        let output_file_name = self.output.file_name.clone();
-        let service = CollectorService::new(move |envelopes| {
-            Self::write_to_file(output_file_name, envelopes)
-        })
-        .with_context(|| "Failed to create the ipc service")?;
+        let output_file = PathBuf::from(self.output.file_name);
+        let service =
+            CollectorService::new(move |envelopes| Self::write_to_file(output_file, envelopes))
+                .with_context(|| "Failed to create the ipc service")?;
         let environment = InterceptEnvironment::new(&self.config, service.address())
             .with_context(|| "Failed to create the ipc environment")?;
 
