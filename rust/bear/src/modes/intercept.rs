@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::Mode;
 use crate::ipc::tcp::CollectorOnTcp;
 use crate::ipc::{Collector, Envelope};
-use crate::output::event::write;
 use crate::{args, config};
 use anyhow::Context;
-use std::fs::OpenOptions;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::mpsc::channel;
@@ -19,56 +15,17 @@ use std::{env, thread};
 pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
 pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 
-/// The intercept mode we are only capturing the build commands
-/// and write it into the output file.
-pub struct Intercept {
-    command: args::BuildCommand,
-    interceptor: Interceptor,
-}
-
-impl Intercept {
-    /// Create a new intercept mode instance.
-    pub fn from(
-        command: args::BuildCommand,
-        output: args::BuildEvents,
-        config: config::Main,
-    ) -> anyhow::Result<Self> {
-        let file_name = output.file_name.as_str();
-        let output_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(file_name)
-            .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
-
-        let interceptor: Interceptor =
-            Interceptor::new(config, move |envelopes| write(output_file, envelopes))?;
-
-        Ok(Self {
-            command,
-            interceptor,
-        })
-    }
-}
-
-impl Mode for Intercept {
-    /// Run the intercept mode by setting up the collector service and
-    /// the intercept environment. The build command is executed in the
-    /// intercept environment.
-    ///
-    /// The exit code is based on the result of the build command.
-    fn run(self) -> anyhow::Result<ExitCode> {
-        self.interceptor.run_build_command(self.command)
-    }
-}
-
-pub(super) struct Interceptor {
+/// The build interceptor is responsible for capturing the build commands and
+/// dispatching them to the consumer. The consumer is a function that processes
+/// the intercepted command executions.
+pub(super) struct BuildInterceptor {
+    #[allow(dead_code)]
     service: CollectorService,
     environment: InterceptEnvironment,
 }
 
-impl Interceptor {
+impl BuildInterceptor {
+    /// Create a new process execution interceptor.
     pub(super) fn new<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
     where
         F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
@@ -86,10 +43,18 @@ impl Interceptor {
         })
     }
 
+    /// Run the build command in the intercept environment.
     pub(super) fn run_build_command(self, command: args::BuildCommand) -> anyhow::Result<ExitCode> {
         self.environment
             .execute_build_command(command)
             .with_context(|| "Failed to execute the build command")
+    }
+}
+
+impl Drop for BuildInterceptor {
+    fn drop(&mut self) {
+        // The `CollectorService` already implements `Drop`, so we don't need to do anything here.
+        // The `CollectorService`'s `Drop` implementation will handle the shutdown of the service.
     }
 }
 

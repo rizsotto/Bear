@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::modes::combined::Combined;
-use bear::modes::intercept::Intercept;
-use bear::modes::semantic::Semantic;
-use bear::modes::Mode;
+use bear::modes::{Combined, Intercept, Mode, Semantic};
 use bear::{args, config};
 use std::env;
 use std::process::ExitCode;
