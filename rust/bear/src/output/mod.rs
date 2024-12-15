@@ -62,13 +62,20 @@ impl OutputWriterImpl {
     }
 }
 
-struct SemanticOutputWriter {
+pub(crate) struct SemanticOutputWriter {
     output: PathBuf,
 }
 
 impl OutputWriter for SemanticOutputWriter {
-    fn run(&self, _: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
-        todo!("implement this method")
+    fn run(&self, entries: impl Iterator<Item = semantic::CompilerCall>) -> Result<()> {
+        let file_name = &self.output;
+        let file = File::create(&file_name)
+            .map(BufWriter::new)
+            .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
+
+        semantic::serialize(file, entries)?;
+
+        Ok(())
     }
 }
 
@@ -79,7 +86,7 @@ impl OutputWriter for SemanticOutputWriter {
 ///
 /// Filtering is implemented by the `filter` module, and the formatting is implemented by the
 /// `json_compilation_db` module.
-struct ClangOutputWriter {
+pub(crate) struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
     filter: config::Filter,
