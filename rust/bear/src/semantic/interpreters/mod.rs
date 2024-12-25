@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::path::PathBuf;
-
 use super::interpreters::combinators::Any;
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
 use super::Interpreter;
+use crate::config;
+use std::path::PathBuf;
 
 mod combinators;
 mod gcc;
@@ -20,8 +20,36 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// Creates an interpreter to recognize the compiler calls.
+    ///
+    /// Using the configuration we can define which compilers to include and exclude.
+    /// Also read the environment variables to detect the compiler to include (and
+    /// make sure those are not excluded either).
+    // TODO: Use the CC or CXX environment variables to detect the compiler to include.
+    //       Use the CC or CXX environment variables and make sure those are not excluded.
+    //       Make sure the environment variables are passed to the method.
+    // TODO: Take environment variables as input.
+    pub fn from(config: &config::Main) -> impl Interpreter {
+        let compilers_to_include = match &config.intercept {
+            config::Intercept::Wrapper { executables, .. } => executables.clone(),
+            _ => vec![],
+        };
+        let compilers_to_exclude = match &config.output {
+            config::Output::Clang { compilers, .. } => compilers
+                .iter()
+                .filter(|compiler| compiler.ignore == config::Ignore::Always)
+                .map(|compiler| compiler.path.clone())
+                .collect(),
+            _ => vec![],
+        };
+        Builder::new()
+            .compilers_to_recognize(compilers_to_include.as_slice())
+            .compilers_to_exclude(compilers_to_exclude.as_slice())
+            .build()
+    }
+
     /// Creates a new builder with default settings.
-    pub fn new() -> Self {
+    fn new() -> Self {
         // FIXME: replace generic with gcc, when it's implemented
         Builder {
             interpreters: vec![
@@ -34,12 +62,12 @@ impl Builder {
     }
 
     /// Factory method to create a new tool from the builder.
-    pub fn build(self) -> impl Interpreter {
+    fn build(self) -> impl Interpreter {
         Any::new(self.interpreters)
     }
 
     /// Adds new interpreters to recognize as compilers by executable name.
-    pub fn compilers_to_recognize(mut self, compilers: &[PathBuf]) -> Self {
+    fn compilers_to_recognize(mut self, compilers: &[PathBuf]) -> Self {
         if !compilers.is_empty() {
             // Add the new compilers at the end of the interpreters.
             let tool = Generic::from(compilers);
@@ -49,7 +77,7 @@ impl Builder {
     }
 
     /// Adds new interpreters to recognize as non-compilers by executable names.
-    pub fn compilers_to_exclude(mut self, compilers: &[PathBuf]) -> Self {
+    fn compilers_to_exclude(mut self, compilers: &[PathBuf]) -> Self {
         if !compilers.is_empty() {
             // Add these new compilers at the front of the interpreters.
             let tool = IgnoreByPath::from(compilers);
