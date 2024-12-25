@@ -2,8 +2,8 @@
 use std::hash::Hash;
 use std::path::PathBuf;
 
-use super::clang::Entry;
-use super::config;
+use crate::config;
+use crate::output::clang::Entry;
 use builder::create_hash;
 use builder::EntryPredicateBuilder as Builder;
 
