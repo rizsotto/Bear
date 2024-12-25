@@ -4,7 +4,7 @@ use crate::intercept::Envelope;
 use crate::output::OutputWriter;
 use crate::semantic::interpreters::Builder;
 use crate::semantic::transformation::Transformation;
-use crate::{args, config, semantic};
+use crate::{args, config, output, semantic};
 use anyhow::{anyhow, Context};
 use path_absolutize::Absolutize;
 use std::fs::{File, OpenOptions};
@@ -189,8 +189,7 @@ impl ClangOutputWriter {
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
         // Write the entries to the file.
-        self.format
-            .write_entries(file, entries)
+        output::clang::write(self.format.command_as_array, file, entries)
             .with_context(|| format!("Failed to write entries: {:?}", file_name.as_path()))?;
         // Return the temporary file name.
         Ok(file_name)
@@ -222,22 +221,6 @@ impl ClangOutputWriter {
 }
 
 impl config::Format {
-    /// The entries are written in the format specified by the configuration.
-    fn write_entries(
-        &self,
-        writer: impl std::io::Write,
-        entries: impl Iterator<Item = crate::output::clang::Entry>,
-    ) -> anyhow::Result<()> {
-        let method = if self.command_as_array {
-            crate::output::clang::write_with_arguments
-        } else {
-            crate::output::clang::write_with_command
-        };
-        method(writer, entries)?;
-
-        Ok(())
-    }
-
     /// Convert the compiler calls into entries.
     ///
     /// The conversion is done by converting the compiler passes into entries.
