@@ -3,7 +3,7 @@
 pub mod intercept;
 pub mod semantic;
 
-use crate::intercept::{read, write};
+use crate::intercept::persistence::{read, write};
 use crate::modes::intercept::BuildInterceptor;
 use crate::modes::semantic::SemanticAnalysisPipeline;
 use crate::{args, config};

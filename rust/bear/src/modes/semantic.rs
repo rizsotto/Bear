@@ -152,6 +152,10 @@ impl OutputWriter for ClangOutputWriter {
 }
 
 impl ClangOutputWriter {
+    /// Write the entries to the compilation database.
+    ///
+    /// The entries are written to a temporary file and then renamed to the final output.
+    /// This guaranties that the output file is always in a consistent state.
     fn write_into_compilation_db(
         &self,
         entries: impl Iterator<Item = crate::output::clang::Entry>,
