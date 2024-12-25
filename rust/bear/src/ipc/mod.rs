@@ -58,6 +58,16 @@ pub struct Envelope {
     pub event: Event,
 }
 
+impl fmt::Display for Envelope {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Envelope rid={}, timestamp={}, event={}",
+            self.rid.0, self.timestamp, self.event
+        )
+    }
+}
+
 /// Represent a relevant life cycle event of a process.
 ///
 /// In the current implementation, we only have one event, the `Started` event.
@@ -67,6 +77,12 @@ pub struct Envelope {
 pub struct Event {
     pub pid: ProcessId,
     pub execution: Execution,
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Event pid={}, execution={}", self.pid.0, self.execution)
+    }
 }
 
 /// Execution is a representation of a process execution.

@@ -67,8 +67,8 @@ impl SemanticAnalysisPipeline {
         // Set up the pipeline of compilation database entries.
         let entries = envelopes
             .into_iter()
+            .inspect(|envelope| log::debug!("envelope: {}", envelope))
             .map(|envelope| envelope.event.execution)
-            .inspect(|execution| log::debug!("execution: {}", execution))
             .flat_map(|execution| self.interpreter.recognize(&execution))
             .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
             .flat_map(|semantic| self.transform.apply(semantic));
