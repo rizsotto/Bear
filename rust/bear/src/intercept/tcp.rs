@@ -256,7 +256,7 @@ mod tests {
 
     mod fixtures {
         use super::*;
-        use crate::ipc::{Execution, ProcessId};
+        use crate::intercept::{Execution, ProcessId};
         use crate::{map_of_strings, vec_of_strings};
         use std::collections::HashMap;
         use std::path::PathBuf;

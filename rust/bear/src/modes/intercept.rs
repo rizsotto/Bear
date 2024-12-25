@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ipc::tcp::CollectorOnTcp;
-use crate::ipc::{Collector, Envelope};
+use crate::intercept::tcp::CollectorOnTcp;
+use crate::intercept::{Collector, Envelope};
 use crate::{args, config};
 use anyhow::Context;
 use std::path::{Path, PathBuf};
@@ -31,8 +31,8 @@ impl BuildInterceptor {
         F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
-        let service =
-            CollectorService::new(consumer).with_context(|| "Failed to create the ipc service")?;
+        let service = CollectorService::new(consumer)
+            .with_context(|| "Failed to create the intercept service")?;
 
         let environment = InterceptEnvironment::new(&config.intercept, service.address())
             .with_context(|| "Failed to create the intercept environment")?;
@@ -74,7 +74,7 @@ pub(super) struct CollectorService {
 }
 
 impl CollectorService {
-    /// Creates a new ipc service.
+    /// Creates a new intercept service.
     ///
     /// The `consumer` is a function that receives the events and processes them.
     /// The function is executed in a separate thread.
@@ -155,7 +155,7 @@ impl InterceptEnvironment {
     /// Creates a new intercept environment.
     ///
     /// The `config` is the intercept configuration that specifies the mode and the
-    /// required parameters for the mode. The `address` is the address of the ipc
+    /// required parameters for the mode. The `address` is the address of the intercept
     /// service that will be used to collect the events.
     pub fn new(config: &config::Intercept, address: String) -> anyhow::Result<Self> {
         let result = match config {
@@ -210,7 +210,7 @@ impl InterceptEnvironment {
     ///
     /// The environment variables are different for each intercept mode.
     /// It does not change the original environment variables, but creates
-    /// the environment variables that are required for the ipc mode.
+    /// the environment variables that are required for the intercept mode.
     fn environment(&self) -> Vec<(String, String)> {
         match self {
             InterceptEnvironment::Wrapper {

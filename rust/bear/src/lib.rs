@@ -3,7 +3,7 @@
 pub mod args;
 pub mod config;
 mod fixtures;
-pub mod ipc;
+pub mod intercept;
 pub mod modes;
 pub mod output;
 pub mod semantic;

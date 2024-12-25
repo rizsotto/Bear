@@ -13,7 +13,7 @@
 pub mod interpreters;
 pub mod transformation;
 
-use super::ipc::Execution;
+use super::intercept::Execution;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use std::path::PathBuf;

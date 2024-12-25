@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ipc::Envelope;
+use crate::intercept::Envelope;
 use crate::output::{OutputWriter, OutputWriterImpl};
 use crate::semantic::transformation::Transformation;
 use crate::semantic::Transform;

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::ipc::Envelope;
+use crate::intercept::Envelope;
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use std::io;
@@ -38,7 +38,7 @@ pub fn write(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ipc::{Event, Execution, ProcessId, ReporterId};
+    use crate::intercept::{Event, Execution, ProcessId, ReporterId};
     use crate::vec_of_strings;
     use serde_json::json;
     use std::collections::HashMap;
