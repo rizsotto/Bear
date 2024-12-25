@@ -9,7 +9,6 @@ use anyhow::{anyhow, Context, Result};
 use path_absolutize::Absolutize;
 
 mod clang;
-pub mod event;
 mod filter;
 
 /// The output writer trait is responsible for writing output file.
