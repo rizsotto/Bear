@@ -20,8 +20,8 @@ extern crate core;
 use anyhow::{Context, Result};
 use bear::intercept::tcp::ReporterOnTcp;
 use bear::intercept::Reporter;
+use bear::intercept::KEY_DESTINATION;
 use bear::intercept::{Event, Execution, ProcessId};
-use bear::modes::intercept::KEY_DESTINATION;
 use std::path::{Path, PathBuf};
 
 /// Implementation of the wrapper process.
