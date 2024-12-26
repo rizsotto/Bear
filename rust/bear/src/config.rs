@@ -64,6 +64,7 @@
 //!   format:
 //!     command_as_array: true
 //!     drop_output_field: false
+//!     use_absolute_path: false
 //! ```
 //!
 //! ```yaml
@@ -523,6 +524,8 @@ pub struct Format {
     pub command_as_array: bool,
     #[serde(default = "default_disabled")]
     pub drop_output_field: bool,
+    #[serde(default = "default_disabled")]
+    pub use_absolute_path: bool,
 }
 
 impl Default for Format {
@@ -530,6 +533,7 @@ impl Default for Format {
         Format {
             command_as_array: true,
             drop_output_field: false,
+            use_absolute_path: false,
         }
     }
 }
@@ -641,6 +645,7 @@ mod test {
           format:
             command_as_array: true
             drop_output_field: false
+            use_absolute_path: true
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -697,6 +702,7 @@ mod test {
                 format: Format {
                     command_as_array: true,
                     drop_output_field: false,
+                    use_absolute_path: true,
                 },
             },
             schema: String::from("4.0"),
@@ -751,6 +757,7 @@ mod test {
                 format: Format {
                     command_as_array: true,
                     drop_output_field: false,
+                    use_absolute_path: false,
                 },
             },
             schema: String::from("4.0"),
@@ -808,7 +815,8 @@ mod test {
                 - file
           format:
             command_as_array: true
-            drop_output_field: false
+            drop_output_field: true
+            use_absolute_path: false
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -852,7 +860,8 @@ mod test {
                 },
                 format: Format {
                     command_as_array: true,
-                    drop_output_field: false,
+                    drop_output_field: true,
+                    use_absolute_path: false,
                 },
             },
             schema: String::from("4.0"),
