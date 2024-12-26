@@ -93,7 +93,7 @@ mod internal {
         meaning: Meaning,
     }
 
-    impl<'a> Argument<'a> {
+    impl Argument<'_> {
         pub(super) fn passes(flags: &[Argument]) -> Vec<CompilerPass> {
             let mut pass: Pass = Pass::Linker;
             let mut inputs: Vec<String> = vec![];
