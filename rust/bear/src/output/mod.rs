@@ -5,6 +5,7 @@ use anyhow::Result;
 
 pub mod clang;
 pub mod filter;
+pub mod formatter;
 
 /// The output writer trait is responsible for writing output file.
 pub(crate) trait OutputWriter {
