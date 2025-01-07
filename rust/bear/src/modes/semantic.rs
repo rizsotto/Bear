@@ -80,11 +80,17 @@ impl OutputWriterImpl {
     ) -> anyhow::Result<OutputWriterImpl> {
         // TODO: This method should fail early if the output file is not writable.
         match config {
-            config::Output::Clang { format, filter, .. } => {
+            config::Output::Clang {
+                format,
+                sources,
+                duplicates,
+                ..
+            } => {
                 let result = ClangOutputWriter {
                     output: PathBuf::from(&args.file_name),
                     append: args.append,
-                    filter: filter.clone(),
+                    source_filter: sources.clone(),
+                    duplicate_filter: duplicates.clone(),
                     command_as_array: format.command_as_array,
                     formatter: From::from(format),
                 };
@@ -127,7 +133,8 @@ impl OutputWriter for SemanticOutputWriter {
 pub(crate) struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
-    filter: config::Filter,
+    source_filter: config::SourceFilter,
+    duplicate_filter: config::DuplicateFilter,
     command_as_array: bool,
     formatter: output::formatter::EntryFormatter,
 }
@@ -162,8 +169,11 @@ impl ClangOutputWriter {
         entries: impl Iterator<Item = output::clang::Entry>,
     ) -> anyhow::Result<()> {
         // Filter out the entries as per the configuration.
-        let filter: output::filter::EntryPredicate = TryFrom::try_from(&self.filter)?;
-        let filtered_entries = entries.filter(filter);
+        let mut source_filter: output::filter::EntryPredicate = From::from(&self.source_filter);
+        let mut duplicate_filter: output::filter::EntryPredicate =
+            From::from(&self.duplicate_filter);
+        let filtered_entries =
+            entries.filter(move |entry| source_filter(entry) && duplicate_filter(entry));
         // Write the entries to a temporary file.
         self.write_into_temporary_compilation_db(filtered_entries)
             .and_then(|temp| {

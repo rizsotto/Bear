@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::hash::Hash;
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::config;
 use crate::output::clang::Entry;
@@ -14,26 +14,33 @@ use builder::EntryPredicateBuilder as Builder;
 /// If the predicate returns `false`, the entry is excluded from the result set.
 pub type EntryPredicate = Box<dyn FnMut(&Entry) -> bool>;
 
-impl TryFrom<&config::Filter> for EntryPredicate {
-    type Error = anyhow::Error;
-
+impl From<&config::SourceFilter> for EntryPredicate {
     /// Create a filter from the configuration.
-    fn try_from(config: &config::Filter) -> Result<Self, Self::Error> {
-        // - Check if the source file exists
-        // - Check if the source file is not in the exclude list of the configuration
-        // - Check if the source file is in the include list of the configuration
-        let source_exist_check =
-            Builder::filter_by_source_existence(config.source.include_only_existing_files);
-        let source_paths_to_exclude =
-            Builder::filter_by_source_paths(&config.source.paths_to_exclude);
-        let source_paths_to_include =
-            Builder::filter_by_source_paths(&config.source.paths_to_include);
-        let source_checks = source_exist_check & !source_paths_to_exclude & source_paths_to_include;
-        // - Check if the entry is not a duplicate based on the fields of the configuration
-        let hash_function = create_hash(&config.duplicates.by_fields);
-        let duplicates = Builder::filter_duplicate_entries(hash_function);
+    fn from(config: &config::SourceFilter) -> Self {
+        let source_exist_check = Builder::filter_by_source_existence(config.only_existing_files);
 
-        Ok((source_checks & duplicates).build())
+        let mut builder = Builder::new();
+        for config::DirectoryFilter { path, ignore } in &config.paths {
+            let filter = Builder::filter_by_source_path(path);
+            match ignore {
+                config::Ignore::Always => {
+                    builder = builder & !filter;
+                }
+                config::Ignore::Never => {
+                    builder = builder & filter;
+                }
+            }
+        }
+
+        (source_exist_check & builder).build()
+    }
+}
+
+impl From<&config::DuplicateFilter> for EntryPredicate {
+    /// Create a filter from the configuration.
+    fn from(config: &config::DuplicateFilter) -> Self {
+        let hash_function = create_hash(&config.by_fields);
+        Builder::filter_duplicate_entries(hash_function).build()
     }
 }
 
@@ -58,7 +65,7 @@ mod builder {
 
         /// Construct a predicate builder that is empty.
         #[inline]
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self { candidate: None }
         }
 
@@ -75,13 +82,9 @@ mod builder {
 
         /// Create a predicate that filters out entries
         /// that are not using any of the given source paths.
-        pub(super) fn filter_by_source_paths(paths: &[PathBuf]) -> Self {
-            if paths.is_empty() {
-                Self::new()
-            } else {
-                let owned_paths: Vec<PathBuf> = paths.to_vec();
-                Self::from(move |entry| owned_paths.iter().any(|path| entry.file.starts_with(path)))
-            }
+        pub(super) fn filter_by_source_path(path: &Path) -> Self {
+            let owned_path = path.to_owned();
+            Self::from(move |entry| entry.file.starts_with(owned_path.clone()))
         }
 
         /// Create a predicate that filters out entries
@@ -172,13 +175,25 @@ mod builder {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::{vec_of_pathbuf, vec_of_strings};
+        use crate::vec_of_strings;
         use std::hash::{Hash, Hasher};
+        use std::path::PathBuf;
 
         #[test]
         fn test_filter_by_source_paths() {
-            let paths_to_include = vec_of_pathbuf!["/home/user/project/source"];
-            let paths_to_exclude = vec_of_pathbuf!["/home/user/project/test"];
+            let config = config::SourceFilter {
+                only_existing_files: false,
+                paths: vec![
+                    config::DirectoryFilter {
+                        path: PathBuf::from("/home/user/project/source"),
+                        ignore: config::Ignore::Never,
+                    },
+                    config::DirectoryFilter {
+                        path: PathBuf::from("/home/user/project/test"),
+                        ignore: config::Ignore::Always,
+                    },
+                ],
+            };
 
             let input: Vec<Entry> = vec![
                 Entry {
@@ -197,10 +212,7 @@ mod builder {
 
             let expected: Vec<Entry> = vec![input[0].clone()];
 
-            let sut: EntryPredicate =
-                (EntryPredicateBuilder::filter_by_source_paths(&paths_to_include)
-                    & !EntryPredicateBuilder::filter_by_source_paths(&paths_to_exclude))
-                .build();
+            let sut: EntryPredicate = From::from(&config);
             let result: Vec<Entry> = input.into_iter().filter(sut).collect();
             assert_eq!(result, expected);
         }

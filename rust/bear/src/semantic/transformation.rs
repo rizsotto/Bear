@@ -40,11 +40,11 @@ impl Transform for Transformation {
         } = &input;
         match self.lookup(compiler) {
             Some(config::Compiler {
-                ignore: config::Ignore::Always,
+                ignore: config::IgnoreOrConsider::Always,
                 ..
             }) => None,
             Some(config::Compiler {
-                ignore: config::Ignore::Conditional,
+                ignore: config::IgnoreOrConsider::Conditional,
                 arguments,
                 ..
             }) => {
@@ -55,7 +55,7 @@ impl Transform for Transformation {
                 }
             }
             Some(config::Compiler {
-                ignore: config::Ignore::Never,
+                ignore: config::IgnoreOrConsider::Never,
                 arguments,
                 ..
             }) => {

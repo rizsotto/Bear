@@ -29,42 +29,46 @@
 //!   executables:
 //!     - /usr/bin/cc
 //!     - /usr/bin/c++
+//!     - /usr/bin/clang
+//!     - /usr/bin/clang++
 //! output:
 //!   specification: clang
 //!   compilers:
 //!     - path: /usr/local/bin/cc
 //!       ignore: always
-//!     - path: /usr/local/bin/c++
+//!     - path: /usr/bin/cc
+//!       ignore: never
+//!     - path: /usr/bin/c++
 //!       ignore: conditional
 //!       arguments:
 //!         match:
 //!           - -###
-//!     - path: /usr/local/bin/clang
+//!     - path: /usr/bin/clang
 //!       ignore: never
 //!       arguments:
 //!         add:
 //!           - -DDEBUG
 //!         remove:
 //!           - -Wall
-//!     - path: /usr/local/bin/clang++
+//!     - path: /usr/bin/clang++
 //!       arguments:
 //!         remove:
 //!           - -Wall
-//!   filter:
-//!     source:
-//!       include_only_existing_files: true
-//!       paths_to_include:
-//!         - sources
-//!       paths_to_exclude:
-//!         - tests
-//!     duplicates:
-//!       by_fields:
-//!         - file
-//!         - directory
+//!   sources:
+//!     only_existing_files: true
+//!     paths:
+//!       - path: /opt/project/sources
+//!         ignore: never
+//!       - path: /opt/project/tests
+//!         ignore: always
+//!   duplicates:
+//!     by_fields:
+//!       - file
+//!       - directory
 //!   format:
 //!     command_as_array: true
 //!     drop_output_field: false
-//!     use_absolute_path: false
+//!     paths_as: canonical
 //! ```
 //!
 //! ```yaml
@@ -298,7 +302,9 @@ pub enum Output {
         #[serde(default)]
         compilers: Vec<Compiler>,
         #[serde(default)]
-        filter: Filter,
+        sources: SourceFilter,
+        #[serde(default)]
+        duplicates: DuplicateFilter,
         #[serde(default)]
         format: Format,
     },
@@ -311,7 +317,8 @@ impl Default for Output {
     fn default() -> Self {
         Output::Clang {
             compilers: vec![],
-            filter: Filter::default(),
+            sources: SourceFilter::default(),
+            duplicates: DuplicateFilter::default(),
             format: Format::default(),
         }
     }
@@ -323,14 +330,17 @@ impl Validate for Output {
         match self {
             Output::Clang {
                 compilers,
-                filter,
+                sources,
+                duplicates,
                 format,
             } => {
                 let compilers = compilers.validate()?;
-                let filter = filter.validate()?;
+                let sources = sources.validate()?;
+                let duplicates = duplicates.validate()?;
                 Ok(Output::Clang {
                     compilers,
-                    filter,
+                    sources,
+                    duplicates,
                     format,
                 })
             }
@@ -346,8 +356,8 @@ impl Validate for Output {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Compiler {
     pub path: PathBuf,
-    #[serde(default = "default_never_ignore")]
-    pub ignore: Ignore,
+    #[serde(default)]
+    pub ignore: IgnoreOrConsider,
     #[serde(default)]
     pub arguments: Arguments,
 }
@@ -371,19 +381,19 @@ impl Validate for Compiler {
     /// Validate the configuration of the compiler.
     fn validate(self) -> Result<Self> {
         match self.ignore {
-            Ignore::Always if self.arguments != Arguments::default() => {
+            IgnoreOrConsider::Always if self.arguments != Arguments::default() => {
                 anyhow::bail!(
                     "All arguments must be empty in always ignore mode. {:?}",
                     self.path
                 );
             }
-            Ignore::Conditional if self.arguments.match_.is_empty() => {
+            IgnoreOrConsider::Conditional if self.arguments.match_.is_empty() => {
                 anyhow::bail!(
                     "The match arguments cannot be empty in conditional ignore mode. {:?}",
                     self.path
                 );
             }
-            Ignore::Never if !self.arguments.match_.is_empty() => {
+            IgnoreOrConsider::Never if !self.arguments.match_.is_empty() => {
                 anyhow::bail!(
                     "The arguments must be empty in never ignore mode. {:?}",
                     self.path
@@ -401,16 +411,23 @@ impl Validate for Compiler {
 ///
 /// The meaning of the possible values are:
 /// - Always: Always ignore the compiler call.
-/// - Conditional: Ignore the compiler call if the arguments match.
 /// - Never: Never ignore the compiler call. (Default)
+/// - Conditional: Ignore the compiler call if the arguments match.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub enum Ignore {
-    #[serde(rename = "always")]
+pub enum IgnoreOrConsider {
+    #[serde(rename = "always", alias = "true")]
     Always,
+    #[serde(rename = "never", alias = "false")]
+    Never,
     #[serde(rename = "conditional")]
     Conditional,
-    #[serde(rename = "never")]
-    Never,
+}
+
+/// The default ignore mode is never ignore.
+impl Default for IgnoreOrConsider {
+    fn default() -> Self {
+        IgnoreOrConsider::Never
+    }
 }
 
 /// Argument lists to match, add or remove.
@@ -430,46 +447,49 @@ pub struct Arguments {
     pub remove: Vec<String>,
 }
 
-/// Filter configuration is used to filter the compiler calls.
-///
-/// Allow to filter the compiler calls by compiler, source files and duplicates.
-///
-/// - Compilers: Specify on the compiler path and arguments.
-/// - Source: Specify the source file location.
-/// - Duplicates: Specify the fields of the JSON compilation database record to detect duplicates.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
-pub struct Filter {
-    #[serde(default)]
-    pub source: SourceFilter,
-    #[serde(default)]
-    pub duplicates: DuplicateFilter,
-}
-
-impl Validate for Filter {
-    /// Validate the configuration of the output writer.
-    fn validate(self) -> Result<Self> {
-        self.duplicates.validate().map(|duplicates| Filter {
-            source: self.source,
-            duplicates,
-        })
-    }
-}
-
 /// Source filter configuration is used to filter the compiler calls based on the source files.
 ///
 /// Allow to filter the compiler calls based on the source files.
 ///
 /// - Include only existing files: can be true or false.
-/// - Paths to include: Only include the compiler calls that compiles source files from this path.
-/// - Paths to exclude: Exclude the compiler calls that compiles source files from this path.
+/// - List of directories to include or exclude.
+///   (The order of these entries will imply the order of evaluation.)
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct SourceFilter {
     #[serde(default = "default_disabled")]
-    pub include_only_existing_files: bool,
+    pub only_existing_files: bool,
     #[serde(default)]
-    pub paths_to_include: Vec<PathBuf>,
-    #[serde(default)]
-    pub paths_to_exclude: Vec<PathBuf>,
+    pub paths: Vec<DirectoryFilter>,
+}
+
+impl Validate for SourceFilter {
+    /// Fail when the same directory is in multiple times in the list.
+    /// Otherwise, return the received source filter.
+    fn validate(self) -> Result<Self> {
+        let mut already_seen = HashSet::new();
+        for directory in &self.paths {
+            if !already_seen.insert(&directory.path) {
+                anyhow::bail!("The directory {:?} is duplicated.", directory.path);
+            }
+        }
+        Ok(self)
+    }
+}
+
+/// Directory filter configuration is used to filter the compiler calls based on
+/// the source file location.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct DirectoryFilter {
+    pub path: PathBuf,
+    pub ignore: Ignore,
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum Ignore {
+    #[serde(rename = "always", alias = "true")]
+    Always,
+    #[serde(rename = "never", alias = "false")]
+    Never,
 }
 
 /// Duplicate filter configuration is used to filter the duplicate compiler calls.
@@ -524,8 +544,8 @@ pub struct Format {
     pub command_as_array: bool,
     #[serde(default = "default_disabled")]
     pub drop_output_field: bool,
-    #[serde(default = "default_disabled")]
-    pub use_absolute_path: bool,
+    #[serde(default)]
+    pub paths_as: PathFormat,
 }
 
 impl Default for Format {
@@ -533,8 +553,26 @@ impl Default for Format {
         Format {
             command_as_array: true,
             drop_output_field: false,
-            use_absolute_path: false,
+            paths_as: PathFormat::default(),
         }
+    }
+}
+
+/// Path format configuration describes how the paths should be formatted.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub enum PathFormat {
+    #[serde(rename = "original", alias = "is")]
+    Original,
+    #[serde(rename = "absolute")]
+    Absolute,
+    #[serde(rename = "canonical")]
+    Canonical,
+}
+
+/// The default path format is the original path.
+impl Default for PathFormat {
+    fn default() -> Self {
+        PathFormat::Original
     }
 }
 
@@ -559,11 +597,6 @@ fn default_wrapper_executable() -> PathBuf {
 /// The default path to the shared library that will be preloaded.
 fn default_preload_library() -> PathBuf {
     PathBuf::from(PRELOAD_LIBRARY_PATH)
-}
-
-/// The default don't ignore the compiler.
-fn default_never_ignore() -> Ignore {
-    Ignore::Never
 }
 
 // Custom deserialization function to validate the schema version
@@ -610,42 +643,46 @@ mod test {
           executables:
             - /usr/bin/cc
             - /usr/bin/c++
+            - /usr/bin/clang
+            - /usr/bin/clang++
         output:
           specification: clang
           compilers:
             - path: /usr/local/bin/cc
               ignore: always
-            - path: /usr/local/bin/c++
+            - path: /usr/bin/cc
+              ignore: never
+            - path: /usr/bin/c++
               ignore: conditional
               arguments:
                 match:
                   - -###
-            - path: /usr/local/bin/clang
+            - path: /usr/bin/clang
               ignore: never
               arguments:
                 add:
                   - -DDEBUG
                 remove:
                   - -Wall
-            - path: /usr/local/bin/clang++
+            - path: /usr/bin/clang++
               arguments:
                 remove:
                   - -Wall
-          filter:
-            source:
-              include_only_existing_files: true
-              paths_to_include:
-                - sources
-              paths_to_exclude:
-                - tests
-            duplicates:
-              by_fields:
-                - file
-                - directory
+          sources:
+            only_existing_files: true
+            paths:
+              - path: /opt/project/sources
+                ignore: never
+              - path: /opt/project/tests
+                ignore: always
+          duplicates:
+            by_fields:
+              - file
+              - directory
           format:
             command_as_array: true
             drop_output_field: false
-            use_absolute_path: true
+            paths_as: canonical
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -654,26 +691,36 @@ mod test {
             intercept: Intercept::Wrapper {
                 path: default_wrapper_executable(),
                 directory: PathBuf::from("/tmp"),
-                executables: vec_of_pathbuf!["/usr/bin/cc", "/usr/bin/c++"],
+                executables: vec_of_pathbuf![
+                    "/usr/bin/cc",
+                    "/usr/bin/c++",
+                    "/usr/bin/clang",
+                    "/usr/bin/clang++"
+                ],
             },
             output: Output::Clang {
                 compilers: vec![
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/cc"),
-                        ignore: Ignore::Always,
+                        ignore: IgnoreOrConsider::Always,
                         arguments: Arguments::default(),
                     },
                     Compiler {
-                        path: PathBuf::from("/usr/local/bin/c++"),
-                        ignore: Ignore::Conditional,
+                        path: PathBuf::from("/usr/bin/cc"),
+                        ignore: IgnoreOrConsider::Never,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/c++"),
+                        ignore: IgnoreOrConsider::Conditional,
                         arguments: Arguments {
                             match_: vec_of_strings!["-###"],
                             ..Default::default()
                         },
                     },
                     Compiler {
-                        path: PathBuf::from("/usr/local/bin/clang"),
-                        ignore: Ignore::Never,
+                        path: PathBuf::from("/usr/bin/clang"),
+                        ignore: IgnoreOrConsider::Never,
                         arguments: Arguments {
                             add: vec_of_strings!["-DDEBUG"],
                             remove: vec_of_strings!["-Wall"],
@@ -681,28 +728,34 @@ mod test {
                         },
                     },
                     Compiler {
-                        path: PathBuf::from("/usr/local/bin/clang++"),
-                        ignore: Ignore::Never,
+                        path: PathBuf::from("/usr/bin/clang++"),
+                        ignore: IgnoreOrConsider::Never,
                         arguments: Arguments {
                             remove: vec_of_strings!["-Wall"],
                             ..Default::default()
                         },
                     },
                 ],
-                filter: Filter {
-                    source: SourceFilter {
-                        include_only_existing_files: true,
-                        paths_to_include: vec_of_pathbuf!["sources"],
-                        paths_to_exclude: vec_of_pathbuf!["tests"],
-                    },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File, OutputFields::Directory],
-                    },
+                sources: SourceFilter {
+                    only_existing_files: true,
+                    paths: vec![
+                        DirectoryFilter {
+                            path: PathBuf::from("/opt/project/sources"),
+                            ignore: Ignore::Never,
+                        },
+                        DirectoryFilter {
+                            path: PathBuf::from("/opt/project/tests"),
+                            ignore: Ignore::Always,
+                        },
+                    ],
+                },
+                duplicates: DuplicateFilter {
+                    by_fields: vec![OutputFields::File, OutputFields::Directory],
                 },
                 format: Format {
                     command_as_array: true,
                     drop_output_field: false,
-                    use_absolute_path: true,
+                    paths_as: PathFormat::Canonical,
                 },
             },
             schema: String::from("4.0"),
@@ -723,13 +776,12 @@ mod test {
             - /usr/bin/c++
         output:
           specification: clang
-          filter:
-            source:
-              include_only_existing_files: true
-            duplicates:
-              by_fields:
-                - file
-                - directory
+          sources:
+            only_existing_files: true
+          duplicates:
+            by_fields:
+              - file
+              - directory
           format:
             command_as_array: true
         "#;
@@ -744,20 +796,17 @@ mod test {
             },
             output: Output::Clang {
                 compilers: vec![],
-                filter: Filter {
-                    source: SourceFilter {
-                        include_only_existing_files: true,
-                        paths_to_include: vec_of_pathbuf![],
-                        paths_to_exclude: vec_of_pathbuf![],
-                    },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File, OutputFields::Directory],
-                    },
+                sources: SourceFilter {
+                    only_existing_files: true,
+                    paths: vec![],
+                },
+                duplicates: DuplicateFilter {
+                    by_fields: vec![OutputFields::File, OutputFields::Directory],
                 },
                 format: Format {
                     command_as_array: true,
                     drop_output_field: false,
-                    use_absolute_path: false,
+                    paths_as: PathFormat::Original,
                 },
             },
             schema: String::from("4.0"),
@@ -807,12 +856,11 @@ mod test {
               ignore: always
             - path: /usr/local/bin/clang++
               ignore: always
-          filter:
-            source:
-              include_only_existing_files: false
-            duplicates:
-              by_fields:
-                - file
+          sources:
+            only_existing_files: false
+          duplicates:
+            by_fields:
+              - file
           format:
             command_as_array: true
             drop_output_field: true
@@ -829,39 +877,36 @@ mod test {
                 compilers: vec![
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/cc"),
-                        ignore: Ignore::Never,
+                        ignore: IgnoreOrConsider::Never,
                         arguments: Arguments::default(),
                     },
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/c++"),
-                        ignore: Ignore::Never,
+                        ignore: IgnoreOrConsider::Never,
                         arguments: Arguments::default(),
                     },
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/clang"),
-                        ignore: Ignore::Always,
+                        ignore: IgnoreOrConsider::Always,
                         arguments: Arguments::default(),
                     },
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/clang++"),
-                        ignore: Ignore::Always,
+                        ignore: IgnoreOrConsider::Always,
                         arguments: Arguments::default(),
                     },
                 ],
-                filter: Filter {
-                    source: SourceFilter {
-                        include_only_existing_files: false,
-                        paths_to_include: vec_of_pathbuf![],
-                        paths_to_exclude: vec_of_pathbuf![],
-                    },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File],
-                    },
+                sources: SourceFilter {
+                    only_existing_files: false,
+                    paths: vec![],
+                },
+                duplicates: DuplicateFilter {
+                    by_fields: vec![OutputFields::File],
                 },
                 format: Format {
                     command_as_array: true,
                     drop_output_field: true,
-                    use_absolute_path: false,
+                    paths_as: PathFormat::Original,
                 },
             },
             schema: String::from("4.0"),
@@ -878,7 +923,8 @@ mod test {
             intercept: Intercept::default(),
             output: Output::Clang {
                 compilers: vec![],
-                filter: Filter::default(),
+                sources: SourceFilter::default(),
+                duplicates: DuplicateFilter::default(),
                 format: Format::default(),
             },
             schema: String::from(SUPPORTED_SCHEMA_VERSION),

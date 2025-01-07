@@ -37,7 +37,7 @@ impl Builder {
         let compilers_to_exclude = match &config.output {
             config::Output::Clang { compilers, .. } => compilers
                 .iter()
-                .filter(|compiler| compiler.ignore == config::Ignore::Always)
+                .filter(|compiler| compiler.ignore == config::IgnoreOrConsider::Always)
                 .map(|compiler| compiler.path.clone())
                 .collect(),
             _ => vec![],
