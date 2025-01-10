@@ -19,6 +19,7 @@
 
 #include "ToolGcc.h"
 #include "Parsers.h"
+#include "Common.h"
 
 #include "libsys/Path.h"
 
@@ -68,18 +69,6 @@ namespace {
         return input_arguments;
     }
 
-    bool is_compiler_query(const CompilerFlags& flags)
-    {
-        // no flag is a no compilation
-        if (flags.empty()) {
-            return true;
-        }
-        // otherwise check if this was a version query of a help
-        return std::any_of(flags.begin(), flags.end(), [](const auto& flag) {
-            return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_INFO);
-        });
-    }
-
     bool is_prerpocessor(const CompilerFlags& flags)
     {
         // one of those make dependency generation also not count as compilation.
@@ -92,47 +81,6 @@ namespace {
             return ((flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING) && (candidate == "-E"))
                 || ((flag.type == CompilerFlagType::PREPROCESSOR_MAKE) && (NO_COMPILATION_FLAG.find(candidate) != NO_COMPILATION_FLAG.end()));
         });
-    }
-
-    bool linking(const CompilerFlags& flags)
-    {
-        return std::none_of(flags.begin(), flags.end(), [](auto flag) {
-            return (flag.type == CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING);
-        });
-    }
-
-    std::tuple<
-            Arguments,
-            std::vector<fs::path>,
-            std::optional<fs::path>
-    > split(const CompilerFlags &flags) {
-        Arguments arguments;
-        std::vector<fs::path> sources;
-        std::optional<fs::path> output;
-
-        for (const auto &flag : flags) {
-            switch (flag.type) {
-                case CompilerFlagType::SOURCE: {
-                    auto candidate = fs::path(flag.arguments.front());
-                    sources.emplace_back(std::move(candidate));
-                    break;
-                }
-                case CompilerFlagType::KIND_OF_OUTPUT_OUTPUT: {
-                    auto candidate = fs::path(flag.arguments.back());
-                    output = std::make_optional(std::move(candidate));
-                    break;
-                }
-                case CompilerFlagType::LINKER:
-                case CompilerFlagType::PREPROCESSOR_MAKE:
-                case CompilerFlagType::DIRECTORY_SEARCH_LINKER:
-                    break;
-                default: {
-                    std::copy(flag.arguments.begin(), flag.arguments.end(), std::back_inserter(arguments));
-                    break;
-                }
-            }
-        }
-        return std::make_tuple(arguments, sources, output);
     }
 }
 
@@ -268,46 +216,8 @@ namespace cs::semantic {
         return compilation(FLAG_DEFINITION, execution);
     }
 
-    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName &flags, const Execution &execution) {
-        const auto &parser =
-                Repeat(
-                        OneOf(
-                                FlagParser(flags),
-                                SourceMatcher(),
-                                EverythingElseFlagMatcher()
-                        )
-                );
-
-        const Arguments &input_arguments = create_argument_list(execution);
-        return parse(parser, input_arguments)
-                .and_then<SemanticPtr>([&execution](auto flags) -> rust::Result<SemanticPtr> {
-                    if (is_compiler_query(flags)) {
-                        SemanticPtr result = std::make_shared<QueryCompiler>();
-                        return rust::Ok(std::move(result));
-                    }
-                    if (is_prerpocessor(flags)) {
-                        SemanticPtr result = std::make_shared<Preprocess>();
-                        return rust::Ok(std::move(result));
-                    }
-
-                    auto[arguments, sources, output] = split(flags);
-                    // Validate: must have source files.
-                    if (sources.empty()) {
-                        return rust::Err(std::runtime_error("Source files not found for compilation."));
-                    }
-                    // TODO: introduce semantic type for linking
-                    if (linking(flags)) {
-                        arguments.insert(arguments.begin(), "-c");
-                    }
-
-                    SemanticPtr result = std::make_shared<Compile>(
-                            execution.working_dir,
-                            execution.executable,
-                            std::move(arguments),
-                            std::move(sources),
-                            std::move(output)
-                    );
-                    return rust::Ok(std::move(result));
-                });
+    rust::Result<SemanticPtr> ToolGcc::compilation(const FlagsByName& flags, const Execution& execution)
+    {
+        return compilation_impl(flags, execution, create_argument_list, is_prerpocessor);
     }
 }
