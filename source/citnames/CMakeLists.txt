@@ -23,6 +23,7 @@ target_sources(citnames_a
         PRIVATE
             source/Citnames.cc
             source/semantic/Build.cc
+            source/semantic/Common.cc
             source/semantic/Parsers.cc
             source/semantic/Semantic.cc
             source/semantic/ToolAny.cc
