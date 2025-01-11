@@ -80,7 +80,6 @@
 //!   specification: bear
 //! ```
 
-use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
@@ -826,8 +825,8 @@ mod validation {
     use std::path::{Path, PathBuf};
 
     use crate::config::{
-        Arguments, Compiler, DirectoryFilter, DuplicateFilter, IgnoreOrConsider, Intercept, Main,
-        Output, SourceFilter,
+        Arguments, Compiler, DuplicateFilter, IgnoreOrConsider, Intercept, Main, Output,
+        SourceFilter,
     };
 
     /// A trait to validate the configuration and return a valid instance.
@@ -1040,8 +1039,7 @@ mod validation {
     #[cfg(test)]
     mod test {
         use super::*;
-        use crate::config::{Ignore, OutputFields};
-        use crate::{vec_of_pathbuf, vec_of_strings};
+        use crate::config::{DirectoryFilter, Ignore, OutputFields};
 
         #[test]
         fn test_duplicate_detection_validation_pass() {
