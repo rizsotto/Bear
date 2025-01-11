@@ -80,10 +80,11 @@
 //!   specification: bear
 //! ```
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 
+use crate::config::validation::Validate;
 use anyhow::{Context, Result};
 use directories::{BaseDirs, ProjectDirs};
 use log::{debug, info};
@@ -194,20 +195,6 @@ impl Default for Main {
     }
 }
 
-impl Validate for Main {
-    /// Validate the configuration of the main configuration.
-    fn validate(self) -> Result<Self> {
-        let intercept = self.intercept.validate()?;
-        let output = self.output.validate()?;
-
-        Ok(Main {
-            schema: self.schema,
-            intercept,
-            output,
-        })
-    }
-}
-
 /// Intercept configuration is either a wrapper or a preload mode.
 ///
 /// In wrapper mode, the compiler is wrapped with a script that intercepts the compiler calls.
@@ -253,40 +240,6 @@ impl Default for Intercept {
     }
 }
 
-impl Validate for Intercept {
-    /// Validate the configuration of the intercept mode.
-    fn validate(self) -> Result<Self> {
-        match self {
-            Intercept::Wrapper {
-                path,
-                directory,
-                executables,
-            } => {
-                if is_empty_path(&path) {
-                    anyhow::bail!("The wrapper path cannot be empty.");
-                }
-                if is_empty_path(&directory) {
-                    anyhow::bail!("The wrapper directory cannot be empty.");
-                }
-                if executables.is_empty() {
-                    anyhow::bail!("The list of executables to wrap cannot be empty.");
-                }
-                Ok(Intercept::Wrapper {
-                    path,
-                    directory,
-                    executables,
-                })
-            }
-            Intercept::Preload { path } => {
-                if is_empty_path(&path) {
-                    anyhow::bail!("The preload library path cannot be empty.");
-                }
-                Ok(Intercept::Preload { path })
-            }
-        }
-    }
-}
-
 /// Output configuration is used to customize the output format.
 ///
 /// Allow to customize the output format of the compiler calls.
@@ -324,31 +277,6 @@ impl Default for Output {
     }
 }
 
-impl Validate for Output {
-    /// Validate the configuration of the output writer.
-    fn validate(self) -> Result<Self> {
-        match self {
-            Output::Clang {
-                compilers,
-                sources,
-                duplicates,
-                format,
-            } => {
-                let compilers = compilers.validate()?;
-                let sources = sources.validate()?;
-                let duplicates = duplicates.validate()?;
-                Ok(Output::Clang {
-                    compilers,
-                    sources,
-                    duplicates,
-                    format,
-                })
-            }
-            Output::Semantic {} => Ok(Output::Semantic {}),
-        }
-    }
-}
-
 /// Represents instructions to transform the compiler calls.
 ///
 /// Allow to transform the compiler calls by adding or removing arguments.
@@ -360,51 +288,6 @@ pub struct Compiler {
     pub ignore: IgnoreOrConsider,
     #[serde(default)]
     pub arguments: Arguments,
-}
-
-impl Validate for Vec<Compiler> {
-    /// Validate the configuration of the compiler list.
-    ///
-    /// Duplicate entries are allowed in the list. The reason behind this is
-    /// that the same compiler can be ignored with some arguments and not
-    /// ignored (but transformed) with other arguments.
-    // TODO: check for duplicate entries
-    // TODO: check if a match argument is used after an always or never
-    fn validate(self) -> Result<Self> {
-        self.into_iter()
-            .map(|compiler| compiler.validate())
-            .collect::<Result<Vec<_>>>()
-    }
-}
-
-impl Validate for Compiler {
-    /// Validate the configuration of the compiler.
-    fn validate(self) -> Result<Self> {
-        match self.ignore {
-            IgnoreOrConsider::Always if self.arguments != Arguments::default() => {
-                anyhow::bail!(
-                    "All arguments must be empty in always ignore mode. {:?}",
-                    self.path
-                );
-            }
-            IgnoreOrConsider::Conditional if self.arguments.match_.is_empty() => {
-                anyhow::bail!(
-                    "The match arguments cannot be empty in conditional ignore mode. {:?}",
-                    self.path
-                );
-            }
-            IgnoreOrConsider::Never if !self.arguments.match_.is_empty() => {
-                anyhow::bail!(
-                    "The arguments must be empty in never ignore mode. {:?}",
-                    self.path
-                );
-            }
-            _ if is_empty_path(&self.path) => {
-                anyhow::bail!("The compiler path cannot be empty.");
-            }
-            _ => Ok(self),
-        }
-    }
 }
 
 /// Represents instructions to ignore the compiler call.
@@ -462,20 +345,6 @@ pub struct SourceFilter {
     pub paths: Vec<DirectoryFilter>,
 }
 
-impl Validate for SourceFilter {
-    /// Fail when the same directory is in multiple times in the list.
-    /// Otherwise, return the received source filter.
-    fn validate(self) -> Result<Self> {
-        let mut already_seen = HashSet::new();
-        for directory in &self.paths {
-            if !already_seen.insert(&directory.path) {
-                anyhow::bail!("The directory {:?} is duplicated.", directory.path);
-            }
-        }
-        Ok(self)
-    }
-}
-
 /// Directory filter configuration is used to filter the compiler calls based on
 /// the source file location.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -498,22 +367,6 @@ pub enum Ignore {
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct DuplicateFilter {
     pub by_fields: Vec<OutputFields>,
-}
-
-impl Validate for DuplicateFilter {
-    /// Deduplicate the fields of the fields vector.
-    fn validate(self) -> Result<Self> {
-        let result = Self {
-            by_fields: self
-                .by_fields
-                .iter()
-                .cloned()
-                .collect::<HashSet<_>>()
-                .into_iter()
-                .collect(),
-        };
-        Ok(result)
-    }
 }
 
 impl Default for DuplicateFilter {
@@ -614,17 +467,6 @@ where
     } else {
         Ok(schema)
     }
-}
-
-/// A trait to validate the configuration and return a valid instance.
-pub trait Validate {
-    fn validate(self) -> Result<Self>
-    where
-        Self: Sized;
-}
-
-fn is_empty_path(path: &Path) -> bool {
-    path.to_str().map_or(false, |p| p.is_empty())
 }
 
 #[cfg(test)]
@@ -973,5 +815,557 @@ mod test {
         let result: serde_yml::Result<Main> = Main::from_reader(content);
 
         assert!(result.is_err());
+    }
+}
+
+mod validation {
+    //! This module defines the validation logic for the configuration.
+
+    use anyhow::Result;
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+
+    use crate::config::{
+        Arguments, Compiler, DirectoryFilter, DuplicateFilter, IgnoreOrConsider, Intercept, Main,
+        Output, SourceFilter,
+    };
+
+    /// A trait to validate the configuration and return a valid instance.
+    pub trait Validate {
+        fn validate(self) -> Result<Self>
+        where
+            Self: Sized;
+    }
+
+    impl Validate for Main {
+        /// Validate the configuration of the main configuration.
+        fn validate(self) -> Result<Self> {
+            let intercept = self.intercept.validate()?;
+            let output = self.output.validate()?;
+
+            Ok(Main {
+                schema: self.schema,
+                intercept,
+                output,
+            })
+        }
+    }
+
+    impl Validate for Intercept {
+        /// Validate the configuration of the intercept mode.
+        fn validate(self) -> Result<Self> {
+            match &self {
+                Intercept::Wrapper {
+                    path,
+                    directory,
+                    executables,
+                } => {
+                    if is_empty_path(path) {
+                        anyhow::bail!("The wrapper path cannot be empty.");
+                    }
+                    if is_empty_path(directory) {
+                        anyhow::bail!("The wrapper directory cannot be empty.");
+                    }
+                    for executable in executables {
+                        if is_empty_path(executable) {
+                            anyhow::bail!("The executable path cannot be empty.");
+                        }
+                    }
+                    Ok(self)
+                }
+                Intercept::Preload { path } => {
+                    if is_empty_path(path) {
+                        anyhow::bail!("The preload library path cannot be empty.");
+                    }
+                    Ok(self)
+                }
+            }
+        }
+    }
+
+    impl Validate for Output {
+        /// Validate the configuration of the output writer.
+        fn validate(self) -> Result<Self> {
+            match self {
+                Output::Clang {
+                    compilers,
+                    sources,
+                    duplicates,
+                    format,
+                } => {
+                    let compilers = compilers.validate()?;
+                    let sources = sources.validate()?;
+                    let duplicates = duplicates.validate()?;
+                    Ok(Output::Clang {
+                        compilers,
+                        sources,
+                        duplicates,
+                        format,
+                    })
+                }
+                Output::Semantic {} => Ok(Output::Semantic {}),
+            }
+        }
+    }
+
+    impl Validate for Vec<Compiler> {
+        /// Validate the configuration of the compiler list.
+        ///
+        /// The validation is done on the individual compiler configuration.
+        /// Duplicate paths are allowed in the list. But the instruction to ignore the
+        /// compiler should be the end of the list.
+        fn validate(self) -> Result<Self> {
+            let mut validated_compilers = Vec::new();
+            let mut grouped_compilers: std::collections::HashMap<PathBuf, Vec<Compiler>> =
+                std::collections::HashMap::new();
+
+            // Group compilers by their path
+            for compiler in self {
+                grouped_compilers
+                    .entry(compiler.path.clone())
+                    .or_default()
+                    .push(compiler);
+            }
+
+            // Validate each group
+            for (path, group) in grouped_compilers {
+                let mut has_always = false;
+                let mut has_conditional = false;
+                let mut has_never = false;
+
+                for compiler in group {
+                    match compiler.ignore {
+                        IgnoreOrConsider::Always | IgnoreOrConsider::Conditional if has_never => {
+                            anyhow::bail!("Invalid configuration: 'Always' or 'Conditional' can't be used after 'Never' for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Never | IgnoreOrConsider::Conditional if has_always => {
+                            anyhow::bail!("Invalid configuration: 'Never' or 'Conditional' can't be used after 'Always' for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Never if has_conditional => {
+                            anyhow::bail!("Invalid configuration: 'Never' can't be used after 'Conditional' for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Always if has_always => {
+                            anyhow::bail!("Invalid configuration: 'Always' can't be used multiple times for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Conditional if has_conditional => {
+                            anyhow::bail!("Invalid configuration: 'Conditional' can't be used multiple times for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Never if has_never => {
+                            anyhow::bail!("Invalid configuration: 'Never' can't be used multiple times for path {:?}", path);
+                        }
+                        IgnoreOrConsider::Conditional => {
+                            has_conditional = true;
+                        }
+                        IgnoreOrConsider::Always => {
+                            has_always = true;
+                        }
+                        IgnoreOrConsider::Never => {
+                            has_never = true;
+                        }
+                    }
+                    validated_compilers.push(compiler.validate()?);
+                }
+            }
+
+            Ok(validated_compilers)
+        }
+    }
+
+    impl Validate for Compiler {
+        /// Validate the configuration of the compiler.
+        fn validate(self) -> Result<Self> {
+            match self.ignore {
+                IgnoreOrConsider::Always if self.arguments != Arguments::default() => {
+                    anyhow::bail!(
+                        "All arguments must be empty in always ignore mode. {:?}",
+                        self.path
+                    );
+                }
+                IgnoreOrConsider::Conditional if self.arguments.match_.is_empty() => {
+                    anyhow::bail!(
+                        "The match arguments cannot be empty in conditional ignore mode. {:?}",
+                        self.path
+                    );
+                }
+                IgnoreOrConsider::Never if !self.arguments.match_.is_empty() => {
+                    anyhow::bail!(
+                        "The arguments must be empty in never ignore mode. {:?}",
+                        self.path
+                    );
+                }
+                _ if is_empty_path(&self.path) => {
+                    anyhow::bail!("The compiler path cannot be empty.");
+                }
+                _ => Ok(self),
+            }
+        }
+    }
+
+    impl Validate for SourceFilter {
+        /// Fail when the same directory is in multiple times in the list.
+        /// Otherwise, return the received source filter.
+        fn validate(self) -> Result<Self> {
+            let mut already_seen = HashSet::new();
+            for directory in &self.paths {
+                if !already_seen.insert(&directory.path) {
+                    anyhow::bail!("The directory {:?} is duplicated.", directory.path);
+                }
+            }
+            Ok(self)
+        }
+    }
+
+    impl Validate for DuplicateFilter {
+        /// Deduplicate the fields of the fields vector.
+        fn validate(self) -> Result<Self> {
+            // error out when the fields vector is empty
+            if self.by_fields.is_empty() {
+                anyhow::bail!("The field list cannot be empty.");
+            }
+            // error out when the fields vector contains duplicates
+            let mut already_seen = HashSet::new();
+            for field in &self.by_fields {
+                if !already_seen.insert(field) {
+                    anyhow::bail!("The field {:?} is duplicated.", field);
+                }
+            }
+            Ok(self)
+        }
+    }
+
+    fn is_empty_path(path: &Path) -> bool {
+        path.to_str().map_or(false, |p| p.is_empty())
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+        use crate::config::{Ignore, OutputFields};
+        use crate::{vec_of_pathbuf, vec_of_strings};
+
+        #[test]
+        fn test_duplicate_detection_validation_pass() {
+            let sut = DuplicateFilter {
+                by_fields: vec![OutputFields::File, OutputFields::Arguments],
+            };
+
+            let result = sut.validate();
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_duplicate_detection_validation_fails() {
+            let sut = DuplicateFilter {
+                by_fields: vec![OutputFields::File, OutputFields::File],
+            };
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_duplicate_detection_validation_fails_on_empty() {
+            let sut = DuplicateFilter { by_fields: vec![] };
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validate_compiler_always_with_arguments() {
+            let sut = Compiler {
+                path: PathBuf::from("/usr/bin/cc"),
+                ignore: IgnoreOrConsider::Always,
+                arguments: Arguments {
+                    add: vec!["-DDEBUG".to_string()],
+                    ..Default::default()
+                },
+            };
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validate_compiler_conditional_without_match() {
+            let compiler = Compiler {
+                path: PathBuf::from("/usr/bin/cc"),
+                ignore: IgnoreOrConsider::Conditional,
+                arguments: Arguments::default(),
+            };
+            let result = compiler.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validate_compiler_never_with_match() {
+            let compiler = Compiler {
+                path: PathBuf::from("/usr/bin/cc"),
+                ignore: IgnoreOrConsider::Never,
+                arguments: Arguments {
+                    match_: vec!["-###".to_string()],
+                    ..Default::default()
+                },
+            };
+            let result = compiler.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validate_compiler_empty_path() {
+            let compiler = Compiler {
+                path: PathBuf::from(""),
+                ignore: IgnoreOrConsider::Never,
+                arguments: Arguments::default(),
+            };
+            let result = compiler.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_compiler_validation_pass() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-###".to_string()],
+                        ..Default::default()
+                    },
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/c++"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments {
+                        add: vec!["-DDEBUG".to_string()],
+                        remove: vec!["-Wall".to_string()],
+                        ..Default::default()
+                    },
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-###".to_string()],
+                        ..Default::default()
+                    },
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments::default(),
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_compiler_validation_fails_conditional_after_always() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments::default(),
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-###".to_string()],
+                        ..Default::default()
+                    },
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_compiler_validation_fails_never_after_always() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments::default(),
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments::default(),
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_compiler_validation_fails_always_after_never() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments::default(),
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments::default(),
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_compiler_validation_fails_never_after_never() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments::default(),
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments {
+                        add: vec!["-Wall".to_string()],
+                        ..Default::default()
+                    },
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_compiler_validation_fails_never_after_conditional() {
+            let sut: Vec<Compiler> = vec![
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-###".to_string()],
+                        ..Default::default()
+                    },
+                },
+                Compiler {
+                    path: PathBuf::from("/usr/bin/cc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments::default(),
+                },
+            ];
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validate_intercept_wrapper_valid() {
+            let sut = Intercept::Wrapper {
+                path: PathBuf::from("/usr/bin/wrapper"),
+                directory: PathBuf::from("/tmp"),
+                executables: vec![PathBuf::from("/usr/bin/cc")],
+            };
+            assert!(sut.validate().is_ok());
+        }
+
+        #[test]
+        fn test_validate_intercept_wrapper_empty_path() {
+            let sut = Intercept::Wrapper {
+                path: PathBuf::from(""),
+                directory: PathBuf::from("/tmp"),
+                executables: vec![PathBuf::from("/usr/bin/cc")],
+            };
+            assert!(sut.validate().is_err());
+        }
+
+        #[test]
+        fn test_validate_intercept_wrapper_empty_directory() {
+            let sut = Intercept::Wrapper {
+                path: PathBuf::from("/usr/bin/wrapper"),
+                directory: PathBuf::from(""),
+                executables: vec![PathBuf::from("/usr/bin/cc")],
+            };
+            assert!(sut.validate().is_err());
+        }
+
+        #[test]
+        fn test_validate_intercept_wrapper_empty_executables() {
+            let sut = Intercept::Wrapper {
+                path: PathBuf::from("/usr/bin/wrapper"),
+                directory: PathBuf::from("/tmp"),
+                executables: vec![
+                    PathBuf::from("/usr/bin/cc"),
+                    PathBuf::from("/usr/bin/c++"),
+                    PathBuf::from(""),
+                ],
+            };
+            assert!(sut.validate().is_err());
+        }
+
+        #[test]
+        fn test_validate_intercept_preload_valid() {
+            let sut = Intercept::Preload {
+                path: PathBuf::from("/usr/local/lib/libexec.so"),
+            };
+            assert!(sut.validate().is_ok());
+        }
+
+        #[test]
+        fn test_validate_intercept_preload_empty_path() {
+            let sut = Intercept::Preload {
+                path: PathBuf::from(""),
+            };
+            assert!(sut.validate().is_err());
+        }
+
+        #[test]
+        fn test_source_filter_validation_success() {
+            let sut = SourceFilter {
+                only_existing_files: true,
+                paths: vec![
+                    DirectoryFilter {
+                        path: PathBuf::from("/opt/project/sources"),
+                        ignore: Ignore::Never,
+                    },
+                    DirectoryFilter {
+                        path: PathBuf::from("/opt/project/tests"),
+                        ignore: Ignore::Always,
+                    },
+                ],
+            };
+
+            let result = sut.validate();
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_source_filter_validation_duplicates() {
+            let sut = SourceFilter {
+                only_existing_files: true,
+                paths: vec![
+                    DirectoryFilter {
+                        path: PathBuf::from("/opt/project/sources"),
+                        ignore: Ignore::Never,
+                    },
+                    DirectoryFilter {
+                        path: PathBuf::from("/opt/project/test"),
+                        ignore: Ignore::Always,
+                    },
+                    DirectoryFilter {
+                        path: PathBuf::from("/opt/project/sources"),
+                        ignore: Ignore::Always,
+                    },
+                ],
+            };
+
+            let result = sut.validate();
+            assert!(result.is_err());
+        }
     }
 }

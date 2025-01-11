@@ -19,20 +19,20 @@ impl From<&config::SourceFilter> for EntryPredicate {
     fn from(config: &config::SourceFilter) -> Self {
         let source_exist_check = Builder::filter_by_source_existence(config.only_existing_files);
 
-        let mut builder = Builder::new();
+        let mut source_path_checks = Builder::new();
         for config::DirectoryFilter { path, ignore } in &config.paths {
             let filter = Builder::filter_by_source_path(path);
             match ignore {
                 config::Ignore::Always => {
-                    builder = builder & !filter;
+                    source_path_checks = source_path_checks & !filter;
                 }
                 config::Ignore::Never => {
-                    builder = builder & filter;
+                    source_path_checks = source_path_checks & filter;
                 }
             }
         }
 
-        (source_exist_check & builder).build()
+        (source_exist_check & source_path_checks).build()
     }
 }
 
@@ -116,7 +116,6 @@ mod builder {
         }
     }
 
-    // FIXME: write unit tests for the combination operators.
     /// Implement the AND operator for combining predicates.
     impl std::ops::BitAnd for EntryPredicateBuilder {
         type Output = EntryPredicateBuilder;
@@ -138,7 +137,6 @@ mod builder {
         }
     }
 
-    // FIXME: write unit tests for the combination operators.
     /// Implement the NOT operator for combining predicates.
     impl std::ops::Not for EntryPredicateBuilder {
         type Output = EntryPredicateBuilder;
@@ -154,7 +152,6 @@ mod builder {
         }
     }
 
-    // FIXME: write unit tests for the hash function.
     /// Create a hash function that is using the given fields to calculate the hash of an entry.
     pub(super) fn create_hash(fields: &[config::OutputFields]) -> impl Fn(&Entry) -> u64 + 'static {
         let owned_fields: Vec<config::OutputFields> = fields.to_vec();
@@ -173,28 +170,13 @@ mod builder {
     }
 
     #[cfg(test)]
-    mod test {
+    mod sources_test {
         use super::*;
         use crate::vec_of_strings;
-        use std::hash::{Hash, Hasher};
         use std::path::PathBuf;
 
         #[test]
         fn test_filter_by_source_paths() {
-            let config = config::SourceFilter {
-                only_existing_files: false,
-                paths: vec![
-                    config::DirectoryFilter {
-                        path: PathBuf::from("/home/user/project/source"),
-                        ignore: config::Ignore::Never,
-                    },
-                    config::DirectoryFilter {
-                        path: PathBuf::from("/home/user/project/test"),
-                        ignore: config::Ignore::Always,
-                    },
-                ],
-            };
-
             let input: Vec<Entry> = vec![
                 Entry {
                     file: PathBuf::from("/home/user/project/source/source.c"),
@@ -212,10 +194,31 @@ mod builder {
 
             let expected: Vec<Entry> = vec![input[0].clone()];
 
+            let config = config::SourceFilter {
+                only_existing_files: false,
+                paths: vec![
+                    config::DirectoryFilter {
+                        path: PathBuf::from("/home/user/project/source"),
+                        ignore: config::Ignore::Never,
+                    },
+                    config::DirectoryFilter {
+                        path: PathBuf::from("/home/user/project/test"),
+                        ignore: config::Ignore::Always,
+                    },
+                ],
+            };
             let sut: EntryPredicate = From::from(&config);
             let result: Vec<Entry> = input.into_iter().filter(sut).collect();
             assert_eq!(result, expected);
         }
+    }
+
+    #[cfg(test)]
+    mod existence_test {
+        use super::*;
+        use crate::vec_of_strings;
+        use std::hash::{Hash, Hasher};
+        use std::path::PathBuf;
 
         #[test]
         fn test_duplicate_detection_works() {
@@ -252,6 +255,207 @@ mod builder {
                 EntryPredicateBuilder::filter_duplicate_entries(hash_function).build();
             let result: Vec<Entry> = input.into_iter().filter(sut).collect();
             assert_eq!(result, expected);
+        }
+    }
+
+    #[cfg(test)]
+    mod create_hash_tests {
+        use super::*;
+        use crate::vec_of_strings;
+        use std::path::PathBuf;
+
+        #[test]
+        fn test_create_hash_with_directory_field() {
+            let entry = create_test_entry();
+
+            let fields = vec![config::OutputFields::Directory];
+            let hash_function = create_hash(&fields);
+            let hash = hash_function(&entry);
+
+            let mut hasher = DefaultHasher::new();
+            entry.directory.hash(&mut hasher);
+            let expected_hash = hasher.finish();
+
+            assert_eq!(hash, expected_hash);
+        }
+
+        #[test]
+        fn test_create_hash_with_file_field() {
+            let entry = create_test_entry();
+
+            let fields = vec![config::OutputFields::File];
+            let hash_function = create_hash(&fields);
+            let hash = hash_function(&entry);
+
+            let mut hasher = DefaultHasher::new();
+            entry.file.hash(&mut hasher);
+            let expected_hash = hasher.finish();
+
+            assert_eq!(hash, expected_hash);
+        }
+
+        #[test]
+        fn test_create_hash_with_arguments_field() {
+            let entry = create_test_entry();
+
+            let fields = vec![config::OutputFields::Arguments];
+            let hash_function = create_hash(&fields);
+            let hash = hash_function(&entry);
+
+            let mut hasher = DefaultHasher::new();
+            entry.arguments.hash(&mut hasher);
+            let expected_hash = hasher.finish();
+
+            assert_eq!(hash, expected_hash);
+        }
+
+        #[test]
+        fn test_create_hash_with_output_field() {
+            let entry = create_test_entry();
+
+            let fields = vec![config::OutputFields::Output];
+            let hash_function = create_hash(&fields);
+            let hash = hash_function(&entry);
+
+            let mut hasher = DefaultHasher::new();
+            entry.output.hash(&mut hasher);
+            let expected_hash = hasher.finish();
+
+            assert_eq!(hash, expected_hash);
+        }
+
+        #[test]
+        fn test_create_hash_with_multiple_fields() {
+            let entry = create_test_entry();
+
+            let fields = vec![
+                config::OutputFields::Directory,
+                config::OutputFields::File,
+                config::OutputFields::Arguments,
+                config::OutputFields::Output,
+            ];
+            let hash_function = create_hash(&fields);
+            let hash = hash_function(&entry);
+
+            let mut hasher = DefaultHasher::new();
+            entry.directory.hash(&mut hasher);
+            entry.file.hash(&mut hasher);
+            entry.arguments.hash(&mut hasher);
+            entry.output.hash(&mut hasher);
+            let expected_hash = hasher.finish();
+
+            assert_eq!(hash, expected_hash);
+        }
+
+        fn create_test_entry() -> Entry {
+            Entry {
+                file: PathBuf::from("/home/user/project/source.c"),
+                arguments: vec_of_strings!["cc", "-c", "source.c"],
+                directory: PathBuf::from("/home/user/project"),
+                output: Some(PathBuf::from("/home/user/project/source.o")),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod bitand_tests {
+        use super::*;
+        use crate::vec_of_strings;
+        use std::path::PathBuf;
+
+        #[test]
+        fn test_bitand_both_predicates_true() {
+            let input = create_test_entries();
+
+            let predicate1 = EntryPredicateBuilder::from(|_: &Entry| true);
+            let predicate2 = EntryPredicateBuilder::from(|_: &Entry| true);
+            let combined_predicate = (predicate1 & predicate2).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(combined_predicate).collect();
+            assert_eq!(result.len(), 1);
+        }
+
+        #[test]
+        fn test_bitand_first_predicate_false() {
+            let input = create_test_entries();
+
+            let predicate1 = EntryPredicateBuilder::from(|_: &Entry| false);
+            let predicate2 = EntryPredicateBuilder::from(|_: &Entry| true);
+            let combined_predicate = (predicate1 & predicate2).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(combined_predicate).collect();
+            assert_eq!(result.len(), 0);
+        }
+
+        #[test]
+        fn test_bitand_second_predicate_false() {
+            let input = create_test_entries();
+
+            let predicate1 = EntryPredicateBuilder::from(|_: &Entry| true);
+            let predicate2 = EntryPredicateBuilder::from(|_: &Entry| false);
+            let combined_predicate = (predicate1 & predicate2).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(combined_predicate).collect();
+            assert_eq!(result.len(), 0);
+        }
+
+        #[test]
+        fn test_bitand_both_predicates_false() {
+            let input = create_test_entries();
+
+            let predicate1 = EntryPredicateBuilder::from(|_: &Entry| false);
+            let predicate2 = EntryPredicateBuilder::from(|_: &Entry| false);
+            let combined_predicate = (predicate1 & predicate2).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(combined_predicate).collect();
+            assert_eq!(result.len(), 0);
+        }
+
+        fn create_test_entries() -> Vec<Entry> {
+            vec![Entry {
+                file: PathBuf::from("/home/user/project/source/source.c"),
+                arguments: vec_of_strings!["cc", "-c", "source.c"],
+                directory: PathBuf::from("/home/user/project"),
+                output: None,
+            }]
+        }
+    }
+
+    #[cfg(test)]
+    mod not_tests {
+        use super::*;
+        use crate::vec_of_strings;
+        use std::path::PathBuf;
+
+        #[test]
+        fn test_not_predicate_true() {
+            let input = create_test_entries();
+
+            let predicate = EntryPredicateBuilder::from(|_: &Entry| true);
+            let not_predicate = (!predicate).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(not_predicate).collect();
+            assert_eq!(result.len(), 0);
+        }
+
+        #[test]
+        fn test_not_predicate_false() {
+            let input = create_test_entries();
+
+            let predicate = EntryPredicateBuilder::from(|_: &Entry| false);
+            let not_predicate = (!predicate).build();
+
+            let result: Vec<Entry> = input.into_iter().filter(not_predicate).collect();
+            assert_eq!(result.len(), 1);
+        }
+
+        fn create_test_entries() -> Vec<Entry> {
+            vec![Entry {
+                file: PathBuf::from("/home/user/project/source/source.c"),
+                arguments: vec_of_strings!["cc", "-c", "source.c"],
+                directory: PathBuf::from("/home/user/project"),
+                output: None,
+            }]
         }
     }
 }
