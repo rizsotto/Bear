@@ -85,7 +85,6 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
 
     path.split(':')
         .map(|dir| Path::new(dir).join(target))
-        // FIXME: check if it is executable
         .filter(|path| path.is_file())
         .find(|path| {
             // We need to compare it with the real path of the candidate executable to avoid
@@ -117,13 +116,10 @@ fn report(execution: Execution) -> Result<()> {
 }
 
 fn into_execution(path_buf: &Path) -> Result<Execution> {
-    std::env::current_dir()
-        .with_context(|| "Cannot get current directory")
-        .map(|working_dir| Execution {
-            executable: path_buf.to_path_buf(),
-            // FIXME: substitute the executable name on the first position
-            arguments: std::env::args().collect(),
-            working_dir,
-            environment: std::env::vars().collect(),
-        })
+    Ok(Execution {
+        executable: path_buf.to_path_buf(),
+        arguments: std::env::args().collect(),
+        working_dir: std::env::current_dir()?,
+        environment: std::env::vars().collect(),
+    })
 }
