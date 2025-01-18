@@ -222,19 +222,42 @@ pub enum Intercept {
 
 /// The default intercept mode is varying based on the target operating system.
 impl Default for Intercept {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "dragonfly"
+    ))]
     fn default() -> Self {
         Intercept::Preload {
             path: default_preload_library(),
         }
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn default() -> Self {
         Intercept::Wrapper {
             path: default_wrapper_executable(),
             directory: default_wrapper_directory(),
-            executables: vec![], // FIXME: better default value
+            executables: vec![
+                PathBuf::from("/usr/bin/cc"),
+                PathBuf::from("/usr/bin/c++"),
+                PathBuf::from("/usr/bin/clang"),
+                PathBuf::from("/usr/bin/clang++"),
+            ],
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    fn default() -> Self {
+        Intercept::Wrapper {
+            path: default_wrapper_executable(),
+            directory: default_wrapper_directory(),
+            executables: vec![
+                PathBuf::from("C:\\msys64\\mingw64\\bin\\gcc.exe"),
+                PathBuf::from("C:\\msys64\\mingw64\\bin\\g++.exe"),
+            ],
         }
     }
 }
