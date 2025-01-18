@@ -18,6 +18,7 @@
 extern crate core;
 
 use anyhow::{Context, Result};
+use bear::intercept::supervise::supervise;
 use bear::intercept::tcp::ReporterOnTcp;
 use bear::intercept::Reporter;
 use bear::intercept::KEY_DESTINATION;
@@ -46,13 +47,11 @@ fn main() -> Result<()> {
     }
 
     // Execute the real executable with the same arguments
-    // TODO: handle signals and forward them to the child process.
-    let status = std::process::Command::new(real_executable)
-        .args(std::env::args().skip(1))
-        .status()?;
-    log::info!("Execution finished with status: {:?}", status);
+    let mut command = std::process::Command::new(real_executable);
+    let exit_status = supervise(command.args(std::env::args().skip(1)))?;
+    log::info!("Execution finished with status: {:?}", exit_status);
     // Return the child process status code
-    std::process::exit(status.code().unwrap_or(1));
+    std::process::exit(exit_status.code().unwrap_or(1));
 }
 
 /// Get the file name of the executable from the arguments.

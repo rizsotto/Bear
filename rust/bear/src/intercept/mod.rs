@@ -9,6 +9,7 @@
 //! The module provides abstractions for the reporter and the collector. And it also defines
 //! the data structures that are used to represent the events.
 
+use crate::intercept::supervise::supervise;
 use crate::{args, config};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -19,6 +20,7 @@ use std::sync::Arc;
 use std::{env, fmt, thread};
 
 pub mod persistence;
+pub mod supervise;
 pub mod tcp;
 
 /// Declare the environment variables used by the intercept mode.
@@ -267,17 +269,17 @@ impl InterceptEnvironment {
         // TODO: record the execution of the build command
 
         let environment = self.environment();
-        let mut child = Command::new(input.arguments[0].clone())
-            .args(input.arguments[1..].iter())
-            .envs(environment)
-            .spawn()?;
+        let process = input.arguments[0].clone();
+        let arguments = input.arguments[1..].to_vec();
 
-        // TODO: forward signals to the child process
-        let result = child.wait()?;
+        let mut child = Command::new(process);
+
+        let exit_status = supervise(child.args(arguments).envs(environment))?;
+        log::info!("Execution finished with status: {:?}", exit_status);
 
         // The exit code is not always available. When the process is killed by a signal,
         // the exit code is not available. In this case, we return the `FAILURE` exit code.
-        let exit_code = result
+        let exit_code = exit_status
             .code()
             .map(|code| ExitCode::from(code as u8))
             .unwrap_or(ExitCode::FAILURE);

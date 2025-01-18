@@ -40,6 +40,15 @@ nom.workspace = true
 regex.workspace = true
 rand.workspace = true
 tempfile.workspace = true
+nix = { version = "0.29", optional = true, features = ["signal", "process"] }
+winapi = { version = "0.3", optional = true, features = ["processthreadsapi", "winnt", "handleapi"] }
+signal-hook = "0.3.17"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["processthreadsapi", "winnt", "handleapi"] }
 
 [profile.release]
 strip = true
