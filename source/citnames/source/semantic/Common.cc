@@ -19,6 +19,7 @@
 
 #include "Common.h"
 
+#include <algorithm>
 #include <string_view>
 #include <tuple>
 
