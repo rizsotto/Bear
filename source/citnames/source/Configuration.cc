@@ -67,8 +67,18 @@ namespace cs {
     }
 
     void from_json(const nlohmann::json &j, Output &rhs) {
-        j.at("format").get_to(rhs.format);
-        j.at("content").get_to(rhs.content);
+        if (j.contains("format")) {
+            j.at("format").get_to(rhs.format);
+        }
+        if (j.contains("content")) {
+            j.at("content").get_to(rhs.content);
+        }
+        if (j.contains("link_commands_output")) {
+            j.at("link_commands_output").get_to(rhs.link_commands_output);
+        }
+        if (j.contains("ar_commands_output")) {
+            j.at("ar_commands_output").get_to(rhs.ar_commands_output);
+        }
     }
 
     void to_json(nlohmann::json &j, const Output &rhs) {
@@ -76,6 +86,12 @@ namespace cs {
                 {"format",  rhs.format},
                 {"content", rhs.content},
         };
+        if (!rhs.link_commands_output.empty()) {
+            j["link_commands_output"] = rhs.link_commands_output;
+        }
+        if (!rhs.ar_commands_output.empty()) {
+            j["ar_commands_output"] = rhs.ar_commands_output;
+        }
     }
 
     void from_json(const nlohmann::json &j, CompilerWrapper &rhs) {

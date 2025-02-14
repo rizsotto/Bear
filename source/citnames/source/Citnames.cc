@@ -187,6 +187,32 @@ namespace {
         }
         return output.size();
     }
+
+    size_t transform_links(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::LinkEntry> &output) {
+        for (const auto &event : *events) {
+            const auto entries = build.recognize(event)
+                    .map<std::list<cs::LinkEntry>>([](const auto &semantic) -> std::list<cs::LinkEntry> {
+                        const auto candidate = dynamic_cast<const cs::semantic::Link *>(semantic.get());
+                        return (candidate != nullptr) ? candidate->into_link_entries() : std::list<cs::LinkEntry>();
+                    })
+                    .unwrap_or({});
+            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
+        }
+        return output.size();
+    }
+
+    size_t transform_ar(cs::semantic::Build &build, const db::EventsDatabaseReader::Ptr& events, std::list<cs::ArEntry> &output) {
+        for (const auto &event : *events) {
+            const auto entries = build.recognize(event)
+                    .map<std::list<cs::ArEntry>>([](const auto &semantic) -> std::list<cs::ArEntry> {
+                        const auto candidate = dynamic_cast<const cs::semantic::Ar *>(semantic.get());
+                        return (candidate != nullptr) ? candidate->into_ar_entries() : std::list<cs::ArEntry>();
+                    })
+                    .unwrap_or({});
+            std::copy(entries.begin(), entries.end(), std::back_inserter(output));
+        }
+        return output.size();
+    }
 }
 
 namespace cs {
@@ -194,9 +220,11 @@ namespace cs {
     rust::Result<int> Command::execute() const {
         cs::CompilationDatabase output(configuration_.output.format, configuration_.output.content);
         std::list<cs::Entry> entries;
+        std::list<cs::LinkEntry> link_entries;
+        std::list<cs::ArEntry> ar_entries;
 
         // get current compilations from the input.
-        return db::EventsDatabaseReader::from(arguments_.input)
+        auto compile_result = db::EventsDatabaseReader::from(arguments_.input)
                 .map<size_t>([this, &entries](const auto &commands) {
                     cs::semantic::Build build(configuration_.compilation);
                     return transform(build, commands, entries);
@@ -212,7 +240,7 @@ namespace cs {
                                 })
                         : rust::Result<size_t>(rust::Ok(new_entries_count));
                 })
-                .and_then<size_t>([this, &output, &entries](const size_t & size) {
+                .and_then<size_t>([this, &output, &entries](auto size) {
                     // write the entries into the output file.
                     spdlog::debug("compilation entries to output. [size: {}]", size);
 
@@ -221,12 +249,73 @@ namespace cs {
                     return rename_file(temporary_file, arguments_.output)
                         ? result
                         : rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", arguments_.output)));
-                })
-                .map<int>([](auto size) {
-                    // just map to success exit code if it was successful.
-                    spdlog::debug("compilation entries written. [size: {}]", size);
-                    return EXIT_SUCCESS;
                 });
+
+        auto link_result = rust::Result<size_t>(rust::Ok<size_t>(0));
+        if (!configuration_.output.link_commands_output.empty()) {
+            link_result = db::EventsDatabaseReader::from(arguments_.input)
+                .map<size_t>([this, &link_entries](const auto &commands) {
+                    cs::semantic::Build build(configuration_.compilation);
+                    return transform_links(build, commands, link_entries);
+                })
+                .and_then<size_t>([this, &output, &link_entries](auto new_entries_count) {
+                    spdlog::debug("link entries created. [size: {}]", new_entries_count);
+                    return (arguments_.append)
+                        ? output.from_link_json(arguments_.output, link_entries)
+                                .template map<size_t>([&new_entries_count](auto old_entries_count) {
+                                    spdlog::debug("link entries have read. [size: {}]", old_entries_count);
+                                    return new_entries_count + old_entries_count;
+                                })
+                        : rust::Result<size_t>(rust::Ok(new_entries_count));
+                })
+                .and_then<size_t>([this, &output, &link_entries](auto size) {
+                    // write the link entries into a separate output file if configured
+                    spdlog::debug("link entries to output. [size: {}]", size);
+
+                    const fs::path link_temp_file(configuration_.output.link_commands_output.string() + ".tmp");
+                    auto link_write_result = output.to_link_json(link_temp_file, link_entries);
+                    return rename_file(link_temp_file, configuration_.output.link_commands_output)
+                        ? link_write_result
+                        : rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", configuration_.output.link_commands_output)));
+                });
+        }
+
+        auto ar_result = rust::Result<size_t>(rust::Ok<size_t>(0));
+        if (!configuration_.output.ar_commands_output.empty()) {
+            ar_result = db::EventsDatabaseReader::from(arguments_.input)
+                .map<size_t>([this, &ar_entries](const auto &commands) {
+                    cs::semantic::Build build(configuration_.compilation);
+                    return transform_ar(build, commands, ar_entries);
+                })
+                .and_then<size_t>([this, &output, &ar_entries](auto new_entries_count) {
+                    spdlog::debug("ar entries created. [size: {}]", new_entries_count);
+                    return (arguments_.append)
+                        ? output.from_ar_json(arguments_.output, ar_entries)
+                                .template map<size_t>([&new_entries_count](auto old_entries_count) {
+                                    spdlog::debug("ar entries have read. [size: {}]", old_entries_count);
+                                    return new_entries_count + old_entries_count;
+                                })
+                        : rust::Result<size_t>(rust::Ok(new_entries_count));
+                })
+                .and_then<size_t>([this, &output, &ar_entries](auto size) {
+                    // write the ar entries into a separate output file if configured
+                    spdlog::debug("ar entries to output. [size: {}]", size);
+
+                    const fs::path ar_temp_file(configuration_.output.ar_commands_output.string() + ".tmp");
+                    auto ar_write_result = output.to_ar_json(ar_temp_file, ar_entries);
+                    return rename_file(ar_temp_file, configuration_.output.ar_commands_output)
+                        ? ar_write_result
+                        : rust::Err(std::runtime_error(fmt::format("Failed to rename file: {}", configuration_.output.ar_commands_output)));
+                });
+        }
+
+        return rust::merge(compile_result, rust::merge(link_result, ar_result))
+            .map<int>([](const auto &sizes) -> int {
+                const auto&[compile_size, link_and_ar_sizes] = sizes;
+                const auto&[link_size, ar_size] = link_and_ar_sizes;
+                spdlog::debug("compilation entries written. [size: {}]", compile_size);
+                return compile_size + link_size + ar_size;
+            });
     }
 
     Command::Command(Arguments arguments, cs::Configuration configuration) noexcept

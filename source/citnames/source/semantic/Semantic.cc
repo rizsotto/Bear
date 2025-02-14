@@ -134,4 +134,140 @@ namespace cs::semantic {
         }
         return results;
     }
+
+    std::list<cs::Entry> Link::into_entries() const {
+        return {};
+    }
+
+    std::list<cs::LinkEntry> Link::into_link_entries() const {
+        const auto abspath = [this](const fs::path &path) -> fs::path {
+            auto candidate = (path.is_absolute()) ? path : working_dir / path;
+            // Create canonical path without checking of file existence.
+            fs::path result;
+            for (const auto& part : candidate) {
+                if (part == ".")
+                    continue;
+                if (part == "..")
+                    result = result.parent_path();
+                else
+                    result = result / part;
+            }
+            return result;
+        };
+        std::list<cs::LinkEntry> results;
+        cs::LinkEntry result {
+            working_dir,
+            output ? std::optional(abspath(output.value())) : std::nullopt,
+            { linker.string() },
+            {}
+        };
+        std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
+        if (output) {
+            result.arguments.emplace_back("-o");
+            result.arguments.push_back(output.value().string());
+        }
+        for (const auto& input : input_files) {
+            result.input_files.push_back(abspath(input));
+            result.arguments.push_back(input.string());
+        }
+        results.emplace_back(std::move(result));
+        return results;
+    }
+
+    std::ostream &Link::operator<<(std::ostream &os) const {
+        os  << "Link { working_dir: " << working_dir
+            << ", linker: " << linker
+            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << ", input_files: " << fmt::format("[{}]", fmt::join(input_files.begin(), input_files.end(), ", "))
+            << ", output: " << (output ? output.value().string() : "")
+            << " }";
+        return os;
+    }
+
+    bool Link::operator==(const Semantic &rhs) const {
+        if (this == &rhs) {
+            return true;
+        }
+        if (const auto *const ptr = dynamic_cast<const Link*>(&rhs)) {
+            return (working_dir == ptr->working_dir)
+                && (linker == ptr->linker)
+                && (flags == ptr->flags)
+                && (input_files == ptr->input_files)
+                && (output == ptr->output);
+        }
+        return false;
+    }
+
+    bool Ar::operator==(const Semantic &rhs) const {
+        if (this == &rhs) {
+            return true;
+        }
+        if (const auto *const ptr = dynamic_cast<const Ar*>(&rhs)) {
+            return (working_dir == ptr->working_dir)
+                && (ar_tool == ptr->ar_tool)
+                && (operation == ptr->operation)
+                && (flags == ptr->flags)
+                && (input_files == ptr->input_files)
+                && (output == ptr->output);
+        }
+        return false;
+    }
+
+    std::list<cs::Entry> Ar::into_entries() const {
+        return {};
+    }
+
+    std::list<cs::ArEntry> Ar::into_ar_entries() const {
+        const auto abspath = [this](const fs::path &path) -> fs::path {
+            auto candidate = (path.is_absolute()) ? path : working_dir / path;
+            // Create canonical path without checking of file existence.
+            fs::path result;
+            for (const auto& part : candidate) {
+                if (part == ".")
+                    continue;
+                if (part == "..")
+                    result = result.parent_path();
+                else
+                    result = result / part;
+            }
+            return result;
+        };
+        std::list<cs::ArEntry> results;
+        cs::ArEntry result {
+            working_dir,
+            output ? std::optional(abspath(output.value())) : std::nullopt,
+            { ar_tool.string() },
+            {},
+            operation
+        };
+
+        // Build arguments list in correct order:
+        // 1. Copy all flags (which include operation, modifiers)
+        std::copy(flags.begin(), flags.end(), std::back_inserter(result.arguments));
+
+        // 2. Add archive file
+        if (output) {
+            result.arguments.push_back(output.value().string());
+        }
+        
+        // 3. Add input files and record them in input_files
+        for (const auto& input : input_files) {
+            result.input_files.push_back(abspath(input));
+            result.arguments.push_back(input.string());
+        }
+        
+        results.emplace_back(std::move(result));
+        return results;
+    }
+
+    std::ostream &Ar::operator<<(std::ostream &os) const {
+        os  << "Ar { working_dir: " << working_dir
+            << ", ar_tool: " << ar_tool
+            << ", operation: " << operation
+            << ", flags: " << fmt::format("[{}]", fmt::join(flags.begin(), flags.end(), ", "))
+            << ", input_files: " << fmt::format("[{}]", fmt::join(input_files.begin(), input_files.end(), ", "))
+            << ", output: " << (output ? output.value().string() : "")
+            << " }";
+        return os;
+    }
 }

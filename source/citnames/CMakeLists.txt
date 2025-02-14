@@ -33,6 +33,8 @@ target_sources(citnames_a
             source/semantic/ToolIntelFortran.cc
             source/semantic/ToolWrapper.cc
             source/semantic/ToolExtendingWrapper.cc
+            source/semantic/ToolLinker.cc
+            source/semantic/ToolAr.cc
         INTERFACE
             $<TARGET_OBJECTS:citnames_a>
         )
