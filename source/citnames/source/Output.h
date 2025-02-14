@@ -27,6 +27,7 @@
 #include <list>
 #include <optional>
 #include <string>
+#include <nlohmann/json.hpp>
 
 namespace fs = std::filesystem;
 
@@ -51,9 +52,46 @@ namespace cs {
         std::list<std::string> arguments;
     };
 
+    // Represents a linking command in the database
+    struct LinkEntry {
+        fs::path directory;
+        std::optional<fs::path> output;
+        std::list<std::string> arguments;
+        std::list<fs::path> input_files;
+    };
+
+    // Represents an ar command in the database for creating static libraries
+    struct ArEntry {
+        fs::path directory;
+        std::optional<fs::path> output;  // The output .a file
+        std::list<std::string> arguments;
+        std::list<fs::path> input_files;  // Object files to archive
+        std::string operation;  // The ar operation (e.g., "r", "q", etc.)
+    };
+
     // Convenient methods for these types.
     bool operator==(const Entry& lhs, const Entry& rhs);
+    bool operator==(const LinkEntry& lhs, const LinkEntry& rhs);
+    bool operator==(const ArEntry& lhs, const ArEntry& rhs);
     std::ostream& operator<<(std::ostream&, const Entry&);
+    std::ostream& operator<<(std::ostream&, const LinkEntry&);
+    std::ostream& operator<<(std::ostream&, const ArEntry&);
+
+    // JSON serialization functions
+    void from_json(const nlohmann::json &j, Entry &entry);
+    void from_json(const nlohmann::json &j, LinkEntry &entry);
+    void from_json(const nlohmann::json &j, ArEntry &entry);
+    void to_json(nlohmann::json &j, const Entry &entry, const Format &format);
+    void to_json(nlohmann::json &j, const LinkEntry &entry, const Format &format);
+    void to_json(nlohmann::json &j, const ArEntry &entry, const Format &format);
+    nlohmann::json to_json(const Entry &rhs, const Format &format);
+    nlohmann::json to_json(const LinkEntry &rhs, const Format &format);
+    nlohmann::json to_json(const ArEntry &rhs, const Format &format);
+
+    // Validation functions
+    void validate(const Entry &entry);
+    void validate(const LinkEntry &entry);
+    void validate(const ArEntry &entry);
 
     // Utility class to persists JSON compilation database.
     //
@@ -65,6 +103,8 @@ namespace cs {
     // parameters. And basic content filtering is also available.
     struct CompilationDatabase {
         using Entries = std::list<Entry>;
+        using LinkEntries = std::list<LinkEntry>;
+        using ArEntries = std::list<ArEntry>;
 
         CompilationDatabase(Format, Content);
         virtual ~CompilationDatabase() noexcept = default;
@@ -72,9 +112,17 @@ namespace cs {
         // Serialization methods with error mapping.
         [[nodiscard]] virtual rust::Result<size_t> to_json(const fs::path& file, const Entries &entries) const;
         [[nodiscard]] virtual rust::Result<size_t> to_json(std::ostream &ostream, const Entries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> to_link_json(const fs::path& file, const LinkEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> to_link_json(std::ostream &ostream, const LinkEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> to_ar_json(const fs::path& file, const ArEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> to_ar_json(std::ostream &ostream, const ArEntries &entries) const;
 
         [[nodiscard]] virtual rust::Result<size_t> from_json(const fs::path& file, Entries &entries) const;
         [[nodiscard]] virtual rust::Result<size_t> from_json(std::istream &istream, Entries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_link_json(const fs::path& file, LinkEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_link_json(std::istream &istream, LinkEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_ar_json(const fs::path& file, ArEntries &entries) const;
+        [[nodiscard]] virtual rust::Result<size_t> from_ar_json(std::istream &istream, ArEntries &entries) const;
 
     private:
         Format format;

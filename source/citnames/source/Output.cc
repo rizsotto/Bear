@@ -327,4 +327,342 @@ namespace cs {
             return rust::Err(std::runtime_error(error.what()));
         }
     }
+
+    void to_json(nlohmann::json &j, const Entry &entry, const Format &format) {
+        j = nlohmann::json{
+                {"file",      entry.file},
+                {"directory", entry.directory},
+        };
+        if (!format.drop_output_field && entry.output) {
+            j["output"] = entry.output.value();
+        }
+        if (format.command_as_array) {
+            j["arguments"] = entry.arguments;
+        } else {
+            j["command"] = sh::join(entry.arguments);
+        }
+    }
+
+    nlohmann::json to_json(const LinkEntry &rhs, const Format &format) {
+        nlohmann::json json;
+        json["directory"] = rhs.directory;
+        json["input_files"] = rhs.input_files;
+        if (!format.drop_output_field && rhs.output.has_value()) {
+            json["output"] = rhs.output.value();
+        }
+        if (format.command_as_array) {
+            json["arguments"] = rhs.arguments;
+        } else {
+            json["command"] = sh::join(rhs.arguments);
+        }
+        return json;
+    }
+
+    void to_json(nlohmann::json &j, const LinkEntry &entry, const Format &format) {
+        j = nlohmann::json{
+                {"directory", entry.directory},
+                {"input_files", entry.input_files},
+        };
+        if (!format.drop_output_field && entry.output.has_value()) {
+            j["output"] = entry.output.value();
+        }
+        if (format.command_as_array) {
+            j["arguments"] = entry.arguments;
+        } else {
+            j["command"] = sh::join(entry.arguments);
+        }
+    }
+
+    bool operator==(const LinkEntry &lhs, const LinkEntry &rhs) {
+        return (lhs.directory == rhs.directory)
+               && (lhs.output == rhs.output)
+               && (lhs.arguments == rhs.arguments)
+               && (lhs.input_files == rhs.input_files);
+    }
+
+    std::ostream &operator<<(std::ostream &os, const LinkEntry &entry) {
+        const Format format;
+        nlohmann::json j;
+        to_json(j, entry, format);
+        os << j;
+        return os;
+    }
+
+    rust::Result<size_t> CompilationDatabase::to_link_json(const fs::path &file, const LinkEntries &rhs) const {
+        try {
+            std::ofstream target(file);
+            return to_link_json(target, rhs)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to write file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to write file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::to_link_json(std::ostream &ostream, const LinkEntries &entries) const {
+        try {
+            size_t count = 0;
+            nlohmann::json json = nlohmann::json::array();
+            for (const auto &entry : entries) {
+                nlohmann::json j;
+                cs::to_json(j, entry, format);
+                json.emplace_back(std::move(j));
+                ++count;
+            }
+
+            ostream << std::setw(2) << json << std::endl;
+
+            return rust::Ok(count);
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::from_link_json(const fs::path &file, LinkEntries &entries) const {
+        try {
+            std::ifstream source(file);
+            return from_link_json(source, entries)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to read file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to read file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::from_link_json(std::istream &istream, LinkEntries &entries) const {
+        try {
+            nlohmann::json in;
+            istream >> in;
+
+            for (const auto &e : in) {
+                LinkEntry entry;
+                cs::from_json(e, entry);
+                entries.emplace_back(std::move(entry));
+            }
+
+            return rust::Ok(in.size());
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    void validate(const LinkEntry &entry) {
+        if (entry.directory.empty()) {
+            throw std::runtime_error("Field 'directory' is empty");
+        }
+        if (entry.arguments.empty()) {
+            throw std::runtime_error("Field 'arguments' is empty");
+        }
+        if (entry.input_files.empty()) {
+            throw std::runtime_error("Field 'input_files' is empty");
+        }
+        if (entry.output.has_value() && entry.output.value().empty()) {
+            throw std::runtime_error("Field 'output' is empty string.");
+        }
+    }
+
+    void from_json(const nlohmann::json &j, LinkEntry &entry) {
+        j.at("directory").get_to(entry.directory);
+        j.at("input_files").get_to(entry.input_files);
+        if (j.contains("output")) {
+            std::string output;
+            j.at("output").get_to(output);
+            entry.output.emplace(output);
+        }
+        if (j.contains("arguments")) {
+            std::list<std::string> arguments;
+            j.at("arguments").get_to(arguments);
+            entry.arguments.swap(arguments);
+        } else if (j.contains("command")) {
+            std::string command;
+            j.at("command").get_to(command);
+
+            sh::split(command)
+                    .on_success([&entry](auto arguments) {
+                        entry.arguments = arguments;
+                    })
+                    .on_error([](auto error) {
+                        throw error;
+                    });
+        } else {
+            throw std::runtime_error("Field 'command' or 'arguments' not found");
+        }
+
+        validate(entry);
+    }
+
+    void validate(const ArEntry &entry) {
+        if (entry.directory.empty()) {
+            throw std::runtime_error("Field 'directory' is empty");
+        }
+        if (entry.arguments.empty()) {
+            throw std::runtime_error("Field 'arguments' is empty");
+        }
+        if (entry.input_files.empty()) {
+            throw std::runtime_error("Field 'input_files' is empty");
+        }
+        if (entry.output.has_value() && entry.output.value().empty()) {
+            throw std::runtime_error("Field 'output' is empty string.");
+        }
+        if (entry.operation.empty()) {
+            throw std::runtime_error("Field 'operation' is empty");
+        }
+    }
+
+    void from_json(const nlohmann::json &j, ArEntry &entry) {
+        j.at("directory").get_to(entry.directory);
+        j.at("input_files").get_to(entry.input_files);
+        j.at("operation").get_to(entry.operation);
+        if (j.contains("output")) {
+            std::string output;
+            j.at("output").get_to(output);
+            entry.output.emplace(output);
+        }
+        if (j.contains("arguments")) {
+            std::list<std::string> arguments;
+            j.at("arguments").get_to(arguments);
+            entry.arguments.swap(arguments);
+        } else if (j.contains("command")) {
+            std::string command;
+            j.at("command").get_to(command);
+
+            sh::split(command)
+                    .on_success([&entry](auto arguments) {
+                        entry.arguments = arguments;
+                    })
+                    .on_error([](auto error) {
+                        throw error;
+                    });
+        } else {
+            throw std::runtime_error("Field 'command' or 'arguments' not found");
+        }
+
+        validate(entry);
+    }
+
+    bool operator==(const ArEntry &lhs, const ArEntry &rhs) {
+        return (lhs.directory == rhs.directory)
+               && (lhs.output == rhs.output)
+               && (lhs.arguments == rhs.arguments)
+               && (lhs.input_files == rhs.input_files)
+               && (lhs.operation == rhs.operation);
+    }
+
+    std::ostream &operator<<(std::ostream &os, const ArEntry &entry) {
+        const Format format;
+        nlohmann::json j;
+        to_json(j, entry, format);
+        os << j;
+        return os;
+    }
+
+    void to_json(nlohmann::json &j, const ArEntry &entry, const Format &format) {
+        j = nlohmann::json{
+                {"directory", entry.directory},
+                {"input_files", entry.input_files},
+                {"operation", entry.operation}
+        };
+        if (!format.drop_output_field && entry.output.has_value()) {
+            j["output"] = entry.output.value();
+        }
+        if (format.command_as_array) {
+            j["arguments"] = entry.arguments;
+        } else {
+            j["command"] = sh::join(entry.arguments);
+        }
+    }
+
+    nlohmann::json to_json(const ArEntry &rhs, const Format &format) {
+        nlohmann::json json;
+        to_json(json, rhs, format);
+        return json;
+    }
+
+    rust::Result<size_t> CompilationDatabase::to_ar_json(const fs::path &file, const ArEntries &entries) const {
+        try {
+            std::ofstream target(file);
+            return to_ar_json(target, entries)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to write file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to write file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::to_ar_json(std::ostream &ostream, const ArEntries &entries) const {
+        try {
+            size_t count = 0;
+            nlohmann::json json = nlohmann::json::array();
+            for (const auto &entry : entries) {
+                nlohmann::json j;
+                cs::to_json(j, entry, format);
+                json.emplace_back(std::move(j));
+                ++count;
+            }
+
+            ostream << std::setw(2) << json << std::endl;
+
+            return rust::Ok(count);
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::from_ar_json(const fs::path &file, ArEntries &entries) const {
+        try {
+            std::ifstream source(file);
+            return from_ar_json(source, entries)
+                    .map_err<std::runtime_error>([&file](auto error) {
+                        return std::runtime_error(
+                                fmt::format("Failed to read file: {}, cause: {}",
+                                            file.string(),
+                                            error.what()));
+                    });
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(
+                    fmt::format("Failed to read file: {}, cause: {}",
+                                file.string(),
+                                error.what())));
+        }
+    }
+
+    rust::Result<size_t> CompilationDatabase::from_ar_json(std::istream &istream, ArEntries &entries) const {
+        try {
+            nlohmann::json in;
+            istream >> in;
+
+            for (const auto &e : in) {
+                ArEntry entry;
+                cs::from_json(e, entry);
+                entries.emplace_back(std::move(entry));
+            }
+
+            return rust::Ok(in.size());
+        } catch (const std::exception &error) {
+            return rust::Err(std::runtime_error(error.what()));
+        }
+    }
 }

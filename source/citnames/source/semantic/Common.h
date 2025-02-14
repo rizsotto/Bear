@@ -28,4 +28,6 @@ namespace cs::semantic {
     rust::Result<SemanticPtr> compilation_impl(const FlagsByName& flags, const Execution& execution,
         std::function<Arguments(const Execution&)> create_argument_list_func,
         std::function<bool(const CompilerFlags&)> is_preprocessor_func);
+    rust::Result<SemanticPtr> linking_impl(const FlagsByName& flags, const Execution& execution);
+    rust::Result<SemanticPtr> archiving_impl(const FlagsByName& flags, const Execution& execution);
 }

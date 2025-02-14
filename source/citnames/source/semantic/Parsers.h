@@ -108,6 +108,8 @@ namespace cs::semantic {
         PREPROCESSOR_MAKE,
         LINKER,
         LINKER_OBJECT_FILE,
+        LINKER_STATIC_LIBRARY,    // For .a files
+        LINKER_SHARED_LIBRARY,    // For .so files
         DIRECTORY_SEARCH,
         DIRECTORY_SEARCH_LINKER,
         SOURCE,
@@ -174,6 +176,12 @@ namespace cs::semantic {
 
     // Parser combinator which recognize source files as a single argument of a compiler call.
     struct SourceMatcher {
+        [[nodiscard]]
+        static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
+    };
+
+    // A parser combinator which recognizes object files and libraries.
+    struct ObjectAndLibraryMatcher {
         [[nodiscard]]
         static rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> parse(const ArgumentsView &input);
     };

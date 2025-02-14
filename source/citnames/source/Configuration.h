@@ -64,6 +64,8 @@ namespace cs {
     struct Output {
         Format format;
         Content content;
+        fs::path link_commands_output;  // Path to the link commands output file
+        fs::path ar_commands_output;    // Path to the ar commands output file
     };
 
     // Represents a compiler wrapper that the tool will recognize.
