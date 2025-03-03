@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use super::{Collector, Envelope, Event, Reporter, ReporterId};
 use chrono::Utc;
-use rand::random;
+use rand;
 
 /// Implements convenient methods for the `Envelope` type.
 impl Envelope {
@@ -58,7 +58,7 @@ impl Envelope {
 /// Implements convenient methods for the `ReporterId` type.
 impl ReporterId {
     pub fn generate() -> Self {
-        let id = random::<u64>();
+        let id = rand::random::<u64>();
         ReporterId(id)
     }
 }
