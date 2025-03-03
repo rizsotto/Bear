@@ -1056,7 +1056,7 @@ mod validation {
     }
 
     fn is_empty_path(path: &Path) -> bool {
-        path.to_str().map_or(false, |p| p.is_empty())
+        path.to_str().is_some_and(|p| p.is_empty())
     }
 
     #[cfg(test)]
