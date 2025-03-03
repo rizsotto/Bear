@@ -18,7 +18,7 @@ log = { version = "0.4", default-features = false, features = ["std"] }
 env_logger = { version = "0.11", default-features = false, features = ["humantime"]}
 rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
 path-absolutize = "3.1"
-directories = "5.0"
+directories = "6.0"
 nom = { version = "7.1", default-features = false, features = ["std"] }
 regex = "1.9"
 shell-words = "1.1"
