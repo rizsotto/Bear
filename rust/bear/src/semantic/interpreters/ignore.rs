@@ -22,6 +22,12 @@ impl IgnoreByPath {
     }
 }
 
+impl Default for IgnoreByPath {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A tool to ignore a command execution by arguments.
 impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> Recognition<CompilerCall> {

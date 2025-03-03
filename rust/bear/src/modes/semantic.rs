@@ -2,7 +2,7 @@
 
 use crate::intercept::Envelope;
 use crate::output::OutputWriter;
-use crate::semantic::interpreters::Builder;
+use crate::semantic::interpreters::create_interpreter;
 use crate::semantic::transformation::Transformation;
 use crate::{args, config, output, semantic};
 use anyhow::Context;
@@ -20,7 +20,7 @@ pub(super) struct SemanticAnalysisPipeline {
 impl SemanticAnalysisPipeline {
     /// Create a new semantic mode instance.
     pub(super) fn from(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
-        let interpreter = Builder::from(config);
+        let interpreter = create_interpreter(config);
         let transform = Transformation::from(&config.output);
         let output_writer = OutputWriterImpl::create(&output, &config.output)?;
 
