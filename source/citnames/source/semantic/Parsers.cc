@@ -299,16 +299,49 @@ namespace cs::semantic {
         return rust::Err(input);
     }
 
-    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> EverythingElseFlagMatcher::parse(const ArgumentsView &input) {
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> ObjectAndLibraryMatcher::parse(const ArgumentsView &input) {
         if (input.empty()) {
             return rust::Err(input);
         }
-        if (const auto &front = input.front(); !front.empty()) {
+        const auto &candidate = input.front();
+        const auto &extension = take_extension(candidate);
+        
+        if (extension == ".o") {
             const auto &[arguments, remainder] = input.take(1);
             if (arguments.empty()) {
                 return rust::Err(input);
             }
             auto flag = CompilerFlag { arguments, CompilerFlagType::LINKER_OBJECT_FILE };
+            return rust::Ok(std::make_pair(flag, remainder));
+        } else if (extension == ".a") {
+            const auto &[arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { arguments, CompilerFlagType::LINKER_STATIC_LIBRARY };
+            return rust::Ok(std::make_pair(flag, remainder));
+        } else if (extension == ".so") {
+            const auto &[arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { arguments, CompilerFlagType::LINKER_SHARED_LIBRARY };
+            return rust::Ok(std::make_pair(flag, remainder));
+        }
+        return rust::Err(input);
+    }
+
+    rust::Result<std::pair<CompilerFlag, ArgumentsView>, ArgumentsView> EverythingElseFlagMatcher::parse(const ArgumentsView &input) {
+        if (input.empty()) {
+            return rust::Err(input);
+        }
+        if (const auto &front = input.front(); !front.empty()) {
+            // For ar commands, treat any non-flag argument as OTHER type
+            const auto &[arguments, remainder] = input.take(1);
+            if (arguments.empty()) {
+                return rust::Err(input);
+            }
+            auto flag = CompilerFlag { arguments, CompilerFlagType::OTHER };
             return rust::Ok(std::make_pair(flag, remainder));
         }
         return rust::Err(input);

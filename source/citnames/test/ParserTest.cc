@@ -49,6 +49,27 @@ namespace cs::semantic {
 
 namespace {
 
+    TEST(Parser, ObjectAndLibraryMatcher) {
+        const auto sut = Repeat(ObjectAndLibraryMatcher());
+
+        {
+            const Arguments input = {"compiler", "file.o", "lib.a", "lib.so"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_ok());
+            const CompilerFlags expected = {
+                    CompilerFlag{slice(input, 1), CompilerFlagType::LINKER_OBJECT_FILE},
+                    CompilerFlag{slice(input, 2), CompilerFlagType::LINKER_STATIC_LIBRARY},
+                    CompilerFlag{slice(input, 3), CompilerFlagType::LINKER_SHARED_LIBRARY},
+            };
+            EXPECT_EQ(expected, flags.unwrap());
+        }
+        {
+            const Arguments input = {"compiler", "file.txt"};
+            const auto flags = parse(sut, input);
+            EXPECT_TRUE(flags.is_err());
+        }
+    }
+
     TEST(Parser, EverythingElseFlagMatcher) {
         const auto sut = Repeat(EverythingElseFlagMatcher());
 
@@ -56,10 +77,10 @@ namespace {
         const auto flags = parse(sut, input);
         EXPECT_TRUE(flags.is_ok());
         const CompilerFlags expected = {
-                CompilerFlag{slice(input, 1), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 2), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 3), CompilerFlagType::LINKER_OBJECT_FILE},
-                CompilerFlag{slice(input, 4), CompilerFlagType::LINKER_OBJECT_FILE},
+                CompilerFlag{slice(input, 1), CompilerFlagType::OTHER},
+                CompilerFlag{slice(input, 2), CompilerFlagType::OTHER},
+                CompilerFlag{slice(input, 3), CompilerFlagType::OTHER},
+                CompilerFlag{slice(input, 4), CompilerFlagType::OTHER},
         };
         EXPECT_EQ(expected, flags.unwrap());
     }

@@ -101,4 +101,61 @@ namespace cs::semantic {
         std::vector<fs::path> sources;
         std::optional<fs::path> output;
     };
+
+    class Link : public CompilerCall {
+    public:
+        Link(fs::path working_dir,
+             fs::path linker,
+             std::list<std::string> flags,
+             std::list<fs::path> input_files,
+             std::optional<fs::path> output = std::nullopt)
+            : working_dir(std::move(working_dir))
+            , linker(std::move(linker))
+            , flags(std::move(flags))
+            , input_files(std::move(input_files))
+            , output(std::move(output))
+        { }
+
+        bool operator==(Semantic const& rhs) const override;
+        std::list<cs::Entry> into_entries() const override;
+        std::list<cs::LinkEntry> into_link_entries() const;
+        std::ostream& operator<<(std::ostream& os) const override;
+
+    private:
+        fs::path working_dir;
+        fs::path linker;
+        std::list<std::string> flags;
+        std::list<fs::path> input_files;
+        std::optional<fs::path> output;
+    };
+
+    class Ar : public CompilerCall {
+    public:
+        Ar(fs::path working_dir,
+           fs::path ar_tool,
+           std::string operation,
+           std::list<std::string> flags,
+           std::list<fs::path> input_files,
+           std::optional<fs::path> output = std::nullopt)
+            : working_dir(std::move(working_dir))
+            , ar_tool(std::move(ar_tool))
+            , operation(std::move(operation))
+            , flags(std::move(flags))
+            , input_files(std::move(input_files))
+            , output(std::move(output))
+        { }
+
+        bool operator==(Semantic const& rhs) const override;
+        std::list<cs::Entry> into_entries() const override;
+        std::list<cs::ArEntry> into_ar_entries() const;
+        std::ostream& operator<<(std::ostream& os) const override;
+
+    private:
+        fs::path working_dir;
+        fs::path ar_tool;
+        std::string operation;  // Keep this for internal use
+        std::list<std::string> flags;  // This will include the operation
+        std::list<fs::path> input_files;
+        std::optional<fs::path> output;
+    };
 }
