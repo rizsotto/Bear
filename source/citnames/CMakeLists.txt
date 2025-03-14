@@ -27,6 +27,7 @@ target_sources(citnames_a
             source/semantic/Parsers.cc
             source/semantic/Semantic.cc
             source/semantic/ToolAny.cc
+            source/semantic/ToolCrayFtnfe.cc
             source/semantic/ToolClang.cc
             source/semantic/ToolCuda.cc
             source/semantic/ToolGcc.cc
@@ -66,6 +67,7 @@ if (ENABLE_UNIT_TESTS)
     add_executable(citnames_unit_test
             test/OutputTest.cc
             test/ParserTest.cc
+            test/ToolCrayFtnfeTest.cc
             test/ToolClangTest.cc
             test/ToolGccTest.cc
             test/ToolIntelFortranTest.cc

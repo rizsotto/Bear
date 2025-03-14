@@ -20,6 +20,7 @@
 #include "Build.h"
 #include "ToolAny.h"
 #include "ToolGcc.h"
+#include "ToolCrayFtnfe.h"
 #include "ToolClang.h"
 #include "ToolCuda.h"
 #include "ToolIntelFortran.h"
@@ -46,6 +47,7 @@ namespace {
                 std::make_shared<cs::semantic::ToolWrapper>(),
                 std::make_shared<cs::semantic::ToolCuda>(),
                 std::make_shared<cs::semantic::ToolIntelFortran>(),
+                std::make_shared<cs::semantic::ToolCrayFtnfe>(),
         };
         for (auto && compiler : cfg.compilers_to_recognize) {
             tools.emplace_front(std::make_shared<cs::semantic::ToolExtendingWrapper>(std::move(compiler)));
