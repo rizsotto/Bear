@@ -192,7 +192,7 @@ namespace cs::semantic {
     }
 
     bool ToolClang::is_compiler_call(const fs::path &program) const {
-        static const auto pattern = std::regex(R"(^([^-]*-)*clang(|\+\+)(-?\d+(\.\d+){0,2})?$)");
+        static const auto pattern = std::regex(R"(^([^-]*-)*(clang(|\+\+)|flang(-new)?)(-?\d+(\.\d+){0,2})?$)");
 
         std::cmatch m;
         return std::regex_match(program.filename().c_str(), m, pattern);

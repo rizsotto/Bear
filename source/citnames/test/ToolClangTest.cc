@@ -41,6 +41,10 @@ namespace {
         EXPECT_TRUE(sut.is_compiler_call("clang-8.1"));
         EXPECT_TRUE(sut.is_compiler_call("clang8.1"));
         EXPECT_TRUE(sut.is_compiler_call("clang81"));
+        EXPECT_TRUE(sut.is_compiler_call("flang"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-20"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-new"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-new-18"));
     }
 
     TEST(ToolClang, simple) {
