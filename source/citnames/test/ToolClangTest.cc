@@ -268,4 +268,34 @@ namespace {
         EXPECT_TRUE(Tool::recognized_ok(result));
         EXPECT_EQ(expected, *(result.unwrap().get()));
     }
+
+    TEST(ToolClang, pass_on_fintrinsic_modules_path) {
+        const Execution input = {
+                "/usr/bin/flang",
+                {
+                        "flang",
+                        "-c",
+                        "-o",
+                        "source.o",
+                        "source.f90",
+                        "-fintrinsic-modules-path",
+                        "arg1",
+                },
+                "/home/user/project",
+                {},
+        };
+        const Compile expected(
+                input.working_dir,
+                input.executable,
+                {"-c", "-fintrinsic-modules-path", "arg1"},
+                {fs::path("source.f90")},
+                {fs::path("source.o")}
+        );
+
+        ToolClang sut({});
+
+        auto result = sut.recognize(input);
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_EQ(expected, *(result.unwrap().get()));
+    }
 }

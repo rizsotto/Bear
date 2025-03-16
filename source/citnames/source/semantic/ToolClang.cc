@@ -171,9 +171,76 @@ namespace {
             {"-Xpreprocessor",    {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
     };
 
+    // Taken from the LLVM 20.1 at:
+    // https://github.com/llvm/llvm-project/blob/llvmorg-20.1.0/clang/include/clang/Driver/Options.td
+    // Only flang exclusive flags are specified here (the ones without
+    // ClangOption visibility)
+    const FlagsByName FLANG_FLAG_DEFINITION = {
+            {"-J",                {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP,         CompilerFlagType::KIND_OF_OUTPUT_NO_LINKING}},
+            {"-Xflang",           {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
+            {"-cpp",              {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-nocpp",              {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-falternative-parameter-statement",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fbackslash",       {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-backslash",    {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fconvert",         {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ,        CompilerFlagType::OTHER}},
+            {"-fdefault-double-8",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdefault-integer-8",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdefault-real-8",  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdisable-integer-16",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdisable-integer-2",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdisable-real-10", {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fdisable-real-3",  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-ffixed-form",      {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-ffixed-line-length",
+                                  {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ,        CompilerFlagType::OTHER}},
+            {"-ffixed-line-length-",
+                                  {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED,                CompilerFlagType::OTHER}},
+            {"-ffree-form",       {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-finit-global-zero",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-init-global-zero",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fhermetic-module-files",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fimplicit-none",   {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-implicit-none",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fintrinsic-modules-path",
+                                  {MatchInstruction::EXACTLY_WITH_1_OPT_SEP,                  CompilerFlagType::OTHER}},
+            {"-flang-deprecated-no-hlfir",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-flang-experimental-hlfir",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-flarge-sizes",     {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-flogical-abbreviations",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-logical-abbreviations",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-automatic",    {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-frealloc-lhs",  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-realloc-lhs",  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fsave-main-program",
+                                  {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-funderscoring",    {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-underscoring", {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-funsigned",        {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-unsigned",     {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fxor-operator",    {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-fno-xor-operator", {MatchInstruction::EXACTLY,                                 CompilerFlagType::OTHER}},
+            {"-module-dir",       {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_OR_SEP,         CompilerFlagType::OTHER}},
+            {"--romc-path",       {MatchInstruction::EXACTLY_WITH_1_OPT_GLUED_WITH_EQ,        CompilerFlagType::DIRECTORY_SEARCH_LINKER}},
+    };
+
     FlagsByName clang_flags(const FlagsByName &base) {
         FlagsByName flags(base);
         flags.insert(CLANG_FLAG_DEFINITION.begin(), CLANG_FLAG_DEFINITION.end());
+        flags.insert(FLANG_FLAG_DEFINITION.begin(), FLANG_FLAG_DEFINITION.end());
         return flags;
     }
 }
