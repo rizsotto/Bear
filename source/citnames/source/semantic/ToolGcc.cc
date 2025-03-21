@@ -205,7 +205,9 @@ namespace cs::semantic {
                 //   - with prefixes like: arm-none-eabi-
                 //   - with postfixes like: -7.0 or 6.4.0
                 // - (excluding cc1)
-            R"(^(cxx|CC|(([^-]*-)*(cc(?!1(?![\d\.]))|[mg]cc|[cmg]\+\+|[g]?fortran)(-?\d+(\.\d+){0,2})?))$)"
+                // - xgcc
+                // - xg++
+            R"(^(cxx|CC|(([^-]*-)*(cc(?!1(?![\d\.]))|[mg]cc|[cmg]\+\+|[g]?fortran)(-?\d+(\.\d+){0,2})?)|xgcc|xg\+\+)$)"
         );
 
         std::cmatch m;
