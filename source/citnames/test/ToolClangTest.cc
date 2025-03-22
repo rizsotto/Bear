@@ -41,6 +41,10 @@ namespace {
         EXPECT_TRUE(sut.is_compiler_call("clang-8.1"));
         EXPECT_TRUE(sut.is_compiler_call("clang8.1"));
         EXPECT_TRUE(sut.is_compiler_call("clang81"));
+        EXPECT_TRUE(sut.is_compiler_call("flang"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-20"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-new"));
+        EXPECT_TRUE(sut.is_compiler_call("flang-new-18"));
     }
 
     TEST(ToolClang, simple) {
@@ -255,6 +259,36 @@ namespace {
                 input.executable,
                 {"-c", "-Z", "arg1", "-aargs", "--analyze"},
                 {fs::path("source.c")},
+                {fs::path("source.o")}
+        );
+
+        ToolClang sut({});
+
+        auto result = sut.recognize(input);
+        EXPECT_TRUE(Tool::recognized_ok(result));
+        EXPECT_EQ(expected, *(result.unwrap().get()));
+    }
+
+    TEST(ToolClang, pass_on_fintrinsic_modules_path) {
+        const Execution input = {
+                "/usr/bin/flang",
+                {
+                        "flang",
+                        "-c",
+                        "-o",
+                        "source.o",
+                        "source.f90",
+                        "-fintrinsic-modules-path",
+                        "arg1",
+                },
+                "/home/user/project",
+                {},
+        };
+        const Compile expected(
+                input.working_dir,
+                input.executable,
+                {"-c", "-fintrinsic-modules-path", "arg1"},
+                {fs::path("source.f90")},
                 {fs::path("source.o")}
         );
 
