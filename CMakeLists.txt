@@ -83,8 +83,6 @@ ExternalProject_Add(BearSource
             -DCMAKE_MODULE_LINKER_FLAGS:STRING=${CMAKE_MODULE_LINKER_FLAGS}
             -DROOT_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
             ${CMAKE_CACHE_ARGS_EXTRA}
-        BUILD_ALWAYS
-            1
         TEST_BEFORE_INSTALL
             1
         TEST_COMMAND
