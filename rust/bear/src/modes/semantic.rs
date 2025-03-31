@@ -218,15 +218,13 @@ impl ClangOutputWriter {
             .map(BufReader::new)
             .with_context(|| format!("Failed to open file: {:?}", source))?;
 
-        let entries = output::clang::read(file)
-            .map(move |candidate| {
-                // We are here to log the error.
-                candidate.map_err(|error| {
-                    log::error!("Failed to read file: {:?}, reason: {}", source_copy, error);
-                    error
-                })
-            })
-            .filter_map(Result::ok);
+        let entries = output::clang::read(file).filter_map(move |candidate| match candidate {
+            Ok(entry) => Some(entry),
+            Err(error) => {
+                log::error!("Failed to read file: {:?}, reason: {}", source_copy, error);
+                None
+            }
+        });
         Ok(entries)
     }
 }
