@@ -31,9 +31,8 @@ where
     R: io::Read,
 {
     match state {
-        State::AtStart => {
-            if read_skipping_ws(&mut reader)? == b'[' {
-                // read the next char to see if the array is empty
+        State::AtStart => match read_skipping_ws(&mut reader)? {
+            b'[' => {
                 let peek = read_skipping_ws(&mut reader)?;
                 if peek == b']' {
                     *state = State::Finished;
@@ -42,11 +41,12 @@ where
                     *state = State::AtMiddle;
                     deserialize_single(io::Cursor::new([peek]).chain(reader)).map(Some)
                 }
-            } else {
+            }
+            _ => {
                 *state = State::Failed;
                 Err(serde::de::Error::custom("expected `[`"))
             }
-        }
+        },
         State::AtMiddle => match read_skipping_ws(&mut reader)? {
             b',' => deserialize_single(reader).map(Some),
             b']' => {
@@ -58,8 +58,7 @@ where
                 Err(serde::de::Error::custom("expected `,` or `]`"))
             }
         },
-        State::Finished => Ok(None),
-        State::Failed => Ok(None),
+        State::Finished | State::Failed => Ok(None),
     }
 }
 
@@ -78,9 +77,10 @@ where
 fn read_skipping_ws(mut reader: impl io::Read) -> Result<u8> {
     loop {
         let mut byte = 0u8;
-        if let Err(io) = reader.read_exact(std::slice::from_mut(&mut byte)) {
-            return Err(Error::io(io));
-        }
+        reader
+            .read_exact(std::slice::from_mut(&mut byte))
+            .map_err(Error::io)?;
+
         if !byte.is_ascii_whitespace() {
             return Ok(byte);
         }

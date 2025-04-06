@@ -12,6 +12,7 @@
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
 use serde::ser::{SerializeSeq, Serializer};
+use serde::Serialize;
 use serde_json::Error;
 
 mod iterator;
@@ -20,7 +21,7 @@ mod type_de;
 mod type_ser;
 
 /// Represents an entry of the compilation database.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Entry {
     /// The main translation unit source processed by this compilation step.
     /// This is used by tools as the key into the compilation database.
@@ -36,6 +37,7 @@ pub struct Entry {
     pub directory: std::path::PathBuf,
     /// The name of the output created by this compilation step. This field is optional.
     /// It can be used to distinguish different processing modes of the same input file.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<std::path::PathBuf>,
 }
 
