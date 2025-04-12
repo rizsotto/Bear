@@ -81,7 +81,6 @@ impl OutputWriterImpl {
         // TODO: This method should fail early if the output file is not writable.
         match config {
             config::Output::Clang {
-                format,
                 sources,
                 duplicates,
                 ..
@@ -89,10 +88,9 @@ impl OutputWriterImpl {
                 let result = ClangOutputWriter {
                     output: PathBuf::from(&args.file_name),
                     append: args.append,
+                    formatter: output::formatter::EntryFormatter::new(),
                     source_filter: sources.clone(),
                     duplicate_filter: duplicates.clone(),
-                    command_as_array: format.command_as_array,
-                    formatter: From::from(format),
                 };
                 Ok(OutputWriterImpl::Clang(result))
             }
@@ -133,19 +131,15 @@ impl OutputWriter for SemanticOutputWriter {
 pub(crate) struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
+    formatter: output::formatter::EntryFormatter,
     source_filter: config::SourceFilter,
     duplicate_filter: config::DuplicateFilter,
-    command_as_array: bool,
-    formatter: output::formatter::EntryFormatter,
 }
 
 impl OutputWriter for ClangOutputWriter {
     /// Implements the main logic of the output writer.
-    fn run(
-        &self,
-        compiler_calls: impl Iterator<Item = semantic::CompilerCall>,
-    ) -> anyhow::Result<()> {
-        let entries = compiler_calls.flat_map(|compiler_call| self.formatter.apply(compiler_call));
+    fn run(&self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
+        let entries = semantics.flat_map(|semantic| self.formatter.apply(semantic));
         if self.append && self.output.exists() {
             let entries_from_db = Self::read_from_compilation_db(self.output.as_path())?;
             let final_entries = entries.chain(entries_from_db);
@@ -200,7 +194,7 @@ impl ClangOutputWriter {
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
         // Write the entries to the file.
-        output::clang::write(self.command_as_array, file, entries)
+        output::clang::write(file, entries)
             .with_context(|| format!("Failed to write entries: {:?}", file_name.as_path()))?;
         // Return the temporary file name.
         Ok(file_name)

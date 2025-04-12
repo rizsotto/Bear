@@ -1,32 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::output::clang::Entry;
-use crate::{config, semantic};
+use crate::semantic;
 use anyhow::anyhow;
-use path_absolutize::Absolutize;
-use std::borrow::Cow;
-use std::io;
 use std::path::{Path, PathBuf};
 
-pub struct EntryFormatter {
-    drop_output_field: bool,
-    path_format: config::PathFormat,
-}
-
-impl From<&config::Format> for EntryFormatter {
-    /// Create a formatter from the configuration.
-    fn from(config: &config::Format) -> Self {
-        let drop_output_field = config.drop_output_field;
-        let path_format = config.paths_as.clone();
-
-        Self {
-            drop_output_field,
-            path_format,
-        }
-    }
-}
+pub struct EntryFormatter {}
 
 impl EntryFormatter {
+    pub(crate) fn new() -> Self {
+        Self {}
+    }
+
     /// Convert the compiler calls into entries.
     ///
     /// The conversion is done by converting the compiler passes into entries.
@@ -39,7 +24,7 @@ impl EntryFormatter {
         } = compiler_call;
         passes
             .into_iter()
-            .map(|pass| self.try_convert_from_pass(&working_dir, &compiler, pass))
+            .map(|pass| Self::try_convert_from_pass(&working_dir, &compiler, pass))
             // We are here to log the error.
             .map(|result| result.map_err(|error| log::info!("{}", error)))
             .filter_map(Result::ok)
@@ -52,7 +37,6 @@ impl EntryFormatter {
     ///
     /// The file and directory paths are converted into fully qualified paths when required.
     fn try_convert_from_pass(
-        &self,
         working_dir: &Path,
         compiler: &Path,
         pass: semantic::CompilerPass,
@@ -65,22 +49,12 @@ impl EntryFormatter {
                 source,
                 output,
                 flags,
-            } => {
-                let output_clone = output.clone();
-                let output_result = match output.filter(|_| !self.drop_output_field) {
-                    None => None,
-                    Some(candidate) => {
-                        let x = self.format_path(candidate.as_path(), working_dir)?;
-                        Some(PathBuf::from(x))
-                    }
-                };
-                Ok(Entry {
-                    file: PathBuf::from(self.format_path(source.as_path(), working_dir)?),
-                    directory: working_dir.to_path_buf(),
-                    output: output_result,
-                    arguments: Self::format_arguments(compiler, &source, &flags, output_clone)?,
-                })
-            }
+            } => Ok(Entry {
+                file: source.clone(),
+                directory: working_dir.to_path_buf(),
+                output: output.clone(),
+                arguments: Self::format_arguments(compiler, &source, &flags, output)?,
+            }),
         }
     }
 
@@ -96,7 +70,7 @@ impl EntryFormatter {
         source: &Path,
         flags: &[String],
         output: Option<PathBuf>,
-    ) -> anyhow::Result<Vec<String>, anyhow::Error> {
+    ) -> anyhow::Result<Vec<String>> {
         let mut arguments: Vec<String> = vec![];
         // Assemble the arguments as it would be for a single source file.
         arguments.push(into_string(compiler)?);
@@ -109,23 +83,6 @@ impl EntryFormatter {
         }
         arguments.push(into_string(source)?);
         Ok(arguments)
-    }
-
-    fn format_path<'a>(&self, path: &'a Path, root: &Path) -> io::Result<Cow<'a, Path>> {
-        // Will compute the absolute path if needed.
-        let absolute = || {
-            if path.is_absolute() {
-                path.absolutize()
-            } else {
-                path.absolutize_from(root)
-            }
-        };
-
-        match self.path_format {
-            config::PathFormat::Original => Ok(Cow::from(path)),
-            config::PathFormat::Absolute => absolute(),
-            config::PathFormat::Canonical => absolute()?.canonicalize().map(Cow::from),
-        }
     }
 }
 
@@ -149,12 +106,7 @@ mod test {
             passes: vec![semantic::CompilerPass::Preprocess],
         };
 
-        let format = config::Format {
-            command_as_array: true,
-            drop_output_field: false,
-            paths_as: config::PathFormat::Original,
-        };
-        let sut: EntryFormatter = (&format).into();
+        let sut = EntryFormatter::new();
         let result = sut.apply(input);
 
         let expected: Vec<Entry> = vec![];
@@ -173,12 +125,7 @@ mod test {
             }],
         };
 
-        let format = config::Format {
-            command_as_array: true,
-            drop_output_field: false,
-            paths_as: config::PathFormat::Original,
-        };
-        let sut: EntryFormatter = (&format).into();
+        let sut = EntryFormatter::new();
         let result = sut.apply(input);
 
         let expected = vec![Entry {
@@ -192,64 +139,7 @@ mod test {
 
     #[test]
     fn test_multiple_sources_compilation() {
-        let input = compiler_call_with_multiple_passes();
-
-        let format = config::Format {
-            command_as_array: true,
-            drop_output_field: true,
-            paths_as: config::PathFormat::Original,
-        };
-        let sut: EntryFormatter = (&format).into();
-        let result = sut.apply(input);
-
-        let expected = vec![
-            Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("/tmp/source1.c"),
-                arguments: vec_of_strings!["clang", "-o", "./source1.o", "/tmp/source1.c"],
-                output: None,
-            },
-            Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("../source2.c"),
-                arguments: vec_of_strings!["clang", "-Wall", "../source2.c"],
-                output: None,
-            },
-        ];
-        assert_eq!(expected, result);
-    }
-
-    #[test]
-    fn test_multiple_sources_compilation_with_abs_paths() {
-        let input = compiler_call_with_multiple_passes();
-
-        let format = config::Format {
-            command_as_array: true,
-            drop_output_field: true,
-            paths_as: config::PathFormat::Absolute,
-        };
-        let sut: EntryFormatter = (&format).into();
-        let result = sut.apply(input);
-
-        let expected = vec![
-            Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("/tmp/source1.c"),
-                arguments: vec_of_strings!["clang", "-o", "./source1.o", "/tmp/source1.c"],
-                output: None,
-            },
-            Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("/home/source2.c"),
-                arguments: vec_of_strings!["clang", "-Wall", "../source2.c"],
-                output: None,
-            },
-        ];
-        assert_eq!(expected, result);
-    }
-
-    fn compiler_call_with_multiple_passes() -> semantic::CompilerCall {
-        semantic::CompilerCall {
+        let input = semantic::CompilerCall {
             compiler: PathBuf::from("clang"),
             working_dir: PathBuf::from("/home/user"),
             passes: vec![
@@ -265,6 +155,25 @@ mod test {
                     flags: vec_of_strings!["-Wall"],
                 },
             ],
-        }
+        };
+
+        let sut = EntryFormatter::new();
+        let result = sut.apply(input);
+
+        let expected = vec![
+            Entry {
+                directory: PathBuf::from("/home/user"),
+                file: PathBuf::from("/tmp/source1.c"),
+                arguments: vec_of_strings!["clang", "-o", "./source1.o", "/tmp/source1.c"],
+                output: Some(PathBuf::from("./source1.o")),
+            },
+            Entry {
+                directory: PathBuf::from("/home/user"),
+                file: PathBuf::from("../source2.c"),
+                arguments: vec_of_strings!["clang", "-Wall", "../source2.c"],
+                output: None,
+            },
+        ];
+        assert_eq!(expected, result);
     }
 }

@@ -18,7 +18,6 @@ use serde_json::Error;
 mod iterator;
 mod tests;
 mod type_de;
-mod type_ser;
 
 /// Represents an entry of the compilation database.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -46,46 +45,16 @@ pub fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, Er
     iterator::iter_json_array(reader)
 }
 
-/// The entries are written in the format specified by the configuration.
+/// Serialize entries from an iterator into a JSON array.
+///
+/// It uses the `arguments` field of the `Entry` struct to serialize the array of strings.
 pub fn write(
-    command_as_array: bool,
-    writer: impl std::io::Write,
-    entries: impl Iterator<Item = Entry>,
-) -> Result<(), Error> {
-    let method = if command_as_array {
-        write_with_arguments
-    } else {
-        write_with_command
-    };
-    method(writer, entries)
-}
-
-/// Serialize entries from an iterator into a JSON array.
-///
-/// It uses the `arguments` field of the `Entry` struct to serialize the array of strings.
-pub(super) fn write_with_arguments(
     writer: impl std::io::Write,
     entries: impl Iterator<Item = Entry>,
 ) -> Result<(), Error> {
     let mut ser = serde_json::Serializer::pretty(writer);
     let mut seq = ser.serialize_seq(None)?;
     for entry in entries {
-        seq.serialize_element(&entry)?;
-    }
-    seq.end()
-}
-
-/// Serialize entries from an iterator into a JSON array.
-///
-/// It uses the `arguments` field of the `Entry` struct to serialize the array of strings.
-pub(super) fn write_with_command(
-    writer: impl std::io::Write,
-    entries: impl Iterator<Item = Entry>,
-) -> Result<(), Error> {
-    let mut ser = serde_json::Serializer::pretty(writer);
-    let mut seq = ser.serialize_seq(None)?;
-    for entry in entries {
-        let entry = type_ser::EntryWithCommand::from(entry);
         seq.serialize_element(&entry)?;
     }
     seq.end()

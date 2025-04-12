@@ -165,7 +165,7 @@ mod success {
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());
-            let result = write_with_arguments(&mut buffer, input.into_iter());
+            let result = write(&mut buffer, input.into_iter());
             assert!(result.is_ok());
 
             // Use the fake "file" as input
@@ -173,24 +173,6 @@ mod success {
             let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_with_array_syntax(), content);
-
-            Ok(())
-        }
-
-        #[test]
-        fn save_with_string_command_syntax() -> Result<(), Error> {
-            let input = expected_values();
-
-            // Create fake "file"
-            let mut buffer = Cursor::new(Vec::new());
-            let result = write_with_command(&mut buffer, input.into_iter());
-            assert!(result.is_ok());
-
-            // Use the fake "file" as input
-            buffer.seek(SeekFrom::Start(0)).unwrap();
-            let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
-
-            assert_eq!(expected_with_string_syntax(), content);
 
             Ok(())
         }
@@ -276,12 +258,22 @@ mod success {
         }
 
         #[test]
+        fn load_content_with_string_command_syntax() {
+            let content = expected_with_string_syntax().to_string();
+
+            let result = read(content.as_bytes());
+            let entries: Vec<Entry> = result.map(|e| e.unwrap()).collect();
+
+            assert_eq!(expected_values(), entries);
+        }
+
+        #[test]
         fn save_with_array_command_syntax() -> Result<(), Error> {
             let input = expected_values();
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());
-            let result = write_with_arguments(&mut buffer, input.into_iter());
+            let result = write(&mut buffer, input.into_iter());
             assert!(result.is_ok());
 
             // Use the fake "file" as input
@@ -289,24 +281,6 @@ mod success {
             let content: Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_with_array_syntax(), content);
-
-            Ok(())
-        }
-
-        #[test]
-        fn save_with_string_command_syntax() -> Result<(), Error> {
-            let input = expected_values();
-
-            // Create fake "file"
-            let mut buffer = Cursor::new(Vec::new());
-            let result = write_with_command(&mut buffer, input.into_iter());
-            assert!(result.is_ok());
-
-            // Use the fake "file" as input
-            buffer.seek(SeekFrom::Start(0)).unwrap();
-            let content: Value = serde_json::from_reader(&mut buffer)?;
-
-            assert_eq!(expected_with_string_syntax(), content);
 
             Ok(())
         }

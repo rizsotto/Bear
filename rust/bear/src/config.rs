@@ -66,9 +66,9 @@
 //!       - file
 //!       - directory
 //!   format:
-//!     command_as_array: true
-//!     drop_output_field: false
-//!     paths_as: canonical
+//!     paths:
+//!       resolver: original
+//!       relative: false
 //! ```
 //!
 //! ```yaml
@@ -102,6 +102,16 @@ pub struct Main {
     pub intercept: Intercept,
     #[serde(default)]
     pub output: Output,
+}
+
+impl Default for Main {
+    fn default() -> Self {
+        Main {
+            schema: String::from(SUPPORTED_SCHEMA_VERSION),
+            intercept: Intercept::default(),
+            output: Output::default(),
+        }
+    }
 }
 
 impl Main {
@@ -181,16 +191,6 @@ impl Main {
         T: serde::de::DeserializeOwned,
     {
         serde_yml::from_reader(rdr)
-    }
-}
-
-impl Default for Main {
-    fn default() -> Self {
-        Main {
-            schema: String::from(SUPPORTED_SCHEMA_VERSION),
-            intercept: Intercept::default(),
-            output: Output::default(),
-        }
     }
 }
 
@@ -413,50 +413,43 @@ pub enum OutputFields {
 }
 
 /// Format configuration of the JSON compilation database.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Format {
-    #[serde(default = "default_enabled")]
-    pub command_as_array: bool,
-    #[serde(default = "default_disabled")]
-    pub drop_output_field: bool,
+    pub paths: PathFormat,
+}
+
+/// Format configuration of paths in the JSON compilation database.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+pub struct PathFormat {
     #[serde(default)]
-    pub paths_as: PathFormat,
+    pub resolver: PathResolver,
+    #[serde(default = "default_disabled")]
+    pub relative: bool,
 }
 
-impl Default for Format {
-    fn default() -> Self {
-        Format {
-            command_as_array: true,
-            drop_output_field: false,
-            paths_as: PathFormat::default(),
-        }
-    }
-}
-
-/// Path format configuration describes how the paths should be formatted.
+/// Path resolver configuration.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub enum PathFormat {
+pub enum PathResolver {
+    /// The original path is the path as it is passed to the compiler.
     #[serde(rename = "original", alias = "is")]
     Original,
+    /// The absolute path from the original path. Symlinks are not resolved.
     #[serde(rename = "absolute")]
     Absolute,
+    /// The canonical path is the absolute path with the symlinks resolved.
     #[serde(rename = "canonical")]
     Canonical,
 }
 
 /// The default path format is the original path.
-impl Default for PathFormat {
+impl Default for PathResolver {
     fn default() -> Self {
-        PathFormat::Original
+        PathResolver::Original
     }
 }
 
 fn default_disabled() -> bool {
     false
-}
-
-fn default_enabled() -> bool {
-    true
 }
 
 /// The default directory where the wrapper executables will be stored.
@@ -544,9 +537,9 @@ mod test {
               - file
               - directory
           format:
-            command_as_array: true
-            drop_output_field: false
-            paths_as: canonical
+            paths:
+              resolver: canonical
+              relative: false
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -617,9 +610,10 @@ mod test {
                     by_fields: vec![OutputFields::File, OutputFields::Directory],
                 },
                 format: Format {
-                    command_as_array: true,
-                    drop_output_field: false,
-                    paths_as: PathFormat::Canonical,
+                    paths: PathFormat {
+                        resolver: PathResolver::Canonical,
+                        relative: false,
+                    },
                 },
             },
             schema: String::from("4.0"),
@@ -646,8 +640,6 @@ mod test {
             by_fields:
               - file
               - directory
-          format:
-            command_as_array: true
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -668,9 +660,10 @@ mod test {
                     by_fields: vec![OutputFields::File, OutputFields::Directory],
                 },
                 format: Format {
-                    command_as_array: true,
-                    drop_output_field: false,
-                    paths_as: PathFormat::Original,
+                    paths: PathFormat {
+                        resolver: PathResolver::Original,
+                        relative: false,
+                    },
                 },
             },
             schema: String::from("4.0"),
@@ -726,9 +719,9 @@ mod test {
             by_fields:
               - file
           format:
-            command_as_array: true
-            drop_output_field: true
-            use_absolute_path: false
+            paths:
+              resolver: canonical
+              relative: true
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -768,9 +761,10 @@ mod test {
                     by_fields: vec![OutputFields::File],
                 },
                 format: Format {
-                    command_as_array: true,
-                    drop_output_field: true,
-                    paths_as: PathFormat::Original,
+                    paths: PathFormat {
+                        resolver: PathResolver::Canonical,
+                        relative: true,
+                    },
                 },
             },
             schema: String::from("4.0"),
