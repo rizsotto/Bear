@@ -55,6 +55,11 @@ compilation database.
 \--force-wrapper
 :   Force to use the compiler wrapper method of `intercept` command.
 
+\--enable-network-proxy
+:   Forward HTTP proxy environment variables (`http_proxy`, `https_proxy`,
+    `grpc_proxy` and their capitalized versions) to `intercept` command.
+    They are unset by default.
+
 # COMMANDS
 
 `bear-intercept(1)`

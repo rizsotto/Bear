@@ -54,6 +54,12 @@ Force to use the dynamic linker method of \f[C]intercept\f[R] command.
 .TP
 --force-wrapper
 Force to use the compiler wrapper method of \f[C]intercept\f[R] command.
+.TP
+--enable-network-proxy
+Forward HTTP proxy environment variables (\f[C]http_proxy\f[R],
+\f[C]https_proxy\f[R], \f[C]grpc_proxy\f[R] and their capitalized
+versions) to \f[C]intercept\f[R] command.
+They are unset by default.
 .SH COMMANDS
 .TP
 \f[B]\f[CB]bear-intercept(1)\f[B]\f[R]
