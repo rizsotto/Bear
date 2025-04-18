@@ -7,6 +7,49 @@
 //! are defined in the configuration this module is given.
 
 use crate::{config, semantic};
+use std::{io, path};
+use thiserror::Error;
+
+/// Responsible to transform the semantic of an executed command.
+pub trait Transformation: Send {
+    fn apply(&self, _: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error>;
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Transformation error: {0}")]
+    Transformation(String),
+    #[error("IO error: {0}")]
+    IO(#[from] io::Error),
+    #[error("Path manipulation error: {0}")]
+    Path(#[from] path::StripPrefixError),
+    #[error("Configuration instructed to filter out")]
+    FilteredOut,
+}
+
+#[derive(Debug, Error)]
+pub enum ConfigurationError {
+    #[error("Initialisation error: {0}")]
+    Initialisation(#[from] io::Error),
+    #[error("'Never' or 'Conditional' can't be used after 'Always' for path {0:?}")]
+    AfterAlways(path::PathBuf),
+    #[error("'Never' can't be used after 'Conditional' for path {0:?}")]
+    AfterConditional(path::PathBuf),
+    #[error("'Always' or 'Conditional' can't be used after 'Never' for path {0:?}")]
+    AfterNever(path::PathBuf),
+    #[error("'Always' can't be used multiple times for path {0:?}")]
+    MultipleAlways(path::PathBuf),
+    #[error("'Conditional' can't be used multiple times for path {0:?}")]
+    MultipleConditional(path::PathBuf),
+    #[error("'Never' can't be used multiple times for path {0:?}")]
+    MultipleNever(path::PathBuf),
+    #[error("'Always' can't be used with arguments for path {0:?}")]
+    AlwaysWithArguments(path::PathBuf),
+    #[error("'Conditional' can't be used without arguments for path {0:?}")]
+    ConditionalWithoutMatch(path::PathBuf),
+    #[error("'Never' can't be used with arguments for path {0:?}")]
+    NeverWithArguments(path::PathBuf),
+}
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
 pub struct FilterAndFormat {
@@ -14,8 +57,8 @@ pub struct FilterAndFormat {
     formatter: formatter::PathFormatter,
 }
 
-impl semantic::Transformation for FilterAndFormat {
-    fn apply(&self, input: semantic::CompilerCall) -> anyhow::Result<semantic::CompilerCall> {
+impl Transformation for FilterAndFormat {
+    fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
         let candidate = self.filter.apply(input)?;
         let formatted = self.formatter.apply(candidate)?;
         Ok(formatted)
@@ -23,7 +66,7 @@ impl semantic::Transformation for FilterAndFormat {
 }
 
 impl TryFrom<&config::Output> for FilterAndFormat {
-    type Error = anyhow::Error;
+    type Error = ConfigurationError;
 
     fn try_from(value: &config::Output) -> Result<Self, Self::Error> {
         match value {
@@ -34,7 +77,6 @@ impl TryFrom<&config::Output> for FilterAndFormat {
                 ..
             } => {
                 let filter = compilers.as_slice().try_into()?;
-
                 let formatter = if sources.only_existing_files {
                     (&format.paths).try_into()?
                 } else {
@@ -48,6 +90,7 @@ impl TryFrom<&config::Output> for FilterAndFormat {
                 Ok(FilterAndFormat { filter, formatter })
             }
             config::Output::Semantic { .. } => {
+                // This will do no filtering and no formatting.
                 let filter = filter::SemanticFilter::default();
                 let formatter = formatter::PathFormatter::default();
                 Ok(FilterAndFormat { filter, formatter })
@@ -67,7 +110,7 @@ mod formatter {
     //! file paths. In the current implementation, the `arguments` attribute is not
     //! transformed.
 
-    use crate::{config, semantic};
+    use super::*;
     use std::env;
     use std::path::{Path, PathBuf};
 
@@ -78,8 +121,8 @@ mod formatter {
         SkipFormat,
     }
 
-    impl semantic::Transformation for PathFormatter {
-        fn apply(&self, call: semantic::CompilerCall) -> anyhow::Result<semantic::CompilerCall> {
+    impl Transformation for PathFormatter {
+        fn apply(&self, call: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
             match self {
                 PathFormatter::SkipFormat => Ok(call),
                 PathFormatter::DoFormat(config, cwd) => call.format(config, cwd),
@@ -88,7 +131,7 @@ mod formatter {
     }
 
     impl TryFrom<&config::PathFormat> for PathFormatter {
-        type Error = anyhow::Error;
+        type Error = ConfigurationError;
 
         fn try_from(config: &config::PathFormat) -> Result<Self, Self::Error> {
             Ok(Self::DoFormat(config.clone(), env::current_dir()?))
@@ -96,7 +139,7 @@ mod formatter {
     }
 
     /// Compute the absolute path from the root directory if the path is relative.
-    fn absolute_to(root: &Path, path: &Path) -> anyhow::Result<PathBuf> {
+    fn absolute_to(root: &Path, path: &Path) -> Result<PathBuf, Error> {
         if path.is_absolute() {
             Ok(path.canonicalize()?)
         } else {
@@ -105,7 +148,7 @@ mod formatter {
     }
 
     /// Compute the relative path from the root directory.
-    fn relative_to(root: &Path, path: &Path) -> anyhow::Result<PathBuf> {
+    fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, Error> {
         // The implementation is naive; it assumes that the path is a child of the root.
         let relative_path = path.strip_prefix(root)?;
         Ok(relative_path.to_path_buf())
@@ -113,9 +156,12 @@ mod formatter {
 
     /// Convenient function to resolve the path based on the configuration.
     impl config::PathResolver {
-        fn resolve(&self, base: &Path, path: &Path) -> anyhow::Result<PathBuf> {
+        fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, Error> {
             match self {
-                config::PathResolver::Canonical => path.canonicalize().map_err(anyhow::Error::msg),
+                config::PathResolver::Canonical => {
+                    let result = path.canonicalize()?;
+                    Ok(result)
+                }
                 config::PathResolver::Relative => {
                     absolute_to(base, path).and_then(|p| relative_to(base, &p))
                 }
@@ -124,7 +170,7 @@ mod formatter {
     }
 
     impl semantic::CompilerCall {
-        pub fn format(self, config: &config::PathFormat, cwd: &Path) -> anyhow::Result<Self> {
+        pub fn format(self, config: &config::PathFormat, cwd: &Path) -> Result<Self, Error> {
             // The working directory is usually an absolute path.
             let working_dir = self.working_dir.canonicalize()?;
 
@@ -145,7 +191,7 @@ mod formatter {
             self,
             config: &config::PathFormat,
             working_dir: &Path,
-        ) -> anyhow::Result<Self> {
+        ) -> Result<Self, Error> {
             match self {
                 semantic::CompilerPass::Compile {
                     source,
@@ -156,7 +202,7 @@ mod formatter {
                     let output: Option<PathBuf> = output
                         .map(|candidate| config.output.resolve(working_dir, &candidate))
                         .transpose()?;
-                    Ok::<semantic::CompilerPass, anyhow::Error>(semantic::CompilerPass::Compile {
+                    Ok(semantic::CompilerPass::Compile {
                         source,
                         output,
                         flags,
@@ -169,8 +215,7 @@ mod formatter {
 }
 
 mod filter {
-    use crate::{config, semantic};
-    use anyhow::anyhow;
+    use super::*;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -184,8 +229,8 @@ mod filter {
         compilers: HashMap<PathBuf, Vec<config::Compiler>>,
     }
 
-    impl semantic::Transformation for SemanticFilter {
-        fn apply(&self, input: semantic::CompilerCall) -> anyhow::Result<semantic::CompilerCall> {
+    impl Transformation for SemanticFilter {
+        fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
             if let Some(configs) = self.compilers.get(&input.compiler) {
                 Self::apply_when_match_compiler(configs.as_slice(), input)
             } else {
@@ -204,7 +249,7 @@ mod filter {
         fn apply_when_match_compiler(
             configs: &[config::Compiler],
             input: semantic::CompilerCall,
-        ) -> anyhow::Result<semantic::CompilerCall> {
+        ) -> Result<semantic::CompilerCall, Error> {
             let mut current_input = Some(input);
 
             for config in configs {
@@ -234,7 +279,7 @@ mod filter {
                     break;
                 }
             }
-            current_input.ok_or(anyhow!("configuration instructed to filter out"))
+            current_input.ok_or(Error::FilteredOut)
         }
 
         /// Check if the compiler call matches the condition defined in the configuration.
@@ -292,15 +337,73 @@ mod filter {
     }
 
     impl TryFrom<&[config::Compiler]> for SemanticFilter {
-        type Error = anyhow::Error;
+        type Error = ConfigurationError;
 
+        /// Validate the configuration of the compiler list.
+        ///
+        /// The validation is done on the individual compiler configuration.
+        /// Duplicate paths are allowed in the list, but the semantic of the
+        /// configuration should be still consistent with the usage.
         fn try_from(config: &[config::Compiler]) -> Result<Self, Self::Error> {
+            use config::{Arguments, IgnoreOrConsider};
+
+            // Group the compilers by path.
             let mut compilers = HashMap::new();
             for compiler in config {
                 compilers
                     .entry(compiler.path.clone())
                     .or_insert_with(Vec::new)
                     .push(compiler.clone());
+            }
+            // Validate the configuration for each compiler path.
+            for (path, compilers) in &compilers {
+                let mut has_always = false;
+                let mut has_conditional = false;
+                let mut has_never = false;
+
+                for compiler in compilers {
+                    match compiler.ignore {
+                        // problems with the order of the configuration
+                        IgnoreOrConsider::Conditional if has_conditional => {
+                            return Err(ConfigurationError::MultipleConditional(path.clone()));
+                        }
+                        IgnoreOrConsider::Always if has_always => {
+                            return Err(ConfigurationError::MultipleAlways(path.clone()));
+                        }
+                        IgnoreOrConsider::Never if has_never => {
+                            return Err(ConfigurationError::MultipleNever(path.clone()));
+                        }
+                        IgnoreOrConsider::Always | IgnoreOrConsider::Never if has_conditional => {
+                            return Err(ConfigurationError::AfterConditional(path.clone()));
+                        }
+                        IgnoreOrConsider::Always | IgnoreOrConsider::Conditional if has_never => {
+                            return Err(ConfigurationError::AfterNever(path.clone()));
+                        }
+                        IgnoreOrConsider::Never | IgnoreOrConsider::Conditional if has_always => {
+                            return Err(ConfigurationError::AfterAlways(path.clone()));
+                        }
+                        // problems with the arguments
+                        IgnoreOrConsider::Always if compiler.arguments != Arguments::default() => {
+                            return Err(ConfigurationError::AlwaysWithArguments(path.clone()));
+                        }
+                        IgnoreOrConsider::Conditional if compiler.arguments.match_.is_empty() => {
+                            return Err(ConfigurationError::ConditionalWithoutMatch(path.clone()));
+                        }
+                        IgnoreOrConsider::Never if !compiler.arguments.match_.is_empty() => {
+                            return Err(ConfigurationError::NeverWithArguments(path.clone()));
+                        }
+                        // update the flags, no problems found
+                        IgnoreOrConsider::Conditional => {
+                            has_conditional = true;
+                        }
+                        IgnoreOrConsider::Always => {
+                            has_always = true;
+                        }
+                        IgnoreOrConsider::Never => {
+                            has_never = true;
+                        }
+                    }
+                }
             }
             Ok(Self { compilers })
         }
@@ -310,7 +413,8 @@ mod filter {
     mod tests {
         use super::*;
         use crate::config::{Arguments, Compiler, IgnoreOrConsider};
-        use crate::semantic::{CompilerCall, CompilerPass, Transformation};
+        use crate::semantic::transformation::Transformation;
+        use crate::semantic::{CompilerCall, CompilerPass};
         use std::path::PathBuf;
 
         #[test]
@@ -434,6 +538,139 @@ mod filter {
             let result = sut.unwrap().apply(input);
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), expected);
+        }
+
+        #[test]
+        fn test_semantic_filter_try_from_valid_configs() {
+            let valid_configs = vec![
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments::default(),
+                }],
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/clang"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments {
+                        add: vec!["-Wall".to_string()],
+                        remove: vec!["-O2".to_string()],
+                        ..Default::default()
+                    },
+                }],
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments::default(),
+                }],
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/clang"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-DDEBUG".to_string()],
+                        ..Default::default()
+                    },
+                }],
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/clang"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments {
+                        match_: vec!["-DDEBUG".to_string()],
+                        add: vec!["-Wall".to_string()],
+                        remove: vec!["-O2".to_string()],
+                    },
+                }],
+            ];
+
+            for config in valid_configs {
+                let result = SemanticFilter::try_from(config.as_slice());
+                assert!(
+                    result.is_ok(),
+                    "Expected valid configuration to pass: {:?}, {}",
+                    config,
+                    result.err().unwrap()
+                );
+            }
+        }
+
+        #[test]
+        fn test_semantic_filter_try_from_invalid_configs() {
+            let invalid_configs = vec![
+                // Multiple "Always" for the same path
+                vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Always,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Always,
+                        arguments: Arguments::default(),
+                    },
+                ],
+                // "Always" after "Never"
+                vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Never,
+                        arguments: Arguments::default(),
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Always,
+                        arguments: Arguments::default(),
+                    },
+                ],
+                // "Never" after "Conditional"
+                vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Conditional,
+                        arguments: Arguments {
+                            match_: vec!["-O2".to_string()],
+                            ..Default::default()
+                        },
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/gcc"),
+                        ignore: IgnoreOrConsider::Never,
+                        arguments: Arguments::default(),
+                    },
+                ],
+                // "Always" with arguments
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Always,
+                    arguments: Arguments {
+                        add: vec!["-Wall".to_string()],
+                        ..Default::default()
+                    },
+                }],
+                // "Conditional" without match arguments
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Conditional,
+                    arguments: Arguments::default(),
+                }],
+                // "Never" with match arguments
+                vec![Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    ignore: IgnoreOrConsider::Never,
+                    arguments: Arguments {
+                        match_: vec!["-O2".to_string()],
+                        ..Default::default()
+                    },
+                }],
+            ];
+
+            for config in invalid_configs {
+                let result = SemanticFilter::try_from(config.as_slice());
+                assert!(
+                    result.is_err(),
+                    "Expected invalid configuration to fail: {:?}",
+                    config
+                );
+            }
         }
     }
 }

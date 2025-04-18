@@ -79,15 +79,6 @@ impl<T> IntoIterator for Recognition<T> {
     }
 }
 
-/// Responsible to transform the semantic of an executed command.
-///
-/// It conditionally removes compiler calls based on compiler names or flags.
-/// It can also alter the compiler flags of the compiler calls. The actions
-/// are defined in the configuration this module is given.
-pub trait Transformation: Send {
-    fn apply(&self, _: CompilerCall) -> anyhow::Result<CompilerCall>;
-}
-
 /// Serialize compiler calls into a JSON array.
 pub fn serialize(
     writer: impl std::io::Write,

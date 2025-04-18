@@ -3,6 +3,7 @@
 use crate::intercept::Envelope;
 use crate::output::OutputWriter;
 use crate::semantic::interpreters::create_interpreter;
+use crate::semantic::transformation;
 use crate::semantic::transformation::FilterAndFormat;
 use crate::{args, config, output, semantic};
 use anyhow::Context;
@@ -13,7 +14,7 @@ use std::path::{Path, PathBuf};
 /// The semantic analysis that is independent of the event source.
 pub(super) struct SemanticAnalysisPipeline {
     interpreter: Box<dyn semantic::Interpreter>,
-    transformation: Box<dyn semantic::Transformation>,
+    transformation: Box<dyn transformation::Transformation>,
     output_writer: OutputWriterImpl,
 }
 
