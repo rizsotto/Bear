@@ -17,7 +17,7 @@
 //! - The configuration directory of the application.
 //!
 //! The configuration file content is validated against the schema version,
-//! syntax and semantic constraints. If the configuration file is invalid,
+//! syntax, and semantic constraints. If the configuration file is invalid,
 //! the application will exit with an error message explaining the issue.
 //!
 //! ```yaml
@@ -35,9 +35,9 @@
 //!   specification: clang
 //!   compilers:
 //!     - path: /usr/local/bin/cc
-//!       ignore: always
-//!     - path: /usr/bin/cc
 //!       ignore: never
+//!     - path: /usr/bin/cc
+//!       ignore: always
 //!     - path: /usr/bin/c++
 //!       ignore: conditional
 //!       arguments:
@@ -67,8 +67,9 @@
 //!       - directory
 //!   format:
 //!     paths:
-//!       resolver: original
-//!       relative: false
+//!       directory: canonical
+//!       file: canonical
+//!       output: canonical
 //! ```
 //!
 //! ```yaml
@@ -200,7 +201,7 @@ impl Main {
 /// The configuration for that is capturing the directory where the wrapper scripts are stored
 /// and the list of executables to wrap.
 ///
-/// In preload mode, the compiler is intercepted by a shared library that is preloaded before
+/// In preload mode, the compiler is intercepted by a shared library preloaded before
 /// the compiler is executed. The configuration for that is the path to the shared library.
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
 #[serde(tag = "mode")]
@@ -264,7 +265,7 @@ impl Default for Intercept {
 
 /// Output configuration is used to customize the output format.
 ///
-/// Allow to customize the output format of the compiler calls.
+/// Allow customizing the output format of the compiler calls.
 ///
 /// - Clang: Output the compiler calls in the clang project defined "JSON compilation database"
 ///   format. (The format is used by clang tooling and other tools based on that library.)
@@ -301,7 +302,7 @@ impl Default for Output {
 
 /// Represents instructions to transform the compiler calls.
 ///
-/// Allow to transform the compiler calls by adding or removing arguments.
+/// Allow transforming the compiler calls by adding or removing arguments.
 /// It also can instruct to filter out the compiler call from the output.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct Compiler {
@@ -314,31 +315,25 @@ pub struct Compiler {
 
 /// Represents instructions to ignore the compiler call.
 ///
-/// The meaning of the possible values are:
+/// The meaning of the possible values is:
 /// - Always: Always ignore the compiler call.
 /// - Never: Never ignore the compiler call. (Default)
 /// - Conditional: Ignore the compiler call if the arguments match.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub enum IgnoreOrConsider {
     #[serde(rename = "always", alias = "true")]
     Always,
+    #[default]
     #[serde(rename = "never", alias = "false")]
     Never,
     #[serde(rename = "conditional")]
     Conditional,
 }
 
-/// The default ignore mode is never ignore.
-impl Default for IgnoreOrConsider {
-    fn default() -> Self {
-        IgnoreOrConsider::Never
-    }
-}
-
 /// Argument lists to match, add or remove.
 ///
 /// The `match` field is used to specify the arguments to match. Can be used only with the
-/// conditional ignore mode.
+/// conditional mode.
 ///
 /// The `add` or `remove` fields are used to specify the arguments to add or remove. These can be
 /// used with the conditional or never ignore mode.
@@ -354,17 +349,26 @@ pub struct Arguments {
 
 /// Source filter configuration is used to filter the compiler calls based on the source files.
 ///
-/// Allow to filter the compiler calls based on the source files.
+/// Allow filtering the compiler calls based on the source files.
 ///
 /// - Include only existing files: can be true or false.
 /// - List of directories to include or exclude.
 ///   (The order of these entries will imply the order of evaluation.)
-#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct SourceFilter {
-    #[serde(default = "default_disabled")]
+    #[serde(default = "default_enabled")]
     pub only_existing_files: bool,
     #[serde(default)]
     pub paths: Vec<DirectoryFilter>,
+}
+
+impl Default for SourceFilter {
+    fn default() -> Self {
+        SourceFilter {
+            only_existing_files: true,
+            paths: vec![],
+        }
+    }
 }
 
 /// Directory filter configuration is used to filter the compiler calls based on
@@ -415,6 +419,7 @@ pub enum OutputFields {
 /// Format configuration of the JSON compilation database.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Format {
+    #[serde(default)]
     pub paths: PathFormat,
 }
 
@@ -422,34 +427,26 @@ pub struct Format {
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct PathFormat {
     #[serde(default)]
-    pub resolver: PathResolver,
-    #[serde(default = "default_disabled")]
-    pub relative: bool,
+    pub directory: PathResolver,
+    #[serde(default)]
+    pub file: PathResolver,
+    #[serde(default)]
+    pub output: PathResolver,
 }
 
-/// Path resolver configuration.
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub enum PathResolver {
-    /// The original path is the path as it is passed to the compiler.
-    #[serde(rename = "original", alias = "is")]
-    Original,
-    /// The absolute path from the original path. Symlinks are not resolved.
-    #[serde(rename = "absolute")]
-    Absolute,
-    /// The canonical path is the absolute path with the symlinks resolved.
+    /// The directory path will be resolved to the canonical path. (Default)
+    #[default]
     #[serde(rename = "canonical")]
     Canonical,
+    /// The directory path will be resolved to the relative path to the directory attribute.
+    #[serde(rename = "relative")]
+    Relative,
 }
 
-/// The default path format is the original path.
-impl Default for PathResolver {
-    fn default() -> Self {
-        PathResolver::Original
-    }
-}
-
-fn default_disabled() -> bool {
-    false
+fn default_enabled() -> bool {
+    true
 }
 
 /// The default directory where the wrapper executables will be stored.
@@ -538,8 +535,9 @@ mod test {
               - directory
           format:
             paths:
-              resolver: canonical
-              relative: false
+              directory: canonical
+              file: canonical
+              output: canonical
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -611,8 +609,9 @@ mod test {
                 },
                 format: Format {
                     paths: PathFormat {
-                        resolver: PathResolver::Canonical,
-                        relative: false,
+                        directory: PathResolver::Canonical,
+                        file: PathResolver::Canonical,
+                        output: PathResolver::Canonical,
                     },
                 },
             },
@@ -661,8 +660,9 @@ mod test {
                 },
                 format: Format {
                     paths: PathFormat {
-                        resolver: PathResolver::Original,
-                        relative: false,
+                        directory: PathResolver::Canonical,
+                        file: PathResolver::Canonical,
+                        output: PathResolver::Canonical,
                     },
                 },
             },
@@ -720,8 +720,9 @@ mod test {
               - file
           format:
             paths:
-              resolver: canonical
-              relative: true
+              directory: relative
+              file: relative
+              output: relative
         "#;
 
         let result = Main::from_reader(content).unwrap();
@@ -762,8 +763,9 @@ mod test {
                 },
                 format: Format {
                     paths: PathFormat {
-                        resolver: PathResolver::Canonical,
-                        relative: true,
+                        directory: PathResolver::Relative,
+                        file: PathResolver::Relative,
+                        output: PathResolver::Relative,
                     },
                 },
             },
@@ -781,7 +783,10 @@ mod test {
             intercept: Intercept::default(),
             output: Output::Clang {
                 compilers: vec![],
-                sources: SourceFilter::default(),
+                sources: SourceFilter {
+                    only_existing_files: true,
+                    paths: vec![],
+                },
                 duplicates: DuplicateFilter::default(),
                 format: Format::default(),
             },

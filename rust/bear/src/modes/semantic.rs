@@ -3,7 +3,7 @@
 use crate::intercept::Envelope;
 use crate::output::OutputWriter;
 use crate::semantic::interpreters::create_interpreter;
-use crate::semantic::transformation::Transformation;
+use crate::semantic::transformation::FilterAndFormat;
 use crate::{args, config, output, semantic};
 use anyhow::Context;
 use std::fs::{File, OpenOptions};
@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 /// The semantic analysis that is independent of the event source.
 pub(super) struct SemanticAnalysisPipeline {
     interpreter: Box<dyn semantic::Interpreter>,
-    transform: Box<dyn semantic::Transform>,
+    transformation: Box<dyn semantic::Transformation>,
     output_writer: OutputWriterImpl,
 }
 
@@ -21,12 +21,12 @@ impl SemanticAnalysisPipeline {
     /// Create a new semantic mode instance.
     pub(super) fn from(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
         let interpreter = create_interpreter(config);
-        let transform = Transformation::from(&config.output);
+        let transformation = FilterAndFormat::try_from(&config.output)?;
         let output_writer = OutputWriterImpl::create(&output, &config.output)?;
 
         Ok(Self {
             interpreter: Box::new(interpreter),
-            transform: Box::new(transform),
+            transformation: Box::new(transformation),
             output_writer,
         })
     }
@@ -44,7 +44,7 @@ impl SemanticAnalysisPipeline {
             .map(|envelope| envelope.event.execution)
             .flat_map(|execution| self.interpreter.recognize(&execution))
             .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
-            .flat_map(|semantic| self.transform.apply(semantic));
+            .flat_map(|semantic| self.transformation.apply(semantic));
         // Consume the entries and write them to the output file.
         // The exit code is based on the result of the output writer.
         self.output_writer.run(entries)

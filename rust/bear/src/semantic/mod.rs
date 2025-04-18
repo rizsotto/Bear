@@ -84,8 +84,8 @@ impl<T> IntoIterator for Recognition<T> {
 /// It conditionally removes compiler calls based on compiler names or flags.
 /// It can also alter the compiler flags of the compiler calls. The actions
 /// are defined in the configuration this module is given.
-pub trait Transform: Send {
-    fn apply(&self, _: CompilerCall) -> Option<CompilerCall>;
+pub trait Transformation: Send {
+    fn apply(&self, _: CompilerCall) -> anyhow::Result<CompilerCall>;
 }
 
 /// Serialize compiler calls into a JSON array.
