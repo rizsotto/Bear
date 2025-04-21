@@ -37,6 +37,35 @@ pub enum CompilerPass {
     },
 }
 
+#[cfg(test)]
+impl Clone for CompilerCall {
+    fn clone(&self) -> Self {
+        Self {
+            compiler: self.compiler.clone(),
+            working_dir: self.working_dir.clone(),
+            passes: self.passes.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Clone for CompilerPass {
+    fn clone(&self) -> Self {
+        match self {
+            CompilerPass::Preprocess => CompilerPass::Preprocess,
+            CompilerPass::Compile {
+                source,
+                output,
+                flags,
+            } => CompilerPass::Compile {
+                source: source.clone(),
+                output: output.clone(),
+                flags: flags.clone(),
+            },
+        }
+    }
+}
+
 /// Responsible to recognize the semantic of an executed command.
 ///
 /// The implementation can be responsible for a single compiler,

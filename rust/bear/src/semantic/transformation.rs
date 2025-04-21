@@ -149,9 +149,53 @@ mod formatter {
 
     /// Compute the relative path from the root directory.
     fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, Error> {
-        // The implementation is naive; it assumes that the path is a child of the root.
-        let relative_path = path.strip_prefix(root)?;
-        Ok(relative_path.to_path_buf())
+        // This is a naive implementation that assumes the root is
+        // on the same filesystem/volume as the path.
+        let mut root_components = root.components();
+        let mut path_components = path.components();
+
+        let mut remaining_root_components = Vec::new();
+        let mut remaining_path_components = Vec::new();
+
+        // Find the common prefix
+        loop {
+            let root_comp = root_components.next();
+            let path_comp = path_components.next();
+            match (root_comp, path_comp) {
+                (Some(root), Some(path)) if root != path => {
+                    remaining_root_components.push(root);
+                    remaining_root_components.extend(root_components);
+                    remaining_path_components.push(path);
+                    remaining_path_components.extend(path_components);
+                    break;
+                }
+                (Some(root), None) => {
+                    remaining_root_components.push(root);
+                    remaining_root_components.extend(root_components);
+                    break;
+                }
+                (None, Some(path)) => {
+                    remaining_path_components.push(path);
+                    remaining_path_components.extend(path_components);
+                    break;
+                }
+                (None, None) => break,
+                _ => continue,
+            }
+        }
+
+        // Count remaining components in the root to determine how many `..` are needed
+        let mut result = PathBuf::new();
+        for _ in remaining_root_components {
+            result.push("..");
+        }
+
+        // Add the remaining components of the path
+        for comp in remaining_path_components {
+            result.push(comp);
+        }
+
+        Ok(result)
     }
 
     /// Convenient function to resolve the path based on the configuration.
@@ -209,6 +253,208 @@ mod formatter {
                     })
                 }
                 _ => Ok(self),
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod formatter_tests {
+        use super::*;
+        use crate::config::{PathFormat, PathResolver};
+        use crate::semantic::{CompilerCall, CompilerPass};
+        use crate::vec_of_strings;
+        use std::fs;
+        use std::path::PathBuf;
+        use tempfile::tempdir;
+
+        #[test]
+        fn test_absolute_to() {
+            // The test creates a temporary directory and a file in it.
+            // Then it verifies that the absolute path of the file is correct.
+            //
+            // E.g., `/tmp/tmpdir/file.txt` is the absolute path of the file,
+            // if `/tmp/tmpdir` is the root directory and `file.txt` is the file.
+            let root_dir = tempdir().unwrap();
+            let root_dir_path = root_dir.path().canonicalize().unwrap();
+
+            let file_path = root_dir_path.join("file.txt");
+            fs::write(&file_path, "content").unwrap();
+
+            let file_relative_path = PathBuf::from("file.txt");
+
+            let result = absolute_to(&root_dir_path, &file_relative_path).unwrap();
+            assert_eq!(result, file_path);
+
+            let result = absolute_to(&root_dir_path, &file_path).unwrap();
+            assert_eq!(result, file_path);
+
+            let result = absolute_to(&root_dir_path, &root_dir_path).unwrap();
+            assert_eq!(result, root_dir_path);
+        }
+
+        #[test]
+        fn test_relative_to() {
+            // The test creates two temporary directories and a file in the first one.
+            // Then it verifies that the relative path from the second directory to the file
+            // in the first directory is correct.
+            //
+            // E.g., `../tmpdir/file.txt` is the relative path to the file,
+            // if `/tmp/tmpdir2` is the root directory and `/tmp/tmpdir/file.txt` is the file.
+            let a_dir = tempdir().unwrap();
+            let a_dir_path = a_dir.path().canonicalize().unwrap();
+            let a_dir_name = a_dir_path.file_name().unwrap();
+
+            let file_path = a_dir_path.join("file.txt");
+            fs::write(&file_path, "content").unwrap();
+
+            let b_dir = tempdir().unwrap();
+            let b_dir_path = b_dir.path().canonicalize().unwrap();
+
+            let result = relative_to(&b_dir_path, &file_path).unwrap();
+            assert_eq!(
+                result,
+                PathBuf::from("..").join(a_dir_name).join("file.txt")
+            );
+
+            let result = relative_to(&a_dir_path, &file_path).unwrap();
+            assert_eq!(result, PathBuf::from("file.txt"));
+        }
+
+        #[test]
+        fn test_path_resolver() {
+            let root_dir = tempdir().unwrap();
+            let root_dir_path = root_dir.path().canonicalize().unwrap();
+
+            let file_path = root_dir_path.join("file.txt");
+            fs::write(&file_path, "content").unwrap();
+
+            let resolver = PathResolver::Canonical;
+            let result = resolver.resolve(&root_dir_path, &file_path).unwrap();
+            assert_eq!(result, file_path);
+
+            let resolver = PathResolver::Relative;
+            let result = resolver.resolve(&root_dir_path, &file_path).unwrap();
+            assert_eq!(result, PathBuf::from("file.txt"));
+        }
+
+        #[test]
+        fn test_path_formatter_skip_format() {
+            let formatter = PathFormatter::SkipFormat;
+
+            let input = CompilerCall {
+                compiler: PathBuf::from("gcc"),
+                working_dir: PathBuf::from("/project"),
+                passes: vec![CompilerPass::Compile {
+                    source: PathBuf::from("main.c"),
+                    output: PathBuf::from("main.o").into(),
+                    flags: vec!["-O2".into()],
+                }],
+            };
+
+            let result = formatter.apply(input.clone());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), input);
+        }
+
+        #[test]
+        fn test_path_formatter_do_format() {
+            let source_dir = tempdir().unwrap();
+            let source_dir_path = source_dir.path().canonicalize().unwrap();
+            let source_dir_name = source_dir_path.file_name().unwrap();
+            let source_file_path = source_dir_path.join("main.c");
+            fs::write(&source_file_path, "int main() {}").unwrap();
+
+            let build_dir = tempdir().unwrap();
+            let build_dir_path = build_dir.path().canonicalize().unwrap();
+            let build_dir_name = build_dir_path.file_name().unwrap();
+            let output_file_path = build_dir_path.join("main.o");
+            fs::write(&output_file_path, "object").unwrap();
+
+            let execution_dir = tempdir().unwrap();
+            let execution_dir_path = execution_dir.path().canonicalize().unwrap();
+
+            // The entry contains compiler call with absolute paths.
+            let input = CompilerCall {
+                compiler: PathBuf::from("gcc"),
+                working_dir: build_dir_path.to_path_buf(),
+                passes: vec![CompilerPass::Compile {
+                    source: source_file_path.clone(),
+                    output: output_file_path.clone().into(),
+                    flags: vec_of_strings!["-O2"],
+                }],
+            };
+
+            {
+                let sut = PathFormatter::DoFormat(
+                    PathFormat {
+                        directory: PathResolver::Canonical,
+                        file: PathResolver::Canonical,
+                        output: PathResolver::Canonical,
+                    },
+                    execution_dir_path.to_path_buf(),
+                );
+
+                let expected = CompilerCall {
+                    compiler: input.compiler.clone(),
+                    working_dir: build_dir_path.clone(),
+                    passes: vec![CompilerPass::Compile {
+                        source: source_file_path.clone(),
+                        output: output_file_path.clone().into(),
+                        flags: vec_of_strings!["-O2"],
+                    }],
+                };
+
+                let result = sut.apply(input.clone());
+                assert!(result.is_ok());
+                assert_eq!(result.unwrap(), expected);
+            }
+            {
+                let sut = PathFormatter::DoFormat(
+                    PathFormat {
+                        directory: PathResolver::Canonical,
+                        file: PathResolver::Relative,
+                        output: PathResolver::Relative,
+                    },
+                    execution_dir_path.to_path_buf(),
+                );
+
+                let expected = CompilerCall {
+                    compiler: input.compiler.clone(),
+                    working_dir: build_dir_path.clone(),
+                    passes: vec![CompilerPass::Compile {
+                        source: PathBuf::from("..").join(source_dir_name).join("main.c"),
+                        output: PathBuf::from("main.o").into(),
+                        flags: vec_of_strings!["-O2"],
+                    }],
+                };
+
+                let result = sut.apply(input.clone());
+                assert!(result.is_ok());
+                assert_eq!(result.unwrap(), expected);
+            }
+            {
+                let sut = PathFormatter::DoFormat(
+                    PathFormat {
+                        directory: PathResolver::Relative,
+                        file: PathResolver::Relative,
+                        output: PathResolver::Relative,
+                    },
+                    execution_dir_path.to_path_buf(),
+                );
+
+                let expected = CompilerCall {
+                    compiler: input.compiler.clone(),
+                    working_dir: PathBuf::from("..").join(build_dir_name),
+                    passes: vec![CompilerPass::Compile {
+                        source: PathBuf::from("..").join(source_dir_name).join("main.c"),
+                        output: PathBuf::from("main.o").into(),
+                        flags: vec_of_strings!["-O2"],
+                    }],
+                };
+
+                let result = sut.apply(input.clone());
+                assert!(result.is_ok());
+                assert_eq!(result.unwrap(), expected);
             }
         }
     }
@@ -428,15 +674,7 @@ mod filter {
                 }],
                 working_dir: std::path::PathBuf::from("/project"),
             };
-            let expected = CompilerCall {
-                compiler: std::path::PathBuf::from("gcc"),
-                passes: vec![CompilerPass::Compile {
-                    source: PathBuf::from("main.c"),
-                    output: PathBuf::from("main.o").into(),
-                    flags: vec!["-O2".into()],
-                }],
-                working_dir: std::path::PathBuf::from("/project"),
-            };
+            let expected = input.clone();
 
             let compilers: Vec<Compiler> = vec![];
             let sut = SemanticFilter::try_from(compilers.as_slice());
