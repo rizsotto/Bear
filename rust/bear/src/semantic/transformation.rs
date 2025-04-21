@@ -49,6 +49,8 @@ pub enum ConfigurationError {
     ConditionalWithoutMatch(path::PathBuf),
     #[error("'Never' can't be used with arguments for path {0:?}")]
     NeverWithArguments(path::PathBuf),
+    #[error("Only relative paths for 'file' and 'output' when 'directory' is relative.")]
+    OnlyRelativePaths,
 }
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
@@ -134,6 +136,14 @@ mod formatter {
         type Error = ConfigurationError;
 
         fn try_from(config: &config::PathFormat) -> Result<Self, Self::Error> {
+            use config::PathResolver::Relative;
+
+            // When the directory is relative, the file and output must be relative too.
+            if config.directory == Relative
+                && (config.file != Relative || config.output != Relative)
+            {
+                return Err(ConfigurationError::OnlyRelativePaths);
+            }
             Ok(Self::DoFormat(config.clone(), env::current_dir()?))
         }
     }
@@ -456,6 +466,42 @@ mod formatter {
                 assert!(result.is_ok());
                 assert_eq!(result.unwrap(), expected);
             }
+        }
+
+        #[test]
+        fn test_path_formatter_try_from() {
+            // Valid configuration: Canonical paths
+            let config = PathFormat {
+                directory: PathResolver::Canonical,
+                file: PathResolver::Canonical,
+                output: PathResolver::Canonical,
+            };
+            let result = PathFormatter::try_from(&config);
+            assert!(result.is_ok());
+            assert!(matches!(result.unwrap(), PathFormatter::DoFormat(..)));
+
+            // Valid configuration: Relative paths
+            let config = PathFormat {
+                directory: PathResolver::Relative,
+                file: PathResolver::Relative,
+                output: PathResolver::Relative,
+            };
+            let result = PathFormatter::try_from(&config);
+            assert!(result.is_ok());
+            assert!(matches!(result.unwrap(), PathFormatter::DoFormat(..)));
+
+            // Invalid configuration: Relative directory with canonical file config
+            let config = PathFormat {
+                directory: PathResolver::Relative,
+                file: PathResolver::Canonical,
+                output: PathResolver::Relative,
+            };
+            let result = PathFormatter::try_from(&config);
+            assert!(result.is_err());
+            assert!(matches!(
+                result.err().unwrap(),
+                ConfigurationError::OnlyRelativePaths
+            ));
         }
     }
 }
