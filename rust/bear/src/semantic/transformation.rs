@@ -17,20 +17,16 @@ pub trait Transformation: Send {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Transformation error: {0}")]
-    Transformation(String),
-    #[error("IO error: {0}")]
-    IO(#[from] io::Error),
-    #[error("Path manipulation error: {0}")]
-    Path(#[from] path::StripPrefixError),
+    #[error("Path canonicalize failed: {0}")]
+    PathCanonicalize(#[from] io::Error),
+    #[error("Path {0} can't be relative to {1}")]
+    PathsCannotBeRelative(path::PathBuf, path::PathBuf),
     #[error("Configuration instructed to filter out")]
     FilteredOut,
 }
 
 #[derive(Debug, Error)]
 pub enum ConfigurationError {
-    #[error("Initialisation error: {0}")]
-    Initialisation(#[from] io::Error),
     #[error("'Never' or 'Conditional' can't be used after 'Always' for path {0:?}")]
     AfterAlways(path::PathBuf),
     #[error("'Never' can't be used after 'Conditional' for path {0:?}")]
@@ -51,6 +47,8 @@ pub enum ConfigurationError {
     NeverWithArguments(path::PathBuf),
     #[error("Only relative paths for 'file' and 'output' when 'directory' is relative.")]
     OnlyRelativePaths,
+    #[error("Getting current directory failed: {0}")]
+    CurrentWorkingDirectory(#[from] io::Error),
 }
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
@@ -197,12 +195,26 @@ mod formatter {
         // Count remaining components in the root to determine how many `..` are needed
         let mut result = PathBuf::new();
         for _ in remaining_root_components {
-            result.push("..");
+            result.push(path::Component::ParentDir);
         }
 
         // Add the remaining components of the path
         for comp in remaining_path_components {
-            result.push(comp);
+            // if comp is a Prefix or RootDir, signal error
+            match comp {
+                path::Component::Normal(_) | path::Component::ParentDir => {
+                    result.push(comp);
+                }
+                path::Component::CurDir => {
+                    // Ignore this (should not happen since we are working with absolute paths)
+                }
+                _ => {
+                    return Err(Error::PathsCannotBeRelative(
+                        path.to_path_buf(),
+                        root.to_path_buf(),
+                    ));
+                }
+            }
         }
 
         Ok(result)
