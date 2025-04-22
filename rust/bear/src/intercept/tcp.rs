@@ -236,7 +236,7 @@ mod tests {
             std::sync::LazyLock::new(|| {
                 vec![
                     Event {
-                        pid: pid(),
+                        pid: ProcessId(3425),
                         execution: Execution {
                             executable: PathBuf::from("/usr/bin/ls"),
                             arguments: vec_of_strings!["ls", "-l"],
@@ -245,7 +245,7 @@ mod tests {
                         },
                     },
                     Event {
-                        pid: pid(),
+                        pid: ProcessId(3492),
                         execution: Execution {
                             executable: PathBuf::from("/usr/bin/cc"),
                             arguments: vec_of_strings![
@@ -263,7 +263,7 @@ mod tests {
                         },
                     },
                     Event {
-                        pid: pid(),
+                        pid: ProcessId(3522),
                         execution: Execution {
                             executable: PathBuf::from("/usr/bin/ld"),
                             arguments: vec_of_strings!["ld", "-o", "./file_a", "./file_a.o"],
@@ -276,9 +276,5 @@ mod tests {
                     },
                 ]
             });
-
-        fn pid() -> ProcessId {
-            ProcessId(rand::random::<u32>())
-        }
     }
 }
