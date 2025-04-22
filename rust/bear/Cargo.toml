@@ -31,7 +31,6 @@ serde_json.workspace = true
 serde_yml.workspace = true
 clap.workspace = true
 directories.workspace = true
-chrono.workspace = true
 log.workspace = true
 env_logger.workspace = true
 shell-words.workspace = true

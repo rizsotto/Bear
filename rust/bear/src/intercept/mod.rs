@@ -52,30 +52,10 @@ pub trait Collector {
     ///
     /// The function returns when the collector is stopped. The collector is stopped
     /// when the `stop` method invoked (from another thread).
-    fn collect(&self, destination: Sender<Envelope>) -> Result<(), anyhow::Error>;
+    fn collect(&self, destination: Sender<Event>) -> Result<(), anyhow::Error>;
 
     /// Stops the collector.
     fn stop(&self) -> Result<(), anyhow::Error>;
-}
-
-/// Envelope is a wrapper around the event.
-///
-/// It contains the reporter id, the timestamp of the event and the event itself.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Envelope {
-    pub rid: ReporterId,
-    pub timestamp: u64,
-    pub event: Event,
-}
-
-impl fmt::Display for Envelope {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Envelope rid={}, timestamp={}, event={}",
-            self.rid.0, self.timestamp, self.event
-        )
-    }
 }
 
 /// Represent a relevant life cycle event of a process.
@@ -119,21 +99,13 @@ impl fmt::Display for Execution {
     }
 }
 
-/// Reporter id is a unique identifier for a reporter.
-///
-/// It is used to identify the process that sends the execution report.
-/// Because the OS PID is not unique across a single build (PIDs are
-/// recycled), we need to use a new unique identifier to identify the process.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ReporterId(pub u64);
-
-/// Process id is a OS identifier for a process.
+/// Process id is an OS identifier for a process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ProcessId(pub u32);
 
 /// The service is responsible for collecting the events from the supervised processes.
 ///
-/// The service is implemented as TCP server that listens on a random port on the loopback
+/// The service is implemented as a TCP server that listens to on a random port on the loopback
 /// interface. The address of the service can be obtained by the `address` method.
 ///
 /// The service is started in a separate thread to dispatch the events to the consumer.
@@ -153,7 +125,7 @@ impl CollectorService {
     /// The function is executed in a separate thread.
     pub fn new<F>(consumer: F) -> anyhow::Result<Self>
     where
-        F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
+        F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
         let collector = tcp::CollectorOnTcp::new()?;

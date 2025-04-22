@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::intercept::Envelope;
+use crate::intercept::Event;
 use crate::output::OutputWriter;
 use crate::semantic::interpreters::create_interpreter;
 use crate::semantic::transformation;
@@ -36,14 +36,13 @@ impl SemanticAnalysisPipeline {
     /// This implements the pipeline of the semantic analysis.
     pub(super) fn analyze_and_write(
         self,
-        envelopes: impl IntoIterator<Item = Envelope>,
+        envelopes: impl IntoIterator<Item = Event>,
     ) -> anyhow::Result<()> {
         // Set up the pipeline of compilation database entries.
         let entries = envelopes
             .into_iter()
-            .inspect(|envelope| log::debug!("envelope: {}", envelope))
-            .map(|envelope| envelope.event.execution)
-            .flat_map(|execution| self.interpreter.recognize(&execution))
+            .inspect(|event| log::debug!("event: {}", event))
+            .flat_map(|event| self.interpreter.recognize(&event.execution))
             .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
             .flat_map(|semantic| self.transformation.apply(semantic));
         // Consume the entries and write them to the output file.

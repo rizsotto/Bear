@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::intercept::{CollectorService, Envelope, InterceptEnvironment};
+use crate::intercept::{CollectorService, Event, InterceptEnvironment};
 use crate::{args, config};
 use anyhow::Context;
 use std::process::ExitCode;
@@ -17,7 +17,7 @@ impl BuildInterceptor {
     /// Create a new process execution interceptor.
     pub(super) fn new<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
     where
-        F: FnOnce(Receiver<Envelope>) -> anyhow::Result<()>,
+        F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
         let service = CollectorService::new(consumer)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::Envelope;
+use super::Event;
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use std::io;
@@ -9,7 +9,7 @@ use std::io;
 ///
 /// Returns an iterator over the build events.
 /// Any error will interrupt the reading process and the remaining events will be lost.
-pub fn read(reader: impl io::Read) -> impl Iterator<Item = Envelope> {
+pub fn read(reader: impl io::Read) -> impl Iterator<Item = Event> {
     let stream = StreamDeserializer::new(IoRead::new(reader));
     stream.filter_map(|result| match result {
         Ok(value) => Some(value),
@@ -26,10 +26,10 @@ pub fn read(reader: impl io::Read) -> impl Iterator<Item = Envelope> {
 /// Any error will interrupt the writing process and the file will be incomplete.
 pub fn write(
     mut writer: impl io::Write,
-    envelopes: impl IntoIterator<Item = Envelope>,
+    events: impl IntoIterator<Item = Event>,
 ) -> Result<(), anyhow::Error> {
-    for envelope in envelopes {
-        serde_json::to_writer(&mut writer, &envelope)?;
+    for event in events {
+        serde_json::to_writer(&mut writer, &event)?;
         writer.write_all(b"\n")?;
     }
     Ok(())
@@ -38,7 +38,7 @@ pub fn write(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::intercept::{Event, Execution, ProcessId, ReporterId};
+    use crate::intercept::{Event, Execution, ProcessId};
     use crate::vec_of_strings;
     use serde_json::json;
     use std::collections::HashMap;
@@ -58,7 +58,7 @@ mod test {
 
     #[test]
     fn read_write_empty() {
-        let events = Vec::<Envelope>::new();
+        let events = Vec::<Event>::new();
 
         let mut buffer = Vec::new();
         write(&mut buffer, events.iter().cloned()).unwrap();
@@ -71,33 +71,25 @@ mod test {
     #[test]
     fn read_stops_on_errors() {
         let line1 = json!({
-            "rid": 42,
-            "timestamp": 0,
-            "event": {
-                "pid": 11782,
-                "execution": {
-                    "executable": "/usr/bin/clang",
-                    "arguments": ["clang", "-c", "main.c"],
-                    "working_dir": "/home/user",
-                    "environment": {
-                        "PATH": "/usr/bin",
-                        "HOME": "/home/user"
-                    }
+            "pid": 11782,
+            "execution": {
+                "executable": "/usr/bin/clang",
+                "arguments": ["clang", "-c", "main.c"],
+                "working_dir": "/home/user",
+                "environment": {
+                    "PATH": "/usr/bin",
+                    "HOME": "/home/user"
                 }
             }
         });
         let line2 = json!({"rid": 42 });
         let line3 = json!({
-            "rid": 42,
-            "timestamp": 273,
-            "event": {
-                "pid": 11934,
-                "execution": {
-                    "executable": "/usr/bin/clang",
-                    "arguments": ["clang", "-c", "output.c"],
-                    "working_dir": "/home/user",
-                    "environment": {}
-                }
+            "pid": 11934,
+            "execution": {
+                "executable": "/usr/bin/clang",
+                "arguments": ["clang", "-c", "output.c"],
+                "working_dir": "/home/user",
+                "environment": {}
             }
         });
         let content = format!("{}\n{}\n{}\n", line1, line2, line3);
@@ -109,37 +101,27 @@ mod test {
         assert_eq!(expected_values()[0..1], read_events);
     }
 
-    const REPORTER_ID: ReporterId = ReporterId(42);
-
-    fn expected_values() -> Vec<Envelope> {
+    fn expected_values() -> Vec<Event> {
         vec![
-            Envelope {
-                rid: REPORTER_ID,
-                timestamp: 0,
-                event: Event {
-                    pid: ProcessId(11782),
-                    execution: Execution {
-                        executable: PathBuf::from("/usr/bin/clang"),
-                        arguments: vec_of_strings!["clang", "-c", "main.c"],
-                        working_dir: PathBuf::from("/home/user"),
-                        environment: HashMap::from([
-                            ("PATH".to_string(), "/usr/bin".to_string()),
-                            ("HOME".to_string(), "/home/user".to_string()),
-                        ]),
-                    },
+            Event {
+                pid: ProcessId(11782),
+                execution: Execution {
+                    executable: PathBuf::from("/usr/bin/clang"),
+                    arguments: vec_of_strings!["clang", "-c", "main.c"],
+                    working_dir: PathBuf::from("/home/user"),
+                    environment: HashMap::from([
+                        ("PATH".to_string(), "/usr/bin".to_string()),
+                        ("HOME".to_string(), "/home/user".to_string()),
+                    ]),
                 },
             },
-            Envelope {
-                rid: REPORTER_ID,
-                timestamp: 273,
-                event: Event {
-                    pid: ProcessId(11934),
-                    execution: Execution {
-                        executable: PathBuf::from("/usr/bin/clang"),
-                        arguments: vec_of_strings!["clang", "-c", "output.c"],
-                        working_dir: PathBuf::from("/home/user"),
-                        environment: HashMap::from([]),
-                    },
+            Event {
+                pid: ProcessId(11934),
+                execution: Execution {
+                    executable: PathBuf::from("/usr/bin/clang"),
+                    arguments: vec_of_strings!["clang", "-c", "output.c"],
+                    working_dir: PathBuf::from("/home/user"),
+                    environment: HashMap::from([]),
                 },
             },
         ]
