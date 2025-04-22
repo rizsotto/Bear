@@ -23,7 +23,7 @@ impl BuildInterceptor {
         let service = CollectorService::new(consumer)
             .with_context(|| "Failed to create the intercept service")?;
 
-        let environment = InterceptEnvironment::new(&config.intercept, service)
+        let environment = InterceptEnvironment::new(&config.intercept, &service)
             .with_context(|| "Failed to create the intercept environment")?;
 
         Ok(Self { environment })

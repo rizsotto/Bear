@@ -189,12 +189,10 @@ pub(crate) enum InterceptEnvironment {
     Wrapper {
         bin_dir: tempfile::TempDir,
         address: String,
-        collector: CollectorService,
     },
     Preload {
         path: PathBuf,
         address: String,
-        collector: CollectorService,
     },
 }
 
@@ -204,7 +202,7 @@ impl InterceptEnvironment {
     /// The `config` is the intercept configuration that specifies the mode and the
     /// required parameters for the mode. The `collector` is the service to collect
     /// the execution events.
-    pub fn new(config: &config::Intercept, collector: CollectorService) -> anyhow::Result<Self> {
+    pub fn new(config: &config::Intercept, collector: &CollectorService) -> anyhow::Result<Self> {
         let address = collector.address();
         let result = match config {
             config::Intercept::Wrapper {
@@ -217,16 +215,11 @@ impl InterceptEnvironment {
                 for executable in executables {
                     std::fs::hard_link(executable, path)?;
                 }
-                InterceptEnvironment::Wrapper {
-                    bin_dir,
-                    address,
-                    collector,
-                }
+                InterceptEnvironment::Wrapper { bin_dir, address }
             }
             config::Intercept::Preload { path } => InterceptEnvironment::Preload {
                 path: path.clone(),
                 address,
-                collector,
             },
         };
         Ok(result)
