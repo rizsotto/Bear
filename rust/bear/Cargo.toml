@@ -35,7 +35,6 @@ chrono.workspace = true
 log.workspace = true
 env_logger.workspace = true
 shell-words.workspace = true
-nom.workspace = true
 regex.workspace = true
 rand.workspace = true
 tempfile.workspace = true

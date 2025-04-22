@@ -8,7 +8,6 @@ use crate::config;
 use std::path::PathBuf;
 
 mod combinators;
-mod gcc;
 mod generic;
 mod ignore;
 mod matchers;
