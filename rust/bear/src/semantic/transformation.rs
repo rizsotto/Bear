@@ -44,7 +44,7 @@ pub enum FilterAndFormatError {
     #[error("Semantic filter configuration error: {0}")]
     FilterByCompiler(#[from] filter_by_compiler::ConfigurationError),
     #[error("Path formatter configuration error: {0}")]
-    PathFormatter(#[from] formatter::PathFormatterError),
+    PathFormatter(#[from] formatter::ConfigurationError),
 }
 
 impl TryFrom<&config::Output> for FilterAndFormat {
@@ -113,7 +113,7 @@ mod formatter {
     }
 
     #[derive(Debug, Error)]
-    pub enum PathFormatterError {
+    pub enum ConfigurationError {
         #[error("Only relative paths for 'file' and 'output' when 'directory' is relative.")]
         OnlyRelativePaths,
         #[error("Getting current directory failed: {0}")]
@@ -121,7 +121,7 @@ mod formatter {
     }
 
     impl TryFrom<&config::PathFormat> for PathFormatter {
-        type Error = PathFormatterError;
+        type Error = ConfigurationError;
 
         fn try_from(config: &config::PathFormat) -> Result<Self, Self::Error> {
             use config::PathResolver::Relative;
@@ -130,7 +130,7 @@ mod formatter {
             if config.directory == Relative
                 && (config.file != Relative || config.output != Relative)
             {
-                return Err(PathFormatterError::OnlyRelativePaths);
+                return Err(ConfigurationError::OnlyRelativePaths);
             }
             Ok(Self::DoFormat(config.clone(), env::current_dir()?))
         }
@@ -502,7 +502,7 @@ mod formatter {
             assert!(result.is_err());
             assert!(matches!(
                 result.err().unwrap(),
-                PathFormatterError::OnlyRelativePaths
+                ConfigurationError::OnlyRelativePaths
             ));
         }
     }
