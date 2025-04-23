@@ -36,18 +36,19 @@ impl SemanticAnalysisPipeline {
     /// This implements the pipeline of the semantic analysis.
     pub(super) fn analyze_and_write(
         self,
-        envelopes: impl IntoIterator<Item = Event>,
+        events: impl IntoIterator<Item = Event>,
     ) -> anyhow::Result<()> {
         // Set up the pipeline of compilation database entries.
-        let entries = envelopes
+        let semantics = events
             .into_iter()
             .inspect(|event| log::debug!("event: {}", event))
             .flat_map(|event| self.interpreter.recognize(&event.execution))
             .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
-            .flat_map(|semantic| self.transformation.apply(semantic));
+            .flat_map(|semantic| self.transformation.apply(semantic))
+            .inspect(|semantic| log::debug!("transformed: {:?}", semantic));
         // Consume the entries and write them to the output file.
         // The exit code is based on the result of the output writer.
-        self.output_writer.run(entries)
+        self.output_writer.run(semantics)
     }
 }
 
@@ -61,13 +62,10 @@ pub(crate) enum OutputWriterImpl {
 }
 
 impl OutputWriter for OutputWriterImpl {
-    fn run(
-        &self,
-        compiler_calls: impl Iterator<Item = semantic::CompilerCall>,
-    ) -> anyhow::Result<()> {
+    fn run(&self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
         match self {
-            OutputWriterImpl::Clang(writer) => writer.run(compiler_calls),
-            OutputWriterImpl::Semantic(writer) => writer.run(compiler_calls),
+            OutputWriterImpl::Clang(writer) => writer.run(semantics),
+            OutputWriterImpl::Semantic(writer) => writer.run(semantics),
         }
     }
 }
@@ -109,13 +107,13 @@ pub(crate) struct SemanticOutputWriter {
 }
 
 impl OutputWriter for SemanticOutputWriter {
-    fn run(&self, entries: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
+    fn run(&self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
         let file_name = &self.output;
         let file = File::create(file_name)
             .map(BufWriter::new)
             .with_context(|| format!("Failed to create file: {:?}", file_name.as_path()))?;
 
-        semantic::serialize(file, entries)?;
+        semantic::serialize(file, semantics)?;
 
         Ok(())
     }
