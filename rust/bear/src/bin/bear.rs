@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<ExitCode> {
     // Print the arguments.
     log::debug!("Arguments: {:?}", arguments);
     // Load the configuration.
-    let configuration = config::Main::load(&arguments.config)?;
+    let configuration = config::Loader::load(&arguments.config)?;
     log::debug!("Configuration: {:?}", configuration);
 
     // Run the application.
