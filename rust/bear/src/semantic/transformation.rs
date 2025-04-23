@@ -27,7 +27,7 @@ pub enum Error {
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
 pub struct FilterAndFormat {
-    filter: filter::SemanticFilter,
+    filter: filter_by_compiler::FilterByCompiler,
     formatter: formatter::PathFormatter,
 }
 
@@ -42,7 +42,7 @@ impl Transformation for FilterAndFormat {
 #[derive(Debug, Error)]
 pub enum FilterAndFormatError {
     #[error("Semantic filter configuration error: {0}")]
-    SemanticFilter(#[from] filter::SemanticFilterError),
+    FilterByCompiler(#[from] filter_by_compiler::ConfigurationError),
     #[error("Path formatter configuration error: {0}")]
     PathFormatter(#[from] formatter::PathFormatterError),
 }
@@ -73,7 +73,7 @@ impl TryFrom<&config::Output> for FilterAndFormat {
             }
             config::Output::Semantic { .. } => {
                 // This will do no filtering and no formatting.
-                let filter = filter::SemanticFilter::default();
+                let filter = filter_by_compiler::FilterByCompiler::default();
                 let formatter = formatter::PathFormatter::default();
                 Ok(FilterAndFormat { filter, formatter })
             }
@@ -508,7 +508,7 @@ mod formatter {
     }
 }
 
-mod filter {
+mod filter_by_compiler {
     use super::*;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -519,11 +519,11 @@ mod filter {
     /// The transformation groups the instructions by the compiler path, so it can be
     /// applied to the compiler call when it matches the path.
     #[derive(Default)]
-    pub struct SemanticFilter {
+    pub struct FilterByCompiler {
         compilers: HashMap<PathBuf, Vec<config::Compiler>>,
     }
 
-    impl Transformation for SemanticFilter {
+    impl Transformation for FilterByCompiler {
         fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
             if let Some(configs) = self.compilers.get(&input.compiler) {
                 Self::apply_when_match_compiler(configs.as_slice(), input)
@@ -533,7 +533,7 @@ mod filter {
         }
     }
 
-    impl SemanticFilter {
+    impl FilterByCompiler {
         /// Apply the transformation to the compiler call.
         ///
         /// Multiple configurations can be applied to the same compiler call.
@@ -631,7 +631,7 @@ mod filter {
     }
 
     #[derive(Debug, Error)]
-    pub enum SemanticFilterError {
+    pub enum ConfigurationError {
         #[error("'Never' or 'Conditional' can't be used after 'Always' for path {0:?}")]
         AfterAlways(path::PathBuf),
         #[error("'Never' can't be used after 'Conditional' for path {0:?}")]
@@ -652,8 +652,8 @@ mod filter {
         NeverWithArguments(path::PathBuf),
     }
 
-    impl TryFrom<&[config::Compiler]> for SemanticFilter {
-        type Error = SemanticFilterError;
+    impl TryFrom<&[config::Compiler]> for FilterByCompiler {
+        type Error = ConfigurationError;
 
         /// Validate the configuration of the compiler list.
         ///
@@ -681,32 +681,32 @@ mod filter {
                     match compiler.ignore {
                         // problems with the order of the configuration
                         IgnoreOrConsider::Conditional if has_conditional => {
-                            return Err(SemanticFilterError::MultipleConditional(path.clone()));
+                            return Err(ConfigurationError::MultipleConditional(path.clone()));
                         }
                         IgnoreOrConsider::Always if has_always => {
-                            return Err(SemanticFilterError::MultipleAlways(path.clone()));
+                            return Err(ConfigurationError::MultipleAlways(path.clone()));
                         }
                         IgnoreOrConsider::Never if has_never => {
-                            return Err(SemanticFilterError::MultipleNever(path.clone()));
+                            return Err(ConfigurationError::MultipleNever(path.clone()));
                         }
                         IgnoreOrConsider::Always | IgnoreOrConsider::Never if has_conditional => {
-                            return Err(SemanticFilterError::AfterConditional(path.clone()));
+                            return Err(ConfigurationError::AfterConditional(path.clone()));
                         }
                         IgnoreOrConsider::Always | IgnoreOrConsider::Conditional if has_never => {
-                            return Err(SemanticFilterError::AfterNever(path.clone()));
+                            return Err(ConfigurationError::AfterNever(path.clone()));
                         }
                         IgnoreOrConsider::Never | IgnoreOrConsider::Conditional if has_always => {
-                            return Err(SemanticFilterError::AfterAlways(path.clone()));
+                            return Err(ConfigurationError::AfterAlways(path.clone()));
                         }
                         // problems with the arguments
                         IgnoreOrConsider::Always if compiler.arguments != Arguments::default() => {
-                            return Err(SemanticFilterError::AlwaysWithArguments(path.clone()));
+                            return Err(ConfigurationError::AlwaysWithArguments(path.clone()));
                         }
                         IgnoreOrConsider::Conditional if compiler.arguments.match_.is_empty() => {
-                            return Err(SemanticFilterError::ConditionalWithoutMatch(path.clone()));
+                            return Err(ConfigurationError::ConditionalWithoutMatch(path.clone()));
                         }
                         IgnoreOrConsider::Never if !compiler.arguments.match_.is_empty() => {
-                            return Err(SemanticFilterError::NeverWithArguments(path.clone()));
+                            return Err(ConfigurationError::NeverWithArguments(path.clone()));
                         }
                         // update the flags, no problems found
                         IgnoreOrConsider::Conditional => {
@@ -747,7 +747,7 @@ mod filter {
             let expected = input.clone();
 
             let compilers: Vec<Compiler> = vec![];
-            let sut = SemanticFilter::try_from(compilers.as_slice());
+            let sut = FilterByCompiler::try_from(compilers.as_slice());
             assert!(sut.is_ok());
 
             let result = sut.unwrap().apply(input);
@@ -773,7 +773,7 @@ mod filter {
                 arguments: Arguments::default(),
             }];
 
-            let sut = SemanticFilter::try_from(compilers.as_slice());
+            let sut = FilterByCompiler::try_from(compilers.as_slice());
             assert!(sut.is_ok());
 
             let result = sut.unwrap().apply(input);
@@ -801,7 +801,7 @@ mod filter {
                 },
             }];
 
-            let sut = SemanticFilter::try_from(compilers.as_slice());
+            let sut = FilterByCompiler::try_from(compilers.as_slice());
             assert!(sut.is_ok());
 
             let result = sut.unwrap().apply(input);
@@ -840,7 +840,7 @@ mod filter {
                 },
             }];
 
-            let sut = SemanticFilter::try_from(compilers.as_slice());
+            let sut = FilterByCompiler::try_from(compilers.as_slice());
             assert!(sut.is_ok());
 
             let result = sut.unwrap().apply(input);
@@ -890,7 +890,7 @@ mod filter {
             ];
 
             for config in valid_configs {
-                let result = SemanticFilter::try_from(config.as_slice());
+                let result = FilterByCompiler::try_from(config.as_slice());
                 assert!(
                     result.is_ok(),
                     "Expected valid configuration to pass: {:?}, {}",
@@ -972,7 +972,7 @@ mod filter {
             ];
 
             for config in invalid_configs {
-                let result = SemanticFilter::try_from(config.as_slice());
+                let result = FilterByCompiler::try_from(config.as_slice());
                 assert!(
                     result.is_err(),
                     "Expected invalid configuration to fail: {:?}",
