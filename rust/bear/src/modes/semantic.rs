@@ -83,7 +83,9 @@ impl OutputWriterImpl {
                     output: PathBuf::from(&args.file_name),
                     append: args.append,
                     formatter: output::formatter::EntryFormatter::new(),
-                    duplicate_filter: duplicates.clone(),
+                    filter: output::filter_duplicates::DuplicateFilter::try_from(
+                        duplicates.clone(),
+                    )?,
                 };
                 Ok(OutputWriterImpl::Clang(result))
             }
@@ -125,7 +127,7 @@ pub(crate) struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
     formatter: output::formatter::EntryFormatter,
-    duplicate_filter: config::DuplicateFilter,
+    filter: output::filter_duplicates::DuplicateFilter,
 }
 
 impl OutputWriter for ClangOutputWriter {
@@ -149,15 +151,14 @@ impl ClangOutputWriter {
     /// Write the entries to the compilation database.
     ///
     /// The entries are written to a temporary file and then renamed to the final output.
-    /// This guaranties that the output file is always in a consistent state.
+    /// This ensures that the output file is always in a consistent state.
     fn write_into_compilation_db(
         &self,
         entries: impl Iterator<Item = output::clang::Entry>,
     ) -> anyhow::Result<()> {
         // Filter out the entries as per the configuration.
-        let mut duplicate_filter: output::filter::EntryPredicate =
-            From::from(&self.duplicate_filter);
-        let filtered_entries = entries.filter(move |entry| duplicate_filter(entry));
+        let mut filter = self.filter.clone();
+        let filtered_entries = entries.filter(move |entry| filter.unique(entry));
         // Write the entries to a temporary file.
         self.write_into_temporary_compilation_db(filtered_entries)
             .and_then(|temp| {
