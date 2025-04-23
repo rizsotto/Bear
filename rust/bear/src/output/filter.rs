@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::hash::Hash;
-use std::path::Path;
 
 use crate::config;
 use crate::output::clang::Entry;
@@ -13,28 +12,6 @@ use builder::EntryPredicateBuilder as Builder;
 /// If the predicate returns `true`, the entry is included in the result set.
 /// If the predicate returns `false`, the entry is excluded from the result set.
 pub type EntryPredicate = Box<dyn FnMut(&Entry) -> bool>;
-
-impl From<&config::SourceFilter> for EntryPredicate {
-    /// Create a filter from the configuration.
-    fn from(config: &config::SourceFilter) -> Self {
-        let source_exist_check = Builder::filter_by_source_existence(config.only_existing_files);
-
-        let mut source_path_checks = Builder::new();
-        for config::DirectoryFilter { path, ignore } in &config.paths {
-            let filter = Builder::filter_by_source_path(path);
-            match ignore {
-                config::Ignore::Always => {
-                    source_path_checks = source_path_checks & !filter;
-                }
-                config::Ignore::Never => {
-                    source_path_checks = source_path_checks & filter;
-                }
-            }
-        }
-
-        (source_exist_check & source_path_checks).build()
-    }
-}
 
 impl From<&config::DuplicateFilter> for EntryPredicate {
     /// Create a filter from the configuration.
@@ -77,23 +54,6 @@ mod builder {
         {
             Self {
                 candidate: Some(Box::new(predicate)),
-            }
-        }
-
-        /// Create a predicate that filters out entries
-        /// that are not using any of the given source paths.
-        pub(super) fn filter_by_source_path(path: &Path) -> Self {
-            let owned_path = path.to_owned();
-            Self::from(move |entry| entry.file.starts_with(owned_path.clone()))
-        }
-
-        /// Create a predicate that filters out entries
-        /// that source file does not exist.
-        pub(super) fn filter_by_source_existence(only_existing: bool) -> Self {
-            if only_existing {
-                Self::from(|entry| entry.file.is_file())
-            } else {
-                Self::new()
             }
         }
 
@@ -166,50 +126,6 @@ mod builder {
                 }
             }
             hasher.finish()
-        }
-    }
-
-    #[cfg(test)]
-    mod sources_test {
-        use super::*;
-        use crate::vec_of_strings;
-        use std::path::PathBuf;
-
-        #[test]
-        fn test_filter_by_source_paths() {
-            let input: Vec<Entry> = vec![
-                Entry {
-                    file: PathBuf::from("/home/user/project/source/source.c"),
-                    arguments: vec_of_strings!["cc", "-c", "source.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-                Entry {
-                    file: PathBuf::from("/home/user/project/test/source.c"),
-                    arguments: vec_of_strings!["cc", "-c", "test.c"],
-                    directory: PathBuf::from("/home/user/project"),
-                    output: None,
-                },
-            ];
-
-            let expected: Vec<Entry> = vec![input[0].clone()];
-
-            let config = config::SourceFilter {
-                only_existing_files: false,
-                paths: vec![
-                    config::DirectoryFilter {
-                        path: PathBuf::from("/home/user/project/source"),
-                        ignore: config::Ignore::Never,
-                    },
-                    config::DirectoryFilter {
-                        path: PathBuf::from("/home/user/project/test"),
-                        ignore: config::Ignore::Always,
-                    },
-                ],
-            };
-            let sut: EntryPredicate = From::from(&config);
-            let result: Vec<Entry> = input.into_iter().filter(sut).collect();
-            assert_eq!(result, expected);
         }
     }
 

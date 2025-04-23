@@ -78,16 +78,11 @@ impl OutputWriterImpl {
     ) -> anyhow::Result<OutputWriterImpl> {
         // TODO: This method should fail early if the output file is not writable.
         match config {
-            config::Output::Clang {
-                sources,
-                duplicates,
-                ..
-            } => {
+            config::Output::Clang { duplicates, .. } => {
                 let result = ClangOutputWriter {
                     output: PathBuf::from(&args.file_name),
                     append: args.append,
                     formatter: output::formatter::EntryFormatter::new(),
-                    source_filter: sources.clone(),
                     duplicate_filter: duplicates.clone(),
                 };
                 Ok(OutputWriterImpl::Clang(result))
@@ -130,7 +125,6 @@ pub(crate) struct ClangOutputWriter {
     output: PathBuf,
     append: bool,
     formatter: output::formatter::EntryFormatter,
-    source_filter: config::SourceFilter,
     duplicate_filter: config::DuplicateFilter,
 }
 
@@ -161,11 +155,9 @@ impl ClangOutputWriter {
         entries: impl Iterator<Item = output::clang::Entry>,
     ) -> anyhow::Result<()> {
         // Filter out the entries as per the configuration.
-        let mut source_filter: output::filter::EntryPredicate = From::from(&self.source_filter);
         let mut duplicate_filter: output::filter::EntryPredicate =
             From::from(&self.duplicate_filter);
-        let filtered_entries =
-            entries.filter(move |entry| source_filter(entry) && duplicate_filter(entry));
+        let filtered_entries = entries.filter(move |entry| duplicate_filter(entry));
         // Write the entries to a temporary file.
         self.write_into_temporary_compilation_db(filtered_entries)
             .and_then(|temp| {
