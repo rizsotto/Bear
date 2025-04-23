@@ -25,32 +25,6 @@ pub enum Error {
     FilteredOut,
 }
 
-#[derive(Debug, Error)]
-pub enum ConfigurationError {
-    #[error("'Never' or 'Conditional' can't be used after 'Always' for path {0:?}")]
-    AfterAlways(path::PathBuf),
-    #[error("'Never' can't be used after 'Conditional' for path {0:?}")]
-    AfterConditional(path::PathBuf),
-    #[error("'Always' or 'Conditional' can't be used after 'Never' for path {0:?}")]
-    AfterNever(path::PathBuf),
-    #[error("'Always' can't be used multiple times for path {0:?}")]
-    MultipleAlways(path::PathBuf),
-    #[error("'Conditional' can't be used multiple times for path {0:?}")]
-    MultipleConditional(path::PathBuf),
-    #[error("'Never' can't be used multiple times for path {0:?}")]
-    MultipleNever(path::PathBuf),
-    #[error("'Always' can't be used with arguments for path {0:?}")]
-    AlwaysWithArguments(path::PathBuf),
-    #[error("'Conditional' can't be used without arguments for path {0:?}")]
-    ConditionalWithoutMatch(path::PathBuf),
-    #[error("'Never' can't be used with arguments for path {0:?}")]
-    NeverWithArguments(path::PathBuf),
-    #[error("Only relative paths for 'file' and 'output' when 'directory' is relative.")]
-    OnlyRelativePaths,
-    #[error("Getting current directory failed: {0}")]
-    CurrentWorkingDirectory(#[from] io::Error),
-}
-
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
 pub struct FilterAndFormat {
     filter: filter::SemanticFilter,
@@ -65,8 +39,16 @@ impl Transformation for FilterAndFormat {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum FilterAndFormatError {
+    #[error("Semantic filter configuration error: {0}")]
+    SemanticFilter(#[from] filter::SemanticFilterError),
+    #[error("Path formatter configuration error: {0}")]
+    PathFormatter(#[from] formatter::PathFormatterError),
+}
+
 impl TryFrom<&config::Output> for FilterAndFormat {
-    type Error = ConfigurationError;
+    type Error = FilterAndFormatError;
 
     fn try_from(value: &config::Output) -> Result<Self, Self::Error> {
         match value {
@@ -130,8 +112,16 @@ mod formatter {
         }
     }
 
+    #[derive(Debug, Error)]
+    pub enum PathFormatterError {
+        #[error("Only relative paths for 'file' and 'output' when 'directory' is relative.")]
+        OnlyRelativePaths,
+        #[error("Getting current directory failed: {0}")]
+        CurrentWorkingDirectory(#[from] io::Error),
+    }
+
     impl TryFrom<&config::PathFormat> for PathFormatter {
-        type Error = ConfigurationError;
+        type Error = PathFormatterError;
 
         fn try_from(config: &config::PathFormat) -> Result<Self, Self::Error> {
             use config::PathResolver::Relative;
@@ -140,7 +130,7 @@ mod formatter {
             if config.directory == Relative
                 && (config.file != Relative || config.output != Relative)
             {
-                return Err(ConfigurationError::OnlyRelativePaths);
+                return Err(PathFormatterError::OnlyRelativePaths);
             }
             Ok(Self::DoFormat(config.clone(), env::current_dir()?))
         }
@@ -512,7 +502,7 @@ mod formatter {
             assert!(result.is_err());
             assert!(matches!(
                 result.err().unwrap(),
-                ConfigurationError::OnlyRelativePaths
+                PathFormatterError::OnlyRelativePaths
             ));
         }
     }
@@ -640,8 +630,30 @@ mod filter {
         }
     }
 
+    #[derive(Debug, Error)]
+    pub enum SemanticFilterError {
+        #[error("'Never' or 'Conditional' can't be used after 'Always' for path {0:?}")]
+        AfterAlways(path::PathBuf),
+        #[error("'Never' can't be used after 'Conditional' for path {0:?}")]
+        AfterConditional(path::PathBuf),
+        #[error("'Always' or 'Conditional' can't be used after 'Never' for path {0:?}")]
+        AfterNever(path::PathBuf),
+        #[error("'Always' can't be used multiple times for path {0:?}")]
+        MultipleAlways(path::PathBuf),
+        #[error("'Conditional' can't be used multiple times for path {0:?}")]
+        MultipleConditional(path::PathBuf),
+        #[error("'Never' can't be used multiple times for path {0:?}")]
+        MultipleNever(path::PathBuf),
+        #[error("'Always' can't be used with arguments for path {0:?}")]
+        AlwaysWithArguments(path::PathBuf),
+        #[error("'Conditional' can't be used without arguments for path {0:?}")]
+        ConditionalWithoutMatch(path::PathBuf),
+        #[error("'Never' can't be used with arguments for path {0:?}")]
+        NeverWithArguments(path::PathBuf),
+    }
+
     impl TryFrom<&[config::Compiler]> for SemanticFilter {
-        type Error = ConfigurationError;
+        type Error = SemanticFilterError;
 
         /// Validate the configuration of the compiler list.
         ///
@@ -669,32 +681,32 @@ mod filter {
                     match compiler.ignore {
                         // problems with the order of the configuration
                         IgnoreOrConsider::Conditional if has_conditional => {
-                            return Err(ConfigurationError::MultipleConditional(path.clone()));
+                            return Err(SemanticFilterError::MultipleConditional(path.clone()));
                         }
                         IgnoreOrConsider::Always if has_always => {
-                            return Err(ConfigurationError::MultipleAlways(path.clone()));
+                            return Err(SemanticFilterError::MultipleAlways(path.clone()));
                         }
                         IgnoreOrConsider::Never if has_never => {
-                            return Err(ConfigurationError::MultipleNever(path.clone()));
+                            return Err(SemanticFilterError::MultipleNever(path.clone()));
                         }
                         IgnoreOrConsider::Always | IgnoreOrConsider::Never if has_conditional => {
-                            return Err(ConfigurationError::AfterConditional(path.clone()));
+                            return Err(SemanticFilterError::AfterConditional(path.clone()));
                         }
                         IgnoreOrConsider::Always | IgnoreOrConsider::Conditional if has_never => {
-                            return Err(ConfigurationError::AfterNever(path.clone()));
+                            return Err(SemanticFilterError::AfterNever(path.clone()));
                         }
                         IgnoreOrConsider::Never | IgnoreOrConsider::Conditional if has_always => {
-                            return Err(ConfigurationError::AfterAlways(path.clone()));
+                            return Err(SemanticFilterError::AfterAlways(path.clone()));
                         }
                         // problems with the arguments
                         IgnoreOrConsider::Always if compiler.arguments != Arguments::default() => {
-                            return Err(ConfigurationError::AlwaysWithArguments(path.clone()));
+                            return Err(SemanticFilterError::AlwaysWithArguments(path.clone()));
                         }
                         IgnoreOrConsider::Conditional if compiler.arguments.match_.is_empty() => {
-                            return Err(ConfigurationError::ConditionalWithoutMatch(path.clone()));
+                            return Err(SemanticFilterError::ConditionalWithoutMatch(path.clone()));
                         }
                         IgnoreOrConsider::Never if !compiler.arguments.match_.is_empty() => {
-                            return Err(ConfigurationError::NeverWithArguments(path.clone()));
+                            return Err(SemanticFilterError::NeverWithArguments(path.clone()));
                         }
                         // update the flags, no problems found
                         IgnoreOrConsider::Conditional => {
