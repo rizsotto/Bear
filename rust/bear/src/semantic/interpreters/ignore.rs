@@ -5,20 +5,30 @@ use std::path::PathBuf;
 
 use super::super::{CompilerCall, Execution, Interpreter, Recognition};
 
+const COREUTILS_MESSAGE: &str = "coreutils executable";
+const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
+
 /// A tool to ignore a command execution by executable name.
 pub(super) struct IgnoreByPath {
     executables: HashSet<PathBuf>,
+    reason: String,
 }
 
 impl IgnoreByPath {
     pub(super) fn new() -> Self {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
-        Self { executables }
+        Self {
+            executables,
+            reason: COREUTILS_MESSAGE.into(),
+        }
     }
 
     pub(super) fn from(compilers: &[PathBuf]) -> Self {
         let executables = compilers.iter().cloned().collect();
-        Self { executables }
+        Self {
+            executables,
+            reason: COMPILER_MESSAGE.into(),
+        }
     }
 }
 
@@ -32,7 +42,7 @@ impl Default for IgnoreByPath {
 impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> Recognition<CompilerCall> {
         if self.executables.contains(&execution.executable) {
-            Recognition::Ignored
+            Recognition::Ignored(self.reason.clone())
         } else {
             Recognition::Unknown
         }
@@ -166,8 +176,9 @@ mod test {
             environment: HashMap::new(),
         };
         let sut = IgnoreByPath::new();
+        let result = sut.recognize(&input);
 
-        assert_eq!(Recognition::Ignored, sut.recognize(&input))
+        assert!(matches!(result, Recognition::Ignored(_)));
     }
 
     #[test]

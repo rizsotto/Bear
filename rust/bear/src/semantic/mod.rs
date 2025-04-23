@@ -89,7 +89,7 @@ pub enum Recognition<T> {
     /// The command was recognized and the semantic was identified.
     Success(T),
     /// The command was recognized, but the semantic was ignored.
-    Ignored,
+    Ignored(String),
     /// The command was recognized, but the semantic was broken.
     Error(String),
     /// The command was not recognized.

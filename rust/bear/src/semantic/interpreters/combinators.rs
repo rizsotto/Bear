@@ -86,7 +86,7 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognition::Ignored => assert!(true),
+            Recognition::Ignored(_) => assert!(true),
             _ => assert!(false),
         }
     }
@@ -121,8 +121,8 @@ mod test {
         fn recognize(&self, _: &Execution) -> Recognition<CompilerCall> {
             match self {
                 MockTool::Recognize => Recognition::Success(any_compiler_call()),
-                MockTool::RecognizeIgnored => Recognition::Ignored,
-                MockTool::RecognizeFailed => Recognition::Error(String::from("problem")),
+                MockTool::RecognizeIgnored => Recognition::Ignored("reason".into()),
+                MockTool::RecognizeFailed => Recognition::Error("problem".into()),
                 MockTool::NotRecognize => Recognition::Unknown,
             }
         }

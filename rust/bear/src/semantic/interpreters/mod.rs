@@ -127,9 +127,11 @@ mod test {
         let interpreter = create_interpreter(&config);
         let input = any_execution();
 
-        match interpreter.recognize(&input) {
-            Recognition::Ignored => assert!(true),
-            _ => assert!(false),
-        }
+        let result = interpreter.recognize(&input);
+
+        assert_eq!(
+            result,
+            Recognition::Ignored("compiler specified in config to ignore".into())
+        );
     }
 }
