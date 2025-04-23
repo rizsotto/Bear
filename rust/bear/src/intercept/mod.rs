@@ -203,8 +203,11 @@ impl InterceptEnvironment {
     /// required parameters for the mode. The `collector` is the service to collect
     /// the execution events.
     pub fn new(config: &config::Intercept, collector: &CollectorService) -> anyhow::Result<Self> {
+        // Validate the configuration.
+        let valid_config = config.validate()?;
+
         let address = collector.address();
-        let result = match config {
+        let result = match &valid_config {
             config::Intercept::Wrapper {
                 path,
                 directory,
@@ -297,5 +300,106 @@ impl InterceptEnvironment {
 
     fn path_to_string(path: &Path) -> String {
         path.to_str().unwrap_or("").to_string()
+    }
+}
+
+impl config::Intercept {
+    /// Validate the configuration of the intercept mode.
+    fn validate(&self) -> anyhow::Result<Self> {
+        match self {
+            config::Intercept::Wrapper {
+                path,
+                directory,
+                executables,
+            } => {
+                if Self::is_empty_path(path) {
+                    anyhow::bail!("The wrapper path cannot be empty.");
+                }
+                if Self::is_empty_path(directory) {
+                    anyhow::bail!("The wrapper directory cannot be empty.");
+                }
+                for executable in executables {
+                    if Self::is_empty_path(executable) {
+                        anyhow::bail!("The executable path cannot be empty.");
+                    }
+                }
+                Ok(self.clone())
+            }
+            config::Intercept::Preload { path } => {
+                if Self::is_empty_path(path) {
+                    anyhow::bail!("The preload library path cannot be empty.");
+                }
+                Ok(self.clone())
+            }
+        }
+    }
+
+    fn is_empty_path(path: &Path) -> bool {
+        path.to_str().is_some_and(|p| p.is_empty())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_validate_intercept_wrapper_valid() {
+        let sut = config::Intercept::Wrapper {
+            path: PathBuf::from("/usr/bin/wrapper"),
+            directory: PathBuf::from("/tmp"),
+            executables: vec![PathBuf::from("/usr/bin/cc")],
+        };
+        assert!(sut.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_intercept_wrapper_empty_path() {
+        let sut = config::Intercept::Wrapper {
+            path: PathBuf::from(""),
+            directory: PathBuf::from("/tmp"),
+            executables: vec![PathBuf::from("/usr/bin/cc")],
+        };
+        assert!(sut.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_intercept_wrapper_empty_directory() {
+        let sut = config::Intercept::Wrapper {
+            path: PathBuf::from("/usr/bin/wrapper"),
+            directory: PathBuf::from(""),
+            executables: vec![PathBuf::from("/usr/bin/cc")],
+        };
+        assert!(sut.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_intercept_wrapper_empty_executables() {
+        let sut = config::Intercept::Wrapper {
+            path: PathBuf::from("/usr/bin/wrapper"),
+            directory: PathBuf::from("/tmp"),
+            executables: vec![
+                PathBuf::from("/usr/bin/cc"),
+                PathBuf::from("/usr/bin/c++"),
+                PathBuf::from(""),
+            ],
+        };
+        assert!(sut.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_intercept_preload_valid() {
+        let sut = config::Intercept::Preload {
+            path: PathBuf::from("/usr/local/lib/libexec.so"),
+        };
+        assert!(sut.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_intercept_preload_empty_path() {
+        let sut = config::Intercept::Preload {
+            path: PathBuf::from(""),
+        };
+        assert!(sut.validate().is_err());
     }
 }
