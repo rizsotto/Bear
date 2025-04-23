@@ -6,46 +6,56 @@
 //! It can also alter the compiler flags of the compiler calls. The actions
 //! are defined in the configuration this module is given.
 
+use crate::config::PathFormat;
 use crate::{config, semantic};
-use std::{io, path};
+use std::io;
 use thiserror::Error;
 
 /// Responsible to transform the semantic of an executed command.
 pub trait Transformation: Send {
-    fn apply(&self, _: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error>;
-}
-
-#[derive(Debug, Error)]
-pub enum Error {
-    // FIXME: Should we report the path that failed?
-    #[error("Path canonicalize failed: {0}")]
-    PathCanonicalize(#[from] io::Error),
-    #[error("Path {0} can't be relative to {1}")]
-    PathsCannotBeRelative(path::PathBuf, path::PathBuf),
-    #[error("Configuration instructed to filter out")]
-    FilteredOut,
+    fn apply(&self, _: semantic::CompilerCall) -> semantic::Recognition<semantic::CompilerCall>;
 }
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
 pub struct FilterAndFormat {
-    filter: filter_by_compiler::FilterByCompiler,
-    formatter: formatter::PathFormatter,
+    format_canonical: formatter::PathFormatter,
+    filter_by_compiler: filter_by_compiler::FilterByCompiler,
+    filter_by_source: filter_by_source_dir::FilterBySourceDir,
+    format_by_config: formatter::PathFormatter,
 }
 
 impl Transformation for FilterAndFormat {
-    fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
-        let candidate = self.filter.apply(input)?;
-        let formatted = self.formatter.apply(candidate)?;
-        Ok(formatted)
+    fn apply(
+        &self,
+        input: semantic::CompilerCall,
+    ) -> semantic::Recognition<semantic::CompilerCall> {
+        // FIXME: this is ugly, but could not find a better way to do it.
+        //        The methods are returning different errors in `Result`.
+        //        While this method returns a `Recognition` enum.
+        match self.format_canonical.apply(input) {
+            Ok(candidate) => match self.filter_by_compiler.apply(candidate) {
+                Ok(candidate) => match self.filter_by_source.apply(candidate) {
+                    Ok(candidate) => match self.format_by_config.apply(candidate) {
+                        Ok(candidate) => semantic::Recognition::Success(candidate),
+                        Err(error) => semantic::Recognition::Error(error.to_string()),
+                    },
+                    Err(error) => semantic::Recognition::Ignored(error.to_string()),
+                },
+                Err(error) => semantic::Recognition::Ignored(error.to_string()),
+            },
+            Err(error) => semantic::Recognition::Error(error.to_string()),
+        }
     }
 }
 
 #[derive(Debug, Error)]
 pub enum FilterAndFormatError {
-    #[error("Semantic filter configuration error: {0}")]
-    FilterByCompiler(#[from] filter_by_compiler::ConfigurationError),
     #[error("Path formatter configuration error: {0}")]
     PathFormatter(#[from] formatter::ConfigurationError),
+    #[error("Compiler filter configuration error: {0}")]
+    FilterByCompiler(#[from] filter_by_compiler::ConfigurationError),
+    #[error("Source filter configuration error: {0}")]
+    FilterBySourceDir(#[from] filter_by_source_dir::ConfigurationError),
 }
 
 impl TryFrom<&config::Output> for FilterAndFormat {
@@ -59,24 +69,42 @@ impl TryFrom<&config::Output> for FilterAndFormat {
                 sources,
                 ..
             } => {
-                let filter = compilers.as_slice().try_into()?;
-                let formatter = if sources.only_existing_files {
-                    (&format.paths).try_into()?
+                if !sources.only_existing_files {
+                    log::warn!("Access to the filesystem is disabled in source filters.");
+                }
+                let format_canonical = if sources.only_existing_files {
+                    let canonical_config = PathFormat::default();
+                    formatter::PathFormatter::try_from(&canonical_config)?
                 } else {
-                    log::warn!(
-                        "The output formatting configuration is ignored. \
-                         Access to the filesystem is disabled in source filters."
-                    );
+                    formatter::PathFormatter::default()
+                };
+                let filter_by_compiler = compilers.as_slice().try_into()?;
+                let filter_by_source = sources.try_into()?;
+                let format_by_config = if sources.only_existing_files {
+                    formatter::PathFormatter::try_from(&format.paths)?
+                } else {
                     formatter::PathFormatter::default()
                 };
 
-                Ok(FilterAndFormat { filter, formatter })
+                Ok(FilterAndFormat {
+                    format_canonical,
+                    filter_by_compiler,
+                    filter_by_source,
+                    format_by_config,
+                })
             }
             config::Output::Semantic { .. } => {
-                // This will do no filtering and no formatting.
-                let filter = filter_by_compiler::FilterByCompiler::default();
-                let formatter = formatter::PathFormatter::default();
-                Ok(FilterAndFormat { filter, formatter })
+                let format_canonical = formatter::PathFormatter::default();
+                let filter_by_compiler = filter_by_compiler::FilterByCompiler::default();
+                let filter_by_source = filter_by_source_dir::FilterBySourceDir::default();
+                let format_by_config = formatter::PathFormatter::default();
+
+                Ok(FilterAndFormat {
+                    format_canonical,
+                    filter_by_compiler,
+                    filter_by_source,
+                    format_by_config,
+                })
             }
         }
     }
@@ -95,17 +123,25 @@ mod formatter {
 
     use super::*;
     use std::env;
-    use std::path::{Path, PathBuf};
+    use std::path;
 
     #[derive(Default, Debug)]
     pub enum PathFormatter {
-        DoFormat(config::PathFormat, PathBuf),
+        DoFormat(config::PathFormat, path::PathBuf),
         #[default]
         SkipFormat,
     }
+    #[derive(Debug, Error)]
+    pub enum Error {
+        // FIXME: Should we report the path that failed?
+        #[error("Path canonicalize failed: {0}")]
+        PathCanonicalize(#[from] io::Error),
+        #[error("Path {0} can't be relative to {1}")]
+        PathsCannotBeRelative(path::PathBuf, path::PathBuf),
+    }
 
-    impl Transformation for PathFormatter {
-        fn apply(&self, call: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+    impl PathFormatter {
+        pub fn apply(&self, call: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
             match self {
                 PathFormatter::SkipFormat => Ok(call),
                 PathFormatter::DoFormat(config, cwd) => call.format(config, cwd),
@@ -138,7 +174,7 @@ mod formatter {
     }
 
     /// Compute the absolute path from the root directory if the path is relative.
-    fn absolute_to(root: &Path, path: &Path) -> Result<PathBuf, Error> {
+    fn absolute_to(root: &path::Path, path: &path::Path) -> Result<path::PathBuf, Error> {
         if path.is_absolute() {
             Ok(path.canonicalize()?)
         } else {
@@ -147,7 +183,7 @@ mod formatter {
     }
 
     /// Compute the relative path from the root directory.
-    fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, Error> {
+    fn relative_to(root: &path::Path, path: &path::Path) -> Result<path::PathBuf, Error> {
         // This is a naive implementation that assumes the root is
         // on the same filesystem/volume as the path.
         let mut root_components = root.components();
@@ -184,7 +220,7 @@ mod formatter {
         }
 
         // Count remaining components in the root to determine how many `..` are needed
-        let mut result = PathBuf::new();
+        let mut result = path::PathBuf::new();
         for _ in remaining_root_components {
             result.push(path::Component::ParentDir);
         }
@@ -213,7 +249,7 @@ mod formatter {
 
     /// Convenient function to resolve the path based on the configuration.
     impl config::PathResolver {
-        fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, Error> {
+        fn resolve(&self, base: &path::Path, path: &path::Path) -> Result<path::PathBuf, Error> {
             match self {
                 config::PathResolver::Canonical => {
                     let result = path.canonicalize()?;
@@ -227,7 +263,7 @@ mod formatter {
     }
 
     impl semantic::CompilerCall {
-        pub fn format(self, config: &config::PathFormat, cwd: &Path) -> Result<Self, Error> {
+        pub fn format(self, config: &config::PathFormat, cwd: &path::Path) -> Result<Self, Error> {
             // The working directory is usually an absolute path.
             let working_dir = self.working_dir.canonicalize()?;
 
@@ -247,7 +283,7 @@ mod formatter {
         pub fn format(
             self,
             config: &config::PathFormat,
-            working_dir: &Path,
+            working_dir: &path::Path,
         ) -> Result<Self, Error> {
             match self {
                 semantic::CompilerPass::Compile {
@@ -256,7 +292,7 @@ mod formatter {
                     flags,
                 } => {
                     let source = config.file.resolve(working_dir, &source)?;
-                    let output: Option<PathBuf> = output
+                    let output: Option<path::PathBuf> = output
                         .map(|candidate| config.output.resolve(working_dir, &candidate))
                         .transpose()?;
                     Ok(semantic::CompilerPass::Compile {
@@ -517,29 +553,36 @@ mod filter_by_compiler {
     /// Transformation contains rearranged information from the configuration.
     ///
     /// The configuration is a list of instructions on how to transform the compiler call.
-    /// The transformation groups the instructions by the compiler path, so it can be
-    /// applied to the compiler call when it matches the path.
+    /// The transformations are grouped by the compiler path, so it can be applied to the
+    /// compiler call when it matches the path.
     #[derive(Default, Debug)]
     pub struct FilterByCompiler {
         compilers: HashMap<path::PathBuf, Vec<config::Compiler>>,
     }
 
-    impl Transformation for FilterByCompiler {
-        fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+    #[derive(Debug, Error)]
+    pub enum Error {
+        #[error("Configuration instructed to filter out")]
+        FilteredOut,
+    }
+
+    impl FilterByCompiler {
+        pub fn apply(
+            &self,
+            input: semantic::CompilerCall,
+        ) -> Result<semantic::CompilerCall, Error> {
             if let Some(configs) = self.compilers.get(&input.compiler) {
                 Self::apply_when_match_compiler(configs.as_slice(), input)
             } else {
                 Ok(input)
             }
         }
-    }
 
-    impl FilterByCompiler {
         /// Apply the transformation to the compiler call.
         ///
         /// Multiple configurations can be applied to the same compiler call.
         /// And depending on the instruction from the configuration, the compiler call
-        /// can be ignored, modified, or left unchanged. The conditional ignore will
+        /// can be ignored, modified, or left unchanged. The conditional ignoring will
         /// check if the compiler call matches the flags defined in the configuration.
         fn apply_when_match_compiler(
             configs: &[config::Compiler],
@@ -730,7 +773,6 @@ mod filter_by_compiler {
     mod tests {
         use super::*;
         use crate::config::{Arguments, Compiler, IgnoreOrConsider};
-        use crate::semantic::transformation::Transformation;
         use crate::semantic::{CompilerCall, CompilerPass};
         use std::path::PathBuf;
 
@@ -998,11 +1040,20 @@ mod filter_by_source_dir {
         filters: Vec<config::DirectoryFilter>,
     }
 
-    impl Transformation for FilterBySourceDir {
+    #[derive(Debug, Error)]
+    pub enum Error {
+        #[error("Configuration instructed to filter out")]
+        FilteredOut,
+    }
+
+    impl FilterBySourceDir {
         // FIXME: This is currently ignore the whole compiler call if any of the
         //        pass matches the filter. This should be changed to ignore only the
         //        pass that matches the filter.
-        fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+        pub fn apply(
+            &self,
+            input: semantic::CompilerCall,
+        ) -> Result<semantic::CompilerCall, Error> {
             // Check if the compiler call matches the source directory filter
             for filter in &self.filters {
                 // Check the source for each pass
@@ -1099,10 +1150,8 @@ mod filter_by_source_dir {
 
     #[cfg(test)]
     mod tests {
-        use super::super::Error;
-        use super::{ConfigurationError, FilterBySourceDir};
+        use super::{ConfigurationError, Error, FilterBySourceDir};
         use crate::config::{DirectoryFilter, Ignore, SourceFilter};
-        use crate::semantic::transformation::Transformation;
         use crate::semantic::{CompilerCall, CompilerPass};
         use std::path::PathBuf;
 
