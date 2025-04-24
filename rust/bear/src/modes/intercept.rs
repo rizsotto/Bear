@@ -11,6 +11,8 @@ use std::sync::mpsc::Receiver;
 /// the intercepted command executions.
 pub(super) struct BuildInterceptor {
     environment: InterceptEnvironment,
+    #[allow(dead_code)]
+    service: CollectorService,
 }
 
 impl BuildInterceptor {
@@ -26,7 +28,10 @@ impl BuildInterceptor {
         let environment = InterceptEnvironment::new(&config.intercept, &service)
             .with_context(|| "Failed to create the intercept environment")?;
 
-        Ok(Self { environment })
+        Ok(Self {
+            environment,
+            service,
+        })
     }
 
     /// Run the build command in the intercept environment.
