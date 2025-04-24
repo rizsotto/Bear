@@ -56,7 +56,7 @@ impl CollectorOnTcp {
     ///
     /// The collector listens to a random port on the loopback interface.
     /// The address of the collector can be obtained by the `address` method.
-    pub fn new() -> Result<Self, anyhow::Error> {
+    pub fn create() -> Result<Self, anyhow::Error> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
@@ -191,7 +191,7 @@ mod tests {
     // if they are the same as the original events.
     #[test]
     fn tcp_reporter_and_collectors_work() {
-        let collector = CollectorOnTcp::new().unwrap();
+        let collector = CollectorOnTcp::create().unwrap();
         let reporter = ReporterOnTcp::new(collector.address()).unwrap();
 
         // Create wrapper to share the collector across threads.

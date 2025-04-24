@@ -123,12 +123,12 @@ impl CollectorService {
     ///
     /// The `consumer` is a function that receives the events and processes them.
     /// The function is executed in a separate thread.
-    pub fn new<F>(consumer: F) -> anyhow::Result<Self>
+    pub fn create<F>(consumer: F) -> anyhow::Result<Self>
     where
         F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
-        let collector = tcp::CollectorOnTcp::new()?;
+        let collector = tcp::CollectorOnTcp::create()?;
         let collector_arc = Arc::new(collector);
         let (sender, receiver) = channel();
 
@@ -202,7 +202,10 @@ impl InterceptEnvironment {
     /// The `config` is the intercept configuration that specifies the mode and the
     /// required parameters for the mode. The `collector` is the service to collect
     /// the execution events.
-    pub fn new(config: &config::Intercept, collector: &CollectorService) -> anyhow::Result<Self> {
+    pub fn create(
+        config: &config::Intercept,
+        collector: &CollectorService,
+    ) -> anyhow::Result<Self> {
         // Validate the configuration.
         let valid_config = config.validate()?;
 

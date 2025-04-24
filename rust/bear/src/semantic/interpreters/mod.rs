@@ -21,7 +21,7 @@ mod matchers;
 //       Use the CC or CXX environment variables and make sure those are not excluded.
 //       Make sure the environment variables are passed to the method.
 // TODO: Take environment variables as input.
-pub fn create_interpreter<'a>(config: &config::Main) -> impl Interpreter + 'a {
+pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
     let compilers_to_include = match &config.intercept {
         config::Intercept::Wrapper { executables, .. } => executables.clone(),
         _ => vec![],
@@ -79,7 +79,7 @@ mod test {
     fn test_create_interpreter_with_default_config() {
         let config = config::Main::default();
 
-        let interpreter = create_interpreter(&config);
+        let interpreter = create(&config);
         let input = any_execution();
 
         match interpreter.recognize(&input) {
@@ -99,7 +99,7 @@ mod test {
             ..Default::default()
         };
 
-        let interpreter = create_interpreter(&config);
+        let interpreter = create(&config);
         let input = any_execution();
 
         match interpreter.recognize(&input) {
@@ -124,7 +124,7 @@ mod test {
             ..Default::default()
         };
 
-        let interpreter = create_interpreter(&config);
+        let interpreter = create(&config);
         let input = any_execution();
 
         let result = interpreter.recognize(&input);

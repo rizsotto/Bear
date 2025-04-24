@@ -49,15 +49,15 @@ impl Application {
         match args.mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept");
-                Intercept::from(input, output, config).map(Application::Intercept)
+                Intercept::create(input, output, config).map(Application::Intercept)
             }
             args::Mode::Semantic { input, output } => {
                 log::debug!("Mode: semantic analysis");
-                Semantic::from(input, output, config).map(Application::Semantic)
+                Semantic::create(input, output, config).map(Application::Semantic)
             }
             args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept and semantic analysis");
-                Combined::from(input, output, config).map(Application::Combined)
+                Combined::create(input, output, config).map(Application::Combined)
             }
         }
     }

@@ -2,7 +2,7 @@
 
 use crate::intercept::Event;
 use crate::output::OutputWriter;
-use crate::semantic::interpreters::create_interpreter;
+use crate::semantic::interpreters;
 use crate::semantic::transformation;
 use crate::semantic::transformation::FilterAndFormat;
 use crate::{args, config, output, semantic};
@@ -20,8 +20,11 @@ pub(super) struct SemanticAnalysisPipeline {
 
 impl SemanticAnalysisPipeline {
     /// Create a new semantic mode instance.
-    pub(super) fn from(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
-        let interpreter = create_interpreter(config);
+    pub(super) fn create(
+        output: args::BuildSemantic,
+        config: &config::Main,
+    ) -> anyhow::Result<Self> {
+        let interpreter = interpreters::create(config);
         let transformation = FilterAndFormat::try_from(&config.output)?;
         let output_writer = OutputWriterImpl::create(&output, &config.output)?;
 
@@ -136,7 +139,7 @@ impl OutputWriter for ClangOutputWriter {
         let entries = semantics.flat_map(|semantic| self.formatter.apply(semantic));
         if self.append && self.output.exists() {
             let entries_from_db = Self::read_from_compilation_db(self.output.as_path())?;
-            let final_entries = entries.chain(entries_from_db);
+            let final_entries = entries_from_db.chain(entries);
             self.write_into_compilation_db(final_entries)
         } else {
             if self.append {

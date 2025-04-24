@@ -3,7 +3,7 @@
 pub mod intercept;
 pub mod semantic;
 
-use crate::intercept::persistence::{read, write};
+use crate::intercept::persistence;
 use crate::modes::intercept::BuildInterceptor;
 use crate::modes::semantic::SemanticAnalysisPipeline;
 use crate::{args, config};
@@ -27,7 +27,7 @@ pub struct Intercept {
 
 impl Intercept {
     /// Create a new intercept mode instance.
-    pub fn from(
+    pub fn create(
         command: args::BuildCommand,
         output: args::BuildEvents,
         config: config::Main,
@@ -41,8 +41,9 @@ impl Intercept {
             .map(io::BufWriter::new)
             .with_context(|| format!("Failed to open file: {:?}", file_name))?;
 
-        let interceptor =
-            BuildInterceptor::new(config, move |envelopes| write(output_file, envelopes))?;
+        let interceptor = BuildInterceptor::create(config, move |events| {
+            persistence::write(output_file, events)
+        })?;
 
         Ok(Self {
             command,
@@ -70,7 +71,7 @@ pub struct Semantic {
 }
 
 impl Semantic {
-    pub fn from(
+    pub fn create(
         input: args::BuildEvents,
         output: args::BuildSemantic,
         config: config::Main,
@@ -82,7 +83,7 @@ impl Semantic {
             .map(BufReader::new)
             .with_context(|| format!("Failed to open file: {:?}", file_name))?;
 
-        let semantic = SemanticAnalysisPipeline::from(output, &config)?;
+        let semantic = SemanticAnalysisPipeline::create(output, &config)?;
 
         Ok(Self {
             event_file,
@@ -97,7 +98,7 @@ impl Mode for Semantic {
     /// The exit code is based on the result of the output writer.
     fn run(self) -> anyhow::Result<ExitCode> {
         self.semantic
-            .analyze_and_write(read(self.event_file))
+            .analyze_and_write(persistence::read(self.event_file))
             .map(|_| ExitCode::SUCCESS)
     }
 }
@@ -110,15 +111,14 @@ pub struct Combined {
 
 impl Combined {
     /// Create a new all mode instance.
-    pub fn from(
+    pub fn create(
         command: args::BuildCommand,
         output: args::BuildSemantic,
         config: config::Main,
     ) -> anyhow::Result<Self> {
-        let semantic = SemanticAnalysisPipeline::from(output, &config)?;
-        let interceptor = BuildInterceptor::new(config, move |envelopes| {
-            semantic.analyze_and_write(envelopes)
-        })?;
+        let semantic = SemanticAnalysisPipeline::create(output, &config)?;
+        let interceptor =
+            BuildInterceptor::create(config, move |events| semantic.analyze_and_write(events))?;
 
         Ok(Self {
             command,

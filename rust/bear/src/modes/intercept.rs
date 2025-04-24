@@ -17,15 +17,15 @@ pub(super) struct BuildInterceptor {
 
 impl BuildInterceptor {
     /// Create a new process execution interceptor.
-    pub(super) fn new<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
+    pub(super) fn create<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
     where
         F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
-        let service = CollectorService::new(consumer)
+        let service = CollectorService::create(consumer)
             .with_context(|| "Failed to create the intercept service")?;
 
-        let environment = InterceptEnvironment::new(&config.intercept, &service)
+        let environment = InterceptEnvironment::create(&config.intercept, &service)
             .with_context(|| "Failed to create the intercept environment")?;
 
         Ok(Self {
