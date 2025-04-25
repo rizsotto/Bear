@@ -3,8 +3,8 @@
 use crate::intercept::Event;
 use crate::output::OutputWriter;
 use crate::semantic::interpreters;
-use crate::semantic::transformation;
 use crate::semantic::transformation::FilterAndFormat;
+use crate::semantic::{transformation, Recognition};
 use crate::{args, config, output, semantic};
 use anyhow::Context;
 use std::fs::{File, OpenOptions};
@@ -42,16 +42,50 @@ impl SemanticAnalysisPipeline {
         events: impl IntoIterator<Item = Event>,
     ) -> anyhow::Result<()> {
         // Set up the pipeline of compilation database entries.
-        let semantics = events
-            .into_iter()
-            .inspect(|event| log::debug!("event: {}", event))
-            .flat_map(|event| self.interpreter.recognize(&event.execution))
-            .inspect(|semantic| log::debug!("semantic: {:?}", semantic))
-            .flat_map(|semantic| self.transformation.apply(semantic))
-            .inspect(|semantic| log::debug!("transformed: {:?}", semantic));
+        let semantics = events.into_iter().flat_map(|event| self.analyze(event));
         // Consume the entries and write them to the output file.
         // The exit code is based on the result of the output writer.
         self.output_writer.run(semantics)
+    }
+
+    pub(super) fn analyze(&self, event: Event) -> Option<semantic::CompilerCall> {
+        log::debug!("event: {}", event);
+        match self.interpreter.recognize(&event.execution) {
+            Recognition::Success(recognized) => {
+                log::debug!("recognized semantic: {:?}", recognized);
+                match self.transformation.apply(recognized) {
+                    Recognition::Success(transformed) => {
+                        log::debug!("transformed semantic: {:?}", transformed);
+                        Some(transformed)
+                    }
+                    Recognition::Error(error) => {
+                        log::debug!("transformation problem: {:?}", error);
+                        None
+                    }
+                    Recognition::Ignored(reason) => {
+                        log::debug!("transformation ignored: {:?}", reason);
+                        None
+                    }
+                    Recognition::Unknown => {
+                        // this never going to happen...
+                        log::debug!("transformation not recognized");
+                        None
+                    }
+                }
+            }
+            Recognition::Error(error) => {
+                log::debug!("recognition problem: {:?}", error);
+                None
+            }
+            Recognition::Ignored(reason) => {
+                log::debug!("ignored: {:?}", reason);
+                None
+            }
+            Recognition::Unknown => {
+                log::debug!("not recognized");
+                None
+            }
+        }
     }
 }
 
