@@ -19,8 +19,8 @@ mod json;
 
 use super::{args, config, intercept, semantic};
 use anyhow::Context;
-use serde::ser::SerializeSeq;
-use serde::Serializer;
+use serde_json::de::IoRead;
+use serde_json::StreamDeserializer;
 use std::{fs, io, path};
 use thiserror::Error;
 
@@ -29,8 +29,21 @@ use thiserror::Error;
 /// The file format in this project is usually a sequence of values. This trait
 /// provides a type-independent abstraction over the file format.
 pub trait FileFormat<T> {
-    fn write(self, _: impl Iterator<Item = T>) -> Result<(), Error>;
-    fn read(self) -> impl Iterator<Item = Result<T, Error>>;
+    fn write(_: impl io::Write, _: impl Iterator<Item = T>) -> Result<(), Error>;
+
+    fn read(_: impl io::Read) -> impl Iterator<Item = Result<T, Error>>;
+
+    /// Reads the entries from the file and ignores any errors.
+    /// This is not always feasible, when the file format is strict.
+    fn read_and_ignore(reader: impl io::Read, source: path::PathBuf) -> impl Iterator<Item = T> {
+        Self::read(reader).filter_map(move |result| match result {
+            Ok(value) => Some(value),
+            Err(error) => {
+                log::warn!("Failed to read entry: {:?} from {:?}", error, source);
+                None
+            }
+        })
+    }
 }
 
 #[derive(Debug, Error)]
@@ -48,21 +61,47 @@ pub enum Error {
 /// The format is a JSON array format, which is a sequence of JSON objects
 /// enclosed in square brackets. Each object represents a compilation
 /// command.
-/// 
+///
 /// # Note
 /// The format itself is defined in the LLVM project documentation.
 /// https://clang.llvm.org/docs/JSONCompilationDatabase.html
-pub trait JsonCompilationDatabase: FileFormat<clang::Entry> {}
+pub struct JsonCompilationDatabase;
+
+impl FileFormat<clang::Entry> for JsonCompilationDatabase {
+    fn write(
+        writer: impl io::Write,
+        entries: impl Iterator<Item = clang::Entry>,
+    ) -> Result<(), Error> {
+        json::write_array(writer, entries).map_err(Error::Json)
+    }
+
+    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, Error>> {
+        json::read_array(reader).map(|value| value.map_err(Error::Json))
+    }
+}
 
 /// The trait represents a JSON semantic database format.
-/// 
+///
 /// The format is a JSON array format, which is a sequence of JSON objects
 /// enclosed in square brackets. Each object represents a semantic analysis
 /// result.
 ///
 /// # Note
 /// The output format is not stable and may change in future versions.
-pub trait JsonSemanticDatabase: FileFormat<semantic::CompilerCall> {}
+pub struct JsonSemanticDatabase;
+
+impl FileFormat<semantic::CompilerCall> for JsonSemanticDatabase {
+    fn write(
+        writer: impl io::Write,
+        entries: impl Iterator<Item = semantic::CompilerCall>,
+    ) -> Result<(), Error> {
+        json::write_array(writer, entries).map_err(Error::Json)
+    }
+    fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::CompilerCall, Error>> {
+        // Not implemented! (No reader for the semantic output in this project.)
+        std::iter::empty()
+    }
+}
 
 /// The trait represents a database format for execution events.
 ///
@@ -71,7 +110,26 @@ pub trait JsonSemanticDatabase: FileFormat<semantic::CompilerCall> {}
 ///
 /// # Note
 /// The output format is not stable and may change in future versions.
-pub trait ExecutionEventDatabase: FileFormat<intercept::Event> {}
+pub struct ExecutionEventDatabase;
+
+impl FileFormat<intercept::Event> for ExecutionEventDatabase {
+    fn write(
+        writer: impl io::Write,
+        entries: impl Iterator<Item = intercept::Event>,
+    ) -> Result<(), Error> {
+        let mut writer = writer;
+        for entry in entries {
+            serde_json::to_writer(&mut writer, &entry).map_err(Error::Json)?;
+            writer.write_all(b"\n").map_err(Error::IO)?;
+        }
+        Ok(())
+    }
+
+    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<intercept::Event, Error>> {
+        let stream = StreamDeserializer::new(IoRead::new(reader));
+        stream.map(|value| value.map_err(Error::Json))
+    }
+}
 
 /// The trait represents a writer for iterator type `T`.
 ///
@@ -81,16 +139,16 @@ pub trait ExecutionEventDatabase: FileFormat<intercept::Event> {}
 pub trait IteratorWriter<T> {
     /// Writes the iterator as a sequence of elements.
     /// It consumes the iterator and returns either a nothing or an error.
-    fn write(self, _: impl Iterator<Item = T>) -> anyhow::Result<()>;
+    fn write_array(self, _: impl Iterator<Item = T>) -> anyhow::Result<()>;
 }
 
 /// Represents the output writer, which can handle different types of outputs.
 ///
 /// This enum provides two variants:
-/// - `Clang`: Handles output for Clang compilation databases.
-/// - `Semantic`: Handles output for semantic analysis results.
+/// - `Clang`: Writes output as a JSON compilation database.
+/// - `Semantic`: Writes output as a JSON semantic analysis result.
 ///
-/// The specific behavior of each variant is implemented in their respective types.
+/// The variants are selected at runtime based on the configuration provided.
 pub enum OutputWriter {
     #[allow(private_interfaces)]
     Clang(FormattedClangOutputWriter),
@@ -117,11 +175,14 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
     }
 }
 
-impl IteratorWriter<semantic::CompilerCall> for OutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
+impl OutputWriter {
+    pub(crate) fn write(
+        self,
+        semantics: impl Iterator<Item = semantic::CompilerCall>,
+    ) -> anyhow::Result<()> {
         match self {
-            Self::Clang(writer) => writer.write(semantics),
-            Self::Semantic(writer) => writer.write(semantics),
+            Self::Clang(writer) => writer.write_array(semantics),
+            Self::Semantic(writer) => writer.write_array(semantics),
         }
     }
 }
@@ -148,14 +209,11 @@ impl TryFrom<&path::Path> for SemanticOutputWriter {
 }
 
 impl IteratorWriter<semantic::CompilerCall> for SemanticOutputWriter {
-    // FIXME: this is the same method as `clang::write` for entries. Should be generalized?
-    fn write(self, entries: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
-        let mut ser = serde_json::Serializer::pretty(self.output);
-        let mut seq = ser.serialize_seq(None)?;
-        for entry in entries {
-            seq.serialize_element(&entry)?;
-        }
-        seq.end()?;
+    fn write_array(
+        self,
+        semantics: impl Iterator<Item = semantic::CompilerCall>,
+    ) -> anyhow::Result<()> {
+        JsonSemanticDatabase::write(self.output, semantics)?;
 
         Ok(())
     }
@@ -183,9 +241,12 @@ impl TryFrom<(&args::BuildSemantic, &config::DuplicateFilter)> for FormattedClan
 }
 
 impl IteratorWriter<semantic::CompilerCall> for FormattedClangOutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
+    fn write_array(
+        self,
+        semantics: impl Iterator<Item = semantic::CompilerCall>,
+    ) -> anyhow::Result<()> {
         let entries = semantics.flat_map(|semantic| self.formatter.apply(semantic));
-        self.writer.write(entries)
+        self.writer.write_array(entries)
     }
 }
 
@@ -225,13 +286,13 @@ impl TryFrom<(&args::BuildSemantic, &config::DuplicateFilter)> for AppendClangOu
 }
 
 impl IteratorWriter<clang::Entry> for AppendClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
+    fn write_array(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
         if let Some(path) = self.path {
             let entries_from_db = Self::read_from_compilation_db(&path)?;
             let final_entries = entries_from_db.chain(entries);
-            self.writer.write(final_entries)
+            self.writer.write_array(final_entries)
         } else {
-            self.writer.write(entries)
+            self.writer.write_array(entries)
         }
     }
 }
@@ -250,13 +311,7 @@ impl AppendClangOutputWriter {
             .map(io::BufReader::new)
             .with_context(|| format!("Failed to open file: {:?}", source))?;
 
-        let entries = clang::read(file).filter_map(move |candidate| match candidate {
-            Ok(entry) => Some(entry),
-            Err(error) => {
-                log::error!("Failed to read file: {:?}, reason: {}", source_copy, error);
-                None
-            }
-        });
+        let entries = JsonCompilationDatabase::read_and_ignore(file, source_copy);
         Ok(entries)
     }
 }
@@ -289,11 +344,11 @@ impl TryFrom<(&path::Path, &config::DuplicateFilter)> for AtomicClangOutputWrite
 }
 
 impl IteratorWriter<clang::Entry> for AtomicClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
+    fn write_array(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
         let temp_file_name = self.temp_file_name.clone();
         let final_file_name = self.final_file_name.clone();
 
-        self.writer.write(entries)?;
+        self.writer.write_array(entries)?;
 
         fs::rename(&temp_file_name, &final_file_name).with_context(|| {
             format!(
@@ -333,10 +388,10 @@ impl TryFrom<(&path::Path, &config::DuplicateFilter)> for ClangOutputWriter {
 }
 
 impl IteratorWriter<clang::Entry> for ClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
+    fn write_array(self, entries: impl Iterator<Item = clang::Entry>) -> anyhow::Result<()> {
         let mut filter = self.filter.clone();
         let filtered_entries = entries.filter(move |entry| filter.unique(entry));
-        clang::write(self.output, filtered_entries)?;
+        JsonCompilationDatabase::write(self.output, filtered_entries)?;
         Ok(())
     }
 }

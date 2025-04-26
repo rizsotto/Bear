@@ -14,7 +14,6 @@
 use crate::output::json;
 use serde::Serialize;
 use serde_json::Error;
-
 mod tests;
 mod type_de;
 

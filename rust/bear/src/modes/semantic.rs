@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::intercept::Event;
-use crate::output::IteratorWriter;
 use crate::semantic::interpreters;
 use crate::semantic::transformation::FilterAndFormat;
 use crate::semantic::{transformation, Recognition};
