@@ -17,11 +17,61 @@ pub mod filter_duplicates;
 pub mod formatter;
 mod json;
 
-use super::{args, config, semantic};
+use super::{args, config, intercept, semantic};
 use anyhow::Context;
 use serde::ser::SerializeSeq;
 use serde::Serializer;
 use std::{fs, io, path};
+use thiserror::Error;
+
+/// The trait represents a file format that can be written to and read from.
+///
+/// The file format in this project is usually a sequence of values. This trait
+/// provides a type-independent abstraction over the file format.
+pub trait FileFormat<T> {
+    fn write(self, _: impl Iterator<Item = T>) -> Result<(), Error>;
+    fn read(self) -> impl Iterator<Item = Result<T, Error>>;
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("Failed to open file: {0}")]
+    IO(#[from] io::Error),
+    #[error("Failed to serialize JSON: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error("Format error: {0}")]
+    Format(String),
+}
+
+/// The trait represents a JSON compilation database format.
+///
+/// The format is a JSON array format, which is a sequence of JSON objects
+/// enclosed in square brackets. Each object represents a compilation
+/// command.
+/// 
+/// # Note
+/// The format itself is defined in the LLVM project documentation.
+/// https://clang.llvm.org/docs/JSONCompilationDatabase.html
+pub trait JsonCompilationDatabase: FileFormat<clang::Entry> {}
+
+/// The trait represents a JSON semantic database format.
+/// 
+/// The format is a JSON array format, which is a sequence of JSON objects
+/// enclosed in square brackets. Each object represents a semantic analysis
+/// result.
+///
+/// # Note
+/// The output format is not stable and may change in future versions.
+pub trait JsonSemanticDatabase: FileFormat<semantic::CompilerCall> {}
+
+/// The trait represents a database format for execution events.
+///
+/// The format is a JSON line format, which is a sequence of JSON objects
+/// separated by newlines. https://jsonlines.org/
+///
+/// # Note
+/// The output format is not stable and may change in future versions.
+pub trait ExecutionEventDatabase: FileFormat<intercept::Event> {}
 
 /// The trait represents a writer for iterator type `T`.
 ///
