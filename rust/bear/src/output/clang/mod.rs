@@ -11,11 +11,10 @@
 //! as an array. The definition of the JSON compilation database files is done in the
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
-use serde::ser::{SerializeSeq, Serializer};
+use crate::output::json;
 use serde::Serialize;
 use serde_json::Error;
 
-mod iterator;
 mod tests;
 mod type_de;
 
@@ -42,7 +41,7 @@ pub struct Entry {
 
 /// Deserialize entries from a JSON array into an iterator.
 pub fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, Error>> {
-    iterator::iter_json_array(reader)
+    json::read_array(reader)
 }
 
 /// Serialize entries from an iterator into a JSON array.
@@ -52,10 +51,5 @@ pub fn write(
     writer: impl std::io::Write,
     entries: impl Iterator<Item = Entry>,
 ) -> Result<(), Error> {
-    let mut ser = serde_json::Serializer::pretty(writer);
-    let mut seq = ser.serialize_seq(None)?;
-    for entry in entries {
-        seq.serialize_element(&entry)?;
-    }
-    seq.end()
+    json::write_array(writer, entries)
 }

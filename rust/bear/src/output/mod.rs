@@ -15,6 +15,7 @@
 pub mod clang;
 pub mod filter_duplicates;
 pub mod formatter;
+mod json;
 
 use super::{args, config, semantic};
 use anyhow::Context;

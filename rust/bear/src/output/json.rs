@@ -1,15 +1,44 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Provides an iterator over a JSON array of objects.
+//! The module contains functions to serialize and deserialize JSON arrays.
 //!
-//! from https://github.com/serde-rs/json/issues/404#issuecomment-892957228
+//! The main objective is to provide a way to serialize and deserialize
+//! entries from an iterator into a JSON array and vice versa. Iterators
+//! allows us to process large datasets without loading everything into
+//! memory at once.
+//!
+//! The format these methods are producing is a JSON array of objects.
+//! It's *not* JSON lines format, which is a sequence of JSON objects
+//! separated by newlines.
 
 use std::io::{self, Read};
 
 use serde::de::DeserializeOwned;
+use serde::ser::{Serialize, SerializeSeq};
+use serde::Serializer;
 use serde_json::{Deserializer, Error, Result};
 
-pub fn iter_json_array<T, R>(mut reader: R) -> impl Iterator<Item = Result<T>>
+/// Serialize entries from an iterator into a JSON array.
+pub fn write_array<W, T>(
+    writer: W,
+    entries: impl Iterator<Item = T>,
+) -> std::result::Result<(), Error>
+where
+    W: io::Write,
+    T: Serialize,
+{
+    let mut ser = serde_json::Serializer::pretty(writer);
+    let mut seq = ser.serialize_seq(None)?;
+    for entry in entries {
+        seq.serialize_element(&entry)?;
+    }
+    seq.end()
+}
+
+/// Deserialize entries from a JSON array into an iterator.
+///
+/// from https://github.com/serde-rs/json/issues/404#issuecomment-892957228
+pub fn read_array<T, R>(mut reader: R) -> impl Iterator<Item = Result<T>>
 where
     T: DeserializeOwned,
     R: io::Read,
