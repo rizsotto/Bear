@@ -2,7 +2,6 @@
 
 pub mod args;
 pub mod config;
-mod fixtures;
 pub mod intercept;
 pub mod modes;
 pub mod output;

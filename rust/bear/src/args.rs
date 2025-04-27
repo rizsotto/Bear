@@ -197,7 +197,6 @@ pub fn cli() -> Command {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::vec_of_strings;
 
     #[test]
     fn test_intercept_call() {
@@ -219,13 +218,13 @@ mod test {
         assert_eq!(
             arguments,
             Arguments {
-                config: Some("~/bear.yaml".to_string()),
+                config: Some("~/bear.yaml".into()),
                 mode: Mode::Intercept {
                     input: BuildCommand {
-                        arguments: vec_of_strings!["make", "all"]
+                        arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildEvents {
-                        file_name: "custom.json".to_string()
+                        file_name: "custom.json".into()
                     },
                 },
             }
@@ -245,10 +244,10 @@ mod test {
                 config: None,
                 mode: Mode::Intercept {
                     input: BuildCommand {
-                        arguments: vec_of_strings!["make", "all"]
+                        arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildEvents {
-                        file_name: "events.json".to_string()
+                        file_name: "events.json".into()
                     },
                 },
             }
@@ -275,13 +274,13 @@ mod test {
         assert_eq!(
             arguments,
             Arguments {
-                config: Some("~/bear.yaml".to_string()),
+                config: Some("~/bear.yaml".into()),
                 mode: Mode::Semantic {
                     input: BuildEvents {
-                        file_name: "custom.json".to_string()
+                        file_name: "custom.json".into()
                     },
                     output: BuildSemantic {
-                        file_name: "result.json".to_string(),
+                        file_name: "result.json".into(),
                         append: true
                     },
                 },
@@ -302,10 +301,10 @@ mod test {
                 config: None,
                 mode: Mode::Semantic {
                     input: BuildEvents {
-                        file_name: "events.json".to_string()
+                        file_name: "events.json".into()
                     },
                     output: BuildSemantic {
-                        file_name: "compile_commands.json".to_string(),
+                        file_name: "compile_commands.json".into(),
                         append: false
                     },
                 },
@@ -336,10 +335,10 @@ mod test {
                 config: Some("~/bear.yaml".to_string()),
                 mode: Mode::Combined {
                     input: BuildCommand {
-                        arguments: vec_of_strings!["make", "all"]
+                        arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildSemantic {
-                        file_name: "result.json".to_string(),
+                        file_name: "result.json".into(),
                         append: true
                     },
                 },
@@ -360,10 +359,10 @@ mod test {
                 config: None,
                 mode: Mode::Combined {
                     input: BuildCommand {
-                        arguments: vec_of_strings!["make", "all"]
+                        arguments: vec!["make", "all"].into_iter().map(String::from).collect(),
                     },
                     output: BuildSemantic {
-                        file_name: "compile_commands.json".to_string(),
+                        file_name: "compile_commands.json".into(),
                         append: false
                     },
                 },

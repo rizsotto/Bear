@@ -226,54 +226,37 @@ mod tests {
     }
 
     mod fixtures {
+        use super::super::super::event;
         use super::*;
-        use crate::intercept::{Execution, ProcessId};
-        use crate::{map_of_strings, vec_of_strings};
         use std::collections::HashMap;
-        use std::path::PathBuf;
 
         pub(super) static EVENTS: std::sync::LazyLock<Vec<Event>> =
             std::sync::LazyLock::new(|| {
                 vec![
-                    Event {
-                        pid: ProcessId(3425),
-                        execution: Execution {
-                            executable: PathBuf::from("/usr/bin/ls"),
-                            arguments: vec_of_strings!["ls", "-l"],
-                            working_dir: PathBuf::from("/tmp"),
-                            environment: HashMap::new(),
-                        },
-                    },
-                    Event {
-                        pid: ProcessId(3492),
-                        execution: Execution {
-                            executable: PathBuf::from("/usr/bin/cc"),
-                            arguments: vec_of_strings![
-                                "cc",
-                                "-c",
-                                "./file_a.c",
-                                "-o",
-                                "./file_a.o"
-                            ],
-                            working_dir: PathBuf::from("/home/user"),
-                            environment: map_of_strings! {
-                                "PATH" => "/usr/bin:/bin",
-                                "HOME" => "/home/user",
-                            },
-                        },
-                    },
-                    Event {
-                        pid: ProcessId(3522),
-                        execution: Execution {
-                            executable: PathBuf::from("/usr/bin/ld"),
-                            arguments: vec_of_strings!["ld", "-o", "./file_a", "./file_a.o"],
-                            working_dir: PathBuf::from("/opt/project"),
-                            environment: map_of_strings! {
-                                "PATH" => "/usr/bin:/bin",
-                                "LD_LIBRARY_PATH" => "/usr/lib:/lib",
-                            },
-                        },
-                    },
+                    event(
+                        3425,
+                        "/usr/bin/ls",
+                        vec!["ls", "-l"],
+                        "/tmp",
+                        HashMap::new(),
+                    ),
+                    event(
+                        3492,
+                        "/usr/bin/cc",
+                        vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
+                        "/home/user",
+                        HashMap::from([("PATH", "/usr/bin:/bin"), ("HOME", "/home/user")]),
+                    ),
+                    event(
+                        3522,
+                        "/usr/bin/ld",
+                        vec!["ld", "-o", "./file_a", "./file_a.o"],
+                        "/opt/project",
+                        HashMap::from([
+                            ("PATH", "/usr/bin:/bin"),
+                            ("LD_LIBRARY_PATH", "/usr/lib:/lib"),
+                        ]),
+                    ),
                 ]
             });
     }

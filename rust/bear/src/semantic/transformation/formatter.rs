@@ -198,7 +198,6 @@ mod formatter_tests {
     use super::*;
     use crate::config::{PathFormat, PathResolver};
     use crate::semantic::{CompilerCall, CompilerPass};
-    use crate::vec_of_strings;
     use std::fs;
     use std::path::PathBuf;
     use tempfile::tempdir;
@@ -316,7 +315,7 @@ mod formatter_tests {
             passes: vec![CompilerPass::Compile {
                 source: source_file_path.clone(),
                 output: output_file_path.clone().into(),
-                flags: vec_of_strings!["-O2"],
+                flags: vec!["-O2".into()],
             }],
         };
 
@@ -336,7 +335,7 @@ mod formatter_tests {
                 passes: vec![CompilerPass::Compile {
                     source: source_file_path.clone(),
                     output: output_file_path.clone().into(),
-                    flags: vec_of_strings!["-O2"],
+                    flags: vec!["-O2".into()],
                 }],
             };
 
@@ -360,7 +359,7 @@ mod formatter_tests {
                 passes: vec![CompilerPass::Compile {
                     source: PathBuf::from("..").join(source_dir_name).join("main.c"),
                     output: PathBuf::from("main.o").into(),
-                    flags: vec_of_strings!["-O2"],
+                    flags: vec!["-O2".into()],
                 }],
             };
 
@@ -384,7 +383,7 @@ mod formatter_tests {
                 passes: vec![CompilerPass::Compile {
                     source: PathBuf::from("..").join(source_dir_name).join("main.c"),
                     output: PathBuf::from("main.o").into(),
-                    flags: vec_of_strings!["-O2"],
+                    flags: vec!["-O2".into()],
                 }],
             };
 

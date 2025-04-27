@@ -64,32 +64,34 @@ impl Interpreter for Generic {
 mod test {
     use std::collections::HashMap;
 
-    use crate::{vec_of_pathbuf, vec_of_strings};
-
     use super::*;
+    use crate::intercept::execution;
 
     #[test]
     fn test_matching() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/something"),
-            arguments: vec_of_strings![
+        let input = execution(
+            "/usr/bin/something",
+            vec![
                 "something",
                 "-Dthis=that",
                 "-I.",
                 "source.c",
                 "-o",
-                "source.c.o"
+                "source.c.o",
             ],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
+            "/home/user",
+            HashMap::new(),
+        );
 
         let expected = CompilerCall {
-            compiler: PathBuf::from("/usr/bin/something"),
-            working_dir: PathBuf::from("/home/user"),
+            compiler: "/usr/bin/something".into(),
+            working_dir: "/home/user".into(),
             passes: vec![CompilerPass::Compile {
-                flags: vec_of_strings!["-Dthis=that", "-I.", "-o", "source.c.o"],
-                source: PathBuf::from("source.c"),
+                flags: vec!["-Dthis=that", "-I.", "-o", "source.c.o"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+                source: "source.c".into(),
                 output: None,
             }],
         };
@@ -99,12 +101,12 @@ mod test {
 
     #[test]
     fn test_matching_without_sources() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/something"),
-            arguments: vec_of_strings!["something", "--help"],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
+        let input = execution(
+            "/usr/bin/something",
+            vec!["something", "--help"],
+            "/home/user",
+            HashMap::new(),
+        );
 
         assert_eq!(
             Recognition::Error(String::from("source file is not found")),
@@ -114,17 +116,20 @@ mod test {
 
     #[test]
     fn test_not_matching() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/cc"),
-            arguments: vec_of_strings!["cc", "-Dthis=that", "-I.", "source.c", "-o", "source.c.o"],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
+        let input = execution(
+            "/usr/bin/ls",
+            vec!["ls", "/home/user/build"],
+            "/home/user",
+            HashMap::new(),
+        );
 
         assert_eq!(Recognition::Unknown, SUT.recognize(&input));
     }
 
     static SUT: std::sync::LazyLock<Generic> = std::sync::LazyLock::new(|| Generic {
-        executables: vec_of_pathbuf!["/usr/bin/something"].into_iter().collect(),
+        executables: vec!["/usr/bin/something"]
+            .into_iter()
+            .map(PathBuf::from)
+            .collect(),
     });
 }

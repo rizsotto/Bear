@@ -60,29 +60,18 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::{CompilerCall, Execution, Recognition};
     use super::*;
     use crate::config;
-    use crate::config::{DuplicateFilter, Format, SourceFilter};
-    use crate::{vec_of_pathbuf, vec_of_strings};
-
-    fn any_execution() -> Execution {
-        Execution {
-            executable: PathBuf::from("/usr/bin/cc"),
-            arguments: vec_of_strings!["cc", "-c", "-Wall", "main.c"],
-            environment: HashMap::new(),
-            working_dir: PathBuf::from("/home/user"),
-        }
-    }
+    use crate::intercept::{execution, Execution};
+    use crate::semantic::{CompilerCall, Recognition};
 
     #[test]
     fn test_create_interpreter_with_default_config() {
         let config = config::Main::default();
 
         let interpreter = create(&config);
-        let input = any_execution();
 
-        match interpreter.recognize(&input) {
+        match interpreter.recognize(&EXECUTION) {
             Recognition::Success(CompilerCall { .. }) => assert!(true),
             _ => assert!(false),
         }
@@ -92,17 +81,16 @@ mod test {
     fn test_create_interpreter_with_compilers_to_include() {
         let config = config::Main {
             intercept: config::Intercept::Wrapper {
-                executables: vec_of_pathbuf!["/usr/bin/cc"],
-                path: PathBuf::from("/usr/libexec/bear"),
-                directory: PathBuf::from("/tmp"),
+                executables: vec!["/usr/bin/cc".into()],
+                path: "/usr/libexec/bear".into(),
+                directory: "/tmp".into(),
             },
             ..Default::default()
         };
 
         let interpreter = create(&config);
-        let input = any_execution();
 
-        match interpreter.recognize(&input) {
+        match interpreter.recognize(&EXECUTION) {
             Recognition::Success(CompilerCall { .. }) => assert!(true),
             _ => assert!(false),
         }
@@ -117,21 +105,29 @@ mod test {
                     ignore: config::IgnoreOrConsider::Always,
                     arguments: config::Arguments::default(),
                 }],
-                sources: SourceFilter::default(),
-                duplicates: DuplicateFilter::default(),
-                format: Format::default(),
+                sources: config::SourceFilter::default(),
+                duplicates: config::DuplicateFilter::default(),
+                format: config::Format::default(),
             },
             ..Default::default()
         };
 
         let interpreter = create(&config);
-        let input = any_execution();
 
-        let result = interpreter.recognize(&input);
+        let result = interpreter.recognize(&EXECUTION);
 
         assert_eq!(
             result,
             Recognition::Ignored("compiler specified in config to ignore".into())
         );
     }
+
+    static EXECUTION: std::sync::LazyLock<Execution> = std::sync::LazyLock::new(|| {
+        execution(
+            "/usr/bin/cc",
+            vec!["cc", "-c", "-Wall", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        )
+    });
 }

@@ -141,7 +141,7 @@ mod test {
         use super::super::JsonCompilationDatabase as Sut;
         use super::super::{Error, FileFormat};
         use serde_json::error::Category;
-        use serde_json::{json, Value};
+        use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};
 
         macro_rules! assert_semantic_error {
@@ -292,7 +292,7 @@ mod test {
             assert!(result.is_ok());
 
             // Use the fake "file" as input
-            buffer.seek(SeekFrom::Start(0)).unwrap();
+            buffer.seek(SeekFrom::Start(0))?;
             let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_with_array_syntax(), content);
@@ -393,8 +393,8 @@ mod test {
             assert!(result.is_ok());
 
             // Use the fake "file" as input
-            buffer.seek(SeekFrom::Start(0)).unwrap();
-            let content: Value = serde_json::from_reader(&mut buffer)?;
+            buffer.seek(SeekFrom::Start(0))?;
+            let content: serde_json::Value = serde_json::from_reader(&mut buffer)?;
 
             assert_eq!(expected_quoted_with_array_syntax(), content);
 
@@ -405,7 +405,7 @@ mod test {
     mod execution_events {
         use super::super::ExecutionEventDatabase as Sut;
         use super::super::FileFormat;
-        use crate::intercept::{Event, Execution, ProcessId};
+        use crate::intercept::{event, Event};
         use serde_json::json;
         use std::collections::HashMap;
         use std::io::{Cursor, Seek, SeekFrom};
@@ -478,10 +478,7 @@ mod test {
                     "/usr/bin/clang",
                     vec!["clang", "-c", "main.c"],
                     "/home/user",
-                    HashMap::from([
-                        ("PATH".to_string(), "/usr/bin".to_string()),
-                        ("HOME".to_string(), "/home/user".to_string()),
-                    ]),
+                    HashMap::from([("PATH", "/usr/bin"), ("HOME", "/home/user")]),
                 ),
                 event(
                     11934,
@@ -491,24 +488,6 @@ mod test {
                     HashMap::from([]),
                 ),
             ]
-        }
-
-        fn event(
-            pid: u32,
-            executable: &str,
-            arguments: Vec<&str>,
-            working_dir: &str,
-            environment: HashMap<String, String>,
-        ) -> Event {
-            Event {
-                pid: ProcessId(pid),
-                execution: Execution {
-                    executable: PathBuf::from(executable),
-                    arguments: arguments.into_iter().map(String::from).collect(),
-                    working_dir: PathBuf::from(working_dir),
-                    environment,
-                },
-            }
         }
     }
 }

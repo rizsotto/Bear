@@ -491,7 +491,6 @@ pub mod loader {
     mod test {
         use super::super::*;
         use super::*;
-        use crate::{vec_of_pathbuf, vec_of_strings};
 
         #[test]
         fn test_wrapper_config() {
@@ -553,12 +552,15 @@ pub mod loader {
                 intercept: Intercept::Wrapper {
                     path: default_wrapper_executable(),
                     directory: PathBuf::from("/tmp"),
-                    executables: vec_of_pathbuf![
+                    executables: vec![
                         "/usr/bin/cc",
                         "/usr/bin/c++",
                         "/usr/bin/clang",
-                        "/usr/bin/clang++"
-                    ],
+                        "/usr/bin/clang++",
+                    ]
+                    .into_iter()
+                    .map(PathBuf::from)
+                    .collect(),
                 },
                 output: Output::Clang {
                     compilers: vec![
@@ -576,7 +578,7 @@ pub mod loader {
                             path: PathBuf::from("/usr/bin/c++"),
                             ignore: IgnoreOrConsider::Conditional,
                             arguments: Arguments {
-                                match_: vec_of_strings!["-###"],
+                                match_: vec!["-###".into()],
                                 ..Default::default()
                             },
                         },
@@ -584,8 +586,8 @@ pub mod loader {
                             path: PathBuf::from("/usr/bin/clang"),
                             ignore: IgnoreOrConsider::Never,
                             arguments: Arguments {
-                                add: vec_of_strings!["-DDEBUG"],
-                                remove: vec_of_strings!["-Wall"],
+                                add: vec!["-DDEBUG".into()],
+                                remove: vec!["-Wall".into()],
                                 ..Default::default()
                             },
                         },
@@ -593,7 +595,7 @@ pub mod loader {
                             path: PathBuf::from("/usr/bin/clang++"),
                             ignore: IgnoreOrConsider::Never,
                             arguments: Arguments {
-                                remove: vec_of_strings!["-Wall"],
+                                remove: vec!["-Wall".into()],
                                 ..Default::default()
                             },
                         },
@@ -654,7 +656,10 @@ pub mod loader {
                 intercept: Intercept::Wrapper {
                     path: default_wrapper_executable(),
                     directory: default_wrapper_directory(),
-                    executables: vec_of_pathbuf!["/usr/bin/cc", "/usr/bin/c++"],
+                    executables: vec!["/usr/bin/cc", "/usr/bin/c++"]
+                        .into_iter()
+                        .map(PathBuf::from)
+                        .collect(),
                 },
                 output: Output::Clang {
                     compilers: vec![],

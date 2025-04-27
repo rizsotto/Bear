@@ -96,13 +96,12 @@ fn into_string(path: &Path) -> anyhow::Result<String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::vec_of_strings;
 
     #[test]
     fn test_non_compilations() {
         let input = semantic::CompilerCall {
-            compiler: PathBuf::from("/usr/bin/cc"),
-            working_dir: PathBuf::from("/home/user"),
+            compiler: "/usr/bin/cc".into(),
+            working_dir: "/home/user".into(),
             passes: vec![semantic::CompilerPass::Preprocess],
         };
 
@@ -116,12 +115,12 @@ mod test {
     #[test]
     fn test_single_source_compilation() {
         let input = semantic::CompilerCall {
-            compiler: PathBuf::from("/usr/bin/clang"),
-            working_dir: PathBuf::from("/home/user"),
+            compiler: "/usr/bin/clang".into(),
+            working_dir: "/home/user".into(),
             passes: vec![semantic::CompilerPass::Compile {
-                source: PathBuf::from("source.c"),
-                output: Some(PathBuf::from("source.o")),
-                flags: vec_of_strings!["-Wall"],
+                source: "source.c".into(),
+                output: Some("source.o".into()),
+                flags: vec!["-Wall".into()],
             }],
         };
 
@@ -129,10 +128,13 @@ mod test {
         let result = sut.apply(input);
 
         let expected = vec![Entry {
-            directory: PathBuf::from("/home/user"),
-            file: PathBuf::from("source.c"),
-            arguments: vec_of_strings!["/usr/bin/clang", "-Wall", "-o", "source.o", "source.c"],
-            output: Some(PathBuf::from("source.o")),
+            directory: "/home/user".into(),
+            file: "source.c".into(),
+            arguments: vec!["/usr/bin/clang", "-Wall", "-o", "source.o", "source.c"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            output: Some("source.o".into()),
         }];
         assert_eq!(expected, result);
     }
@@ -140,19 +142,19 @@ mod test {
     #[test]
     fn test_multiple_sources_compilation() {
         let input = semantic::CompilerCall {
-            compiler: PathBuf::from("clang"),
-            working_dir: PathBuf::from("/home/user"),
+            compiler: "clang".into(),
+            working_dir: "/home/user".into(),
             passes: vec![
                 semantic::CompilerPass::Preprocess,
                 semantic::CompilerPass::Compile {
-                    source: PathBuf::from("/tmp/source1.c"),
-                    output: Some(PathBuf::from("./source1.o")),
-                    flags: vec_of_strings![],
+                    source: "/tmp/source1.c".into(),
+                    output: Some("./source1.o".into()),
+                    flags: vec![],
                 },
                 semantic::CompilerPass::Compile {
-                    source: PathBuf::from("../source2.c"),
+                    source: "../source2.c".into(),
                     output: None,
-                    flags: vec_of_strings!["-Wall"],
+                    flags: vec!["-Wall".into()],
                 },
             ],
         };
@@ -162,15 +164,21 @@ mod test {
 
         let expected = vec![
             Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("/tmp/source1.c"),
-                arguments: vec_of_strings!["clang", "-o", "./source1.o", "/tmp/source1.c"],
-                output: Some(PathBuf::from("./source1.o")),
+                directory: "/home/user".into(),
+                file: "/tmp/source1.c".into(),
+                arguments: vec!["clang", "-o", "./source1.o", "/tmp/source1.c"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
+                output: Some("./source1.o".into()),
             },
             Entry {
-                directory: PathBuf::from("/home/user"),
-                file: PathBuf::from("../source2.c"),
-                arguments: vec_of_strings!["clang", "-Wall", "../source2.c"],
+                directory: "/home/user".into(),
+                file: "../source2.c".into(),
+                arguments: vec!["clang", "-Wall", "../source2.c"]
+                    .into_iter()
+                    .map(String::from)
+                    .collect(),
                 output: None,
             },
         ];

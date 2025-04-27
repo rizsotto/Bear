@@ -57,6 +57,10 @@ pub trait Collector {
     fn stop(&self) -> Result<(), anyhow::Error>;
 }
 
+/// Process id is an OS identifier for a process.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct ProcessId(pub u32);
+
 /// Represent a relevant life cycle event of a process.
 ///
 /// In the current implementation, we only have one event, the `Started` event.
@@ -98,9 +102,37 @@ impl fmt::Display for Execution {
     }
 }
 
-/// Process id is an OS identifier for a process.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ProcessId(pub u32);
+#[cfg(test)]
+pub fn execution(
+    executable: &str,
+    arguments: Vec<&str>,
+    working_dir: &str,
+    environment: HashMap<&str, &str>,
+) -> Execution {
+    Execution {
+        executable: PathBuf::from(executable),
+        arguments: arguments.iter().map(|s| s.to_string()).collect(),
+        working_dir: PathBuf::from(working_dir),
+        environment: environment
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect(),
+    }
+}
+
+#[cfg(test)]
+pub fn event(
+    pid: u32,
+    executable: &str,
+    arguments: Vec<&str>,
+    working_dir: &str,
+    environment: HashMap<&str, &str>,
+) -> Event {
+    Event {
+        pid: ProcessId(pid),
+        execution: execution(executable, arguments, working_dir, environment),
+    }
+}
 
 /// The service is responsible for collecting the events from the supervised processes.
 ///

@@ -161,20 +161,18 @@ static COREUTILS_FILES: [&str; 106] = [
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
-    use std::path::PathBuf;
-
-    use crate::vec_of_strings;
 
     use super::*;
+    use crate::intercept::execution;
 
     #[test]
     fn test_executions_are_ignored_by_executable_name() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/ls"),
-            arguments: vec_of_strings!["ls", "/home/user/build"],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
+        let input = execution(
+            "/usr/bin/ls",
+            vec!["ls", "/home/user/build"],
+            "/home/user",
+            HashMap::new(),
+        );
         let sut = IgnoreByPath::new();
         let result = sut.recognize(&input);
 
@@ -183,12 +181,12 @@ mod test {
 
     #[test]
     fn test_not_known_executables_are_not_recognized() {
-        let input = Execution {
-            executable: PathBuf::from("/usr/bin/bear"),
-            arguments: vec_of_strings!["bear", "--", "make"],
-            working_dir: PathBuf::from("/home/user"),
-            environment: HashMap::new(),
-        };
+        let input = execution(
+            "/usr/bin/unknown",
+            vec!["unknown", "/home/user/build"],
+            "/home/user",
+            HashMap::new(),
+        );
         let sut = IgnoreByPath::new();
 
         assert_eq!(Recognition::Unknown, sut.recognize(&input))
