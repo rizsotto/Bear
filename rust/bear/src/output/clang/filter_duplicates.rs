@@ -8,7 +8,7 @@
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
-use super::clang::Entry;
+use super::Entry;
 use crate::config;
 use thiserror::Error;
 
@@ -77,8 +77,8 @@ impl TryFrom<config::DuplicateFilter> for DuplicateFilter {
 
 #[cfg(test)]
 mod tests {
+    use super::super::entry;
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_try_from_success() {
@@ -207,14 +207,5 @@ mod tests {
 
         assert!(sut.unique(&entry1));
         assert!(!sut.unique(&entry2));
-    }
-
-    fn entry(file: &str, arguments: Vec<&str>, directory: &str, output: Option<&str>) -> Entry {
-        Entry {
-            file: PathBuf::from(file),
-            arguments: arguments.into_iter().map(String::from).collect(),
-            directory: PathBuf::from(directory),
-            output: output.map(PathBuf::from),
-        }
     }
 }

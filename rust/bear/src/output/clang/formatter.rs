@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::output::clang::Entry;
+use super::Entry;
 use crate::semantic;
 use anyhow::anyhow;
 use std::path::{Path, PathBuf};
@@ -95,6 +95,7 @@ fn into_string(path: &Path) -> anyhow::Result<String> {
 
 #[cfg(test)]
 mod test {
+    use super::super::entry;
     use super::*;
 
     #[test]
@@ -127,15 +128,12 @@ mod test {
         let sut = EntryFormatter::new();
         let result = sut.apply(input);
 
-        let expected = vec![Entry {
-            directory: "/home/user".into(),
-            file: "source.c".into(),
-            arguments: vec!["/usr/bin/clang", "-Wall", "-o", "source.o", "source.c"]
-                .into_iter()
-                .map(String::from)
-                .collect(),
-            output: Some("source.o".into()),
-        }];
+        let expected = vec![entry(
+            "source.c",
+            vec!["/usr/bin/clang", "-Wall", "-o", "source.o", "source.c"],
+            "/home/user",
+            Some("source.o"),
+        )];
         assert_eq!(expected, result);
     }
 
@@ -163,24 +161,18 @@ mod test {
         let result = sut.apply(input);
 
         let expected = vec![
-            Entry {
-                directory: "/home/user".into(),
-                file: "/tmp/source1.c".into(),
-                arguments: vec!["clang", "-o", "./source1.o", "/tmp/source1.c"]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                output: Some("./source1.o".into()),
-            },
-            Entry {
-                directory: "/home/user".into(),
-                file: "../source2.c".into(),
-                arguments: vec!["clang", "-Wall", "../source2.c"]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
-                output: None,
-            },
+            entry(
+                "/tmp/source1.c",
+                vec!["clang", "-o", "./source1.o", "/tmp/source1.c"],
+                "/home/user",
+                Some("./source1.o"),
+            ),
+            entry(
+                "../source2.c",
+                vec!["clang", "-Wall", "../source2.c"],
+                "/home/user",
+                None,
+            ),
         ];
         assert_eq!(expected, result);
     }
