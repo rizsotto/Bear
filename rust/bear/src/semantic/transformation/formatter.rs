@@ -10,9 +10,9 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
-use super::*;
-use std::env;
-use std::path;
+use crate::{config, semantic};
+use std::{env, io, path};
+use thiserror::Error;
 
 #[derive(Default, Debug)]
 pub enum PathFormatter {
@@ -62,6 +62,8 @@ impl TryFrom<&config::PathFormat> for PathFormatter {
 
 /// Compute the absolute path from the root directory if the path is relative.
 fn absolute_to(root: &path::Path, path: &path::Path) -> Result<path::PathBuf, Error> {
+    // TODO: instead of calling `canonicalize` on the path, we should use
+    //       `path::absolute` when the filesystem access is not allowed.
     if path.is_absolute() {
         Ok(path.canonicalize()?)
     } else {
