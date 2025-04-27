@@ -14,7 +14,6 @@
 use crate::output::json;
 use serde::Serialize;
 use serde_json::Error;
-mod tests;
 mod type_de;
 
 /// Represents an entry of the compilation database.
@@ -36,6 +35,16 @@ pub struct Entry {
     /// It can be used to distinguish different processing modes of the same input file.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<std::path::PathBuf>,
+}
+
+#[cfg(test)]
+pub fn entry(file: &str, arguments: Vec<&str>, directory: &str, output: Option<&str>) -> Entry {
+    Entry {
+        file: std::path::PathBuf::from(file),
+        arguments: arguments.into_iter().map(String::from).collect(),
+        directory: std::path::PathBuf::from(directory),
+        output: output.map(std::path::PathBuf::from),
+    }
 }
 
 /// Deserialize entries from a JSON array into an iterator.

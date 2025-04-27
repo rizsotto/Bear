@@ -19,7 +19,6 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::{env, fmt, thread};
 
-pub mod persistence;
 pub mod supervise;
 pub mod tcp;
 

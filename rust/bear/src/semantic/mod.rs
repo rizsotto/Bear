@@ -14,8 +14,7 @@ pub mod interpreters;
 pub mod transformation;
 
 use super::intercept::Execution;
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use std::path::PathBuf;
 
 /// Represents an executed command semantic.
@@ -106,18 +105,4 @@ impl<T> IntoIterator for Recognition<T> {
             _ => None.into_iter(),
         }
     }
-}
-
-/// Serialize compiler calls into a JSON array.
-pub fn serialize(
-    writer: impl std::io::Write,
-    entries: impl Iterator<Item = CompilerCall> + Sized,
-) -> anyhow::Result<()> {
-    let mut ser = serde_json::Serializer::pretty(writer);
-    let mut seq = ser.serialize_seq(None)?;
-    for entry in entries {
-        seq.serialize_element(&entry)?;
-    }
-    seq.end()?;
-    Ok(())
 }

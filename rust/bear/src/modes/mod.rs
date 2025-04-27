@@ -3,15 +3,14 @@
 pub mod intercept;
 pub mod semantic;
 
-use crate::intercept::persistence;
 use crate::modes::intercept::BuildInterceptor;
 use crate::modes::semantic::SemanticAnalysisPipeline;
+use crate::output::{ExecutionEventDatabase, FileFormat};
 use crate::{args, config};
 use anyhow::Context;
-use std::fs::{File, OpenOptions};
-use std::io;
 use std::io::BufReader;
 use std::process::ExitCode;
+use std::{fs, io, path};
 
 /// The mode trait is used to run the application in different modes.
 pub trait Mode {
@@ -32,17 +31,13 @@ impl Intercept {
         output: args::BuildEvents,
         config: config::Main,
     ) -> anyhow::Result<Self> {
-        let file_name = output.file_name.as_str();
-        let output_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(file_name)
+        let file_name = path::PathBuf::from(output.file_name);
+        let output_file = fs::File::create(file_name.as_path())
             .map(io::BufWriter::new)
             .with_context(|| format!("Failed to open file: {:?}", file_name))?;
 
         let interceptor = BuildInterceptor::create(config, move |events| {
-            persistence::write(output_file, events)
+            ExecutionEventDatabase::write(output_file, events.iter()).map_err(anyhow::Error::from)
         })?;
 
         Ok(Self {
@@ -66,7 +61,8 @@ impl Mode for Intercept {
 /// The semantic mode we are deduct the semantic meaning of the
 /// executed commands from the build process.
 pub struct Semantic {
-    event_file: BufReader<File>,
+    event_file: BufReader<fs::File>,
+    event_file_name: path::PathBuf,
     semantic: SemanticAnalysisPipeline,
 }
 
@@ -76,17 +72,16 @@ impl Semantic {
         output: args::BuildSemantic,
         config: config::Main,
     ) -> anyhow::Result<Self> {
-        let file_name = input.file_name.as_str();
-        let event_file = OpenOptions::new()
-            .read(true)
-            .open(file_name)
+        let event_file_name = path::PathBuf::from(input.file_name);
+        let event_file = fs::File::open(event_file_name.as_path())
             .map(BufReader::new)
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
+            .with_context(|| format!("Failed to open file: {:?}", event_file_name))?;
 
         let semantic = SemanticAnalysisPipeline::create(output, &config)?;
 
         Ok(Self {
             event_file,
+            event_file_name,
             semantic,
         })
     }
@@ -98,7 +93,10 @@ impl Mode for Semantic {
     /// The exit code is based on the result of the output writer.
     fn run(self) -> anyhow::Result<ExitCode> {
         self.semantic
-            .analyze_and_write(persistence::read(self.event_file))
+            .analyze_and_write(ExecutionEventDatabase::read_and_ignore(
+                self.event_file,
+                self.event_file_name,
+            ))
             .map(|_| ExitCode::SUCCESS)
     }
 }
