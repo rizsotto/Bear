@@ -106,13 +106,13 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     fn read_from_compilation_db(
         source: &path::Path,
     ) -> anyhow::Result<impl Iterator<Item = Entry>> {
-        let source_copy = source.to_path_buf();
-
         let file = fs::File::open(source)
             .map(io::BufReader::new)
             .with_context(|| format!("Failed to open file: {:?}", source))?;
 
-        let entries = JsonCompilationDatabase::read_and_ignore(file, source_copy);
+        let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
+            log::warn!("Problems to read previous entries: {:?}", error);
+        });
         Ok(entries)
     }
 }

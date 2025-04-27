@@ -62,7 +62,6 @@ impl Mode for Intercept {
 /// executed commands from the build process.
 pub struct Semantic {
     event_file: BufReader<fs::File>,
-    event_file_name: path::PathBuf,
     semantic: SemanticAnalysisPipeline,
 }
 
@@ -81,7 +80,6 @@ impl Semantic {
 
         Ok(Self {
             event_file,
-            event_file_name,
             semantic,
         })
     }
@@ -95,7 +93,9 @@ impl Mode for Semantic {
         self.semantic
             .analyze_and_write(ExecutionEventDatabase::read_and_ignore(
                 self.event_file,
-                self.event_file_name,
+                |error| {
+                    log::warn!("Event file reading issue: {:?}", error);
+                },
             ))
             .map(|_| ExitCode::SUCCESS)
     }

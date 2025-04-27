@@ -11,7 +11,7 @@ use super::{clang, json};
 use crate::{intercept, semantic};
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
-use std::{io, path};
+use std::io;
 use thiserror::Error;
 
 /// The trait represents a file format that can be written to and read from.
@@ -25,11 +25,14 @@ pub trait FileFormat<T> {
 
     /// Reads the entries from the file and ignores any errors.
     /// This is not always feasible, when the file format is strict.
-    fn read_and_ignore(reader: impl io::Read, source: path::PathBuf) -> impl Iterator<Item = T> {
+    fn read_and_ignore(
+        reader: impl io::Read,
+        message_writer: impl Fn(&str),
+    ) -> impl Iterator<Item = T> {
         Self::read(reader).filter_map(move |result| match result {
             Ok(value) => Some(value),
             Err(error) => {
-                log::warn!("Failed to read entry: {:?} from {:?}", error, source);
+                message_writer(&error.to_string());
                 None
             }
         })
@@ -400,7 +403,6 @@ mod test {
         use serde_json::json;
         use std::collections::HashMap;
         use std::io::{Cursor, Seek, SeekFrom};
-        use std::path::PathBuf;
 
         #[test]
         fn read_write() {
@@ -453,13 +455,17 @@ mod test {
                 }
             });
             let content = format!("{}\n{}\n{}\n", line1, line2, line3);
-            let source = PathBuf::from("/home/user/project.json");
 
             let mut cursor = Cursor::new(content);
-            let read_events: Vec<_> = Sut::read_and_ignore(&mut cursor, source).collect();
+            let warnings = std::cell::RefCell::new(Vec::new());
+            let read_events: Vec<_> = Sut::read_and_ignore(&mut cursor, |error| {
+                warnings.borrow_mut().push(format!("Warning: {:?}", error));
+            })
+            .collect();
 
-            // Only the fist event is read, all other lines are ignored.
+            // Only the first event is read, all other lines are ignored.
             assert_eq!(expected_values()[0..1], read_events);
+            assert_eq!(warnings.borrow().len(), 1);
         }
 
         fn expected_values() -> Vec<Event> {
