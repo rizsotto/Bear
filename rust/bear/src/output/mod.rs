@@ -7,7 +7,8 @@ mod json;
 use crate::{args, config, semantic};
 use anyhow::Context;
 use clang::{
-    AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter, FormattedClangOutputWriter,
+    AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter,
+    FormattedClangOutputWriter, UniqueOutputWriter,
 };
 use formats::{FileFormat, JsonSemanticDatabase};
 use std::{fs, io, path};
@@ -23,7 +24,7 @@ pub enum OutputWriter {
     #[allow(private_interfaces)]
     Clang(
         FormattedClangOutputWriter<
-            AppendClangOutputWriter<AtomicClangOutputWriter<ClangOutputWriter>>,
+            AppendClangOutputWriter<AtomicClangOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
         >,
     ),
     #[allow(private_interfaces)]
@@ -40,10 +41,10 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
                 let final_file_name = path::Path::new(&args.file_name);
                 let temp_file_name = final_file_name.with_extension("tmp");
 
-                let base_writer =
-                    ClangOutputWriter::try_from((temp_file_name.as_path(), duplicates))?;
+                let base_writer = ClangOutputWriter::create(&temp_file_name)?;
+                let unique_writer = UniqueOutputWriter::create(base_writer, duplicates)?;
                 let atomic_writer =
-                    AtomicClangOutputWriter::new(base_writer, &temp_file_name, final_file_name);
+                    AtomicClangOutputWriter::new(unique_writer, &temp_file_name, final_file_name);
                 let append_writer =
                     AppendClangOutputWriter::new(atomic_writer, args.append, final_file_name);
                 let formatted_writer = FormattedClangOutputWriter::new(append_writer);
