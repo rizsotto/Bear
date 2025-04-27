@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This crate provides support for reading and writing JSON compilation database files.
+//! This module provides support for reading and writing JSON compilation database files.
 //!
 //! A compilation database is a set of records which describe the compilation of the
 //! source files in a given project. It describes the compiler invocation command to

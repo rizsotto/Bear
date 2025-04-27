@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! This module is responsible for writing the output of the semantic analysis.
+//!
+//! The output can be in different formats, such as JSON compilation databases
+//! or semantic analysis results in JSON format. The module provides functionality
+//! to write these outputs to files, handle duplicates, and format the output
+//! as needed.
+//!
+//! The `OutputWriter` enum represents the main entry point for writing the output.
+//! The input of the `OutputWriter` is a stream of `semantic::CompilerCall` instances.
+
 pub mod clang;
 pub mod formats;
 mod json;

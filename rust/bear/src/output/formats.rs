@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This module is responsible for writing the output of the semantic analysis.
+//! This module is responsible for declaring the file formats this project
+//! is using. The following formats are declared:
 //!
-//! The output can be in different formats, such as JSON compilation databases
-//! or semantic analysis results in JSON format. The module provides functionality
-//! to write these outputs to files, handle duplicates, and format the output
-//! as needed.
-//!
-//! The public API of this module includes the `IteratorWriter` trait, which is
-//! implemented by different output writers. The `OutputWriter` enum represents
-//! the main entry point for writing the output. The input of the `OutputWriter`
-//! is a stream of `semantic::CompilerCall` instances.
+//! - The JSON compilation database format. Declared by the Clang project.
+//! - The semantic database format. (Internal format of this project.)
+//! - The execution event database format. (Internal format of this project.)
 
 use super::{clang, json};
 use crate::{intercept, semantic};
@@ -41,6 +36,10 @@ pub trait FileFormat<T> {
     }
 }
 
+/// Represents errors that can occur while working with file formats.
+///
+/// This enum encapsulates various error types, such as I/O errors, JSON serialization
+/// errors, and custom format errors.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Failed to open file: {0}")]
