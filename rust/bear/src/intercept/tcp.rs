@@ -10,13 +10,16 @@ use std::sync::Arc;
 
 use super::{Collector, Event, Reporter};
 
-/// Implements convenient methods for the `Event` type.
-impl Event {
+/// The serializer for events to transmit over the network.
+///
+/// The events are serialized using TLV (Type-Length-Value) format.
+/// The type is always 0, the length is a 4-byte big-endian integer,
+/// and the value is the JSON representation of the event.
+struct EventWireSerializer;
+
+impl EventWireSerializer {
     /// Read an event from a reader using TLV format.
-    ///
-    /// The event is serialized using JSON, and the length of the JSON
-    /// is written as a 4-byte big-endian integer before the JSON.
-    fn read_from(reader: &mut impl Read) -> Result<Self, anyhow::Error> {
+    fn read(reader: &mut impl Read) -> Result<Event, anyhow::Error> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -29,11 +32,8 @@ impl Event {
     }
 
     /// Write an event to a writer using TLV format.
-    ///
-    /// The event is serialized using JSON, and the length of the JSON
-    /// is written as a 4-byte big-endian integer before the JSON.
-    fn write_into(&self, writer: &mut impl Write) -> Result<u32, anyhow::Error> {
-        let serialized_event = serde_json::to_string(&self)?;
+    fn write(writer: &mut impl Write, event: Event) -> Result<u32, anyhow::Error> {
+        let serialized_event = serde_json::to_string(&event)?;
         let bytes = serialized_event.into_bytes();
         let length = bytes.len() as u32;
 
@@ -71,7 +71,7 @@ impl CollectorOnTcp {
     }
 
     fn send(&self, mut socket: TcpStream, destination: Sender<Event>) -> Result<(), anyhow::Error> {
-        let event = Event::read_from(&mut socket)?;
+        let event = EventWireSerializer::read(&mut socket)?;
         destination.send(event)?;
 
         Ok(())
@@ -148,7 +148,7 @@ impl Reporter for ReporterOnTcp {
     /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), anyhow::Error> {
         let mut socket = TcpStream::connect(self.destination.clone())?;
-        event.write_into(&mut socket)?;
+        EventWireSerializer::write(&mut socket, event)?;
 
         Ok(())
     }
@@ -170,13 +170,13 @@ mod tests {
     fn read_write_works() {
         let mut writer = Cursor::new(vec![0; 1024]);
         for event in fixtures::EVENTS.iter() {
-            let result = Event::write_into(event, &mut writer);
+            let result = EventWireSerializer::write(&mut writer, event.clone());
             assert!(result.is_ok());
         }
 
         let mut reader = Cursor::new(writer.get_ref());
         for event in fixtures::EVENTS.iter() {
-            let result = Event::read_from(&mut reader);
+            let result = EventWireSerializer::read(&mut reader);
             assert!(result.is_ok());
             assert_eq!(result.unwrap(), event.clone());
         }
