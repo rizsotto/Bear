@@ -9,22 +9,38 @@
 //! The module provides abstractions for the reporter and the collector. And it also defines
 //! the data structures that are used to represent the events.
 
-use crate::intercept::supervise::supervise;
+pub mod supervise;
+mod tcp;
+
 use crate::{args, config};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
-use std::{env, fmt, thread};
-
-pub mod supervise;
-pub mod tcp;
+use std::{fmt, thread};
+use supervise::supervise;
 
 /// Declare the environment variables used by the intercept mode.
-pub const KEY_DESTINATION: &str = "INTERCEPT_REPORTER_ADDRESS";
-pub const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
+const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
+const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
+
+/// Creates a new reporter instance.
+///
+/// This function is supposed to be called from another process than the collector.
+/// Therefore, the reporter destination is passed as an environment variable.
+/// The reporter destination is the address of the collector service.
+pub fn create_reporter() -> anyhow::Result<Box<dyn Reporter>> {
+    let reporter =
+        // Get the reporter address from the environment variable
+        std::env::var(KEY_DESTINATION)
+        .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
+        // Create a new reporter
+        .and_then(tcp::ReporterOnTcp::new)?;
+    Ok(Box::new(reporter))
+}
 
 /// Represents the remote sink of supervised process events.
 ///
@@ -299,7 +315,7 @@ impl InterceptEnvironment {
             InterceptEnvironment::Wrapper {
                 bin_dir, address, ..
             } => {
-                let path_original = env::var("PATH").unwrap_or_else(|_| String::new());
+                let path_original = std::env::var("PATH").unwrap_or_else(|_| String::new());
                 let path_updated = InterceptEnvironment::insert_to_path(
                     &path_original,
                     Self::path_to_string(bin_dir.path()),
@@ -310,7 +326,8 @@ impl InterceptEnvironment {
                 ]
             }
             InterceptEnvironment::Preload { path, address, .. } => {
-                let path_original = env::var(KEY_PRELOAD_PATH).unwrap_or_else(|_| String::new());
+                let path_original =
+                    std::env::var(KEY_PRELOAD_PATH).unwrap_or_else(|_| String::new());
                 let path_updated = InterceptEnvironment::insert_to_path(
                     &path_original,
                     Self::path_to_string(path),

@@ -18,10 +18,8 @@
 extern crate core;
 
 use anyhow::{Context, Result};
+use bear::intercept::create_reporter;
 use bear::intercept::supervise::supervise;
-use bear::intercept::tcp::ReporterOnTcp;
-use bear::intercept::Reporter;
-use bear::intercept::KEY_DESTINATION;
 use bear::intercept::{Event, Execution, ProcessId};
 use std::path::{Path, PathBuf};
 
@@ -103,14 +101,9 @@ fn report(execution: Execution) -> Result<()> {
         execution,
     };
 
-    // Get the reporter address from the environment
-    std::env::var(KEY_DESTINATION)
-        .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
-        // Create a new reporter
-        .and_then(ReporterOnTcp::new)
-        .with_context(|| "Cannot create TCP execution reporter")
-        // Report the execution
-        .and_then(|reporter| reporter.report(event))
+    create_reporter()
+        .with_context(|| "Cannot create execution reporter")?
+        .report(event)
         .with_context(|| "Sending execution failed")
 }
 
