@@ -381,8 +381,9 @@ impl InterceptEnvironment {
                 let path_original = std::env::var("PATH").unwrap_or_else(|_| String::new());
                 let path_updated = InterceptEnvironment::insert_to_path(
                     &path_original,
-                    Self::path_to_string(bin_dir.path()),
-                );
+                    bin_dir.path().to_path_buf(),
+                )
+                .unwrap_or_else(|_| path_original.clone());
                 vec![
                     ("PATH".to_string(), path_updated),
                     (KEY_DESTINATION.to_string(), address.clone()),
@@ -391,10 +392,9 @@ impl InterceptEnvironment {
             InterceptEnvironment::Preload { path, address, .. } => {
                 let path_original =
                     std::env::var(KEY_PRELOAD_PATH).unwrap_or_else(|_| String::new());
-                let path_updated = InterceptEnvironment::insert_to_path(
-                    &path_original,
-                    Self::path_to_string(path),
-                );
+                let path_updated =
+                    InterceptEnvironment::insert_to_path(&path_original, path.clone())
+                        .unwrap_or_else(|_| path_original.clone());
                 vec![
                     (KEY_PRELOAD_PATH.to_string(), path_updated),
                     (KEY_DESTINATION.to_string(), address.clone()),
@@ -403,17 +403,17 @@ impl InterceptEnvironment {
         }
     }
 
-    /// Manipulate a `PATH` like environment value by inserting the `first` path into
+    /// Manipulate a `PATH`-like environment value by inserting the `first` path into
     /// the original value. It removes the `first` path if it already exists in the
     /// original value. And it inserts the `first` path at the beginning of the value.
-    fn insert_to_path(original: &str, first: String) -> String {
-        let mut paths: Vec<_> = original.split(':').filter(|it| it != &first).collect();
-        paths.insert(0, first.as_str());
-        paths.join(":")
-    }
-
-    fn path_to_string(path: &Path) -> String {
-        path.to_str().unwrap_or("").to_string()
+    fn insert_to_path(original: &str, first: PathBuf) -> anyhow::Result<String> {
+        let mut paths: Vec<_> = std::env::split_paths(original)
+            .filter(|path| path != &first)
+            .collect();
+        paths.insert(0, first);
+        std::env::join_paths(paths)
+            .map(|os_string| os_string.into_string().unwrap_or_default())
+            .map_err(|e| anyhow::anyhow!("Failed to join paths: {}", e))
     }
 }
 
