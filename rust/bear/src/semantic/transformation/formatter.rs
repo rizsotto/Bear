@@ -196,7 +196,7 @@ impl semantic::CompilerPass {
 }
 
 #[cfg(test)]
-mod formatter_tests {
+mod test {
     use super::*;
     use crate::config::{PathFormat, PathResolver};
     use crate::semantic::{CompilerCall, CompilerPass};
