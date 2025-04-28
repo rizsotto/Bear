@@ -20,8 +20,7 @@ extern crate core;
 use anyhow::{Context, Result};
 use bear::intercept::create_reporter;
 use bear::intercept::supervise::supervise;
-use bear::intercept::{Event, Execution, ProcessId};
-use std::path::{Path, PathBuf};
+use bear::intercept::{Event, Execution};
 
 /// Implementation of the wrapper process.
 ///
@@ -31,42 +30,25 @@ use std::path::{Path, PathBuf};
 /// the execution.
 fn main() -> Result<()> {
     env_logger::init();
-    // Find out what is the executable name the execution was started with
-    let executable = file_name_from_arguments()?;
-    log::info!("Executable as called: {:?}", executable);
+    // Capture the current process execution details
+    let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
+    log::info!("Execution captured: {:?}", execution);
     // Read the PATH variable and find the next executable with the same name
-    let real_executable = next_in_path(&executable)?;
-    log::info!("Executable to call: {:?}", real_executable);
+    let real_executable = next_in_path(&execution.executable)?;
+    let real_execution = execution.with_executable(&real_executable);
+    log::info!("Execution to call: {:?}", real_execution);
 
     // Reporting failures shall not fail the execution.
-    match into_execution(&real_executable).and_then(report) {
+    match report(real_execution.clone()) {
         Ok(_) => log::info!("Execution reported"),
         Err(e) => log::error!("Execution reporting failed: {}", e),
     }
 
     // Execute the real executable with the same arguments
-    let mut command = std::process::Command::new(real_executable);
-    let exit_status = supervise(command.args(std::env::args().skip(1)))?;
+    let exit_status = supervise(real_execution)?;
     log::info!("Execution finished with status: {:?}", exit_status);
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
-}
-
-/// Get the file name of the executable from the arguments.
-///
-/// Since the executable will be called via soft link, the first argument
-/// will be the name of the soft link. This function returns the file name
-/// of the soft link.
-fn file_name_from_arguments() -> Result<PathBuf> {
-    std::env::args()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("Cannot get first argument"))
-        .and_then(|arg| match PathBuf::from(arg).file_name() {
-            Some(file_name) => Ok(PathBuf::from(file_name)),
-            None => Err(anyhow::anyhow!(
-                "Cannot get the file name from the argument"
-            )),
-        })
 }
 
 /// Find the next executable in the PATH variable.
@@ -74,14 +56,17 @@ fn file_name_from_arguments() -> Result<PathBuf> {
 /// The function reads the PATH variable and tries to find the next executable
 /// with the same name as the given executable. It returns the path to the
 /// executable.
-fn next_in_path(target: &Path) -> Result<PathBuf> {
-    let path = std::env::var("PATH")?;
-    log::debug!("PATH: {}", path);
-    // The `current_exe` is a canonical path to the current executable.
-    let current_exe = std::env::current_exe()?;
+fn next_in_path(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
+    let target = current_exe
+        .file_name()
+        .with_context(|| "Cannot get the file name of the executable")?;
+    let path =
+        std::env::var("PATH").with_context(|| "Cannot get the PATH variable from environment")?;
 
-    path.split(':')
-        .map(|dir| Path::new(dir).join(target))
+    log::debug!("PATH: {}", path);
+
+    std::env::split_paths(&path)
+        .map(|dir| dir.join(target))
         .filter(|path| path.is_file())
         .find(|path| {
             // We need to compare it with the real path of the candidate executable to avoid
@@ -96,22 +81,10 @@ fn next_in_path(target: &Path) -> Result<PathBuf> {
 }
 
 fn report(execution: Execution) -> Result<()> {
-    let event = Event {
-        pid: ProcessId(std::process::id()),
-        execution,
-    };
+    let event = Event::new(execution);
 
     create_reporter()
         .with_context(|| "Cannot create execution reporter")?
         .report(event)
         .with_context(|| "Sending execution failed")
-}
-
-fn into_execution(path_buf: &Path) -> Result<Execution> {
-    Ok(Execution {
-        executable: path_buf.to_path_buf(),
-        arguments: std::env::args().collect(),
-        working_dir: std::env::current_dir()?,
-        environment: std::env::vars().collect(),
-    })
 }

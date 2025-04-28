@@ -17,7 +17,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::{fmt, thread};
@@ -73,10 +73,6 @@ pub trait Collector {
     fn stop(&self) -> Result<(), anyhow::Error>;
 }
 
-/// Process id is an OS identifier for a process.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct ProcessId(pub u32);
-
 /// Represent a relevant life cycle event of a process.
 ///
 /// In the current implementation, we only have one event, the `Started` event.
@@ -84,13 +80,21 @@ pub struct ProcessId(pub u32);
 /// and the execution information.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Event {
-    pub pid: ProcessId,
+    pub pid: u32,
     pub execution: Execution,
+}
+
+impl Event {
+    /// Creates a new event that is originated from the current process.
+    pub fn new(execution: Execution) -> Self {
+        let pid = std::process::id();
+        Event { pid, execution }
+    }
 }
 
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Event pid={}, execution={}", self.pid.0, self.execution)
+        write!(f, "Event pid={}, execution={}", self.pid, self.execution)
     }
 }
 
@@ -105,6 +109,69 @@ pub struct Execution {
     pub arguments: Vec<String>,
     pub working_dir: PathBuf,
     pub environment: HashMap<String, String>,
+}
+
+impl Execution {
+    /// Capture the execution information of the current process.
+    pub fn capture() -> anyhow::Result<Self> {
+        let executable = std::env::current_exe()?;
+        let arguments = std::env::args().collect();
+        let working_dir = std::env::current_dir()?;
+        let environment = std::env::vars().collect();
+
+        Ok(Self {
+            executable,
+            arguments,
+            working_dir,
+            environment,
+        })
+    }
+
+    pub fn with_executable(&self, executable: &Path) -> Self {
+        let mut updated = self.clone();
+        updated.executable = executable.to_path_buf();
+        updated
+    }
+
+    pub fn with_environment(&self, environment: HashMap<String, String>) -> Self {
+        let mut updated = self.clone();
+        updated.environment = environment;
+        updated
+    }
+}
+
+impl TryFrom<args::BuildCommand> for Execution {
+    type Error = anyhow::Error;
+
+    /// Converts the `BuildCommand` to an `Execution` object.
+    fn try_from(value: args::BuildCommand) -> Result<Self, Self::Error> {
+        let executable = value
+            .arguments
+            .first()
+            .ok_or_else(|| anyhow::anyhow!("No executable found"))?
+            .clone()
+            .into();
+        let arguments = value.arguments.to_vec();
+        let working_dir = std::env::current_dir()?;
+        let environment = std::env::vars().collect();
+
+        Ok(Self {
+            executable,
+            arguments,
+            working_dir,
+            environment,
+        })
+    }
+}
+
+impl From<Execution> for std::process::Command {
+    fn from(val: Execution) -> Self {
+        let mut command = std::process::Command::new(val.executable);
+        command.args(val.arguments.iter().skip(1));
+        command.envs(val.environment);
+        command.current_dir(val.working_dir);
+        command
+    }
 }
 
 impl fmt::Display for Execution {
@@ -145,7 +212,7 @@ pub fn event(
     environment: HashMap<&str, &str>,
 ) -> Event {
     Event {
-        pid: ProcessId(pid),
+        pid,
         execution: execution(executable, arguments, working_dir, environment),
     }
 }
@@ -286,13 +353,9 @@ impl InterceptEnvironment {
     pub fn execute_build_command(&self, input: args::BuildCommand) -> anyhow::Result<ExitCode> {
         // TODO: record the execution of the build command
 
-        let environment = self.environment();
-        let process = input.arguments[0].clone();
-        let arguments = input.arguments[1..].to_vec();
-
-        let mut child = Command::new(process);
-
-        let exit_status = supervise(child.args(arguments).envs(environment))?;
+        let child: Execution = TryInto::<Execution>::try_into(input)?
+            .with_environment(self.environment().into_iter().collect());
+        let exit_status = supervise(child)?;
         log::info!("Execution finished with status: {:?}", exit_status);
 
         // The exit code is not always available. When the process is killed by a signal,
