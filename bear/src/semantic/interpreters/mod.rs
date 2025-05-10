@@ -72,8 +72,8 @@ mod test {
         let interpreter = create(&config);
 
         match interpreter.recognize(&EXECUTION) {
-            Recognition::Success(CompilerCall { .. }) => assert!(true),
-            _ => assert!(false),
+            Recognition::Success(CompilerCall { .. }) => {}
+            _ => panic!("Expected Success, but got a match"),
         }
     }
 
@@ -91,8 +91,8 @@ mod test {
         let interpreter = create(&config);
 
         match interpreter.recognize(&EXECUTION) {
-            Recognition::Success(CompilerCall { .. }) => assert!(true),
-            _ => assert!(false),
+            Recognition::Success(CompilerCall { .. }) => {}
+            _ => panic!("Expected Success, but got a match"),
         }
     }
 

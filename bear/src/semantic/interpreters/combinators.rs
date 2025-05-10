@@ -50,8 +50,8 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognition::Unknown => assert!(true),
-            _ => assert!(false),
+            Recognition::Unknown => {}
+            _ => panic!("Expected Unknown, but got a match"),
         }
     }
 
@@ -68,8 +68,8 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognition::Success(_) => assert!(true),
-            _ => assert!(false),
+            Recognition::Success(_) => {}
+            _ => panic!("Expected Success, but got a match"),
         }
     }
 
@@ -86,8 +86,8 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognition::Ignored(_) => assert!(true),
-            _ => assert!(false),
+            Recognition::Ignored(_) => {}
+            _ => panic!("Expected Ignored, but got a match"),
         }
     }
 
@@ -105,8 +105,8 @@ mod test {
         let input = any_execution();
 
         match sut.recognize(&input) {
-            Recognition::Error(_) => assert!(true),
-            _ => assert!(false),
+            Recognition::Error(_) => {}
+            _ => panic!("Expected Error, but got a match"),
         }
     }
 
