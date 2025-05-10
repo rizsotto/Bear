@@ -102,6 +102,8 @@ namespace cmd {
         constexpr char FLAG_COMMAND[] = "--";
         constexpr char FLAG_FORCE_WRAPPER[] = "--force-wrapper";
         constexpr char FLAG_FORCE_PRELOAD[] = "--force-preload";
+        constexpr char FLAG_ENABLE_NETWORK_PROXY[] = "--enable-network-proxy";
+        constexpr const char* PROXY_ENV_VARS[] = {"http_proxy", "https_proxy", "grpc_proxy","all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "GRPC_PROXY", "ALL_PROXY"};
 
         constexpr char DEFAULT_OUTPUT[] = "events.json";
     }

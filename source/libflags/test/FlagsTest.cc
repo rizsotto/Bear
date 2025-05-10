@@ -177,16 +177,16 @@ namespace {
             const char *expected =
                     "Usage: test [--flag] [--option <arg>] [--options <arg0> <arg1> <arg2>] [--verbose] [-- ...]\n"
                     "\n"
-                    "  --flag               a single flag\n"
-                    "  --option <arg>       a flag with a value\n"
+                    "  --flag                  a single flag\n"
+                    "  --option <arg>          a flag with a value\n"
                     "  --options <arg0> <arg1> <arg2>\n"
                     "               a flag with 3 values\n"
-                    "  --verbose            run in verbose mode\n"
-                    "  -- ...               rest of the arguments\n"
+                    "  --verbose               run in verbose mode\n"
+                    "  -- ...                  rest of the arguments\n"
                     "\n"
                     "query options\n"
-                    "  --help               print help and exit\n"
-                    "  --version            print version and exit\n";
+                    "  --help                  print help and exit\n"
+                    "  --version               print version and exit\n";
 
             std::ostringstream out;
             sut.print_help(nullptr, out);
@@ -367,8 +367,8 @@ namespace {
                     "  dump\n"
                     "\n"
                     "query options\n"
-                    "  --help               print help and exit\n"
-                    "  --version            print version and exit\n";
+                    "  --help                  print help and exit\n"
+                    "  --version               print version and exit\n";
 
             std::ostringstream out;
             sut.print_help(nullptr, out);
@@ -378,11 +378,11 @@ namespace {
             const char *expected =
                     "Usage: test append [--option <arg>] [--verbose]\n"
                     "\n"
-                    "  --option <arg>       a flag with a value\n"
-                    "  --verbose            run in verbose mode\n"
+                    "  --option <arg>          a flag with a value\n"
+                    "  --verbose               run in verbose mode\n"
                     "\n"
                     "query options\n"
-                    "  --help               print help and exit\n";
+                    "  --help                  print help and exit\n";
 
             std::ostringstream out;
             sut.print_help(&append, out);

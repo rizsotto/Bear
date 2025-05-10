@@ -110,11 +110,11 @@ namespace {
             // print flag name
             os << flag_name;
             // decide if the help text goes into the same line or not
-            if (flag_size > 22) {
+            if (flag_size > 25) {
                 os << std::endl
                    << std::string(15, ' ');
             } else {
-                os << std::string(23 - flag_size, ' ');
+                os << std::string(26 - flag_size, ' ');
             }
             os << option.help;
             // print default value if exists
