@@ -37,6 +37,17 @@ shell-words.workspace = true
 tempfile.workspace = true
 signal-hook.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+anyhow.workspace = true
+assert_cmd = "2.0"
+predicates = "3.1"
+
+[build-dependencies]
+tempfile.workspace = true
+which = "7.0"
+cc = "1.2"
+
 [profile.release]
 strip = true
 lto = true
