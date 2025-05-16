@@ -77,7 +77,6 @@ impl TryFrom<config::DuplicateFilter> for DuplicateFilter {
 
 #[cfg(test)]
 mod tests {
-    use super::super::entry;
     use super::*;
 
     #[test]
@@ -120,13 +119,13 @@ mod tests {
         };
         let mut sut = DuplicateFilter::try_from(config).unwrap();
 
-        let entry1 = entry(
+        let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "source.c"],
             "/home/user/project",
             Some("/home/user/project/source.o"),
         );
-        let entry2 = entry(
+        let entry2 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "-Wall", "source.c"],
             "/home/user/project",
@@ -144,13 +143,13 @@ mod tests {
         };
         let mut sut = DuplicateFilter::try_from(config).unwrap();
 
-        let entry1 = entry(
+        let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "source.c"],
             "/home/user/project",
             Some("/home/user/project/source.o"),
         );
-        let entry2 = entry(
+        let entry2 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "source.c", "-o", "test.o"],
             "/home/user/project",
@@ -168,13 +167,13 @@ mod tests {
         };
         let mut sut = DuplicateFilter::try_from(config).unwrap();
 
-        let entry1 = entry(
+        let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "source.c"],
             "/home/user/project",
             Some("/home/user/project/source.o"),
         );
-        let entry2 = entry(
+        let entry2 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "-Wall", "source.c"],
             "/home/user/project",
@@ -192,13 +191,13 @@ mod tests {
         };
         let mut sut = DuplicateFilter::try_from(config).unwrap();
 
-        let entry1 = entry(
+        let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "source.c"],
             "/home/user/project",
             Some("/home/user/project/source.o"),
         );
-        let entry2 = entry(
+        let entry2 = Entry::from_arguments_str(
             "/home/user/project/source.c",
             vec!["cc", "-c", "-Wall", "source.c"],
             "/home/user/project",

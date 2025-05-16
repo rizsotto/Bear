@@ -50,7 +50,7 @@ pub enum Error {
     #[error("Failed to serialize JSON: {0}")]
     Json(#[from] serde_json::Error),
     #[error("Format error: {0}")]
-    Format(String),
+    Format(#[from] clang::EntryError),
 }
 
 /// The trait represents a JSON compilation database format.
@@ -73,7 +73,10 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
     }
 
     fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, Error>> {
-        json::read_array(reader).map(|value| value.map_err(Error::Json))
+        json::read_array(reader).map(|res| {
+            res.map_err(Error::Json)
+                .and_then(|entry: clang::Entry| entry.validate().map_err(Error::Format))
+        })
     }
 }
 
@@ -131,19 +134,28 @@ impl FileFormat<intercept::Event> for ExecutionEventDatabase {
 #[cfg(test)]
 mod test {
     mod compilation_database {
-        use super::super::clang::{entry, Entry};
+        use super::super::clang::Entry;
         use super::super::JsonCompilationDatabase as Sut;
         use super::super::{Error, FileFormat};
         use serde_json::error::Category;
         use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};
 
-        macro_rules! assert_semantic_error {
+        macro_rules! assert_json_error {
             ($x:expr) => {
                 match $x {
                     Some(Err(Error::Json(error))) => assert_eq!(error.classify(), Category::Data),
-                    _ => assert!(false, "shout be semantic error"),
+                    _ => assert!(false, "shout be JSON error"),
                 }
+            };
+        }
+
+        macro_rules! assert_format_error {
+            ($x:expr) => {
+                assert!(
+                    matches!($x, Some(Err(Error::Format(_)))),
+                    "should be format error"
+                );
             };
         }
 
@@ -152,7 +164,7 @@ mod test {
             let content = r#"this is not json"#;
             let mut result = Sut::read(content.as_bytes());
 
-            assert_semantic_error!(result.next());
+            assert_json_error!(result.next());
             assert!(result.next().is_none());
         }
 
@@ -161,7 +173,7 @@ mod test {
             let content = json!({ "file": "string" }).to_string();
             let mut result = Sut::read(content.as_bytes());
 
-            assert_semantic_error!(result.next());
+            assert_json_error!(result.next());
             assert!(result.next().is_none());
         }
 
@@ -177,7 +189,7 @@ mod test {
             .to_string();
             let mut result = Sut::read(content.as_bytes());
 
-            assert_semantic_error!(result.next());
+            assert_format_error!(result.next());
             assert!(result.next().is_none());
         }
 
@@ -194,7 +206,7 @@ mod test {
             .to_string();
             let mut result = Sut::read(content.as_bytes());
 
-            assert_semantic_error!(result.next());
+            assert_format_error!(result.next());
             assert!(result.next().is_none());
         }
 
@@ -207,17 +219,34 @@ mod test {
             assert!(result.next().is_none());
         }
 
-        fn expected_values() -> Vec<Entry> {
+        fn expected_values_with_arguments() -> Vec<Entry> {
             vec![
-                entry(
+                Entry::from_arguments_str(
                     "./file_a.c",
                     vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
                     "/home/user",
                     None,
                 ),
-                entry(
+                Entry::from_arguments_str(
                     "./file_b.c",
                     vec!["cc", "-c", "./file_b.c", "-o", "./file_b.o"],
+                    "/home/user",
+                    Some("./file_b.o"),
+                ),
+            ]
+        }
+
+        fn expected_values_with_command() -> Vec<Entry> {
+            vec![
+                Entry::from_command_str(
+                    "./file_a.c",
+                    "cc -c ./file_a.c -o ./file_a.o",
+                    "/home/user",
+                    None,
+                ),
+                Entry::from_command_str(
+                    "./file_b.c",
+                    "cc -c ./file_b.c -o ./file_b.o",
                     "/home/user",
                     Some("./file_b.o"),
                 ),
@@ -263,7 +292,7 @@ mod test {
             let result = Sut::read(content.as_bytes());
             let entries: Vec<Entry> = result.map(|e| e.unwrap()).collect();
 
-            assert_eq!(expected_values(), entries);
+            assert_eq!(expected_values_with_command(), entries);
         }
 
         #[test]
@@ -273,12 +302,12 @@ mod test {
             let result = Sut::read(content.as_bytes());
             let entries: Vec<Entry> = result.map(|e| e.unwrap()).collect();
 
-            assert_eq!(expected_values(), entries);
+            assert_eq!(expected_values_with_arguments(), entries);
         }
 
         #[test]
         fn save_with_array_command_syntax() -> Result<(), Error> {
-            let input = expected_values();
+            let input = expected_values_with_arguments();
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());
@@ -294,9 +323,9 @@ mod test {
             Ok(())
         }
 
-        fn expected_quoted_values() -> Vec<Entry> {
+        fn expected_quoted_values_with_argument() -> Vec<Entry> {
             vec![
-                entry(
+                Entry::from_arguments_str(
                     "./file_a.c",
                     vec![
                         "cc",
@@ -310,7 +339,7 @@ mod test {
                     "/home/user",
                     None,
                 ),
-                entry(
+                Entry::from_arguments_str(
                     "./file_b.c",
                     vec![
                         "cc",
@@ -321,6 +350,23 @@ mod test {
                         "-o",
                         "./file_b.o",
                     ],
+                    "/home/user",
+                    None,
+                ),
+            ]
+        }
+
+        fn expected_quoted_values_with_command() -> Vec<Entry> {
+            vec![
+                Entry::from_command_str(
+                    "./file_a.c",
+                    r#"cc -c -D 'name=\"me\"' ./file_a.c -o ./file_a.o"#,
+                    "/home/user",
+                    None,
+                ),
+                Entry::from_command_str(
+                    "./file_b.c",
+                    r#"cc -c -D 'name="me"' ./file_b.c -o ./file_b.o"#,
                     "/home/user",
                     None,
                 ),
@@ -364,7 +410,7 @@ mod test {
             let result = Sut::read(content.as_bytes());
             let entries: Vec<Entry> = result.map(|e| e.unwrap()).collect();
 
-            assert_eq!(expected_quoted_values(), entries);
+            assert_eq!(expected_quoted_values_with_argument(), entries);
         }
 
         #[test]
@@ -374,12 +420,12 @@ mod test {
             let result = Sut::read(content.as_bytes());
             let entries: Vec<Entry> = result.map(|e| e.unwrap()).collect();
 
-            assert_eq!(expected_quoted_values(), entries);
+            assert_eq!(expected_quoted_values_with_command(), entries);
         }
 
         #[test]
         fn save_quoted_with_array_command_syntax() -> Result<(), Error> {
-            let input = expected_quoted_values();
+            let input = expected_quoted_values_with_argument();
 
             // Create fake "file"
             let mut buffer = Cursor::new(Vec::new());

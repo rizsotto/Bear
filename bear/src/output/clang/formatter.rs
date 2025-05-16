@@ -49,12 +49,16 @@ impl EntryFormatter {
                 source,
                 output,
                 flags,
-            } => Ok(Entry {
-                file: source.clone(),
-                directory: working_dir.to_path_buf(),
-                output: output.clone(),
-                arguments: Self::format_arguments(compiler, &source, &flags, output)?,
-            }),
+            } => {
+                let source_clone = source.clone();
+                let output_clone = output.clone();
+                Ok(Entry::from_arguments(
+                    source_clone,
+                    Self::format_arguments(compiler, &source, &flags, output)?,
+                    working_dir.to_path_buf(),
+                    output_clone,
+                ))
+            }
         }
     }
 
@@ -95,7 +99,6 @@ fn into_string(path: &Path) -> anyhow::Result<String> {
 
 #[cfg(test)]
 mod test {
-    use super::super::entry;
     use super::*;
 
     #[test]
@@ -128,7 +131,7 @@ mod test {
         let sut = EntryFormatter::new();
         let result = sut.apply(input);
 
-        let expected = vec![entry(
+        let expected = vec![Entry::from_arguments_str(
             "source.c",
             vec!["/usr/bin/clang", "-Wall", "-o", "source.o", "source.c"],
             "/home/user",
@@ -161,13 +164,13 @@ mod test {
         let result = sut.apply(input);
 
         let expected = vec![
-            entry(
+            Entry::from_arguments_str(
                 "/tmp/source1.c",
                 vec!["clang", "-o", "./source1.o", "/tmp/source1.c"],
                 "/home/user",
                 Some("./source1.o"),
             ),
-            entry(
+            Entry::from_arguments_str(
                 "../source2.c",
                 vec!["clang", "-Wall", "../source2.c"],
                 "/home/user",

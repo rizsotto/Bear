@@ -13,44 +13,192 @@
 
 mod filter_duplicates;
 mod formatter;
-mod type_de;
 
 use super::formats::{FileFormat, JsonCompilationDatabase};
 use super::IteratorWriter;
 use crate::{config, semantic};
 use anyhow::Context;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use shell_words;
 use std::{fs, io, path};
+use thiserror::Error;
 
 /// Represents an entry of the compilation database.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Entry {
     /// The main translation unit source processed by this compilation step.
     /// This is used by tools as the key into the compilation database.
     /// There can be multiple command objects for the same file, for example if the same
     /// source file is compiled with different configurations.
     pub file: path::PathBuf,
-    /// The compile command executed. This must be a valid command to rerun the exact
-    /// compilation step for the translation unit in the environment the build system uses.
-    /// Shell expansion is not supported.
+    /// The compile command argv as list of strings. This should run the compilation step
+    /// for the translation unit file. `arguments[0]` should be the executable name, such
+    /// as `clang++`. Arguments should not be escaped, but ready to pass to `execvp()`.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub arguments: Vec<String>,
-    /// The working directory of the compilation. All paths specified in the command or
-    /// file fields must be either absolute or relative to this directory.
+    /// The compile command as a single shell-escaped string. Arguments may be shell quoted
+    /// and escaped following platform conventions, with ‘"’ and ‘\’ being the only special
+    /// characters. Shell expansion is not supported.
+    ///
+    /// Either `arguments` or `command` is required. `arguments` is preferred, as shell
+    /// (un)escaping is a possible source of errors.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
+    pub command: String,
+    /// The working directory of the compilation. All paths specified in the `command` or
+    /// `file` fields must be either absolute or relative to this directory.
     pub directory: path::PathBuf,
     /// The name of the output created by this compilation step. This field is optional.
     /// It can be used to distinguish different processing modes of the same input file.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub output: Option<path::PathBuf>,
 }
 
-#[cfg(test)]
-pub fn entry(file: &str, arguments: Vec<&str>, directory: &str, output: Option<&str>) -> Entry {
-    Entry {
-        file: path::PathBuf::from(file),
-        arguments: arguments.into_iter().map(String::from).collect(),
-        directory: path::PathBuf::from(directory),
-        output: output.map(path::PathBuf::from),
+impl Entry {
+    /// Create an Entry from arguments (preferred).
+    pub fn from_arguments(
+        file: impl Into<path::PathBuf>,
+        arguments: Vec<String>,
+        directory: impl Into<path::PathBuf>,
+        output: Option<impl Into<path::PathBuf>>,
+    ) -> Self {
+        Entry {
+            file: file.into(),
+            arguments,
+            command: String::default(),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
     }
+
+    /// Create an Entry from a shell command string.
+    pub fn from_command(
+        file: impl Into<path::PathBuf>,
+        command: String,
+        directory: impl Into<path::PathBuf>,
+        output: Option<impl Into<path::PathBuf>>,
+    ) -> Self {
+        Entry {
+            file: file.into(),
+            arguments: Vec::default(),
+            command,
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
+    }
+
+    /// Semantic validation of the entry. Checking all fields for
+    /// valid values and formats.
+    pub fn validate(self) -> Result<Self, EntryError> {
+        if self.file.to_string_lossy().is_empty() {
+            return Err(EntryError::EmptyFileName);
+        }
+        if self.directory.to_string_lossy().is_empty() {
+            return Err(EntryError::EmptyDirectory);
+        }
+        if self.command.is_empty() && self.arguments.is_empty() {
+            return Err(EntryError::CommandOrArgumentsAreMissing);
+        }
+        if !self.command.is_empty() && !self.arguments.is_empty() {
+            return Err(EntryError::CommandOrArgumentsArePresent);
+        }
+        if !self.command.is_empty() {
+            shell_words::split(&self.command)?;
+        }
+        Ok(self)
+    }
+
+    /// Convert entry to a form when only the command field is available.
+    ///
+    /// The method can fail if the entry is invalid.
+    pub fn to_command(self) -> Result<Self, EntryError> {
+        let valid = self.validate()?;
+
+        let command = if valid.command.is_empty() {
+            shell_words::join(&valid.arguments)
+        } else {
+            valid.command
+        };
+
+        Ok(Entry {
+            file: valid.file,
+            arguments: Vec::default(),
+            command,
+            directory: valid.directory,
+            output: valid.output,
+        })
+    }
+
+    /// Convert entry to a form when only the arguments field is available.
+    ///
+    /// The method can fail if the entry is invalid or command field does
+    /// not contain a valid shell escaped string.
+    pub fn to_arguments(self) -> Result<Self, EntryError> {
+        let valid = self.validate()?;
+
+        let arguments = if valid.arguments.is_empty() {
+            shell_words::split(&valid.command)?
+        } else {
+            valid.arguments
+        };
+
+        Ok(Entry {
+            file: valid.file,
+            arguments,
+            command: String::default(),
+            directory: valid.directory,
+            output: valid.output,
+        })
+    }
+
+    /// Constructor method for testing purposes.
+    #[cfg(test)]
+    pub fn from_arguments_str(
+        file: &str,
+        arguments: Vec<&str>,
+        directory: &str,
+        output: Option<&str>,
+    ) -> Entry {
+        Entry::from_arguments(
+            path::PathBuf::from(file),
+            arguments.into_iter().map(String::from).collect(),
+            path::PathBuf::from(directory),
+            output.map(path::PathBuf::from),
+        )
+    }
+
+    /// Constructor method for testing purposes.
+    #[cfg(test)]
+    pub fn from_command_str(
+        file: &str,
+        command: &str,
+        directory: &str,
+        output: Option<&str>,
+    ) -> Entry {
+        Entry::from_command(
+            path::PathBuf::from(file),
+            String::from(command),
+            path::PathBuf::from(directory),
+            output.map(path::PathBuf::from),
+        )
+    }
+}
+
+/// Represents the possible errors that can occur when validating an entry.
+#[derive(Debug, Error)]
+pub enum EntryError {
+    #[error("Entry has an empty file field")]
+    EmptyFileName,
+    #[error("Entry has an empty directory field")]
+    EmptyDirectory,
+    #[error("Both command and arguments fields are empty")]
+    CommandOrArgumentsAreMissing,
+    #[error("Both command and arguments fields are present")]
+    CommandOrArgumentsArePresent,
+    #[error("Entry has an invalid command field: {0}")]
+    InvalidCommand(#[from] shell_words::ParseError),
 }
 
 /// Formats `semantic::CompilerCall` instances into `Entry` objects.
@@ -294,8 +442,8 @@ mod tests {
         let result_file = dir.path().join("result_file.json");
 
         let entries_to_write = vec![
-            entry("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            entry("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
         let writer = ClangOutputWriter::create(&result_file).unwrap();
@@ -317,15 +465,15 @@ mod tests {
 
         // Create the original file with some entries
         let original_entries = vec![
-            entry("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            entry("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
         let writer = ClangOutputWriter::create(&file_to_append).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
-            entry("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            entry("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
         let writer = ClangOutputWriter::create(&result_file).unwrap();
@@ -339,5 +487,101 @@ mod tests {
         assert!(content.contains("file2.cpp"));
         assert!(content.contains("file3.cpp"));
         assert!(content.contains("file4.cpp"));
+    }
+
+    #[test]
+    fn test_entry_validate_success_arguments() {
+        let entry = Entry::from_arguments_str("main.cpp", vec!["clang", "-c"], "/tmp", None);
+
+        assert!(entry.command.is_empty());
+        assert!(!entry.arguments.is_empty());
+
+        assert!(entry.clone().validate().is_ok());
+    }
+
+    #[test]
+    fn test_entry_validate_success_command() {
+        let entry = Entry::from_command_str("main.cpp", "clang -c", "/tmp", None);
+
+        assert!(!entry.command.is_empty());
+        assert!(entry.arguments.is_empty());
+
+        assert!(entry.clone().validate().is_ok());
+    }
+
+    #[test]
+    fn test_entry_validate_errors() {
+        let cases = vec![
+            (
+                Entry::from_arguments_str("", vec!["clang", "-c"], "/tmp", None),
+                EntryError::EmptyFileName,
+            ),
+            (
+                Entry::from_arguments_str("main.cpp", vec!["clang", "-c"], "", None),
+                EntryError::EmptyDirectory,
+            ),
+            (
+                Entry {
+                    file: "main.cpp".into(),
+                    arguments: vec![],
+                    command: "".to_string(),
+                    directory: "/tmp".into(),
+                    output: None,
+                },
+                EntryError::CommandOrArgumentsAreMissing,
+            ),
+            (
+                Entry {
+                    file: "main.cpp".into(),
+                    arguments: vec!["clang".to_string()],
+                    command: "clang".to_string(),
+                    directory: "/tmp".into(),
+                    output: None,
+                },
+                EntryError::CommandOrArgumentsArePresent,
+            ),
+            (
+                Entry::from_command_str("main.cpp", "\"unterminated", "/tmp", None),
+                EntryError::InvalidCommand(shell_words::ParseError),
+            ),
+        ];
+
+        for (entry, expected_error) in cases {
+            let err = entry.validate().unwrap_err();
+            match (err, expected_error) {
+                (EntryError::EmptyFileName, EntryError::EmptyFileName)
+                | (EntryError::EmptyDirectory, EntryError::EmptyDirectory)
+                | (
+                    EntryError::CommandOrArgumentsAreMissing,
+                    EntryError::CommandOrArgumentsAreMissing,
+                )
+                | (
+                    EntryError::CommandOrArgumentsArePresent,
+                    EntryError::CommandOrArgumentsArePresent,
+                ) => {}
+                (EntryError::InvalidCommand(_), EntryError::InvalidCommand(_)) => {}
+                (other, expected) => panic!("Expected {:?}, got {:?}", expected, other),
+            }
+        }
+    }
+
+    #[test]
+    fn test_entry_conversions() {
+        let entries = vec![
+            Entry::from_arguments_str("main.cpp", vec!["clang", "-c", "main.cpp"], "/tmp", None),
+            Entry::from_command_str("main.cpp", "clang -c main.cpp", "/tmp", None),
+            Entry::from_arguments_str("foo.c", vec!["gcc", "-c", "foo.c"], "/src", Some("foo.o")),
+            Entry::from_command_str("bar.c", "gcc -O2 -c bar.c", "/src", Some("bar.o")),
+        ];
+
+        for entry in entries {
+            // arguments -> command -> arguments
+            let to_cmd = entry.clone().to_command().unwrap();
+            let to_args = to_cmd.clone().to_arguments().unwrap();
+            let to_cmd_again = to_args.clone().to_command().unwrap();
+            assert_eq!(to_cmd, to_cmd_again);
+            let to_args_again = to_cmd_again.clone().to_arguments().unwrap();
+            assert_eq!(to_args, to_args_again);
+        }
     }
 }
