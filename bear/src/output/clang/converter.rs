@@ -50,14 +50,16 @@ impl EntryConverter {
                 output,
                 flags,
             } => {
-                let source_clone = source.clone();
-                let output_clone = output.clone();
-                Ok(Entry::from_arguments(
-                    source_clone,
-                    Self::format_arguments(compiler, &source, &flags, output)?,
-                    working_dir.to_path_buf(),
-                    output_clone,
-                ))
+                let entry = Entry::from_arguments(
+                    &source,
+                    Self::arguments(compiler, &source, &flags, output.as_ref())?,
+                    working_dir,
+                    output,
+                );
+
+                entry.validate()?;
+
+                Ok(entry)
             }
         }
     }
@@ -69,21 +71,18 @@ impl EntryConverter {
     /// not necessarily result in the same command line arguments. One example for that
     /// is the multiple source files are treated as separate compiler calls. Another
     /// thing that can change is the order of the arguments.
-    fn format_arguments(
+    fn arguments(
         compiler: &Path,
         source: &Path,
         flags: &[String],
-        output: Option<PathBuf>,
+        output: Option<&PathBuf>,
     ) -> anyhow::Result<Vec<String>> {
-        let mut arguments: Vec<String> = vec![];
-        // Assemble the arguments as it would be for a single source file.
+        let mut arguments = Vec::with_capacity(flags.len() + 3);
         arguments.push(into_string(compiler)?);
-        for flag in flags {
-            arguments.push(flag.clone());
-        }
+        arguments.extend(flags.iter().cloned());
         if let Some(file) = output {
-            arguments.push(String::from("-o"));
-            arguments.push(into_string(file.as_path())?)
+            arguments.push("-o".to_string());
+            arguments.push(into_string(file)?);
         }
         arguments.push(into_string(source)?);
         Ok(arguments)

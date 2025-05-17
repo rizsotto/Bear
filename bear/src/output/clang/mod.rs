@@ -73,22 +73,6 @@ impl Entry {
         }
     }
 
-    /// Create an Entry from a shell command string.
-    pub fn from_command(
-        file: impl Into<path::PathBuf>,
-        command: String,
-        directory: impl Into<path::PathBuf>,
-        output: Option<impl Into<path::PathBuf>>,
-    ) -> Self {
-        Entry {
-            file: file.into(),
-            arguments: Vec::default(),
-            command,
-            directory: directory.into(),
-            output: output.map(|o| o.into()),
-        }
-    }
-
     /// Semantic validation of the entry. Checking all fields for
     /// valid values and formats.
     pub fn validate(&self) -> Result<(), EntryError> {
@@ -111,44 +95,32 @@ impl Entry {
     }
 
     /// Convert entry to a form when only the command field is available.
-    ///
-    /// The method can fail if the entry is invalid.
-    pub fn to_command(&self) -> Result<Self, EntryError> {
-        self.validate()?;
-
-        let command = if self.command.is_empty() {
-            shell_words::join(&self.arguments)
+    pub fn as_command(&self) -> Self {
+        if !self.command.is_empty() {
+            self.clone()
         } else {
-            self.command.clone()
-        };
-
-        Ok(Entry::from_command(
-            self.file.clone(),
-            command,
-            self.directory.clone(),
-            self.output.clone(),
-        ))
+            Self {
+                command: shell_words::join(&self.arguments),
+                arguments: Vec::default(),
+                ..self.clone()
+            }
+        }
     }
 
     /// Convert entry to a form when only the arguments field is available.
     ///
-    /// The method can fail if the entry is invalid or command field does
-    /// not contain a valid shell escaped string.
-    pub fn to_arguments(&self) -> Result<Self, EntryError> {
-        self.validate()?;
-
-        let arguments = if self.arguments.is_empty() {
-            shell_words::split(&self.command)?
+    /// The method can fail if the command field does not contain a valid shell escaped string.
+    pub fn as_arguments(&self) -> Result<Self, EntryError> {
+        if !self.arguments.is_empty() {
+            Ok(self.clone())
         } else {
-            self.arguments.clone()
-        };
-
-        Ok(Entry::from_arguments(
-            self.file.clone(),
-            arguments,
-            self.directory.clone(),
-            self.output.clone(),
-        ))
+            let arguments = shell_words::split(&self.command)?;
+            Ok(Self {
+                arguments,
+                command: String::default(),
+                ..self.clone()
+            })
+        }
     }
 
     /// Constructor method for testing purposes.
@@ -158,13 +130,14 @@ impl Entry {
         arguments: Vec<&str>,
         directory: &str,
         output: Option<&str>,
-    ) -> Entry {
-        Entry::from_arguments(
-            path::PathBuf::from(file),
-            arguments.into_iter().map(String::from).collect(),
-            path::PathBuf::from(directory),
-            output.map(path::PathBuf::from),
-        )
+    ) -> Self {
+        Self {
+            file: file.into(),
+            command: String::default(),
+            arguments: arguments.into_iter().map(String::from).collect(),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
     }
 
     /// Constructor method for testing purposes.
@@ -174,18 +147,19 @@ impl Entry {
         command: &str,
         directory: &str,
         output: Option<&str>,
-    ) -> Entry {
-        Entry::from_command(
-            path::PathBuf::from(file),
-            String::from(command),
-            path::PathBuf::from(directory),
-            output.map(path::PathBuf::from),
-        )
+    ) -> Self {
+        Self {
+            file: file.into(),
+            arguments: Vec::default(),
+            command: command.into(),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
     }
 }
 
 /// Represents the possible errors that can occur when validating an entry.
-#[derive(Debug, Error)]
+#[derive(Debug, Eq, PartialEq, Error)]
 pub enum EntryError {
     #[error("Entry has an empty file field")]
     EmptyFileName,
@@ -262,20 +236,7 @@ mod tests {
 
         for (entry, expected_error) in cases {
             let err = entry.validate().unwrap_err();
-            match (err, expected_error) {
-                (EntryError::EmptyFileName, EntryError::EmptyFileName)
-                | (EntryError::EmptyDirectory, EntryError::EmptyDirectory)
-                | (
-                    EntryError::CommandOrArgumentsAreMissing,
-                    EntryError::CommandOrArgumentsAreMissing,
-                )
-                | (
-                    EntryError::CommandOrArgumentsArePresent,
-                    EntryError::CommandOrArgumentsArePresent,
-                ) => {}
-                (EntryError::InvalidCommand(_), EntryError::InvalidCommand(_)) => {}
-                (other, expected) => panic!("Expected {:?}, got {:?}", expected, other),
-            }
+            assert_eq!(err, expected_error);
         }
     }
 
@@ -290,11 +251,11 @@ mod tests {
 
         for entry in entries {
             // arguments -> command -> arguments
-            let to_cmd = entry.clone().to_command().unwrap();
-            let to_args = to_cmd.clone().to_arguments().unwrap();
-            let to_cmd_again = to_args.clone().to_command().unwrap();
+            let to_cmd = entry.clone().as_command();
+            let to_args = to_cmd.clone().as_arguments().unwrap();
+            let to_cmd_again = to_args.clone().as_command();
             assert_eq!(to_cmd, to_cmd_again);
-            let to_args_again = to_cmd_again.clone().to_arguments().unwrap();
+            let to_args_again = to_cmd_again.clone().as_arguments().unwrap();
             assert_eq!(to_args, to_args_again);
         }
     }
