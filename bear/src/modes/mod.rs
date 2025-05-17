@@ -5,7 +5,7 @@ pub mod semantic;
 
 use crate::modes::intercept::BuildInterceptor;
 use crate::modes::semantic::SemanticAnalysisPipeline;
-use crate::output::formats::{ExecutionEventDatabase, FileFormat};
+use crate::output::{ExecutionEventDatabase, FileFormat};
 use crate::{args, config};
 use anyhow::Context;
 use std::io::BufReader;

@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! https://clang.llvm.org/docs/JSONCompilationDatabase.html#format
+//! This module is responsible for formatting paths in the compiler calls.
+//! The reason for this is to ensure that the paths are in a consistent format
+//! when it comes to the output.
 //!
-//! The format specification allows the `directory` attribute to be absolute or relative
-//! to the current working directory. The `file`, `output` and `arguments` attributes
-//! are either absolute or relative to the `directory` attribute.
+//! The JSON compilation database
+//! [format specification](https://clang.llvm.org/docs/JSONCompilationDatabase.html#format)
+//! allows the `directory` attribute to be absolute or relative to the current working
+//! directory. The `file`, `output` and `arguments` attributes are either absolute or
+//! relative to the `directory` attribute.
 //!
 //! The `arguments` attribute contains the compiler flags, where some flags are using
 //! file paths. In the current implementation, the `arguments` attribute is not

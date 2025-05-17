@@ -75,7 +75,10 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
     fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, Error>> {
         json::read_array(reader).map(|res| {
             res.map_err(Error::Json)
-                .and_then(|entry: clang::Entry| entry.validate().map_err(Error::Format))
+                .and_then(|entry: clang::Entry| match entry.validate() {
+                    Ok(_) => Ok(entry),
+                    Err(err) => Err(Error::Format(err)),
+                })
         })
     }
 }
@@ -105,8 +108,8 @@ impl FileFormat<semantic::CompilerCall> for JsonSemanticDatabase {
 
 /// The trait represents a database format for execution events.
 ///
-/// The format is a JSON line format, which is a sequence of JSON objects
-/// separated by newlines. https://jsonlines.org/
+/// The format is a [JSON line format](https://jsonlines.org/), which is a sequence
+/// of JSON objects separated by newlines.
 ///
 /// # Note
 /// The output format is not stable and may change in future versions.

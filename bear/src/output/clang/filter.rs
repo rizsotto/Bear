@@ -13,16 +13,16 @@ use crate::config;
 use thiserror::Error;
 
 #[derive(Clone, Debug)]
-pub(crate) struct DuplicateFilter {
+pub struct DuplicateEntryFilter {
     /// The fields to use for filtering duplicate entries.
     fields: Vec<config::OutputFields>,
     /// The cache of seen hashes.
     hash_values: HashSet<u64>,
 }
 
-unsafe impl Send for DuplicateFilter {}
+unsafe impl Send for DuplicateEntryFilter {}
 
-impl DuplicateFilter {
+impl DuplicateEntryFilter {
     pub fn unique(&mut self, entry: &Entry) -> bool {
         let hash = self.hash_function(entry);
         if self.hash_values.contains(&hash) {
@@ -54,7 +54,7 @@ pub enum ConfigurationError {
     EmptyFieldList,
 }
 
-impl TryFrom<config::DuplicateFilter> for DuplicateFilter {
+impl TryFrom<config::DuplicateFilter> for DuplicateEntryFilter {
     type Error = ConfigurationError;
 
     fn try_from(config: config::DuplicateFilter) -> Result<Self, Self::Error> {
@@ -68,7 +68,7 @@ impl TryFrom<config::DuplicateFilter> for DuplicateFilter {
             }
         }
 
-        Ok(DuplicateFilter {
+        Ok(DuplicateEntryFilter {
             fields: config.by_fields,
             hash_values: HashSet::new(),
         })
@@ -85,7 +85,7 @@ mod tests {
             by_fields: vec![config::OutputFields::File, config::OutputFields::Directory],
         };
 
-        let result = DuplicateFilter::try_from(config);
+        let result = DuplicateEntryFilter::try_from(config);
         assert!(result.is_ok());
     }
 
@@ -93,7 +93,7 @@ mod tests {
     fn test_try_from_failure_empty_fields() {
         let config = config::DuplicateFilter { by_fields: vec![] };
 
-        let result = DuplicateFilter::try_from(config);
+        let result = DuplicateEntryFilter::try_from(config);
         assert!(matches!(result, Err(ConfigurationError::EmptyFieldList)));
     }
 
@@ -103,7 +103,7 @@ mod tests {
             by_fields: vec![config::OutputFields::File, config::OutputFields::File],
         };
 
-        let result = DuplicateFilter::try_from(config);
+        let result = DuplicateEntryFilter::try_from(config);
         assert!(matches!(
             result,
             Err(ConfigurationError::DuplicateField(
@@ -117,7 +117,7 @@ mod tests {
         let config = config::DuplicateFilter {
             by_fields: vec![config::OutputFields::File, config::OutputFields::Directory],
         };
-        let mut sut = DuplicateFilter::try_from(config).unwrap();
+        let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
@@ -141,7 +141,7 @@ mod tests {
         let config = config::DuplicateFilter {
             by_fields: vec![config::OutputFields::Output],
         };
-        let mut sut = DuplicateFilter::try_from(config).unwrap();
+        let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
@@ -165,7 +165,7 @@ mod tests {
         let config = config::DuplicateFilter {
             by_fields: vec![config::OutputFields::Arguments],
         };
-        let mut sut = DuplicateFilter::try_from(config).unwrap();
+        let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",
@@ -189,7 +189,7 @@ mod tests {
         let config = config::DuplicateFilter {
             by_fields: vec![config::OutputFields::File],
         };
-        let mut sut = DuplicateFilter::try_from(config).unwrap();
+        let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
             "/home/user/project/source.c",

@@ -5,9 +5,9 @@ use crate::semantic;
 use anyhow::anyhow;
 use std::path::{Path, PathBuf};
 
-pub struct EntryFormatter {}
+pub struct EntryConverter {}
 
-impl EntryFormatter {
+impl EntryConverter {
     pub(crate) fn new() -> Self {
         Self {}
     }
@@ -109,7 +109,7 @@ mod test {
             passes: vec![semantic::CompilerPass::Preprocess],
         };
 
-        let sut = EntryFormatter::new();
+        let sut = EntryConverter::new();
         let result = sut.apply(input);
 
         let expected: Vec<Entry> = vec![];
@@ -128,7 +128,7 @@ mod test {
             }],
         };
 
-        let sut = EntryFormatter::new();
+        let sut = EntryConverter::new();
         let result = sut.apply(input);
 
         let expected = vec![Entry::from_arguments_str(
@@ -160,7 +160,7 @@ mod test {
             ],
         };
 
-        let sut = EntryFormatter::new();
+        let sut = EntryConverter::new();
         let result = sut.apply(input);
 
         let expected = vec![
