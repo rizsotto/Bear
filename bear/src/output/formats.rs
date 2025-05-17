@@ -69,12 +69,20 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
         writer: impl io::Write,
         entries: impl Iterator<Item = clang::Entry>,
     ) -> Result<(), Error> {
-        json::write_array(writer, entries).map_err(Error::Json)
+        json::serialize_result_seq(
+            writer,
+            // Ensure only valid entries are serialized.
+            entries.map(|entry| match entry.validate() {
+                Ok(_) => Ok(entry),
+                Err(err) => Err(Error::Format(err)),
+            }),
+        )
     }
 
     fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, Error>> {
-        json::read_array(reader).map(|res| {
+        json::deserialize_seq(reader).map(|res| {
             res.map_err(Error::Json)
+                // Ensure only valid entries are returned.
                 .and_then(|entry: clang::Entry| match entry.validate() {
                     Ok(_) => Ok(entry),
                     Err(err) => Err(Error::Format(err)),
@@ -98,7 +106,7 @@ impl FileFormat<semantic::CompilerCall> for JsonSemanticDatabase {
         writer: impl io::Write,
         entries: impl Iterator<Item = semantic::CompilerCall>,
     ) -> Result<(), Error> {
-        json::write_array(writer, entries).map_err(Error::Json)
+        json::serialize_seq(writer, entries).map_err(Error::Json)
     }
     fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::CompilerCall, Error>> {
         // Not implemented! (No reader for the semantic output in this project.)
@@ -137,7 +145,7 @@ impl FileFormat<intercept::Event> for ExecutionEventDatabase {
 #[cfg(test)]
 mod test {
     mod compilation_database {
-        use super::super::clang::Entry;
+        use super::super::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
         use super::super::{Error, FileFormat};
         use serde_json::error::Category;
@@ -220,6 +228,18 @@ mod test {
             let mut result = Sut::read(content.as_bytes());
 
             assert!(result.next().is_none());
+        }
+
+        #[test]
+        fn write_fails_on_invalid_entry() {
+            let entry = Entry::from_arguments_str("main.cpp", vec!["clang", "-c"], "", None);
+            assert_eq!(entry.validate(), Err(EntryError::EmptyDirectory));
+
+            let mut buffer = Cursor::new(Vec::new());
+            let result = Sut::write(&mut buffer, vec![entry].into_iter());
+
+            assert!(result.is_err());
+            assert!(matches!(result, Err(Error::Format(_))));
         }
 
         fn expected_values_with_arguments() -> Vec<Entry> {

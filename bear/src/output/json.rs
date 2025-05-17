@@ -16,13 +16,39 @@ use std::io;
 use serde::de::DeserializeOwned;
 use serde::ser::{Serialize, SerializeSeq};
 use serde::Serializer;
-use serde_json::{Deserializer, Error, Result};
 
 /// Serialize entries from an iterator into a JSON array.
-pub fn write_array<W, T>(
+///
+/// The iterator must yield `Result<T, E>` where `T` is the type to be serialized
+/// and `E` is the error type. If an error occurs during serialization,
+/// the function will return that error.
+pub fn serialize_result_seq<W, T, E>(
+    writer: W,
+    entries: impl Iterator<Item = Result<T, E>>,
+) -> Result<(), E>
+where
+    W: io::Write,
+    T: Serialize,
+    E: std::error::Error + From<serde_json::Error>,
+{
+    let mut ser = serde_json::Serializer::pretty(writer);
+    let mut seq = ser.serialize_seq(None)?;
+    for entry in entries {
+        match entry {
+            Ok(object) => seq.serialize_element(&object)?,
+            Err(err) => return Err(err),
+        }
+    }
+    seq.end()?;
+
+    Ok(())
+}
+
+/// Serialize entries from an iterator into a JSON array.
+pub fn serialize_seq<W, T>(
     writer: W,
     entries: impl Iterator<Item = T>,
-) -> std::result::Result<(), Error>
+) -> Result<(), serde_json::Error>
 where
     W: io::Write,
     T: Serialize,
@@ -45,7 +71,7 @@ where
 /// is that the deserializer will not be able to distinguish between
 /// the end of the type, and it consumes the next byte which is relevant to
 /// the array parser.
-pub fn read_array<T, R>(reader: R) -> impl Iterator<Item = Result<T>>
+pub fn deserialize_seq<T, R>(reader: R) -> impl Iterator<Item = Result<T, serde_json::Error>>
 where
     T: DeserializeOwned,
     R: io::Read,
@@ -69,30 +95,30 @@ impl<R: io::Read> PeekableReader<R> {
         }
     }
 
-    fn peek(&mut self) -> Result<u8> {
+    fn peek(&mut self) -> Result<u8, serde_json::Error> {
         if self.peeked.is_none() {
             let mut byte = 0u8;
             self.reader
                 .read_exact(std::slice::from_mut(&mut byte))
-                .map_err(Error::io)?;
+                .map_err(serde_json::Error::io)?;
             self.peeked = Some(byte);
         }
         Ok(self.peeked.unwrap())
     }
 
-    fn consume(&mut self) -> Result<u8> {
+    fn consume(&mut self) -> Result<u8, serde_json::Error> {
         if let Some(byte) = self.peeked.take() {
             Ok(byte)
         } else {
             let mut byte = 0u8;
             self.reader
                 .read_exact(std::slice::from_mut(&mut byte))
-                .map_err(Error::io)?;
+                .map_err(serde_json::Error::io)?;
             Ok(byte)
         }
     }
 
-    fn peek_skipping_ws(&mut self) -> Result<u8> {
+    fn peek_skipping_ws(&mut self) -> Result<u8, serde_json::Error> {
         loop {
             let byte = self.peek()?;
             if !byte.is_ascii_whitespace() {
@@ -102,7 +128,7 @@ impl<R: io::Read> PeekableReader<R> {
         }
     }
 
-    fn consume_skipping_ws(&mut self) -> Result<u8> {
+    fn consume_skipping_ws(&mut self) -> Result<u8, serde_json::Error> {
         self.peek_skipping_ws()?; // Make sure peeked byte is not whitespace
         self.consume()
     }
@@ -133,7 +159,10 @@ enum State {
     Failed,
 }
 
-fn yield_next_obj<T, R>(reader: &mut PeekableReader<R>, state: &mut State) -> Result<Option<T>>
+fn yield_next_obj<T, R>(
+    reader: &mut PeekableReader<R>,
+    state: &mut State,
+) -> Result<Option<T>, serde_json::Error>
 where
     T: DeserializeOwned,
     R: io::Read,
@@ -177,12 +206,14 @@ where
     }
 }
 
-fn deserialize_single<T, R>(reader: &mut R) -> Result<T>
+fn deserialize_single<T, R>(reader: &mut R) -> Result<T, serde_json::Error>
 where
     T: DeserializeOwned,
     R: io::Read,
 {
-    let next_obj = Deserializer::from_reader(reader).into_iter::<T>().next();
+    let next_obj = serde_json::Deserializer::from_reader(reader)
+        .into_iter::<T>()
+        .next();
     match next_obj {
         Some(result) => result,
         None => Err(serde::de::Error::custom("premature EOF")),
@@ -221,11 +252,13 @@ mod tests {
     {
         // Create fake "file"
         let mut buffer = Cursor::new(Vec::new());
-        write_array(&mut buffer, input.iter().cloned()).unwrap();
+        serialize_seq(&mut buffer, input.iter().cloned()).unwrap();
 
         // Use the fake "file" as input
         buffer.seek(SeekFrom::Start(0)).unwrap();
-        let result: Vec<T> = read_array(&mut buffer).collect::<Result<_>>().unwrap();
+        let result: Vec<T> = deserialize_seq(&mut buffer)
+            .collect::<Result<_, serde_json::Error>>()
+            .unwrap();
 
         assert_eq!(result, input.to_vec());
     }
@@ -235,7 +268,9 @@ mod tests {
         let buffer = "[ 1 , 5 , 0 , 2 , 9 ]".as_bytes();
 
         let mut cursor = Cursor::new(buffer);
-        let result: Vec<i32> = read_array(&mut cursor).collect::<Result<_>>().unwrap();
+        let result: Vec<i32> = deserialize_seq(&mut cursor)
+            .collect::<Result<_, serde_json::Error>>()
+            .unwrap();
 
         assert_eq!(result, vec![1, 5, 0, 2, 9]);
     }
@@ -245,7 +280,7 @@ mod tests {
         let buffer = "[ \"key\": \"value\", ".as_bytes();
 
         let mut cursor = Cursor::new(buffer);
-        let mut it = read_array::<String, &mut Cursor<&[u8]>>(&mut cursor);
+        let mut it = deserialize_seq::<String, &mut Cursor<&[u8]>>(&mut cursor);
 
         let first = it.next().unwrap();
         assert!(first.is_ok());
