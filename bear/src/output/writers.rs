@@ -195,8 +195,11 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
 ///
 /// # Features
 /// - Writes the entries to a file.
+/// - Formats the entries to the configured shape.
 pub(super) struct ClangOutputWriter {
     output: io::BufWriter<fs::File>,
+    command_field_as_array: bool,
+    keep_output_field: bool,
 }
 
 impl ClangOutputWriter {
@@ -205,16 +208,33 @@ impl ClangOutputWriter {
             .map(io::BufWriter::new)
             .with_context(|| format!("Failed to open file: {:?}", file_name))?;
 
-        Ok(Self { output })
+        Ok(Self {
+            output,
+            command_field_as_array: true,
+            keep_output_field: true,
+        })
     }
 }
 
 impl IteratorWriter<Entry> for ClangOutputWriter {
     fn write(self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+        let entries = entries.map(|entry| {
+            let mut entry = if self.command_field_as_array {
+                // It's safe to assume that the entry is valid, so we can unwrap.
+                entry.as_arguments().unwrap()
+            } else {
+                entry.as_command()
+            };
+            if !self.keep_output_field {
+                entry.output = None;
+            }
+            entry
+        });
         JsonCompilationDatabase::write(self.output, entries)?;
         Ok(())
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
