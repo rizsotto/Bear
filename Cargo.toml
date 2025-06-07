@@ -2,6 +2,7 @@
 
 [workspace]
 members = [
+  "platform-checks",
   "bear",
   "intercept-preload",
   "intercept-wrapper"

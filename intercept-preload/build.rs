@@ -14,6 +14,9 @@ fn main() {
 
         // Set rpath to look for dependencies in the same directory as the library
         println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
+
+        // Perform system capability checks
+        platform_checks::perform_system_checks();
     } else {
         // We don't build on non-Linux platforms
         println!("cargo:warning=libexec is only supported on Linux platforms");

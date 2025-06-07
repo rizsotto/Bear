@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "platform-checks"
+description = "Build-time utilities for system capability detection"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[lib]
+name = "platform_checks"
+path = "src/lib.rs"
+
+[dependencies]
+tempfile.workspace = true
+cc = "1.2"
+
+[build-dependencies]

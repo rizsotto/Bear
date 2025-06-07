@@ -25,3 +25,36 @@ log.workspace = true
 libc = "0.2"
 
 [build-dependencies]
+platform-checks = { path = "../platform-checks" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(has_header_dlfcn_h)',
+    'cfg(has_symbol_dlopen)',
+    'cfg(has_symbol_dlsym)',
+    'cfg(has_symbol_dlerror)',
+    'cfg(has_symbol_dlclose)',
+    'cfg(has_symbol_RTLD_NEXT)',
+    'cfg(has_header_errno_h)',
+    'cfg(has_symbol_EACCES)',
+    'cfg(has_symbol_ENOENT)',
+    'cfg(has_header_unistd_h)',
+    'cfg(has_symbol_execve)',
+    'cfg(has_symbol_execv)',
+    'cfg(has_symbol_execvpe)',
+    'cfg(has_symbol_execvp)',
+    'cfg(has_symbol_execvP)',
+    'cfg(has_symbol_exect)',
+    'cfg(has_symbol_execl)',
+    'cfg(has_symbol_execlp)',
+    'cfg(has_symbol_execle)',
+    'cfg(has_symbol_execveat)',
+    'cfg(has_symbol_fexecve)',
+    'cfg(has_header_spawn_h)',
+    'cfg(has_symbol_posix_spawn)',
+    'cfg(has_symbol_posix_spawnp)',
+    'cfg(has_header_stdio_h)',
+    'cfg(has_symbol_popen)',
+    'cfg(has_header_stdlib_h)',
+    'cfg(has_symbol_system)'
+] }
