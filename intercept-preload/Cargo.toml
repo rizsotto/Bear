@@ -13,7 +13,7 @@ edition.workspace = true
 [lib]
 name = "exec"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 bear = { path = "../bear" }
