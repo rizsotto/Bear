@@ -17,7 +17,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "bear"
-path = "src/bin/bear.rs"
+path = "src/bin/main.rs"
 
 [dependencies]
 thiserror.workspace = true
