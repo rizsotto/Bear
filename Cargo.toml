@@ -3,9 +3,16 @@
 [workspace]
 members = [
   "bear",
-  "intercept-preload"
+  "intercept-preload",
+  "intercept-wrapper"
 ]
 resolver = "2"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = 3
+codegen-units = 1
 
 [workspace.dependencies]
 thiserror = "2.0"

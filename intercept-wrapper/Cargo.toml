@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "intercept-wrapper"
+description = "A wrapper around executables for Bear to intercept build commands."
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+bear = { path = "../bear" }
+anyhow.workspace = true
+log.workspace = true
+env_logger.workspace = true
+
+[[bin]]
+name = "wrapper"
+path = "src/main.rs"
+

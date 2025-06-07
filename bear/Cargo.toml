@@ -19,10 +19,6 @@ path = "src/lib.rs"
 name = "bear"
 path = "src/bin/bear.rs"
 
-[[bin]]
-name = "wrapper"
-path = "src/bin/wrapper.rs"
-
 [dependencies]
 thiserror.workspace = true
 anyhow.workspace = true
@@ -49,11 +45,7 @@ tempfile.workspace = true
 which = "7.0"
 cc = "1.2"
 
-[profile.release]
-strip = true
-lto = true
-opt-level = 3
-codegen-units = 1
+
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
