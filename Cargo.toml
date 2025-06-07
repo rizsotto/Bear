@@ -5,7 +5,8 @@ members = [
   "platform-checks",
   "bear",
   "intercept-preload",
-  "intercept-wrapper"
+  "intercept-wrapper",
+  "integration-tests"
 ]
 resolver = "2"
 

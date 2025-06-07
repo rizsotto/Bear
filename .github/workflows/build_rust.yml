@@ -50,8 +50,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-      - run: cargo build --verbose
-      - run: cargo test --verbose
+      - name: Build all packages
+        run: cargo build --verbose
+      - name: Run unit tests
+        run: cargo test --verbose
+      - name: Run integration tests
+        run: cargo test --verbose --features allow-integration-tests
 
   doc:
     name: Generate Documentation
