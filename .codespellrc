@@ -5,4 +5,4 @@ quiet-level = 3
 
 # serde -> ser
 # abd -> source matcher for ADA files
-ignore-words-list = ser,abd
+ignore-words-list = ser,abd,exect
