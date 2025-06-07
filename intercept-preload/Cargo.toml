@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "intercept-preload"
+description = "Dynamic library to be used with Bear for LD_PRELOAD interception"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[lib]
+name = "exec"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bear = { path = "../bear" }
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[build-dependencies]
