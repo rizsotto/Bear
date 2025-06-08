@@ -95,6 +95,7 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
         .cargo_output(false)
         .cargo_warnings(false)
         .inherit_rustflags(true)
+        .define("_GNU_SOURCE", "1")
         .file(path)
         .try_compile(&format!("check_{}", symbol));
 

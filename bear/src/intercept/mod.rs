@@ -24,7 +24,7 @@ use std::{fmt, thread};
 use supervise::supervise;
 
 /// Declare the environment variables used by the intercept mode.
-const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
+pub const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
 const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 
 /// Creates a new reporter instance.
@@ -39,6 +39,11 @@ pub fn create_reporter() -> anyhow::Result<Box<dyn Reporter>> {
         .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
         // Create a new reporter
         .and_then(tcp::ReporterOnTcp::new)?;
+    Ok(Box::new(reporter))
+}
+
+pub fn create_reporter_on_tcp(address: &str) -> anyhow::Result<Box<dyn Reporter>> {
+    let reporter = tcp::ReporterOnTcp::new(address.to_string())?;
     Ok(Box::new(reporter))
 }
 
