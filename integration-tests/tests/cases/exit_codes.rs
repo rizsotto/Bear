@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::constants::{BEAR_BIN, FALSE_PATH, SLEEP_PATH, TRUE_PATH};
+use super::constants::*;
 
 use assert_cmd::cargo::cargo_bin;
 use assert_cmd::Command;
