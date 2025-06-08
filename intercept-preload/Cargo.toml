@@ -22,7 +22,7 @@ anyhow.workspace = true
 log.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-libc = "0.2"
+libc.workspace = true
 
 [build-dependencies]
 platform-checks = { path = "../platform-checks" }

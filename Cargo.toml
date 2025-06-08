@@ -10,16 +10,17 @@ members = [
 ]
 resolver = "2"
 
-[profile.release]
-strip = true
-lto = true
-opt-level = 3
-codegen-units = 1
+[workspace.package]
+version = "4.0.0"
+authors = ["László Nagy <rizsotto at gmail dot com>"]
+repository = "https://github.com/rizsotto/Bear"
+homepage = "https://github.com/rizsotto/Bear"
+license = "GPL-3"
+edition = "2021"
 
 [workspace.dependencies]
 thiserror = "2.0"
 anyhow = "1.0"
-libc = "0.2"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
 serde_yml = "0.0"
@@ -30,11 +31,15 @@ directories = "6.0"
 shell-words = "1.1"
 tempfile = { version = "3.19", default-features = false }
 signal-hook = { version = "0.3", default-features = false }
+libc = "0.2"
+which = "7.0"
+cc = "1.2"
+assert_cmd = "2.0"
+assert_fs = "1.1"
+predicates = "3.1"
 
-[workspace.package]
-version = "4.0.0"
-authors = ["László Nagy <rizsotto at gmail dot com>"]
-repository = "https://github.com/rizsotto/Bear"
-homepage = "https://github.com/rizsotto/Bear"
-license = "GPL-3"
-edition = "2021"
+[profile.release]
+strip = true
+lto = true
+opt-level = 3
+codegen-units = 1

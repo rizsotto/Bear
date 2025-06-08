@@ -35,7 +35,3 @@ signal-hook.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-anyhow.workspace = true
-assert_cmd = "2.0"
-assert_fs = "1.1"
-predicates = "3.1"

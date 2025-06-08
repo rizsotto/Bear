@@ -16,6 +16,4 @@ path = "src/lib.rs"
 
 [dependencies]
 tempfile.workspace = true
-cc = "1.2"
-
-[build-dependencies]
+cc.workspace = true

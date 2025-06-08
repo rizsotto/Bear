@@ -1,38 +1,35 @@
 [package]
 name = "integration-tests"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
 publish = false
 
 [features]
 allow-integration-tests = []
 
-[dependencies]
+[dev-dependencies]
 bear = { path = "../bear" }
 intercept-preload = { path = "../intercept-preload" }
 intercept-wrapper = { path = "../intercept-wrapper" }
-
-[dev-dependencies]
-tempfile = { version = "3.19", default-features = false }
-anyhow = "1.0"
-assert_cmd = "2.0"
-assert_fs = "1.1"
-predicates = "3.1"
+tempfile.workspace = true
+anyhow.workspace = true
+assert_cmd.workspace = true
+assert_fs.workspace = true
+predicates.workspace = true
 
 [build-dependencies]
 platform-checks = { path = "../platform-checks" }
-which = "7.0"
-
-[[bin]]
-name = "integration-deps-only"
-path = "src/build_deps.rs"
-required-features = ["allow-integration-tests"]
+which.workspace = true
 
 [[test]]
 name = "integration"
 path = "tests/integration.rs"
-harness = true
 required-features = ["allow-integration-tests"]
+harness = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
