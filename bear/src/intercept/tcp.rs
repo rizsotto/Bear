@@ -135,9 +135,8 @@ impl ReporterOnTcp {
     ///
     /// It does not open the TCP connection yet. Stores the destination
     /// address and creates a unique reporter id.
-    pub fn new(destination: String) -> Result<Self, anyhow::Error> {
-        let result = ReporterOnTcp { destination };
-        Ok(result)
+    pub fn new(destination: String) -> Self {
+        ReporterOnTcp { destination }
     }
 }
 
@@ -192,7 +191,7 @@ mod tests {
     #[test]
     fn tcp_reporter_and_collectors_work() {
         let collector = CollectorOnTcp::create().unwrap();
-        let reporter = ReporterOnTcp::new(collector.address()).unwrap();
+        let reporter = ReporterOnTcp::new(collector.address());
 
         // Create wrapper to share the collector across threads.
         let thread_collector = Arc::new(collector);

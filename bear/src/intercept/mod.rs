@@ -38,13 +38,13 @@ pub fn create_reporter() -> anyhow::Result<Box<dyn Reporter>> {
         std::env::var(KEY_DESTINATION)
         .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
         // Create a new reporter
-        .and_then(tcp::ReporterOnTcp::new)?;
+        .map(tcp::ReporterOnTcp::new)?;
     Ok(Box::new(reporter))
 }
 
-pub fn create_reporter_on_tcp(address: &str) -> anyhow::Result<Box<dyn Reporter>> {
-    let reporter = tcp::ReporterOnTcp::new(address.to_string())?;
-    Ok(Box::new(reporter))
+pub fn create_reporter_on_tcp(address: &str) -> Box<dyn Reporter> {
+    let reporter = tcp::ReporterOnTcp::new(address.to_string());
+    Box::new(reporter)
 }
 
 /// Represents the remote sink of supervised process events.
