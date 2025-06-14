@@ -10,6 +10,7 @@
 //! We are interested in the compiler passes, because those are the
 //! ones that are relevant to build a JSON compilation database.
 
+pub mod clang;
 pub mod interpreters;
 pub mod transformation;
 

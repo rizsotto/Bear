@@ -10,7 +10,6 @@
 //! The `OutputWriter` enum represents the main entry point for writing the output.
 //! The input of the `OutputWriter` is a stream of `semantic::CompilerCall` instances.
 
-mod clang;
 mod formats;
 mod json;
 mod writers;

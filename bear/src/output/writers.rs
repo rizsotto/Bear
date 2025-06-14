@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::clang::{DuplicateEntryFilter, Entry, EntryConverter};
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
+use crate::semantic::clang::{DuplicateEntryFilter, Entry, EntryConverter};
 use crate::{config, semantic};
 use anyhow::Context;
 use std::{fs, io, path};
