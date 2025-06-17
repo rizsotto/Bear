@@ -3,7 +3,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::super::{Command, Execution, Interpreter, Recognition};
+use crate::semantic::clang;
+use crate::semantic::{Command, Execution, FormatConfig, Interpreter, Recognition};
 
 const COREUTILS_MESSAGE: &str = "coreutils executable";
 const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
@@ -38,11 +39,26 @@ impl Default for IgnoreByPath {
     }
 }
 
+#[derive(Debug)]
+struct CoreutilsCommand;
+
+impl CoreutilsCommand {
+    pub fn new() -> Box<dyn Command> {
+        Box::new(Self {})
+    }
+}
+
+impl Command for CoreutilsCommand {
+    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry> {
+        vec![]
+    }
+}
+
 /// A tool to ignore a command execution by arguments.
 impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> Recognition<Box<dyn Command>> {
         if self.executables.contains(&execution.executable) {
-            Recognition::Ignored(self.reason.clone())
+            Recognition::Success(CoreutilsCommand::new())
         } else {
             Recognition::Unknown
         }
@@ -176,7 +192,7 @@ mod test {
         let sut = IgnoreByPath::new();
         let result = sut.recognize(&input);
 
-        assert!(matches!(result, Recognition::Ignored(_)));
+        assert!(matches!(result, Recognition::Success(_)));
     }
 
     #[test]

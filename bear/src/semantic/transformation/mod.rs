@@ -34,19 +34,20 @@ impl Transformation for FilterAndFormat {
         // FIXME: this is ugly, but could not find a better way to do it.
         //        The methods are returning different errors in `Result`.
         //        While this method returns a `Recognition` enum.
-        match self.format_canonical.apply(input) {
-            Ok(candidate) => match self.filter_by_compiler.apply(candidate) {
-                Ok(candidate) => match self.filter_by_source.apply(candidate) {
-                    Ok(candidate) => match self.format_by_config.apply(candidate) {
-                        Ok(candidate) => semantic::Recognition::Success(candidate),
-                        Err(error) => semantic::Recognition::Error(error.to_string()),
-                    },
-                    Err(error) => semantic::Recognition::Ignored(error.to_string()),
-                },
-                Err(error) => semantic::Recognition::Ignored(error.to_string()),
-            },
-            Err(error) => semantic::Recognition::Error(error.to_string()),
-        }
+        // match self.format_canonical.apply(input) {
+        //     Ok(candidate) => match self.filter_by_compiler.apply(candidate) {
+        //         Ok(candidate) => match self.filter_by_source.apply(candidate) {
+        //             Ok(candidate) => match self.format_by_config.apply(candidate) {
+        //                 Ok(candidate) => semantic::Recognition::Success(candidate),
+        //                 Err(error) => semantic::Recognition::Error(error.to_string()),
+        //             },
+        //             Err(error) => semantic::Recognition::Ignored(error.to_string()),
+        //         },
+        //         Err(error) => semantic::Recognition::Ignored(error.to_string()),
+        //     },
+        //     Err(error) => semantic::Recognition::Error(error.to_string()),
+        // }
+        semantic::Recognition::Success(input)
     }
 }
 

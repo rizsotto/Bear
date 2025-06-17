@@ -74,24 +74,6 @@ mod test {
     }
 
     #[test]
-    fn test_any_when_ignored() {
-        let sut = Any {
-            interpreters: vec![
-                Box::new(MockTool::NotRecognize),
-                Box::new(MockTool::RecognizeIgnored),
-                Box::new(MockTool::Recognize),
-            ],
-        };
-
-        let input = any_execution();
-
-        match sut.recognize(&input) {
-            Recognition::Ignored(_) => {}
-            _ => panic!("Expected Ignored, but got a match"),
-        }
-    }
-
-    #[test]
     fn test_any_when_match_fails() {
         let sut = Any {
             interpreters: vec![
@@ -112,7 +94,6 @@ mod test {
 
     enum MockTool {
         Recognize,
-        RecognizeIgnored,
         RecognizeFailed,
         NotRecognize,
     }
@@ -121,7 +102,6 @@ mod test {
         fn recognize(&self, _: &Execution) -> Recognition<Box<dyn Command>> {
             match self {
                 MockTool::Recognize => Recognition::Success(any_compiler_call()),
-                MockTool::RecognizeIgnored => Recognition::Ignored("reason".into()),
                 MockTool::RecognizeFailed => Recognition::Error("problem".into()),
                 MockTool::NotRecognize => Recognition::Unknown,
             }

@@ -56,10 +56,6 @@ impl SemanticAnalysis {
                 log::debug!("recognition problem: {:?}", error);
                 None
             }
-            Recognition::Ignored(reason) => {
-                log::debug!("ignored: {:?}", reason);
-                None
-            }
             Recognition::Unknown => {
                 log::debug!("not recognized");
                 None

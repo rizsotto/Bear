@@ -14,8 +14,8 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
+use crate::config;
 use crate::semantic::interpreters::generic::{CompilerCall, CompilerPass};
-use crate::{config, semantic};
 use std::{env, io, path};
 use thiserror::Error;
 
