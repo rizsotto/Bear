@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::super::interpreters::generic::{CompilerCall, CompilerPass};
 use super::Entry;
-use crate::semantic;
 use anyhow::anyhow;
 use std::path::{Path, PathBuf};
 
@@ -16,12 +16,12 @@ impl EntryConverter {
     ///
     /// The conversion is done by converting the compiler passes into entries.
     /// Errors are logged and ignored. The entries format is controlled by the configuration.
-    pub(crate) fn apply(&self, compiler_call: semantic::CompilerCall) -> Vec<Entry> {
-        let semantic::CompilerCall {
+    pub(crate) fn apply(&self, command: CompilerCall) -> Vec<Entry> {
+        let CompilerCall {
             compiler,
             working_dir,
             passes,
-        } = compiler_call;
+        } = command;
         passes
             .into_iter()
             .map(|pass| Self::try_convert_from_pass(&working_dir, &compiler, pass))
@@ -39,13 +39,13 @@ impl EntryConverter {
     fn try_convert_from_pass(
         working_dir: &Path,
         compiler: &Path,
-        pass: semantic::CompilerPass,
+        pass: CompilerPass,
     ) -> anyhow::Result<Entry> {
         match pass {
-            semantic::CompilerPass::Preprocess => {
+            CompilerPass::Preprocess => {
                 Err(anyhow!("preprocess pass should not show up in results"))
             }
-            semantic::CompilerPass::Compile {
+            CompilerPass::Compile {
                 source,
                 output,
                 flags,
@@ -102,10 +102,10 @@ mod test {
 
     #[test]
     fn test_non_compilations() {
-        let input = semantic::CompilerCall {
+        let input = CompilerCall {
             compiler: "/usr/bin/cc".into(),
             working_dir: "/home/user".into(),
-            passes: vec![semantic::CompilerPass::Preprocess],
+            passes: vec![CompilerPass::Preprocess],
         };
 
         let sut = EntryConverter::new();
@@ -117,10 +117,10 @@ mod test {
 
     #[test]
     fn test_single_source_compilation() {
-        let input = semantic::CompilerCall {
+        let input = CompilerCall {
             compiler: "/usr/bin/clang".into(),
             working_dir: "/home/user".into(),
-            passes: vec![semantic::CompilerPass::Compile {
+            passes: vec![CompilerPass::Compile {
                 source: "source.c".into(),
                 output: Some("source.o".into()),
                 flags: vec!["-Wall".into()],
@@ -141,17 +141,17 @@ mod test {
 
     #[test]
     fn test_multiple_sources_compilation() {
-        let input = semantic::CompilerCall {
+        let input = CompilerCall {
             compiler: "clang".into(),
             working_dir: "/home/user".into(),
             passes: vec![
-                semantic::CompilerPass::Preprocess,
-                semantic::CompilerPass::Compile {
+                CompilerPass::Preprocess,
+                CompilerPass::Compile {
                     source: "/tmp/source1.c".into(),
                     output: Some("./source1.o".into()),
                     flags: vec![],
                 },
-                semantic::CompilerPass::Compile {
+                CompilerPass::Compile {
                     source: "../source2.c".into(),
                     output: None,
                     flags: vec!["-Wall".into()],

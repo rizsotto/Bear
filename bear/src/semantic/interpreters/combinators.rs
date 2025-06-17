@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{CompilerCall, Execution, Interpreter, Recognition};
+use super::super::{Command, Execution, Interpreter, Recognition};
 
 /// Represents a set of interpreters, where any of them can recognize the semantic.
 /// The evaluation is done in the order of the interpreters. The first one which
@@ -18,7 +18,7 @@ impl Any {
 }
 
 impl Interpreter for Any {
-    fn recognize(&self, x: &Execution) -> Recognition<CompilerCall> {
+    fn recognize(&self, x: &Execution) -> Recognition<Box<dyn Command>> {
         for tool in &self.interpreters {
             match tool.recognize(x) {
                 Recognition::Unknown => continue,
@@ -34,7 +34,7 @@ mod test {
     use std::collections::HashMap;
     use std::path::PathBuf;
 
-    use super::super::super::CompilerCall;
+    use super::super::super::interpreters::generic::CompilerCall;
     use super::*;
 
     #[test]
@@ -118,7 +118,7 @@ mod test {
     }
 
     impl Interpreter for MockTool {
-        fn recognize(&self, _: &Execution) -> Recognition<CompilerCall> {
+        fn recognize(&self, _: &Execution) -> Recognition<Box<dyn Command>> {
             match self {
                 MockTool::Recognize => Recognition::Success(any_compiler_call()),
                 MockTool::RecognizeIgnored => Recognition::Ignored("reason".into()),
@@ -137,11 +137,11 @@ mod test {
         }
     }
 
-    fn any_compiler_call() -> CompilerCall {
-        CompilerCall {
+    fn any_compiler_call() -> Box<dyn Command> {
+        Box::new(CompilerCall {
             compiler: PathBuf::new(),
             working_dir: PathBuf::new(),
             passes: vec![],
-        }
+        })
     }
 }

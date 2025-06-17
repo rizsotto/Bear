@@ -7,6 +7,7 @@
 //! compiler call when it matches the path.
 
 use super::*;
+use crate::semantic::interpreters::generic::{CompilerCall, CompilerPass};
 use std::collections::HashMap;
 use std::path;
 
@@ -22,7 +23,7 @@ pub enum Error {
 }
 
 impl FilterByCompiler {
-    pub fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+    pub fn apply(&self, input: CompilerCall) -> Result<CompilerCall, Error> {
         if let Some(configs) = self.compilers.get(&input.compiler) {
             Self::apply_when_match_compiler(configs.as_slice(), input)
         } else {
@@ -38,8 +39,8 @@ impl FilterByCompiler {
     /// check if the compiler call matches the flags defined in the configuration.
     fn apply_when_match_compiler(
         configs: &[config::Compiler],
-        input: semantic::CompilerCall,
-    ) -> Result<semantic::CompilerCall, Error> {
+        input: CompilerCall,
+    ) -> Result<CompilerCall, Error> {
         let mut current_input = Some(input);
 
         for config in configs {
@@ -57,7 +58,7 @@ impl FilterByCompiler {
                     ignore: config::IgnoreOrConsider::Never,
                     arguments,
                     ..
-                } => current_input.map(|input| semantic::CompilerCall {
+                } => current_input.map(|input| CompilerCall {
                     compiler: input.compiler.clone(),
                     working_dir: input.working_dir.clone(),
                     passes: Self::apply_argument_changes(arguments, input.passes.as_slice()),
@@ -75,10 +76,10 @@ impl FilterByCompiler {
     ///
     /// Any compiler pass that matches the flags defined in the configuration will cause
     /// the whole compiler call to be ignored.
-    fn match_condition(arguments: &config::Arguments, passes: &[semantic::CompilerPass]) -> bool {
+    fn match_condition(arguments: &config::Arguments, passes: &[CompilerPass]) -> bool {
         let match_flags = arguments.match_.as_slice();
         passes.iter().any(|pass| match pass {
-            semantic::CompilerPass::Compile { flags, .. } => {
+            CompilerPass::Compile { flags, .. } => {
                 flags.iter().any(|flag| match_flags.contains(flag))
             }
             _ => false,
@@ -91,15 +92,15 @@ impl FilterByCompiler {
     /// Only the flags will be changed, but applies to all compiler passes.
     fn apply_argument_changes(
         arguments: &config::Arguments,
-        passes: &[semantic::CompilerPass],
-    ) -> Vec<semantic::CompilerPass> {
+        passes: &[CompilerPass],
+    ) -> Vec<CompilerPass> {
         let arguments_to_remove = arguments.remove.as_slice();
         let arguments_to_add = arguments.add.as_slice();
 
         let mut new_passes = Vec::with_capacity(passes.len());
         for pass in passes {
             match pass {
-                semantic::CompilerPass::Compile {
+                CompilerPass::Compile {
                     source,
                     output,
                     flags,
@@ -107,15 +108,13 @@ impl FilterByCompiler {
                     let mut new_flags = flags.clone();
                     new_flags.retain(|flag| !arguments_to_remove.contains(flag));
                     new_flags.extend(arguments_to_add.iter().cloned());
-                    new_passes.push(semantic::CompilerPass::Compile {
+                    new_passes.push(CompilerPass::Compile {
                         source: source.clone(),
                         output: output.clone(),
                         flags: new_flags,
                     });
                 }
-                semantic::CompilerPass::Preprocess => {
-                    new_passes.push(semantic::CompilerPass::Preprocess)
-                }
+                CompilerPass::Preprocess => new_passes.push(CompilerPass::Preprocess),
             }
         }
         new_passes
@@ -221,7 +220,6 @@ impl TryFrom<&[config::Compiler]> for FilterByCompiler {
 mod tests {
     use super::*;
     use crate::config::{Arguments, Compiler, IgnoreOrConsider};
-    use crate::semantic::{CompilerCall, CompilerPass};
     use std::path::PathBuf;
 
     #[test]

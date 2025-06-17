@@ -16,54 +16,14 @@ pub mod transformation;
 
 use super::intercept::Execution;
 use serde::Serialize;
+use std::fmt::Debug;
 use std::path::PathBuf;
 
-/// Represents an executed command semantic.
-#[derive(Debug, PartialEq, Serialize)]
-pub struct CompilerCall {
-    pub compiler: PathBuf,
-    pub working_dir: PathBuf,
-    pub passes: Vec<CompilerPass>,
-}
+#[derive(Debug, Default)]
+pub struct FormatConfig {}
 
-/// Represents a compiler call pass.
-#[derive(Debug, PartialEq, Serialize)]
-pub enum CompilerPass {
-    Preprocess,
-    Compile {
-        source: PathBuf,
-        output: Option<PathBuf>,
-        flags: Vec<String>,
-    },
-}
-
-#[cfg(test)]
-impl Clone for CompilerCall {
-    fn clone(&self) -> Self {
-        Self {
-            compiler: self.compiler.clone(),
-            working_dir: self.working_dir.clone(),
-            passes: self.passes.clone(),
-        }
-    }
-}
-
-#[cfg(test)]
-impl Clone for CompilerPass {
-    fn clone(&self) -> Self {
-        match self {
-            CompilerPass::Preprocess => CompilerPass::Preprocess,
-            CompilerPass::Compile {
-                source,
-                output,
-                flags,
-            } => CompilerPass::Compile {
-                source: source.clone(),
-                output: output.clone(),
-                flags: flags.clone(),
-            },
-        }
-    }
+pub trait Command: Debug + Send {
+    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry>;
 }
 
 /// Responsible to recognize the semantic of an executed command.
@@ -76,7 +36,7 @@ impl Clone for CompilerPass {
 /// Or classify the recognition as ignored to not be further processed
 /// later on.
 pub trait Interpreter: Send {
-    fn recognize(&self, _: &Execution) -> Recognition<CompilerCall>;
+    fn recognize(&self, _: &Execution) -> Recognition<Box<dyn Command>>;
 }
 
 /// Represents a semantic recognition result.

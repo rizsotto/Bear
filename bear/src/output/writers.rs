@@ -2,6 +2,7 @@
 
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry, EntryConverter};
+use crate::semantic::FormatConfig;
 use crate::{config, semantic};
 use anyhow::Context;
 use std::{fs, io, path};
@@ -38,8 +39,11 @@ impl TryFrom<&path::Path> for SemanticOutputWriter {
     }
 }
 
-impl IteratorWriter<semantic::CompilerCall> for SemanticOutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
+impl IteratorWriter<Box<dyn semantic::Command>> for SemanticOutputWriter {
+    fn write(
+        self,
+        semantics: impl Iterator<Item = Box<dyn semantic::Command>>,
+    ) -> anyhow::Result<()> {
         JsonSemanticDatabase::write(self.output, semantics)?;
 
         Ok(())
@@ -48,22 +52,25 @@ impl IteratorWriter<semantic::CompilerCall> for SemanticOutputWriter {
 
 /// Formats `semantic::CompilerCall` instances into `Entry` objects.
 pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
-    formatter: EntryConverter,
+    format: FormatConfig,
     writer: T,
 }
 
 impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
     pub(super) fn new(writer: T) -> Self {
-        let formatter = EntryConverter::new();
-        Self { formatter, writer }
+        let format = FormatConfig::default();
+        Self { format, writer }
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::CompilerCall>
+impl<T: IteratorWriter<Entry>> IteratorWriter<Box<dyn semantic::Command>>
     for ConverterClangOutputWriter<T>
 {
-    fn write(self, semantics: impl Iterator<Item = semantic::CompilerCall>) -> anyhow::Result<()> {
-        let entries = semantics.flat_map(|semantic| self.formatter.apply(semantic));
+    fn write(
+        self,
+        semantics: impl Iterator<Item = Box<dyn semantic::Command>>,
+    ) -> anyhow::Result<()> {
+        let entries = semantics.flat_map(|semantic| semantic.to_clang_entries(&self.format));
         self.writer.write(entries)
     }
 }

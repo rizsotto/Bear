@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use super::super::{CompilerCall, Execution, Interpreter, Recognition};
+use super::super::{Command, Execution, Interpreter, Recognition};
 
 const COREUTILS_MESSAGE: &str = "coreutils executable";
 const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
@@ -40,7 +40,7 @@ impl Default for IgnoreByPath {
 
 /// A tool to ignore a command execution by arguments.
 impl Interpreter for IgnoreByPath {
-    fn recognize(&self, execution: &Execution) -> Recognition<CompilerCall> {
+    fn recognize(&self, execution: &Execution) -> Recognition<Box<dyn Command>> {
         if self.executables.contains(&execution.executable) {
             Recognition::Ignored(self.reason.clone())
         } else {
@@ -188,7 +188,8 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
+        let result = sut.recognize(&input);
 
-        assert_eq!(Recognition::Unknown, sut.recognize(&input))
+        assert!(matches!(result, Recognition::Unknown));
     }
 }

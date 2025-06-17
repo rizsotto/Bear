@@ -7,6 +7,7 @@
 
 use super::*;
 use crate::config;
+use crate::semantic::interpreters::generic::{CompilerCall, CompilerPass};
 use std::path;
 
 #[derive(Default, Debug)]
@@ -24,12 +25,12 @@ impl FilterBySourceDir {
     // FIXME: This is currently ignore the whole compiler call if any of the
     //        pass matches the filter. This should be changed to ignore only the
     //        pass that matches the filter.
-    pub fn apply(&self, input: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+    pub fn apply(&self, input: CompilerCall) -> Result<CompilerCall, Error> {
         // Check if the compiler call matches the source directory filter
         for filter in &self.filters {
             // Check the source for each pass
             let matching = input.passes.iter().any(|pass| {
-                if let semantic::CompilerPass::Compile { source, .. } = pass {
+                if let CompilerPass::Compile { source, .. } = pass {
                     // Check if the source is in the filter directory
                     return source.starts_with(&filter.path);
                 }
@@ -121,9 +122,9 @@ impl TryFrom<&config::SourceFilter> for Vec<config::DirectoryFilter> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::{ConfigurationError, Error, FilterBySourceDir};
     use crate::config::{DirectoryFilter, Ignore, SourceFilter};
-    use crate::semantic::{CompilerCall, CompilerPass};
     use std::path::PathBuf;
 
     #[test]

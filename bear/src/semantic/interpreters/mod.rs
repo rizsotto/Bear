@@ -8,7 +8,7 @@ use crate::config;
 use std::path::PathBuf;
 
 mod combinators;
-mod generic;
+pub(crate) mod generic;
 mod ignore;
 mod matchers;
 
@@ -63,7 +63,7 @@ mod test {
     use super::*;
     use crate::config;
     use crate::intercept::{execution, Execution};
-    use crate::semantic::{CompilerCall, Recognition};
+    use crate::semantic::Recognition;
 
     #[test]
     fn test_create_interpreter_with_default_config() {
@@ -71,10 +71,8 @@ mod test {
 
         let interpreter = create(&config);
 
-        match interpreter.recognize(&EXECUTION) {
-            Recognition::Success(CompilerCall { .. }) => {}
-            _ => panic!("Expected Success, but got a match"),
-        }
+        let result = interpreter.recognize(&EXECUTION);
+        assert!(matches!(result, Recognition::Success(_)));
     }
 
     #[test]
@@ -90,10 +88,8 @@ mod test {
 
         let interpreter = create(&config);
 
-        match interpreter.recognize(&EXECUTION) {
-            Recognition::Success(CompilerCall { .. }) => {}
-            _ => panic!("Expected Success, but got a match"),
-        }
+        let result = interpreter.recognize(&EXECUTION);
+        assert!(matches!(result, Recognition::Success(_)));
     }
 
     #[test]
@@ -115,11 +111,7 @@ mod test {
         let interpreter = create(&config);
 
         let result = interpreter.recognize(&EXECUTION);
-
-        assert_eq!(
-            result,
-            Recognition::Ignored("compiler specified in config to ignore".into())
-        );
+        assert!(matches!(result, Recognition::Ignored(_)));
     }
 
     static EXECUTION: std::sync::LazyLock<Execution> = std::sync::LazyLock::new(|| {

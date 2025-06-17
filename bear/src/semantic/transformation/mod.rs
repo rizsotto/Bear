@@ -11,13 +11,14 @@ mod filter_by_source_dir;
 mod formatter;
 
 use crate::config::PathFormat;
+use crate::semantic::interpreters::generic::CompilerCall;
 use crate::{config, semantic};
 use std::io;
 use thiserror::Error;
 
 /// Responsible to transform the semantic of an executed command.
 pub trait Transformation: Send {
-    fn apply(&self, _: semantic::CompilerCall) -> semantic::Recognition<semantic::CompilerCall>;
+    fn apply(&self, _: CompilerCall) -> semantic::Recognition<CompilerCall>;
 }
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
@@ -29,10 +30,7 @@ pub struct FilterAndFormat {
 }
 
 impl Transformation for FilterAndFormat {
-    fn apply(
-        &self,
-        input: semantic::CompilerCall,
-    ) -> semantic::Recognition<semantic::CompilerCall> {
+    fn apply(&self, input: CompilerCall) -> semantic::Recognition<CompilerCall> {
         // FIXME: this is ugly, but could not find a better way to do it.
         //        The methods are returning different errors in `Result`.
         //        While this method returns a `Recognition` enum.

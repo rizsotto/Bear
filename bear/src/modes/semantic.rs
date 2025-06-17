@@ -26,30 +26,31 @@ impl TryFrom<&config::Main> for SemanticAnalysis {
 }
 
 impl SemanticAnalysis {
-    pub fn analyze(&self, event: Event) -> Option<semantic::CompilerCall> {
+    pub fn analyze(&self, event: Event) -> Option<Box<dyn semantic::Command>> {
         log::debug!("event: {}", event);
         match self.interpreter.recognize(&event.execution) {
             Recognition::Success(recognized) => {
                 log::debug!("recognized semantic: {:?}", recognized);
-                match self.transformation.apply(recognized) {
-                    Recognition::Success(transformed) => {
-                        log::debug!("transformed semantic: {:?}", transformed);
-                        Some(transformed)
-                    }
-                    Recognition::Error(error) => {
-                        log::debug!("transformation problem: {:?}", error);
-                        None
-                    }
-                    Recognition::Ignored(reason) => {
-                        log::debug!("transformation ignored: {:?}", reason);
-                        None
-                    }
-                    Recognition::Unknown => {
-                        // this never going to happen...
-                        log::debug!("transformation not recognized");
-                        None
-                    }
-                }
+                Some(recognized)
+                // match self.transformation.apply(recognized) {
+                //     Recognition::Success(transformed) => {
+                //         log::debug!("transformed semantic: {:?}", transformed);
+                //         Some(transformed)
+                //     }
+                //     Recognition::Error(error) => {
+                //         log::debug!("transformation problem: {:?}", error);
+                //         None
+                //     }
+                //     Recognition::Ignored(reason) => {
+                //         log::debug!("transformation ignored: {:?}", reason);
+                //         None
+                //     }
+                //     Recognition::Unknown => {
+                //         // this never going to happen...
+                //         log::debug!("transformation not recognized");
+                //         None
+                //     }
+                // }
             }
             Recognition::Error(error) => {
                 log::debug!("recognition problem: {:?}", error);

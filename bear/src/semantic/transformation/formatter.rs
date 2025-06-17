@@ -14,6 +14,7 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
+use crate::semantic::interpreters::generic::{CompilerCall, CompilerPass};
 use crate::{config, semantic};
 use std::{env, io, path};
 use thiserror::Error;
@@ -34,7 +35,7 @@ pub enum Error {
 }
 
 impl PathFormatter {
-    pub fn apply(&self, call: semantic::CompilerCall) -> Result<semantic::CompilerCall, Error> {
+    pub fn apply(&self, call: CompilerCall) -> Result<CompilerCall, Error> {
         match self {
             PathFormatter::SkipFormat => Ok(call),
             PathFormatter::DoFormat(config, cwd) => call.format(config, cwd),
@@ -155,12 +156,12 @@ impl config::PathResolver {
     }
 }
 
-impl semantic::CompilerCall {
+impl CompilerCall {
     pub fn format(self, config: &config::PathFormat, cwd: &path::Path) -> Result<Self, Error> {
         // The working directory is usually an absolute path.
         let working_dir = self.working_dir.canonicalize()?;
 
-        Ok(semantic::CompilerCall {
+        Ok(CompilerCall {
             compiler: self.compiler,
             working_dir: config.directory.resolve(cwd, &working_dir)?,
             passes: self
@@ -172,14 +173,14 @@ impl semantic::CompilerCall {
     }
 }
 
-impl semantic::CompilerPass {
+impl CompilerPass {
     pub fn format(
         self,
         config: &config::PathFormat,
         working_dir: &path::Path,
     ) -> Result<Self, Error> {
         match self {
-            semantic::CompilerPass::Compile {
+            CompilerPass::Compile {
                 source,
                 output,
                 flags,
@@ -188,7 +189,7 @@ impl semantic::CompilerPass {
                 let output: Option<path::PathBuf> = output
                     .map(|candidate| config.output.resolve(working_dir, &candidate))
                     .transpose()?;
-                Ok(semantic::CompilerPass::Compile {
+                Ok(CompilerPass::Compile {
                     source,
                     output,
                     flags,
@@ -203,7 +204,6 @@ impl semantic::CompilerPass {
 mod test {
     use super::*;
     use crate::config::{PathFormat, PathResolver};
-    use crate::semantic::{CompilerCall, CompilerPass};
     use std::fs;
     use std::path::PathBuf;
     use tempfile::tempdir;
