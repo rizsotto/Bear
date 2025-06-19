@@ -19,6 +19,7 @@
 //! for a compilation database), using the provided [`FormatConfig`].
 
 pub mod clang;
+pub mod command;
 pub mod interpreters;
 pub mod transformation;
 
@@ -33,7 +34,7 @@ use std::fmt::Debug;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Command {
     /// A recognized compiler command (e.g., gcc, clang).
-    Compiler(interpreters::CompilerCommand),
+    Compiler(command::CompilerCommand),
     /// A command that is intentionally ignored and not processed further.
     Ignored,
     /// A command that is filtered out and not included in the output.

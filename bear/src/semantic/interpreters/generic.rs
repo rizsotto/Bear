@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::super::command::{ArgumentGroup, ArgumentKind, CompilerCommand};
 use super::super::{Execution, Interpreter};
 use super::matchers::source::looks_like_a_source_file;
-use super::{ArgumentGroup, ArgumentKind, CompilerCommand};
 use crate::semantic::Command;
 use std::collections::HashSet;
 use std::path::PathBuf;
