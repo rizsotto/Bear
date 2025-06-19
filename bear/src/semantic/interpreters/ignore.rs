@@ -11,7 +11,7 @@ const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
 /// A tool to ignore a command execution by executable name.
 pub(super) struct IgnoreByPath {
     executables: HashSet<PathBuf>,
-    reason: String,
+    reason: &'static str,
 }
 
 impl IgnoreByPath {
@@ -19,7 +19,7 @@ impl IgnoreByPath {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
         Self {
             executables,
-            reason: COREUTILS_MESSAGE.into(),
+            reason: COREUTILS_MESSAGE,
         }
     }
 
@@ -27,7 +27,7 @@ impl IgnoreByPath {
         let executables = compilers.iter().cloned().collect();
         Self {
             executables,
-            reason: COMPILER_MESSAGE.into(),
+            reason: COMPILER_MESSAGE,
         }
     }
 }
@@ -42,7 +42,7 @@ impl Default for IgnoreByPath {
 impl Interpreter for IgnoreByPath {
     fn recognize(&self, execution: &Execution) -> Option<Command> {
         if self.executables.contains(&execution.executable) {
-            Some(Command::Ignored)
+            Some(Command::Ignored(self.reason))
         } else {
             None
         }

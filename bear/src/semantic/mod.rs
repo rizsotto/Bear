@@ -36,9 +36,9 @@ pub enum Command {
     /// A recognized compiler command (e.g., gcc, clang).
     Compiler(command::CompilerCommand),
     /// A command that is intentionally ignored and not processed further.
-    Ignored,
+    Ignored(&'static str),
     /// A command that is filtered out and not included in the output.
-    Filtered,
+    Filtered(&'static str),
 }
 
 /// Responsible for recognizing the semantic meaning of an executed command.
@@ -68,8 +68,8 @@ impl Formattable for Command {
     fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
         match self {
             Command::Compiler(cmd) => cmd.to_entries(config),
-            Command::Ignored => vec![],
-            Command::Filtered => vec![],
+            Command::Ignored(_) => vec![],
+            Command::Filtered(_) => vec![],
         }
     }
 }

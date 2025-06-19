@@ -5,7 +5,7 @@
 //! It defines how to classify arguments, group them, and convert them into entries
 //! for the final compilation database.
 
-use crate::semantic::{clang, FormatConfig};
+use crate::semantic::{clang, FormatConfig, Formattable};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -57,8 +57,14 @@ impl CompilerCommand {
             arguments,
         }
     }
+}
 
-    pub fn to_entries(&self, _config: &FormatConfig) -> Vec<clang::Entry> {
+impl Formattable for CompilerCommand {
+    /// Converts the compiler command into a list of entries for the compilation database.
+    ///
+    /// It processes the command arguments, identifies source files, and constructs
+    /// entries with the executable, arguments, working directory, and output file if present.
+    fn to_entries(&self, _config: &FormatConfig) -> Vec<clang::Entry> {
         // Find all source files in the arguments
         let source_files: Vec<String> = self
             .arguments
@@ -130,7 +136,7 @@ mod test {
             ],
         );
 
-        let config = crate::semantic::FormatConfig::default();
+        let config = FormatConfig::default();
         let entries = cmd.to_entries(&config);
 
         assert_eq!(entries.len(), 1);
@@ -165,7 +171,7 @@ mod test {
             ],
         );
 
-        let config = crate::semantic::FormatConfig::default();
+        let config = FormatConfig::default();
         let entries = cmd.to_entries(&config);
 
         assert_eq!(entries.len(), 2);
@@ -202,7 +208,7 @@ mod test {
             ],
         );
 
-        let config = crate::semantic::FormatConfig::default();
+        let config = FormatConfig::default();
         let entries = cmd.to_entries(&config);
 
         assert_eq!(entries.len(), 1);
@@ -227,7 +233,7 @@ mod test {
             }],
         );
 
-        let config = crate::semantic::FormatConfig::default();
+        let config = FormatConfig::default();
         let entries = cmd.to_entries(&config);
 
         assert_eq!(entries.len(), 0);
