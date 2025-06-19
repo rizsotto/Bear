@@ -31,7 +31,7 @@ use std::fmt::Debug;
 /// This enum aggregates different types of commands that can be recognized
 /// by the semantic analysis system.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) enum Command {
+pub enum Command {
     /// A recognized compiler command (e.g., gcc, clang).
     Compiler(interpreters::CompilerCommand),
     /// A command that is intentionally ignored and not processed further.

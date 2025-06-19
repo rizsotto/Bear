@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub struct EntryConverter {}
 
 impl EntryConverter {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 
@@ -16,7 +16,7 @@ impl EntryConverter {
     ///
     /// The conversion is done by converting the compiler passes into entries.
     /// Errors are logged and ignored. The entries format is controlled by the configuration.
-    pub(crate) fn apply(&self, command: CompilerCall) -> Vec<Entry> {
+    pub fn apply(&self, command: CompilerCall) -> Vec<Entry> {
         let CompilerCall {
             compiler,
             working_dir,

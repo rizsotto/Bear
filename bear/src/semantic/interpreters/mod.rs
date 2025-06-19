@@ -9,16 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod combinators;
-pub(crate) mod generic;
+pub mod generic;
 mod ignore;
 mod matchers;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct CompilerCommand {}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct IgnoredCommand {}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub(crate) struct FilteredCommand {}
+pub struct CompilerCommand {}
 
 impl CompilerCommand {
     pub fn new() -> Self {
@@ -28,12 +24,6 @@ impl CompilerCommand {
     pub fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
         // Convert the compiler command to entries based on the provided config.
         vec![]
-    }
-}
-
-impl IgnoredCommand {
-    pub fn new() -> Self {
-        Self {}
     }
 }
 

@@ -231,7 +231,7 @@ pub fn event(
 /// The consumer is a function that receives the events from the service and processes them.
 /// It also runs in a separate thread. The reason for having two threads is to avoid blocking
 /// the main thread of the application and decouple the collection from the processing.
-pub(crate) struct CollectorService {
+pub struct CollectorService {
     collector: Arc<dyn Collector>,
     network_thread: Option<thread::JoinHandle<()>>,
     output_thread: Option<thread::JoinHandle<()>>,
@@ -304,7 +304,7 @@ impl Drop for CollectorService {
 ///
 /// The `Preload` mode requires the path to the preload library that will be used to
 /// intercept the child processes.
-pub(crate) enum InterceptEnvironment {
+pub enum InterceptEnvironment {
     Wrapper {
         bin_dir: tempfile::TempDir,
         address: String,
