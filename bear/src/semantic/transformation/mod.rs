@@ -18,7 +18,7 @@ use thiserror::Error;
 
 /// Responsible to transform the semantic of an executed command.
 pub trait Transformation: Send {
-    fn apply(&self, _: CompilerCall) -> semantic::Recognition<CompilerCall>;
+    fn apply(&self, _: CompilerCall) -> Option<CompilerCall>;
 }
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
@@ -30,7 +30,7 @@ pub struct FilterAndFormat {
 }
 
 impl Transformation for FilterAndFormat {
-    fn apply(&self, input: CompilerCall) -> semantic::Recognition<CompilerCall> {
+    fn apply(&self, input: CompilerCall) -> Option<CompilerCall> {
         // FIXME: this is ugly, but could not find a better way to do it.
         //        The methods are returning different errors in `Result`.
         //        While this method returns a `Recognition` enum.
@@ -47,7 +47,7 @@ impl Transformation for FilterAndFormat {
         //     },
         //     Err(error) => semantic::Recognition::Error(error.to_string()),
         // }
-        semantic::Recognition::Success(input)
+        Some(input)
     }
 }
 

@@ -62,7 +62,6 @@ mod test {
     use super::*;
     use crate::config;
     use crate::intercept::{execution, Execution};
-    use crate::semantic::Recognition;
 
     #[test]
     fn test_create_interpreter_with_default_config() {
@@ -71,7 +70,7 @@ mod test {
         let interpreter = create(&config);
 
         let result = interpreter.recognize(&EXECUTION);
-        assert!(matches!(result, Recognition::Success(_)));
+        assert!(matches!(result, Some(_)));
     }
 
     #[test]
@@ -88,7 +87,7 @@ mod test {
         let interpreter = create(&config);
 
         let result = interpreter.recognize(&EXECUTION);
-        assert!(matches!(result, Recognition::Success(_)));
+        assert!(matches!(result, Some(_)));
     }
 
     // #[test]

@@ -2,8 +2,8 @@
 
 use crate::intercept::Event;
 use crate::semantic::interpreters;
+use crate::semantic::transformation;
 use crate::semantic::transformation::FilterAndFormat;
-use crate::semantic::{transformation, Recognition};
 use crate::{args, config, output, semantic};
 
 pub(super) struct SemanticAnalysis {
@@ -29,7 +29,7 @@ impl SemanticAnalysis {
     pub fn analyze(&self, event: Event) -> Option<Box<dyn semantic::Command>> {
         log::debug!("event: {}", event);
         match self.interpreter.recognize(&event.execution) {
-            Recognition::Success(recognized) => {
+            Some(recognized) => {
                 log::debug!("recognized semantic: {:?}", recognized);
                 Some(recognized)
                 // match self.transformation.apply(recognized) {
@@ -52,11 +52,7 @@ impl SemanticAnalysis {
                 //     }
                 // }
             }
-            Recognition::Error(error) => {
-                log::debug!("recognition problem: {:?}", error);
-                None
-            }
-            Recognition::Unknown => {
+            None => {
                 log::debug!("not recognized");
                 None
             }

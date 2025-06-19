@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{Command, Execution, Interpreter, Recognition};
+use super::super::{Command, Execution, Interpreter};
 
 /// Represents a set of interpreters, where any of them can recognize the semantic.
 /// The evaluation is done in the order of the interpreters. The first one which
@@ -18,14 +18,14 @@ impl Any {
 }
 
 impl Interpreter for Any {
-    fn recognize(&self, x: &Execution) -> Recognition<Box<dyn Command>> {
+    fn recognize(&self, x: &Execution) -> Option<Box<dyn Command>> {
         for tool in &self.interpreters {
             match tool.recognize(x) {
-                Recognition::Unknown => continue,
+                None => continue,
                 result => return result,
             }
         }
-        Recognition::Unknown
+        None
     }
 }
 
@@ -47,12 +47,12 @@ mod test {
             ],
         };
 
-        let input = any_execution();
+        let input = execution_fixture();
 
-        match sut.recognize(&input) {
-            Recognition::Unknown => {}
-            _ => panic!("Expected Unknown, but got a match"),
-        }
+        assert!(
+            matches!(sut.recognize(&input), None),
+            "Expected None, but got a match"
+        );
     }
 
     #[test]
@@ -65,50 +65,29 @@ mod test {
             ],
         };
 
-        let input = any_execution();
+        let input = execution_fixture();
 
-        match sut.recognize(&input) {
-            Recognition::Success(_) => {}
-            _ => panic!("Expected Success, but got a match"),
-        }
-    }
-
-    #[test]
-    fn test_any_when_match_fails() {
-        let sut = Any {
-            interpreters: vec![
-                Box::new(MockTool::NotRecognize),
-                Box::new(MockTool::RecognizeFailed),
-                Box::new(MockTool::Recognize),
-                Box::new(MockTool::NotRecognize),
-            ],
-        };
-
-        let input = any_execution();
-
-        match sut.recognize(&input) {
-            Recognition::Error(_) => {}
-            _ => panic!("Expected Error, but got a match"),
-        }
+        assert!(
+            matches!(sut.recognize(&input), Some(_)),
+            "Expected Some(_), got a match"
+        );
     }
 
     enum MockTool {
         Recognize,
-        RecognizeFailed,
         NotRecognize,
     }
 
     impl Interpreter for MockTool {
-        fn recognize(&self, _: &Execution) -> Recognition<Box<dyn Command>> {
+        fn recognize(&self, _: &Execution) -> Option<Box<dyn Command>> {
             match self {
-                MockTool::Recognize => Recognition::Success(any_compiler_call()),
-                MockTool::RecognizeFailed => Recognition::Error("problem".into()),
-                MockTool::NotRecognize => Recognition::Unknown,
+                MockTool::Recognize => Some(command_fixture()),
+                MockTool::NotRecognize => None,
             }
         }
     }
 
-    fn any_execution() -> Execution {
+    fn execution_fixture() -> Execution {
         Execution {
             executable: PathBuf::new(),
             arguments: vec![],
@@ -117,7 +96,7 @@ mod test {
         }
     }
 
-    fn any_compiler_call() -> Box<dyn Command> {
+    fn command_fixture() -> Box<dyn Command> {
         Box::new(CompilerCall {
             compiler: PathBuf::new(),
             working_dir: PathBuf::new(),

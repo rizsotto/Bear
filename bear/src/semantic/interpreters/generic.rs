@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{Execution, Interpreter, Recognition};
+use super::super::{Execution, Interpreter};
 use super::matchers::source::looks_like_a_source_file;
 use crate::semantic::{clang, Command, FormatConfig};
-use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
 /// Represents an executed command semantic.
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
 pub struct CompilerCall {
     pub compiler: PathBuf,
     pub working_dir: PathBuf,
@@ -23,7 +22,7 @@ impl Command for CompilerCall {
 }
 
 /// Represents a compiler call pass.
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq)]
 pub enum CompilerPass {
     Preprocess,
     Compile {
@@ -60,6 +59,25 @@ impl Clone for CompilerPass {
     }
 }
 
+#[derive(Debug, PartialEq)]
+struct FailedCompilerCall {
+    reason: String,
+}
+
+impl FailedCompilerCall {
+    pub fn new(reason: &str) -> Self {
+        Self {
+            reason: reason.to_string(),
+        }
+    }
+}
+
+impl Command for FailedCompilerCall {
+    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry> {
+        vec![]
+    }
+}
+
 /// A tool to recognize a compiler by executable name.
 pub(super) struct Generic {
     executables: HashSet<PathBuf>,
@@ -77,7 +95,7 @@ impl Interpreter for Generic {
     /// - the executable name,
     /// - one of the arguments is a source file,
     /// - the rest of the arguments are flags.
-    fn recognize(&self, x: &Execution) -> Recognition<Box<dyn Command>> {
+    fn recognize(&self, x: &Execution) -> Option<Box<dyn Command>> {
         if self.executables.contains(&x.executable) {
             let mut flags = vec![];
             let mut sources = vec![];
@@ -92,9 +110,11 @@ impl Interpreter for Generic {
             }
 
             if sources.is_empty() {
-                Recognition::Error(String::from("source file is not found"))
+                Some(Box::new(FailedCompilerCall::new(
+                    "source file is not found",
+                )))
             } else {
-                Recognition::Success(Box::new(CompilerCall {
+                Some(Box::new(CompilerCall {
                     compiler: x.executable.clone(),
                     working_dir: x.working_dir.clone(),
                     passes: sources
@@ -108,7 +128,7 @@ impl Interpreter for Generic {
                 }))
             }
         } else {
-            Recognition::Unknown
+            None
         }
     }
 }
@@ -150,7 +170,7 @@ mod test {
         // };
         let result = SUT.recognize(&input);
 
-        assert!(matches!(result, Recognition::Success(_)));
+        assert!(matches!(result, Some(_)));
     }
 
     #[test]
@@ -163,7 +183,7 @@ mod test {
         );
         let result = SUT.recognize(&input);
 
-        assert!(matches!(result, Recognition::Error(_)));
+        assert!(matches!(result, Some(_)));
     }
 
     #[test]
@@ -176,7 +196,7 @@ mod test {
         );
         let result = SUT.recognize(&input);
 
-        assert!(matches!(result, Recognition::Unknown));
+        assert!(matches!(result, None));
     }
 
     static SUT: std::sync::LazyLock<Generic> = std::sync::LazyLock::new(|| Generic {
