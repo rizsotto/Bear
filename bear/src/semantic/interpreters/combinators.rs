@@ -96,11 +96,6 @@ mod test {
     }
 
     fn command_fixture() -> Command {
-        Command::Compiler(CompilerCommand {})
-        // CompilerCall {
-        //     compiler: PathBuf::new(),
-        //     working_dir: PathBuf::new(),
-        //     passes: vec![],
-        // }
+        Command::Compiler(CompilerCommand::new(PathBuf::new(), PathBuf::new(), vec![]))
     }
 }

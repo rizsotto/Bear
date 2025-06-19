@@ -14,14 +14,37 @@ mod ignore;
 mod matchers;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CompilerCommand {}
+pub enum ArgumentKind {
+    Compiler,
+    Source,
+    Output,
+    Switch,
+    Other,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Argument {
+    pub args: Vec<String>,
+    pub kind: ArgumentKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CompilerCommand {
+    pub working_dir: PathBuf,
+    pub executable: PathBuf,
+    pub arguments: Vec<Argument>,
+}
 
 impl CompilerCommand {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(working_dir: PathBuf, executable: PathBuf, arguments: Vec<Argument>) -> Self {
+        Self {
+            working_dir,
+            executable,
+            arguments,
+        }
     }
 
-    pub fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
+    pub fn to_entries(&self, _config: &FormatConfig) -> Vec<clang::Entry> {
         // Convert the compiler command to entries based on the provided config.
         vec![]
     }
