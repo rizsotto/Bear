@@ -2,7 +2,7 @@
 
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
-use crate::semantic::FormatConfig;
+use crate::semantic::{FormatConfig, Formattable};
 use crate::{config, semantic};
 use anyhow::Context;
 use std::{fs, io, path};
@@ -39,11 +39,8 @@ impl TryFrom<&path::Path> for SemanticOutputWriter {
     }
 }
 
-impl IteratorWriter<Box<dyn semantic::Command>> for SemanticOutputWriter {
-    fn write(
-        self,
-        semantics: impl Iterator<Item = Box<dyn semantic::Command>>,
-    ) -> anyhow::Result<()> {
+impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> anyhow::Result<()> {
         JsonSemanticDatabase::write(self.output, semantics)?;
 
         Ok(())
@@ -63,14 +60,9 @@ impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<Box<dyn semantic::Command>>
-    for ConverterClangOutputWriter<T>
-{
-    fn write(
-        self,
-        semantics: impl Iterator<Item = Box<dyn semantic::Command>>,
-    ) -> anyhow::Result<()> {
-        let entries = semantics.flat_map(|semantic| semantic.to_clang_entries(&self.format));
+impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> anyhow::Result<()> {
+        let entries = semantics.flat_map(|semantic| semantic.to_entries(&self.format));
         self.writer.write(entries)
     }
 }

@@ -3,8 +3,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use crate::semantic::clang;
-use crate::semantic::{Command, Execution, FormatConfig, Interpreter};
+use crate::semantic::{Command, Execution, Interpreter};
 
 const COREUTILS_MESSAGE: &str = "coreutils executable";
 const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
@@ -39,26 +38,11 @@ impl Default for IgnoreByPath {
     }
 }
 
-#[derive(Debug)]
-struct CoreutilsCommand;
-
-impl CoreutilsCommand {
-    pub fn new() -> Box<dyn Command> {
-        Box::new(Self {})
-    }
-}
-
-impl Command for CoreutilsCommand {
-    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry> {
-        vec![]
-    }
-}
-
 /// A tool to ignore a command execution by arguments.
 impl Interpreter for IgnoreByPath {
-    fn recognize(&self, execution: &Execution) -> Option<Box<dyn Command>> {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
         if self.executables.contains(&execution.executable) {
-            Some(CoreutilsCommand::new())
+            Some(Command::Ignored)
         } else {
             None
         }

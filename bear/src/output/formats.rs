@@ -101,16 +101,14 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
 /// The output format is not stable and may change in future versions.
 pub struct JsonSemanticDatabase;
 
-impl FileFormat<Box<dyn semantic::Command>> for JsonSemanticDatabase {
+impl FileFormat<semantic::Command> for JsonSemanticDatabase {
     fn write(
         writer: impl io::Write,
-        entries: impl Iterator<Item = Box<dyn semantic::Command>>,
+        entries: impl Iterator<Item = semantic::Command>,
     ) -> Result<(), Error> {
-        // FIXME!!!
-        //json::serialize_seq(writer, entries).map_err(Error::Json)
-        Ok(())
+        json::serialize_seq(writer, entries).map_err(Error::Json)
     }
-    fn read(_: impl io::Read) -> impl Iterator<Item = Result<Box<dyn semantic::Command>, Error>> {
+    fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::Command, Error>> {
         // Not implemented! (No reader for the semantic output in this project.)
         std::iter::empty()
     }

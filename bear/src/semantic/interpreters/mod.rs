@@ -3,14 +3,39 @@
 use super::interpreters::combinators::Any;
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
-use super::Interpreter;
+use super::{clang, FormatConfig, Interpreter};
 use crate::config;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod combinators;
 pub(crate) mod generic;
 mod ignore;
 mod matchers;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct CompilerCommand {}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct IgnoredCommand {}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct FilteredCommand {}
+
+impl CompilerCommand {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
+        // Convert the compiler command to entries based on the provided config.
+        vec![]
+    }
+}
+
+impl IgnoredCommand {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 /// Creates an interpreter to recognize the compiler calls.
 ///

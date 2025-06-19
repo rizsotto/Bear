@@ -10,9 +10,8 @@ mod filter_by_compiler;
 mod filter_by_source_dir;
 mod formatter;
 
-use crate::config::PathFormat;
+use crate::config;
 use crate::semantic::interpreters::generic::CompilerCall;
-use crate::{config, semantic};
 use std::io;
 use thiserror::Error;
 
@@ -76,7 +75,7 @@ impl TryFrom<&config::Output> for FilterAndFormat {
                     log::warn!("Access to the filesystem is disabled in source filters.");
                 }
                 let format_canonical = if sources.only_existing_files {
-                    let canonical_config = PathFormat::default();
+                    let canonical_config = config::PathFormat::default();
                     formatter::PathFormatter::try_from(&canonical_config)?
                 } else {
                     formatter::PathFormatter::default()

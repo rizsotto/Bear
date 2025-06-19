@@ -74,7 +74,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
 impl OutputWriter {
     pub(crate) fn write(
         self,
-        semantics: impl Iterator<Item = Box<dyn semantic::Command>>,
+        semantics: impl Iterator<Item = semantic::Command>,
     ) -> anyhow::Result<()> {
         match self {
             Self::Clang(writer) => writer.write(semantics),

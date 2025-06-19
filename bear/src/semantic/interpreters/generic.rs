@@ -15,12 +15,6 @@ pub struct CompilerCall {
     pub passes: Vec<CompilerPass>,
 }
 
-impl Command for CompilerCall {
-    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry> {
-        clang::EntryConverter::new().apply(self.clone())
-    }
-}
-
 /// Represents a compiler call pass.
 #[derive(Debug, PartialEq)]
 pub enum CompilerPass {
@@ -64,20 +58,6 @@ struct FailedCompilerCall {
     reason: String,
 }
 
-impl FailedCompilerCall {
-    pub fn new(reason: &str) -> Self {
-        Self {
-            reason: reason.to_string(),
-        }
-    }
-}
-
-impl Command for FailedCompilerCall {
-    fn to_clang_entries(&self, _: &FormatConfig) -> Vec<clang::Entry> {
-        vec![]
-    }
-}
-
 /// A tool to recognize a compiler by executable name.
 pub(super) struct Generic {
     executables: HashSet<PathBuf>,
@@ -95,42 +75,43 @@ impl Interpreter for Generic {
     /// - the executable name,
     /// - one of the arguments is a source file,
     /// - the rest of the arguments are flags.
-    fn recognize(&self, x: &Execution) -> Option<Box<dyn Command>> {
-        if self.executables.contains(&x.executable) {
-            let mut flags = vec![];
-            let mut sources = vec![];
-
-            // find sources and filter out requested flags.
-            for argument in x.arguments.iter().skip(1) {
-                if looks_like_a_source_file(argument.as_str()) {
-                    sources.push(PathBuf::from(argument));
-                } else {
-                    flags.push(argument.clone());
-                }
-            }
-
-            if sources.is_empty() {
-                Some(Box::new(FailedCompilerCall::new(
-                    "source file is not found",
-                )))
-            } else {
-                Some(Box::new(CompilerCall {
-                    compiler: x.executable.clone(),
-                    working_dir: x.working_dir.clone(),
-                    passes: sources
-                        .iter()
-                        .map(|source| CompilerPass::Compile {
-                            source: source.clone(),
-                            output: None,
-                            flags: flags.clone(),
-                        })
-                        .collect(),
-                }))
-            }
-        } else {
-            None
-        }
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        None
     }
+    // fn recognize(&self, x: &Execution) -> Option<CompilerCall> {
+    //     if self.executables.contains(&x.executable) {
+    //         let mut flags = vec![];
+    //         let mut sources = vec![];
+    //
+    //         // find sources and filter out requested flags.
+    //         for argument in x.arguments.iter().skip(1) {
+    //             if looks_like_a_source_file(argument.as_str()) {
+    //                 sources.push(PathBuf::from(argument));
+    //             } else {
+    //                 flags.push(argument.clone());
+    //             }
+    //         }
+    //
+    //         if sources.is_empty() {
+    //             None
+    //         } else {
+    //             Some(CompilerCall {
+    //                 compiler: x.executable.clone(),
+    //                 working_dir: x.working_dir.clone(),
+    //                 passes: sources
+    //                     .iter()
+    //                     .map(|source| CompilerPass::Compile {
+    //                         source: source.clone(),
+    //                         output: None,
+    //                         flags: flags.clone(),
+    //                     })
+    //                     .collect(),
+    //             })
+    //         }
+    //     } else {
+    //         None
+    //     }
+    // }
 }
 
 #[cfg(test)]

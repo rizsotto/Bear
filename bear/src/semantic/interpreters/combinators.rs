@@ -18,7 +18,7 @@ impl Any {
 }
 
 impl Interpreter for Any {
-    fn recognize(&self, x: &Execution) -> Option<Box<dyn Command>> {
+    fn recognize(&self, x: &Execution) -> Option<Command> {
         for tool in &self.interpreters {
             match tool.recognize(x) {
                 None => continue,
@@ -31,11 +31,10 @@ impl Interpreter for Any {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::semantic::interpreters::CompilerCommand;
     use std::collections::HashMap;
     use std::path::PathBuf;
-
-    use super::super::super::interpreters::generic::CompilerCall;
-    use super::*;
 
     #[test]
     fn test_any_when_no_match() {
@@ -79,7 +78,7 @@ mod test {
     }
 
     impl Interpreter for MockTool {
-        fn recognize(&self, _: &Execution) -> Option<Box<dyn Command>> {
+        fn recognize(&self, _: &Execution) -> Option<Command> {
             match self {
                 MockTool::Recognize => Some(command_fixture()),
                 MockTool::NotRecognize => None,
@@ -96,11 +95,12 @@ mod test {
         }
     }
 
-    fn command_fixture() -> Box<dyn Command> {
-        Box::new(CompilerCall {
-            compiler: PathBuf::new(),
-            working_dir: PathBuf::new(),
-            passes: vec![],
-        })
+    fn command_fixture() -> Command {
+        Command::Compiler(CompilerCommand {})
+        // CompilerCall {
+        //     compiler: PathBuf::new(),
+        //     working_dir: PathBuf::new(),
+        //     passes: vec![],
+        // }
     }
 }
