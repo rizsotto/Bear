@@ -45,8 +45,48 @@ impl CompilerCommand {
     }
 
     pub fn to_entries(&self, _config: &FormatConfig) -> Vec<clang::Entry> {
-        // Convert the compiler command to entries based on the provided config.
-        vec![]
+        // Find all source files in the arguments
+        let source_files: Vec<String> = self
+            .arguments
+            .iter()
+            .filter(|arg| arg.kind == ArgumentKind::Source)
+            .flat_map(|arg| &arg.args)
+            .cloned()
+            .collect();
+
+        // If no source files found, return empty vector
+        if source_files.is_empty() {
+            return vec![];
+        }
+
+        // Build the full command arguments by flattening all argument args
+        let mut command_args = vec![self.executable.to_string_lossy().to_string()];
+        for arg in &self.arguments {
+            command_args.extend(arg.args.iter().cloned());
+        }
+
+        // Find output file if present
+        let output_file = self
+            .arguments
+            .iter()
+            .filter(|arg| arg.kind == ArgumentKind::Output)
+            .flat_map(|arg| &arg.args)
+            .skip(1) // Skip the "-o" flag itself, take the output filename
+            .next()
+            .map(|s| PathBuf::from(s));
+
+        // Create one entry per source file
+        source_files
+            .into_iter()
+            .map(|source_file| {
+                clang::Entry::from_arguments(
+                    source_file,
+                    command_args.clone(),
+                    &self.working_dir,
+                    output_file.as_ref(),
+                )
+            })
+            .collect()
     }
 }
 
@@ -158,4 +198,128 @@ mod test {
             HashMap::new(),
         )
     });
+
+    #[test]
+    fn test_compiler_command_to_entries_single_source() {
+        let cmd = CompilerCommand::new(
+            PathBuf::from("/home/user"),
+            PathBuf::from("/usr/bin/gcc"),
+            vec![
+                Argument {
+                    args: vec!["-c".to_string()],
+                    kind: ArgumentKind::Switch,
+                },
+                Argument {
+                    args: vec!["-Wall".to_string()],
+                    kind: ArgumentKind::Switch,
+                },
+                Argument {
+                    args: vec!["main.c".to_string()],
+                    kind: ArgumentKind::Source,
+                },
+            ],
+        );
+
+        let config = crate::semantic::FormatConfig::default();
+        let entries = cmd.to_entries(&config);
+
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.file, PathBuf::from("main.c"));
+        assert_eq!(entry.directory, PathBuf::from("/home/user"));
+        assert_eq!(
+            entry.arguments,
+            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c"]
+        );
+        assert_eq!(entry.output, None);
+    }
+
+    #[test]
+    fn test_compiler_command_to_entries_multiple_sources() {
+        let cmd = CompilerCommand::new(
+            PathBuf::from("/home/user"),
+            PathBuf::from("/usr/bin/g++"),
+            vec![
+                Argument {
+                    args: vec!["-c".to_string()],
+                    kind: ArgumentKind::Switch,
+                },
+                Argument {
+                    args: vec!["file1.cpp".to_string()],
+                    kind: ArgumentKind::Source,
+                },
+                Argument {
+                    args: vec!["file2.cpp".to_string()],
+                    kind: ArgumentKind::Source,
+                },
+            ],
+        );
+
+        let config = crate::semantic::FormatConfig::default();
+        let entries = cmd.to_entries(&config);
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].file, PathBuf::from("file1.cpp"));
+        assert_eq!(entries[1].file, PathBuf::from("file2.cpp"));
+
+        for entry in &entries {
+            assert_eq!(entry.directory, PathBuf::from("/home/user"));
+            assert_eq!(
+                entry.arguments,
+                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"]
+            );
+        }
+    }
+
+    #[test]
+    fn test_compiler_command_to_entries_with_output() {
+        let cmd = CompilerCommand::new(
+            PathBuf::from("/tmp"),
+            PathBuf::from("clang"),
+            vec![
+                Argument {
+                    args: vec!["-c".to_string()],
+                    kind: ArgumentKind::Switch,
+                },
+                Argument {
+                    args: vec!["-o".to_string(), "main.o".to_string()],
+                    kind: ArgumentKind::Output,
+                },
+                Argument {
+                    args: vec!["main.c".to_string()],
+                    kind: ArgumentKind::Source,
+                },
+            ],
+        );
+
+        let config = crate::semantic::FormatConfig::default();
+        let entries = cmd.to_entries(&config);
+
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.file, PathBuf::from("main.c"));
+        assert_eq!(entry.directory, PathBuf::from("/tmp"));
+        assert_eq!(
+            entry.arguments,
+            vec!["clang", "-c", "-o", "main.o", "main.c"]
+        );
+        assert_eq!(entry.output, Some(PathBuf::from("main.o")));
+    }
+
+    #[test]
+    fn test_compiler_command_to_entries_no_sources() {
+        let cmd = CompilerCommand::new(
+            PathBuf::from("/home/user"),
+            PathBuf::from("gcc"),
+            vec![Argument {
+                args: vec!["--version".to_string()],
+                kind: ArgumentKind::Switch,
+            }],
+        );
+
+        let config = crate::semantic::FormatConfig::default();
+        let entries = cmd.to_entries(&config);
+
+        assert_eq!(entries.len(), 0);
+    }
 }
