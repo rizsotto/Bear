@@ -2,7 +2,7 @@
 
 use super::super::{Execution, Interpreter};
 use super::matchers::source::looks_like_a_source_file;
-use super::{Argument, ArgumentKind, CompilerCommand};
+use super::{ArgumentGroup, ArgumentKind, CompilerCommand};
 use crate::semantic::Command;
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -83,7 +83,7 @@ impl Interpreter for Generic {
 
         // First argument is the compiler itself
         if let Some(first) = iter.next() {
-            annotated_args.push(Argument {
+            annotated_args.push(ArgumentGroup {
                 args: vec![first.clone()],
                 kind: ArgumentKind::Compiler,
             });
@@ -91,18 +91,18 @@ impl Interpreter for Generic {
 
         while let Some(arg) = iter.next() {
             if looks_like_a_source_file(arg) {
-                annotated_args.push(Argument {
+                annotated_args.push(ArgumentGroup {
                     args: vec![arg.clone()],
                     kind: ArgumentKind::Source,
                 });
             } else if arg == "-o" {
                 if let Some(output) = iter.next() {
-                    annotated_args.push(Argument {
+                    annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone(), output.clone()],
                         kind: ArgumentKind::Output,
                     });
                 } else {
-                    annotated_args.push(Argument {
+                    annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
                         kind: ArgumentKind::Switch,
                     });
@@ -111,24 +111,24 @@ impl Interpreter for Generic {
                 // Handle switches with values (e.g., -I include, -D define)
                 if (arg == "-I" || arg == "-D" || arg == "-L") && iter.peek().is_some() {
                     let value = iter.next().unwrap();
-                    annotated_args.push(Argument {
+                    annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone(), value.clone()],
                         kind: ArgumentKind::Switch,
                     });
                 } else if arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-L") {
                     // Handle combined flags like -I. or -DFOO=bar
-                    annotated_args.push(Argument {
+                    annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
                         kind: ArgumentKind::Switch,
                     });
                 } else {
-                    annotated_args.push(Argument {
+                    annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
                         kind: ArgumentKind::Switch,
                     });
                 }
             } else {
-                annotated_args.push(Argument {
+                annotated_args.push(ArgumentGroup {
                     args: vec![arg.clone()],
                     kind: ArgumentKind::Other,
                 });

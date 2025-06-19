@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! This module provides types and logic for interpreting and representing compiler commands.
+//!
+//! It defines how to classify arguments, group them, and convert them into entries suitable
+//! for further processing (e.g., for use with Clang tooling).
+
 use super::interpreters::combinators::Any;
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
@@ -13,6 +18,37 @@ pub mod generic;
 mod ignore;
 mod matchers;
 
+/// Represents a full compiler command invocation.
+///
+/// The [`working_dir`] is the directory where the command is executed,
+/// the [`executable`] is the path to the compiler binary,
+/// while [`arguments`] contains the command-line arguments annotated
+/// with their meaning (e.g., source files, output files, switches).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CompilerCommand {
+    pub working_dir: PathBuf,
+    pub executable: PathBuf,
+    pub arguments: Vec<ArgumentGroup>,
+}
+
+/// Represents a group of arguments of the same intent.
+///
+/// Groups the arguments which belongs together, and annotate the meaning of them.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ArgumentGroup {
+    pub args: Vec<String>,
+    pub kind: ArgumentKind,
+}
+
+/// Represents the meaning of the argument in the compiler call. Identifies
+/// the purpose of each argument in the command line.
+///
+/// Variants:
+/// - `Compiler`: The compiler executable itself.
+/// - `Source`: A source file to be compiled.
+/// - `Output`: An output file or related argument (e.g., `-o output.o`).
+/// - `Switch`: A compiler switch or flag (e.g., `-Wall`).
+/// - `Other`: Any other argument not classified above.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArgumentKind {
     Compiler,
@@ -22,21 +58,8 @@ pub enum ArgumentKind {
     Other,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Argument {
-    pub args: Vec<String>,
-    pub kind: ArgumentKind,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CompilerCommand {
-    pub working_dir: PathBuf,
-    pub executable: PathBuf,
-    pub arguments: Vec<Argument>,
-}
-
 impl CompilerCommand {
-    pub fn new(working_dir: PathBuf, executable: PathBuf, arguments: Vec<Argument>) -> Self {
+    pub fn new(working_dir: PathBuf, executable: PathBuf, arguments: Vec<ArgumentGroup>) -> Self {
         Self {
             working_dir,
             executable,
@@ -205,15 +228,15 @@ mod test {
             PathBuf::from("/home/user"),
             PathBuf::from("/usr/bin/gcc"),
             vec![
-                Argument {
+                ArgumentGroup {
                     args: vec!["-c".to_string()],
                     kind: ArgumentKind::Switch,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["-Wall".to_string()],
                     kind: ArgumentKind::Switch,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["main.c".to_string()],
                     kind: ArgumentKind::Source,
                 },
@@ -240,15 +263,15 @@ mod test {
             PathBuf::from("/home/user"),
             PathBuf::from("/usr/bin/g++"),
             vec![
-                Argument {
+                ArgumentGroup {
                     args: vec!["-c".to_string()],
                     kind: ArgumentKind::Switch,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["file1.cpp".to_string()],
                     kind: ArgumentKind::Source,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["file2.cpp".to_string()],
                     kind: ArgumentKind::Source,
                 },
@@ -277,15 +300,15 @@ mod test {
             PathBuf::from("/tmp"),
             PathBuf::from("clang"),
             vec![
-                Argument {
+                ArgumentGroup {
                     args: vec!["-c".to_string()],
                     kind: ArgumentKind::Switch,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["-o".to_string(), "main.o".to_string()],
                     kind: ArgumentKind::Output,
                 },
-                Argument {
+                ArgumentGroup {
                     args: vec!["main.c".to_string()],
                     kind: ArgumentKind::Source,
                 },
@@ -311,7 +334,7 @@ mod test {
         let cmd = CompilerCommand::new(
             PathBuf::from("/home/user"),
             PathBuf::from("gcc"),
-            vec![Argument {
+            vec![ArgumentGroup {
                 args: vec!["--version".to_string()],
                 kind: ArgumentKind::Switch,
             }],
