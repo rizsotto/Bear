@@ -39,12 +39,23 @@ pub struct ArgumentGroup {
 /// - `Source`: A source file to be compiled.
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
 /// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
+///   Can optionally specify which compiler pass the argument affects.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArgumentKind {
     Compiler,
     Source,
     Output,
-    Other,
+    Other(Option<CompilerPass>),
+}
+
+/// Represents different compiler passes that an argument might affect.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CompilerPass {
+    Info,
+    Preprocessing,
+    Compiling,
+    Assembling,
+    Linking,
 }
 
 impl CompilerCommand {
@@ -67,7 +78,7 @@ impl Formattable for CompilerCommand {
         let source_files: Vec<String> = self
             .arguments
             .iter()
-            .filter(|arg| arg.kind == ArgumentKind::Source)
+            .filter(|arg| matches!(arg.kind, ArgumentKind::Source))
             .flat_map(|arg| &arg.args)
             .cloned()
             .collect();
@@ -87,7 +98,7 @@ impl Formattable for CompilerCommand {
         let output_file = self
             .arguments
             .iter()
-            .filter(|arg| arg.kind == ArgumentKind::Output)
+            .filter(|arg| matches!(arg.kind, ArgumentKind::Output))
             .flat_map(|arg| &arg.args)
             .skip(1) // Skip the "-o" flag itself, take the output filename
             .next()
@@ -121,11 +132,11 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Other,
+                    kind: ArgumentKind::Other(Some(CompilerPass::Compiling)),
                 },
                 ArgumentGroup {
                     args: vec!["-Wall".to_string()],
-                    kind: ArgumentKind::Other,
+                    kind: ArgumentKind::Other(None),
                 },
                 ArgumentGroup {
                     args: vec!["main.c".to_string()],
@@ -156,7 +167,7 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Other,
+                    kind: ArgumentKind::Other(Some(CompilerPass::Compiling)),
                 },
                 ArgumentGroup {
                     args: vec!["file1.cpp".to_string()],
@@ -193,7 +204,7 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Other,
+                    kind: ArgumentKind::Other(Some(CompilerPass::Compiling)),
                 },
                 ArgumentGroup {
                     args: vec!["-o".to_string(), "main.o".to_string()],
@@ -227,7 +238,7 @@ mod test {
             PathBuf::from("gcc"),
             vec![ArgumentGroup {
                 args: vec!["--version".to_string()],
-                kind: ArgumentKind::Other,
+                kind: ArgumentKind::Other(Some(CompilerPass::Info)),
             }],
         );
 

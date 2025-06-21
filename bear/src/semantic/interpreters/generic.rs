@@ -104,7 +104,7 @@ impl Interpreter for Generic {
                 } else {
                     annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
-                        kind: ArgumentKind::Other,
+                        kind: ArgumentKind::Other(None),
                     });
                 }
             } else if arg.starts_with('-') {
@@ -113,24 +113,24 @@ impl Interpreter for Generic {
                     let value = iter.next().unwrap();
                     annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone(), value.clone()],
-                        kind: ArgumentKind::Other,
+                        kind: ArgumentKind::Other(None),
                     });
                 } else if arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-L") {
                     // Handle combined flags like -I. or -DFOO=bar
                     annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
-                        kind: ArgumentKind::Other,
+                        kind: ArgumentKind::Other(None),
                     });
                 } else {
                     annotated_args.push(ArgumentGroup {
                         args: vec![arg.clone()],
-                        kind: ArgumentKind::Other,
+                        kind: ArgumentKind::Other(None),
                     });
                 }
             } else {
                 annotated_args.push(ArgumentGroup {
                     args: vec![arg.clone()],
-                    kind: ArgumentKind::Other,
+                    kind: ArgumentKind::Other(None),
                 });
             }
         }
@@ -179,11 +179,11 @@ mod test {
                 assert_eq!(cmd.arguments[0].args, vec!["something"]);
 
                 // Check switch argument
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[1].args, vec!["-Dthis=that"]);
 
                 // Check switch with value (combined form)
-                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[2].args, vec!["-I."]);
 
                 // Check source file
@@ -219,7 +219,7 @@ mod test {
                 assert_eq!(cmd.arguments[0].args, vec!["something"]);
 
                 // Check switch argument
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[1].args, vec!["--help"]);
             }
             _ => panic!("Expected Some(Command::Compiler(_))"),
@@ -276,27 +276,27 @@ mod test {
                 assert_eq!(cmd.arguments[0].args, vec!["gcc"]);
 
                 // Check various switches
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[1].args, vec!["-c"]);
 
-                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[2].args, vec!["-Wall"]);
 
-                assert_eq!(cmd.arguments[3].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[3].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[3].args, vec!["-Werror"]);
 
                 // Check include paths (both separate and combined forms)
-                assert_eq!(cmd.arguments[4].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[4].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[4].args, vec!["-I/usr/include"]);
 
-                assert_eq!(cmd.arguments[5].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[5].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[5].args, vec!["-I."]);
 
                 // Check defines
-                assert_eq!(cmd.arguments[6].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[6].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[6].args, vec!["-DDEBUG=1"]);
 
-                assert_eq!(cmd.arguments[7].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[7].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[7].args, vec!["-DVERSION=\"1.0\""]);
 
                 // Check source files
@@ -311,10 +311,10 @@ mod test {
                 assert_eq!(cmd.arguments[10].args, vec!["-o", "output.o"]);
 
                 // Check library link arguments
-                assert_eq!(cmd.arguments[11].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[11].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[11].args, vec!["-L/usr/lib"]);
 
-                assert_eq!(cmd.arguments[12].kind, ArgumentKind::Other);
+                assert_eq!(cmd.arguments[12].kind, ArgumentKind::Other(None));
                 assert_eq!(cmd.arguments[12].args, vec!["-lmath"]);
             }
             _ => panic!("Expected Some(Command::Compiler(_))"),
