@@ -38,14 +38,12 @@ pub struct ArgumentGroup {
 /// - `Compiler`: The compiler executable itself.
 /// - `Source`: A source file to be compiled.
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
-/// - `Switch`: A compiler switch or flag (e.g., `-Wall`).
-/// - `Other`: Any other argument not classified above.
+/// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArgumentKind {
     Compiler,
     Source,
     Output,
-    Switch,
     Other,
 }
 
@@ -123,11 +121,11 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Switch,
+                    kind: ArgumentKind::Other,
                 },
                 ArgumentGroup {
                     args: vec!["-Wall".to_string()],
-                    kind: ArgumentKind::Switch,
+                    kind: ArgumentKind::Other,
                 },
                 ArgumentGroup {
                     args: vec!["main.c".to_string()],
@@ -158,7 +156,7 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Switch,
+                    kind: ArgumentKind::Other,
                 },
                 ArgumentGroup {
                     args: vec!["file1.cpp".to_string()],
@@ -195,7 +193,7 @@ mod test {
             vec![
                 ArgumentGroup {
                     args: vec!["-c".to_string()],
-                    kind: ArgumentKind::Switch,
+                    kind: ArgumentKind::Other,
                 },
                 ArgumentGroup {
                     args: vec!["-o".to_string(), "main.o".to_string()],
@@ -229,7 +227,7 @@ mod test {
             PathBuf::from("gcc"),
             vec![ArgumentGroup {
                 args: vec!["--version".to_string()],
-                kind: ArgumentKind::Switch,
+                kind: ArgumentKind::Other,
             }],
         );
 
