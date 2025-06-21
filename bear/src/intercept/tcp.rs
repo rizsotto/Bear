@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
-use super::{Collector, Event, Reporter};
+use super::{Collector, CollectorError, Event, Reporter, ReporterError};
 
 /// The serializer for events to transmit over the network.
 ///
@@ -19,7 +19,7 @@ struct EventWireSerializer;
 
 impl EventWireSerializer {
     /// Read an event from a reader using TLV format.
-    fn read(reader: &mut impl Read) -> Result<Event, anyhow::Error> {
+    fn read(reader: &mut impl Read) -> Result<Event, CollectorError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -32,7 +32,7 @@ impl EventWireSerializer {
     }
 
     /// Write an event to a writer using TLV format.
-    fn write(writer: &mut impl Write, event: Event) -> Result<u32, anyhow::Error> {
+    fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReporterError> {
         let serialized_event = serde_json::to_string(&event)?;
         let bytes = serialized_event.into_bytes();
         let length = bytes.len() as u32;
@@ -56,7 +56,7 @@ impl CollectorOnTcp {
     ///
     /// The collector listens to a random port on the loopback interface.
     /// The address of the collector can be obtained by the `address` method.
-    pub fn create() -> Result<Self, anyhow::Error> {
+    pub fn create() -> Result<Self, CollectorError> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
@@ -70,7 +70,11 @@ impl CollectorOnTcp {
         Ok(result)
     }
 
-    fn send(&self, mut socket: TcpStream, destination: Sender<Event>) -> Result<(), anyhow::Error> {
+    fn send(
+        &self,
+        mut socket: TcpStream,
+        destination: Sender<Event>,
+    ) -> Result<(), CollectorError> {
         let event = EventWireSerializer::read(&mut socket)?;
         destination.send(event)?;
 
@@ -88,7 +92,7 @@ impl Collector for CollectorOnTcp {
     /// The collector listens to the TCP port and accepts incoming connections.
     /// When a connection is accepted, the collector reads the events from the
     /// connection and sends them to the destination channel.
-    fn collect(&self, destination: Sender<Event>) -> Result<(), anyhow::Error> {
+    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError> {
         for stream in self.listener.incoming() {
             // This has to be the first thing to do, to implement the stop method!
             if self.shutdown.load(Ordering::Relaxed) {
@@ -118,9 +122,10 @@ impl Collector for CollectorOnTcp {
     /// The collector is stopped when the `collect` method sees the shutdown flag.
     /// To signal the collector to stop, we connect to the collector to unblock the
     /// `accept` call to check the shutdown flag.
-    fn stop(&self) -> Result<(), anyhow::Error> {
+    fn stop(&self) -> Result<(), CollectorError> {
         self.shutdown.store(true, Ordering::Relaxed);
-        let _ = TcpStream::connect(self.address)?;
+        let _ =
+            TcpStream::connect(self.address).map_err(|e| CollectorError::Network(e.to_string()))?;
         Ok(())
     }
 }
@@ -145,8 +150,9 @@ impl Reporter for ReporterOnTcp {
     ///
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
-    fn report(&self, event: Event) -> Result<(), anyhow::Error> {
-        let mut socket = TcpStream::connect(self.destination.clone())?;
+    fn report(&self, event: Event) -> Result<(), ReporterError> {
+        let mut socket = TcpStream::connect(self.destination.clone())
+            .map_err(|e| ReporterError::Network(e.to_string()))?;
         EventWireSerializer::write(&mut socket, event)?;
 
         Ok(())

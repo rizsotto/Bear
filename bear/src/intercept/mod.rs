@@ -13,7 +13,6 @@ pub mod supervise;
 mod tcp;
 
 use crate::{args, config};
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -22,6 +21,66 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::{fmt, thread};
 use supervise::supervise;
+use thiserror::Error;
+
+/// Errors that can occur in the reporter.
+#[derive(Error, Debug)]
+pub enum ReporterError {
+    #[error("Environment variable '{0}' is missing")]
+    MissingEnvironmentVariable(String),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+/// Errors that can occur in the collector.
+#[derive(Error, Debug)]
+pub enum CollectorError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("Channel communication error: {0}")]
+    Channel(String),
+}
+
+impl<T> From<std::sync::mpsc::SendError<T>> for CollectorError {
+    fn from(err: std::sync::mpsc::SendError<T>) -> Self {
+        CollectorError::Channel(format!("Failed to send message: {}", err))
+    }
+}
+
+/// Errors that can occur in the intercept environment and configuration.
+#[derive(Error, Debug)]
+pub enum InterceptError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Process execution error: {0}")]
+    ProcessExecution(String),
+    #[error("Configuration validation error: {0}")]
+    ConfigValidation(String),
+    #[error("Path manipulation error: {0}")]
+    Path(String),
+    #[error("Thread join error")]
+    ThreadJoin,
+    #[error("No executable found in build command")]
+    NoExecutable,
+    #[error("Reporter error: {0}")]
+    Reporter(#[from] ReporterError),
+    #[error("Collector error: {0}")]
+    Collector(#[from] CollectorError),
+}
+
+impl From<std::env::JoinPathsError> for InterceptError {
+    fn from(err: std::env::JoinPathsError) -> Self {
+        InterceptError::Path(format!("Failed to join paths: {}", err))
+    }
+}
 
 /// Declare the environment variables used by the intercept mode.
 pub const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
@@ -32,13 +91,10 @@ const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
 /// This function is supposed to be called from another process than the collector.
 /// Therefore, the reporter destination is passed as an environment variable.
 /// The reporter destination is the address of the collector service.
-pub fn create_reporter() -> anyhow::Result<Box<dyn Reporter>> {
-    let reporter =
-        // Get the reporter address from the environment variable
-        std::env::var(KEY_DESTINATION)
-        .with_context(|| format!("${} is missing from the environment", KEY_DESTINATION))
-        // Create a new reporter
-        .map(tcp::ReporterOnTcp::new)?;
+pub fn create_reporter() -> Result<Box<dyn Reporter>, ReporterError> {
+    let address = std::env::var(KEY_DESTINATION)
+        .map_err(|_| ReporterError::MissingEnvironmentVariable(KEY_DESTINATION.to_string()))?;
+    let reporter = tcp::ReporterOnTcp::new(address);
     Ok(Box::new(reporter))
 }
 
@@ -51,7 +107,7 @@ pub fn create_reporter_on_tcp(address: &str) -> Box<dyn Reporter> {
 ///
 /// This allows the reporters to send events to a remote collector.
 pub trait Reporter {
-    fn report(&self, event: Event) -> Result<(), anyhow::Error>;
+    fn report(&self, event: Event) -> Result<(), ReporterError>;
 }
 
 /// Represents the local sink of supervised process events.
@@ -72,10 +128,10 @@ pub trait Collector {
     ///
     /// The function returns when the collector is stopped. The collector is stopped
     /// when the `stop` method invoked (from another thread).
-    fn collect(&self, destination: Sender<Event>) -> Result<(), anyhow::Error>;
+    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError>;
 
     /// Stops the collector.
-    fn stop(&self) -> Result<(), anyhow::Error>;
+    fn stop(&self) -> Result<(), CollectorError>;
 }
 
 /// Represent a relevant life cycle event of a process.
@@ -118,7 +174,7 @@ pub struct Execution {
 
 impl Execution {
     /// Capture the execution information of the current process.
-    pub fn capture() -> anyhow::Result<Self> {
+    pub fn capture() -> Result<Self, InterceptError> {
         let executable = std::env::current_exe()?;
         let arguments = std::env::args().collect();
         let working_dir = std::env::current_dir()?;
@@ -146,14 +202,14 @@ impl Execution {
 }
 
 impl TryFrom<args::BuildCommand> for Execution {
-    type Error = anyhow::Error;
+    type Error = InterceptError;
 
     /// Converts the `BuildCommand` to an `Execution` object.
     fn try_from(value: args::BuildCommand) -> Result<Self, Self::Error> {
         let executable = value
             .arguments
             .first()
-            .ok_or_else(|| anyhow::anyhow!("No executable found"))?
+            .ok_or(InterceptError::NoExecutable)?
             .clone()
             .into();
         let arguments = value.arguments.to_vec();
@@ -324,7 +380,7 @@ impl InterceptEnvironment {
     pub fn create(
         config: &config::Intercept,
         collector: &CollectorService,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, InterceptError> {
         // Validate the configuration.
         let valid_config = config.validate()?;
 
@@ -355,12 +411,16 @@ impl InterceptEnvironment {
     /// The method is blocking and waits for the build command to finish.
     /// The method returns the exit code of the build command. Result failure
     /// indicates that the build command failed to start.
-    pub fn execute_build_command(&self, input: args::BuildCommand) -> anyhow::Result<ExitCode> {
+    pub fn execute_build_command(
+        &self,
+        input: args::BuildCommand,
+    ) -> Result<ExitCode, InterceptError> {
         // TODO: record the execution of the build command
 
         let child: Execution = TryInto::<Execution>::try_into(input)?
             .with_environment(self.environment().into_iter().collect());
-        let exit_status = supervise(child)?;
+        let exit_status =
+            supervise(child).map_err(|e| InterceptError::ProcessExecution(e.to_string()))?;
         log::info!("Execution finished with status: {:?}", exit_status);
 
         // The exit code is not always available. When the process is killed by a signal,
@@ -411,20 +471,20 @@ impl InterceptEnvironment {
     /// Manipulate a `PATH`-like environment value by inserting the `first` path into
     /// the original value. It removes the `first` path if it already exists in the
     /// original value. And it inserts the `first` path at the beginning of the value.
-    fn insert_to_path(original: &str, first: PathBuf) -> anyhow::Result<String> {
+    fn insert_to_path(original: &str, first: PathBuf) -> Result<String, InterceptError> {
         let mut paths: Vec<_> = std::env::split_paths(original)
             .filter(|path| path != &first)
             .collect();
         paths.insert(0, first);
         std::env::join_paths(paths)
             .map(|os_string| os_string.into_string().unwrap_or_default())
-            .map_err(|e| anyhow::anyhow!("Failed to join paths: {}", e))
+            .map_err(InterceptError::from)
     }
 }
 
 impl config::Intercept {
     /// Validate the configuration of the intercept mode.
-    fn validate(&self) -> anyhow::Result<Self> {
+    fn validate(&self) -> Result<Self, InterceptError> {
         match self {
             config::Intercept::Wrapper {
                 path,
@@ -432,21 +492,29 @@ impl config::Intercept {
                 executables,
             } => {
                 if Self::is_empty_path(path) {
-                    anyhow::bail!("The wrapper path cannot be empty.");
+                    return Err(InterceptError::ConfigValidation(
+                        "The wrapper path cannot be empty.".to_string(),
+                    ));
                 }
                 if Self::is_empty_path(directory) {
-                    anyhow::bail!("The wrapper directory cannot be empty.");
+                    return Err(InterceptError::ConfigValidation(
+                        "The wrapper directory cannot be empty.".to_string(),
+                    ));
                 }
                 for executable in executables {
                     if Self::is_empty_path(executable) {
-                        anyhow::bail!("The executable path cannot be empty.");
+                        return Err(InterceptError::ConfigValidation(
+                            "The executable path cannot be empty.".to_string(),
+                        ));
                     }
                 }
                 Ok(self.clone())
             }
             config::Intercept::Preload { path } => {
                 if Self::is_empty_path(path) {
-                    anyhow::bail!("The preload library path cannot be empty.");
+                    return Err(InterceptError::ConfigValidation(
+                        "The preload library path cannot be empty.".to_string(),
+                    ));
                 }
                 Ok(self.clone())
             }
