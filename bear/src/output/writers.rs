@@ -220,9 +220,9 @@ impl IteratorWriter<Entry> for ClangOutputWriter {
         let entries = entries.map(|entry| {
             let mut entry = if self.command_field_as_array {
                 // It's safe to assume that the entry is valid, so we can unwrap.
-                entry.as_arguments().unwrap()
+                entry.as_arguments().unwrap().into_owned()
             } else {
-                entry.as_command()
+                entry.as_command().into_owned()
             };
             if !self.keep_output_field {
                 entry.output = None;

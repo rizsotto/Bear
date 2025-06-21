@@ -16,6 +16,7 @@ mod filter;
 
 use serde::{Deserialize, Serialize};
 use shell_words;
+use std::borrow::Cow;
 use std::path;
 use thiserror::Error;
 
@@ -95,31 +96,31 @@ impl Entry {
     }
 
     /// Convert entry to a form when only the command field is available.
-    pub fn as_command(&self) -> Self {
+    pub fn as_command(&self) -> Cow<Self> {
         if !self.command.is_empty() {
-            self.clone()
+            Cow::Borrowed(self)
         } else {
-            Self {
+            Cow::Owned(Self {
                 command: shell_words::join(&self.arguments),
                 arguments: Vec::default(),
                 ..self.clone()
-            }
+            })
         }
     }
 
     /// Convert entry to a form when only the arguments field is available.
     ///
     /// The method can fail if the command field does not contain a valid shell escaped string.
-    pub fn as_arguments(&self) -> Result<Self, EntryError> {
+    pub fn as_arguments(&self) -> Result<Cow<Self>, EntryError> {
         if !self.arguments.is_empty() {
-            Ok(self.clone())
+            Ok(Cow::Borrowed(self))
         } else {
             let arguments = shell_words::split(&self.command)?;
-            Ok(Self {
+            Ok(Cow::Owned(Self {
                 arguments,
                 command: String::default(),
                 ..self.clone()
-            })
+            }))
         }
     }
 
@@ -251,12 +252,39 @@ mod tests {
 
         for entry in entries {
             // arguments -> command -> arguments
-            let to_cmd = entry.clone().as_command();
-            let to_args = to_cmd.clone().as_arguments().unwrap();
-            let to_cmd_again = to_args.clone().as_command();
-            assert_eq!(to_cmd, to_cmd_again);
-            let to_args_again = to_cmd_again.clone().as_arguments().unwrap();
-            assert_eq!(to_args, to_args_again);
+            let to_cmd = entry.as_command();
+            let to_args = to_cmd.as_arguments().unwrap();
+            let to_cmd_again = to_args.as_command();
+            assert_eq!(*to_cmd, *to_cmd_again);
+            let to_args_again = to_cmd_again.as_arguments().unwrap();
+            assert_eq!(*to_args, *to_args_again);
         }
+    }
+
+    #[test]
+    fn test_cow_optimization() {
+        // Test that as_command() returns borrowed when command field is already present
+        let entry_with_command =
+            Entry::from_command_str("main.cpp", "clang -c main.cpp", "/tmp", None);
+        let cow_result = entry_with_command.as_command();
+        assert!(matches!(cow_result, std::borrow::Cow::Borrowed(_)));
+
+        // Test that as_arguments() returns borrowed when arguments field is already present
+        let entry_with_args =
+            Entry::from_arguments_str("main.cpp", vec!["clang", "-c", "main.cpp"], "/tmp", None);
+        let cow_result = entry_with_args.as_arguments().unwrap();
+        assert!(matches!(cow_result, std::borrow::Cow::Borrowed(_)));
+
+        // Test that as_command() returns owned when conversion is needed
+        let entry_with_args_only =
+            Entry::from_arguments_str("main.cpp", vec!["clang", "-c", "main.cpp"], "/tmp", None);
+        let cow_result = entry_with_args_only.as_command();
+        assert!(matches!(cow_result, std::borrow::Cow::Owned(_)));
+
+        // Test that as_arguments() returns owned when conversion is needed
+        let entry_with_command_only =
+            Entry::from_command_str("main.cpp", "clang -c main.cpp", "/tmp", None);
+        let cow_result = entry_with_command_only.as_arguments().unwrap();
+        assert!(matches!(cow_result, std::borrow::Cow::Owned(_)));
     }
 }
