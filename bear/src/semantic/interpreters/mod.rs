@@ -5,14 +5,17 @@
 //! interpreter chain to include or exclude specific compilers.
 
 use super::interpreters::combinators::Any;
+use super::interpreters::filter::FilteringInterpreter;
+use super::interpreters::format::FormattingInterpreter;
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
-use super::{clang, FormatConfig, Interpreter};
+use super::Interpreter;
 use crate::config;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 mod combinators;
+pub mod filter;
+pub mod format;
 pub mod generic;
 mod ignore;
 mod matchers;
@@ -20,8 +23,10 @@ mod matchers;
 /// Creates an interpreter to recognize the compiler calls.
 ///
 /// Using the configuration we can define which compilers to include and exclude.
-/// Also read the environment variables to detect the compiler to include (and
-/// make sure those are not excluded either).
+/// The interpreter chain is built as follows:
+/// 1. Basic recognition (ignore non-compilers, recognize compilers)
+/// 2. Filtering (filter by compiler and source directory)
+/// 3. Formatting (format paths according to configuration)
 // TODO: Use the CC or CXX environment variables to detect the compiler to include.
 //       Use the CC or CXX environment variables and make sure those are not excluded.
 //       Make sure the environment variables are passed to the method.
@@ -40,6 +45,7 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
         _ => vec![],
     };
 
+    // Build the base interpreter chain
     let mut interpreters: Vec<Box<dyn Interpreter>> = vec![
         // ignore executables which are not compilers,
         Box::new(IgnoreByPath::default()),
@@ -57,7 +63,39 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
         interpreters.insert(0, Box::new(tool));
     }
 
-    Any::new(interpreters)
+    let base_interpreter = Any::new(interpreters);
+
+    // Wrap with filtering and formatting based on output configuration
+    match &config.output {
+        config::Output::Clang {
+            compilers,
+            sources,
+            format,
+            ..
+        } => {
+            // First apply filtering
+            let filtered_interpreter =
+                FilteringInterpreter::from_config(Box::new(base_interpreter), compilers, sources)
+                    .unwrap_or_else(|_| {
+                        // If filtering configuration is invalid, create a pass-through filter
+                        FilteringInterpreter::new(Box::new(Any::new(vec![])), vec![], vec![])
+                    });
+
+            // Then apply formatting
+            let formatted_interpreter =
+                FormattingInterpreter::from_config(Box::new(filtered_interpreter), &format.paths)
+                    .unwrap_or_else(|_| {
+                        // If formatting configuration is invalid, use pass-through
+                        FormattingInterpreter::pass_through(Box::new(Any::new(vec![])))
+                    });
+
+            formatted_interpreter
+        }
+        config::Output::Semantic { .. } => {
+            // For semantic output, just use pass-through formatting
+            FormattingInterpreter::pass_through(Box::new(base_interpreter))
+        }
+    }
 }
 
 #[cfg(test)]
