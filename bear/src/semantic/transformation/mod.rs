@@ -8,11 +8,11 @@
 
 mod filter_by_compiler;
 mod filter_by_source_dir;
-mod formatter;
 
 use crate::config;
 use crate::semantic::interpreters::generic::CompilerCall;
 use std::io;
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// Responsible to transform the semantic of an executed command.
@@ -22,10 +22,8 @@ pub trait Transformation: Send {
 
 /// FilterAndFormat is a transformation that filters and formats the compiler calls.
 pub struct FilterAndFormat {
-    format_canonical: formatter::PathFormatter,
     filter_by_compiler: filter_by_compiler::FilterByCompiler,
     filter_by_source: filter_by_source_dir::FilterBySourceDir,
-    format_by_config: formatter::PathFormatter,
 }
 
 impl Transformation for FilterAndFormat {
@@ -52,8 +50,6 @@ impl Transformation for FilterAndFormat {
 
 #[derive(Debug, Error)]
 pub enum FilterAndFormatError {
-    #[error("Path formatter configuration error: {0}")]
-    PathFormatter(#[from] formatter::ConfigurationError),
     #[error("Compiler filter configuration error: {0}")]
     FilterByCompiler(#[from] filter_by_compiler::ConfigurationError),
     #[error("Source filter configuration error: {0}")]
@@ -64,50 +60,52 @@ impl TryFrom<&config::Output> for FilterAndFormat {
     type Error = FilterAndFormatError;
 
     fn try_from(value: &config::Output) -> Result<Self, Self::Error> {
-        match value {
-            config::Output::Clang {
-                compilers,
-                format,
-                sources,
-                ..
-            } => {
-                if !sources.only_existing_files {
-                    log::warn!("Access to the filesystem is disabled in source filters.");
-                }
-                let format_canonical = if sources.only_existing_files {
-                    let canonical_config = config::PathFormat::default();
-                    formatter::PathFormatter::try_from(&canonical_config)?
-                } else {
-                    formatter::PathFormatter::default()
-                };
-                let filter_by_compiler = compilers.as_slice().try_into()?;
-                let filter_by_source = sources.try_into()?;
-                let format_by_config = if sources.only_existing_files {
-                    formatter::PathFormatter::try_from(&format.paths)?
-                } else {
-                    formatter::PathFormatter::default()
-                };
-
-                Ok(FilterAndFormat {
-                    format_canonical,
-                    filter_by_compiler,
-                    filter_by_source,
-                    format_by_config,
-                })
-            }
-            config::Output::Semantic { .. } => {
-                let format_canonical = formatter::PathFormatter::default();
-                let filter_by_compiler = filter_by_compiler::FilterByCompiler::default();
-                let filter_by_source = filter_by_source_dir::FilterBySourceDir::default();
-                let format_by_config = formatter::PathFormatter::default();
-
-                Ok(FilterAndFormat {
-                    format_canonical,
-                    filter_by_compiler,
-                    filter_by_source,
-                    format_by_config,
-                })
-            }
-        }
+        // match value {
+        //     config::Output::Clang {
+        //         compilers,
+        //         format,
+        //         sources,
+        //         ..
+        //     } => {
+        //         if !sources.only_existing_files {
+        //             log::warn!("Access to the filesystem is disabled in source filters.");
+        //         }
+        //         let format_canonical = if sources.only_existing_files {
+        //             let canonical_config = config::PathFormat::default();
+        //             formatter::PathFormatter::try_from(&canonical_config)?
+        //         } else {
+        //             formatter::PathFormatter::default()
+        //         };
+        //         let filter_by_compiler = compilers.as_slice().try_into()?;
+        //         let filter_by_source = sources.try_into()?;
+        //         let format_by_config = if sources.only_existing_files {
+        //             formatter::PathFormatter::try_from(&format.paths)?
+        //         } else {
+        //             formatter::PathFormatter::default()
+        //         };
+        //
+        //         Ok(FilterAndFormat {
+        //             format_canonical,
+        //             filter_by_compiler,
+        //             filter_by_source,
+        //             format_by_config,
+        //         })
+        //     }
+        //     config::Output::Semantic { .. } => {
+        //         let format_canonical = formatter::PathFormatter::default();
+        //         let filter_by_compiler = filter_by_compiler::FilterByCompiler::default();
+        //         let filter_by_source = filter_by_source_dir::FilterBySourceDir::default();
+        //         let format_by_config = formatter::PathFormatter::default();
+        //
+        //         Ok(FilterAndFormat {
+        //             format_canonical,
+        //             filter_by_compiler,
+        //             filter_by_source,
+        //             format_by_config,
+        //         })
+        //     }
+        // }
+        let inner = filter_by_source_dir::ConfigurationError::DuplicateItem(PathBuf::new());
+        Err(FilterAndFormatError::FilterBySourceDir(inner))
     }
 }

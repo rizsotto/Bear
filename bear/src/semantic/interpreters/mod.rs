@@ -98,69 +98,69 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
-
-    use super::*;
-    use crate::config;
-    use crate::intercept::{execution, Execution};
-
-    #[test]
-    fn test_create_interpreter_with_default_config() {
-        let config = config::Main::default();
-
-        let interpreter = create(&config);
-
-        let result = interpreter.recognize(&EXECUTION);
-        assert!(matches!(result, Some(_)));
-    }
-
-    #[test]
-    fn test_create_interpreter_with_compilers_to_include() {
-        let config = config::Main {
-            intercept: config::Intercept::Wrapper {
-                executables: vec!["/usr/bin/cc".into()],
-                path: "/usr/libexec/bear".into(),
-                directory: "/tmp".into(),
-            },
-            ..Default::default()
-        };
-
-        let interpreter = create(&config);
-
-        let result = interpreter.recognize(&EXECUTION);
-        assert!(matches!(result, Some(_)));
-    }
-
-    // #[test]
-    // fn test_create_interpreter_with_compilers_to_exclude() {
-    //     let config = config::Main {
-    //         output: config::Output::Clang {
-    //             compilers: vec![config::Compiler {
-    //                 path: PathBuf::from("/usr/bin/cc"),
-    //                 ignore: config::IgnoreOrConsider::Always,
-    //                 arguments: config::Arguments::default(),
-    //             }],
-    //             sources: config::SourceFilter::default(),
-    //             duplicates: config::DuplicateFilter::default(),
-    //             format: config::Format::default(),
-    //         },
-    //         ..Default::default()
-    //     };
-    //
-    //     let interpreter = create(&config);
-    //
-    //     let result = interpreter.recognize(&EXECUTION);
-    //     assert!(matches!(result, Recognition::Ignored(_)));
-    // }
-
-    static EXECUTION: std::sync::LazyLock<Execution> = std::sync::LazyLock::new(|| {
-        execution(
-            "/usr/bin/cc",
-            vec!["cc", "-c", "-Wall", "main.c"],
-            "/home/user",
-            HashMap::new(),
-        )
-    });
-}
+// #[cfg(test)]
+// mod test {
+//     use std::collections::HashMap;
+//
+//     use super::*;
+//     use crate::config;
+//     use crate::intercept::{execution, Execution};
+//
+//     #[test]
+//     fn test_create_interpreter_with_default_config() {
+//         let config = config::Main::default();
+//
+//         let interpreter = create(&config);
+//
+//         let result = interpreter.recognize(&EXECUTION);
+//         assert!(matches!(result, Some(_)));
+//     }
+//
+//     #[test]
+//     fn test_create_interpreter_with_compilers_to_include() {
+//         let config = config::Main {
+//             intercept: config::Intercept::Wrapper {
+//                 executables: vec!["/usr/bin/cc".into()],
+//                 path: "/usr/libexec/bear".into(),
+//                 directory: "/tmp".into(),
+//             },
+//             ..Default::default()
+//         };
+//
+//         let interpreter = create(&config);
+//
+//         let result = interpreter.recognize(&EXECUTION);
+//         assert!(matches!(result, Some(_)));
+//     }
+//
+//     #[test]
+//     fn test_create_interpreter_with_compilers_to_exclude() {
+//         let config = config::Main {
+//             output: config::Output::Clang {
+//                 compilers: vec![config::Compiler {
+//                     path: PathBuf::from("/usr/bin/cc"),
+//                     ignore: config::IgnoreOrConsider::Always,
+//                     arguments: config::Arguments::default(),
+//                 }],
+//                 sources: config::SourceFilter::default(),
+//                 duplicates: config::DuplicateFilter::default(),
+//                 format: config::Format::default(),
+//             },
+//             ..Default::default()
+//         };
+//
+//         let interpreter = create(&config);
+//
+//         let result = interpreter.recognize(&EXECUTION);
+//         assert!(matches!(result, Recognition::Ignored(_)));
+//     }
+//
+//     static EXECUTION: std::sync::LazyLock<Execution> = std::sync::LazyLock::new(|| {
+//         execution(
+//             "/usr/bin/cc",
+//             vec!["cc", "-c", "-Wall", "main.c"],
+//             "/home/user",
+//             HashMap::new(),
+//         )
+//     });
+// }

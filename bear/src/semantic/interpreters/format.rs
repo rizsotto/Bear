@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! This module is responsible for formatting paths in the compiler calls.
+//! The reason for this is to ensure that the paths are in a consistent format
+//! when it comes to the output.
+//!
+//! The JSON compilation database
+//! [format specification](https://clang.llvm.org/docs/JSONCompilationDatabase.html#format)
+//! allows the `directory` attribute to be absolute or relative to the current working
+//! directory. The `file`, `output` and `arguments` attributes are either absolute or
+//! relative to the `directory` attribute.
+//!
+//! The `arguments` attribute contains the compiler flags, where some flags are using
+//! file paths. In the current implementation, the `arguments` attribute is not
+//! transformed.
+//!
 //! Formatting interpreter that wraps another interpreter to format paths in compiler commands
 //! according to configuration (absolute, relative, canonical).
 
@@ -17,7 +31,7 @@ pub struct FormattingInterpreter {
 }
 
 #[derive(Debug)]
-enum PathFormatter {
+pub enum PathFormatter {
     /// Apply formatting according to the configuration
     Format {
         config: PathFormat,
@@ -74,11 +88,8 @@ impl Interpreter for FormattingInterpreter {
                 // Apply formatting to the compiler command
                 match self.formatter.format_command(compiler_cmd.clone()) {
                     Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
-                    Err(_) => {
-                        // If formatting fails, return the original command
-                        // This is a design choice - we could also return None or an error variant
-                        Some(Command::Compiler(compiler_cmd))
-                    }
+                    // If formatting fails, return None
+                    Err(_) => None,
                 }
             }
             // Pass through other command types unchanged
@@ -97,7 +108,7 @@ impl PathFormatter {
             } => {
                 // Format the working directory
                 let working_dir = cmd.working_dir.canonicalize()?;
-                cmd.working_dir = config.directory.resolve_path(current_dir, &working_dir)?;
+                cmd.working_dir = config.directory.resolve(current_dir, &working_dir)?;
 
                 // Format paths in arguments
                 for arg_group in &mut cmd.arguments {
@@ -106,7 +117,7 @@ impl PathFormatter {
                             // Format source file paths
                             for arg in &mut arg_group.args {
                                 if let Ok(formatted) =
-                                    Self::format_source_path(arg, &working_dir, &config.file)
+                                    Self::format_path(arg, &working_dir, &config.file)
                                 {
                                     *arg = formatted;
                                 }
@@ -116,7 +127,7 @@ impl PathFormatter {
                             // Format output file paths
                             // For output arguments, we need to handle "-o filename" pairs
                             if arg_group.args.len() >= 2 && arg_group.args[0] == "-o" {
-                                if let Ok(formatted) = Self::format_output_path(
+                                if let Ok(formatted) = Self::format_path(
                                     &arg_group.args[1],
                                     &working_dir,
                                     &config.output,
@@ -137,23 +148,13 @@ impl PathFormatter {
         }
     }
 
-    fn format_source_path(
+    fn format_path(
         path_str: &str,
         working_dir: &Path,
         resolver: &PathResolver,
     ) -> Result<String, FormatError> {
         let path = PathBuf::from(path_str);
-        let resolved = resolver.resolve_path(working_dir, &path)?;
-        Ok(resolved.to_string_lossy().to_string())
-    }
-
-    fn format_output_path(
-        path_str: &str,
-        working_dir: &Path,
-        resolver: &PathResolver,
-    ) -> Result<String, FormatError> {
-        let path = PathBuf::from(path_str);
-        let resolved = resolver.resolve_path(working_dir, &path)?;
+        let resolved = resolver.resolve(working_dir, &path)?;
         Ok(resolved.to_string_lossy().to_string())
     }
 }
@@ -177,7 +178,7 @@ impl TryFrom<&PathFormat> for PathFormatter {
 }
 
 impl PathResolver {
-    fn resolve_path(&self, base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
+    fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
         match self {
             PathResolver::Canonical => {
                 let result = path.canonicalize()?;
@@ -193,6 +194,8 @@ impl PathResolver {
 
 /// Compute the absolute path from the root directory if the path is relative.
 fn absolute_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
+    // TODO: instead of calling `canonicalize` on the path, we should use
+    //       `path::absolute` when the filesystem access is not allowed.
     if path.is_absolute() {
         Ok(path.canonicalize()?)
     } else {
@@ -268,7 +271,9 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::intercept::execution;
     use crate::semantic::command::ArgumentGroup;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
 
@@ -284,29 +289,26 @@ mod tests {
 
     #[test]
     fn test_pass_through_formatting() {
-        let mock_cmd = CompilerCommand::new(
-            PathBuf::from("/project"),
-            PathBuf::from("/usr/bin/gcc"),
-            vec![ArgumentGroup {
-                args: vec!["main.c".to_string()],
-                kind: ArgumentKind::Source,
-            }],
+        let mock_cmd = CompilerCommand::from_strings(
+            "/project",
+            "/usr/bin/gcc",
+            vec![(ArgumentKind::Source, vec!["main.c"])],
         );
 
         let mock_interpreter = MockInterpreter {
             result: Some(Command::Compiler(mock_cmd.clone())),
         };
 
-        let formatter = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
+        let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 
-        let execution = Execution {
-            executable: PathBuf::from("/usr/bin/gcc"),
-            arguments: vec!["gcc".to_string(), "main.c".to_string()],
-            working_dir: PathBuf::from("/project"),
-            environment: std::collections::HashMap::new(),
-        };
+        let execution = execution(
+            "/usr/bin/gcc",
+            vec!["gcc", "main.c"],
+            "/project",
+            HashMap::new(),
+        );
 
-        let result = formatter.recognize(&execution);
+        let result = sut.recognize(&execution);
         if let Some(Command::Compiler(result_cmd)) = result {
             assert_eq!(result_cmd, mock_cmd);
         } else {
@@ -320,16 +322,11 @@ mod tests {
             result: Some(Command::Ignored("test reason")),
         };
 
-        let formatter = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
+        let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 
-        let execution = Execution {
-            executable: PathBuf::from("/usr/bin/ls"),
-            arguments: vec!["ls".to_string()],
-            working_dir: PathBuf::from("/project"),
-            environment: std::collections::HashMap::new(),
-        };
+        let execution = execution("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
 
-        let result = formatter.recognize(&execution);
+        let result = sut.recognize(&execution);
         assert!(matches!(result, Some(Command::Ignored(_))));
     }
 
@@ -370,6 +367,174 @@ mod tests {
             result.err().unwrap(),
             ConfigurationError::OnlyRelativePaths
         ));
+    }
+
+    #[test]
+    fn test_path_formatter_do_format() {
+        let source_dir = tempdir().unwrap();
+        let source_dir_path = source_dir.path().canonicalize().unwrap();
+        let source_dir_name = source_dir_path.file_name().unwrap();
+        let source_file_path = source_dir_path.join("main.c");
+        fs::write(&source_file_path, "int main() {}").unwrap();
+
+        let build_dir = tempdir().unwrap();
+        let build_dir_path = build_dir.path().canonicalize().unwrap();
+        let build_dir_name = build_dir_path.file_name().unwrap();
+        let output_file_path = build_dir_path.join("main.o");
+        fs::write(&output_file_path, "object").unwrap();
+
+        let execution_dir = tempdir().unwrap();
+        let execution_dir_path = execution_dir.path().canonicalize().unwrap();
+
+        // The entry contains compiler call with absolute paths.
+        let input = CompilerCommand::new(
+            build_dir_path.clone(),
+            "/usr/bin/gcc".into(),
+            vec![
+                ArgumentGroup {
+                    args: vec![source_file_path.to_string_lossy().to_string()],
+                    kind: ArgumentKind::Source,
+                },
+                ArgumentGroup {
+                    args: vec!["-o".into(), output_file_path.to_string_lossy().to_string()],
+                    kind: ArgumentKind::Output,
+                },
+                ArgumentGroup {
+                    args: vec!["-O2".into()],
+                    kind: ArgumentKind::Other(None),
+                },
+            ],
+        );
+
+        {
+            let sut = PathFormatter::Format {
+                config: PathFormat {
+                    directory: PathResolver::Canonical,
+                    file: PathResolver::Canonical,
+                    output: PathResolver::Canonical,
+                },
+                current_dir: execution_dir_path.to_path_buf(),
+            };
+
+            let expected = CompilerCommand::new(
+                build_dir_path.clone(),
+                input.executable.clone(),
+                vec![
+                    ArgumentGroup {
+                        args: vec![source_file_path.to_string_lossy().to_string()],
+                        kind: ArgumentKind::Source,
+                    },
+                    ArgumentGroup {
+                        args: vec!["-o".into(), output_file_path.to_string_lossy().to_string()],
+                        kind: ArgumentKind::Output,
+                    },
+                    ArgumentGroup {
+                        args: vec!["-O2".into()],
+                        kind: ArgumentKind::Other(None),
+                    },
+                ],
+            );
+
+            let result = sut.format_command(input.clone());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+        {
+            let sut = PathFormatter::Format {
+                config: PathFormat {
+                    directory: PathResolver::Canonical,
+                    file: PathResolver::Relative,
+                    output: PathResolver::Relative,
+                },
+                current_dir: execution_dir_path.to_path_buf(),
+            };
+
+            let relative_source_path = PathBuf::from("..").join(source_dir_name).join("main.c");
+            let relative_output_path = PathBuf::from("main.o");
+
+            let expected = CompilerCommand::new(
+                build_dir_path.clone(),
+                input.executable.clone(),
+                vec![
+                    ArgumentGroup {
+                        args: vec![relative_source_path.to_string_lossy().to_string()],
+                        kind: ArgumentKind::Source,
+                    },
+                    ArgumentGroup {
+                        args: vec![
+                            "-o".into(),
+                            relative_output_path.to_string_lossy().to_string(),
+                        ],
+                        kind: ArgumentKind::Output,
+                    },
+                    ArgumentGroup {
+                        args: vec!["-O2".into()],
+                        kind: ArgumentKind::Other(None),
+                    },
+                ],
+            );
+
+            let result = sut.format_command(input.clone());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+        {
+            let sut = PathFormatter::Format {
+                config: PathFormat {
+                    directory: PathResolver::Relative,
+                    file: PathResolver::Relative,
+                    output: PathResolver::Relative,
+                },
+                current_dir: execution_dir_path.to_path_buf(),
+            };
+
+            let relative_build_dir_path = PathBuf::from("..").join(build_dir_name);
+            let relative_source_path = PathBuf::from("..").join(source_dir_name).join("main.c");
+            let relative_output_path = PathBuf::from("main.o");
+
+            let expected = CompilerCommand::new(
+                relative_build_dir_path,
+                input.executable.clone(),
+                vec![
+                    ArgumentGroup {
+                        args: vec![relative_source_path.to_string_lossy().to_string()],
+                        kind: ArgumentKind::Source,
+                    },
+                    ArgumentGroup {
+                        args: vec![
+                            "-o".into(),
+                            relative_output_path.to_string_lossy().to_string(),
+                        ],
+                        kind: ArgumentKind::Output,
+                    },
+                    ArgumentGroup {
+                        args: vec!["-O2".into()],
+                        kind: ArgumentKind::Other(None),
+                    },
+                ],
+            );
+
+            let result = sut.format_command(input.clone());
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_path_resolver() {
+        let root_dir = tempdir().unwrap();
+        let root_dir_path = root_dir.path().canonicalize().unwrap();
+
+        let file_path = root_dir_path.join("file.txt");
+        fs::write(&file_path, "content").unwrap();
+
+        let sut = PathResolver::Canonical;
+        let result = sut.resolve(&root_dir_path, &file_path).unwrap();
+        assert_eq!(result, file_path);
+
+        let sut = PathResolver::Relative;
+        let result = sut.resolve(&root_dir_path, &file_path).unwrap();
+        assert_eq!(result, PathBuf::from("file.txt"));
     }
 
     #[test]

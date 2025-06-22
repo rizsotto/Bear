@@ -7,7 +7,6 @@
 
 use crate::semantic::{clang, FormatConfig, Formattable};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::path::PathBuf;
 
 /// Represents a full compiler command invocation.
@@ -67,6 +66,25 @@ impl CompilerCommand {
             arguments,
         }
     }
+
+    #[cfg(test)]
+    pub fn from_strings(
+        working_dir: &str,
+        executable: &str,
+        arguments: Vec<(ArgumentKind, Vec<&str>)>,
+    ) -> Self {
+        Self {
+            working_dir: PathBuf::from(working_dir),
+            executable: PathBuf::from(executable),
+            arguments: arguments
+                .into_iter()
+                .map(|(kind, args)| ArgumentGroup {
+                    args: args.into_iter().map(String::from).collect(),
+                    kind,
+                })
+                .collect(),
+        }
+    }
 }
 
 impl Formattable for CompilerCommand {
@@ -101,8 +119,7 @@ impl Formattable for CompilerCommand {
             .iter()
             .filter(|arg| matches!(arg.kind, ArgumentKind::Output))
             .flat_map(|arg| &arg.args)
-            .skip(1) // Skip the "-o" flag itself, take the output filename
-            .next()
+            .nth(1) // Skip the "-o" flag itself, take the output filename
             .map(|s| PathBuf::from(s));
 
         // Create one entry per source file
