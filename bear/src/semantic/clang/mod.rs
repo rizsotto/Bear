@@ -71,6 +71,21 @@ impl Entry {
         }
     }
 
+    pub fn from_arguments_as_command(
+        file: impl Into<path::PathBuf>,
+        arguments: Vec<String>,
+        directory: impl Into<path::PathBuf>,
+        output: Option<impl Into<path::PathBuf>>,
+    ) -> Self {
+        Entry {
+            file: file.into(),
+            arguments: Vec::default(),
+            command: shell_words::join(&arguments),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
+    }
+
     /// Semantic validation of the entry. Checking all fields for
     /// valid values and formats.
     pub fn validate(&self) -> Result<(), EntryError> {

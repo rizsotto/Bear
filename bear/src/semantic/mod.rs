@@ -54,10 +54,19 @@ pub trait Interpreter: Send {
 ///
 /// This struct can be extended to control how recognized commands are
 /// transformed into output entries (e.g., for a compilation database).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct FormatConfig {
     command_field_as_array: bool,
     keep_output_field: bool,
+}
+
+impl Default for FormatConfig {
+    fn default() -> Self {
+        Self {
+            command_field_as_array: true,
+            keep_output_field: true,
+        }
+    }
 }
 
 /// Trait for types that can be formatted into output entries.
