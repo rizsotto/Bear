@@ -11,7 +11,6 @@
 //! as an array. The definition of the JSON compilation database files is done in the
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
-mod converter;
 mod filter;
 
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,6 @@ use std::path;
 use thiserror::Error;
 
 // Re-export types for easier access
-pub use converter::EntryConverter;
 pub use filter::DuplicateEntryFilter;
 
 /// Represents an entry of the compilation database.
