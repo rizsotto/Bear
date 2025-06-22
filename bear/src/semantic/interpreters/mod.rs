@@ -11,6 +11,7 @@ use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
 use super::Interpreter;
 use crate::config;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 mod combinators;
@@ -78,7 +79,11 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
                 FilteringInterpreter::from_config(Box::new(base_interpreter), compilers, sources)
                     .unwrap_or_else(|_| {
                         // If filtering configuration is invalid, create a pass-through filter
-                        FilteringInterpreter::new(Box::new(Any::new(vec![])), vec![], vec![])
+                        FilteringInterpreter::new(
+                            Box::new(Any::new(vec![])),
+                            HashMap::new(),
+                            vec![],
+                        )
                     });
 
             // Then apply formatting

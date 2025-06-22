@@ -38,7 +38,7 @@ pub enum Command {
     /// A command that is intentionally ignored and not processed further.
     Ignored(&'static str),
     /// A command that is filtered out and not included in the output.
-    Filtered(&'static str),
+    Filtered(String),
 }
 
 /// Responsible for recognizing the semantic meaning of an executed command.
