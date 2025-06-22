@@ -7,6 +7,7 @@
 
 use crate::semantic::{clang, FormatConfig, Formattable};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 /// Represents a full compiler command invocation.
@@ -108,6 +109,8 @@ impl Formattable for CompilerCommand {
         source_files
             .into_iter()
             .map(|source_file| {
+                // TODO: respect the config for command field as array
+                // TODO: respect the config for keeping output field
                 clang::Entry::from_arguments(
                     source_file,
                     command_args.clone(),
