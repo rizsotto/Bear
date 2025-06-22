@@ -12,7 +12,7 @@
 //! - [`Formattable`]: Trait for converting recognized commands into output entries.
 //! - [`FormatConfig`]: Configuration for formatting output entries.
 //!
-//! Implementors of [`Interpreter`] analyze an `Execution` and determine if it matches a known command.
+//! Implementers of [`Interpreter`] analyze an `Execution` and determine if it matches a known command.
 //! If recognized, they return a boxed [`Command`] representing the semantic meaning of the execution.
 //!
 //! The [`Formattable`] trait allows recognized commands to be transformed into output entries (e.g.,
@@ -42,7 +42,7 @@ pub enum Command {
 
 /// Responsible for recognizing the semantic meaning of an executed command.
 ///
-/// Implementors of this trait analyze an [`Execution`] and determine if it matches
+/// Implementers of this trait analyze an [`Execution`] and determine if it matches
 /// a known command (such as a compiler or interpreter). If recognized, they
 /// return a [`Command`] representing the semantic meaning of the execution.
 pub trait Interpreter: Send {

@@ -49,7 +49,7 @@ mod test {
         let input = execution_fixture();
 
         assert!(
-            matches!(sut.recognize(&input), None),
+            sut.recognize(&input).is_none(),
             "Expected None, but got a match"
         );
     }
@@ -67,7 +67,7 @@ mod test {
         let input = execution_fixture();
 
         assert!(
-            matches!(sut.recognize(&input), Some(_)),
+            sut.recognize(&input).is_some(),
             "Expected Some(_), got a match"
         );
     }

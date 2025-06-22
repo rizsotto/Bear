@@ -188,7 +188,7 @@ mod test {
         );
         let result = SUT.recognize(&input);
 
-        assert!(matches!(result, None));
+        assert!(result.is_none());
     }
 
     #[test]

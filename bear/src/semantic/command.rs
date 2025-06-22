@@ -246,8 +246,10 @@ mod test {
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
-        let mut config = FormatConfig::default();
-        config.command_field_as_array = false;
+        let config = FormatConfig {
+            keep_output_field: true,
+            command_field_as_array: false,
+        };
         let entries = sut.to_entries(&config);
 
         assert_eq!(entries.len(), 1);
@@ -274,8 +276,10 @@ mod test {
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
-        let mut config = FormatConfig::default();
-        config.keep_output_field = false;
+        let config = FormatConfig {
+            command_field_as_array: true,
+            keep_output_field: false,
+        };
         let entries = sut.to_entries(&config);
 
         assert_eq!(entries.len(), 1);

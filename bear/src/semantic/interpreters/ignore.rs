@@ -176,7 +176,7 @@ mod test {
         let sut = IgnoreByPath::new();
         let result = sut.recognize(&input);
 
-        assert!(matches!(result, Some(_)));
+        assert!(result.is_some());
     }
 
     #[test]
@@ -190,6 +190,6 @@ mod test {
         let sut = IgnoreByPath::new();
         let result = sut.recognize(&input);
 
-        assert!(matches!(result, None));
+        assert!(result.is_none());
     }
 }
