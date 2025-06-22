@@ -2,13 +2,10 @@
 
 use crate::intercept::Event;
 use crate::semantic::interpreters;
-use crate::semantic::transformation;
-use crate::semantic::transformation::FilterAndFormat;
 use crate::{args, config, output, semantic};
 
 pub(super) struct SemanticAnalysis {
     interpreter: Box<dyn semantic::Interpreter>,
-    transformation: Box<dyn transformation::Transformation>,
 }
 
 impl TryFrom<&config::Main> for SemanticAnalysis {
@@ -16,11 +13,9 @@ impl TryFrom<&config::Main> for SemanticAnalysis {
 
     fn try_from(config: &config::Main) -> Result<Self, Self::Error> {
         let interpreter = interpreters::create(config);
-        let transformation = FilterAndFormat::try_from(&config.output)?;
 
         Ok(Self {
             interpreter: Box::new(interpreter),
-            transformation: Box::new(transformation),
         })
     }
 }
@@ -32,25 +27,6 @@ impl SemanticAnalysis {
             Some(recognized) => {
                 log::debug!("recognized semantic: {:?}", recognized);
                 Some(recognized)
-                // match self.transformation.apply(recognized) {
-                //     Recognition::Success(transformed) => {
-                //         log::debug!("transformed semantic: {:?}", transformed);
-                //         Some(transformed)
-                //     }
-                //     Recognition::Error(error) => {
-                //         log::debug!("transformation problem: {:?}", error);
-                //         None
-                //     }
-                //     Recognition::Ignored(reason) => {
-                //         log::debug!("transformation ignored: {:?}", reason);
-                //         None
-                //     }
-                //     Recognition::Unknown => {
-                //         // this never going to happen...
-                //         log::debug!("transformation not recognized");
-                //         None
-                //     }
-                // }
             }
             None => {
                 log::debug!("not recognized");
