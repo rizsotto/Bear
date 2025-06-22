@@ -120,7 +120,7 @@ impl Formattable for CompilerCommand {
             .filter(|arg| matches!(arg.kind, ArgumentKind::Output))
             .flat_map(|arg| &arg.args)
             .nth(1) // Skip the "-o" flag itself, take the output filename
-            .map(|s| PathBuf::from(s));
+            .map(PathBuf::from);
 
         // Create one entry per source file
         source_files

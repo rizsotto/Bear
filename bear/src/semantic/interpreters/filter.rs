@@ -62,7 +62,7 @@ impl FilteringInterpreter {
         for compiler in compilers {
             compilers_by_path
                 .entry(compiler.path.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(compiler);
         }
 

@@ -87,14 +87,11 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
                     });
 
             // Then apply formatting
-            let formatted_interpreter =
-                FormattingInterpreter::from_config(Box::new(filtered_interpreter), &format.paths)
-                    .unwrap_or_else(|_| {
-                        // If formatting configuration is invalid, use pass-through
-                        FormattingInterpreter::pass_through(Box::new(Any::new(vec![])))
-                    });
-
-            formatted_interpreter
+            FormattingInterpreter::from_config(Box::new(filtered_interpreter), &format.paths)
+                .unwrap_or_else(|_| {
+                    // If formatting configuration is invalid, use pass-through
+                    FormattingInterpreter::pass_through(Box::new(Any::new(vec![])))
+                })
         }
         config::Output::Semantic { .. } => {
             // For semantic output, just use pass-through formatting
