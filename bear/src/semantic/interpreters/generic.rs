@@ -8,54 +8,6 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::vec;
 
-/// Represents an executed command semantic (deprecated - use CompilerCommand instead).
-#[deprecated(note = "Use CompilerCommand instead")]
-#[derive(Debug, PartialEq)]
-pub struct CompilerCall {
-    pub compiler: PathBuf,
-    pub working_dir: PathBuf,
-    pub passes: Vec<CompilerPass>,
-}
-
-/// Represents a compiler call pass (deprecated - use Argument instead).
-#[deprecated(note = "Use Argument instead")]
-#[derive(Debug, PartialEq)]
-pub enum CompilerPass {
-    Preprocess,
-    Compile {
-        source: PathBuf,
-        output: Option<PathBuf>,
-        flags: Vec<String>,
-    },
-}
-
-impl Clone for CompilerCall {
-    fn clone(&self) -> Self {
-        Self {
-            compiler: self.compiler.clone(),
-            working_dir: self.working_dir.clone(),
-            passes: self.passes.clone(),
-        }
-    }
-}
-
-impl Clone for CompilerPass {
-    fn clone(&self) -> Self {
-        match self {
-            CompilerPass::Preprocess => CompilerPass::Preprocess,
-            CompilerPass::Compile {
-                source,
-                output,
-                flags,
-            } => CompilerPass::Compile {
-                source: source.clone(),
-                output: output.clone(),
-                flags: flags.clone(),
-            },
-        }
-    }
-}
-
 /// A tool to recognize a compiler by executable name.
 pub(super) struct Generic {
     executables: HashSet<PathBuf>,
