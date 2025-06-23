@@ -39,6 +39,7 @@ impl DuplicateEntryFilter {
                 config::OutputFields::Directory => entry.directory.hash(&mut hasher),
                 config::OutputFields::File => entry.file.hash(&mut hasher),
                 config::OutputFields::Arguments => entry.arguments.hash(&mut hasher),
+                config::OutputFields::Command => entry.command.hash(&mut hasher),
                 config::OutputFields::Output => entry.output.hash(&mut hasher),
             }
         }
@@ -50,6 +51,8 @@ impl DuplicateEntryFilter {
 pub enum ConfigurationError {
     #[error("Duplicate field: {0:?}")]
     DuplicateField(config::OutputFields),
+    #[error("Command and Arguments cannot be both specified")]
+    CommandAndArgumentsBothSpecified,
     #[error("Empty field list")]
     EmptyFieldList,
 }
@@ -66,6 +69,12 @@ impl TryFrom<config::DuplicateFilter> for DuplicateEntryFilter {
             if !already_seen.insert(field) {
                 return Err(ConfigurationError::DuplicateField(field.clone()));
             }
+        }
+
+        if already_seen.contains(&config::OutputFields::Command)
+            && already_seen.contains(&config::OutputFields::Arguments)
+        {
+            return Err(ConfigurationError::CommandAndArgumentsBothSpecified);
         }
 
         Ok(DuplicateEntryFilter {
@@ -109,6 +118,21 @@ mod tests {
             Err(ConfigurationError::DuplicateField(
                 config::OutputFields::File
             ))
+        ));
+    }
+
+    #[test]
+    fn test_try_from_failure_command_and_arguments() {
+        let config = config::DuplicateFilter {
+            by_fields: vec![
+                config::OutputFields::Command,
+                config::OutputFields::Arguments,
+            ],
+        };
+        let result = DuplicateEntryFilter::try_from(config);
+        assert!(matches!(
+            result,
+            Err(ConfigurationError::CommandAndArgumentsBothSpecified)
         ));
     }
 

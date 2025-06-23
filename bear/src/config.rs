@@ -323,6 +323,8 @@ mod types {
         File,
         #[serde(rename = "arguments")]
         Arguments,
+        #[serde(rename = "command")]
+        Command,
         #[serde(rename = "output")]
         Output,
     }
