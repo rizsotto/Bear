@@ -129,21 +129,13 @@ impl Formattable for CompilerCommand {
         source_files
             .into_iter()
             .map(|source_file| {
-                if config.command_field_as_array {
-                    clang::Entry::from_arguments(
-                        source_file,
-                        command_args.clone(),
-                        &self.working_dir,
-                        output_file.as_ref(),
-                    )
-                } else {
-                    clang::Entry::from_arguments_as_command(
-                        source_file,
-                        command_args.clone(),
-                        &self.working_dir,
-                        output_file.as_ref(),
-                    )
-                }
+                clang::Entry::new(
+                    source_file,
+                    command_args.clone(),
+                    &self.working_dir,
+                    output_file.as_ref(),
+                    !config.command_field_as_array,
+                )
             })
             .collect()
     }
@@ -152,7 +144,6 @@ impl Formattable for CompilerCommand {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_compiler_command_to_entries_single_source() {
@@ -173,15 +164,13 @@ mod test {
         let config = FormatConfig::default();
         let entries = sut.to_entries(&config);
 
-        assert_eq!(entries.len(), 1);
-        let entry = &entries[0];
-        assert_eq!(entry.file, PathBuf::from("main.c"));
-        assert_eq!(entry.directory, PathBuf::from("/home/user"));
-        assert_eq!(
-            entry.arguments,
-            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c", "-o", "main.o"]
-        );
-        assert_eq!(entry.output, Some(PathBuf::from("main.o")));
+        let expected = vec![clang::Entry::from_arguments_str(
+            "main.c",
+            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
+            "/home/user",
+            Some("main.o"),
+        )];
+        assert_eq!(entries, expected);
     }
 
     #[test]
@@ -202,17 +191,21 @@ mod test {
         let config = FormatConfig::default();
         let entries = sut.to_entries(&config);
 
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].file, PathBuf::from("file1.cpp"));
-        assert_eq!(entries[1].file, PathBuf::from("file2.cpp"));
-
-        for entry in &entries {
-            assert_eq!(entry.directory, PathBuf::from("/home/user"));
-            assert_eq!(
-                entry.arguments,
-                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"]
-            );
-        }
+        let expected = vec![
+            clang::Entry::from_arguments_str(
+                "file1.cpp",
+                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"],
+                "/home/user",
+                None,
+            ),
+            clang::Entry::from_arguments_str(
+                "file2.cpp",
+                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"],
+                "/home/user",
+                None,
+            ),
+        ];
+        assert_eq!(entries, expected);
     }
 
     #[test]
@@ -229,7 +222,8 @@ mod test {
         let config = FormatConfig::default();
         let entries = sut.to_entries(&config);
 
-        assert_eq!(entries.len(), 0);
+        let expected: Vec<clang::Entry> = vec![];
+        assert_eq!(entries, expected);
     }
 
     #[test]
@@ -252,14 +246,13 @@ mod test {
         };
         let entries = sut.to_entries(&config);
 
-        assert_eq!(entries.len(), 1);
-        let entry = &entries[0];
-        assert_eq!(entry.directory, PathBuf::from("/home/user"));
-        assert_eq!(entry.file, PathBuf::from("main.c"));
-        assert_eq!(entry.output, Some(PathBuf::from("main.o")));
-        // Command should be a string, not an array
-        assert!(entry.arguments.is_empty());
-        assert_eq!(entry.command, "/usr/bin/gcc -c main.c -o main.o");
+        let expected = vec![clang::Entry::from_command_str(
+            "main.c",
+            "/usr/bin/gcc -c main.c -o main.o",
+            "/home/user",
+            Some("main.o"),
+        )];
+        assert_eq!(entries, expected);
     }
 
     #[test]
@@ -282,9 +275,12 @@ mod test {
         };
         let entries = sut.to_entries(&config);
 
-        assert_eq!(entries.len(), 1);
-        let entry = &entries[0];
-        // Output field should be None
-        assert!(entry.output.is_none());
+        let expected = vec![clang::Entry::from_arguments_str(
+            "main.c",
+            vec!["/usr/bin/gcc", "-c", "main.c", "-o", "main.o"],
+            "/home/user",
+            None,
+        )];
+        assert_eq!(entries, expected);
     }
 }

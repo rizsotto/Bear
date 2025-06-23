@@ -28,13 +28,13 @@ pub struct Entry {
     /// This is used by tools as the key into the compilation database.
     /// There can be multiple command objects for the same file, for example if the same
     /// source file is compiled with different configurations.
-    pub file: path::PathBuf,
+    file: path::PathBuf,
     /// The compile command argv as list of strings. This should run the compilation step
     /// for the translation unit file. `arguments[0]` should be the executable name, such
     /// as `clang++`. Arguments should not be escaped, but ready to pass to `execvp()`.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    pub arguments: Vec<String>,
+    arguments: Vec<String>,
     /// The compile command as a single shell-escaped string. Arguments may be shell quoted
     /// and escaped following platform conventions, with ‘"’ and ‘\’ being the only special
     /// characters. Shell expansion is not supported.
@@ -43,46 +43,42 @@ pub struct Entry {
     /// (un)escaping is a possible source of errors.
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
-    pub command: String,
+    command: String,
     /// The working directory of the compilation. All paths specified in the `command` or
     /// `file` fields must be either absolute or relative to this directory.
-    pub directory: path::PathBuf,
+    directory: path::PathBuf,
     /// The name of the output created by this compilation step. This field is optional.
     /// It can be used to distinguish different processing modes of the same input file.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
-    pub output: Option<path::PathBuf>,
+    output: Option<path::PathBuf>,
 }
 
 impl Entry {
-    /// Create an Entry from arguments (preferred).
-    pub fn from_arguments(
+    /// Create an Entry from arguments or as a command string.
+    pub fn new(
         file: impl Into<path::PathBuf>,
         arguments: Vec<String>,
         directory: impl Into<path::PathBuf>,
         output: Option<impl Into<path::PathBuf>>,
+        as_command: bool,
     ) -> Self {
-        Entry {
-            file: file.into(),
-            arguments,
-            command: String::default(),
-            directory: directory.into(),
-            output: output.map(|o| o.into()),
-        }
-    }
-
-    pub fn from_arguments_as_command(
-        file: impl Into<path::PathBuf>,
-        arguments: Vec<String>,
-        directory: impl Into<path::PathBuf>,
-        output: Option<impl Into<path::PathBuf>>,
-    ) -> Self {
-        Entry {
-            file: file.into(),
-            arguments: Vec::default(),
-            command: shell_words::join(&arguments),
-            directory: directory.into(),
-            output: output.map(|o| o.into()),
+        if as_command {
+            Entry {
+                file: file.into(),
+                arguments: Vec::default(),
+                command: shell_words::join(&arguments),
+                directory: directory.into(),
+                output: output.map(|o| o.into()),
+            }
+        } else {
+            Entry {
+                file: file.into(),
+                arguments,
+                command: String::default(),
+                directory: directory.into(),
+                output: output.map(|o| o.into()),
+            }
         }
     }
 
