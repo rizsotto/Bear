@@ -20,144 +20,11 @@ use std::process::ExitCode;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::{fmt, thread};
-use supervise::supervise;
 use thiserror::Error;
-
-/// Errors that can occur in the reporter.
-#[derive(Error, Debug)]
-pub enum ReporterError {
-    #[error("Environment variable '{0}' is missing")]
-    MissingEnvironmentVariable(String),
-    #[error("Network error: {0}")]
-    Network(String),
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
-
-/// Errors that can occur in the collector.
-#[derive(Error, Debug)]
-pub enum CollectorError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Network error: {0}")]
-    Network(String),
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    #[error("Channel communication error: {0}")]
-    Channel(String),
-}
-
-impl<T> From<std::sync::mpsc::SendError<T>> for CollectorError {
-    fn from(err: std::sync::mpsc::SendError<T>) -> Self {
-        CollectorError::Channel(format!("Failed to send message: {}", err))
-    }
-}
-
-/// Errors that can occur in the intercept environment and configuration.
-#[derive(Error, Debug)]
-pub enum InterceptError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Process execution error: {0}")]
-    ProcessExecution(String),
-    #[error("Configuration validation error: {0}")]
-    ConfigValidation(String),
-    #[error("Path manipulation error: {0}")]
-    Path(String),
-    #[error("Thread join error")]
-    ThreadJoin,
-    #[error("No executable found in build command")]
-    NoExecutable,
-    #[error("Reporter error: {0}")]
-    Reporter(#[from] ReporterError),
-    #[error("Collector error: {0}")]
-    Collector(#[from] CollectorError),
-}
-
-impl From<std::env::JoinPathsError> for InterceptError {
-    fn from(err: std::env::JoinPathsError) -> Self {
-        InterceptError::Path(format!("Failed to join paths: {}", err))
-    }
-}
 
 /// Declare the environment variables used by the intercept mode.
 pub const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
 const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
-
-/// Creates a new reporter instance.
-///
-/// This function is supposed to be called from another process than the collector.
-/// Therefore, the reporter destination is passed as an environment variable.
-/// The reporter destination is the address of the collector service.
-pub fn create_reporter() -> Result<Box<dyn Reporter>, ReporterError> {
-    let address = std::env::var(KEY_DESTINATION)
-        .map_err(|_| ReporterError::MissingEnvironmentVariable(KEY_DESTINATION.to_string()))?;
-    let reporter = tcp::ReporterOnTcp::new(address);
-    Ok(Box::new(reporter))
-}
-
-pub fn create_reporter_on_tcp(address: &str) -> Box<dyn Reporter> {
-    let reporter = tcp::ReporterOnTcp::new(address.to_string());
-    Box::new(reporter)
-}
-
-/// Represents the remote sink of supervised process events.
-///
-/// This allows the reporters to send events to a remote collector.
-pub trait Reporter {
-    fn report(&self, event: Event) -> Result<(), ReporterError>;
-}
-
-/// Represents the local sink of supervised process events.
-///
-/// The collector is responsible for collecting the events from the reporters.
-///
-/// To share the collector between threads, we use the `Arc` type to wrap the
-/// collector. This way we can clone the collector and send it to other threads.
-pub trait Collector {
-    /// Returns the address of the collector.
-    ///
-    /// The address is in the format of `ip:port`.
-    fn address(&self) -> String;
-
-    /// Collects the events from the reporters.
-    ///
-    /// The events are sent to the given destination channel.
-    ///
-    /// The function returns when the collector is stopped. The collector is stopped
-    /// when the `stop` method invoked (from another thread).
-    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError>;
-
-    /// Stops the collector.
-    fn stop(&self) -> Result<(), CollectorError>;
-}
-
-/// Represent a relevant life cycle event of a process.
-///
-/// In the current implementation, we only have one event, the `Started` event.
-/// This event is sent when a process is started. It contains the process id
-/// and the execution information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Event {
-    pub pid: u32,
-    pub execution: Execution,
-}
-
-impl Event {
-    /// Creates a new event that is originated from the current process.
-    pub fn new(execution: Execution) -> Self {
-        let pid = std::process::id();
-        Event { pid, execution }
-    }
-}
-
-impl fmt::Display for Event {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Event pid={}, execution={}", self.pid, self.execution)
-    }
-}
 
 /// Execution is a representation of a process execution.
 ///
@@ -198,6 +65,24 @@ impl Execution {
         let mut updated = self.clone();
         updated.environment = environment;
         updated
+    }
+
+    #[cfg(test)]
+    pub fn from_strings(
+        executable: &str,
+        arguments: Vec<&str>,
+        working_dir: &str,
+        environment: HashMap<&str, &str>,
+    ) -> Self {
+        Self {
+            executable: PathBuf::from(executable),
+            arguments: arguments.iter().map(|s| s.to_string()).collect(),
+            working_dir: PathBuf::from(working_dir),
+            environment: environment
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
     }
 }
 
@@ -246,36 +131,91 @@ impl fmt::Display for Execution {
     }
 }
 
-#[cfg(test)]
-pub fn execution(
-    executable: &str,
-    arguments: Vec<&str>,
-    working_dir: &str,
-    environment: HashMap<&str, &str>,
-) -> Execution {
-    Execution {
-        executable: PathBuf::from(executable),
-        arguments: arguments.iter().map(|s| s.to_string()).collect(),
-        working_dir: PathBuf::from(working_dir),
-        environment: environment
-            .iter()
-            .map(|(k, v)| (k.to_string(), v.to_string()))
-            .collect(),
+/// Represent a relevant life cycle event of a process.
+///
+/// In the current implementation, we only have one event, the `Started` event.
+/// This event is sent when a process is started. It contains the process id
+/// and the execution information.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct Event {
+    pub pid: u32,
+    pub execution: Execution,
+}
+
+impl Event {
+    /// Creates a new event that is originated from the current process.
+    pub fn new(execution: Execution) -> Self {
+        let pid = std::process::id();
+        Event { pid, execution }
+    }
+
+    #[cfg(test)]
+    pub fn from_strings(
+        pid: u32,
+        executable: &str,
+        arguments: Vec<&str>,
+        working_dir: &str,
+        environment: HashMap<&str, &str>,
+    ) -> Self {
+        Self {
+            pid,
+            execution: Execution::from_strings(executable, arguments, working_dir, environment),
+        }
     }
 }
 
-#[cfg(test)]
-pub fn event(
-    pid: u32,
-    executable: &str,
-    arguments: Vec<&str>,
-    working_dir: &str,
-    environment: HashMap<&str, &str>,
-) -> Event {
-    Event {
-        pid,
-        execution: execution(executable, arguments, working_dir, environment),
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Event pid={}, execution={}", self.pid, self.execution)
     }
+}
+
+/// Creates a new reporter instance.
+///
+/// This function is supposed to be called from another process than the collector.
+/// Therefore, the reporter destination is passed as an environment variable.
+/// The reporter destination is the address of the collector service.
+pub fn create_reporter() -> Result<Box<dyn Reporter>, ReporterError> {
+    let address = std::env::var(KEY_DESTINATION)
+        .map_err(|_| ReporterError::MissingEnvironmentVariable(KEY_DESTINATION.to_string()))?;
+    let reporter = tcp::ReporterOnTcp::new(address);
+    Ok(Box::new(reporter))
+}
+
+pub fn create_reporter_on_tcp(address: &str) -> Box<dyn Reporter> {
+    let reporter = tcp::ReporterOnTcp::new(address.to_string());
+    Box::new(reporter)
+}
+
+/// Represents the remote sink of supervised process events.
+///
+/// This allows the reporters to send events to a remote collector.
+pub trait Reporter {
+    fn report(&self, event: Event) -> Result<(), ReporterError>;
+}
+
+/// Represents the local sink of supervised process events.
+///
+/// The collector is responsible for collecting the events from the reporters.
+///
+/// To share the collector between threads, we use the `Arc` type to wrap the
+/// collector. This way we can clone the collector and send it to other threads.
+pub trait Collector {
+    /// Returns the address of the collector.
+    ///
+    /// The address is in the format of `ip:port`.
+    fn address(&self) -> String;
+
+    /// Collects the events from the reporters.
+    ///
+    /// The events are sent to the given destination channel.
+    ///
+    /// The function returns when the collector is stopped. The collector is stopped
+    /// when the `stop` method invoked (from another thread).
+    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError>;
+
+    /// Stops the collector.
+    fn stop(&self) -> Result<(), CollectorError>;
 }
 
 /// The service is responsible for collecting the events from the supervised processes.
@@ -419,8 +359,8 @@ impl InterceptEnvironment {
 
         let child: Execution = TryInto::<Execution>::try_into(input)?
             .with_environment(self.environment().into_iter().collect());
-        let exit_status =
-            supervise(child).map_err(|e| InterceptError::ProcessExecution(e.to_string()))?;
+        let exit_status = supervise::supervise(child)
+            .map_err(|e| InterceptError::ProcessExecution(e.to_string()))?;
         log::info!("Execution finished with status: {:?}", exit_status);
 
         // The exit code is not always available. When the process is killed by a signal,
@@ -523,6 +463,65 @@ impl config::Intercept {
 
     fn is_empty_path(path: &Path) -> bool {
         path.to_str().is_some_and(|p| p.is_empty())
+    }
+}
+
+/// Errors that can occur in the reporter.
+#[derive(Error, Debug)]
+pub enum ReporterError {
+    #[error("Environment variable '{0}' is missing")]
+    MissingEnvironmentVariable(String),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+/// Errors that can occur in the collector.
+#[derive(Error, Debug)]
+pub enum CollectorError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Network error: {0}")]
+    Network(String),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("Channel communication error: {0}")]
+    Channel(String),
+}
+
+impl<T> From<std::sync::mpsc::SendError<T>> for CollectorError {
+    fn from(err: std::sync::mpsc::SendError<T>) -> Self {
+        CollectorError::Channel(format!("Failed to send message: {}", err))
+    }
+}
+
+/// Errors that can occur in the intercept environment and configuration.
+#[derive(Error, Debug)]
+pub enum InterceptError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Process execution error: {0}")]
+    ProcessExecution(String),
+    #[error("Configuration validation error: {0}")]
+    ConfigValidation(String),
+    #[error("Path manipulation error: {0}")]
+    Path(String),
+    #[error("Thread join error")]
+    ThreadJoin,
+    #[error("No executable found in build command")]
+    NoExecutable,
+    #[error("Reporter error: {0}")]
+    Reporter(#[from] ReporterError),
+    #[error("Collector error: {0}")]
+    Collector(#[from] CollectorError),
+}
+
+impl From<std::env::JoinPathsError> for InterceptError {
+    fn from(err: std::env::JoinPathsError) -> Self {
+        InterceptError::Path(format!("Failed to join paths: {}", err))
     }
 }
 

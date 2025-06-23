@@ -231,28 +231,27 @@ mod tests {
     }
 
     mod fixtures {
-        use super::super::super::event;
         use super::*;
         use std::collections::HashMap;
 
         pub(super) static EVENTS: std::sync::LazyLock<Vec<Event>> =
             std::sync::LazyLock::new(|| {
                 vec![
-                    event(
+                    Event::from_strings(
                         3425,
                         "/usr/bin/ls",
                         vec!["ls", "-l"],
                         "/tmp",
                         HashMap::new(),
                     ),
-                    event(
+                    Event::from_strings(
                         3492,
                         "/usr/bin/cc",
                         vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
                         "/home/user",
                         HashMap::from([("PATH", "/usr/bin:/bin"), ("HOME", "/home/user")]),
                     ),
-                    event(
+                    Event::from_strings(
                         3522,
                         "/usr/bin/ld",
                         vec!["ld", "-o", "./file_a", "./file_a.o"],

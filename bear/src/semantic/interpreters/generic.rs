@@ -100,11 +100,10 @@ mod test {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::intercept::execution;
 
     #[test]
     fn test_matching() {
-        let input = execution(
+        let input = Execution::from_strings(
             "/usr/bin/something",
             vec![
                 "something",
@@ -152,7 +151,7 @@ mod test {
 
     #[test]
     fn test_matching_without_sources() {
-        let input = execution(
+        let input = Execution::from_strings(
             "/usr/bin/something",
             vec!["something", "--help"],
             "/home/user",
@@ -180,7 +179,7 @@ mod test {
 
     #[test]
     fn test_not_matching() {
-        let input = execution(
+        let input = Execution::from_strings(
             "/usr/bin/ls",
             vec!["ls", "/home/user/build"],
             "/home/user",
@@ -193,7 +192,7 @@ mod test {
 
     #[test]
     fn test_complex_argument_parsing() {
-        let input = execution(
+        let input = Execution::from_strings(
             "/usr/bin/something",
             vec![
                 "gcc",

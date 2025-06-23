@@ -468,7 +468,7 @@ mod test {
     mod execution_events {
         use super::super::ExecutionEventDatabase as Sut;
         use super::super::FileFormat;
-        use crate::intercept::{event, Event};
+        use crate::intercept::Event;
         use serde_json::json;
         use std::collections::HashMap;
         use std::io::{Cursor, Seek, SeekFrom};
@@ -539,14 +539,14 @@ mod test {
 
         fn expected_values() -> Vec<Event> {
             vec![
-                event(
+                Event::from_strings(
                     11782,
                     "/usr/bin/clang",
                     vec!["clang", "-c", "main.c"],
                     "/home/user",
                     HashMap::from([("PATH", "/usr/bin"), ("HOME", "/home/user")]),
                 ),
-                event(
+                Event::from_strings(
                     11934,
                     "/usr/bin/clang",
                     vec!["clang", "-c", "output.c"],

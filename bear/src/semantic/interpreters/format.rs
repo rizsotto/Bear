@@ -271,7 +271,6 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::intercept::execution;
     use crate::semantic::command::ArgumentGroup;
     use std::collections::HashMap;
     use std::fs;
@@ -301,7 +300,7 @@ mod tests {
 
         let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 
-        let execution = execution(
+        let execution = Execution::from_strings(
             "/usr/bin/gcc",
             vec!["gcc", "main.c"],
             "/project",
@@ -324,7 +323,8 @@ mod tests {
 
         let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 
-        let execution = execution("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
+        let execution =
+            Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
 
         let result = sut.recognize(&execution);
         assert!(matches!(result, Some(Command::Ignored(_))));

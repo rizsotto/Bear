@@ -288,7 +288,6 @@ mod tests {
     use crate::config::{
         Arguments, Compiler, DirectoryFilter, Ignore, IgnoreOrConsider, SourceFilter,
     };
-    use crate::intercept::execution;
     use crate::semantic::command::CompilerCommand;
     use std::path::PathBuf;
 
@@ -322,7 +321,7 @@ mod tests {
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), compiler_filters, vec![]);
 
-        let execution = execution(
+        let execution = Execution::from_strings(
             "/usr/bin/gcc",
             vec!["gcc", "main.c"],
             "/project",
@@ -353,7 +352,7 @@ mod tests {
         let sut =
             FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), source_filters);
 
-        let execution = execution(
+        let execution = Execution::from_strings(
             "/usr/bin/gcc",
             vec!["gcc", "tests/test_file.c"],
             "/project",
@@ -378,7 +377,7 @@ mod tests {
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
 
-        let execution = execution(
+        let execution = Execution::from_strings(
             "/usr/bin/gcc",
             vec!["gcc", "main.c"],
             "/project",
@@ -401,7 +400,8 @@ mod tests {
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
 
-        let execution = execution("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
+        let execution =
+            Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
 
         let result = sut.recognize(&execution);
         assert!(matches!(result, Some(Command::Ignored(_))));
