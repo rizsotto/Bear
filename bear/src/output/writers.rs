@@ -2,7 +2,6 @@
 
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
-use crate::semantic::Formattable;
 use crate::{config, semantic};
 use anyhow::Context;
 use std::{fs, io, path};

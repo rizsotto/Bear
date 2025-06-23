@@ -5,7 +5,8 @@
 //! It defines how to classify arguments, group them, and convert them into entries
 //! for the final compilation database.
 
-use crate::semantic::{clang, EntryFormat, Formattable};
+use crate::config;
+use crate::semantic::clang;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -85,14 +86,12 @@ impl CompilerCommand {
                 .collect(),
         }
     }
-}
 
-impl Formattable for CompilerCommand {
     /// Converts the compiler command into a list of entries for the compilation database.
     ///
     /// It processes the command arguments, identifies source files, and constructs
     /// entries with the executable, arguments, working directory, and output file if present.
-    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry> {
+    pub(super) fn to_entries(&self, config: &config::EntryFormat) -> Vec<clang::Entry> {
         // Find all source files in the arguments
         let source_files: Vec<String> = self
             .arguments
@@ -144,6 +143,7 @@ impl Formattable for CompilerCommand {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::config::EntryFormat;
 
     #[test]
     fn test_compiler_command_to_entries_single_source() {

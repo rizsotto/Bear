@@ -4,26 +4,13 @@
 //!
 //! This module provides traits and types for recognizing the semantic meaning of executed commands
 //! (such as compilers or interpreters) and for formatting their output into structured entries.
-//!
-//! # Main Components
-//!
-//! - [`Command`]: Enum representing recognized command types.
-//! - [`Interpreter`]: Trait for recognizing the semantic meaning of an `Execution`.
-//! - [`Formattable`]: Trait for converting recognized commands into output entries.
-//! - [`EntryFormat`]: Configuration for formatting output entries.
-//!
-//! Implementers of [`Interpreter`] analyze an `Execution` and determine if it matches a known command.
-//! If recognized, they return a boxed [`Command`] representing the semantic meaning of the execution.
-//!
-//! The [`Formattable`] trait allows recognized commands to be transformed into output entries (e.g.,
-//! for a compilation database), using the provided [`EntryFormat`].
 
 pub mod clang;
 pub mod command;
 pub mod interpreters;
 
 use super::intercept::Execution;
-use crate::config::EntryFormat;
+use crate::config;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -41,6 +28,17 @@ pub enum Command {
     Filtered(String),
 }
 
+impl Command {
+    /// Converts the command into compilation database entries.
+    pub fn to_entries(&self, config: &config::EntryFormat) -> Vec<clang::Entry> {
+        match self {
+            Command::Compiler(cmd) => cmd.to_entries(config),
+            Command::Ignored(_) => vec![],
+            Command::Filtered(_) => vec![],
+        }
+    }
+}
+
 /// Responsible for recognizing the semantic meaning of an executed command.
 ///
 /// Implementers of this trait analyze an [`Execution`] and determine if it matches
@@ -49,20 +47,4 @@ pub enum Command {
 pub trait Interpreter: Send {
     /// An [`Option<Command>`] containing the recognized command, or `None` if not recognized.
     fn recognize(&self, execution: &Execution) -> Option<Command>;
-}
-
-/// Trait for types that can be formatted into output entries.
-pub trait Formattable {
-    /// Converts the command into a list of entries, using the provided format configuration.
-    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry>;
-}
-
-impl Formattable for Command {
-    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry> {
-        match self {
-            Command::Compiler(cmd) => cmd.to_entries(config),
-            Command::Ignored(_) => vec![],
-            Command::Filtered(_) => vec![],
-        }
-    }
 }
