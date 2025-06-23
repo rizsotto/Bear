@@ -2,7 +2,7 @@
 
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
-use crate::semantic::{FormatConfig, Formattable};
+use crate::semantic::Formattable;
 use crate::{config, semantic};
 use anyhow::Context;
 use std::{fs, io, path};
@@ -49,14 +49,16 @@ impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
 
 /// Formats `semantic::CompilerCall` instances into `Entry` objects.
 pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
-    format: FormatConfig,
+    format: config::EntryFormat,
     writer: T,
 }
 
 impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
-    pub(super) fn new(writer: T) -> Self {
-        let format = FormatConfig::default();
-        Self { format, writer }
+    pub(super) fn new(writer: T, format: &config::EntryFormat) -> Self {
+        Self {
+            format: format.clone(),
+            writer,
+        }
     }
 }
 

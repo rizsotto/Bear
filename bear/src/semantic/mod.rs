@@ -10,19 +10,20 @@
 //! - [`Command`]: Enum representing recognized command types.
 //! - [`Interpreter`]: Trait for recognizing the semantic meaning of an `Execution`.
 //! - [`Formattable`]: Trait for converting recognized commands into output entries.
-//! - [`FormatConfig`]: Configuration for formatting output entries.
+//! - [`EntryFormat`]: Configuration for formatting output entries.
 //!
 //! Implementers of [`Interpreter`] analyze an `Execution` and determine if it matches a known command.
 //! If recognized, they return a boxed [`Command`] representing the semantic meaning of the execution.
 //!
 //! The [`Formattable`] trait allows recognized commands to be transformed into output entries (e.g.,
-//! for a compilation database), using the provided [`FormatConfig`].
+//! for a compilation database), using the provided [`EntryFormat`].
 
 pub mod clang;
 pub mod command;
 pub mod interpreters;
 
 use super::intercept::Execution;
+use crate::config::EntryFormat;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
@@ -50,33 +51,14 @@ pub trait Interpreter: Send {
     fn recognize(&self, execution: &Execution) -> Option<Command>;
 }
 
-/// Configuration for formatting output entries.
-///
-/// This struct can be extended to control how recognized commands are
-/// transformed into output entries (e.g., for a compilation database).
-#[derive(Debug)]
-pub struct FormatConfig {
-    command_field_as_array: bool,
-    keep_output_field: bool,
-}
-
-impl Default for FormatConfig {
-    fn default() -> Self {
-        Self {
-            command_field_as_array: true,
-            keep_output_field: true,
-        }
-    }
-}
-
 /// Trait for types that can be formatted into output entries.
 pub trait Formattable {
     /// Converts the command into a list of entries, using the provided format configuration.
-    fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry>;
+    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry>;
 }
 
 impl Formattable for Command {
-    fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
+    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry> {
         match self {
             Command::Compiler(cmd) => cmd.to_entries(config),
             Command::Ignored(_) => vec![],

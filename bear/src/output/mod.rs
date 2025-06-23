@@ -48,7 +48,9 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
     fn try_from(value: (&args::BuildSemantic, &config::Output)) -> Result<Self, Self::Error> {
         let (args, config) = value;
         match config {
-            config::Output::Clang { duplicates, .. } => {
+            config::Output::Clang {
+                duplicates, format, ..
+            } => {
                 let final_file_name = path::Path::new(&args.file_name);
                 let temp_file_name = final_file_name.with_extension("tmp");
 
@@ -58,7 +60,8 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
                     AtomicClangOutputWriter::new(unique_writer, &temp_file_name, final_file_name);
                 let append_writer =
                     AppendClangOutputWriter::new(atomic_writer, args.append, final_file_name);
-                let formatted_writer = ConverterClangOutputWriter::new(append_writer);
+                let formatted_writer =
+                    ConverterClangOutputWriter::new(append_writer, &format.entry);
 
                 Ok(Self::Clang(formatted_writer))
             }

@@ -66,6 +66,9 @@
 //!       directory: canonical
 //!       file: canonical
 //!       output: canonical
+//!     entry:
+//!       command_as_array: true
+//!       keep_output_field: true
 //! ```
 //!
 //! ```yaml
@@ -334,6 +337,8 @@ mod types {
     pub struct Format {
         #[serde(default)]
         pub paths: PathFormat,
+        #[serde(default)]
+        pub entry: EntryFormat,
     }
 
     /// Format configuration of paths in the JSON compilation database.
@@ -356,6 +361,24 @@ mod types {
         /// The directory path will be resolved to the relative path to the directory attribute.
         #[serde(rename = "relative")]
         Relative,
+    }
+
+    /// Configuration for formatting output entries.
+    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    pub struct EntryFormat {
+        #[serde(default = "default_enabled")]
+        pub command_field_as_array: bool,
+        #[serde(default = "default_enabled")]
+        pub keep_output_field: bool,
+    }
+
+    impl Default for EntryFormat {
+        fn default() -> Self {
+            Self {
+                command_field_as_array: true,
+                keep_output_field: true,
+            }
+        }
     }
 
     pub(super) const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
@@ -382,14 +405,14 @@ mod types {
     }
 
     // Custom deserialization function to validate the schema version
-    fn validate_schema_version<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+    fn validate_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let schema: String = Deserialize::deserialize(deserializer)?;
         if schema != SUPPORTED_SCHEMA_VERSION {
             use serde::de::Error;
-            Err(D::Error::custom(format!(
+            Err(Error::custom(format!(
                 "Unsupported schema version: {}. Expected: {}",
                 schema, SUPPORTED_SCHEMA_VERSION
             )))
@@ -624,6 +647,10 @@ pub mod loader {
                             file: PathResolver::Canonical,
                             output: PathResolver::Canonical,
                         },
+                        entry: EntryFormat {
+                            command_field_as_array: true,
+                            keep_output_field: true,
+                        },
                     },
                 },
                 schema: String::from("4.0"),
@@ -677,6 +704,10 @@ pub mod loader {
                             directory: PathResolver::Canonical,
                             file: PathResolver::Canonical,
                             output: PathResolver::Canonical,
+                        },
+                        entry: EntryFormat {
+                            command_field_as_array: true,
+                            keep_output_field: true,
                         },
                     },
                 },
@@ -737,6 +768,9 @@ pub mod loader {
               directory: relative
               file: relative
               output: relative
+            entry:
+              command_field_as_array: false
+              keep_output_field: false
         "#;
 
             let result = Loader::from_reader(content).unwrap();
@@ -780,6 +814,10 @@ pub mod loader {
                             directory: PathResolver::Relative,
                             file: PathResolver::Relative,
                             output: PathResolver::Relative,
+                        },
+                        entry: EntryFormat {
+                            command_field_as_array: false,
+                            keep_output_field: false,
                         },
                     },
                 },

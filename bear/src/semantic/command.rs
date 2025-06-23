@@ -5,7 +5,7 @@
 //! It defines how to classify arguments, group them, and convert them into entries
 //! for the final compilation database.
 
-use crate::semantic::{clang, FormatConfig, Formattable};
+use crate::semantic::{clang, EntryFormat, Formattable};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -92,7 +92,7 @@ impl Formattable for CompilerCommand {
     ///
     /// It processes the command arguments, identifies source files, and constructs
     /// entries with the executable, arguments, working directory, and output file if present.
-    fn to_entries(&self, config: &FormatConfig) -> Vec<clang::Entry> {
+    fn to_entries(&self, config: &EntryFormat) -> Vec<clang::Entry> {
         // Find all source files in the arguments
         let source_files: Vec<String> = self
             .arguments
@@ -161,7 +161,7 @@ mod test {
             ],
         );
 
-        let config = FormatConfig::default();
+        let config = EntryFormat::default();
         let entries = sut.to_entries(&config);
 
         let expected = vec![clang::Entry::from_arguments_str(
@@ -188,7 +188,7 @@ mod test {
             ],
         );
 
-        let config = FormatConfig::default();
+        let config = EntryFormat::default();
         let entries = sut.to_entries(&config);
 
         let expected = vec![
@@ -219,7 +219,7 @@ mod test {
             )],
         );
 
-        let config = FormatConfig::default();
+        let config = EntryFormat::default();
         let entries = sut.to_entries(&config);
 
         let expected: Vec<clang::Entry> = vec![];
@@ -240,7 +240,7 @@ mod test {
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
-        let config = FormatConfig {
+        let config = EntryFormat {
             keep_output_field: true,
             command_field_as_array: false,
         };
@@ -269,7 +269,7 @@ mod test {
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
-        let config = FormatConfig {
+        let config = EntryFormat {
             command_field_as_array: true,
             keep_output_field: false,
         };
