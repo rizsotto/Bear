@@ -413,8 +413,7 @@ mod types {
         if schema != SUPPORTED_SCHEMA_VERSION {
             use serde::de::Error;
             Err(Error::custom(format!(
-                "Unsupported schema version: {}. Expected: {}",
-                schema, SUPPORTED_SCHEMA_VERSION
+                "Unsupported schema version: {schema}. Expected: {SUPPORTED_SCHEMA_VERSION}"
             )))
         } else {
             Ok(schema)
@@ -494,10 +493,10 @@ pub mod loader {
             let reader = OpenOptions::new()
                 .read(true)
                 .open(file)
-                .with_context(|| format!("Failed to open configuration file: {:?}", file))?;
+                .with_context(|| format!("Failed to open configuration file: {file:?}"))?;
 
             let content: Main = Self::from_reader(reader)
-                .with_context(|| format!("Failed to parse configuration from file: {:?}", file))?;
+                .with_context(|| format!("Failed to parse configuration from file: {file:?}"))?;
 
             Ok(content)
         }

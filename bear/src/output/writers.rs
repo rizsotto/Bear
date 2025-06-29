@@ -32,7 +32,7 @@ impl TryFrom<&path::Path> for SemanticOutputWriter {
     fn try_from(file_name: &path::Path) -> Result<Self, Self::Error> {
         let output = fs::File::create(file_name)
             .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
+            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
 
         Ok(Self { output })
     }
@@ -101,10 +101,10 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     ) -> anyhow::Result<impl Iterator<Item = Entry>> {
         let file = fs::File::open(source)
             .map(io::BufReader::new)
-            .with_context(|| format!("Failed to open file: {:?}", source))?;
+            .with_context(|| format!("Failed to open file: {source:?}"))?;
 
         let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
-            log::warn!("Problems to read previous entries: {:?}", error);
+            log::warn!("Problems to read previous entries: {error:?}");
         });
         Ok(entries)
     }
@@ -154,10 +154,7 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter
         self.writer.write(entries)?;
 
         fs::rename(&temp_file_name, &final_file_name).with_context(|| {
-            format!(
-                "Failed to rename file from '{:?}' to '{:?}'.",
-                temp_file_name, final_file_name
-            )
+            format!("Failed to rename file from '{temp_file_name:?}' to '{final_file_name:?}'.")
         })?;
 
         Ok(())
@@ -176,7 +173,7 @@ pub(super) struct UniqueOutputWriter<T: IteratorWriter<Entry>> {
 impl<T: IteratorWriter<Entry>> UniqueOutputWriter<T> {
     pub(super) fn create(writer: T, config: &config::DuplicateFilter) -> anyhow::Result<Self> {
         let filter = DuplicateEntryFilter::try_from(config.clone())
-            .with_context(|| format!("Failed to create duplicate filter: {:?}", config))?;
+            .with_context(|| format!("Failed to create duplicate filter: {config:?}"))?;
 
         Ok(Self { writer, filter })
     }
@@ -204,7 +201,7 @@ impl ClangOutputWriter {
     pub(super) fn create(file_name: &path::Path) -> anyhow::Result<Self> {
         let output = fs::File::create(file_name)
             .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
+            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
 
         Ok(Self { output })
     }

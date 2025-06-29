@@ -523,12 +523,12 @@ mod test {
                     "environment": {}
                 }
             });
-            let content = format!("{}\n{}\n{}\n", line1, line2, line3);
+            let content = format!("{line1}\n{line2}\n{line3}\n");
 
             let mut cursor = Cursor::new(content);
             let warnings = std::cell::RefCell::new(Vec::new());
             let read_events: Vec<_> = Sut::read_and_ignore(&mut cursor, |error| {
-                warnings.borrow_mut().push(format!("Warning: {:?}", error));
+                warnings.borrow_mut().push(format!("Warning: {error:?}"));
             })
             .collect();
 

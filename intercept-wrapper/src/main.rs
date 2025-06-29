@@ -32,23 +32,23 @@ fn main() -> Result<()> {
     env_logger::init();
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
-    log::info!("Execution captured: {:?}", execution);
+    log::info!("Execution captured: {execution:?}");
     // Read the PATH variable and find the next executable with the same name
     let real_executable = next_in_path(&execution.executable)?;
     let real_execution = execution.with_executable(&real_executable);
-    log::info!("Execution to call: {:?}", real_execution);
+    log::info!("Execution to call: {real_execution:?}");
 
     // Reporting failures shall not fail this process. Therefore, errors will be logged
     // but not propagated. The process will continue to execute the real executable.
-    if let Err(e) = report(&real_execution) {
-        log::error!("Failed to report the execution: {}", e);
+    if let Err(err) = report(&real_execution) {
+        log::error!("Failed to report the execution: {err}");
     } else {
         log::info!("Execution reported successfully");
     }
 
     // Execute the real executable with the same arguments
     let exit_status = supervise(real_execution)?;
-    log::info!("Execution finished with status: {:?}", exit_status);
+    log::info!("Execution finished with status: {exit_status:?}");
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
 }
@@ -76,7 +76,7 @@ fn next_in_path(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
     let path =
         std::env::var("PATH").with_context(|| "Cannot get the PATH variable from environment")?;
 
-    log::debug!("PATH: {}", path);
+    log::debug!("PATH: {path}");
 
     std::env::split_paths(&path)
         .map(|dir| dir.join(target))

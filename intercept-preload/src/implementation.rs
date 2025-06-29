@@ -419,7 +419,7 @@ pub unsafe extern "C" fn execle(
     // In execle, the envp pointer follows the NULL terminator
     // Since we can't access variadic args reliably, we'll use the current environment
     let current_env = std::env::vars()
-        .map(|(k, v)| format!("{}={}", k, v))
+        .map(|(k, v)| format!("{k}={v}"))
         .map(|s| CString::new(s).unwrap())
         .collect::<Vec<_>>();
 
@@ -514,8 +514,8 @@ where
         }
     };
 
-    if let Err(e) = unsafe { (*reporter).report(event) } {
-        log::debug!("Failed to report execution: {}", e);
+    if let Err(err) = unsafe { (*reporter).report(event) } {
+        log::debug!("Failed to report execution: {err}",);
     } else {
         log::debug!("Execution reported successfully");
     }

@@ -388,7 +388,7 @@ mod tests {
         if let Some(Command::Compiler(result_cmd)) = result {
             assert_eq!(result_cmd, mock_cmd);
         } else {
-            panic!("Expected Command::Compiler, got {:?}", result);
+            panic!("Expected Command::Compiler, got {result:?}");
         }
     }
 
@@ -526,9 +526,7 @@ mod tests {
             let result = FilteringInterpreter::validate_compiler_configuration(&config);
             assert!(
                 result.is_ok(),
-                "Expected valid configuration to pass: {:?}, got {:?}",
-                config,
-                result
+                "Expected valid configuration to pass: {config:?}, got {result:?}"
             );
         }
     }
@@ -607,8 +605,7 @@ mod tests {
             let result = FilteringInterpreter::validate_compiler_configuration(&config);
             assert!(
                 result.is_err(),
-                "Expected invalid configuration to fail: {:?}",
-                config
+                "Expected invalid configuration to fail: {config:?}"
             );
         }
     }

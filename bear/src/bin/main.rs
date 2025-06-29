@@ -12,22 +12,22 @@ fn main() -> anyhow::Result<ExitCode> {
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");
-    log::debug!("{} v{}", pkg_name, pkg_version);
+    log::debug!("{pkg_name} v{pkg_version}");
 
     // Parse the command line arguments.
     let matches = args::cli().get_matches();
     let arguments = args::Arguments::try_from(matches)?;
 
     // Print the arguments.
-    log::debug!("Arguments: {:?}", arguments);
+    log::debug!("Arguments: {arguments:?}");
     // Load the configuration.
     let configuration = config::Loader::load(&arguments.config)?;
-    log::debug!("Configuration: {:?}", configuration);
+    log::debug!("Configuration: {configuration:?}");
 
     // Run the application.
     let application = Application::configure(arguments, configuration)?;
     let result = application.run();
-    log::debug!("Exit code: {:?}", result);
+    log::debug!("Exit code: {result:?}");
 
     Ok(result)
 }
@@ -69,7 +69,7 @@ impl Application {
             Application::Combined(all) => all.run(),
         };
         status.unwrap_or_else(|error| {
-            log::error!("Bear: {}", error);
+            log::error!("Bear: {error}");
             ExitCode::FAILURE
         })
     }

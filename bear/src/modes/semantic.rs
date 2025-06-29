@@ -22,10 +22,10 @@ impl TryFrom<&config::Main> for SemanticAnalysis {
 
 impl SemanticAnalysis {
     pub fn analyze(&self, event: Event) -> Option<semantic::Command> {
-        log::debug!("event: {}", event);
+        log::debug!("event: {event}");
         match self.interpreter.recognize(&event.execution) {
             Some(recognized) => {
-                log::debug!("recognized semantic: {:?}", recognized);
+                log::debug!("recognized semantic: {recognized:?}");
                 Some(recognized)
             }
             None => {

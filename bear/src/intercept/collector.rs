@@ -66,14 +66,14 @@ impl CollectorService {
         let collector_in_thread = collector_arc.clone();
         let collector_thread = thread::spawn(move || {
             let result = collector_in_thread.collect(sender);
-            if let Err(e) = result {
-                log::error!("Failed to collect events: {}", e);
+            if let Err(err) = result {
+                log::error!("Failed to collect events: {err}");
             }
         });
         let output_thread = thread::spawn(move || {
             let result = consumer(receiver);
-            if let Err(e) = result {
-                log::error!("Failed to process events: {}", e);
+            if let Err(err) = result {
+                log::error!("Failed to process events: {err}");
             }
         });
 
@@ -120,7 +120,7 @@ pub enum CollectorError {
 
 impl<T> From<std::sync::mpsc::SendError<T>> for CollectorError {
     fn from(err: std::sync::mpsc::SendError<T>) -> Self {
-        CollectorError::Channel(format!("Failed to send message: {}", err))
+        CollectorError::Channel(format!("Failed to send message: {err}"))
     }
 }
 
@@ -195,7 +195,7 @@ impl InterceptEnvironment {
         let child: Execution = Self::execution(input, self.environment())?;
         let exit_status = supervise::supervise(child)
             .map_err(|e| InterceptError::ProcessExecution(e.to_string()))?;
-        log::info!("Execution finished with status: {:?}", exit_status);
+        log::info!("Execution finished with status: {exit_status:?}");
 
         // The exit code is not always available. When the process is killed by a signal,
         // the exit code is not available. In this case, we return the `FAILURE` exit code.
@@ -343,7 +343,7 @@ pub enum InterceptError {
 
 impl From<std::env::JoinPathsError> for InterceptError {
     fn from(err: std::env::JoinPathsError) -> Self {
-        InterceptError::Path(format!("Failed to join paths: {}", err))
+        InterceptError::Path(format!("Failed to join paths: {err}"))
     }
 }
 

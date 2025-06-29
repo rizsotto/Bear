@@ -36,18 +36,12 @@ pub fn check_include_file(header: &str, define: &str) {
 
     match result {
         Ok(_) => {
-            println!("cargo:rustc-cfg=has_header_{}", define);
-            println!("cargo:rustc-check-cfg=cfg(has_header_{})", define);
-            println!(
-                "cargo:warning=Checking for include file: {} ... found",
-                header
-            );
+            println!("cargo:rustc-cfg=has_header_{define}");
+            println!("cargo:rustc-check-cfg=cfg(has_header_{define})");
+            println!("cargo:warning=Checking for include file: {header} ... found");
         }
         Err(_) => {
-            println!(
-                "cargo:warning=Checking for include file: {} ... missing",
-                header
-            );
+            println!("cargo:warning=Checking for include file: {header} ... missing");
         }
     }
 }
@@ -73,13 +67,11 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
             (void)ptr; // Suppress unused variable warning
             return 0;
         }}
-        "#,
-        symbol = symbol,
-        header = header
+        "#
     );
 
     let (mut file, path) = tempfile::Builder::new()
-        .prefix(&format!("check_{}", symbol))
+        .prefix(&format!("check_{symbol}"))
         .suffix(".c")
         .tempfile_in(std::env::var("OUT_DIR").unwrap_or_else(|_| "target".to_string()))
         .expect("Failed to create temp file for symbol check")
@@ -97,16 +89,16 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
         .inherit_rustflags(true)
         .define("_GNU_SOURCE", "1")
         .file(path)
-        .try_compile(&format!("check_{}", symbol));
+        .try_compile(&format!("check_{symbol}"));
 
     match result {
         Ok(_) => {
-            println!("cargo:rustc-cfg=has_symbol_{}", symbol);
-            println!("cargo:rustc-check-cfg=cfg(has_symbol_{})", symbol);
-            println!("cargo:warning=Checking for symbol: {} ... found", symbol);
+            println!("cargo:rustc-cfg=has_symbol_{symbol}");
+            println!("cargo:rustc-check-cfg=cfg(has_symbol_{symbol})");
+            println!("cargo:warning=Checking for symbol: {symbol} ... found");
         }
         Err(_) => {
-            println!("cargo:warning=Checking for symbol: {} ... missing", symbol);
+            println!("cargo:warning=Checking for symbol: {symbol} ... missing");
         }
     }
 }

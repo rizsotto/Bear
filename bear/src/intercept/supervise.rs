@@ -55,9 +55,9 @@ pub fn supervise(execution: Execution) -> Result<ExitStatus, SuperviseError> {
             Ok(None) => {
                 thread::sleep(time::Duration::from_millis(100));
             }
-            Err(e) => {
-                log::error!("Error waiting for child process: {}", e);
-                return Err(SuperviseError::ProcessWait(e));
+            Err(err) => {
+                log::error!("Error waiting for child process: {err}");
+                return Err(SuperviseError::ProcessWait(err));
             }
         }
     }

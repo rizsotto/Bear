@@ -34,7 +34,7 @@ impl Intercept {
         let file_name = path::PathBuf::from(output.file_name);
         let output_file = fs::File::create(file_name.as_path())
             .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {:?}", file_name))?;
+            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
 
         let interceptor = BuildInterceptor::create(config, move |events| {
             ExecutionEventDatabase::write(output_file, events.iter()).map_err(anyhow::Error::from)
@@ -74,7 +74,7 @@ impl Semantic {
         let event_file_name = path::PathBuf::from(input.file_name);
         let event_file = fs::File::open(event_file_name.as_path())
             .map(BufReader::new)
-            .with_context(|| format!("Failed to open file: {:?}", event_file_name))?;
+            .with_context(|| format!("Failed to open file: {event_file_name:?}"))?;
 
         let semantic = SemanticAnalysisPipeline::create(output, &config)?;
 
@@ -94,7 +94,7 @@ impl Mode for Semantic {
             .analyze_and_write(ExecutionEventDatabase::read_and_ignore(
                 self.event_file,
                 |error| {
-                    log::warn!("Event file reading issue: {:?}", error);
+                    log::warn!("Event file reading issue: {error:?}");
                 },
             ))
             .map(|_| ExitCode::SUCCESS)

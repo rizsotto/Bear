@@ -311,7 +311,7 @@ mod tests {
         if let Some(Command::Compiler(result_cmd)) = result {
             assert_eq!(result_cmd, mock_cmd);
         } else {
-            panic!("Expected Command::Compiler, got {:?}", result);
+            panic!("Expected Command::Compiler, got {result:?}");
         }
     }
 

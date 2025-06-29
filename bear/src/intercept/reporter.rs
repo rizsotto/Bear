@@ -83,8 +83,8 @@ impl ReporterFactory {
 
                 AtomicPtr::new(prt)
             }
-            Err(e) => {
-                log::error!("Failed to create reporter: {}", e);
+            Err(err) => {
+                log::error!("Failed to create reporter: {err}");
                 AtomicPtr::new(std::ptr::null_mut())
             }
         }

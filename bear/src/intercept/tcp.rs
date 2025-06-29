@@ -110,8 +110,8 @@ impl Collector for CollectorOnTcp {
                     // No new connection available, continue checking for shutdown
                     continue;
                 }
-                Err(e) => {
-                    println!("Error: {}", e);
+                Err(err) => {
+                    println!("Error: {err}");
                     break;
                 }
             }
