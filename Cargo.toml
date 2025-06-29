@@ -32,7 +32,7 @@ shell-words = "1.1"
 tempfile = { version = "3.19", default-features = false }
 signal-hook = { version = "0.3", default-features = false }
 libc = "0.2"
-which = "7.0"
+which = "8.0"
 cc = "1.2"
 assert_cmd = "2.0"
 assert_fs = "1.1"
