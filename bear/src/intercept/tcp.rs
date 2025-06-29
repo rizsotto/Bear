@@ -8,7 +8,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
-use super::{Collector, CollectorError, Event, Reporter, ReporterError};
+use super::collector::{Collector, CollectorError};
+use super::reporter::{Reporter, ReportingError};
+use super::Event;
 
 /// The serializer for events to transmit over the network.
 ///
@@ -32,7 +34,7 @@ impl EventWireSerializer {
     }
 
     /// Write an event to a writer using TLV format.
-    fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReporterError> {
+    fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReportingError> {
         let serialized_event = serde_json::to_string(&event)?;
         let bytes = serialized_event.into_bytes();
         let length = bytes.len() as u32;
@@ -150,9 +152,9 @@ impl Reporter for ReporterOnTcp {
     ///
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
-    fn report(&self, event: Event) -> Result<(), ReporterError> {
-        let mut socket = TcpStream::connect(self.destination.clone())
-            .map_err(|e| ReporterError::Network(e.to_string()))?;
+    fn report(&self, event: Event) -> Result<(), ReportingError> {
+        let mut socket =
+            TcpStream::connect(self.destination.clone()).map_err(ReportingError::Network)?;
         EventWireSerializer::write(&mut socket, event)?;
 
         Ok(())

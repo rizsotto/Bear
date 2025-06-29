@@ -18,7 +18,9 @@ use std::path::PathBuf;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-use bear::intercept::{create_reporter_on_tcp, Event, Execution};
+use bear::intercept::reporter::{Reporter, ReporterFactory};
+use bear::intercept::tcp::ReporterOnTcp;
+use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
@@ -141,27 +143,10 @@ static REAL_POSIX_SPAWNP: AtomicPtr<libc::c_void> = {
 };
 
 #[ctor]
-static REPORTER_ADDRESS: AtomicPtr<String> = {
-    // Capture destination address from environment at load time
-    match std::env::var(bear::intercept::KEY_DESTINATION) {
-        Ok(destination) => {
-            log::debug!("Using collector address: {}", destination);
-
-            // Leak the String to get a stable pointer for the lifetime of the program
-            let boxed_destination = Box::new(destination);
-            let ptr = Box::into_raw(boxed_destination);
-
-            AtomicPtr::new(ptr)
-        }
-        Err(e) => {
-            log::debug!(
-                "Failed to get collector address from environment: {} {}",
-                bear::intercept::KEY_DESTINATION,
-                e
-            );
-            AtomicPtr::new(std::ptr::null_mut())
-        }
-    }
+static REPORTER: AtomicPtr<ReporterOnTcp> = {
+    // This will capture the reporter address for later use, before any environment variable
+    // might be changed.
+    ReporterFactory::create_as_ptr()
 };
 
 /// # Safety
@@ -515,9 +500,9 @@ fn report<F>(f: F)
 where
     F: FnOnce() -> Result<Execution, c_int>,
 {
-    let reporter_address = REPORTER_ADDRESS.load(Ordering::SeqCst);
-    if reporter_address.is_null() {
-        log::debug!("No reporter address provided");
+    let reporter = REPORTER.load(Ordering::SeqCst);
+    if reporter.is_null() {
+        log::debug!("No reporter available, skipping report");
         return;
     }
 
@@ -529,12 +514,11 @@ where
         }
     };
 
-    // SAFETY: We check for null above, and we assume the pointer is valid for the lifetime of the program.
-    let reporter_address_str = unsafe { &*reporter_address }.as_str();
-
-    // FIXME: the report should not use anyhow
-    let reporter = create_reporter_on_tcp(reporter_address_str);
-    let _ = reporter.report(event);
+    if let Err(e) = unsafe { (*reporter).report(event) } {
+        log::debug!("Failed to report execution: {}", e);
+    } else {
+        log::debug!("Execution reported successfully");
+    }
 }
 
 // Utility functions to convert C arguments to Rust types

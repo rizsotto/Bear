@@ -18,7 +18,7 @@
 extern crate core;
 
 use anyhow::{Context, Result};
-use bear::intercept::create_reporter;
+use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise;
 use bear::intercept::{Event, Execution};
 
@@ -38,10 +38,12 @@ fn main() -> Result<()> {
     let real_execution = execution.with_executable(&real_executable);
     log::info!("Execution to call: {:?}", real_execution);
 
-    // Reporting failures shall not fail the execution.
-    match report(real_execution.clone()) {
-        Ok(_) => log::info!("Execution reported"),
-        Err(e) => log::error!("Execution reporting failed: {}", e),
+    // Reporting failures shall not fail this process. Therefore, errors will be logged
+    // but not propagated. The process will continue to execute the real executable.
+    if let Err(e) = report(&real_execution) {
+        log::error!("Failed to report the execution: {}", e);
+    } else {
+        log::info!("Execution reported successfully");
     }
 
     // Execute the real executable with the same arguments
@@ -49,6 +51,17 @@ fn main() -> Result<()> {
     log::info!("Execution finished with status: {:?}", exit_status);
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
+}
+
+/// Report the execution to the remote collector.
+fn report(real_execution: &Execution) -> Result<()> {
+    let reporter = ReporterFactory::create().with_context(|| "Failed to create the reporter")?;
+    let event = Event::new(real_execution.clone());
+    reporter
+        .report(event)
+        .with_context(|| "Failed to send report")?;
+
+    Ok(())
 }
 
 /// Find the next executable in the PATH variable.
@@ -78,13 +91,4 @@ fn next_in_path(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
             real_path != current_exe
         })
         .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
-}
-
-fn report(execution: Execution) -> Result<()> {
-    let event = Event::new(execution);
-
-    create_reporter()
-        .with_context(|| "Cannot create execution reporter")?
-        .report(event)
-        .with_context(|| "Sending execution failed")
 }

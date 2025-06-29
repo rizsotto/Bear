@@ -62,3 +62,13 @@ pub fn supervise(execution: Execution) -> Result<ExitStatus, SuperviseError> {
         }
     }
 }
+
+impl From<Execution> for std::process::Command {
+    fn from(val: Execution) -> Self {
+        let mut command = std::process::Command::new(val.executable);
+        command.args(val.arguments.iter().skip(1));
+        command.envs(val.environment);
+        command.current_dir(val.working_dir);
+        command
+    }
+}

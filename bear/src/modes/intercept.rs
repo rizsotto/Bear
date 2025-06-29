@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::intercept::{CollectorService, Event, InterceptEnvironment};
+use crate::intercept::collector::{CollectorService, InterceptEnvironment};
+use crate::intercept::Event;
 use crate::{args, config};
 use anyhow::Context;
 use std::process::ExitCode;
