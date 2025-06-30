@@ -15,7 +15,7 @@ mod json;
 mod writers;
 
 use crate::{args, config, semantic};
-use std::path;
+use thiserror::Error;
 use writers::{
     AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter,
     ConverterClangOutputWriter, IteratorWriter, SemanticOutputWriter, UniqueOutputWriter,
@@ -43,7 +43,7 @@ pub enum OutputWriter {
 }
 
 impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
-    type Error = anyhow::Error;
+    type Error = WriterCreationError;
 
     fn try_from(value: (&args::BuildSemantic, &config::Output)) -> Result<Self, Self::Error> {
         let (args, config) = value;
@@ -51,7 +51,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
             config::Output::Clang {
                 duplicates, format, ..
             } => {
-                let final_file_name = path::Path::new(&args.file_name);
+                let final_file_name = std::path::Path::new(&args.file_name);
                 let temp_file_name = final_file_name.with_extension("tmp");
 
                 let base_writer = ClangOutputWriter::create(&temp_file_name)?;
@@ -66,7 +66,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
                 Ok(Self::Clang(formatted_writer))
             }
             config::Output::Semantic { .. } => {
-                let path = path::Path::new(&args.file_name);
+                let path = std::path::Path::new(&args.file_name);
                 let result = SemanticOutputWriter::try_from(path)?;
                 Ok(Self::Semantic(result))
             }
@@ -74,11 +74,34 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
     }
 }
 
+/// Represents errors that can occur while creating an output writer.
+#[derive(Error, Debug)]
+pub enum WriterCreationError {
+    #[error("Failed to create the output writer: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Failed to configure the output writer: {0}")]
+    Configuration(String),
+}
+
 impl OutputWriter {
-    pub fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> anyhow::Result<()> {
+    pub fn write(
+        self,
+        semantics: impl Iterator<Item = semantic::Command>,
+    ) -> Result<(), FormatError> {
         match self {
             Self::Clang(writer) => writer.write(semantics),
             Self::Semantic(writer) => writer.write(semantics),
         }
     }
+}
+
+/// Represents errors that can occur while working with file formats.
+#[derive(Debug, Error)]
+pub enum FormatError {
+    #[error("Generic IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Format syntax error: {0}")]
+    Syntax(#[from] serde_json::Error),
+    #[error("Format semantic error: {0}")]
+    Semantic(#[from] semantic::clang::EntryError),
 }

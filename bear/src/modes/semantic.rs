@@ -66,6 +66,8 @@ impl SemanticAnalysisPipeline {
             .flat_map(|event| self.analyzer.analyze(event));
         // Consume the entries and write them to the output file.
         // The exit code is based on the result of the output writer.
-        self.writer.write(semantics)
+        self.writer.write(semantics)?;
+
+        Ok(())
     }
 }

@@ -7,21 +7,20 @@
 //! - The semantic database format. (Internal format of this project.)
 //! - The execution event database format. (Internal format of this project.)
 
-use super::json;
+use super::{json, FormatError};
 use crate::{intercept, semantic, semantic::clang};
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use std::io;
-use thiserror::Error;
 
 /// The trait represents a file format that can be written to and read from.
 ///
 /// The file format in this project is usually a sequence of values. This trait
 /// provides a type-independent abstraction over the file format.
 pub trait FileFormat<T> {
-    fn write(_: impl io::Write, _: impl Iterator<Item = T>) -> Result<(), Error>;
+    fn write(_: impl io::Write, _: impl Iterator<Item = T>) -> Result<(), FormatError>;
 
-    fn read(_: impl io::Read) -> impl Iterator<Item = Result<T, Error>>;
+    fn read(_: impl io::Read) -> impl Iterator<Item = Result<T, FormatError>>;
 
     /// Reads the entries from the file and ignores any errors.
     /// This is not always feasible, when the file format is strict.
@@ -39,21 +38,7 @@ pub trait FileFormat<T> {
     }
 }
 
-/// Represents errors that can occur while working with file formats.
-///
-/// This enum encapsulates various error types, such as I/O errors, JSON serialization
-/// errors, and custom format errors.
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("Failed to open file: {0}")]
-    IO(#[from] io::Error),
-    #[error("Failed to serialize JSON: {0}")]
-    Json(#[from] serde_json::Error),
-    #[error("Format error: {0}")]
-    Format(#[from] clang::EntryError),
-}
-
-/// The trait represents a JSON compilation database format.
+/// The type represents a JSON compilation database format.
 ///
 /// The format is a JSON array format, which is a sequence of JSON objects
 /// enclosed in square brackets. Each object represents a compilation
@@ -68,30 +53,30 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
     fn write(
         writer: impl io::Write,
         entries: impl Iterator<Item = clang::Entry>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FormatError> {
         json::serialize_result_seq(
             writer,
             // Ensure only valid entries are serialized.
             entries.map(|entry| match entry.validate() {
                 Ok(_) => Ok(entry),
-                Err(err) => Err(Error::Format(err)),
+                Err(err) => Err(FormatError::Semantic(err)),
             }),
         )
     }
 
-    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, Error>> {
+    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, FormatError>> {
         json::deserialize_seq(reader).map(|res| {
-            res.map_err(Error::Json)
+            res.map_err(FormatError::Syntax)
                 // Ensure only valid entries are returned.
                 .and_then(|entry: clang::Entry| match entry.validate() {
                     Ok(_) => Ok(entry),
-                    Err(err) => Err(Error::Format(err)),
+                    Err(err) => Err(FormatError::Semantic(err)),
                 })
         })
     }
 }
 
-/// The trait represents a JSON semantic database format.
+/// The type represents a JSON semantic database format.
 ///
 /// The format is a JSON array format, which is a sequence of JSON objects
 /// enclosed in square brackets. Each object represents a semantic analysis
@@ -105,16 +90,16 @@ impl FileFormat<semantic::Command> for JsonSemanticDatabase {
     fn write(
         writer: impl io::Write,
         entries: impl Iterator<Item = semantic::Command>,
-    ) -> Result<(), Error> {
-        json::serialize_seq(writer, entries).map_err(Error::Json)
+    ) -> Result<(), FormatError> {
+        json::serialize_seq(writer, entries).map_err(FormatError::Syntax)
     }
-    fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::Command, Error>> {
+    fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::Command, FormatError>> {
         // Not implemented! (No reader for the semantic output in this project.)
         std::iter::empty()
     }
 }
 
-/// The trait represents a database format for execution events.
+/// The type represents a database format for execution events.
 ///
 /// The format is a [JSON line format](https://jsonlines.org/), which is a sequence
 /// of JSON objects separated by newlines.
@@ -127,18 +112,18 @@ impl FileFormat<intercept::Event> for ExecutionEventDatabase {
     fn write(
         writer: impl io::Write,
         entries: impl Iterator<Item = intercept::Event>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), FormatError> {
         let mut writer = writer;
         for entry in entries {
-            serde_json::to_writer(&mut writer, &entry).map_err(Error::Json)?;
-            writer.write_all(b"\n").map_err(Error::IO)?;
+            serde_json::to_writer(&mut writer, &entry).map_err(FormatError::Syntax)?;
+            writer.write_all(b"\n").map_err(FormatError::Io)?;
         }
         Ok(())
     }
 
-    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<intercept::Event, Error>> {
+    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<intercept::Event, FormatError>> {
         let stream = StreamDeserializer::new(IoRead::new(reader));
-        stream.map(|value| value.map_err(Error::Json))
+        stream.map(|value| value.map_err(FormatError::Syntax))
     }
 }
 
@@ -147,7 +132,7 @@ mod test {
     mod compilation_database {
         use super::super::semantic::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
-        use super::super::{Error, FileFormat};
+        use super::super::{FileFormat, FormatError};
         use serde_json::error::Category;
         use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};
@@ -155,7 +140,9 @@ mod test {
         macro_rules! assert_json_error {
             ($x:expr) => {
                 match $x {
-                    Some(Err(Error::Json(error))) => assert_eq!(error.classify(), Category::Data),
+                    Some(Err(FormatError::Syntax(error))) => {
+                        assert_eq!(error.classify(), Category::Data)
+                    }
                     _ => assert!(false, "shout be JSON error"),
                 }
             };
@@ -164,7 +151,7 @@ mod test {
         macro_rules! assert_format_error {
             ($x:expr) => {
                 assert!(
-                    matches!($x, Some(Err(Error::Format(_)))),
+                    matches!($x, Some(Err(FormatError::Semantic(_)))),
                     "should be format error"
                 );
             };
@@ -239,7 +226,7 @@ mod test {
             let result = Sut::write(&mut buffer, vec![entry].into_iter());
 
             assert!(result.is_err());
-            assert!(matches!(result, Err(Error::Format(_))));
+            assert!(matches!(result, Err(FormatError::Semantic(_))));
         }
 
         fn expected_values_with_arguments() -> Vec<Entry> {
@@ -329,7 +316,7 @@ mod test {
         }
 
         #[test]
-        fn save_with_array_command_syntax() -> Result<(), Error> {
+        fn save_with_array_command_syntax() -> Result<(), FormatError> {
             let input = expected_values_with_arguments();
 
             // Create fake "file"
@@ -447,7 +434,7 @@ mod test {
         }
 
         #[test]
-        fn save_quoted_with_array_command_syntax() -> Result<(), Error> {
+        fn save_quoted_with_array_command_syntax() -> Result<(), FormatError> {
             let input = expected_quoted_values_with_argument();
 
             // Create fake "file"

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
+use super::{FormatError, WriterCreationError};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
 use crate::{config, semantic};
-use anyhow::Context;
 use std::{fs, io, path};
 
 /// The trait represents a writer for iterator type `T`.
@@ -14,7 +14,7 @@ use std::{fs, io, path};
 pub(super) trait IteratorWriter<T> {
     /// Writes the iterator as a sequence of elements.
     /// It consumes the iterator and returns either a nothing or an error.
-    fn write(self, _: impl Iterator<Item = T>) -> anyhow::Result<()>;
+    fn write(self, _: impl Iterator<Item = T>) -> Result<(), FormatError>;
 }
 
 /// This writer is used to write the semantic analysis results to a file.
@@ -27,22 +27,18 @@ pub(super) struct SemanticOutputWriter {
 }
 
 impl TryFrom<&path::Path> for SemanticOutputWriter {
-    type Error = anyhow::Error;
+    type Error = WriterCreationError;
 
     fn try_from(file_name: &path::Path) -> Result<Self, Self::Error> {
-        let output = fs::File::create(file_name)
-            .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
+        let output = fs::File::create(file_name).map(io::BufWriter::new)?;
 
         Ok(Self { output })
     }
 }
 
 impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> anyhow::Result<()> {
-        JsonSemanticDatabase::write(self.output, semantics)?;
-
-        Ok(())
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), FormatError> {
+        JsonSemanticDatabase::write(self.output, semantics)
     }
 }
 
@@ -62,7 +58,7 @@ impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> anyhow::Result<()> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), FormatError> {
         let entries = semantics.flat_map(|semantic| semantic.to_entries(&self.format));
         self.writer.write(entries)
     }
@@ -74,6 +70,9 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterCl
 /// combining them with new entries, and writing the result back to the file.
 /// If the file does not exist and the append option is enabled, it logs a warning
 /// and writes only the new entries.
+///
+/// # Note
+/// Reading errors will be ignored, and a warning will be logged.
 pub(super) struct AppendClangOutputWriter<T: IteratorWriter<Entry>> {
     writer: T,
     path: Option<path::PathBuf>,
@@ -98,10 +97,8 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     /// because the logic is not bound to the instance.
     fn read_from_compilation_db(
         source: &path::Path,
-    ) -> anyhow::Result<impl Iterator<Item = Entry>> {
-        let file = fs::File::open(source)
-            .map(io::BufReader::new)
-            .with_context(|| format!("Failed to open file: {source:?}"))?;
+    ) -> Result<impl Iterator<Item = Entry>, FormatError> {
+        let file = fs::File::open(source).map(io::BufReader::new)?;
 
         let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
             log::warn!("Problems to read previous entries: {error:?}");
@@ -111,7 +108,7 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
         if let Some(path) = self.path {
             let entries_from_db = Self::read_from_compilation_db(&path)?;
             let final_entries = entries_from_db.chain(entries);
@@ -147,15 +144,13 @@ impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
         let temp_file_name = self.temp_file_name.clone();
         let final_file_name = self.final_file_name.clone();
 
         self.writer.write(entries)?;
 
-        fs::rename(&temp_file_name, &final_file_name).with_context(|| {
-            format!("Failed to rename file from '{temp_file_name:?}' to '{final_file_name:?}'.")
-        })?;
+        fs::rename(&temp_file_name, &final_file_name)?;
 
         Ok(())
     }
@@ -171,16 +166,19 @@ pub(super) struct UniqueOutputWriter<T: IteratorWriter<Entry>> {
 }
 
 impl<T: IteratorWriter<Entry>> UniqueOutputWriter<T> {
-    pub(super) fn create(writer: T, config: &config::DuplicateFilter) -> anyhow::Result<Self> {
+    pub(super) fn create(
+        writer: T,
+        config: &config::DuplicateFilter,
+    ) -> Result<Self, WriterCreationError> {
         let filter = DuplicateEntryFilter::try_from(config.clone())
-            .with_context(|| format!("Failed to create duplicate filter: {config:?}"))?;
+            .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
         Ok(Self { writer, filter })
     }
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
         let mut filter = self.filter.clone();
         let filtered_entries = entries.filter(move |entry| filter.unique(entry));
 
@@ -198,19 +196,16 @@ pub(super) struct ClangOutputWriter {
 }
 
 impl ClangOutputWriter {
-    pub(super) fn create(file_name: &path::Path) -> anyhow::Result<Self> {
-        let output = fs::File::create(file_name)
-            .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
+    pub(super) fn create(file_name: &path::Path) -> Result<Self, WriterCreationError> {
+        let output = fs::File::create(file_name).map(io::BufWriter::new)?;
 
         Ok(Self { output })
     }
 }
 
 impl IteratorWriter<Entry> for ClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
-        JsonCompilationDatabase::write(self.output, entries)?;
-        Ok(())
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
+        JsonCompilationDatabase::write(self.output, entries)
     }
 }
 
@@ -223,7 +218,7 @@ mod tests {
     struct MockWriter;
 
     impl IteratorWriter<Entry> for MockWriter {
-        fn write(self, _: impl Iterator<Item = Entry>) -> anyhow::Result<()> {
+        fn write(self, _: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
             Ok(())
         }
     }
