@@ -8,22 +8,6 @@ use std::thread;
 use std::time;
 use thiserror::Error;
 
-/// Errors that can occur during process supervision.
-#[derive(Error, Debug)]
-pub enum SuperviseError {
-    #[error("Failed to register signal handler")]
-    SignalRegistration(#[source] std::io::Error),
-
-    #[error("Failed to spawn child process")]
-    ProcessSpawn(#[source] std::io::Error),
-
-    #[error("Failed to kill child process")]
-    ProcessKill(#[source] std::io::Error),
-
-    #[error("Failed to wait for child process")]
-    ProcessWait(#[source] std::io::Error),
-}
-
 /// This method supervises the execution of a command.
 ///
 /// It starts the command and waits for its completion. It also forwards
@@ -71,4 +55,17 @@ impl From<Execution> for std::process::Command {
         command.current_dir(val.working_dir);
         command
     }
+}
+
+/// Errors that can occur during process supervision.
+#[derive(Error, Debug)]
+pub enum SuperviseError {
+    #[error("Failed to register signal handler")]
+    SignalRegistration(#[source] std::io::Error),
+    #[error("Failed to spawn child process")]
+    ProcessSpawn(#[source] std::io::Error),
+    #[error("Failed to kill child process")]
+    ProcessKill(#[source] std::io::Error),
+    #[error("Failed to wait for child process")]
+    ProcessWait(#[source] std::io::Error),
 }

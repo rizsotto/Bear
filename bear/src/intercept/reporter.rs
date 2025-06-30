@@ -21,24 +21,6 @@ use crate::intercept::{tcp, Event, KEY_DESTINATION};
 use std::sync::atomic::AtomicPtr;
 use thiserror::Error;
 
-/// Errors that can occur during reporter initialization.
-#[derive(Error, Debug)]
-pub enum InitialisationError {
-    #[error("Environment variable '{0}' is missing")]
-    MissingEnvironmentVariable(&'static str),
-    #[error("Network error: {0}")]
-    Network(String),
-}
-
-/// Errors that can occur while reporting events.
-#[derive(Error, Debug)]
-pub enum ReportingError {
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    #[error("IO error: {0}")]
-    Network(#[from] std::io::Error),
-}
-
 /// Trait for reporting intercepted events to a remote collector.
 pub trait Reporter {
     /// Sends an event to the remote collector.
@@ -46,6 +28,15 @@ pub trait Reporter {
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), ReportingError>;
+}
+
+/// Errors that can occur while reporting events.
+#[derive(Error, Debug)]
+pub enum ReportingError {
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("Network error: {0}")]
+    Network(#[from] std::io::Error),
 }
 
 /// Factory for creating reporter instances.
@@ -89,4 +80,13 @@ impl ReporterFactory {
             }
         }
     }
+}
+
+/// Errors that can occur during reporter initialization.
+#[derive(Error, Debug)]
+pub enum InitialisationError {
+    #[error("Environment variable '{0}' is missing")]
+    MissingEnvironmentVariable(&'static str),
+    #[error("Network error: {0}")]
+    Network(#[from] std::io::Error),
 }

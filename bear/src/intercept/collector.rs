@@ -34,6 +34,17 @@ pub trait Collector {
     fn stop(&self) -> Result<(), CollectorError>;
 }
 
+/// Errors that can occur in the collector.
+#[derive(Error, Debug)]
+pub enum CollectorError {
+    #[error("Network error: {0}")]
+    Network(#[from] std::io::Error),
+    #[error("Serialization error: {0}")]
+    Serialization(#[from] serde_json::Error),
+    #[error("Channel communication error: {0}")]
+    Channel(String),
+}
+
 /// The service is responsible for collecting the events from the supervised processes.
 ///
 /// The service is implemented as a TCP server that listens to on a random port on the loopback
@@ -102,25 +113,6 @@ impl Drop for CollectorService {
         if let Some(thread) = self.output_thread.take() {
             thread.join().expect("Failed to join the output thread");
         }
-    }
-}
-
-/// Errors that can occur in the collector.
-#[derive(Error, Debug)]
-pub enum CollectorError {
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Network error: {0}")]
-    Network(String),
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    #[error("Channel communication error: {0}")]
-    Channel(String),
-}
-
-impl<T> From<std::sync::mpsc::SendError<T>> for CollectorError {
-    fn from(err: std::sync::mpsc::SendError<T>) -> Self {
-        CollectorError::Channel(format!("Failed to send message: {err}"))
     }
 }
 

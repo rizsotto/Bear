@@ -78,7 +78,9 @@ impl CollectorOnTcp {
         destination: Sender<Event>,
     ) -> Result<(), CollectorError> {
         let event = EventWireSerializer::read(&mut socket)?;
-        destination.send(event)?;
+        destination
+            .send(event)
+            .map_err(|err| CollectorError::Channel(err.to_string()))?;
 
         Ok(())
     }
@@ -126,8 +128,7 @@ impl Collector for CollectorOnTcp {
     /// `accept` call to check the shutdown flag.
     fn stop(&self) -> Result<(), CollectorError> {
         self.shutdown.store(true, Ordering::Relaxed);
-        let _ =
-            TcpStream::connect(self.address).map_err(|e| CollectorError::Network(e.to_string()))?;
+        let _ = TcpStream::connect(self.address).map_err(CollectorError::Network)?;
         Ok(())
     }
 }
@@ -143,7 +144,7 @@ impl ReporterOnTcp {
     /// It does not open the TCP connection yet. Stores the destination
     /// address and creates a unique reporter id.
     pub fn new(destination: String) -> Self {
-        ReporterOnTcp { destination }
+        Self { destination }
     }
 }
 
