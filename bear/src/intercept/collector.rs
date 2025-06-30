@@ -3,6 +3,7 @@
 use crate::intercept::{supervise, tcp, Event, Execution, KEY_DESTINATION, KEY_PRELOAD_PATH};
 use crate::{args, config};
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -17,11 +18,6 @@ use thiserror::Error;
 /// To share the collector between threads, we use the `Arc` type to wrap the
 /// collector. This way we can clone the collector and send it to other threads.
 pub trait Collector {
-    /// Returns the address of the collector.
-    ///
-    /// The address is in the format of `ip:port`.
-    fn address(&self) -> String;
-
     /// Collects the events from the reporters.
     ///
     /// The events are sent to the given destination channel.
@@ -56,6 +52,7 @@ pub enum CollectorError {
 /// the main thread of the application and decouple the collection from the processing.
 pub struct CollectorService {
     collector: Arc<dyn Collector>,
+    address: SocketAddr,
     network_thread: Option<thread::JoinHandle<()>>,
     output_thread: Option<thread::JoinHandle<()>>,
 }
@@ -70,7 +67,7 @@ impl CollectorService {
         F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
         F: Send + 'static,
     {
-        let collector = tcp::CollectorOnTcp::create()?;
+        let (collector, address) = tcp::CollectorOnTcp::create()?;
         let collector_arc = Arc::new(collector);
         let (sender, receiver) = channel();
 
@@ -88,9 +85,10 @@ impl CollectorService {
             }
         });
 
-        log::debug!("Collector service started at {}", collector_arc.address());
+        log::debug!("Collector service started at {address}");
         Ok(CollectorService {
             collector: collector_arc,
+            address,
             network_thread: Some(collector_thread),
             output_thread: Some(output_thread),
         })
@@ -98,7 +96,7 @@ impl CollectorService {
 
     /// Returns the address of the service.
     pub fn address(&self) -> String {
-        self.collector.address()
+        self.address.to_string()
     }
 }
 

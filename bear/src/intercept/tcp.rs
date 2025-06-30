@@ -58,39 +58,22 @@ impl CollectorOnTcp {
     ///
     /// The collector listens to a random port on the loopback interface.
     /// The address of the collector can be obtained by the `address` method.
-    pub fn create() -> Result<Self, CollectorError> {
+    pub fn create() -> Result<(Self, SocketAddr), CollectorError> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
 
-        let result = CollectorOnTcp {
+        let result = Self {
             shutdown,
             listener,
             address,
         };
 
-        Ok(result)
-    }
-
-    fn send(
-        &self,
-        mut socket: TcpStream,
-        destination: Sender<Event>,
-    ) -> Result<(), CollectorError> {
-        let event = EventWireSerializer::read(&mut socket)?;
-        destination
-            .send(event)
-            .map_err(|err| CollectorError::Channel(err.to_string()))?;
-
-        Ok(())
+        Ok((result, address))
     }
 }
 
 impl Collector for CollectorOnTcp {
-    fn address(&self) -> String {
-        self.address.to_string()
-    }
-
     /// Single-threaded implementation of the collector.
     ///
     /// The collector listens to the TCP port and accepts incoming connections.
@@ -104,9 +87,12 @@ impl Collector for CollectorOnTcp {
             }
 
             match stream {
-                Ok(connection) => {
+                Ok(mut connection) => {
                     // ... (process the connection in a separate thread or task)
-                    self.send(connection, destination.clone())?;
+                    let event = EventWireSerializer::read(&mut connection)?;
+                    destination
+                        .send(event)
+                        .map_err(|err| CollectorError::Channel(err.to_string()))?;
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     // No new connection available, continue checking for shutdown
@@ -199,8 +185,8 @@ mod tests {
     // if they are the same as the original events.
     #[test]
     fn tcp_reporter_and_collectors_work() {
-        let collector = CollectorOnTcp::create().unwrap();
-        let reporter = ReporterOnTcp::new(collector.address());
+        let (collector, address) = CollectorOnTcp::create().unwrap();
+        let reporter = ReporterOnTcp::new(address.to_string());
 
         // Create wrapper to share the collector across threads.
         let thread_collector = Arc::new(collector);
