@@ -50,7 +50,6 @@ impl EventWireSerializer {
 pub struct CollectorOnTcp {
     shutdown: Arc<AtomicBool>,
     listener: TcpListener,
-    address: SocketAddr,
 }
 
 impl CollectorOnTcp {
@@ -63,13 +62,7 @@ impl CollectorOnTcp {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
 
-        let result = Self {
-            shutdown,
-            listener,
-            address,
-        };
-
-        Ok((result, address))
+        Ok((Self { shutdown, listener }, address))
     }
 }
 
@@ -114,7 +107,9 @@ impl Collector for CollectorOnTcp {
     /// `accept` call to check the shutdown flag.
     fn stop(&self) -> Result<(), CollectorError> {
         self.shutdown.store(true, Ordering::Relaxed);
-        let _ = TcpStream::connect(self.address).map_err(CollectorError::Network)?;
+
+        let address = self.listener.local_addr()?;
+        let _ = TcpStream::connect(address).map_err(CollectorError::Network)?;
         Ok(())
     }
 }
