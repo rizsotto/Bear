@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
@@ -14,31 +14,45 @@ use thiserror::Error;
 /// Represents the local sink of supervised process events.
 ///
 /// The collector is responsible for collecting the events from the reporters.
-///
-/// To share the collector between threads, we use the `Arc` type to wrap the
-/// collector. This way we can clone the collector and send it to other threads.
-pub trait Collector {
+pub trait Collector: Send + Sync {
+    /// Creates a new collector instance.
+    ///
+    /// The collector listens to a random port on the loopback interface.
+    /// The returned address can be used to connect to the collector.
+    fn create(
+        destination: Sender<Result<Event, ReceivingError>>,
+    ) -> Result<(Self, SocketAddr), CollectorError>
+    where
+        Self: Sized;
+
     /// Collects the events from the reporters.
     ///
     /// The events are sent to the given destination channel.
     ///
-    /// The function returns when the collector is stopped. The collector is stopped
-    /// when the `stop` method invoked (from another thread).
-    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError>;
+    /// The function returns when the collector is stopped or failed.
+    /// To request the collector to stop collecting events, call the `stop` method.
+    fn start(&self) -> Result<(), CollectorError>;
 
-    /// Stops the collector.
+    /// Request the collector to stop collecting events.
     fn stop(&self) -> Result<(), CollectorError>;
+}
+
+/// Errors that can occur to set up the collector.
+#[derive(Error, Debug)]
+pub enum CollectorError {
+    #[error("Collecting events failed with IO error: {0}")]
+    Network(#[from] std::io::Error),
+    #[error("Collecting events failed with internal IPC error: {0}")]
+    Channel(String),
 }
 
 /// Errors that can occur in the collector.
 #[derive(Error, Debug)]
-pub enum CollectorError {
-    #[error("Network error: {0}")]
+pub enum ReceivingError {
+    #[error("Receiving event failed with IO error: {0}")]
     Network(#[from] std::io::Error),
-    #[error("Serialization error: {0}")]
+    #[error("Receiving event failed with serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
-    #[error("Channel communication error: {0}")]
-    Channel(String),
 }
 
 /// The service is responsible for collecting the events from the supervised processes.
@@ -51,10 +65,9 @@ pub enum CollectorError {
 /// It also runs in a separate thread. The reason for having two threads is to avoid blocking
 /// the main thread of the application and decouple the collection from the processing.
 pub struct CollectorService {
-    collector: Arc<dyn Collector>,
-    address: SocketAddr,
-    network_thread: Option<thread::JoinHandle<()>>,
-    output_thread: Option<thread::JoinHandle<()>>,
+    collector_arc: Arc<dyn Collector>,
+    // Declare the thread handle as option to allow take ownership and join it later.
+    collector_thread: Option<thread::JoinHandle<()>>,
 }
 
 impl CollectorService {
@@ -62,54 +75,41 @@ impl CollectorService {
     ///
     /// The `consumer` is a function that receives the events and processes them.
     /// The function is executed in a separate thread.
-    pub fn create<F>(consumer: F) -> anyhow::Result<Self>
-    where
-        F: FnOnce(Receiver<Event>) -> anyhow::Result<()>,
-        F: Send + 'static,
-    {
-        let (collector, address) = tcp::CollectorOnTcp::create()?;
+    pub fn create(
+        destination: Sender<Result<Event, ReceivingError>>,
+    ) -> Result<(Self, SocketAddr), CollectorError> {
+        let (collector, address) = tcp::CollectorOnTcp::create(destination)?;
         let collector_arc = Arc::new(collector);
-        let (sender, receiver) = channel();
 
         let collector_in_thread = collector_arc.clone();
         let collector_thread = thread::spawn(move || {
-            let result = collector_in_thread.collect(sender);
+            let result = collector_in_thread.start();
             if let Err(err) = result {
                 log::error!("Failed to collect events: {err}");
             }
         });
-        let output_thread = thread::spawn(move || {
-            let result = consumer(receiver);
-            if let Err(err) = result {
-                log::error!("Failed to process events: {err}");
-            }
-        });
 
         log::debug!("Collector service started at {address}");
-        Ok(CollectorService {
-            collector: collector_arc,
+        Ok((
+            Self {
+                collector_arc,
+                collector_thread: Some(collector_thread),
+            },
             address,
-            network_thread: Some(collector_thread),
-            output_thread: Some(output_thread),
-        })
-    }
-
-    /// Returns the address of the service.
-    pub fn address(&self) -> String {
-        self.address.to_string()
+        ))
     }
 }
 
 impl Drop for CollectorService {
     /// Shuts down the service.
     fn drop(&mut self) {
-        // TODO: log the shutdown of the service and any errors
-        self.collector.stop().expect("Failed to stop the collector");
-        if let Some(thread) = self.network_thread.take() {
-            thread.join().expect("Failed to join the collector thread");
+        if let Err(err) = self.collector_arc.stop() {
+            log::error!("Failed to stop the collector: {err}");
         }
-        if let Some(thread) = self.output_thread.take() {
-            thread.join().expect("Failed to join the output thread");
+        if let Some(handle) = self.collector_thread.take() {
+            if let Err(err) = handle.join() {
+                log::error!("Failed to join collector thread {err:?}");
+            }
         }
     }
 }
@@ -126,13 +126,14 @@ impl Drop for CollectorService {
 /// The `Preload` mode requires the path to the preload library that will be used to
 /// intercept the child processes.
 pub enum InterceptEnvironment {
+    // FIXME: the environment should be captured here.
     Wrapper {
         bin_dir: tempfile::TempDir,
-        address: String,
+        address: SocketAddr,
     },
     Preload {
         path: PathBuf,
-        address: String,
+        address: SocketAddr,
     },
 }
 
@@ -142,14 +143,10 @@ impl InterceptEnvironment {
     /// The `config` is the intercept configuration that specifies the mode and the
     /// required parameters for the mode. The `collector` is the service to collect
     /// the execution events.
-    pub fn create(
-        config: &config::Intercept,
-        collector: &CollectorService,
-    ) -> Result<Self, InterceptError> {
+    pub fn create(config: &config::Intercept, address: SocketAddr) -> Result<Self, InterceptError> {
         // Validate the configuration.
         let valid_config = config.validate()?;
 
-        let address = collector.address();
         let result = match &valid_config {
             config::Intercept::Wrapper {
                 path,
@@ -215,7 +212,7 @@ impl InterceptEnvironment {
                 .unwrap_or_else(|_| path_original.clone());
                 vec![
                     ("PATH".to_string(), path_updated),
-                    (KEY_DESTINATION.to_string(), address.clone()),
+                    (KEY_DESTINATION.to_string(), address.to_string()),
                 ]
             }
             InterceptEnvironment::Preload { path, address, .. } => {
@@ -226,7 +223,7 @@ impl InterceptEnvironment {
                         .unwrap_or_else(|_| path_original.clone());
                 vec![
                     (KEY_PRELOAD_PATH.to_string(), path_updated),
-                    (KEY_DESTINATION.to_string(), address.clone()),
+                    (KEY_DESTINATION.to_string(), address.to_string()),
                 ]
             }
         }
@@ -313,6 +310,7 @@ impl config::Intercept {
 }
 
 /// Errors that can occur in the intercept environment and configuration.
+// FIXME: this should be simplified
 #[derive(Error, Debug)]
 pub enum InterceptError {
     #[error("IO error: {0}")]
@@ -331,6 +329,7 @@ pub enum InterceptError {
     Collector(#[from] CollectorError),
 }
 
+// FIXME: this should be removed when error is simplified
 impl From<std::env::JoinPathsError> for InterceptError {
     fn from(err: std::env::JoinPathsError) -> Self {
         InterceptError::Path(format!("Failed to join paths: {err}"))

@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::Arc;
 
-use super::collector::{Collector, CollectorError};
+use super::collector::{Collector, CollectorError, ReceivingError};
 use super::reporter::{Reporter, ReportingError};
 use super::Event;
 
@@ -21,7 +21,7 @@ struct EventWireSerializer;
 
 impl EventWireSerializer {
     /// Read an event from a reader using TLV format.
-    fn read(reader: &mut impl Read) -> Result<Event, CollectorError> {
+    fn read(reader: &mut impl Read) -> Result<Event, ReceivingError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -50,29 +50,36 @@ impl EventWireSerializer {
 pub struct CollectorOnTcp {
     shutdown: Arc<AtomicBool>,
     listener: TcpListener,
+    destination: Sender<Result<Event, ReceivingError>>,
 }
 
-impl CollectorOnTcp {
+impl Collector for CollectorOnTcp {
     /// Creates a new TCP event collector.
     ///
     /// The collector listens to a random port on the loopback interface.
     /// The address of the collector can be obtained by the `address` method.
-    pub fn create() -> Result<(Self, SocketAddr), CollectorError> {
+    fn create(
+        destination: Sender<Result<Event, ReceivingError>>,
+    ) -> Result<(Self, SocketAddr), CollectorError> {
         let shutdown = Arc::new(AtomicBool::new(false));
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
 
-        Ok((Self { shutdown, listener }, address))
+        Ok((
+            Self {
+                shutdown,
+                listener,
+                destination,
+            },
+            address,
+        ))
     }
-}
-
-impl Collector for CollectorOnTcp {
     /// Single-threaded implementation of the collector.
     ///
     /// The collector listens to the TCP port and accepts incoming connections.
     /// When a connection is accepted, the collector reads the events from the
     /// connection and sends them to the destination channel.
-    fn collect(&self, destination: Sender<Event>) -> Result<(), CollectorError> {
+    fn start(&self) -> Result<(), CollectorError> {
         for stream in self.listener.incoming() {
             // This has to be the first thing to do, to implement the stop method!
             if self.shutdown.load(Ordering::Relaxed) {
@@ -82,8 +89,8 @@ impl Collector for CollectorOnTcp {
             match stream {
                 Ok(mut connection) => {
                     // ... (process the connection in a separate thread or task)
-                    let event = EventWireSerializer::read(&mut connection)?;
-                    destination
+                    let event = EventWireSerializer::read(&mut connection);
+                    self.destination
                         .send(event)
                         .map_err(|err| CollectorError::Channel(err.to_string()))?;
                 }
@@ -150,7 +157,6 @@ mod tests {
     use std::sync::mpsc::channel;
     use std::sync::Arc;
     use std::thread;
-    use std::time::Duration;
 
     // Test that the serialization and deserialization of the Envelope works.
     // We write the Envelope to a buffer and read it back to check if the
@@ -180,36 +186,50 @@ mod tests {
     // if they are the same as the original events.
     #[test]
     fn tcp_reporter_and_collectors_work() {
-        let (collector, address) = CollectorOnTcp::create().unwrap();
+        let (input, output) = channel();
+
+        let (collector, address) = CollectorOnTcp::create(input).unwrap();
         let reporter = ReporterOnTcp::new(address.to_string());
 
         // Create wrapper to share the collector across threads.
         let thread_collector = Arc::new(collector);
         let main_collector = thread_collector.clone();
 
-        // Start the collector in a separate thread.
-        let (input, output) = channel();
-        let receiver_thread = thread::spawn(move || {
-            thread_collector.collect(input).unwrap();
+        // Start a consumer thread to collect events from the output channel
+        let consumer_thread = thread::spawn(move || {
+            let mut events = Vec::new();
+            for event in output.iter() {
+                events.push(event.unwrap());
+                if events.len() == fixtures::EVENTS.len() {
+                    break;
+                }
+            }
+            events
         });
+
+        // Start the collector in a separate thread.
+        let receiver_thread = thread::spawn(move || {
+            thread_collector.start().unwrap();
+        });
+
         // Send events to the reporter.
         for event in fixtures::EVENTS.iter() {
             let result = reporter.report(event.clone());
             assert!(result.is_ok());
         }
 
-        // Call the stop method to stop the collector. This will close the
-        // channel and the collector will stop reading from it.
-        thread::sleep(Duration::from_secs(1));
+        // Wait for all events to be consumed
+        let received_events = consumer_thread.join().unwrap();
+
+        // Call the stop method to stop the collector.
         main_collector.stop().unwrap();
 
-        // Empty the channel and assert that we received all the events.
-        let mut count = 0;
-        for event in output.iter() {
+        // Assert that we received all the events.
+        assert_eq!(received_events.len(), fixtures::EVENTS.len());
+        for event in received_events {
             assert!(fixtures::EVENTS.contains(&event));
-            count += 1;
         }
-        assert_eq!(count, fixtures::EVENTS.len());
+
         // shutdown the receiver thread
         receiver_thread.join().unwrap();
     }
