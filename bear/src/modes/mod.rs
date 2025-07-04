@@ -36,8 +36,10 @@ impl Intercept {
             .map(io::BufWriter::new)
             .with_context(|| format!("Failed to open file: {file_name:?}"))?;
 
-        let interceptor = BuildInterceptor::create(config, move |events| {
-            ExecutionEventDatabase::write(output_file, events.iter()).map_err(anyhow::Error::from)
+        let interceptor = BuildInterceptor::create(config, move |event_candidates| {
+            // FIXME: errors are silently ignored here, we should log them
+            let events = event_candidates.into_iter().filter_map(Result::ok);
+            ExecutionEventDatabase::write(output_file, events).map_err(anyhow::Error::from)
         })?;
 
         Ok(Self {
@@ -115,8 +117,11 @@ impl Combined {
         config: config::Main,
     ) -> anyhow::Result<Self> {
         let semantic = SemanticAnalysisPipeline::create(output, &config)?;
-        let interceptor =
-            BuildInterceptor::create(config, move |events| semantic.analyze_and_write(events))?;
+        let interceptor = BuildInterceptor::create(config, move |event_candidates| {
+            // FIXME: errors are silently ignored here, we should log them
+            let events = event_candidates.into_iter().filter_map(Result::ok);
+            semantic.analyze_and_write(events)
+        })?;
 
         Ok(Self {
             command,

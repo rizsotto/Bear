@@ -111,11 +111,11 @@ pub struct ExecutionEventDatabase;
 impl FileFormat<intercept::Event> for ExecutionEventDatabase {
     fn write(
         writer: impl io::Write,
-        entries: impl Iterator<Item = intercept::Event>,
+        events: impl Iterator<Item = intercept::Event>,
     ) -> Result<(), FormatError> {
         let mut writer = writer;
-        for entry in entries {
-            serde_json::to_writer(&mut writer, &entry).map_err(FormatError::Syntax)?;
+        for event in events {
+            serde_json::to_writer(&mut writer, &event).map_err(FormatError::Syntax)?;
             writer.write_all(b"\n").map_err(FormatError::Io)?;
         }
         Ok(())
