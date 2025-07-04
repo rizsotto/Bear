@@ -2,11 +2,12 @@
 
 use crate::intercept::{supervise, tcp, Event, Execution, KEY_DESTINATION, KEY_PRELOAD_PATH};
 use crate::{args, config};
+use anyhow::Context;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
@@ -333,6 +334,60 @@ pub enum InterceptError {
 impl From<std::env::JoinPathsError> for InterceptError {
     fn from(err: std::env::JoinPathsError) -> Self {
         InterceptError::Path(format!("Failed to join paths: {err}"))
+    }
+}
+
+/// The build interceptor is responsible for capturing the build commands and
+/// dispatching them to the consumer. The consumer is a function that processes
+/// the intercepted command executions.
+pub(crate) struct BuildInterceptor {
+    environment: InterceptEnvironment,
+    #[allow(dead_code)]
+    service: CollectorService,
+    writer_thread: Option<thread::JoinHandle<()>>,
+}
+
+impl BuildInterceptor {
+    /// Create a new process execution interceptor with a closure consumer.
+    pub fn create<F>(config: config::Main, consumer: F) -> anyhow::Result<Self>
+    where
+        F: FnOnce(Receiver<Result<Event, ReceivingError>>) -> anyhow::Result<()> + Send + 'static,
+    {
+        let (sender, receiver) = channel::<Result<Event, ReceivingError>>();
+
+        let writer_thread = thread::spawn(move || {
+            if let Err(err) = consumer(receiver) {
+                log::error!("Failed to process intercepted events: {err:?}");
+            }
+        });
+
+        let (service, address) = CollectorService::create(sender)
+            .with_context(|| "Failed to create the intercept service")?;
+
+        let environment = InterceptEnvironment::create(&config.intercept, address)
+            .with_context(|| "Failed to create the intercept environment")?;
+
+        Ok(Self {
+            environment,
+            service,
+            writer_thread: Some(writer_thread),
+        })
+    }
+
+    /// Run the build command in the intercept environment.
+    pub fn run_build(self, command: args::BuildCommand) -> anyhow::Result<ExitCode> {
+        let result = self
+            .environment
+            .execute_build_command(command)
+            .with_context(|| "Failed to execute the build command")?;
+
+        if let Some(thread) = self.writer_thread {
+            if let Err(err) = thread.join() {
+                log::error!("Failed to join the intercept writer thread: {err:?}");
+            }
+        }
+
+        Ok(result)
     }
 }
 
