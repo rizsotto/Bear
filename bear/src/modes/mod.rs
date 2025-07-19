@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod execution;
+
 use crate::intercept::collector::{BuildInterceptor, ReceivingError};
-use crate::intercept::Event;
 use crate::output::{ExecutionEventDatabase, FileFormat};
 use crate::semantic;
-use crate::{args, config, output};
+use crate::{args, config, intercept, output};
 use anyhow::Context;
 use std::io::BufReader;
 use std::process::ExitCode;
@@ -86,7 +87,7 @@ impl Intercept {
             .map(io::BufWriter::new)
             .with_context(|| format!("Failed to open file: {file_name:?}"))?;
 
-        let consumer = move |candidates: Receiver<Result<Event, ReceivingError>>| {
+        let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
             let events = candidates
                 .into_iter()
                 .filter_map(Self::filter_received_event);
@@ -109,7 +110,7 @@ impl Intercept {
         config: config::Main,
     ) -> anyhow::Result<Self> {
         let analyzer = SemanticAnalysisPipeline::create(output, &config)?;
-        let consumer = move |candidates: Receiver<Result<Event, ReceivingError>>| {
+        let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
             let events = candidates
                 .into_iter()
                 .filter_map(Self::filter_received_event);
@@ -132,7 +133,9 @@ impl Intercept {
     }
 
     /// Filter the failed events from the receiver.
-    fn filter_received_event(candidate: Result<Event, ReceivingError>) -> Option<Event> {
+    fn filter_received_event(
+        candidate: Result<intercept::Event, ReceivingError>,
+    ) -> Option<intercept::Event> {
         match candidate {
             Ok(event) => Some(event),
             Err(err) => {
@@ -208,7 +211,7 @@ impl SemanticAnalysisPipeline {
 
     /// Consumer the envelopes for analysis and write the result to the output file.
     /// This implements the pipeline of the semantic analysis.
-    fn consume(self, events: impl IntoIterator<Item = Event>) -> anyhow::Result<()> {
+    fn consume(self, events: impl IntoIterator<Item = intercept::Event>) -> anyhow::Result<()> {
         // Set up the pipeline of compilation database entries.
         let semantics = events.into_iter().flat_map(|event| {
             // FIXME: add logging for this step
