@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-mod configure;
 mod execution;
 
-use crate::intercept::collector::{BuildInterceptor, ReceivingError};
-use crate::output::{ExecutionEventDatabase, FileFormat};
+use crate::intercept::executor::BuildExecutor;
+use crate::intercept::tcp::CollectorOnTcp;
+use crate::modes::execution::{Consumer, Interceptor};
+use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
 use crate::semantic;
 use crate::{args, config, intercept, output};
-use anyhow::Context;
-use std::io::BufReader;
+use crossbeam_channel::Receiver;
 use std::process::ExitCode;
-use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use std::{fs, io, path};
 
 /// Represent the modes the application can run in.
@@ -71,139 +71,224 @@ impl Mode {
     }
 }
 
-/// This represents the build interception mode.
-///
-/// Captures the build command and the event processing mechanism as a single value.
-pub struct Intercept {
-    command: args::BuildCommand,
-    interceptor: BuildInterceptor,
+fn configure_interceptor(
+    output: args::BuildSemantic,
+    config: &config::Main,
+) -> Result<Interceptor, ConfigurationError> {
+    let (producer, address) =
+        CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
+
+    let build = BuildExecutor::create(&config.intercept, address)
+        .map_err(ConfigurationError::ExecutorCreation)?;
+
+    let consumer = SemanticEventWriter::create(output, config)
+        .map_err(ConfigurationError::ConsumerCreation)?;
+
+    Ok(Interceptor::new(
+        Arc::new(producer),
+        Box::new(consumer),
+        Box::new(build),
+    ))
 }
 
-impl Intercept {
-    /// Configure the intercept mode to write the build events to a file.
-    fn configure_to_write(
-        command: args::BuildCommand,
-        output: args::BuildEvents,
-        config: config::Main,
-    ) -> anyhow::Result<Self> {
-        let file_name = path::PathBuf::from(output.file_name);
-        let output_file = fs::File::create(file_name.as_path())
-            .map(io::BufWriter::new)
-            .with_context(|| format!("Failed to open file: {file_name:?}"))?;
+fn configure_replayer() -> Result<Interceptor, ConfigurationError> {
+    todo!()
+}
 
-        let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
-            let events = candidates
-                .into_iter()
-                .filter_map(Self::filter_received_event);
-            ExecutionEventDatabase::write(output_file, events).map_err(anyhow::Error::from)
-        };
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigurationError {
+    #[error("Failed to create collector: {0}")]
+    CollectorCreation(std::io::Error),
+    #[error("Failed to create executor: {0}")]
+    ExecutorCreation(std::io::Error),
+    #[error("Failed to create consumer: {0}")]
+    ConsumerCreation(WriterCreationError),
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
+}
 
-        let interceptor = BuildInterceptor::create(config, consumer)?;
+// /// This represents the build interception mode.
+// ///
+// /// Captures the build command and the event processing mechanism as a single value.
+// pub struct Intercept {
+//     command: args::BuildCommand,
+//     interceptor: BuildInterceptor,
+// }
+//
+// impl Intercept {
+//     /// Configure the intercept mode to write the build events to a file.
+//     fn configure_to_write(
+//         command: args::BuildCommand,
+//         output: args::BuildEvents,
+//         config: config::Main,
+//     ) -> anyhow::Result<Self> {
+//         let file_name = path::PathBuf::from(output.file_name);
+//         let output_file = fs::File::create(file_name.as_path())
+//             .map(io::BufWriter::new)
+//             .with_context(|| format!("Failed to open file: {file_name:?}"))?;
+//
+//         let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
+//             let events = candidates
+//                 .into_iter()
+//                 .filter_map(Self::filter_received_event);
+//             ExecutionEventDatabase::write(output_file, events).map_err(anyhow::Error::from)
+//         };
+//
+//         let interceptor = BuildInterceptor::create(config, consumer)?;
+//
+//         Ok(Self {
+//             command,
+//             interceptor,
+//         })
+//     }
+//
+//     /// Configure the intercept mode to analyze the build events and write the analysis results
+//     /// into a file, based on the provided output configuration.
+//     fn configure_to_analyse(
+//         command: args::BuildCommand,
+//         output: args::BuildSemantic,
+//         config: config::Main,
+//     ) -> anyhow::Result<Self> {
+//         let analyzer = SemanticAnalysisPipeline::create(output, &config)?;
+//         let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
+//             let events = candidates
+//                 .into_iter()
+//                 .filter_map(Self::filter_received_event);
+//             analyzer.consume(events)
+//         };
+//
+//         let interceptor = BuildInterceptor::create(config, consumer)?;
+//
+//         Ok(Self {
+//             command,
+//             interceptor,
+//         })
+//     }
+//
+//     /// Run the build command in the intercept environment.
+//     ///
+//     /// The exit code is based on the result of the build command.
+//     fn run(self) -> anyhow::Result<ExitCode> {
+//         self.interceptor.run_build(self.command)
+//     }
+//
+//     /// Filter the failed events from the receiver.
+//     fn filter_received_event(
+//         candidate: Result<intercept::Event, ReceivingError>,
+//     ) -> Option<intercept::Event> {
+//         match candidate {
+//             Ok(event) => Some(event),
+//             Err(err) => {
+//                 log::error!("Receiving event during build interception failed: {err:?}");
+//                 None
+//             }
+//         }
+//     }
+// }
+//
+// /// This represents the replay mode, when the build events are read from a file.
+// pub struct Replay {
+//     source: BufReader<fs::File>,
+//     analyzer: SemanticAnalysisPipeline,
+// }
+//
+// impl Replay {
+//     /// Configure the replay mode to analyze the build events from a file.
+//     fn configure_to_analyse(
+//         input: args::BuildEvents,
+//         output: args::BuildSemantic,
+//         config: config::Main,
+//     ) -> anyhow::Result<Self> {
+//         let event_file_name = path::PathBuf::from(input.file_name);
+//         let event_file = fs::File::open(event_file_name.as_path())
+//             .map(BufReader::new)
+//             .with_context(|| format!("Failed to open file: {event_file_name:?}"))?;
+//
+//         let semantic = SemanticAnalysisPipeline::create(output, &config)?;
+//
+//         Ok(Self {
+//             source: event_file,
+//             analyzer: semantic,
+//         })
+//     }
+//
+//     /// Run the semantic mode by reading the event file and analyzing the events.
+//     ///
+//     /// The exit code is based on the result of the output writer.
+//     fn run(self) -> anyhow::Result<ExitCode> {
+//         let events = ExecutionEventDatabase::read_and_ignore(self.source, |error| {
+//             log::warn!("Event file reading issue: {error:?}")
+//         });
+//
+//         self.analyzer.consume(events).map(|_| ExitCode::SUCCESS)
+//     }
+// }
+//
+// /// Represents the semantic analysis pipeline.
+// ///
+// /// This is a set of complex operations that are performed on the build events.
+// /// But the event source is not relevant for the semantic analysis itself.
+// struct SemanticAnalysisPipeline {
+//     interpreter: Box<dyn semantic::Interpreter>,
+//     writer: output::OutputWriter,
+// }
+//
+// impl SemanticAnalysisPipeline {
+//     /// Create a new semantic analysis pipeline based on the output configuration.
+//     ///
+//     /// The `output` argument contains the configuration for the output file location,
+//     /// while the `config` argument contains the configuration for the semantic analysis
+//     /// and the output format.
+//     fn create(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
+//         let interpreter = Box::new(semantic::interpreters::create(config));
+//         let writer = output::OutputWriter::try_from((&output, &config.output))?;
+//
+//         Ok(Self {
+//             interpreter,
+//             writer,
+//         })
+//     }
+//
+//     /// Consumer the envelopes for analysis and write the result to the output file.
+//     /// This implements the pipeline of the semantic analysis.
+//     fn consume(self, events: impl IntoIterator<Item = intercept::Event>) -> anyhow::Result<()> {
+//         // Set up the pipeline of compilation database entries.
+//         let semantics = events.into_iter().flat_map(|event| {
+//             // FIXME: add logging for this step
+//             self.interpreter.recognize(&event.execution)
+//         });
+//         // Consume the entries and write them to the output file.
+//         // The exit code is based on the result of the output writer.
+//         self.writer.write(semantics)?;
+//
+//         Ok(())
+//     }
+// }
 
-        Ok(Self {
-            command,
-            interceptor,
-        })
-    }
+struct RawEventWriter;
 
-    /// Configure the intercept mode to analyze the build events and write the analysis results
-    /// into a file, based on the provided output configuration.
-    fn configure_to_analyse(
-        command: args::BuildCommand,
-        output: args::BuildSemantic,
-        config: config::Main,
-    ) -> anyhow::Result<Self> {
-        let analyzer = SemanticAnalysisPipeline::create(output, &config)?;
-        let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
-            let events = candidates
-                .into_iter()
-                .filter_map(Self::filter_received_event);
-            analyzer.consume(events)
-        };
-
-        let interceptor = BuildInterceptor::create(config, consumer)?;
-
-        Ok(Self {
-            command,
-            interceptor,
-        })
-    }
-
-    /// Run the build command in the intercept environment.
-    ///
-    /// The exit code is based on the result of the build command.
-    fn run(self) -> anyhow::Result<ExitCode> {
-        self.interceptor.run_build(self.command)
-    }
-
-    /// Filter the failed events from the receiver.
-    fn filter_received_event(
-        candidate: Result<intercept::Event, ReceivingError>,
-    ) -> Option<intercept::Event> {
-        match candidate {
-            Ok(event) => Some(event),
-            Err(err) => {
-                log::error!("Receiving event during build interception failed: {err:?}");
-                None
-            }
-        }
+impl Consumer<intercept::Event, FormatError> for RawEventWriter {
+    fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+        // TODO!!!!
+        Ok(())
     }
 }
 
-/// This represents the replay mode, when the build events are read from a file.
-pub struct Replay {
-    source: BufReader<fs::File>,
-    analyzer: SemanticAnalysisPipeline,
-}
-
-impl Replay {
-    /// Configure the replay mode to analyze the build events from a file.
-    fn configure_to_analyse(
-        input: args::BuildEvents,
-        output: args::BuildSemantic,
-        config: config::Main,
-    ) -> anyhow::Result<Self> {
-        let event_file_name = path::PathBuf::from(input.file_name);
-        let event_file = fs::File::open(event_file_name.as_path())
-            .map(BufReader::new)
-            .with_context(|| format!("Failed to open file: {event_file_name:?}"))?;
-
-        let semantic = SemanticAnalysisPipeline::create(output, &config)?;
-
-        Ok(Self {
-            source: event_file,
-            analyzer: semantic,
-        })
-    }
-
-    /// Run the semantic mode by reading the event file and analyzing the events.
-    ///
-    /// The exit code is based on the result of the output writer.
-    fn run(self) -> anyhow::Result<ExitCode> {
-        let events = ExecutionEventDatabase::read_and_ignore(self.source, |error| {
-            log::warn!("Event file reading issue: {error:?}")
-        });
-
-        self.analyzer.consume(events).map(|_| ExitCode::SUCCESS)
-    }
-}
-
-/// Represents the semantic analysis pipeline.
-///
-/// This is a set of complex operations that are performed on the build events.
-/// But the event source is not relevant for the semantic analysis itself.
-struct SemanticAnalysisPipeline {
+struct SemanticEventWriter {
     interpreter: Box<dyn semantic::Interpreter>,
     writer: output::OutputWriter,
 }
 
-impl SemanticAnalysisPipeline {
+impl SemanticEventWriter {
     /// Create a new semantic analysis pipeline based on the output configuration.
     ///
     /// The `output` argument contains the configuration for the output file location,
     /// while the `config` argument contains the configuration for the semantic analysis
     /// and the output format.
-    fn create(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
+    fn create(
+        output: args::BuildSemantic,
+        config: &config::Main,
+    ) -> Result<Self, WriterCreationError> {
         let interpreter = Box::new(semantic::interpreters::create(config));
         let writer = output::OutputWriter::try_from((&output, &config.output))?;
 
@@ -212,17 +297,24 @@ impl SemanticAnalysisPipeline {
             writer,
         })
     }
+}
 
-    /// Consumer the envelopes for analysis and write the result to the output file.
-    /// This implements the pipeline of the semantic analysis.
-    fn consume(self, events: impl IntoIterator<Item = intercept::Event>) -> anyhow::Result<()> {
-        // Set up the pipeline of compilation database entries.
-        let semantics = events.into_iter().flat_map(|event| {
-            // FIXME: add logging for this step
-            self.interpreter.recognize(&event.execution)
-        });
+impl Consumer<intercept::Event, FormatError> for SemanticEventWriter {
+    /// Consume the intercepted events, and transform them into semantic events,
+    /// and write them into the target file (with the right format).
+    fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+        // Transform and log the events to semantics.
+        let semantics = events
+            .into_iter()
+            .inspect(|event| {
+                log::debug!("Processing event: {:?}", event);
+            })
+            .flat_map(|event| self.interpreter.recognize(&event.execution))
+            .inspect(|semantic| {
+                log::debug!("Recognized semantic: {:?}", semantic);
+            });
+
         // Consume the entries and write them to the output file.
-        // The exit code is based on the result of the output writer.
         self.writer.write(semantics)?;
 
         Ok(())

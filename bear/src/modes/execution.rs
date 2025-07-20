@@ -2,11 +2,11 @@
 
 use crate::args::BuildCommand;
 use crate::intercept;
-use crate::intercept::collector::CollectorError;
+use crate::intercept::collector::{CancellableProducer, CollectorError, Producer};
 use crate::intercept::executor;
 use crate::intercept::supervise::SuperviseError;
 use crate::output::FormatError;
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver};
 use std::process::ExitCode;
 use std::sync::Arc;
 use thiserror::Error;
@@ -19,7 +19,7 @@ use thiserror::Error;
 ///
 /// # Thread Safety
 /// Implementors must be `Send + Sync` to allow usage across thread boundaries.
-pub trait Consumer<T, E>: Send + Sync {
+pub trait Consumer<T, E>: Send {
     /// Consumes all items from the receiver until the channel is closed.
     ///
     /// This is a blocking operation that processes each received item.
@@ -32,55 +32,8 @@ pub trait Consumer<T, E>: Send + Sync {
     /// # Returns
     /// * `Ok(())` - All items were successfully processed
     /// * `Err(E)` - An error occurred during processing
-    fn consume(&self, _: Receiver<T>) -> Result<(), E>;
+    fn consume(self: Box<Self>, _: Receiver<T>) -> Result<(), E>;
 }
-
-/// A trait for producing events to a channel-based stream.
-///
-/// # Type Parameters
-/// - `T`: The type of items being produced (typically `intercept::Event`)
-/// - `E`: The error type that can occur during production
-///
-/// # Thread Safety
-/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
-pub trait Producer<T, E>: Send + Sync {
-    /// Produces items by sending them through the provided sender.
-    ///
-    /// This is a blocking operation that continues until all items are produced
-    /// or an error occurs. The producer should close the sender when finished
-    /// to signal completion to consumers.
-    ///
-    /// # Arguments
-    /// * `sender` - Channel sender to produce items to
-    ///
-    /// # Returns
-    /// * `Ok(())` - All items were successfully produced
-    /// * `Err(E)` - An error occurred during production
-    fn produce(&self, _: Sender<T>) -> Result<(), E>;
-}
-
-/// A trait for cancelling ongoing operations.
-///
-/// # Type Parameters
-/// - `E`: The error type that can occur during cancellation
-///
-/// # Thread Safety
-/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
-pub trait Cancellable<E>: Send + Sync {
-    /// Cancels the ongoing operation.
-    ///
-    /// # Returns
-    /// * `Ok(())` - Cancellation was successful
-    /// * `Err(E)` - An error occurred during cancellation
-    fn cancel(&self) -> Result<(), E>;
-}
-
-/// A trait for producers that support cancellation during operation.
-///
-/// # Type Parameters
-/// - `T`: The type of items being produced (typically `intercept::Event`)
-/// - `E`: The error type that can occur during production or cancellation
-pub trait CancellableProducer<T, E>: Producer<T, E> + Cancellable<E> {}
 
 /// Coordinates live command interception during build execution.
 ///
@@ -93,11 +46,23 @@ pub trait CancellableProducer<T, E>: Producer<T, E> + Cancellable<E> {}
 /// handling thread synchronization and error propagation.
 pub struct Interceptor {
     producer: Arc<dyn CancellableProducer<intercept::Event, CollectorError>>,
-    consumer: Arc<dyn Consumer<intercept::Event, FormatError>>,
+    consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
     build: Box<dyn executor::Executor<SuperviseError>>,
 }
 
 impl Interceptor {
+    pub fn new(
+        producer: Arc<dyn CancellableProducer<intercept::Event, CollectorError>>,
+        consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
+        build: Box<dyn executor::Executor<SuperviseError>>,
+    ) -> Self {
+        Self {
+            producer,
+            consumer,
+            build,
+        }
+    }
+
     /// Runs live command interception for the given build command.
     ///
     /// # Arguments
@@ -154,11 +119,18 @@ impl Interceptor {
 /// - Testing semantic analysis changes
 /// - Generating compilation databases from archived event data
 pub struct Replayer {
-    source: Arc<dyn Producer<intercept::Event, CollectorError>>,
-    consumer: Arc<dyn Consumer<intercept::Event, FormatError>>,
+    source: Box<dyn Producer<intercept::Event, CollectorError>>,
+    consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
 }
 
 impl Replayer {
+    pub fn new(
+        source: Box<dyn Producer<intercept::Event, CollectorError>>,
+        consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
+    ) -> Self {
+        Self { source, consumer }
+    }
+
     /// Replays stored intercept events through the processing pipeline.
     ///
     /// # Returns

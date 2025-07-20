@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::args::BuildCommand;
-use crate::intercept;
+use crate::config;
 use crate::intercept::supervise;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::net::SocketAddr;
 use std::process::ExitStatus;
 
 /// A trait for executing build commands.
@@ -31,11 +31,15 @@ pub trait Executor<E> {
     fn run(&self, _: BuildCommand) -> Result<ExitStatus, E>;
 }
 
-struct BuildExecutor {
+pub struct BuildExecutor {
     environment: HashMap<String, String>,
 }
 
 impl BuildExecutor {
+    pub fn create(config: &config::Intercept, address: SocketAddr) -> Result<Self, std::io::Error> {
+        todo!()
+    }
+
     fn build(&self, val: BuildCommand) -> std::process::Command {
         let mut command = std::process::Command::new(val.arguments.first().unwrap());
         command.args(val.arguments.iter().skip(1));
