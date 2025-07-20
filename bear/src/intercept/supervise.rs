@@ -13,16 +13,15 @@ use thiserror::Error;
 /// It starts the command and waits for its completion. It also forwards
 /// signals to the child process. The method returns the exit status of the
 /// child process.
-pub fn supervise(execution: Execution) -> Result<ExitStatus, SuperviseError> {
+pub fn supervise(command: &mut std::process::Command) -> Result<ExitStatus, SuperviseError> {
     let signaled = Arc::new(AtomicUsize::new(0));
     for signal in signal_hook::consts::TERM_SIGNALS {
         signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)
             .map_err(SuperviseError::SignalRegistration)?;
     }
 
-    let mut child = Into::<std::process::Command>::into(execution)
-        .spawn()
-        .map_err(SuperviseError::ProcessSpawn)?;
+    let mut child = command.spawn().map_err(SuperviseError::ProcessSpawn)?;
+
     loop {
         // Forward signals to the child process, but don't exit the loop while it is running
         if signaled.swap(0usize, Ordering::SeqCst) != 0 {
@@ -45,6 +44,12 @@ pub fn supervise(execution: Execution) -> Result<ExitStatus, SuperviseError> {
             }
         }
     }
+}
+
+/// This function supervises the execution of a command represented by the `Execution` struct.
+pub fn supervise_execution(execution: Execution) -> Result<ExitStatus, SuperviseError> {
+    let mut child = Into::<std::process::Command>::into(execution);
+    supervise(&mut child)
 }
 
 impl From<Execution> for std::process::Command {

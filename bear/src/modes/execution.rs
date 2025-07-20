@@ -3,6 +3,7 @@
 use crate::args::BuildCommand;
 use crate::intercept;
 use crate::intercept::collector::CollectorError;
+use crate::intercept::executor;
 use crate::intercept::supervise::SuperviseError;
 use crate::output::FormatError;
 use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
@@ -81,30 +82,6 @@ pub trait Cancellable<E>: Send + Sync {
 /// - `E`: The error type that can occur during production or cancellation
 pub trait CancellableProducer<T, E>: Producer<T, E> + Cancellable<E> {}
 
-/// A trait for executing build commands.
-///
-/// Executors are responsible for running the actual build process while
-/// allowing command interception to occur. They manage the lifecycle of
-/// the build command and report its exit status.
-///
-/// # Type Parameters
-/// - `E`: The error type that can occur during execution
-pub trait Executor<E> {
-    /// Executes the given build command.
-    ///
-    /// This is a blocking operation that runs the build command to completion.
-    /// During execution, the command and its subprocesses may be intercepted
-    /// by Bear's interception mechanisms.
-    ///
-    /// # Arguments
-    /// * `command` - The build command to execute
-    ///
-    /// # Returns
-    /// * `Ok(ExitCode)` - The build completed with the given exit code
-    /// * `Err(E)` - An error occurred during execution
-    fn run(&self, _: BuildCommand) -> Result<ExitCode, E>;
-}
-
 /// Coordinates live command interception during build execution.
 ///
 /// `Interceptor` manages the simultaneous execution of:
@@ -114,10 +91,10 @@ pub trait Executor<E> {
 ///
 /// The interceptor ensures proper coordination between these components,
 /// handling thread synchronization and error propagation.
-struct Interceptor {
+pub struct Interceptor {
     producer: Arc<dyn CancellableProducer<intercept::Event, CollectorError>>,
     consumer: Arc<dyn Consumer<intercept::Event, FormatError>>,
-    build: Box<dyn Executor<SuperviseError>>,
+    build: Box<dyn executor::Executor<SuperviseError>>,
 }
 
 impl Interceptor {
@@ -129,7 +106,7 @@ impl Interceptor {
     /// # Returns
     /// * `Ok(ExitCode::SUCCESS)` - All operations completed successfully
     /// * `Err(RuntimeError)` - An error occurred in any component
-    fn run(self, command: BuildCommand) -> Result<ExitCode, RuntimeError> {
+    pub fn run(self, command: BuildCommand) -> Result<ExitCode, RuntimeError> {
         let (sender, receiver) = unbounded::<intercept::Event>();
 
         let producer_thread = {
@@ -142,7 +119,7 @@ impl Interceptor {
             std::thread::spawn(move || consumer.consume(receiver))
         };
 
-        self.build.run(command)?;
+        let exit_status = self.build.run(command)?;
 
         self.producer.cancel()?;
 
@@ -158,7 +135,14 @@ impl Interceptor {
             .map_err(|_| RuntimeError::Thread("Consumer thread panicked"))?
             .map_err(RuntimeError::Consumer)?;
 
-        Ok(ExitCode::SUCCESS)
+        // The exit code is not always available. When the process is killed by a signal,
+        // the exit code is not available. In this case, we return the `FAILURE` exit code.
+        let exit_code = exit_status
+            .code()
+            .map(|code| ExitCode::from(code as u8))
+            .unwrap_or(ExitCode::FAILURE);
+
+        Ok(exit_code)
     }
 }
 
@@ -169,7 +153,7 @@ impl Interceptor {
 /// - Re-analyzing previous builds with different configurations
 /// - Testing semantic analysis changes
 /// - Generating compilation databases from archived event data
-struct Replayer {
+pub struct Replayer {
     source: Arc<dyn Producer<intercept::Event, CollectorError>>,
     consumer: Arc<dyn Consumer<intercept::Event, FormatError>>,
 }
@@ -180,7 +164,7 @@ impl Replayer {
     /// # Returns
     /// * `Ok(ExitCode::SUCCESS)` - All events were successfully replayed
     /// * `Err(RuntimeError)` - An error occurred during replay (most likely IO error)
-    fn run(self) -> Result<ExitCode, RuntimeError> {
+    pub fn run(self) -> Result<ExitCode, RuntimeError> {
         let (sender, receiver) = bounded::<intercept::Event>(10);
 
         let source_thread = {

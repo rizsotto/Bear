@@ -181,7 +181,7 @@ impl InterceptEnvironment {
         // TODO: record the execution of the build command
 
         let child: Execution = Self::execution(input, self.environment())?;
-        let exit_status = supervise::supervise(child)
+        let exit_status = supervise::supervise_execution(child)
             .map_err(|e| InterceptError::ProcessExecution(e.to_string()))?;
         log::info!("Execution finished with status: {exit_status:?}");
 

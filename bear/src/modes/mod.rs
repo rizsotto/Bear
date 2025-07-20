@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+mod configure;
 mod execution;
 
 use crate::intercept::collector::{BuildInterceptor, ReceivingError};
@@ -23,8 +24,8 @@ use std::{fs, io, path};
 /// or if we are replaying them. If we are analyzing the build events or just writing them
 /// to a file is not relevant for the mode itself, but rather for the configuration.
 pub enum Mode {
-    Intercept(Intercept),
-    Replay(Replay),
+    Intercept(execution::Interceptor, args::BuildCommand),
+    Replay(execution::Replayer),
 }
 
 impl Mode {
@@ -37,15 +38,18 @@ impl Mode {
         match args.mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept build and write events");
-                Intercept::configure_to_write(input, output, config).map(Self::Intercept)
+                // Intercept::configure_to_write(input, output, config).map(Self::Intercept)
+                todo!()
             }
             args::Mode::Semantic { input, output } => {
                 log::debug!("Mode: replay events and semantic analysis");
-                Replay::configure_to_analyse(input, output, config).map(Self::Replay)
+                // Replay::configure_to_analyse(input, output, config).map(Self::Replay)
+                todo!()
             }
             args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept build and semantic analysis");
-                Intercept::configure_to_analyse(input, output, config).map(Self::Intercept)
+                // Intercept::configure_to_analyse(input, output, config).map(Self::Intercept)
+                todo!()
             }
         }
     }
@@ -57,7 +61,7 @@ impl Mode {
     /// run-time errors, the user were passing valid arguments and configurations.
     pub fn run(self) -> ExitCode {
         let status = match self {
-            Self::Intercept(intercept) => intercept.run(),
+            Self::Intercept(interceptor, command) => interceptor.run(command),
             Self::Replay(semantic) => semantic.run(),
         };
         status.unwrap_or_else(|error| {

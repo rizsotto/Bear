@@ -10,6 +10,7 @@
 //! the data structures that are used to represent the events.
 
 pub mod collector;
+pub mod executor;
 pub mod reporter;
 pub mod supervise;
 pub mod tcp;

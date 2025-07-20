@@ -19,7 +19,7 @@ extern crate core;
 
 use anyhow::{Context, Result};
 use bear::intercept::reporter::{Reporter, ReporterFactory};
-use bear::intercept::supervise::supervise;
+use bear::intercept::supervise::supervise_execution;
 use bear::intercept::{Event, Execution};
 
 /// Implementation of the wrapper process.
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
     }
 
     // Execute the real executable with the same arguments
-    let exit_status = supervise(real_execution)?;
+    let exit_status = supervise_execution(real_execution)?;
     log::info!("Execution finished with status: {exit_status:?}");
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
