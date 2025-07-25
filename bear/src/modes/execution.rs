@@ -2,9 +2,9 @@
 
 use crate::args::BuildCommand;
 use crate::intercept;
-use crate::intercept::collector::{CancellableProducer, CollectorError, Producer};
 use crate::intercept::executor;
 use crate::intercept::supervise::SuperviseError;
+use crate::intercept::{CancellableProducer, Producer, ProducerError};
 use crate::output::FormatError;
 use crossbeam_channel::{bounded, unbounded, Receiver};
 use std::process::ExitCode;
@@ -45,14 +45,14 @@ pub trait Consumer<T, E>: Send {
 /// The interceptor ensures proper coordination between these components,
 /// handling thread synchronization and error propagation.
 pub struct Interceptor {
-    producer: Arc<dyn CancellableProducer<intercept::Event, CollectorError>>,
+    producer: Arc<dyn CancellableProducer<intercept::Event, ProducerError>>,
     consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
     build: Box<dyn executor::Executor<SuperviseError>>,
 }
 
 impl Interceptor {
     pub fn new(
-        producer: Arc<dyn CancellableProducer<intercept::Event, CollectorError>>,
+        producer: Arc<dyn CancellableProducer<intercept::Event, ProducerError>>,
         consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
         build: Box<dyn executor::Executor<SuperviseError>>,
     ) -> Self {
@@ -119,13 +119,13 @@ impl Interceptor {
 /// - Testing semantic analysis changes
 /// - Generating compilation databases from archived event data
 pub struct Replayer {
-    source: Box<dyn Producer<intercept::Event, CollectorError>>,
+    source: Box<dyn Producer<intercept::Event, ProducerError>>,
     consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
 }
 
 impl Replayer {
     pub fn new(
-        source: Box<dyn Producer<intercept::Event, CollectorError>>,
+        source: Box<dyn Producer<intercept::Event, ProducerError>>,
         consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
     ) -> Self {
         Self { source, consumer }
@@ -169,7 +169,7 @@ impl Replayer {
 #[derive(Error, Debug)]
 pub enum RuntimeError {
     #[error("Producer error: {0}")]
-    Producer(#[from] CollectorError),
+    Producer(#[from] ProducerError),
 
     #[error("Consumer error: {0}")]
     Consumer(#[from] FormatError),

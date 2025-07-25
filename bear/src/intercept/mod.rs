@@ -9,7 +9,6 @@
 //! The module provides abstractions for the reporter and the collector. And it also defines
 //! the data structures that are used to represent the events.
 
-pub mod collector;
 pub mod executor;
 pub mod reporter;
 pub mod supervise;
@@ -139,4 +138,60 @@ pub enum CaptureError {
     CurrentExecutable(std::io::Error),
     #[error("Failed to capture current directory: {0}")]
     CurrentDirectory(std::io::Error),
+}
+
+/// A trait for producing events to a channel-based stream.
+///
+/// # Type Parameters
+/// - `T`: The type of items being produced (typically `intercept::Event`)
+/// - `E`: The error type that can occur during production
+///
+/// # Thread Safety
+/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+pub trait Producer<T, E>: Send + Sync {
+    /// Produces items by sending them through the provided sender.
+    ///
+    /// This is a blocking operation that continues until all items are produced
+    /// or an error occurs. The producer should close the sender when finished
+    /// to signal completion to consumers.
+    ///
+    /// # Arguments
+    /// * `sender` - Channel sender to produce items to
+    ///
+    /// # Returns
+    /// * `Ok(())` - All items were successfully produced
+    /// * `Err(E)` - An error occurred during production
+    fn produce(&self, _: crossbeam_channel::Sender<T>) -> Result<(), E>;
+}
+
+/// A trait for cancelling ongoing operations.
+///
+/// # Type Parameters
+/// - `E`: The error type that can occur during cancellation
+///
+/// # Thread Safety
+/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+pub trait Cancellable<E>: Send + Sync {
+    /// Cancels the ongoing operation.
+    ///
+    /// # Returns
+    /// * `Ok(())` - Cancellation was successful
+    /// * `Err(E)` - An error occurred during cancellation
+    fn cancel(&self) -> Result<(), E>;
+}
+
+/// A trait for producers that support cancellation during operation.
+///
+/// # Type Parameters
+/// - `T`: The type of items being produced (typically `intercept::Event`)
+/// - `E`: The error type that can occur during production or cancellation
+pub trait CancellableProducer<T, E>: Producer<T, E> + Cancellable<E> {}
+
+/// Errors that can occur to set up the collector.
+#[derive(Error, Debug)]
+pub enum ProducerError {
+    #[error("Collecting events failed with IO error: {0}")]
+    Network(#[from] std::io::Error),
+    #[error("Collecting events failed with internal IPC error: {0}")]
+    Channel(String),
 }

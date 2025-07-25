@@ -2,9 +2,8 @@
 
 //! The module contains the implementation of the TCP collector and reporter.
 
-use super::collector::{Cancellable, CancellableProducer, CollectorError, Producer};
 use super::reporter::{Reporter, ReportingError};
-use super::Event;
+use super::{Cancellable, CancellableProducer, Event, Producer, ProducerError};
 use crossbeam_channel::Sender;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -75,13 +74,13 @@ impl CollectorOnTcp {
     }
 }
 
-impl Producer<Event, CollectorError> for CollectorOnTcp {
+impl Producer<Event, ProducerError> for CollectorOnTcp {
     /// Single-threaded implementation of the collector.
     ///
     /// The collector listens to the TCP port and accepts incoming connections.
     /// When a connection is accepted, the collector reads the events from the
     /// connection and sends them to the destination channel.
-    fn produce(&self, destination: Sender<Event>) -> Result<(), CollectorError> {
+    fn produce(&self, destination: Sender<Event>) -> Result<(), ProducerError> {
         for stream in self.listener.incoming() {
             // This has to be the first thing to do, to implement the stop method!
             if self.shutdown.load(Ordering::Relaxed) {
@@ -97,7 +96,7 @@ impl Producer<Event, CollectorError> for CollectorOnTcp {
                             // Send the event to the destination channel
                             destination
                                 .send(event)
-                                .map_err(|err| CollectorError::Channel(err.to_string()))?;
+                                .map_err(|err| ProducerError::Channel(err.to_string()))?;
                         }
                         Err(err) => {
                             // Log the error and continue to the next connection
@@ -119,22 +118,22 @@ impl Producer<Event, CollectorError> for CollectorOnTcp {
     }
 }
 
-impl Cancellable<CollectorError> for CollectorOnTcp {
+impl Cancellable<ProducerError> for CollectorOnTcp {
     /// Stops the collector by flipping the shutdown flag and connecting to the collector.
     ///
     /// The collector is stopped when the `produce` method sees the shutdown flag.
     /// To signal the collector to stop, we connect to the collector to unblock the
     /// `accept` call to check the shutdown flag.
-    fn cancel(&self) -> Result<(), CollectorError> {
+    fn cancel(&self) -> Result<(), ProducerError> {
         self.shutdown.store(true, Ordering::Relaxed);
 
         let address = self.listener.local_addr()?;
-        let _ = TcpStream::connect(address).map_err(CollectorError::Network)?;
+        let _ = TcpStream::connect(address).map_err(ProducerError::Network)?;
         Ok(())
     }
 }
 
-impl CancellableProducer<Event, CollectorError> for CollectorOnTcp {}
+impl CancellableProducer<Event, ProducerError> for CollectorOnTcp {}
 
 /// Represents a TCP event reporter.
 pub struct ReporterOnTcp {

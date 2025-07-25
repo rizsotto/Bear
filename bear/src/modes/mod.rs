@@ -120,7 +120,7 @@ pub enum ConfigurationError {
 mod impls {
     use super::execution;
     use super::ConfigurationError;
-    use crate::intercept::collector::{CollectorError, Producer};
+    use crate::intercept::{Producer, ProducerError};
     use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
@@ -152,13 +152,13 @@ mod impls {
         }
     }
 
-    impl Producer<intercept::Event, CollectorError> for RawEventReader {
+    impl Producer<intercept::Event, ProducerError> for RawEventReader {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
-        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), CollectorError> {
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ProducerError> {
             let source = fs::File::open(&self.file_name)
                 .map(io::BufReader::new)
-                .map_err(CollectorError::Network)?;
+                .map_err(ProducerError::Network)?;
 
             let events = ExecutionEventDatabase::read_and_ignore(source, |error| {
                 log::warn!("Event file reading issue: {error:?}");
@@ -167,7 +167,7 @@ mod impls {
             for event in events {
                 if let Err(error) = destination.send(event) {
                     log::error!("Failed to forward event: {error}");
-                    return Err(CollectorError::Channel(error.to_string()));
+                    return Err(ProducerError::Channel(error.to_string()));
                 }
             }
 
