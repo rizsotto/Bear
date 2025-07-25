@@ -50,7 +50,7 @@ impl BuildExecutor {
 
 impl Executor<supervise::SuperviseError> for BuildExecutor {
     fn run(&self, build_command: BuildCommand) -> Result<ExitStatus, supervise::SuperviseError> {
-        log::debug!("Running build command: {:?}", build_command);
+        log::debug!("Running build command: {build_command:?}");
         let mut command = self.build(build_command);
         supervise::supervise(&mut command)
     }

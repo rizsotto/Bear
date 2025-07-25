@@ -4,14 +4,9 @@ mod execution;
 
 use crate::intercept::executor::BuildExecutor;
 use crate::intercept::tcp::CollectorOnTcp;
-use crate::modes::execution::{Consumer, Interceptor};
-use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
-use crate::semantic;
-use crate::{args, config, intercept, output};
-use crossbeam_channel::Receiver;
+use crate::{args, config, output};
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::{fs, io, path};
 
 /// Represent the modes the application can run in.
 ///
@@ -34,22 +29,61 @@ impl Mode {
     /// Here we are checking if the command line arguments and configuration are valid.
     /// If the arguments are valid, we create the appropriate mode instance.
     /// If that is not the case, we try to return a useful error message.
-    pub fn configure(args: args::Arguments, config: config::Main) -> anyhow::Result<Self> {
+    pub fn configure(
+        args: args::Arguments,
+        config: config::Main,
+    ) -> Result<Self, ConfigurationError> {
         match args.mode {
             args::Mode::Intercept { input, output } => {
                 log::debug!("Mode: intercept build and write events");
-                // Intercept::configure_to_write(input, output, config).map(Self::Intercept)
-                todo!()
+
+                let (producer, address) =
+                    CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
+
+                let build = BuildExecutor::create(&config.intercept, address)
+                    .map_err(ConfigurationError::ExecutorCreation)?;
+
+                let consumer = impls::RawEventWriter::create(&output.file_name)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
+
+                let intercept = execution::Interceptor::new(
+                    Arc::new(producer),
+                    Box::new(consumer),
+                    Box::new(build),
+                );
+
+                Ok(Self::Intercept(intercept, input))
             }
             args::Mode::Semantic { input, output } => {
                 log::debug!("Mode: replay events and semantic analysis");
-                // Replay::configure_to_analyse(input, output, config).map(Self::Replay)
-                todo!()
+
+                let source = impls::RawEventReader::create(&input.file_name)?;
+                let consumer = impls::SemanticEventWriter::create(output, &config)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
+
+                let replayer = execution::Replayer::new(Box::new(source), Box::new(consumer));
+
+                Ok(Self::Replay(replayer))
             }
             args::Mode::Combined { input, output } => {
                 log::debug!("Mode: intercept build and semantic analysis");
-                // Intercept::configure_to_analyse(input, output, config).map(Self::Intercept)
-                todo!()
+
+                let (producer, address) =
+                    CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
+
+                let build = BuildExecutor::create(&config.intercept, address)
+                    .map_err(ConfigurationError::ExecutorCreation)?;
+
+                let consumer = impls::SemanticEventWriter::create(output, &config)
+                    .map_err(ConfigurationError::ConsumerCreation)?;
+
+                let intercept = execution::Interceptor::new(
+                    Arc::new(producer),
+                    Box::new(consumer),
+                    Box::new(build),
+                );
+
+                Ok(Self::Intercept(intercept, input))
             }
         }
     }
@@ -71,30 +105,6 @@ impl Mode {
     }
 }
 
-fn configure_interceptor(
-    output: args::BuildSemantic,
-    config: &config::Main,
-) -> Result<Interceptor, ConfigurationError> {
-    let (producer, address) =
-        CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
-
-    let build = BuildExecutor::create(&config.intercept, address)
-        .map_err(ConfigurationError::ExecutorCreation)?;
-
-    let consumer = SemanticEventWriter::create(output, config)
-        .map_err(ConfigurationError::ConsumerCreation)?;
-
-    Ok(Interceptor::new(
-        Arc::new(producer),
-        Box::new(consumer),
-        Box::new(build),
-    ))
-}
-
-fn configure_replayer() -> Result<Interceptor, ConfigurationError> {
-    todo!()
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
     #[error("Failed to create collector: {0}")]
@@ -102,221 +112,147 @@ pub enum ConfigurationError {
     #[error("Failed to create executor: {0}")]
     ExecutorCreation(std::io::Error),
     #[error("Failed to create consumer: {0}")]
-    ConsumerCreation(WriterCreationError),
+    ConsumerCreation(output::WriterCreationError),
     #[error("Invalid configuration: {0}")]
     InvalidConfiguration(String),
 }
 
-// /// This represents the build interception mode.
-// ///
-// /// Captures the build command and the event processing mechanism as a single value.
-// pub struct Intercept {
-//     command: args::BuildCommand,
-//     interceptor: BuildInterceptor,
-// }
-//
-// impl Intercept {
-//     /// Configure the intercept mode to write the build events to a file.
-//     fn configure_to_write(
-//         command: args::BuildCommand,
-//         output: args::BuildEvents,
-//         config: config::Main,
-//     ) -> anyhow::Result<Self> {
-//         let file_name = path::PathBuf::from(output.file_name);
-//         let output_file = fs::File::create(file_name.as_path())
-//             .map(io::BufWriter::new)
-//             .with_context(|| format!("Failed to open file: {file_name:?}"))?;
-//
-//         let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
-//             let events = candidates
-//                 .into_iter()
-//                 .filter_map(Self::filter_received_event);
-//             ExecutionEventDatabase::write(output_file, events).map_err(anyhow::Error::from)
-//         };
-//
-//         let interceptor = BuildInterceptor::create(config, consumer)?;
-//
-//         Ok(Self {
-//             command,
-//             interceptor,
-//         })
-//     }
-//
-//     /// Configure the intercept mode to analyze the build events and write the analysis results
-//     /// into a file, based on the provided output configuration.
-//     fn configure_to_analyse(
-//         command: args::BuildCommand,
-//         output: args::BuildSemantic,
-//         config: config::Main,
-//     ) -> anyhow::Result<Self> {
-//         let analyzer = SemanticAnalysisPipeline::create(output, &config)?;
-//         let consumer = move |candidates: Receiver<Result<intercept::Event, ReceivingError>>| {
-//             let events = candidates
-//                 .into_iter()
-//                 .filter_map(Self::filter_received_event);
-//             analyzer.consume(events)
-//         };
-//
-//         let interceptor = BuildInterceptor::create(config, consumer)?;
-//
-//         Ok(Self {
-//             command,
-//             interceptor,
-//         })
-//     }
-//
-//     /// Run the build command in the intercept environment.
-//     ///
-//     /// The exit code is based on the result of the build command.
-//     fn run(self) -> anyhow::Result<ExitCode> {
-//         self.interceptor.run_build(self.command)
-//     }
-//
-//     /// Filter the failed events from the receiver.
-//     fn filter_received_event(
-//         candidate: Result<intercept::Event, ReceivingError>,
-//     ) -> Option<intercept::Event> {
-//         match candidate {
-//             Ok(event) => Some(event),
-//             Err(err) => {
-//                 log::error!("Receiving event during build interception failed: {err:?}");
-//                 None
-//             }
-//         }
-//     }
-// }
-//
-// /// This represents the replay mode, when the build events are read from a file.
-// pub struct Replay {
-//     source: BufReader<fs::File>,
-//     analyzer: SemanticAnalysisPipeline,
-// }
-//
-// impl Replay {
-//     /// Configure the replay mode to analyze the build events from a file.
-//     fn configure_to_analyse(
-//         input: args::BuildEvents,
-//         output: args::BuildSemantic,
-//         config: config::Main,
-//     ) -> anyhow::Result<Self> {
-//         let event_file_name = path::PathBuf::from(input.file_name);
-//         let event_file = fs::File::open(event_file_name.as_path())
-//             .map(BufReader::new)
-//             .with_context(|| format!("Failed to open file: {event_file_name:?}"))?;
-//
-//         let semantic = SemanticAnalysisPipeline::create(output, &config)?;
-//
-//         Ok(Self {
-//             source: event_file,
-//             analyzer: semantic,
-//         })
-//     }
-//
-//     /// Run the semantic mode by reading the event file and analyzing the events.
-//     ///
-//     /// The exit code is based on the result of the output writer.
-//     fn run(self) -> anyhow::Result<ExitCode> {
-//         let events = ExecutionEventDatabase::read_and_ignore(self.source, |error| {
-//             log::warn!("Event file reading issue: {error:?}")
-//         });
-//
-//         self.analyzer.consume(events).map(|_| ExitCode::SUCCESS)
-//     }
-// }
-//
-// /// Represents the semantic analysis pipeline.
-// ///
-// /// This is a set of complex operations that are performed on the build events.
-// /// But the event source is not relevant for the semantic analysis itself.
-// struct SemanticAnalysisPipeline {
-//     interpreter: Box<dyn semantic::Interpreter>,
-//     writer: output::OutputWriter,
-// }
-//
-// impl SemanticAnalysisPipeline {
-//     /// Create a new semantic analysis pipeline based on the output configuration.
-//     ///
-//     /// The `output` argument contains the configuration for the output file location,
-//     /// while the `config` argument contains the configuration for the semantic analysis
-//     /// and the output format.
-//     fn create(output: args::BuildSemantic, config: &config::Main) -> anyhow::Result<Self> {
-//         let interpreter = Box::new(semantic::interpreters::create(config));
-//         let writer = output::OutputWriter::try_from((&output, &config.output))?;
-//
-//         Ok(Self {
-//             interpreter,
-//             writer,
-//         })
-//     }
-//
-//     /// Consumer the envelopes for analysis and write the result to the output file.
-//     /// This implements the pipeline of the semantic analysis.
-//     fn consume(self, events: impl IntoIterator<Item = intercept::Event>) -> anyhow::Result<()> {
-//         // Set up the pipeline of compilation database entries.
-//         let semantics = events.into_iter().flat_map(|event| {
-//             // FIXME: add logging for this step
-//             self.interpreter.recognize(&event.execution)
-//         });
-//         // Consume the entries and write them to the output file.
-//         // The exit code is based on the result of the output writer.
-//         self.writer.write(semantics)?;
-//
-//         Ok(())
-//     }
-// }
+mod impls {
+    use super::execution;
+    use super::ConfigurationError;
+    use crate::intercept::collector::{CollectorError, Producer};
+    use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
+    use crate::{args, config, intercept, output, semantic};
+    use crossbeam_channel::{Receiver, Sender};
+    use std::{fs, io, path};
 
-struct RawEventWriter;
-
-impl Consumer<intercept::Event, FormatError> for RawEventWriter {
-    fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
-        // TODO!!!!
-        Ok(())
-    }
-}
-
-struct SemanticEventWriter {
-    interpreter: Box<dyn semantic::Interpreter>,
-    writer: output::OutputWriter,
-}
-
-impl SemanticEventWriter {
-    /// Create a new semantic analysis pipeline based on the output configuration.
+    /// Represents an event file reader to be event source.
     ///
-    /// The `output` argument contains the configuration for the output file location,
-    /// while the `config` argument contains the configuration for the semantic analysis
-    /// and the output format.
-    fn create(
-        output: args::BuildSemantic,
-        config: &config::Main,
-    ) -> Result<Self, WriterCreationError> {
-        let interpreter = Box::new(semantic::interpreters::create(config));
-        let writer = output::OutputWriter::try_from((&output, &config.output))?;
-
-        Ok(Self {
-            interpreter,
-            writer,
-        })
+    /// The event file is written by the interceptor mode and contains unprocessed
+    /// events that can be later processed by the semantic analysis pipeline.
+    pub(super) struct RawEventReader {
+        file_name: path::PathBuf,
     }
-}
 
-impl Consumer<intercept::Event, FormatError> for SemanticEventWriter {
-    /// Consume the intercepted events, and transform them into semantic events,
-    /// and write them into the target file (with the right format).
-    fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
-        // Transform and log the events to semantics.
-        let semantics = events
-            .into_iter()
-            .inspect(|event| {
-                log::debug!("Processing event: {:?}", event);
+    impl RawEventReader {
+        /// Create a new raw event reader.
+        ///
+        /// This reader will read the intercepted events from a file in a raw format.
+        pub(super) fn create(file_name: &str) -> Result<Self, ConfigurationError> {
+            let file_path = path::PathBuf::from(file_name);
+            if !file_path.exists() || !file_path.is_file() {
+                return Err(ConfigurationError::InvalidConfiguration(format!(
+                    "Event file not found: {file_name}"
+                )));
+            }
+
+            Ok(Self {
+                file_name: file_path,
             })
-            .flat_map(|event| self.interpreter.recognize(&event.execution))
-            .inspect(|semantic| {
-                log::debug!("Recognized semantic: {:?}", semantic);
+        }
+    }
+
+    impl Producer<intercept::Event, CollectorError> for RawEventReader {
+        /// Opens the event file and reads the events while dispatching them to
+        /// the destination channel. Errors are logged and ignored.
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), CollectorError> {
+            let source = fs::File::open(&self.file_name)
+                .map(io::BufReader::new)
+                .map_err(CollectorError::Network)?;
+
+            let events = ExecutionEventDatabase::read_and_ignore(source, |error| {
+                log::warn!("Event file reading issue: {error:?}");
             });
 
-        // Consume the entries and write them to the output file.
-        self.writer.write(semantics)?;
+            for event in events {
+                if let Err(error) = destination.send(event) {
+                    log::error!("Failed to forward event: {error}");
+                    return Err(CollectorError::Channel(error.to_string()));
+                }
+            }
 
-        Ok(())
+            Ok(())
+        }
+    }
+
+    /// Represents a raw event writer to be used as a consumer.
+    ///
+    /// The raw event writer will write the intercepted events as they are observed
+    /// without any transformation. This can be later replayed to analyze the build.
+    pub(super) struct RawEventWriter {
+        destination: io::BufWriter<fs::File>,
+    }
+
+    impl RawEventWriter {
+        /// Create a new raw event writer.
+        ///
+        /// This writer will write the intercepted events to a file in a raw format.
+        pub(super) fn create(file_name: &str) -> Result<Self, WriterCreationError> {
+            let destination = fs::File::create(file_name)
+                .map(io::BufWriter::new)
+                .map_err(WriterCreationError::Io)?;
+
+            Ok(Self { destination })
+        }
+    }
+
+    impl execution::Consumer<intercept::Event, FormatError> for RawEventWriter {
+        /// Using existing file format, write the intercepted events to the output file.
+        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+            ExecutionEventDatabase::write(self.destination, events.into_iter())
+        }
+    }
+
+    /// Represents a semantic event writer as a consumer.
+    ///
+    /// The output of this writer is a semantic analysis of the build commands
+    /// that were intercepted. It uses the semantic interpreter to transform the
+    /// intercepted events into semantic events and writes them to the output file
+    /// in the specified format.
+    pub(super) struct SemanticEventWriter {
+        interpreter: Box<dyn semantic::Interpreter>,
+        writer: output::OutputWriter,
+    }
+
+    impl SemanticEventWriter {
+        /// Create a new semantic analysis pipeline based on the output configuration.
+        ///
+        /// The `output` argument contains the configuration for the output file location,
+        /// while the `config` argument contains the configuration for the semantic analysis
+        /// and the output format.
+        pub(super) fn create(
+            output: args::BuildSemantic,
+            config: &config::Main,
+        ) -> Result<Self, WriterCreationError> {
+            let interpreter = Box::new(semantic::interpreters::create(config));
+            let writer = output::OutputWriter::try_from((&output, &config.output))?;
+
+            Ok(Self {
+                interpreter,
+                writer,
+            })
+        }
+    }
+
+    impl execution::Consumer<intercept::Event, FormatError> for SemanticEventWriter {
+        /// Consume the intercepted events, and transform them into semantic events,
+        /// and write them into the target file (with the right format).
+        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+            // Transform and log the events to semantics.
+            let semantics = events
+                .into_iter()
+                .inspect(|event| {
+                    log::debug!("Processing event: {event:?}");
+                })
+                .flat_map(|event| self.interpreter.recognize(&event.execution))
+                .inspect(|semantic| {
+                    log::debug!("Recognized semantic: {semantic:?}");
+                });
+
+            // Consume the entries and write them to the output file.
+            self.writer.write(semantics)?;
+
+            Ok(())
+        }
     }
 }
