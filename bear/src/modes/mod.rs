@@ -140,7 +140,7 @@ mod impls {
         }
     }
 
-    impl execution::Producer<intercept::Event, ReceivingError> for TcpEventProducer {
+    impl execution::Producer for TcpEventProducer {
         fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
             for event in self.source.events() {
                 match event {
@@ -160,13 +160,13 @@ mod impls {
         }
     }
 
-    impl execution::Cancellable<ReceivingError> for TcpEventProducer {
+    impl execution::Cancellable for TcpEventProducer {
         fn cancel(&self) -> Result<(), ReceivingError> {
             self.source.shutdown()
         }
     }
 
-    impl execution::CancellableProducer<intercept::Event, ReceivingError> for TcpEventProducer {}
+    impl execution::CancellableProducer for TcpEventProducer {}
 
     /// Represents an event file reader to be event source.
     ///
@@ -194,7 +194,7 @@ mod impls {
         }
     }
 
-    impl execution::Producer<intercept::Event, ReceivingError> for RawEventReader {
+    impl execution::Producer for RawEventReader {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
         fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
@@ -237,7 +237,7 @@ mod impls {
         }
     }
 
-    impl execution::Consumer<intercept::Event, FormatError> for RawEventWriter {
+    impl execution::Consumer for RawEventWriter {
         /// Using existing file format, write the intercepted events to the output file.
         fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
             ExecutionEventDatabase::write(self.destination, events.into_iter())
@@ -275,7 +275,7 @@ mod impls {
         }
     }
 
-    impl execution::Consumer<intercept::Event, FormatError> for SemanticEventWriter {
+    impl execution::Consumer for SemanticEventWriter {
         /// Consume the intercepted events, and transform them into semantic events,
         /// and write them into the target file (with the right format).
         fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
@@ -308,7 +308,7 @@ mod impls {
         }
     }
 
-    impl execution::Executor<SuperviseError> for BuildExecutor {
+    impl execution::Executor for BuildExecutor {
         /// Execute the build command in the given environment.
         ///
         /// This will run the build command and return the exit code.

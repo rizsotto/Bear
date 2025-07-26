@@ -215,6 +215,9 @@ mod tests {
             assert!(result.is_ok());
         }
 
+        // Give some time for events to be processed before shutdown
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
         // Call the stop method to stop the collector.
         {
             let tcp_collector = Arc::clone(&collector_arc);

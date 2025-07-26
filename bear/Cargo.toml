@@ -36,3 +36,4 @@ crossbeam-channel.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+mockall = "0.13"
