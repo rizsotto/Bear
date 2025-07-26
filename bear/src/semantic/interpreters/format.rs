@@ -272,19 +272,10 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 mod tests {
     use super::*;
     use crate::semantic::command::ArgumentGroup;
+    use crate::semantic::MockInterpreter;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::tempdir;
-
-    struct MockInterpreter {
-        result: Option<Command>,
-    }
-
-    impl Interpreter for MockInterpreter {
-        fn recognize(&self, _execution: &Execution) -> Option<Command> {
-            self.result.clone()
-        }
-    }
 
     #[test]
     fn test_pass_through_formatting() {
@@ -293,10 +284,12 @@ mod tests {
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source, vec!["main.c"])],
         );
+        let expected_cmd = mock_cmd.clone();
 
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Compiler(mock_cmd.clone())),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .returning(move |_| Some(Command::Compiler(mock_cmd.clone())));
 
         let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 
@@ -309,7 +302,7 @@ mod tests {
 
         let result = sut.recognize(&execution);
         if let Some(Command::Compiler(result_cmd)) = result {
-            assert_eq!(result_cmd, mock_cmd);
+            assert_eq!(result_cmd, expected_cmd);
         } else {
             panic!("Expected Command::Compiler, got {result:?}");
         }
@@ -317,9 +310,10 @@ mod tests {
 
     #[test]
     fn test_pass_through_non_compiler_commands() {
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Ignored("test reason")),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .returning(|_| Some(Command::Ignored("test reason")));
 
         let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
 

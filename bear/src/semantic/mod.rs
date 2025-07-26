@@ -44,6 +44,7 @@ impl Command {
 /// Implementers of this trait analyze an [`Execution`] and determine if it matches
 /// a known command (such as a compiler or interpreter). If recognized, they
 /// return a [`Command`] representing the semantic meaning of the execution.
+#[cfg_attr(test, mockall::automock)]
 pub trait Interpreter: Send {
     /// An [`Option<Command>`] containing the recognized command, or `None` if not recognized.
     fn recognize(&self, execution: &Execution) -> Option<Command>;

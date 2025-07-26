@@ -121,9 +121,9 @@ mod impls {
     use super::execution;
     use super::ConfigurationError;
     use crate::args::BuildCommand;
+    use crate::intercept::environment;
     use crate::intercept::supervise::SuperviseError;
     use crate::intercept::tcp::{CollectorOnTcp, ReceivingError};
-    use crate::intercept::{environment, supervise};
     use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};

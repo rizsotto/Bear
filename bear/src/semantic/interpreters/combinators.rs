@@ -33,17 +33,23 @@ impl Interpreter for Any {
 mod test {
     use super::*;
     use crate::semantic::command::CompilerCommand;
+    use crate::semantic::MockInterpreter;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
     #[test]
     fn test_any_when_no_match() {
+        let mut mock1 = MockInterpreter::new();
+        let mut mock2 = MockInterpreter::new();
+        let mut mock3 = MockInterpreter::new();
+
+        // Set up all mocks to return None (not recognize)
+        mock1.expect_recognize().returning(|_| None);
+        mock2.expect_recognize().returning(|_| None);
+        mock3.expect_recognize().returning(|_| None);
+
         let sut = Any {
-            interpreters: vec![
-                Box::new(MockTool::NotRecognize),
-                Box::new(MockTool::NotRecognize),
-                Box::new(MockTool::NotRecognize),
-            ],
+            interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)],
         };
 
         let input = execution_fixture();
@@ -56,12 +62,19 @@ mod test {
 
     #[test]
     fn test_any_when_success() {
+        let mut mock1 = MockInterpreter::new();
+        let mut mock2 = MockInterpreter::new();
+        let mock3 = MockInterpreter::new();
+
+        // First mock returns None, second returns Some, third should not be called
+        mock1.expect_recognize().returning(|_| None);
+        mock2
+            .expect_recognize()
+            .returning(|_| Some(command_fixture()));
+        // mock3 should not be called since mock2 returns a match
+
         let sut = Any {
-            interpreters: vec![
-                Box::new(MockTool::NotRecognize),
-                Box::new(MockTool::Recognize),
-                Box::new(MockTool::NotRecognize),
-            ],
+            interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)],
         };
 
         let input = execution_fixture();
@@ -70,20 +83,6 @@ mod test {
             sut.recognize(&input).is_some(),
             "Expected Some(_), got a match"
         );
-    }
-
-    enum MockTool {
-        Recognize,
-        NotRecognize,
-    }
-
-    impl Interpreter for MockTool {
-        fn recognize(&self, _: &Execution) -> Option<Command> {
-            match self {
-                MockTool::Recognize => Some(command_fixture()),
-                MockTool::NotRecognize => None,
-            }
-        }
     }
 
     fn execution_fixture() -> Execution {

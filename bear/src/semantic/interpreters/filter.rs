@@ -289,17 +289,8 @@ mod tests {
         Arguments, Compiler, DirectoryFilter, Ignore, IgnoreOrConsider, SourceFilter,
     };
     use crate::semantic::command::CompilerCommand;
+    use crate::semantic::MockInterpreter;
     use std::path::PathBuf;
-
-    struct MockInterpreter {
-        result: Option<Command>,
-    }
-
-    impl Interpreter for MockInterpreter {
-        fn recognize(&self, _execution: &Execution) -> Option<Command> {
-            self.result.clone()
-        }
-    }
 
     #[test]
     fn test_filter_compiler_always_ignored() {
@@ -315,9 +306,11 @@ mod tests {
             vec![(ArgumentKind::Source, vec!["main.c"])],
         );
 
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Compiler(mock_cmd)),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .times(1)
+            .return_const(Some(Command::Compiler(mock_cmd)));
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), compiler_filters, vec![]);
 
@@ -345,9 +338,11 @@ mod tests {
             vec![(ArgumentKind::Source, vec!["tests/test_file.c"])],
         );
 
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Compiler(mock_cmd)),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .times(1)
+            .return_const(Some(Command::Compiler(mock_cmd)));
 
         let sut =
             FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), source_filters);
@@ -371,9 +366,11 @@ mod tests {
             vec![(ArgumentKind::Source, vec!["main.c"])],
         );
 
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Compiler(mock_cmd.clone())),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .times(1)
+            .return_const(Some(Command::Compiler(mock_cmd.clone())));
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
 
@@ -394,9 +391,11 @@ mod tests {
 
     #[test]
     fn test_pass_through_non_compiler_commands() {
-        let mock_interpreter = MockInterpreter {
-            result: Some(Command::Ignored("test reason")),
-        };
+        let mut mock_interpreter = MockInterpreter::new();
+        mock_interpreter
+            .expect_recognize()
+            .times(1)
+            .return_const(Some(Command::Ignored("test reason")));
 
         let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
 
