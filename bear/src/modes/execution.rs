@@ -2,12 +2,11 @@
 
 use crate::args::BuildCommand;
 use crate::intercept;
-use crate::intercept::executor;
 use crate::intercept::supervise::SuperviseError;
-use crate::intercept::{CancellableProducer, Producer, ProducerError};
+use crate::intercept::tcp::ReceivingError;
 use crate::output::FormatError;
 use crossbeam_channel::{bounded, unbounded, Receiver};
-use std::process::ExitCode;
+use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -35,6 +34,77 @@ pub trait Consumer<T, E>: Send {
     fn consume(self: Box<Self>, _: Receiver<T>) -> Result<(), E>;
 }
 
+/// A trait for producing events to a channel-based stream.
+///
+/// # Type Parameters
+/// - `T`: The type of items being produced (typically `intercept::Event`)
+/// - `E`: The error type that can occur during production
+///
+/// # Thread Safety
+/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+pub trait Producer<T, E>: Send + Sync {
+    /// Produces items by sending them through the provided sender.
+    ///
+    /// This is a blocking operation that continues until all items are produced
+    /// or an error occurs. The producer should close the sender when finished
+    /// to signal completion to consumers.
+    ///
+    /// # Arguments
+    /// * `sender` - Channel sender to produce items to
+    ///
+    /// # Returns
+    /// * `Ok(())` - All items were successfully produced
+    /// * `Err(E)` - An error occurred during production
+    fn produce(&self, _: crossbeam_channel::Sender<T>) -> Result<(), E>;
+}
+
+/// A trait for cancelling ongoing operations.
+///
+/// # Type Parameters
+/// - `E`: The error type that can occur during cancellation
+///
+/// # Thread Safety
+/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+pub trait Cancellable<E>: Send + Sync {
+    /// Cancels the ongoing operation.
+    ///
+    /// # Returns
+    /// * `Ok(())` - Cancellation was successful
+    /// * `Err(E)` - An error occurred during cancellation
+    fn cancel(&self) -> Result<(), E>;
+}
+
+/// A trait for producers that support cancellation during operation.
+///
+/// # Type Parameters
+/// - `T`: The type of items being produced (typically `intercept::Event`)
+/// - `E`: The error type that can occur during production or cancellation
+pub trait CancellableProducer<T, E>: Producer<T, E> + Cancellable<E> {}
+
+/// A trait for executing build commands.
+///
+/// Executors are responsible for running the actual build process while
+/// allowing command interception to occur. They manage the lifecycle of
+/// the build command and report its exit status.
+///
+/// # Type Parameters
+/// - `E`: The error type that can occur during execution
+pub trait Executor<E> {
+    /// Executes the given build command.
+    ///
+    /// This is a blocking operation that runs the build command to completion.
+    /// During execution, the command and its subprocesses may be intercepted
+    /// by Bear's interception mechanisms.
+    ///
+    /// # Arguments
+    /// * `command` - The build command to execute
+    ///
+    /// # Returns
+    /// * `Ok(ExitCode)` - The build completed with the given exit code
+    /// * `Err(E)` - An error occurred during execution
+    fn run(&self, _: BuildCommand) -> Result<ExitStatus, E>;
+}
+
 /// Coordinates live command interception during build execution.
 ///
 /// `Interceptor` manages the simultaneous execution of:
@@ -45,16 +115,16 @@ pub trait Consumer<T, E>: Send {
 /// The interceptor ensures proper coordination between these components,
 /// handling thread synchronization and error propagation.
 pub struct Interceptor {
-    producer: Arc<dyn CancellableProducer<intercept::Event, ProducerError>>,
+    producer: Arc<dyn CancellableProducer<intercept::Event, ReceivingError>>,
     consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
-    build: Box<dyn executor::Executor<SuperviseError>>,
+    build: Box<dyn Executor<SuperviseError>>,
 }
 
 impl Interceptor {
     pub fn new(
-        producer: Arc<dyn CancellableProducer<intercept::Event, ProducerError>>,
+        producer: Arc<dyn CancellableProducer<intercept::Event, ReceivingError>>,
         consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
-        build: Box<dyn executor::Executor<SuperviseError>>,
+        build: Box<dyn Executor<SuperviseError>>,
     ) -> Self {
         Self {
             producer,
@@ -119,13 +189,13 @@ impl Interceptor {
 /// - Testing semantic analysis changes
 /// - Generating compilation databases from archived event data
 pub struct Replayer {
-    source: Box<dyn Producer<intercept::Event, ProducerError>>,
+    source: Box<dyn Producer<intercept::Event, ReceivingError>>,
     consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
 }
 
 impl Replayer {
     pub fn new(
-        source: Box<dyn Producer<intercept::Event, ProducerError>>,
+        source: Box<dyn Producer<intercept::Event, ReceivingError>>,
         consumer: Box<dyn Consumer<intercept::Event, FormatError>>,
     ) -> Self {
         Self { source, consumer }
@@ -169,7 +239,7 @@ impl Replayer {
 #[derive(Error, Debug)]
 pub enum RuntimeError {
     #[error("Producer error: {0}")]
-    Producer(#[from] ProducerError),
+    Producer(#[from] ReceivingError),
 
     #[error("Consumer error: {0}")]
     Consumer(#[from] FormatError),

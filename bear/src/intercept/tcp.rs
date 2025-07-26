@@ -3,8 +3,7 @@
 //! The module contains the implementation of the TCP collector and reporter.
 
 use super::reporter::{Reporter, ReportingError};
-use super::{Cancellable, CancellableProducer, Event, Producer, ProducerError};
-use crossbeam_channel::Sender;
+use super::Event;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -54,6 +53,8 @@ pub enum ReceivingError {
     Serialization(#[from] serde_json::Error),
 }
 
+// TODO: should we define a trait for collectors?
+
 /// Represents a TCP event collector.
 pub struct CollectorOnTcp {
     shutdown: Arc<AtomicBool>,
@@ -72,68 +73,50 @@ impl CollectorOnTcp {
 
         Ok((Self { shutdown, listener }, address))
     }
-}
 
-impl Producer<Event, ProducerError> for CollectorOnTcp {
     /// Single-threaded implementation of the collector.
     ///
     /// The collector listens to the TCP port and accepts incoming connections.
     /// When a connection is accepted, the collector reads the events from the
-    /// connection and sends them to the destination channel.
-    fn produce(&self, destination: Sender<Event>) -> Result<(), ProducerError> {
-        for stream in self.listener.incoming() {
-            // This has to be the first thing to do, to implement the stop method!
-            if self.shutdown.load(Ordering::Relaxed) {
-                break;
+    /// connection and emits them.
+    pub fn events(&self) -> impl Iterator<Item = Result<Event, ReceivingError>> + '_ {
+        let listener = &self.listener;
+        let shutdown = &self.shutdown;
+
+        std::iter::from_fn(move || {
+            if shutdown.load(Ordering::Relaxed) {
+                return None;
             }
 
-            match stream {
-                Ok(mut connection) => {
-                    // ... (process the connection in a separate thread or task)
-                    let event = EventWireSerializer::read(&mut connection);
-                    match event {
-                        Ok(event) => {
-                            // Send the event to the destination channel
-                            destination
-                                .send(event)
-                                .map_err(|err| ProducerError::Channel(err.to_string()))?;
-                        }
-                        Err(err) => {
-                            // Log the error and continue to the next connection
-                            log::error!("Failed to read event: {err}");
-                        }
+            match listener.accept() {
+                Ok((mut connection, _)) => {
+                    if shutdown.load(Ordering::Relaxed) {
+                        let _ = connection.shutdown(std::net::Shutdown::Both);
+                        None
+                    } else {
+                        let result = EventWireSerializer::read(&mut connection);
+                        let _ = connection.shutdown(std::net::Shutdown::Both);
+                        Some(result)
                     }
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    // No new connection available, continue checking for shutdown
-                    continue;
-                }
-                Err(err) => {
-                    log::error!("Error while reading the socket: {err}");
-                    break;
-                }
+                Err(err) => Some(Err(ReceivingError::Network(err))),
             }
-        }
-        Ok(())
+        })
     }
-}
 
-impl Cancellable<ProducerError> for CollectorOnTcp {
     /// Stops the collector by flipping the shutdown flag and connecting to the collector.
     ///
     /// The collector is stopped when the `produce` method sees the shutdown flag.
     /// To signal the collector to stop, we connect to the collector to unblock the
     /// `accept` call to check the shutdown flag.
-    fn cancel(&self) -> Result<(), ProducerError> {
+    pub fn shutdown(&self) -> Result<(), ReceivingError> {
         self.shutdown.store(true, Ordering::Relaxed);
 
         let address = self.listener.local_addr()?;
-        let _ = TcpStream::connect(address).map_err(ProducerError::Network)?;
+        let _ = TcpStream::connect(address).map_err(ReceivingError::Network)?;
         Ok(())
     }
 }
-
-impl CancellableProducer<Event, ProducerError> for CollectorOnTcp {}
 
 /// Represents a TCP event reporter.
 pub struct ReporterOnTcp {
@@ -199,29 +182,30 @@ mod tests {
     // if they are the same as the original events.
     #[test]
     fn tcp_reporter_and_collectors_work() {
-        let (input, output) = crossbeam_channel::unbounded();
-
         let (collector, address) = CollectorOnTcp::new().unwrap();
         let collector_arc = Arc::new(collector);
         let reporter = ReporterOnTcp::new(address.to_string());
 
-        // Start a consumer thread to collect events from the output channel
-        let drain_thread = thread::spawn(move || {
-            let mut events = Vec::new();
-            for event in output.iter() {
-                events.push(event);
-                if events.len() == fixtures::EVENTS.len() {
-                    break;
-                }
-            }
-            events
-        });
-
-        // Start the collector in a separate thread.
+        // Start the collector in a separate thread using the events iterator
         let collector_thread = {
             let tcp_collector = Arc::clone(&collector_arc);
             thread::spawn(move || {
-                tcp_collector.produce(input).unwrap();
+                let mut received_events = Vec::new();
+                for event_result in tcp_collector.events() {
+                    match event_result {
+                        Ok(event) => {
+                            received_events.push(event);
+                            if received_events.len() == fixtures::EVENTS.len() {
+                                break;
+                            }
+                        }
+                        Err(err) => {
+                            log::error!("Failed to receive event: {err}");
+                            break;
+                        }
+                    }
+                }
+                received_events
             })
         };
 
@@ -234,11 +218,11 @@ mod tests {
         // Call the stop method to stop the collector.
         {
             let tcp_collector = Arc::clone(&collector_arc);
-            tcp_collector.cancel().unwrap();
+            tcp_collector.shutdown().unwrap();
         }
 
         // Wait for all events to be consumed
-        let received_events = drain_thread.join().unwrap();
+        let received_events = collector_thread.join().unwrap();
 
         // Assert that we received all the events.
         assert_eq!(received_events.len(), fixtures::EVENTS.len());
@@ -247,7 +231,7 @@ mod tests {
         }
 
         // shutdown the receiver thread
-        collector_thread.join().unwrap();
+        // Note: collector_thread is already joined above
     }
 
     mod fixtures {

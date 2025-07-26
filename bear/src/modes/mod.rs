@@ -2,7 +2,7 @@
 
 mod execution;
 
-use crate::intercept::executor::BuildExecutor;
+use crate::intercept::environment::BuildEnvironment;
 use crate::intercept::tcp::CollectorOnTcp;
 use crate::{args, config, output};
 use std::process::ExitCode;
@@ -40,16 +40,16 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = BuildExecutor::create(&config.intercept, address)
+                let build = BuildEnvironment::create(&config.intercept, address)
                     .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::RawEventWriter::create(&output.file_name)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
-                    Arc::new(producer),
+                    Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
-                    Box::new(build),
+                    Box::new(impls::BuildExecutor::create(build)),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -71,16 +71,16 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = BuildExecutor::create(&config.intercept, address)
+                let build = BuildEnvironment::create(&config.intercept, address)
                     .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::SemanticEventWriter::create(output, &config)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
-                    Arc::new(producer),
+                    Arc::new(impls::TcpEventProducer::create(producer)),
                     Box::new(consumer),
-                    Box::new(build),
+                    Box::new(impls::BuildExecutor::create(build)),
                 );
 
                 Ok(Self::Intercept(intercept, input))
@@ -120,11 +120,53 @@ pub enum ConfigurationError {
 mod impls {
     use super::execution;
     use super::ConfigurationError;
-    use crate::intercept::{Producer, ProducerError};
+    use crate::args::BuildCommand;
+    use crate::intercept::supervise::SuperviseError;
+    use crate::intercept::tcp::{CollectorOnTcp, ReceivingError};
+    use crate::intercept::{environment, supervise};
     use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
+    use std::process::ExitStatus;
     use std::{fs, io, path};
+
+    pub(super) struct TcpEventProducer {
+        source: CollectorOnTcp,
+    }
+
+    impl TcpEventProducer {
+        pub(super) fn create(source: CollectorOnTcp) -> Self {
+            Self { source }
+        }
+    }
+
+    impl execution::Producer<intercept::Event, ReceivingError> for TcpEventProducer {
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
+            for event in self.source.events() {
+                match event {
+                    Ok(event) => {
+                        log::debug!("Forwarding event: {event:?}");
+                        if let Err(error) = destination.send(event) {
+                            log::error!("Failed to forward event: {error}");
+                        }
+                    }
+                    Err(error) => {
+                        log::warn!("Failed to receive event: {error}");
+                    }
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    impl execution::Cancellable<ReceivingError> for TcpEventProducer {
+        fn cancel(&self) -> Result<(), ReceivingError> {
+            self.source.shutdown()
+        }
+    }
+
+    impl execution::CancellableProducer<intercept::Event, ReceivingError> for TcpEventProducer {}
 
     /// Represents an event file reader to be event source.
     ///
@@ -152,13 +194,13 @@ mod impls {
         }
     }
 
-    impl Producer<intercept::Event, ProducerError> for RawEventReader {
+    impl execution::Producer<intercept::Event, ReceivingError> for RawEventReader {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
-        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ProducerError> {
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
             let source = fs::File::open(&self.file_name)
                 .map(io::BufReader::new)
-                .map_err(ProducerError::Network)?;
+                .map_err(ReceivingError::Network)?;
 
             let events = ExecutionEventDatabase::read_and_ignore(source, |error| {
                 log::warn!("Event file reading issue: {error:?}");
@@ -167,7 +209,6 @@ mod impls {
             for event in events {
                 if let Err(error) = destination.send(event) {
                     log::error!("Failed to forward event: {error}");
-                    return Err(ProducerError::Channel(error.to_string()));
                 }
             }
 
@@ -253,6 +294,26 @@ mod impls {
             self.writer.write(semantics)?;
 
             Ok(())
+        }
+    }
+
+    pub(super) struct BuildExecutor {
+        environment: environment::BuildEnvironment,
+    }
+
+    impl BuildExecutor {
+        /// Create a new build executor with the given environment.
+        pub(super) fn create(environment: environment::BuildEnvironment) -> Self {
+            Self { environment }
+        }
+    }
+
+    impl execution::Executor<SuperviseError> for BuildExecutor {
+        /// Execute the build command in the given environment.
+        ///
+        /// This will run the build command and return the exit code.
+        fn run(&self, command: BuildCommand) -> Result<ExitStatus, SuperviseError> {
+            self.environment.run_build(command)
         }
     }
 }
