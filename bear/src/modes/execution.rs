@@ -250,6 +250,15 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
+    // Helper functions for comparing ExitCode values that works with older Rust versions
+    fn assert_is_success(code: ExitCode) {
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::SUCCESS));
+    }
+
+    fn assert_is_failure(code: ExitCode) {
+        assert_eq!(format!("{code:?}"), format!("{:?}", ExitCode::FAILURE));
+    }
+
     // Simple mock struct that implements both Producer and Cancellable
     struct MockCancellableProducer {
         events: Vec<Event>,
@@ -408,10 +417,7 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.expect("Failed to get result in happy path test"),
-            ExitCode::SUCCESS
-        );
+        assert_is_success(result.expect("Failed to get result in happy path test"));
 
         let consumed_events = captured_events
             .lock()
@@ -493,10 +499,7 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.expect("Failed to get result in empty events test"),
-            ExitCode::SUCCESS
-        );
+        assert_is_success(result.expect("Failed to get result in empty events test"));
         assert_eq!(
             captured_events
                 .lock()
@@ -546,10 +549,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.expect("Failed to get result in interceptor happy path test"),
-            ExitCode::SUCCESS
-        );
+        assert_is_success(result.expect("Failed to get result in interceptor happy path test"));
 
         let consumed_events = captured_events
             .lock()
@@ -695,10 +695,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.expect("Failed to get result in non-zero exit code test"),
-            ExitCode::FAILURE
-        );
+        assert_is_failure(result.expect("Failed to get result in non-zero exit code test"));
     }
 
     #[test]
@@ -743,10 +740,7 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(
-            result.expect("Failed to get result in coordination timing test"),
-            ExitCode::SUCCESS
-        );
+        assert_is_success(result.expect("Failed to get result in coordination timing test"));
 
         let consumed_events = captured_events
             .lock()
@@ -804,9 +798,8 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(
+        assert_is_success(
             result.expect("Failed to get result in replayer coordination timing test"),
-            ExitCode::SUCCESS
         );
 
         let consumed_events = captured_events
