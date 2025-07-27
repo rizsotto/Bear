@@ -88,8 +88,8 @@ const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 /// This function is unsafe because it modifies global state.
 #[ctor]
 unsafe fn on_load() {
-    env_logger::init();
-
+    #[cfg(not(test))]
+    let _ = env_logger::try_init();
     log::debug!("Initializing intercept-preload library");
 }
 
