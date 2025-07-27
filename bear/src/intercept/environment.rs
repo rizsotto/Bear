@@ -304,32 +304,78 @@ mod test {
     fn test_insert_to_path_empty_original() {
         let original = "";
         let first = PathBuf::from("/usr/local/bin");
-        let result = insert_to_path(original, first).unwrap();
-        assert_eq!(result, "/usr/local/bin");
+        let result = insert_to_path(original, first.clone()).unwrap();
+        // For empty path case, we just return the path as a string
+        assert_eq!(result, first.to_string_lossy());
     }
 
     #[test]
     fn test_insert_to_path_prepend_new() {
-        let original = "/usr/bin:/bin";
-        let first = PathBuf::from("/usr/local/bin");
-        let result = insert_to_path(original, first).unwrap();
-        assert_eq!(result, "/usr/local/bin:/usr/bin:/bin");
+        // Create platform-independent paths using std::env functions
+        let bin = PathBuf::from("/bin");
+        let usr_bin = PathBuf::from("/usr/bin");
+        let usr_local_bin = PathBuf::from("/usr/local/bin");
+
+        // Join the original paths using platform-specific separator
+        let original = std::env::join_paths([usr_bin.clone(), bin.clone()])
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        // Apply our function
+        let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
+
+        // Create expected result using platform-specific separator
+        let expected = std::env::join_paths([usr_local_bin, usr_bin, bin])
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn test_insert_to_path_move_existing_to_front() {
-        let original = "/usr/bin:/usr/local/bin:/bin";
-        let first = PathBuf::from("/usr/local/bin");
-        let result = insert_to_path(original, first).unwrap();
-        assert_eq!(result, "/usr/local/bin:/usr/bin:/bin");
+        // Create platform-independent paths using std::env functions
+        let bin = PathBuf::from("/bin");
+        let usr_bin = PathBuf::from("/usr/bin");
+        let usr_local_bin = PathBuf::from("/usr/local/bin");
+
+        // Join the original paths using platform-specific separator
+        let original = std::env::join_paths([usr_bin.clone(), usr_local_bin.clone(), bin.clone()])
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        // Apply our function
+        let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
+
+        // Create expected result using platform-specific separator
+        let expected = std::env::join_paths([usr_local_bin, usr_bin, bin])
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        assert_eq!(result, expected);
     }
 
     #[test]
     fn test_insert_to_path_already_first() {
-        let original = "/usr/local/bin:/usr/bin:/bin";
-        let first = PathBuf::from("/usr/local/bin");
-        let result = insert_to_path(original, first).unwrap();
-        assert_eq!(result, "/usr/local/bin:/usr/bin:/bin");
+        // Create platform-independent paths using std::env functions
+        let bin = PathBuf::from("/bin");
+        let usr_bin = PathBuf::from("/usr/bin");
+        let usr_local_bin = PathBuf::from("/usr/local/bin");
+
+        // Join the original paths using platform-specific separator
+        let original = std::env::join_paths([usr_local_bin.clone(), usr_bin.clone(), bin.clone()])
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        // Apply our function
+        let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
+
+        assert_eq!(result, original);
     }
 
     #[test]
