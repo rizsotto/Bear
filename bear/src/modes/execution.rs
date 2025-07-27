@@ -13,7 +13,7 @@ use thiserror::Error;
 /// A trait for consuming events from a channel-based stream.
 ///
 /// # Thread Safety
-/// Implementors must be `Send` to allow usage across thread boundaries.
+/// Implementers must be `Send` to allow usage across thread boundaries.
 #[cfg_attr(test, mockall::automock)]
 pub trait Consumer: Send {
     /// Consumes all items from the receiver until the channel is closed.
@@ -34,7 +34,7 @@ pub trait Consumer: Send {
 /// A trait for producing events to a channel-based stream.
 ///
 /// # Thread Safety
-/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+/// Implementers must be `Send + Sync` to allow usage across thread boundaries.
 #[cfg_attr(test, mockall::automock)]
 pub trait Producer: Send + Sync {
     /// Produces items by sending them through the provided sender.
@@ -58,7 +58,7 @@ pub trait Producer: Send + Sync {
 /// A trait for cancelling ongoing operations.
 ///
 /// # Thread Safety
-/// Implementors must be `Send + Sync` to allow usage across thread boundaries.
+/// Implementers must be `Send + Sync` to allow usage across thread boundaries.
 #[cfg_attr(test, mockall::automock)]
 pub trait Cancellable: Send + Sync {
     /// Cancels the ongoing operation.

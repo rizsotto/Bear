@@ -23,6 +23,7 @@ use thiserror::Error;
 /// Declare the environment variables used by the intercept mode.
 const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
 const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
+const KEY_PATH: &str = "PATH";
 
 /// Execution is a representation of a process execution.
 ///
