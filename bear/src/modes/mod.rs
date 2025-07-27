@@ -2,7 +2,7 @@
 
 mod execution;
 
-use crate::intercept::environment::BuildEnvironment;
+use crate::intercept::environment;
 use crate::intercept::tcp::CollectorOnTcp;
 use crate::{args, config, output};
 use std::process::ExitCode;
@@ -40,7 +40,7 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = BuildEnvironment::create(&config.intercept, address)
+                let build = environment::BuildEnvironment::create(&config.intercept, address)
                     .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::RawEventWriter::create(&output.file_name)
@@ -71,7 +71,7 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = BuildEnvironment::create(&config.intercept, address)
+                let build = environment::BuildEnvironment::create(&config.intercept, address)
                     .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::SemanticEventWriter::create(output, &config)
@@ -110,7 +110,7 @@ pub enum ConfigurationError {
     #[error("Failed to create collector: {0}")]
     CollectorCreation(std::io::Error),
     #[error("Failed to create executor: {0}")]
-    ExecutorCreation(std::io::Error),
+    ExecutorCreation(environment::ConfigurationError),
     #[error("Failed to create consumer: {0}")]
     ConsumerCreation(output::WriterCreationError),
     #[error("Invalid configuration: {0}")]
