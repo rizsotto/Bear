@@ -78,7 +78,7 @@ fn test_exit_code_for_non_existing_command() {
         .assert()
         .failure()
         .stderr(predicate::str::contains(
-            "Failed to execute the build command",
+            "Bear: Executor error: Failed to spawn child process",
         ));
 }
 
