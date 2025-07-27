@@ -198,6 +198,9 @@ impl Replayer {
     /// * `Ok(ExitCode::SUCCESS)` - All events were successfully replayed
     /// * `Err(RuntimeError)` - An error occurred during replay (most likely IO error)
     pub fn run(self) -> Result<ExitCode, RuntimeError> {
+        // Using bounded channel to reduce memory usage and implement backpressure.
+        // This is possible with replay mode, because the source is a file. While this
+        // is not possible with intercept mode, because that would slow the build process.
         let (sender, receiver) = bounded::<intercept::Event>(10);
 
         let source_thread = {
@@ -284,7 +287,10 @@ mod tests {
         }
 
         fn cancel_call_count(&self) -> usize {
-            *self.cancel_count.lock().unwrap()
+            *self
+                .cancel_count
+                .lock()
+                .expect("Failed to lock cancel_count mutex")
         }
     }
 
@@ -314,7 +320,10 @@ mod tests {
 
     impl Cancellable for MockCancellableProducer {
         fn cancel(&self) -> Result<(), ReceivingError> {
-            *self.cancel_count.lock().unwrap() += 1;
+            *self
+                .cancel_count
+                .lock()
+                .expect("Failed to lock cancel_count mutex") += 1;
             if self.should_fail_cancel {
                 return Err(ReceivingError::Network(std::io::Error::other(
                     "Cancel failure",
@@ -343,11 +352,15 @@ mod tests {
     }
 
     fn create_success_exit_status() -> ExitStatus {
-        std::process::Command::new("true").status().unwrap()
+        std::process::Command::new("true")
+            .status()
+            .expect("Failed to get success exit status")
     }
 
     fn create_failure_exit_status() -> ExitStatus {
-        std::process::Command::new("false").status().unwrap()
+        std::process::Command::new("false")
+            .status()
+            .expect("Failed to get failure exit status")
     }
 
     #[test]
@@ -372,7 +385,7 @@ mod tests {
                     create_test_event(1003, "/usr/bin/g++"),
                 ];
                 for event in test_events {
-                    sender.send(event).unwrap();
+                    sender.send(event).expect("Failed to send test event");
                 }
                 Ok(())
             });
@@ -383,7 +396,10 @@ mod tests {
             .times(1)
             .returning(move |receiver| {
                 for event in receiver {
-                    captured_events_clone.lock().unwrap().push(event);
+                    captured_events_clone
+                        .lock()
+                        .expect("Failed to lock captured_events mutex")
+                        .push(event);
                 }
                 Ok(())
             });
@@ -392,9 +408,14 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        assert_eq!(
+            result.expect("Failed to get result in happy path test"),
+            ExitCode::SUCCESS
+        );
 
-        let consumed_events = captured_events.lock().unwrap();
+        let consumed_events = captured_events
+            .lock()
+            .expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
     }
@@ -426,7 +447,7 @@ mod tests {
         producer_mock.expect_produce().times(1).returning(|sender| {
             sender
                 .send(create_test_event(1001, "/usr/bin/gcc"))
-                .unwrap();
+                .expect("Failed to send test event");
             Ok(())
         });
 
@@ -460,7 +481,10 @@ mod tests {
             .times(1)
             .returning(move |receiver| {
                 for event in receiver {
-                    captured_events_clone.lock().unwrap().push(event);
+                    captured_events_clone
+                        .lock()
+                        .expect("Failed to lock captured_events mutex")
+                        .push(event);
                 }
                 Ok(())
             });
@@ -469,8 +493,17 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
-        assert_eq!(captured_events.lock().unwrap().len(), 0);
+        assert_eq!(
+            result.expect("Failed to get result in empty events test"),
+            ExitCode::SUCCESS
+        );
+        assert_eq!(
+            captured_events
+                .lock()
+                .expect("Failed to lock captured_events mutex")
+                .len(),
+            0
+        );
     }
 
     #[test]
@@ -491,7 +524,10 @@ mod tests {
             .times(1)
             .returning(move |receiver| {
                 for event in receiver {
-                    captured_events_clone.lock().unwrap().push(event);
+                    captured_events_clone
+                        .lock()
+                        .expect("Failed to lock captured_events mutex")
+                        .push(event);
                 }
                 Ok(())
             });
@@ -510,9 +546,14 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        assert_eq!(
+            result.expect("Failed to get result in interceptor happy path test"),
+            ExitCode::SUCCESS
+        );
 
-        let consumed_events = captured_events.lock().unwrap();
+        let consumed_events = captured_events
+            .lock()
+            .expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 2);
         assert_eq!(*consumed_events, events);
         assert_eq!(producer_mock.cancel_call_count(), 1);
@@ -654,7 +695,10 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::FAILURE);
+        assert_eq!(
+            result.expect("Failed to get result in non-zero exit code test"),
+            ExitCode::FAILURE
+        );
     }
 
     #[test]
@@ -677,7 +721,10 @@ mod tests {
             .returning(move |receiver| {
                 for event in receiver {
                     std::thread::sleep(Duration::from_millis(5));
-                    captured_events_clone.lock().unwrap().push(event);
+                    captured_events_clone
+                        .lock()
+                        .expect("Failed to lock captured_events mutex")
+                        .push(event);
                 }
                 Ok(())
             });
@@ -696,9 +743,14 @@ mod tests {
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        assert_eq!(
+            result.expect("Failed to get result in coordination timing test"),
+            ExitCode::SUCCESS
+        );
 
-        let consumed_events = captured_events.lock().unwrap();
+        let consumed_events = captured_events
+            .lock()
+            .expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
         assert_eq!(producer_mock.cancel_call_count(), 1);
@@ -727,7 +779,7 @@ mod tests {
                 ];
                 for event in test_events {
                     std::thread::sleep(Duration::from_millis(5));
-                    sender.send(event).unwrap();
+                    sender.send(event).expect("Failed to send test event");
                 }
                 Ok(())
             });
@@ -739,7 +791,10 @@ mod tests {
             .returning(move |receiver| {
                 for event in receiver {
                     std::thread::sleep(Duration::from_millis(10));
-                    captured_events_clone.lock().unwrap().push(event);
+                    captured_events_clone
+                        .lock()
+                        .expect("Failed to lock captured_events mutex")
+                        .push(event);
                 }
                 Ok(())
             });
@@ -749,9 +804,14 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), ExitCode::SUCCESS);
+        assert_eq!(
+            result.expect("Failed to get result in replayer coordination timing test"),
+            ExitCode::SUCCESS
+        );
 
-        let consumed_events = captured_events.lock().unwrap();
+        let consumed_events = captured_events
+            .lock()
+            .expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
     }
