@@ -433,11 +433,6 @@ mod test {
         // Create a dummy wrapper executable
         let wrapper_path = temp_path.join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
-        std::fs::set_permissions(&wrapper_path, {
-            use std::os::unix::fs::PermissionsExt;
-            PermissionsExt::from_mode(0o755)
-        })
-        .unwrap();
 
         let config = config::Intercept::Wrapper {
             path: wrapper_path.clone(),
