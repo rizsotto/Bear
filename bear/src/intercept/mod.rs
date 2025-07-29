@@ -14,16 +14,12 @@ pub mod reporter;
 pub mod supervise;
 pub mod tcp;
 
+use crate::environment::relevant_env;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
-
-/// Declare the environment variables used by the intercept mode.
-const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
-const KEY_PRELOAD_PATH: &str = "LD_PRELOAD";
-const KEY_PATH: &str = "PATH";
 
 /// Execution is a representation of a process execution.
 ///
@@ -47,7 +43,6 @@ impl Execution {
         let executable = std::env::current_exe().map_err(CaptureError::CurrentExecutable)?;
         let arguments = std::env::args().collect();
         let working_dir = std::env::current_dir().map_err(CaptureError::CurrentDirectory)?;
-        // TODO: filter the environment variables to only include those relevant for the execution
         let environment = std::env::vars().collect();
 
         Ok(Self {
@@ -62,6 +57,19 @@ impl Execution {
         let mut updated = self;
         updated.executable = executable.to_path_buf();
         updated
+    }
+
+    /// Trims the execution information to only contain relevant environment variables.
+    pub fn trim(self) -> Self {
+        let environment = self
+            .environment
+            .into_iter()
+            .filter(|(k, _)| relevant_env(k))
+            .collect();
+        Self {
+            environment,
+            ..self
+        }
     }
 
     #[cfg(test)]
@@ -110,6 +118,13 @@ impl Event {
     pub fn new(execution: Execution) -> Self {
         let pid = std::process::id();
         Event { pid, execution }
+    }
+
+    /// Create a new event from the current, where the new event execution
+    /// is trimmed to only contain relevant environment variables.
+    pub fn trim(self) -> Self {
+        let execution = self.execution.trim();
+        Self { execution, ..self }
     }
 
     #[cfg(test)]

@@ -2,8 +2,8 @@
 
 use crate::args::BuildCommand;
 use crate::config;
+use crate::environment::{KEY_DESTINATION, KEY_OS__PATH, KEY_OS__PRELOAD_PATH};
 use crate::intercept::supervise;
-use crate::intercept::{KEY_DESTINATION, KEY_PATH, KEY_PRELOAD_PATH};
 use std::collections::HashMap;
 use std::env::JoinPathsError;
 use std::net::SocketAddr;
@@ -80,10 +80,10 @@ impl BuildEnvironment {
                 }
 
                 // Update PATH environment variable
-                let path_original = environment.get(KEY_PATH).cloned().unwrap_or_default();
+                let path_original = environment.get(KEY_OS__PATH).cloned().unwrap_or_default();
                 let path_updated =
                     insert_to_path(&path_original, temp_dir_handle.path().to_path_buf())?;
-                environment.insert(KEY_PATH.to_string(), path_updated);
+                environment.insert(KEY_OS__PATH.to_string(), path_updated);
 
                 Self {
                     environment,
@@ -93,11 +93,11 @@ impl BuildEnvironment {
             config::Intercept::Preload { path } => {
                 // Update LD_PRELOAD environment variable
                 let preload_original = environment
-                    .get(KEY_PRELOAD_PATH)
+                    .get(KEY_OS__PRELOAD_PATH)
                     .cloned()
                     .unwrap_or_default();
                 let preload_updated = insert_to_path(&preload_original, path.clone())?;
-                environment.insert(KEY_PRELOAD_PATH.to_string(), preload_updated);
+                environment.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
 
                 Self {
                     environment,
@@ -464,7 +464,7 @@ mod test {
         );
 
         // Check that LD_PRELOAD contains our library
-        let ld_preload = env.environment.get(KEY_PRELOAD_PATH).unwrap();
+        let ld_preload = env.environment.get(KEY_OS__PRELOAD_PATH).unwrap();
         assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
     }
 

@@ -141,7 +141,7 @@ impl Reporter for ReporterOnTcp {
     fn report(&self, event: Event) -> Result<(), ReportingError> {
         let mut socket =
             TcpStream::connect(self.destination.clone()).map_err(ReportingError::Network)?;
-        EventWireSerializer::write(&mut socket, event)?;
+        EventWireSerializer::write(&mut socket, event.trim())?;
 
         Ok(())
     }
@@ -256,19 +256,28 @@ mod tests {
                         "/usr/bin/cc",
                         vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
                         "/home/user",
-                        HashMap::from([("PATH", "/usr/bin:/bin"), ("HOME", "/home/user")]),
+                        HashMap::from([("PATH", "/usr/bin:/bin"), ("CC", "gcc")]),
                     ),
                     Event::from_strings(
                         3522,
                         "/usr/bin/ld",
                         vec!["ld", "-o", "./file_a", "./file_a.o"],
                         "/opt/project",
-                        HashMap::from([
-                            ("PATH", "/usr/bin:/bin"),
-                            ("LD_LIBRARY_PATH", "/usr/lib:/lib"),
-                        ]),
+                        HashMap::from([("PATH", "/usr/bin:/bin"), ("LD_PRELOAD", "/usr/lib:/lib")]),
                     ),
                 ]
             });
+
+        #[test]
+        fn events_are_not_changed_when_trimmed() {
+            for event in EVENTS.iter() {
+                let original_event = event.clone();
+                let trimmed_event = event.clone().trim();
+                assert_eq!(
+                    trimmed_event, original_event,
+                    "Trimmed event should be equal to the original event"
+                );
+            }
+        }
     }
 }

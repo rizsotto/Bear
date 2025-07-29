@@ -17,7 +17,8 @@
 //! to obtain a raw pointer suitable for static/global usage. The reporter sends events to a remote
 //! collector, with the destination specified by the `KEY_DESTINATION` environment variable.
 
-use crate::intercept::{tcp, Event, KEY_DESTINATION};
+use crate::environment::KEY_DESTINATION;
+use crate::intercept::{tcp, Event};
 use std::sync::atomic::AtomicPtr;
 use thiserror::Error;
 
