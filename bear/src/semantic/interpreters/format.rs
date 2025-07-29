@@ -18,8 +18,7 @@
 //! according to configuration (absolute, relative, canonical).
 
 use crate::config::{PathFormat, PathResolver};
-use crate::semantic::command::{ArgumentKind, CompilerCommand};
-use crate::semantic::{Command, Execution, Interpreter};
+use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::path::{Path, PathBuf};
 use std::{env, io};
 use thiserror::Error;
@@ -271,7 +270,7 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::command::ArgumentGroup;
+    use crate::semantic::ArgumentGroup;
     use crate::semantic::MockInterpreter;
     use std::collections::HashMap;
     use std::fs;

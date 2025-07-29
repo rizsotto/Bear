@@ -4,8 +4,7 @@
 //! based on compiler paths and source directories.
 
 use crate::config;
-use crate::semantic::command::{ArgumentKind, CompilerCommand};
-use crate::semantic::{Command, Execution, Interpreter};
+use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -288,7 +287,7 @@ mod tests {
     use crate::config::{
         Arguments, Compiler, DirectoryFilter, Ignore, IgnoreOrConsider, SourceFilter,
     };
-    use crate::semantic::command::CompilerCommand;
+    use crate::semantic::CompilerCommand;
     use crate::semantic::MockInterpreter;
     use std::path::PathBuf;
 

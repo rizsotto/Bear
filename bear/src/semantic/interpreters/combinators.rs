@@ -32,7 +32,7 @@ impl Interpreter for Any {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::semantic::command::CompilerCommand;
+    use crate::semantic::CompilerCommand;
     use crate::semantic::MockInterpreter;
     use std::collections::HashMap;
     use std::path::PathBuf;
