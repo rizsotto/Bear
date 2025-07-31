@@ -363,15 +363,20 @@ mod tests {
     }
 
     fn create_success_exit_status() -> ExitStatus {
-        std::process::Command::new("true")
-            .status()
-            .expect("Failed to get success exit status")
+        // According to the Rust documentation, ExitStatus::default() is equivalent to success.
+        ExitStatus::default()
     }
 
+    #[cfg(unix)]
     fn create_failure_exit_status() -> ExitStatus {
-        std::process::Command::new("false")
-            .status()
-            .expect("Failed to get failure exit status")
+        use std::os::unix::process::ExitStatusExt;
+        ExitStatusExt::from_raw(256) // On Unix, 256 represents exit code 1 (256 >> 8 = 1)
+    }
+
+    #[cfg(not(unix))]
+    fn create_failure_exit_status() -> ExitStatus {
+        use std::os::windows::process::ExitStatusExt;
+        ExitStatusExt::from_raw(1) // On Windows, use raw value 1 to get exit code 1
     }
 
     #[test]
@@ -594,7 +599,14 @@ mod tests {
         consumer_mock
             .expect_consume()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|receiver| {
+                // Actually consume all events from the channel to prevent race condition
+                // where the channel is closed before the producer finishes sending
+                while receiver.recv().is_ok() {
+                    // Consume events until channel is closed
+                }
+                Ok(())
+            });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock
@@ -652,7 +664,14 @@ mod tests {
         consumer_mock
             .expect_consume()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|receiver| {
+                // Actually consume all events from the channel to prevent race condition
+                // where the channel is closed before the producer finishes sending
+                while receiver.recv().is_ok() {
+                    // Consume events until channel is closed
+                }
+                Ok(())
+            });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock
@@ -681,7 +700,14 @@ mod tests {
         consumer_mock
             .expect_consume()
             .times(1)
-            .returning(|_| Ok(()));
+            .returning(|receiver| {
+                // Actually consume all events from the channel to prevent race condition
+                // where the channel is closed before the producer finishes sending
+                while receiver.recv().is_ok() {
+                    // Consume events until channel is closed
+                }
+                Ok(())
+            });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock
