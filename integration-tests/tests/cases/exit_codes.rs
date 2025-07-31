@@ -9,13 +9,16 @@ use predicates::prelude::*;
 use std::process::{Command as StdCommand, Stdio};
 #[cfg(has_executable_sleep)]
 use std::time::Instant;
+use tempfile::TempDir;
 
 #[test]
 fn test_exit_code_for_empty_arguments() {
     // Executing Bear with no arguments should return a non-zero exit code,
     // and print usage information.
+    let temp_dir = TempDir::new().unwrap();
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .env("RUST_LOG", "debug")
         .env("RUST_BACKTRACE", "1")
         .assert()
@@ -27,8 +30,11 @@ fn test_exit_code_for_empty_arguments() {
 fn test_exit_code_for_help() {
     // Executing help and subcommand help should always has zero exit code,
     // and print out usage information
+    let temp_dir = TempDir::new().unwrap();
+
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("--help")
         .assert()
         .success()
@@ -36,6 +42,7 @@ fn test_exit_code_for_help() {
 
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("intercept")
         .arg("--help")
         .assert()
@@ -44,6 +51,7 @@ fn test_exit_code_for_help() {
 
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("semantic")
         .arg("--help")
         .assert()
@@ -55,8 +63,10 @@ fn test_exit_code_for_help() {
 fn test_exit_code_for_invalid_argument() {
     // Executing Bear with an invalid argument should always has non-zero exit code,
     // and print relevant information about the reason about the failure.
+    let temp_dir = TempDir::new().unwrap();
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("invalid_argument")
         .env("RUST_LOG", "debug")
         .env("RUST_BACKTRACE", "1")
@@ -70,8 +80,10 @@ fn test_exit_code_for_invalid_argument() {
 fn test_exit_code_for_non_existing_command() {
     // Executing a non-existing command should always has non-zero exit code,
     // and print relevant information about the reason about the failure.
+    let temp_dir = TempDir::new().unwrap();
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .args(["--", "invalid_command"])
         .env("RUST_LOG", "debug")
         .env("RUST_BACKTRACE", "1")
@@ -87,8 +99,10 @@ fn test_exit_code_for_non_existing_command() {
 #[cfg(has_executable_true)]
 fn test_exit_code_for_true() {
     // When the executed command returns successfully, Bear exit code should be zero.
+    let temp_dir = TempDir::new().unwrap();
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("--")
         .arg(TRUE_PATH)
         .env("RUST_LOG", "debug")
@@ -101,8 +115,10 @@ fn test_exit_code_for_true() {
 #[cfg(has_executable_false)]
 fn test_exit_code_for_false() {
     // When the executed command returns unsuccessfully, Bear exit code should be non-zero.
+    let temp_dir = TempDir::new().unwrap();
     Command::cargo_bin(BEAR_BIN)
         .unwrap()
+        .current_dir(temp_dir.path())
         .arg("--")
         .arg(FALSE_PATH)
         .env("RUST_LOG", "debug")
@@ -116,9 +132,11 @@ fn test_exit_code_for_false() {
 fn test_exit_code_when_signaled() {
     // When the bear process is signaled, Bear exit code should be non-zero.
     // And should terminate the child process and return immediately.
+    let temp_dir = TempDir::new().unwrap();
 
     let mut cmd = StdCommand::new(cargo_bin(BEAR_BIN));
-    cmd.arg("--")
+    cmd.current_dir(temp_dir.path())
+        .arg("--")
         .arg(SLEEP_PATH)
         .arg("10")
         .env("RUST_LOG", "debug")
