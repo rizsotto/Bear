@@ -50,13 +50,13 @@ pub struct BuildCommand {
 
 #[derive(Debug, PartialEq)]
 pub struct BuildSemantic {
-    pub file_name: String,
+    pub path: std::path::PathBuf,
     pub append: bool,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct BuildEvents {
-    pub file_name: String,
+    pub path: std::path::PathBuf,
 }
 
 impl TryFrom<ArgMatches> for Arguments {
@@ -68,28 +68,28 @@ impl TryFrom<ArgMatches> for Arguments {
         match matches.subcommand() {
             Some((MODE_INTERCEPT_SUBCOMMAND, intercept_matches)) => {
                 let input = BuildCommand::try_from(intercept_matches)?;
-                let output = intercept_matches
+                let path = intercept_matches
                     .get_one::<String>("output")
-                    .map(String::to_string)
+                    .map(std::path::PathBuf::from)
                     .expect("output is defaulted");
 
                 // let output = BuildEvents::try_from(intercept_matches)?;
                 let mode = Mode::Intercept {
                     input,
-                    output: BuildEvents { file_name: output },
+                    output: BuildEvents { path },
                 };
                 let arguments = Arguments { config, mode };
                 Ok(arguments)
             }
             Some((MODE_SEMANTIC_SUBCOMMAND, semantic_matches)) => {
-                let input = semantic_matches
+                let path = semantic_matches
                     .get_one::<String>("input")
-                    .map(String::to_string)
+                    .map(std::path::PathBuf::from)
                     .expect("input is defaulted");
 
                 let output = BuildSemantic::try_from(semantic_matches)?;
                 let mode = Mode::Semantic {
-                    input: BuildEvents { file_name: input },
+                    input: BuildEvents { path },
                     output,
                 };
                 let arguments = Arguments { config, mode };
@@ -124,12 +124,12 @@ impl TryFrom<&ArgMatches> for BuildSemantic {
     type Error = anyhow::Error;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
-        let file_name = matches
+        let path = matches
             .get_one::<String>("output")
-            .map(String::to_string)
+            .map(std::path::PathBuf::from)
             .expect("output is defaulted");
         let append = *matches.get_one::<bool>("append").unwrap_or(&false);
-        Ok(BuildSemantic { file_name, append })
+        Ok(BuildSemantic { path, append })
     }
 }
 
@@ -224,7 +224,7 @@ mod test {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildEvents {
-                        file_name: "custom.json".into()
+                        path: "custom.json".into()
                     },
                 },
             }
@@ -247,7 +247,7 @@ mod test {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildEvents {
-                        file_name: "events.json".into()
+                        path: "events.json".into()
                     },
                 },
             }
@@ -277,10 +277,10 @@ mod test {
                 config: Some("~/bear.yaml".into()),
                 mode: Mode::Semantic {
                     input: BuildEvents {
-                        file_name: "custom.json".into()
+                        path: "custom.json".into()
                     },
                     output: BuildSemantic {
-                        file_name: "result.json".into(),
+                        path: "result.json".into(),
                         append: true
                     },
                 },
@@ -301,10 +301,10 @@ mod test {
                 config: None,
                 mode: Mode::Semantic {
                     input: BuildEvents {
-                        file_name: "events.json".into()
+                        path: "events.json".into()
                     },
                     output: BuildSemantic {
-                        file_name: "compile_commands.json".into(),
+                        path: "compile_commands.json".into(),
                         append: false
                     },
                 },
@@ -338,7 +338,7 @@ mod test {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
                     output: BuildSemantic {
-                        file_name: "result.json".into(),
+                        path: "result.json".into(),
                         append: true
                     },
                 },
@@ -362,7 +362,7 @@ mod test {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect(),
                     },
                     output: BuildSemantic {
-                        file_name: "compile_commands.json".into(),
+                        path: "compile_commands.json".into(),
                         append: false
                     },
                 },

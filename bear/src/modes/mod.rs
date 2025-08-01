@@ -43,7 +43,7 @@ impl Mode {
                 let build = environment::BuildEnvironment::create(&config.intercept, address)
                     .map_err(ConfigurationError::ExecutorCreation)?;
 
-                let consumer = impls::RawEventWriter::create(&output.file_name)
+                let consumer = impls::RawEventWriter::create(&output.path)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
                 let intercept = execution::Interceptor::new(
@@ -57,7 +57,7 @@ impl Mode {
             args::Mode::Semantic { input, output } => {
                 log::debug!("Mode: replay events and semantic analysis");
 
-                let source = impls::RawEventReader::create(&input.file_name)?;
+                let source = impls::RawEventReader::create(&input.path)?;
                 let consumer = impls::SemanticEventWriter::create(output, &config)
                     .map_err(ConfigurationError::ConsumerCreation)?;
 
@@ -131,7 +131,7 @@ mod impls {
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use std::process::ExitStatus;
-    use std::{fs, io, path};
+    use std::{fs, io};
 
     pub(super) struct TcpEventProducer {
         source: CollectorOnTcp,
@@ -176,23 +176,22 @@ mod impls {
     /// The event file is written by the interceptor mode and contains unprocessed
     /// events that can be later processed by the semantic analysis pipeline.
     pub(super) struct RawEventReader {
-        file_name: path::PathBuf,
+        path: std::path::PathBuf,
     }
 
     impl RawEventReader {
         /// Create a new raw event reader.
         ///
         /// This reader will read the intercepted events from a file in a raw format.
-        pub(super) fn create(file_name: &str) -> Result<Self, ConfigurationError> {
-            let file_path = path::PathBuf::from(file_name);
-            if !file_path.exists() || !file_path.is_file() {
+        pub(super) fn create(path: &std::path::Path) -> Result<Self, ConfigurationError> {
+            if !path.exists() || !path.is_file() {
                 return Err(ConfigurationError::InvalidConfiguration(format!(
-                    "Event file not found: {file_name}"
+                    "Event file not found: {path:?}"
                 )));
             }
 
             Ok(Self {
-                file_name: file_path,
+                path: path.to_path_buf(),
             })
         }
     }
@@ -201,7 +200,7 @@ mod impls {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
         fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReporterError> {
-            let source = fs::File::open(&self.file_name)
+            let source = fs::File::open(&self.path)
                 .map(io::BufReader::new)
                 .map_err(ReporterError::Network)?;
 
@@ -224,7 +223,7 @@ mod impls {
     /// The raw event writer will write the intercepted events as they are observed
     /// without any transformation. This can be later replayed to analyze the build.
     pub(super) struct RawEventWriter {
-        path: path::PathBuf,
+        path: std::path::PathBuf,
         destination: io::BufWriter<fs::File>,
     }
 
@@ -232,13 +231,15 @@ mod impls {
         /// Create a new raw event writer.
         ///
         /// This writer will write the intercepted events to a file in a raw format.
-        pub(super) fn create(filename: &str) -> Result<Self, WriterCreationError> {
-            let path = path::PathBuf::from(filename);
-            let destination = fs::File::create(filename)
+        pub(super) fn create(path: &std::path::Path) -> Result<Self, WriterCreationError> {
+            let destination = fs::File::create(path)
                 .map(io::BufWriter::new)
-                .map_err(|err| WriterCreationError::Io(path.clone(), err))?;
+                .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-            Ok(Self { path, destination })
+            Ok(Self {
+                path: path.to_path_buf(),
+                destination,
+            })
         }
     }
 

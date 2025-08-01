@@ -140,28 +140,21 @@ pub(super) struct AtomicClangOutputWriter<T: IteratorWriter<Entry>> {
 }
 
 impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
-    pub(super) fn new(
-        writer: T,
-        temp_file_name: &path::Path,
-        final_file_name: &path::Path,
-    ) -> Self {
+    pub(super) fn new(writer: T, temp_path: &path::Path, final_path: &path::Path) -> Self {
         Self {
             writer,
-            temp_path: temp_file_name.to_path_buf(),
-            final_path: final_file_name.to_path_buf(),
+            temp_path: temp_path.to_path_buf(),
+            final_path: final_path.to_path_buf(),
         }
     }
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
-        let temp_filename = self.temp_path.clone();
-        let final_filename = self.final_path.clone();
-
         self.writer.write(entries)?;
 
-        fs::rename(&temp_filename, &final_filename)
-            .map_err(|err| WriterError::Io(final_filename, SerializationError::Io(err)))?;
+        fs::rename(&self.temp_path, &self.final_path)
+            .map_err(|err| WriterError::Io(self.final_path, SerializationError::Io(err)))?;
 
         Ok(())
     }

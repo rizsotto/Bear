@@ -51,22 +51,22 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
             config::Output::Clang {
                 duplicates, format, ..
             } => {
-                let final_file_name = std::path::Path::new(&args.file_name);
-                let temp_file_name = final_file_name.with_extension("tmp");
+                let final_path = &args.path;
+                let temp_path = &args.path.with_extension("tmp");
 
-                let base_writer = ClangOutputWriter::create(&temp_file_name)?;
+                let base_writer = ClangOutputWriter::create(temp_path)?;
                 let unique_writer = UniqueOutputWriter::create(base_writer, duplicates)?;
                 let atomic_writer =
-                    AtomicClangOutputWriter::new(unique_writer, &temp_file_name, final_file_name);
+                    AtomicClangOutputWriter::new(unique_writer, temp_path, final_path);
                 let append_writer =
-                    AppendClangOutputWriter::new(atomic_writer, final_file_name, args.append);
+                    AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
                 let formatted_writer =
                     ConverterClangOutputWriter::new(append_writer, &format.entry);
 
                 Ok(Self::Clang(formatted_writer))
             }
             config::Output::Semantic { .. } => {
-                let path = std::path::Path::new(&args.file_name);
+                let path = std::path::Path::new(&args.path);
                 let result = SemanticOutputWriter::try_from(path)?;
                 Ok(Self::Semantic(result))
             }
