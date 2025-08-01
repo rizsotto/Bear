@@ -7,7 +7,6 @@
 //! program invocation. The `Arguments` type is used to represent all
 //! possible invocations of the program.
 
-use anyhow::anyhow;
 use clap::{arg, command, ArgAction, ArgMatches, Command};
 
 /// Common constants used in the module.
@@ -60,11 +59,20 @@ pub struct BuildEvents {
 }
 
 impl TryFrom<ArgMatches> for Arguments {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(matches: ArgMatches) -> Result<Self, Self::Error> {
         let config = matches.get_one::<String>("config").map(String::to_string);
+        let mode = Mode::try_from(matches)?;
 
+        Ok(Arguments { config, mode })
+    }
+}
+
+impl TryFrom<ArgMatches> for Mode {
+    type Error = ParseError;
+
+    fn try_from(matches: ArgMatches) -> Result<Self, Self::Error> {
         match matches.subcommand() {
             Some((MODE_INTERCEPT_SUBCOMMAND, intercept_matches)) => {
                 let input = BuildCommand::try_from(intercept_matches)?;
@@ -73,13 +81,10 @@ impl TryFrom<ArgMatches> for Arguments {
                     .map(std::path::PathBuf::from)
                     .expect("output is defaulted");
 
-                // let output = BuildEvents::try_from(intercept_matches)?;
-                let mode = Mode::Intercept {
+                Ok(Mode::Intercept {
                     input,
                     output: BuildEvents { path },
-                };
-                let arguments = Arguments { config, mode };
-                Ok(arguments)
+                })
             }
             Some((MODE_SEMANTIC_SUBCOMMAND, semantic_matches)) => {
                 let path = semantic_matches
@@ -88,32 +93,28 @@ impl TryFrom<ArgMatches> for Arguments {
                     .expect("input is defaulted");
 
                 let output = BuildSemantic::try_from(semantic_matches)?;
-                let mode = Mode::Semantic {
+                Ok(Mode::Semantic {
                     input: BuildEvents { path },
                     output,
-                };
-                let arguments = Arguments { config, mode };
-                Ok(arguments)
+                })
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
                 let output = BuildSemantic::try_from(&matches)?;
-                let mode = Mode::Combined { input, output };
-                let arguments = Arguments { config, mode };
-                Ok(arguments)
+                Ok(Mode::Combined { input, output })
             }
-            _ => Err(anyhow!("unrecognized subcommand")),
+            _ => Err(ParseError::UnrecognizedSubcommand),
         }
     }
 }
 
 impl TryFrom<&ArgMatches> for BuildCommand {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
         let arguments = matches
             .get_many("COMMAND")
-            .expect("missing build command")
+            .ok_or(ParseError::MissingBuildCommand)?
             .cloned()
             .collect();
         Ok(BuildCommand { arguments })
@@ -121,7 +122,7 @@ impl TryFrom<&ArgMatches> for BuildCommand {
 }
 
 impl TryFrom<&ArgMatches> for BuildSemantic {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
         let path = matches
@@ -131,6 +132,14 @@ impl TryFrom<&ArgMatches> for BuildSemantic {
         let append = *matches.get_one::<bool>("append").unwrap_or(&false);
         Ok(BuildSemantic { path, append })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    #[error("Unrecognized subcommand")]
+    UnrecognizedSubcommand,
+    #[error("Missing build command")]
+    MissingBuildCommand,
 }
 
 /// Represents the command line interface of the application.
