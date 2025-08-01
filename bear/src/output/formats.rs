@@ -7,25 +7,25 @@
 //! - The semantic database format. (Internal format of this project.)
 //! - The execution event database format. (Internal format of this project.)
 
-use super::{json, FormatError};
+use super::json;
 use crate::{intercept, semantic, semantic::clang};
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
-use std::io;
+use thiserror::Error;
 
 /// The trait represents a file format that can be written to and read from.
 ///
 /// The file format in this project is usually a sequence of values. This trait
 /// provides a type-independent abstraction over the file format.
-pub trait FileFormat<T> {
-    fn write(_: impl io::Write, _: impl Iterator<Item = T>) -> Result<(), FormatError>;
+pub trait SerializationFormat<T> {
+    fn write(_: impl std::io::Write, _: impl Iterator<Item = T>) -> Result<(), SerializationError>;
 
-    fn read(_: impl io::Read) -> impl Iterator<Item = Result<T, FormatError>>;
+    fn read(_: impl std::io::Read) -> impl Iterator<Item = Result<T, SerializationError>>;
 
     /// Reads the entries from the file and ignores any errors.
     /// This is not always feasible, when the file format is strict.
     fn read_and_ignore(
-        reader: impl io::Read,
+        reader: impl std::io::Read,
         message_writer: impl Fn(&str),
     ) -> impl Iterator<Item = T> {
         Self::read(reader).filter_map(move |result| match result {
@@ -36,6 +36,17 @@ pub trait FileFormat<T> {
             }
         })
     }
+}
+
+/// Represents errors that can occur while working with file formats.
+#[derive(Debug, Error)]
+pub enum SerializationError {
+    #[error("Generic IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Format syntax error: {0}")]
+    Syntax(#[from] serde_json::Error),
+    #[error("Format semantic error: {0}")]
+    Semantic(#[from] clang::EntryError),
 }
 
 /// The type represents a JSON compilation database format.
@@ -49,28 +60,30 @@ pub trait FileFormat<T> {
 /// https://clang.llvm.org/docs/JSONCompilationDatabase.html
 pub struct JsonCompilationDatabase;
 
-impl FileFormat<clang::Entry> for JsonCompilationDatabase {
+impl SerializationFormat<clang::Entry> for JsonCompilationDatabase {
     fn write(
-        writer: impl io::Write,
+        writer: impl std::io::Write,
         entries: impl Iterator<Item = clang::Entry>,
-    ) -> Result<(), FormatError> {
+    ) -> Result<(), SerializationError> {
         json::serialize_result_seq(
             writer,
             // Ensure only valid entries are serialized.
             entries.map(|entry| match entry.validate() {
                 Ok(_) => Ok(entry),
-                Err(err) => Err(FormatError::Semantic(err)),
+                Err(err) => Err(SerializationError::Semantic(err)),
             }),
         )
     }
 
-    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<clang::Entry, FormatError>> {
+    fn read(
+        reader: impl std::io::Read,
+    ) -> impl Iterator<Item = Result<clang::Entry, SerializationError>> {
         json::deserialize_seq(reader).map(|res| {
-            res.map_err(FormatError::Syntax)
+            res.map_err(SerializationError::Syntax)
                 // Ensure only valid entries are returned.
                 .and_then(|entry: clang::Entry| match entry.validate() {
                     Ok(_) => Ok(entry),
-                    Err(err) => Err(FormatError::Semantic(err)),
+                    Err(err) => Err(SerializationError::Semantic(err)),
                 })
         })
     }
@@ -86,14 +99,16 @@ impl FileFormat<clang::Entry> for JsonCompilationDatabase {
 /// The output format is not stable and may change in future versions.
 pub struct JsonSemanticDatabase;
 
-impl FileFormat<semantic::Command> for JsonSemanticDatabase {
+impl SerializationFormat<semantic::Command> for JsonSemanticDatabase {
     fn write(
-        writer: impl io::Write,
+        writer: impl std::io::Write,
         entries: impl Iterator<Item = semantic::Command>,
-    ) -> Result<(), FormatError> {
-        json::serialize_seq(writer, entries).map_err(FormatError::Syntax)
+    ) -> Result<(), SerializationError> {
+        json::serialize_seq(writer, entries).map_err(SerializationError::Syntax)
     }
-    fn read(_: impl io::Read) -> impl Iterator<Item = Result<semantic::Command, FormatError>> {
+    fn read(
+        _: impl std::io::Read,
+    ) -> impl Iterator<Item = Result<semantic::Command, SerializationError>> {
         // Not implemented! (No reader for the semantic output in this project.)
         std::iter::empty()
     }
@@ -108,22 +123,24 @@ impl FileFormat<semantic::Command> for JsonSemanticDatabase {
 /// The output format is not stable and may change in future versions.
 pub struct ExecutionEventDatabase;
 
-impl FileFormat<intercept::Event> for ExecutionEventDatabase {
+impl SerializationFormat<intercept::Event> for ExecutionEventDatabase {
     fn write(
-        writer: impl io::Write,
+        writer: impl std::io::Write,
         events: impl Iterator<Item = intercept::Event>,
-    ) -> Result<(), FormatError> {
+    ) -> Result<(), SerializationError> {
         let mut writer = writer;
         for event in events {
-            serde_json::to_writer(&mut writer, &event).map_err(FormatError::Syntax)?;
-            writer.write_all(b"\n").map_err(FormatError::Io)?;
+            serde_json::to_writer(&mut writer, &event).map_err(SerializationError::Syntax)?;
+            writer.write_all(b"\n").map_err(SerializationError::Io)?;
         }
         Ok(())
     }
 
-    fn read(reader: impl io::Read) -> impl Iterator<Item = Result<intercept::Event, FormatError>> {
+    fn read(
+        reader: impl std::io::Read,
+    ) -> impl Iterator<Item = Result<intercept::Event, SerializationError>> {
         let stream = StreamDeserializer::new(IoRead::new(reader));
-        stream.map(|value| value.map_err(FormatError::Syntax))
+        stream.map(|value| value.map_err(SerializationError::Syntax))
     }
 }
 
@@ -132,7 +149,7 @@ mod test {
     mod compilation_database {
         use super::super::semantic::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
-        use super::super::{FileFormat, FormatError};
+        use super::super::{SerializationError, SerializationFormat};
         use serde_json::error::Category;
         use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};
@@ -140,7 +157,7 @@ mod test {
         macro_rules! assert_json_error {
             ($x:expr) => {
                 match $x {
-                    Some(Err(FormatError::Syntax(error))) => {
+                    Some(Err(SerializationError::Syntax(error))) => {
                         assert_eq!(error.classify(), Category::Data)
                     }
                     _ => assert!(false, "shout be JSON error"),
@@ -151,7 +168,7 @@ mod test {
         macro_rules! assert_format_error {
             ($x:expr) => {
                 assert!(
-                    matches!($x, Some(Err(FormatError::Semantic(_)))),
+                    matches!($x, Some(Err(SerializationError::Semantic(_)))),
                     "should be format error"
                 );
             };
@@ -226,7 +243,7 @@ mod test {
             let result = Sut::write(&mut buffer, vec![entry].into_iter());
 
             assert!(result.is_err());
-            assert!(matches!(result, Err(FormatError::Semantic(_))));
+            assert!(matches!(result, Err(SerializationError::Semantic(_))));
         }
 
         fn expected_values_with_arguments() -> Vec<Entry> {
@@ -316,7 +333,7 @@ mod test {
         }
 
         #[test]
-        fn save_with_array_command_syntax() -> Result<(), FormatError> {
+        fn save_with_array_command_syntax() -> Result<(), SerializationError> {
             let input = expected_values_with_arguments();
 
             // Create fake "file"
@@ -434,7 +451,7 @@ mod test {
         }
 
         #[test]
-        fn save_quoted_with_array_command_syntax() -> Result<(), FormatError> {
+        fn save_quoted_with_array_command_syntax() -> Result<(), SerializationError> {
             let input = expected_quoted_values_with_argument();
 
             // Create fake "file"
@@ -454,7 +471,7 @@ mod test {
 
     mod execution_events {
         use super::super::ExecutionEventDatabase as Sut;
-        use super::super::FileFormat;
+        use super::super::SerializationFormat;
         use crate::intercept::Event;
         use serde_json::json;
         use std::collections::HashMap;

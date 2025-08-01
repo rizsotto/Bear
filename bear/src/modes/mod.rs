@@ -124,7 +124,9 @@ mod impls {
     use crate::intercept::environment;
     use crate::intercept::supervise::SuperviseError;
     use crate::intercept::tcp::{CollectorOnTcp, ReceivingError};
-    use crate::output::{ExecutionEventDatabase, FileFormat, FormatError, WriterCreationError};
+    use crate::output::{
+        ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
+    };
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use std::process::ExitStatus;
@@ -221,6 +223,7 @@ mod impls {
     /// The raw event writer will write the intercepted events as they are observed
     /// without any transformation. This can be later replayed to analyze the build.
     pub(super) struct RawEventWriter {
+        path: path::PathBuf,
         destination: io::BufWriter<fs::File>,
     }
 
@@ -228,19 +231,21 @@ mod impls {
         /// Create a new raw event writer.
         ///
         /// This writer will write the intercepted events to a file in a raw format.
-        pub(super) fn create(file_name: &str) -> Result<Self, WriterCreationError> {
-            let destination = fs::File::create(file_name)
+        pub(super) fn create(filename: &str) -> Result<Self, WriterCreationError> {
+            let path = path::PathBuf::from(filename);
+            let destination = fs::File::create(filename)
                 .map(io::BufWriter::new)
-                .map_err(WriterCreationError::Io)?;
+                .map_err(|err| WriterCreationError::Io(path.clone(), err))?;
 
-            Ok(Self { destination })
+            Ok(Self { path, destination })
         }
     }
 
     impl execution::Consumer for RawEventWriter {
         /// Using existing file format, write the intercepted events to the output file.
-        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), WriterError> {
             ExecutionEventDatabase::write(self.destination, events.into_iter())
+                .map_err(|err| WriterError::Io(self.path.clone(), err))
         }
     }
 
@@ -278,7 +283,7 @@ mod impls {
     impl execution::Consumer for SemanticEventWriter {
         /// Consume the intercepted events, and transform them into semantic events,
         /// and write them into the target file (with the right format).
-        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), FormatError> {
+        fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), WriterError> {
             // Transform and log the events to semantics.
             let semantics = events
                 .into_iter()

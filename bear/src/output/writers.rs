@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::formats::{FileFormat, JsonCompilationDatabase, JsonSemanticDatabase};
-use super::{FormatError, WriterCreationError};
+use super::formats::{
+    JsonCompilationDatabase, JsonSemanticDatabase, SerializationError, SerializationFormat,
+};
+use super::{WriterCreationError, WriterError};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
 use crate::{config, semantic};
 use std::{fs, io, path};
@@ -14,7 +16,7 @@ use std::{fs, io, path};
 pub(super) trait IteratorWriter<T> {
     /// Writes the iterator as a sequence of elements.
     /// It consumes the iterator and returns either a nothing or an error.
-    fn write(self, _: impl Iterator<Item = T>) -> Result<(), FormatError>;
+    fn write(self, _: impl Iterator<Item = T>) -> Result<(), WriterError>;
 }
 
 /// This writer is used to write the semantic analysis results to a file.
@@ -24,21 +26,28 @@ pub(super) trait IteratorWriter<T> {
 /// It reflects the internal representation of the semantic analysis types.
 pub(super) struct SemanticOutputWriter {
     output: io::BufWriter<fs::File>,
+    path: path::PathBuf,
 }
 
 impl TryFrom<&path::Path> for SemanticOutputWriter {
     type Error = WriterCreationError;
 
-    fn try_from(file_name: &path::Path) -> Result<Self, Self::Error> {
-        let output = fs::File::create(file_name).map(io::BufWriter::new)?;
+    fn try_from(output_path: &path::Path) -> Result<Self, Self::Error> {
+        let output = fs::File::create(output_path)
+            .map(io::BufWriter::new)
+            .map_err(|err| WriterCreationError::Io(output_path.to_path_buf(), err))?;
 
-        Ok(Self { output })
+        Ok(Self {
+            output,
+            path: output_path.to_path_buf(),
+        })
     }
 }
 
 impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), FormatError> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         JsonSemanticDatabase::write(self.output, semantics)
+            .map_err(|err| WriterError::Io(self.path, err))
     }
 }
 
@@ -58,7 +67,7 @@ impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), FormatError> {
+    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         let entries = semantics.flat_map(|semantic| semantic.to_entries(&self.format));
         self.writer.write(entries)
     }
@@ -79,9 +88,9 @@ pub(super) struct AppendClangOutputWriter<T: IteratorWriter<Entry>> {
 }
 
 impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
-    pub(super) fn new(writer: T, append: bool, file_name: &path::Path) -> Self {
-        let path = if file_name.exists() {
-            Some(file_name.to_path_buf())
+    pub(super) fn new(writer: T, input_path: &path::Path, append: bool) -> Self {
+        let path = if input_path.exists() {
+            Some(input_path.to_path_buf())
         } else {
             if append {
                 log::warn!("The output file does not exist, the append option is ignored.");
@@ -97,7 +106,7 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     /// because the logic is not bound to the instance.
     fn read_from_compilation_db(
         source: &path::Path,
-    ) -> Result<impl Iterator<Item = Entry>, FormatError> {
+    ) -> Result<impl Iterator<Item = Entry>, SerializationError> {
         let file = fs::File::open(source).map(io::BufReader::new)?;
 
         let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
@@ -108,9 +117,10 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
-        if let Some(path) = self.path {
-            let entries_from_db = Self::read_from_compilation_db(&path)?;
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+        if let Some(path) = &self.path {
+            let entries_from_db = Self::read_from_compilation_db(path)
+                .map_err(|err| WriterError::Io(path.clone(), err))?;
             let final_entries = entries_from_db.chain(entries);
             self.writer.write(final_entries)
         } else {
@@ -125,8 +135,8 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter
 /// This ensures that the output file is not left in an inconsistent state in case of errors.
 pub(super) struct AtomicClangOutputWriter<T: IteratorWriter<Entry>> {
     writer: T,
-    temp_file_name: path::PathBuf,
-    final_file_name: path::PathBuf,
+    temp_path: path::PathBuf,
+    final_path: path::PathBuf,
 }
 
 impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
@@ -137,20 +147,21 @@ impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
     ) -> Self {
         Self {
             writer,
-            temp_file_name: temp_file_name.to_path_buf(),
-            final_file_name: final_file_name.to_path_buf(),
+            temp_path: temp_file_name.to_path_buf(),
+            final_path: final_file_name.to_path_buf(),
         }
     }
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
-        let temp_file_name = self.temp_file_name.clone();
-        let final_file_name = self.final_file_name.clone();
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+        let temp_filename = self.temp_path.clone();
+        let final_filename = self.final_path.clone();
 
         self.writer.write(entries)?;
 
-        fs::rename(&temp_file_name, &final_file_name)?;
+        fs::rename(&temp_filename, &final_filename)
+            .map_err(|err| WriterError::Io(final_filename, SerializationError::Io(err)))?;
 
         Ok(())
     }
@@ -178,7 +189,7 @@ impl<T: IteratorWriter<Entry>> UniqueOutputWriter<T> {
 }
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
         let mut filter = self.filter.clone();
         let filtered_entries = entries.filter(move |entry| filter.unique(entry));
 
@@ -193,19 +204,26 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
 /// - Formats the entries to the configured shape.
 pub(super) struct ClangOutputWriter {
     output: io::BufWriter<fs::File>,
+    path: path::PathBuf,
 }
 
 impl ClangOutputWriter {
-    pub(super) fn create(file_name: &path::Path) -> Result<Self, WriterCreationError> {
-        let output = fs::File::create(file_name).map(io::BufWriter::new)?;
+    pub(super) fn create(path: &path::Path) -> Result<Self, WriterCreationError> {
+        let output = fs::File::create(path)
+            .map(io::BufWriter::new)
+            .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-        Ok(Self { output })
+        Ok(Self {
+            output,
+            path: path.to_path_buf(),
+        })
     }
 }
 
 impl IteratorWriter<Entry> for ClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
+    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
         JsonCompilationDatabase::write(self.output, entries)
+            .map_err(|err| WriterError::Io(self.path, err))
     }
 }
 
@@ -218,7 +236,7 @@ mod tests {
     struct MockWriter;
 
     impl IteratorWriter<Entry> for MockWriter {
-        fn write(self, _: impl Iterator<Item = Entry>) -> Result<(), FormatError> {
+        fn write(self, _: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
             Ok(())
         }
     }
@@ -226,71 +244,71 @@ mod tests {
     #[test]
     fn test_atomic_clang_output_writer_success() {
         let dir = tempdir().unwrap();
-        let temp_file_path = dir.path().join("temp_file.json");
-        let final_file_path = dir.path().join("final_file.json");
+        let temp_path = dir.path().join("temp_file.json");
+        let final_path = dir.path().join("final_file.json");
 
         // Create the temp file
-        fs::File::create(&temp_file_path).unwrap();
+        fs::File::create(&temp_path).unwrap();
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_file_path, &final_file_path);
+        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
         sut.write(std::iter::empty()).unwrap();
 
         // Verify the final file exists
-        assert!(final_file_path.exists());
-        assert!(!temp_file_path.exists());
+        assert!(final_path.exists());
+        assert!(!temp_path.exists());
     }
 
     #[test]
     fn test_atomic_clang_output_writer_temp_file_missing() {
         let dir = tempdir().unwrap();
-        let temp_file_path = dir.path().join("temp_file.json");
-        let final_file_path = dir.path().join("final_file.json");
+        let temp_path = dir.path().join("temp_file.json");
+        let final_path = dir.path().join("final_file.json");
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_file_path, &final_file_path);
+        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
         let result = sut.write(std::iter::empty());
 
         // Verify the operation fails
         assert!(result.is_err());
-        assert!(!final_file_path.exists());
+        assert!(!final_path.exists());
     }
 
     #[test]
     fn test_atomic_clang_output_writer_final_file_exists() {
         let dir = tempdir().unwrap();
-        let temp_file_path = dir.path().join("temp_file.json");
-        let final_file_path = dir.path().join("final_file.json");
+        let temp_path = dir.path().join("temp_file.json");
+        let final_path = dir.path().join("final_file.json");
 
         // Create the temp file and final file
-        fs::File::create(&temp_file_path).unwrap();
-        fs::File::create(&final_file_path).unwrap();
+        fs::File::create(&temp_path).unwrap();
+        fs::File::create(&final_path).unwrap();
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_file_path, &final_file_path);
+        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
         let result = sut.write(std::iter::empty());
 
         // Verify the operation fails
         assert!(result.is_ok());
-        assert!(final_file_path.exists());
-        assert!(!temp_file_path.exists());
+        assert!(final_path.exists());
+        assert!(!temp_path.exists());
     }
 
     #[test]
     fn test_append_clang_output_writer_no_original_file() {
         let dir = tempdir().unwrap();
-        let file_to_append = dir.path().join("file_to_append.json");
-        let result_file = dir.path().join("result_file.json");
+        let input_path = dir.path().join("file_to_append.json");
+        let result_path = dir.path().join("result_file.json");
 
         let entries_to_write = vec![
             Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_file).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, false, &file_to_append);
+        let writer = ClangOutputWriter::create(&result_path).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
         sut.write(entries_to_write.into_iter()).unwrap();
 
         // Verify the result file contains the written entries
-        assert!(result_file.exists());
-        let content = fs::read_to_string(&result_file).unwrap();
+        assert!(result_path.exists());
+        let content = fs::read_to_string(&result_path).unwrap();
         assert!(content.contains("file1.cpp"));
         assert!(content.contains("file2.cpp"));
     }
@@ -298,15 +316,15 @@ mod tests {
     #[test]
     fn test_append_clang_output_writer_with_original_file() {
         let dir = tempdir().unwrap();
-        let file_to_append = dir.path().join("file_to_append.json");
-        let result_file = dir.path().join("result_file.json");
+        let input_path = dir.path().join("file_to_append.json");
+        let result_path = dir.path().join("result_file.json");
 
         // Create the original file with some entries
         let original_entries = vec![
             Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer = ClangOutputWriter::create(&file_to_append).unwrap();
+        let writer = ClangOutputWriter::create(&input_path).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -314,13 +332,13 @@ mod tests {
             Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_file).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, false, &file_to_append);
+        let writer = ClangOutputWriter::create(&result_path).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains both original and new entries
-        assert!(result_file.exists());
-        let content = fs::read_to_string(&result_file).unwrap();
+        assert!(result_path.exists());
+        let content = fs::read_to_string(&result_path).unwrap();
         assert!(content.contains("file1.cpp"));
         assert!(content.contains("file2.cpp"));
         assert!(content.contains("file3.cpp"));

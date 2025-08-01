@@ -22,7 +22,7 @@ use writers::{
 };
 
 // Re-export types for convenience.
-pub use formats::{ExecutionEventDatabase, FileFormat};
+pub use formats::{ExecutionEventDatabase, SerializationError, SerializationFormat};
 
 /// Represents the output writer, which can handle different types of outputs.
 ///
@@ -59,7 +59,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
                 let atomic_writer =
                     AtomicClangOutputWriter::new(unique_writer, &temp_file_name, final_file_name);
                 let append_writer =
-                    AppendClangOutputWriter::new(atomic_writer, args.append, final_file_name);
+                    AppendClangOutputWriter::new(atomic_writer, final_file_name, args.append);
                 let formatted_writer =
                     ConverterClangOutputWriter::new(append_writer, &format.entry);
 
@@ -74,20 +74,11 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
     }
 }
 
-/// Represents errors that can occur while creating an output writer.
-#[derive(Error, Debug)]
-pub enum WriterCreationError {
-    #[error("Failed to create the output writer: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Failed to configure the output writer: {0}")]
-    Configuration(String),
-}
-
 impl OutputWriter {
     pub fn write(
         self,
         semantics: impl Iterator<Item = semantic::Command>,
-    ) -> Result<(), FormatError> {
+    ) -> Result<(), WriterError> {
         match self {
             Self::Clang(writer) => writer.write(semantics),
             Self::Semantic(writer) => writer.write(semantics),
@@ -95,13 +86,18 @@ impl OutputWriter {
     }
 }
 
-/// Represents errors that can occur while working with file formats.
-#[derive(Debug, Error)]
-pub enum FormatError {
-    #[error("Generic IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Format syntax error: {0}")]
-    Syntax(#[from] serde_json::Error),
-    #[error("Format semantic error: {0}")]
-    Semantic(#[from] semantic::clang::EntryError),
+/// Represents errors that can occur while creating an output writer.
+#[derive(Error, Debug)]
+pub enum WriterCreationError {
+    #[error("Failed to create the output writer {0}: {1}")]
+    Io(std::path::PathBuf, std::io::Error),
+    #[error("Failed to configure the output writer: {0}")]
+    Configuration(String),
+}
+
+/// Represents errors that can occur while writing output.
+#[derive(Error, Debug)]
+pub enum WriterError {
+    #[error("Serialization error {0}: {1}")]
+    Io(std::path::PathBuf, SerializationError),
 }

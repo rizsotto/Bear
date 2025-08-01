@@ -4,7 +4,7 @@ use crate::args::BuildCommand;
 use crate::intercept;
 use crate::intercept::supervise::SuperviseError;
 use crate::intercept::tcp::ReceivingError;
-use crate::output::FormatError;
+use crate::output::WriterError;
 use crossbeam_channel::{bounded, unbounded, Receiver};
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
@@ -28,7 +28,7 @@ pub trait Consumer: Send {
     /// # Returns
     /// * `Ok(())` - All items were successfully processed
     /// * `Err(FormatError)` - An error occurred during processing
-    fn consume(self: Box<Self>, receiver: Receiver<intercept::Event>) -> Result<(), FormatError>;
+    fn consume(self: Box<Self>, receiver: Receiver<intercept::Event>) -> Result<(), WriterError>;
 }
 
 /// A trait for producing events to a channel-based stream.
@@ -235,7 +235,7 @@ pub enum RuntimeError {
     #[error("Producer error: {0}")]
     Producer(#[from] ReceivingError),
     #[error("Consumer error: {0}")]
-    Consumer(#[from] FormatError),
+    Consumer(#[from] WriterError),
     #[error("Executor error: {0}")]
     Executor(#[from] SuperviseError),
     #[error("Thread error: {0}")]
@@ -246,6 +246,7 @@ pub enum RuntimeError {
 mod tests {
     use super::*;
     use crate::intercept::Event;
+    use crate::output::{SerializationError, WriterError};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
@@ -465,10 +466,12 @@ mod tests {
         });
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(|_| Err(FormatError::Io(std::io::Error::other("Test failure"))));
+        consumer_mock.expect_consume().times(1).returning(|_| {
+            Err(WriterError::Io(
+                std::path::PathBuf::new(),
+                SerializationError::Io(std::io::Error::other("Test failure")),
+            ))
+        });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
         let result = replayer.run();
@@ -632,10 +635,12 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(events));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(|_| Err(FormatError::Io(std::io::Error::other("Test failure"))));
+        consumer_mock.expect_consume().times(1).returning(|_| {
+            Err(WriterError::Io(
+                std::path::PathBuf::new(),
+                SerializationError::Io(std::io::Error::other("Test failure")),
+            ))
+        });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock
