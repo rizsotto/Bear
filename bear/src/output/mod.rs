@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This module is responsible for writing the output of the semantic analysis.
+//! This module is responsible for writing the output of semantic analysis.
 //!
 //! The output can be in different formats, such as JSON compilation databases
 //! or semantic analysis results in JSON format. The module provides functionality
 //! to write these outputs to files, handle duplicates, and format the output
 //! as needed.
 //!
-//! The `OutputWriter` enum represents the main entry point for writing the output.
-//! The input of the `OutputWriter` is a stream of `semantic::CompilerCall` instances.
+//! The `OutputWriter` enum represents the main entry point for writing output.
+//! The input to the `OutputWriter` is a stream of `semantic::Command` instances.
 
 mod formats;
 mod json;
@@ -24,6 +24,11 @@ use writers::{
 // Re-export types for convenience.
 pub use formats::{ExecutionEventDatabase, SerializationError, SerializationFormat};
 
+/// A stack of output writers for Clang compilation databases.
+type ClangWriterStack = ConverterClangOutputWriter<
+    AppendClangOutputWriter<AtomicClangOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
+>;
+
 /// Represents the output writer, which can handle different types of outputs.
 ///
 /// This enum provides two variants:
@@ -33,11 +38,7 @@ pub use formats::{ExecutionEventDatabase, SerializationError, SerializationForma
 /// The variants are selected at runtime based on the configuration provided.
 pub enum OutputWriter {
     #[allow(private_interfaces)]
-    Clang(
-        ConverterClangOutputWriter<
-            AppendClangOutputWriter<AtomicClangOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
-        >,
-    ),
+    Clang(ClangWriterStack),
     #[allow(private_interfaces)]
     Semantic(SemanticOutputWriter),
 }
@@ -75,6 +76,13 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
 }
 
 impl OutputWriter {
+    /// Writes semantic commands using the configured output writer.
+    ///
+    /// # Arguments
+    /// * `semantics` - An iterator of semantic commands to write
+    ///
+    /// # Returns
+    /// `Ok(())` on success, or a `WriterError` if writing fails.
     pub fn write(
         self,
         semantics: impl Iterator<Item = semantic::Command>,

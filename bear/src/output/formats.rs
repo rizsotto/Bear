@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This module is responsible for declaring the file formats this project
-//! is using. The following formats are declared:
+//! This module declares the file formats used by this project.
+//! The following formats are declared:
 //!
-//! - The JSON compilation database format. Declared by the Clang project.
-//! - The semantic database format. (Internal format of this project.)
-//! - The execution event database format. (Internal format of this project.)
+//! - The JSON compilation database format, as declared by the Clang project.
+//! - The semantic database format (internal format of this project).
+//! - The execution event database format (internal format of this project.)
 
 use super::json;
 use crate::{intercept, semantic, semantic::clang};
@@ -13,17 +13,34 @@ use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use thiserror::Error;
 
-/// The trait represents a file format that can be written to and read from.
+/// Represents errors that can occur while working with file formats.
+#[derive(Debug, Error)]
+pub enum SerializationError {
+    #[error("Generic IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Format syntax error: {0}")]
+    Syntax(#[from] serde_json::Error),
+    #[error("Format semantic error: {0}")]
+    Semantic(#[from] clang::EntryError),
+}
+
+/// A trait representing a file format that can be written to and read from.
 ///
-/// The file format in this project is usually a sequence of values. This trait
-/// provides a type-independent abstraction over the file format.
+/// File formats in this project are usually sequences of values. This trait
+/// provides a type-independent abstraction over file formats.
 pub trait SerializationFormat<T> {
-    fn write(_: impl std::io::Write, _: impl Iterator<Item = T>) -> Result<(), SerializationError>;
+    /// Writes an iterator of items to the specified writer.
+    fn write(
+        writer: impl std::io::Write,
+        items: impl Iterator<Item = T>,
+    ) -> Result<(), SerializationError>;
 
-    fn read(_: impl std::io::Read) -> impl Iterator<Item = Result<T, SerializationError>>;
+    /// Reads items from the specified reader, returning an iterator of results.
+    fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<T, SerializationError>>;
 
-    /// Reads the entries from the file and ignores any errors.
-    /// This is not always feasible, when the file format is strict.
+    /// Reads entries from the file and ignores any errors.
+    ///
+    /// This is not always feasible when the file format is strict.
     fn read_and_ignore(
         reader: impl std::io::Read,
         message_writer: impl Fn(&str),
@@ -36,17 +53,6 @@ pub trait SerializationFormat<T> {
             }
         })
     }
-}
-
-/// Represents errors that can occur while working with file formats.
-#[derive(Debug, Error)]
-pub enum SerializationError {
-    #[error("Generic IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Format syntax error: {0}")]
-    Syntax(#[from] serde_json::Error),
-    #[error("Format semantic error: {0}")]
-    Semantic(#[from] clang::EntryError),
 }
 
 /// The type represents a JSON compilation database format.
@@ -102,9 +108,9 @@ pub struct JsonSemanticDatabase;
 impl SerializationFormat<semantic::Command> for JsonSemanticDatabase {
     fn write(
         writer: impl std::io::Write,
-        entries: impl Iterator<Item = semantic::Command>,
+        commands: impl Iterator<Item = semantic::Command>,
     ) -> Result<(), SerializationError> {
-        json::serialize_seq(writer, entries).map_err(SerializationError::Syntax)
+        json::serialize_seq(writer, commands).map_err(SerializationError::Syntax)
     }
     fn read(
         _: impl std::io::Read,

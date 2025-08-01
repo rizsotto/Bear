@@ -8,18 +8,19 @@ use crate::semantic::clang::{DuplicateEntryFilter, Entry};
 use crate::{config, semantic};
 use std::{fs, io, path};
 
-/// The trait represents a writer for iterator type `T`.
+/// A trait representing a writer for iterator type `T`.
 ///
 /// This trait is implemented by types that can consume an iterator of type `T`
 /// and write its elements to some output. The writing process may succeed or fail,
 /// returning either `()` on success or an error.
 pub(super) trait IteratorWriter<T> {
     /// Writes the iterator as a sequence of elements.
-    /// It consumes the iterator and returns either a nothing or an error.
-    fn write(self, _: impl Iterator<Item = T>) -> Result<(), WriterError>;
+    ///
+    /// Consumes the iterator and returns either nothing on success or an error.
+    fn write(self, items: impl Iterator<Item = T>) -> Result<(), WriterError>;
 }
 
-/// This writer is used to write the semantic analysis results to a file.
+/// The type represents a writer for semantic analysis results to a file.
 ///
 /// # Note
 /// The output format is not stable and may change in future versions.
@@ -51,7 +52,7 @@ impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
     }
 }
 
-/// Formats `semantic::CompilerCall` instances into `Entry` objects.
+/// The type represents a converter that formats `semantic::Command` instances into `Entry` objects.
 pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
     format: config::EntryFormat,
     writer: T,
@@ -73,7 +74,7 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterCl
     }
 }
 
-/// Handles the logic for appending entries to an existing Clang output file.
+/// The type represents a writer that handles appending entries to an existing Clang output file.
 ///
 /// This writer supports reading existing entries from a compilation database file,
 /// combining them with new entries, and writing the result back to the file.
@@ -129,7 +130,7 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter
     }
 }
 
-/// Responsible for writing a JSON compilation database file atomically.
+/// The type represents a writer that writes JSON compilation database files atomically.
 ///
 /// The file is first written to a temporary file and then renamed to the final file name.
 /// This ensures that the output file is not left in an inconsistent state in case of errors.
@@ -160,7 +161,7 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter
     }
 }
 
-/// Responsible for writing a JSON compilation database file from the given entries.
+/// The type represents a writer that writes JSON compilation database files from given entries.
 ///
 /// # Features
 /// - Filters duplicates based on the provided configuration.
@@ -190,7 +191,7 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
     }
 }
 
-/// Responsible for writing a JSON compilation database file from the given entries.
+/// The type represents a writer that writes JSON compilation database files from given entries.
 ///
 /// # Features
 /// - Writes the entries to a file.

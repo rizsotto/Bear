@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! The module contains functions to serialize and deserialize JSON arrays.
+//! This module contains functions to serialize and deserialize JSON arrays.
 //!
 //! The main objective is to provide a way to serialize and deserialize
 //! entries from an iterator into a JSON array and vice versa. Iterators
-//! allows us to process large datasets without loading everything into
+//! allow us to process large datasets without loading everything into
 //! memory at once.
 //!
-//! The format these methods are producing is a JSON array of objects.
+//! The format these methods produce is a JSON array of objects.
 //! It's *not* JSON lines format, which is a sequence of JSON objects
 //! separated by newlines.
 
