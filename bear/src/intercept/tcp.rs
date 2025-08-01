@@ -2,13 +2,12 @@
 
 //! The module contains the implementation of the TCP collector and reporter.
 
-use super::reporter::{Reporter, ReportingError};
+use super::reporter::{Reporter, ReporterError};
 use super::Event;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use thiserror::Error;
 
 /// The serializer for events to transmit over the network.
 ///
@@ -19,7 +18,7 @@ struct EventWireSerializer;
 
 impl EventWireSerializer {
     /// Read an event from a reader using TLV format.
-    fn read(reader: &mut impl Read) -> Result<Event, ReceivingError> {
+    fn read(reader: &mut impl Read) -> Result<Event, ReporterError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
         let length = u32::from_be_bytes(length_bytes) as usize;
@@ -32,7 +31,7 @@ impl EventWireSerializer {
     }
 
     /// Write an event to a writer using TLV format.
-    fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReportingError> {
+    fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReporterError> {
         let serialized_event = serde_json::to_string(&event)?;
         let bytes = serialized_event.into_bytes();
         let length = bytes.len() as u32;
@@ -43,17 +42,6 @@ impl EventWireSerializer {
         Ok(length)
     }
 }
-
-/// Errors that can occur in the collector.
-#[derive(Error, Debug)]
-pub enum ReceivingError {
-    #[error("Receiving event failed with IO error: {0}")]
-    Network(#[from] std::io::Error),
-    #[error("Receiving event failed with serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-}
-
-// TODO: should we define a trait for collectors?
 
 /// Represents a TCP event collector.
 pub struct CollectorOnTcp {
@@ -79,7 +67,7 @@ impl CollectorOnTcp {
     /// The collector listens to the TCP port and accepts incoming connections.
     /// When a connection is accepted, the collector reads the events from the
     /// connection and emits them.
-    pub fn events(&self) -> impl Iterator<Item = Result<Event, ReceivingError>> + '_ {
+    pub fn events(&self) -> impl Iterator<Item = Result<Event, ReporterError>> + '_ {
         let listener = &self.listener;
         let shutdown = &self.shutdown;
 
@@ -99,7 +87,7 @@ impl CollectorOnTcp {
                         Some(result)
                     }
                 }
-                Err(err) => Some(Err(ReceivingError::Network(err))),
+                Err(err) => Some(Err(ReporterError::Network(err))),
             }
         })
     }
@@ -109,11 +97,11 @@ impl CollectorOnTcp {
     /// The collector is stopped when the `produce` method sees the shutdown flag.
     /// To signal the collector to stop, we connect to the collector to unblock the
     /// `accept` call to check the shutdown flag.
-    pub fn shutdown(&self) -> Result<(), ReceivingError> {
+    pub fn shutdown(&self) -> Result<(), ReporterError> {
         self.shutdown.store(true, Ordering::Relaxed);
 
         let address = self.listener.local_addr()?;
-        let _ = TcpStream::connect(address).map_err(ReceivingError::Network)?;
+        let _ = TcpStream::connect(address).map_err(ReporterError::Network)?;
         Ok(())
     }
 }
@@ -138,9 +126,9 @@ impl Reporter for ReporterOnTcp {
     ///
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
-    fn report(&self, event: Event) -> Result<(), ReportingError> {
+    fn report(&self, event: Event) -> Result<(), ReporterError> {
         let mut socket =
-            TcpStream::connect(self.destination.clone()).map_err(ReportingError::Network)?;
+            TcpStream::connect(self.destination.clone()).map_err(ReporterError::Network)?;
         EventWireSerializer::write(&mut socket, event.trim())?;
 
         Ok(())
@@ -151,8 +139,6 @@ impl Reporter for ReporterOnTcp {
 mod tests {
     use super::*;
     use std::io::Cursor;
-    use std::sync::Arc;
-    use std::thread;
 
     // Test that the serialization and deserialization of the Envelope works.
     // We write the Envelope to a buffer and read it back to check if the
@@ -189,7 +175,7 @@ mod tests {
         // Start the collector in a separate thread using the events iterator
         let collector_thread = {
             let tcp_collector = Arc::clone(&collector_arc);
-            thread::spawn(move || {
+            std::thread::spawn(move || {
                 let mut received_events = Vec::new();
                 for event_result in tcp_collector.events() {
                     match event_result {

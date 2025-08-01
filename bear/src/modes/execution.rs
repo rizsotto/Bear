@@ -2,8 +2,8 @@
 
 use crate::args::BuildCommand;
 use crate::intercept;
+use crate::intercept::reporter::ReporterError;
 use crate::intercept::supervise::SuperviseError;
-use crate::intercept::tcp::ReceivingError;
 use crate::output::WriterError;
 use crossbeam_channel::{bounded, unbounded, Receiver};
 use std::process::{ExitCode, ExitStatus};
@@ -48,11 +48,11 @@ pub trait Producer: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - All items were successfully produced
-    /// * `Err(ReceivingError)` - An error occurred during production
+    /// * `Err(ReportingError)` - An error occurred during production
     fn produce(
         &self,
         sender: crossbeam_channel::Sender<intercept::Event>,
-    ) -> Result<(), ReceivingError>;
+    ) -> Result<(), ReporterError>;
 }
 
 /// A trait for cancelling ongoing operations.
@@ -65,8 +65,8 @@ pub trait Cancellable: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - Cancellation was successful
-    /// * `Err(ReceivingError)` - An error occurred during cancellation
-    fn cancel(&self) -> Result<(), ReceivingError>;
+    /// * `Err(ReportingError)` - An error occurred during cancellation
+    fn cancel(&self) -> Result<(), ReporterError>;
 }
 
 /// A trait for producers that support cancellation during operation.
@@ -233,7 +233,7 @@ impl Replayer {
 #[derive(Error, Debug)]
 pub enum RuntimeError {
     #[error("Producer error: {0}")]
-    Producer(#[from] ReceivingError),
+    Producer(#[from] ReporterError),
     #[error("Consumer error: {0}")]
     Consumer(#[from] WriterError),
     #[error("Executor error: {0}")]
@@ -310,9 +310,9 @@ mod tests {
         fn produce(
             &self,
             sender: crossbeam_channel::Sender<intercept::Event>,
-        ) -> Result<(), ReceivingError> {
+        ) -> Result<(), ReporterError> {
             if self.should_fail_produce {
-                return Err(ReceivingError::Network(std::io::Error::new(
+                return Err(ReporterError::Network(std::io::Error::new(
                     std::io::ErrorKind::ConnectionRefused,
                     "Test failure",
                 )));
@@ -320,7 +320,7 @@ mod tests {
 
             for event in &self.events {
                 sender.send(event.clone()).map_err(|_| {
-                    ReceivingError::Network(std::io::Error::new(
+                    ReporterError::Network(std::io::Error::new(
                         std::io::ErrorKind::BrokenPipe,
                         "Channel disconnected",
                     ))
@@ -331,13 +331,13 @@ mod tests {
     }
 
     impl Cancellable for MockCancellableProducer {
-        fn cancel(&self) -> Result<(), ReceivingError> {
+        fn cancel(&self) -> Result<(), ReporterError> {
             *self
                 .cancel_count
                 .lock()
                 .expect("Failed to lock cancel_count mutex") += 1;
             if self.should_fail_cancel {
-                return Err(ReceivingError::Network(std::io::Error::other(
+                return Err(ReporterError::Network(std::io::Error::other(
                     "Cancel failure",
                 )));
             }
@@ -438,7 +438,7 @@ mod tests {
     fn test_replayer_producer_failure() {
         let mut producer_mock = MockProducer::new();
         producer_mock.expect_produce().times(1).returning(|_| {
-            Err(ReceivingError::Network(std::io::Error::new(
+            Err(ReporterError::Network(std::io::Error::new(
                 std::io::ErrorKind::ConnectionRefused,
                 "Test failure",
             )))
@@ -451,7 +451,7 @@ mod tests {
         assert!(result.is_err());
         matches!(
             result.unwrap_err(),
-            RuntimeError::Producer(ReceivingError::Network(_))
+            RuntimeError::Producer(ReporterError::Network(_))
         );
     }
 

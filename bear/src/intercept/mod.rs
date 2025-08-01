@@ -102,6 +102,15 @@ impl fmt::Display for Execution {
     }
 }
 
+/// Represents errors that can occur while capturing the execution information.
+#[derive(Error, Debug)]
+pub enum CaptureError {
+    #[error("Failed to capture execution: {0}")]
+    CurrentExecutable(std::io::Error),
+    #[error("Failed to capture current directory: {0}")]
+    CurrentDirectory(std::io::Error),
+}
+
 /// Represent a relevant life cycle event of a process.
 ///
 /// In the current implementation, we only have one event, the `Started` event.
@@ -146,12 +155,4 @@ impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Event pid={}, execution={}", self.pid, self.execution)
     }
-}
-
-#[derive(Error, Debug)]
-pub enum CaptureError {
-    #[error("Failed to capture execution: {0}")]
-    CurrentExecutable(std::io::Error),
-    #[error("Failed to capture current directory: {0}")]
-    CurrentDirectory(std::io::Error),
 }

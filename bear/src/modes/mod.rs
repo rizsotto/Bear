@@ -122,8 +122,9 @@ mod impls {
     use super::ConfigurationError;
     use crate::args::BuildCommand;
     use crate::intercept::environment;
+    use crate::intercept::reporter::ReporterError;
     use crate::intercept::supervise::SuperviseError;
-    use crate::intercept::tcp::{CollectorOnTcp, ReceivingError};
+    use crate::intercept::tcp::CollectorOnTcp;
     use crate::output::{
         ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
     };
@@ -143,7 +144,7 @@ mod impls {
     }
 
     impl execution::Producer for TcpEventProducer {
-        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReporterError> {
             for event in self.source.events() {
                 match event {
                     Ok(event) => {
@@ -163,7 +164,7 @@ mod impls {
     }
 
     impl execution::Cancellable for TcpEventProducer {
-        fn cancel(&self) -> Result<(), ReceivingError> {
+        fn cancel(&self) -> Result<(), ReporterError> {
             self.source.shutdown()
         }
     }
@@ -199,10 +200,10 @@ mod impls {
     impl execution::Producer for RawEventReader {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
-        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReceivingError> {
+        fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReporterError> {
             let source = fs::File::open(&self.file_name)
                 .map(io::BufReader::new)
-                .map_err(ReceivingError::Network)?;
+                .map_err(ReporterError::Network)?;
 
             let events = ExecutionEventDatabase::read_and_ignore(source, |error| {
                 log::warn!("Event file reading issue: {error:?}");

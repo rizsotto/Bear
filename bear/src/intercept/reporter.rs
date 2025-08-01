@@ -28,12 +28,12 @@ pub trait Reporter {
     ///
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
-    fn report(&self, event: Event) -> Result<(), ReportingError>;
+    fn report(&self, event: Event) -> Result<(), ReporterError>;
 }
 
 /// Errors that can occur while reporting events.
 #[derive(Error, Debug)]
-pub enum ReportingError {
+pub enum ReporterError {
     #[error("Serialization error: {0}")]
     Serialization(#[from] serde_json::Error),
     #[error("Network error: {0}")]
@@ -49,9 +49,9 @@ impl ReporterFactory {
     /// The created reporter is not connected yet; it only stores the destination address.
     /// It is safe to presume that the existence of the instance does not imply it is
     /// consuming resources until the `report` method is called.
-    pub fn create() -> Result<tcp::ReporterOnTcp, InitialisationError> {
+    pub fn create() -> Result<tcp::ReporterOnTcp, ReporterCreationError> {
         let address = std::env::var(KEY_DESTINATION)
-            .map_err(|_| InitialisationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
+            .map_err(|_| ReporterCreationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
 
         let reporter = tcp::ReporterOnTcp::new(address);
         Ok(reporter)
@@ -85,7 +85,7 @@ impl ReporterFactory {
 
 /// Errors that can occur during reporter initialization.
 #[derive(Error, Debug)]
-pub enum InitialisationError {
+pub enum ReporterCreationError {
     #[error("Environment variable '{0}' is missing")]
     MissingEnvironmentVariable(&'static str),
     #[error("Network error: {0}")]
