@@ -212,8 +212,15 @@ impl BuildEnvironment {
     ///
     /// Panics if the build command has no arguments (empty arguments vector).
     fn as_command(&self, val: BuildCommand) -> std::process::Command {
-        let mut command = std::process::Command::new(val.arguments.first().unwrap());
-        command.args(val.arguments.iter().skip(1));
+        let mut command = match val.arguments.as_slice() {
+            [] => panic!("BuildCommand arguments cannot be empty"),
+            [executable] => std::process::Command::new(executable),
+            [executable, arguments @ ..] => {
+                let mut cmd = std::process::Command::new(executable);
+                cmd.args(arguments);
+                cmd
+            }
+        };
         command.envs(self.environment.clone());
         command
     }

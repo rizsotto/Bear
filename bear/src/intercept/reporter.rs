@@ -60,10 +60,16 @@ impl ReporterFactory {
     /// Creates a new reporter and returns it as an atomic pointer.
     ///
     /// This is useful for static/global usage where a stable pointer is required
-    /// for the program's lifetime. Caller is responsible for managing the memory.
+    /// for the program's lifetime.
     ///
-    /// Logs errors if reporter creation fails and returns a null pointer in that case.
-    /// Caller is responsible to check for null pointer before using it.
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring the returned pointer is not used after
+    /// the program terminates. The memory will be leaked intentionally to provide a
+    /// stable pointer for the lifetime of the program.
+    ///
+    /// Returns a null pointer if reporter creation fails. Caller must check for null
+    /// before dereferencing.
     pub fn create_as_ptr() -> AtomicPtr<tcp::ReporterOnTcp> {
         match Self::create() {
             Ok(reporter) => {
@@ -71,9 +77,9 @@ impl ReporterFactory {
 
                 // Leak the reporter to get a stable pointer for the lifetime of the program
                 let boxed_reporter = Box::new(reporter);
-                let prt = Box::into_raw(boxed_reporter);
+                let ptr = Box::into_raw(boxed_reporter);
 
-                AtomicPtr::new(prt)
+                AtomicPtr::new(ptr)
             }
             Err(err) => {
                 log::error!("Failed to create reporter: {err}");

@@ -11,13 +11,13 @@ use std::sync::Arc;
 
 /// The serializer for events to transmit over the network.
 ///
-/// The events are serialized using TLV (Type-Length-Value) format.
-/// The type is always 0, the length is a 4-byte big-endian integer,
-/// and the value is the JSON representation of the event.
+/// The events are serialized using LV (Length-Value) format.
+/// The length is a 4-byte big-endian integer, and the value is the JSON
+/// representation of the event.
 struct EventWireSerializer;
 
 impl EventWireSerializer {
-    /// Read an event from a reader using TLV format.
+    /// Read an event from a reader using LV format.
     fn read(reader: &mut impl Read) -> Result<Event, ReporterError> {
         let mut length_bytes = [0; 4];
         reader.read_exact(&mut length_bytes)?;
@@ -30,7 +30,7 @@ impl EventWireSerializer {
         Ok(event)
     }
 
-    /// Write an event to a writer using TLV format.
+    /// Write an event to a writer using LV format.
     fn write(writer: &mut impl Write, event: Event) -> Result<u32, ReporterError> {
         let serialized_event = serde_json::to_string(&event)?;
         let bytes = serialized_event.into_bytes();

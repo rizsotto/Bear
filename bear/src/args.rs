@@ -112,12 +112,18 @@ impl TryFrom<&ArgMatches> for BuildCommand {
     type Error = ParseError;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
-        let arguments = matches
+        let arguments: Vec<_> = matches
             .get_many("COMMAND")
             .ok_or(ParseError::MissingBuildCommand)?
             .cloned()
             .collect();
-        Ok(BuildCommand { arguments })
+
+        // TODO: write test to validate we need this check.
+        if arguments.is_empty() {
+            Err(ParseError::MissingBuildCommand)
+        } else {
+            Ok(BuildCommand { arguments })
+        }
     }
 }
 

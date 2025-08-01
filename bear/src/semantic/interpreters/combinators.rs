@@ -87,8 +87,8 @@ mod test {
 
     fn execution_fixture() -> Execution {
         Execution {
-            executable: PathBuf::new(),
-            arguments: vec![],
+            executable: PathBuf::from("/usr/bin/ls"),
+            arguments: vec!["ls".to_string()],
             working_dir: PathBuf::new(),
             environment: HashMap::new(),
         }

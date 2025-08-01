@@ -54,8 +54,16 @@ pub fn supervise_execution(execution: Execution) -> Result<ExitStatus, Supervise
 
 impl From<Execution> for std::process::Command {
     fn from(val: Execution) -> Self {
-        let mut command = std::process::Command::new(val.executable);
-        command.args(val.arguments.iter().skip(1));
+        let mut command = match val.arguments.as_slice() {
+            [] => panic!("Execution arguments cannot be empty"),
+            [_] => std::process::Command::new(val.executable),
+            [_, arguments @ ..] => {
+                let mut cmd = std::process::Command::new(val.executable);
+                cmd.args(arguments);
+                cmd
+            }
+        };
+
         command.envs(val.environment);
         command.current_dir(val.working_dir);
         command

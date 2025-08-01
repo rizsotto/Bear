@@ -26,6 +26,13 @@ use thiserror::Error;
 /// It does not contain information about the outcome of the execution,
 /// like the exit code or the duration of the execution. It only contains
 /// the information that is necessary to reproduce the execution.
+///
+/// # Fields
+/// - `executable`: The path to the executable that was run.
+/// - `arguments`: The command line arguments that were passed to the executable.
+///   Includes the executable itself as the first argument.
+/// - `working_dir`: The current working directory of the process.
+/// - `environment`: The environment variables that were set for the process.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Execution {
     pub executable: PathBuf,
@@ -39,6 +46,10 @@ impl Execution {
     ///
     /// This method retrieves the executable path, command-line arguments,
     /// current working directory, and environment variables of the process.
+    ///
+    /// **Security Note**: This method captures ALL environment variables from
+    /// the current process, which may include sensitive information. Consider
+    /// using the `trim()` method to filter to only relevant environment variables.
     pub fn capture() -> Result<Self, CaptureError> {
         let executable = std::env::current_exe().map_err(CaptureError::CurrentExecutable)?;
         let arguments = std::env::args().collect();
