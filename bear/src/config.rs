@@ -423,11 +423,11 @@ mod types {
 
 pub mod loader {
     use super::Main;
-    use anyhow::Context;
     use directories::{BaseDirs, ProjectDirs};
     use log::{debug, info};
     use std::fs::OpenOptions;
     use std::path::{Path, PathBuf};
+    use thiserror::Error;
 
     pub struct Loader {}
 
@@ -437,11 +437,10 @@ pub mod loader {
         /// If the configuration file is specified, it will be used. Otherwise, the default locations
         /// will be searched for the configuration file. If the configuration file is not found, the
         /// default configuration will be returned.
-        pub fn load(file: &Option<String>) -> anyhow::Result<Main> {
-            if let Some(path) = file {
+        pub fn load(filename: &Option<String>) -> Result<Main, ConfigError> {
+            if let Some(path) = filename {
                 // If the configuration file is specified, use it.
-                let config_file_path = PathBuf::from(path);
-                Self::from_file(config_file_path.as_path())
+                Self::from_file(Path::new(path))
             } else {
                 // Otherwise, try to find the configuration file in the default locations.
                 let locations = Self::file_locations();
@@ -487,16 +486,21 @@ pub mod loader {
         }
 
         /// Loads the configuration from the specified file.
-        pub fn from_file(file: &Path) -> anyhow::Result<Main> {
-            info!("Loading configuration file: {}", file.display());
+        pub fn from_file(path: &Path) -> Result<Main, ConfigError> {
+            info!("Loading configuration file: {}", path.display());
 
-            let reader = OpenOptions::new()
-                .read(true)
-                .open(file)
-                .with_context(|| format!("Failed to open configuration file: {file:?}"))?;
+            let reader = OpenOptions::new().read(true).open(path).map_err(|source| {
+                ConfigError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                }
+            })?;
 
-            let content: Main = Self::from_reader(reader)
-                .with_context(|| format!("Failed to parse configuration from file: {file:?}"))?;
+            let content: Main =
+                Self::from_reader(reader).map_err(|source| ConfigError::ParseError {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
 
             Ok(content)
         }
@@ -509,6 +513,28 @@ pub mod loader {
         {
             serde_yml::from_reader(rdr)
         }
+    }
+
+    /// Represents all possible configuration-related errors.
+    #[derive(Debug, Error)]
+    pub enum ConfigError {
+        /// Error when opening or reading a configuration file.
+        #[error("Failed to access configuration file '{path}': {source}")]
+        FileAccess {
+            path: PathBuf,
+            #[source]
+            source: std::io::Error,
+        },
+        /// Error when parsing the configuration file format.
+        #[error("Failed to parse configuration from file '{path}': {source}")]
+        ParseError {
+            path: PathBuf,
+            #[source]
+            source: serde_yml::Error,
+        },
+        /// Error when the schema version is not supported.
+        #[error("Unsupported schema version: {found}. Expected: {expected}")]
+        UnsupportedSchema { found: String, expected: String },
     }
 
     #[cfg(test)]
