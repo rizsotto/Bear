@@ -27,7 +27,7 @@ pub trait Consumer: Send {
     ///
     /// # Returns
     /// * `Ok(())` - All items were successfully processed
-    /// * `Err(FormatError)` - An error occurred during processing
+    /// * `Err(WriterError)` - An error occurred during processing
     fn consume(self: Box<Self>, receiver: Receiver<intercept::Event>) -> Result<(), WriterError>;
 }
 
@@ -48,7 +48,7 @@ pub trait Producer: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - All items were successfully produced
-    /// * `Err(ReportingError)` - An error occurred during production
+    /// * `Err(ReporterError)` - An error occurred during production
     fn produce(
         &self,
         sender: crossbeam_channel::Sender<intercept::Event>,
@@ -65,7 +65,7 @@ pub trait Cancellable: Send + Sync {
     ///
     /// # Returns
     /// * `Ok(())` - Cancellation was successful
-    /// * `Err(ReportingError)` - An error occurred during cancellation
+    /// * `Err(ReporterError)` - An error occurred during cancellation
     fn cancel(&self) -> Result<(), ReporterError>;
 }
 

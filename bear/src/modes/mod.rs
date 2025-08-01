@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+//! # Execution Modes
+//!
+//! This module provides the core execution patterns for Bear's operation modes.
+//! It defines traits and implementations for the producer-consumer pattern
+//! used throughout the application.
+
 mod execution;
 
 use crate::intercept::environment;
@@ -8,16 +14,19 @@ use crate::{args, config, output};
 use std::process::ExitCode;
 use std::sync::Arc;
 
-/// Represent the modes the application can run in.
+/// Represents the application execution modes.
 ///
-/// To the user the modes are:
-/// - intercept only: capture build commands and write them to a file.
-/// - semantic only: read build commands from a file and analyze them.
-/// - combined: capture build commands and analyze them in one go.
+/// Bear supports three user-facing modes:
+/// - **Intercept only**: Capture build commands and write them to a file for later analysis.
+/// - **Semantic only**: Read previously captured build commands from a file and analyze them.
+/// - **Combined**: Capture build commands and analyze them in real-time.
 ///
-/// This representation of the mode is based on if we are intercepting the build commands
-/// or if we are replaying them. If we are analyzing the build events or just writing them
-/// to a file is not relevant for the mode itself, but rather for the configuration.
+/// Internally, this enum distinguishes between:
+/// - `Intercept`: Modes that execute build commands while capturing events (intercept-only and combined)
+/// - `Replay`: Modes that process previously captured events (semantic-only)
+///
+/// The distinction between writing raw events vs. performing semantic analysis
+/// is handled by the consumer configuration, not the mode itself.
 pub enum Mode {
     Intercept(execution::Interceptor, args::BuildCommand),
     Replay(execution::Replayer),
@@ -88,11 +97,11 @@ impl Mode {
         }
     }
 
-    /// It actually runs the application mode.
+    /// Runs the application mode.
     ///
-    /// This is when the build command is executed in the intercept mode or
-    /// when the event file is read in the replay mode. These errors are all
-    /// run-time errors, the user were passing valid arguments and configurations.
+    /// This executes the build command in intercept mode or reads the event file in replay mode.
+    /// All errors returned are runtime errors that occur after valid arguments and configuration
+    /// have been provided.
     pub fn run(self) -> ExitCode {
         let status = match self {
             Self::Intercept(interceptor, command) => interceptor.run(command),
