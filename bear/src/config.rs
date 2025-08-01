@@ -2,7 +2,7 @@
 
 //! This module defines the configuration of the application.
 //!
-//! The configuration is either loaded from a file or used with the default
+//! The configuration is either loaded from a file or used with default
 //! values, which are defined in the code. The configuration exposes the main
 //! logical steps that the application will follow.
 //!
@@ -10,11 +10,11 @@
 //! The default configuration file name is `bear.yml`.
 //!
 //! The configuration file location is searched in the following order:
-//! - The current working directory.
-//! - The local configuration directory of the user.
-//! - The configuration directory of the user.
-//! - The local configuration directory of the application.
-//! - The configuration directory of the application.
+//! 1. The current working directory
+//! 2. The local configuration directory of the user
+//! 3. The configuration directory of the user
+//! 4. The local configuration directory of the application
+//! 5. The configuration directory of the application
 //!
 //! ```yaml
 //! schema: 4.0

@@ -3,9 +3,8 @@
 //! This module contains the command line interface of the application.
 //!
 //! The command line parsing is implemented using the `clap` library.
-//! The module is defining types to represent a structured form of the
-//! program invocation. The `Arguments` type is used to represent all
-//! possible invocations of the program.
+//! The module defines types to represent a structured form of program invocation.
+//! The `Arguments` type is used to represent all possible invocations of the program.
 
 use clap::{arg, command, ArgAction, ArgMatches, Command};
 
@@ -18,9 +17,9 @@ const DEFAULT_EVENT_FILE: &str = "events.json";
 /// Represents the command line arguments of the application.
 #[derive(Debug, PartialEq)]
 pub struct Arguments {
-    // The path of the configuration file.
+    /// The path of the configuration file.
     pub config: Option<String>,
-    // The mode of the application.
+    /// The mode of the application.
     pub mode: Mode,
 }
 
@@ -44,17 +43,23 @@ pub enum Mode {
 /// Represents the execution of a command.
 #[derive(Debug, PartialEq)]
 pub struct BuildCommand {
+    /// The command arguments to execute. (This is a non-empty vector of strings.)
     pub arguments: Vec<String>,
 }
 
+/// Represents the semantic output configuration.
 #[derive(Debug, PartialEq)]
 pub struct BuildSemantic {
+    /// The output file path.
     pub path: std::path::PathBuf,
+    /// Whether to append to an existing file.
     pub append: bool,
 }
 
+/// Represents the build events configuration.
 #[derive(Debug, PartialEq)]
 pub struct BuildEvents {
+    /// The path to the events file.
     pub path: std::path::PathBuf,
 }
 
@@ -113,17 +118,13 @@ impl TryFrom<&ArgMatches> for BuildCommand {
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
         let arguments: Vec<_> = matches
-            .get_many("COMMAND")
+            .get_many("BUILD_COMMAND")
             .ok_or(ParseError::MissingBuildCommand)?
             .cloned()
             .collect();
 
-        // TODO: write test to validate we need this check.
-        if arguments.is_empty() {
-            Err(ParseError::MissingBuildCommand)
-        } else {
-            Ok(BuildCommand { arguments })
-        }
+        // The arguments must not be empty, and that is enforced by the CLI definition.
+        Ok(BuildCommand { arguments })
     }
 }
 
@@ -168,7 +169,7 @@ pub fn cli() -> Command {
             Command::new(MODE_INTERCEPT_SUBCOMMAND)
                 .about("intercepts command execution")
                 .args(&[
-                    arg!(<COMMAND> "Build command")
+                    arg!(<BUILD_COMMAND> "Build command")
                         .action(ArgAction::Append)
                         .value_terminator("--")
                         .num_args(1..)
@@ -196,7 +197,7 @@ pub fn cli() -> Command {
                 .arg_required_else_help(false),
         )
         .args(&[
-            arg!(<COMMAND> "Build command")
+            arg!(<BUILD_COMMAND> "Build command")
                 .action(ArgAction::Append)
                 .value_terminator("--")
                 .num_args(1..)
