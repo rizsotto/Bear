@@ -5,14 +5,16 @@
 //! interpreter chain to include or exclude specific compilers.
 
 use super::interpreters::combinators::Any;
-use super::interpreters::filter::FilteringInterpreter;
-use super::interpreters::format::FormattingInterpreter;
+use super::interpreters::filter::{
+    CompilerFilterConfigurationError, FilteringInterpreter, SourceFilterConfigurationError,
+};
+use super::interpreters::format::{FormatConfigurationError, FormattingInterpreter};
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
 use super::Interpreter;
 use crate::config;
-use std::collections::HashMap;
 use std::path::PathBuf;
+use thiserror::Error;
 
 mod combinators;
 pub mod filter;
@@ -20,6 +22,16 @@ pub mod format;
 pub mod generic;
 mod ignore;
 mod matchers;
+
+#[derive(Error, Debug)]
+pub enum InterpreterConfigError {
+    #[error("Compiler filter configuration error: {0}")]
+    CompilerFilter(#[from] CompilerFilterConfigurationError),
+    #[error("Source filter configuration error: {0}")]
+    SourceFilter(#[from] SourceFilterConfigurationError),
+    #[error("Format configuration error: {0}")]
+    Format(#[from] FormatConfigurationError),
+}
 
 /// Creates an interpreter to recognize the compiler calls.
 ///
@@ -32,7 +44,7 @@ mod matchers;
 //       Use the CC or CXX environment variables and make sure those are not excluded.
 //       Make sure the environment variables are passed to the method.
 // TODO: Take environment variables as input.
-pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
+pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, InterpreterConfigError> {
     let compilers_to_include = match &config.intercept {
         config::Intercept::Wrapper { executables, .. } => executables.clone(),
         _ => vec![],
@@ -74,28 +86,16 @@ pub fn create<'a>(config: &config::Main) -> impl Interpreter + 'a {
             format,
             ..
         } => {
-            // First apply filtering
-            let filtered_interpreter =
-                FilteringInterpreter::from_config(Box::new(base_interpreter), compilers, sources)
-                    .unwrap_or_else(|_| {
-                        // If filtering configuration is invalid, create a pass-through filter
-                        FilteringInterpreter::new(
-                            Box::new(Any::new(vec![])),
-                            HashMap::new(),
-                            vec![],
-                        )
-                    });
-
-            // Then apply formatting
-            FormattingInterpreter::from_config(Box::new(filtered_interpreter), &format.paths)
-                .unwrap_or_else(|_| {
-                    // If formatting configuration is invalid, use pass-through
-                    FormattingInterpreter::pass_through(Box::new(Any::new(vec![])))
-                })
+            let filtering =
+                FilteringInterpreter::from_config(base_interpreter, compilers, sources)?;
+            let formatting = FormattingInterpreter::from_config(filtering, &format.paths)?;
+            Ok(formatting)
         }
         config::Output::Semantic { .. } => {
             // For semantic output, just use pass-through formatting
-            FormattingInterpreter::pass_through(Box::new(base_interpreter))
+            let filtering = FilteringInterpreter::pass_through(base_interpreter);
+            let formatting = FormattingInterpreter::pass_through(filtering);
+            Ok(formatting)
         }
     }
 }

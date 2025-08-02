@@ -281,11 +281,12 @@ mod impls {
             output: args::BuildSemantic,
             config: &config::Main,
         ) -> Result<Self, WriterCreationError> {
-            let interpreter = Box::new(semantic::interpreters::create(config));
+            let interpreter = semantic::interpreters::create(config)
+                .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
             let writer = output::OutputWriter::try_from((&output, &config.output))?;
 
             Ok(Self {
-                interpreter,
+                interpreter: Box::new(interpreter),
                 writer,
             })
         }

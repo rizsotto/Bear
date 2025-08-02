@@ -17,6 +17,7 @@
 //! Formatting interpreter that wraps another interpreter to format paths in compiler commands
 //! according to configuration (absolute, relative, canonical).
 
+use super::InterpreterConfigError;
 use crate::config::{PathFormat, PathResolver};
 use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::path::{Path, PathBuf};
@@ -24,13 +25,51 @@ use std::{env, io};
 use thiserror::Error;
 
 /// A wrapper interpreter that applies path formatting to recognized compiler commands.
-pub struct FormattingInterpreter {
-    inner: Box<dyn Interpreter>,
+pub struct FormattingInterpreter<T: Interpreter> {
+    inner: T,
     formatter: PathFormatter,
 }
 
+impl<T: Interpreter> FormattingInterpreter<T> {
+    /// Creates a new formatting interpreter that wraps another interpreter.
+    fn new(inner: T, formatter: PathFormatter) -> Self {
+        Self { inner, formatter }
+    }
+
+    /// Creates a formatting interpreter from configuration.
+    pub fn from_config(inner: T, config: &PathFormat) -> Result<Self, InterpreterConfigError> {
+        let formatter = PathFormatter::try_from(config)?;
+        Ok(Self::new(inner, formatter))
+    }
+
+    /// Creates a pass-through formatting interpreter (no formatting applied).
+    pub fn pass_through(inner: T) -> Self {
+        Self::new(inner, PathFormatter::Skip)
+    }
+}
+
+impl<T: Interpreter> Interpreter for FormattingInterpreter<T> {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        // First, let the inner interpreter recognize the command
+        let command = self.inner.recognize(execution)?;
+
+        match command {
+            Command::Compiler(compiler_cmd) => {
+                // Apply formatting to the compiler command
+                match self.formatter.format_command(compiler_cmd.clone()) {
+                    Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
+                    // If formatting fails, return None
+                    Err(_) => None,
+                }
+            }
+            // Pass through other command types unchanged
+            other => Some(other),
+        }
+    }
+}
+
 #[derive(Debug)]
-pub enum PathFormatter {
+enum PathFormatter {
     /// Apply formatting according to the configuration
     Format {
         config: PathFormat,
@@ -49,52 +88,11 @@ pub enum FormatError {
 }
 
 #[derive(Debug, Error)]
-pub enum ConfigurationError {
+pub enum FormatConfigurationError {
     #[error("Only relative paths for 'file' and 'output' when 'directory' is relative")]
     OnlyRelativePaths,
     #[error("Getting current directory failed: {0}")]
     CurrentWorkingDirectory(#[from] io::Error),
-}
-
-impl FormattingInterpreter {
-    /// Creates a new formatting interpreter that wraps another interpreter.
-    pub fn new(inner: Box<dyn Interpreter>, formatter: PathFormatter) -> Self {
-        Self { inner, formatter }
-    }
-
-    /// Creates a formatting interpreter from configuration.
-    pub fn from_config(
-        inner: Box<dyn Interpreter>,
-        config: &PathFormat,
-    ) -> Result<Self, ConfigurationError> {
-        let formatter = PathFormatter::try_from(config)?;
-        Ok(Self::new(inner, formatter))
-    }
-
-    /// Creates a pass-through formatting interpreter (no formatting applied).
-    pub fn pass_through(inner: Box<dyn Interpreter>) -> Self {
-        Self::new(inner, PathFormatter::Skip)
-    }
-}
-
-impl Interpreter for FormattingInterpreter {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        // First, let the inner interpreter recognize the command
-        let command = self.inner.recognize(execution)?;
-
-        match command {
-            Command::Compiler(compiler_cmd) => {
-                // Apply formatting to the compiler command
-                match self.formatter.format_command(compiler_cmd.clone()) {
-                    Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
-                    // If formatting fails, return None
-                    Err(_) => None,
-                }
-            }
-            // Pass through other command types unchanged
-            other => Some(other),
-        }
-    }
 }
 
 impl PathFormatter {
@@ -159,14 +157,14 @@ impl PathFormatter {
 }
 
 impl TryFrom<&PathFormat> for PathFormatter {
-    type Error = ConfigurationError;
+    type Error = FormatConfigurationError;
 
     fn try_from(config: &PathFormat) -> Result<Self, Self::Error> {
         use PathResolver::Relative;
 
         // When the directory is relative, the file and output must be relative too.
         if config.directory == Relative && (config.file != Relative || config.output != Relative) {
-            return Err(ConfigurationError::OnlyRelativePaths);
+            return Err(FormatConfigurationError::OnlyRelativePaths);
         }
 
         Ok(Self::Format {
@@ -290,7 +288,7 @@ mod tests {
             .expect_recognize()
             .returning(move |_| Some(Command::Compiler(mock_cmd.clone())));
 
-        let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
+        let sut = FormattingInterpreter::pass_through(mock_interpreter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -314,7 +312,7 @@ mod tests {
             .expect_recognize()
             .returning(|_| Some(Command::Ignored("test reason")));
 
-        let sut = FormattingInterpreter::pass_through(Box::new(mock_interpreter));
+        let sut = FormattingInterpreter::pass_through(mock_interpreter);
 
         let execution =
             Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
@@ -358,7 +356,7 @@ mod tests {
         assert!(result.is_err());
         assert!(matches!(
             result.err().unwrap(),
-            ConfigurationError::OnlyRelativePaths
+            FormatConfigurationError::OnlyRelativePaths
         ));
     }
 

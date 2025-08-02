@@ -3,6 +3,7 @@
 //! Filtering interpreter that wraps another interpreter to filter out compiler commands
 //! based on compiler paths and source directories.
 
+use super::InterpreterConfigError;
 use crate::config;
 use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::collections::HashMap;
@@ -10,44 +11,142 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// A wrapper interpreter that applies filtering to recognized compiler commands.
-pub struct FilteringInterpreter {
-    inner: Box<dyn Interpreter>,
-    compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
-    source_filters: Vec<config::DirectoryFilter>,
+pub struct FilteringInterpreter<T: Interpreter> {
+    inner: T,
+    filter: Filter,
 }
 
-impl FilteringInterpreter {
+impl<T: Interpreter> FilteringInterpreter<T> {
     /// Creates a new filtering interpreter that wraps another interpreter.
-    pub fn new(
-        inner: Box<dyn Interpreter>,
-        compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
-        source_filters: Vec<config::DirectoryFilter>,
-    ) -> Self {
-        Self {
-            inner,
-            compiler_filters,
-            source_filters,
-        }
+    fn new(inner: T, filter: Filter) -> Self {
+        Self { inner, filter }
     }
 
     /// Creates a filtering interpreter from configuration.
     pub fn from_config(
-        inner: Box<dyn Interpreter>,
+        inner: T,
         compilers: &[config::Compiler],
         sources: &config::SourceFilter,
-    ) -> Result<Self, ConfigurationError> {
-        // Validate compiler configuration
-        Self::validate_compiler_configuration(compilers)?;
+    ) -> Result<Self, InterpreterConfigError> {
+        let filter = Filter::try_from((compilers, sources))?;
+        Ok(Self::new(inner, filter))
+    }
 
-        let mut compiler_filters = HashMap::new();
-        for c in compilers {
-            compiler_filters.insert(c.path.clone(), c.ignore.clone());
+    /// Creates a pass-through filtering interpreter (no filtering applied).
+    pub fn pass_through(inner: T) -> Self {
+        Self::new(inner, Filter::Skip)
+    }
+}
+
+impl<T: Interpreter> Interpreter for FilteringInterpreter<T> {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        // First, let the inner interpreter recognize the command
+        let command = self.inner.recognize(execution)?;
+
+        match command {
+            Command::Compiler(compiler_cmd) => {
+                // Apply filtering to the compiler command
+                match self.filter.filter_command(&compiler_cmd) {
+                    Ok(()) => Some(Command::Compiler(compiler_cmd)),
+                    Err(reason) => Some(Command::Filtered(reason)),
+                }
+            }
+            // Pass through other command types unchanged
+            other => Some(other),
         }
+    }
+}
 
-        // Validate source configuration
-        let source_filters = Self::validate_source_configuration(sources)?;
+#[derive(Debug)]
+enum Filter {
+    /// Apply filtering according to the configuration
+    Filter {
+        compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
+        source_filters: Vec<config::DirectoryFilter>,
+    },
+    /// Skip filtering (pass through unchanged)
+    Skip,
+}
 
-        Ok(Self::new(inner, compiler_filters, source_filters))
+impl Filter {
+    fn filter_command(&self, cmd: &CompilerCommand) -> Result<(), String> {
+        match self {
+            Filter::Skip => Ok(()),
+            Filter::Filter {
+                compiler_filters,
+                source_filters,
+            } => {
+                // Check if the compiler should be filtered
+                if let Some(reason) = self.should_filter_compiler(&cmd.executable, compiler_filters)
+                {
+                    return Err(reason);
+                }
+
+                // Check if any source files should be filtered
+                if let Some(reason) = self.should_filter_sources(cmd, source_filters) {
+                    return Err(reason);
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    fn should_filter_compiler(
+        &self,
+        compiler_path: &PathBuf,
+        compiler_filters: &HashMap<PathBuf, config::IgnoreOrConsider>,
+    ) -> Option<String> {
+        if let Some(ignore) = compiler_filters.get(compiler_path) {
+            match ignore {
+                config::IgnoreOrConsider::Always => Some(format!(
+                    "Compiler {} is configured to be ignored",
+                    compiler_path.display()
+                )),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn should_filter_sources(
+        &self,
+        cmd: &CompilerCommand,
+        source_filters: &[config::DirectoryFilter],
+    ) -> Option<String> {
+        // Get all source files from the command
+        let source_files: Vec<&String> = cmd
+            .arguments
+            .iter()
+            .filter(|arg| arg.kind == ArgumentKind::Source)
+            .flat_map(|arg| &arg.args)
+            .collect();
+
+        // TODO: handle cases when there are multiple source files, but filtering
+        //       keeps at least one source file in the result.
+        for source_file in source_files {
+            // FIXME: this is not needed if the command is already using absolute paths
+            let source_path = if PathBuf::from(source_file).is_absolute() {
+                PathBuf::from(source_file)
+            } else {
+                cmd.working_dir.join(source_file)
+            };
+
+            for filter in source_filters {
+                if source_path.starts_with(&filter.path) {
+                    return match filter.ignore {
+                        config::Ignore::Always => Some(format!(
+                            "Source file {} is in filtered directory {}",
+                            source_file,
+                            filter.path.display()
+                        )),
+                        config::Ignore::Never => None,
+                    };
+                }
+            }
+        }
+        None
     }
 
     /// Validates the compiler configuration.
@@ -164,80 +263,29 @@ impl FilteringInterpreter {
         }
         Ok(verified)
     }
-
-    fn should_filter_compiler(&self, compiler_path: &PathBuf) -> Option<String> {
-        if let Some(ignore) = self.compiler_filters.get(compiler_path) {
-            match ignore {
-                config::IgnoreOrConsider::Always => Some(format!(
-                    "Compiler {} is configured to be ignored",
-                    compiler_path.display()
-                )),
-                _ => None,
-            }
-        } else {
-            None
-        }
-    }
-
-    fn should_filter_sources(&self, cmd: &CompilerCommand) -> Option<String> {
-        // Get all source files from the command
-        let source_files: Vec<&String> = cmd
-            .arguments
-            .iter()
-            .filter(|arg| arg.kind == ArgumentKind::Source)
-            .flat_map(|arg| &arg.args)
-            .collect();
-
-        // TODO: handle cases when there are multiple source files, but filtering
-        //       keeps at least one source file in the result.
-        for source_file in source_files {
-            // FIXME: this is not needed if the command is already using absolute paths
-            let source_path = if PathBuf::from(source_file).is_absolute() {
-                PathBuf::from(source_file)
-            } else {
-                cmd.working_dir.join(source_file)
-            };
-
-            for filter in &self.source_filters {
-                if source_path.starts_with(&filter.path) {
-                    return match filter.ignore {
-                        config::Ignore::Always => Some(format!(
-                            "Source file {} is in filtered directory {}",
-                            source_file,
-                            filter.path.display()
-                        )),
-                        config::Ignore::Never => None,
-                    };
-                }
-            }
-        }
-        None
-    }
 }
 
-impl Interpreter for FilteringInterpreter {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        // First, let the inner interpreter recognize the command
-        let command = self.inner.recognize(execution)?;
+impl TryFrom<(&[config::Compiler], &config::SourceFilter)> for Filter {
+    type Error = InterpreterConfigError;
 
-        match command {
-            Command::Compiler(compiler_cmd) => {
-                // Check if the compiler should be filtered
-                if let Some(reason) = self.should_filter_compiler(&compiler_cmd.executable) {
-                    return Some(Command::Filtered(reason));
-                }
+    fn try_from(
+        (compilers, sources): (&[config::Compiler], &config::SourceFilter),
+    ) -> Result<Self, Self::Error> {
+        // Validate compiler configuration
+        Self::validate_compiler_configuration(compilers)?;
 
-                // Check if any source files should be filtered
-                if let Some(reason) = self.should_filter_sources(&compiler_cmd) {
-                    return Some(Command::Filtered(reason));
-                }
-
-                // No filtering applied, return the original command
-                Some(Command::Compiler(compiler_cmd))
-            }
-            // Pass through other command types unchanged
-            other => Some(other),
+        let mut compiler_filters = HashMap::new();
+        for c in compilers {
+            compiler_filters.insert(c.path.clone(), c.ignore.clone());
         }
+
+        // Validate source configuration
+        let source_filters = Self::validate_source_configuration(sources)?;
+
+        Ok(Self::Filter {
+            compiler_filters,
+            source_filters,
+        })
     }
 }
 
@@ -273,14 +321,6 @@ pub enum SourceFilterConfigurationError {
     Canonicalization(#[from] std::io::Error),
 }
 
-#[derive(Debug, Error)]
-pub enum ConfigurationError {
-    #[error("Compiler filter configuration error: {0}")]
-    CompilerFilter(#[from] CompilerFilterConfigurationError),
-    #[error("Source filter configuration error: {0}")]
-    SourceFilter(#[from] SourceFilterConfigurationError),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -293,11 +333,15 @@ mod tests {
 
     #[test]
     fn test_filter_compiler_always_ignored() {
-        let mut compiler_filters = HashMap::new();
-        compiler_filters.insert(
-            PathBuf::from("/usr/bin/gcc"),
-            config::IgnoreOrConsider::Always,
-        );
+        let compilers = vec![Compiler {
+            path: PathBuf::from("/usr/bin/gcc"),
+            ignore: IgnoreOrConsider::Always,
+            arguments: Arguments::default(),
+        }];
+        let sources = SourceFilter {
+            only_existing_files: false,
+            paths: vec![],
+        };
 
         let mock_cmd = CompilerCommand::from_strings(
             "/project",
@@ -311,7 +355,8 @@ mod tests {
             .times(1)
             .return_const(Some(Command::Compiler(mock_cmd)));
 
-        let sut = FilteringInterpreter::new(Box::new(mock_interpreter), compiler_filters, vec![]);
+        let sut =
+            FilteringInterpreter::from_config(mock_interpreter, &compilers, &sources).unwrap();
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -326,10 +371,14 @@ mod tests {
 
     #[test]
     fn test_filter_source_directory_always_ignored() {
-        let source_filters = vec![config::DirectoryFilter {
-            path: PathBuf::from("/project/tests"),
-            ignore: config::Ignore::Always,
-        }];
+        let compilers = vec![];
+        let sources = SourceFilter {
+            only_existing_files: false,
+            paths: vec![DirectoryFilter {
+                path: PathBuf::from("/project/tests"),
+                ignore: Ignore::Always,
+            }],
+        };
 
         let mock_cmd = CompilerCommand::from_strings(
             "/project",
@@ -344,7 +393,7 @@ mod tests {
             .return_const(Some(Command::Compiler(mock_cmd)));
 
         let sut =
-            FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), source_filters);
+            FilteringInterpreter::from_config(mock_interpreter, &compilers, &sources).unwrap();
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -371,7 +420,7 @@ mod tests {
             .times(1)
             .return_const(Some(Command::Compiler(mock_cmd.clone())));
 
-        let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
+        let sut = FilteringInterpreter::pass_through(mock_interpreter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -396,7 +445,7 @@ mod tests {
             .times(1)
             .return_const(Some(Command::Ignored("test reason")));
 
-        let sut = FilteringInterpreter::new(Box::new(mock_interpreter), HashMap::new(), vec![]);
+        let sut = FilteringInterpreter::pass_through(mock_interpreter);
 
         let execution =
             Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
@@ -424,7 +473,7 @@ mod tests {
                 },
             ],
         };
-        let result = FilteringInterpreter::validate_source_configuration(&config);
+        let result = Filter::validate_source_configuration(&config);
         assert!(
             matches!(result, Err(SourceFilterConfigurationError::DuplicateSourceInstruction(path)) if path == PathBuf::from("/project/src"))
         );
@@ -449,7 +498,7 @@ mod tests {
                 },
             ],
         };
-        let result = FilteringInterpreter::validate_source_configuration(&config);
+        let result = Filter::validate_source_configuration(&config);
         assert!(
             matches!(result, Err(SourceFilterConfigurationError::DuplicateDirectory(path)) if path == PathBuf::from("/project/src"))
         );
@@ -470,7 +519,7 @@ mod tests {
                 },
             ],
         };
-        let result = FilteringInterpreter::validate_source_configuration(&config);
+        let result = Filter::validate_source_configuration(&config);
         assert!(result.is_ok());
         let filters = result.unwrap();
         assert_eq!(filters.len(), 2);
@@ -521,7 +570,7 @@ mod tests {
             }],
         ];
         for config in valid_configs {
-            let result = FilteringInterpreter::validate_compiler_configuration(&config);
+            let result = Filter::validate_compiler_configuration(&config);
             assert!(
                 result.is_ok(),
                 "Expected valid configuration to pass: {config:?}, got {result:?}"
@@ -600,7 +649,7 @@ mod tests {
             }],
         ];
         for config in invalid_configs {
-            let result = FilteringInterpreter::validate_compiler_configuration(&config);
+            let result = Filter::validate_compiler_configuration(&config);
             assert!(
                 result.is_err(),
                 "Expected invalid configuration to fail: {config:?}"
