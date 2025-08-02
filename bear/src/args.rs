@@ -161,10 +161,7 @@ pub fn cli() -> Command {
         .subcommand_negates_reqs(true)
         .subcommand_precedence_over_arg(true)
         .arg_required_else_help(true)
-        .args(&[
-            arg!(-v --verbose ... "Sets the level of verbosity").action(ArgAction::Count),
-            arg!(-c --config <FILE> "Path of the config file"),
-        ])
+        .args(&[arg!(-c --config <FILE> "Path of the config file")])
         .subcommand(
             Command::new(MODE_INTERCEPT_SUBCOMMAND)
                 .about("intercepts command execution")
