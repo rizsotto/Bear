@@ -11,30 +11,26 @@ use std::path::PathBuf;
 use thiserror::Error;
 
 /// A wrapper interpreter that applies filtering to recognized compiler commands.
-pub struct FilteringInterpreter<T: Interpreter> {
+pub(super) struct FilteringInterpreter<T: Interpreter> {
     inner: T,
-    filter: Filter,
+    filter: Option<Filter>,
 }
 
 impl<T: Interpreter> FilteringInterpreter<T> {
-    /// Creates a new filtering interpreter that wraps another interpreter.
-    fn new(inner: T, filter: Filter) -> Self {
-        Self { inner, filter }
-    }
-
     /// Creates a filtering interpreter from configuration.
-    pub fn from_config(
-        inner: T,
-        compilers: &[config::Compiler],
-        sources: &config::SourceFilter,
-    ) -> Result<Self, InterpreterConfigError> {
-        let filter = Filter::try_from((compilers, sources))?;
-        Ok(Self::new(inner, filter))
+    pub fn from_filter(inner: T, filter: Filter) -> Self {
+        Self {
+            inner,
+            filter: Some(filter),
+        }
     }
 
     /// Creates a pass-through filtering interpreter (no filtering applied).
     pub fn pass_through(inner: T) -> Self {
-        Self::new(inner, Filter::Skip)
+        Self {
+            inner,
+            filter: None,
+        }
     }
 }
 
@@ -43,53 +39,45 @@ impl<T: Interpreter> Interpreter for FilteringInterpreter<T> {
         // First, let the inner interpreter recognize the command
         let command = self.inner.recognize(execution)?;
 
-        match command {
-            Command::Compiler(compiler_cmd) => {
-                // Apply filtering to the compiler command
-                match self.filter.filter_command(&compiler_cmd) {
-                    Ok(()) => Some(Command::Compiler(compiler_cmd)),
-                    Err(reason) => Some(Command::Filtered(reason)),
+        if let Some(filter) = &self.filter {
+            // If a filter is set, apply it to the recognized command
+            match command {
+                Command::Compiler(compiler_cmd) => {
+                    // Apply filtering to the compiler command
+                    match filter.filter_command(&compiler_cmd) {
+                        Ok(_) => Some(Command::Compiler(compiler_cmd)),
+                        Err(reason) => Some(Command::Filtered(reason)),
+                    }
                 }
+                // Pass through other command types unchanged
+                other => Some(other),
             }
-            // Pass through other command types unchanged
-            other => Some(other),
+        } else {
+            // If no filter is set, return the command as is
+            Some(command)
         }
     }
 }
 
 #[derive(Debug)]
-enum Filter {
-    /// Apply filtering according to the configuration
-    Filter {
-        compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
-        source_filters: Vec<config::DirectoryFilter>,
-    },
-    /// Skip filtering (pass through unchanged)
-    Skip,
+pub(super) struct Filter {
+    compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
+    source_filters: Vec<config::DirectoryFilter>,
 }
 
 impl Filter {
     fn filter_command(&self, cmd: &CompilerCommand) -> Result<(), String> {
-        match self {
-            Filter::Skip => Ok(()),
-            Filter::Filter {
-                compiler_filters,
-                source_filters,
-            } => {
-                // Check if the compiler should be filtered
-                if let Some(reason) = self.should_filter_compiler(&cmd.executable, compiler_filters)
-                {
-                    return Err(reason);
-                }
-
-                // Check if any source files should be filtered
-                if let Some(reason) = self.should_filter_sources(cmd, source_filters) {
-                    return Err(reason);
-                }
-
-                Ok(())
-            }
+        // Check if the compiler should be filtered
+        if let Some(reason) = self.should_filter_compiler(&cmd.executable, &self.compiler_filters) {
+            return Err(reason);
         }
+
+        // Check if any source files should be filtered
+        if let Some(reason) = self.should_filter_sources(cmd, &self.source_filters) {
+            return Err(reason);
+        }
+
+        Ok(())
     }
 
     fn should_filter_compiler(
@@ -282,7 +270,7 @@ impl TryFrom<(&[config::Compiler], &config::SourceFilter)> for Filter {
         // Validate source configuration
         let source_filters = Self::validate_source_configuration(sources)?;
 
-        Ok(Self::Filter {
+        Ok(Self {
             compiler_filters,
             source_filters,
         })
@@ -355,8 +343,9 @@ mod tests {
             .times(1)
             .return_const(Some(Command::Compiler(mock_cmd)));
 
-        let sut =
-            FilteringInterpreter::from_config(mock_interpreter, &compilers, &sources).unwrap();
+        let filter =
+            Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
+        let sut = FilteringInterpreter::from_filter(mock_interpreter, filter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -392,8 +381,9 @@ mod tests {
             .times(1)
             .return_const(Some(Command::Compiler(mock_cmd)));
 
-        let sut =
-            FilteringInterpreter::from_config(mock_interpreter, &compilers, &sources).unwrap();
+        let filter =
+            Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
+        let sut = FilteringInterpreter::from_filter(mock_interpreter, filter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",

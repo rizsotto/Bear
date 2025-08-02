@@ -17,7 +17,6 @@
 //! Formatting interpreter that wraps another interpreter to format paths in compiler commands
 //! according to configuration (absolute, relative, canonical).
 
-use super::InterpreterConfigError;
 use crate::config::{PathFormat, PathResolver};
 use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::path::{Path, PathBuf};
@@ -25,26 +24,26 @@ use std::{env, io};
 use thiserror::Error;
 
 /// A wrapper interpreter that applies path formatting to recognized compiler commands.
-pub struct FormattingInterpreter<T: Interpreter> {
+pub(super) struct FormattingInterpreter<T: Interpreter> {
     inner: T,
-    formatter: PathFormatter,
+    formatter: Option<PathFormatter>,
 }
 
 impl<T: Interpreter> FormattingInterpreter<T> {
-    /// Creates a new formatting interpreter that wraps another interpreter.
-    fn new(inner: T, formatter: PathFormatter) -> Self {
-        Self { inner, formatter }
-    }
-
     /// Creates a formatting interpreter from configuration.
-    pub fn from_config(inner: T, config: &PathFormat) -> Result<Self, InterpreterConfigError> {
-        let formatter = PathFormatter::try_from(config)?;
-        Ok(Self::new(inner, formatter))
+    pub fn from_filter(inner: T, config: PathFormatter) -> Self {
+        Self {
+            inner,
+            formatter: Some(config),
+        }
     }
 
     /// Creates a pass-through formatting interpreter (no formatting applied).
     pub fn pass_through(inner: T) -> Self {
-        Self::new(inner, PathFormatter::Skip)
+        Self {
+            inner,
+            formatter: None,
+        }
     }
 }
 
@@ -53,96 +52,73 @@ impl<T: Interpreter> Interpreter for FormattingInterpreter<T> {
         // First, let the inner interpreter recognize the command
         let command = self.inner.recognize(execution)?;
 
-        match command {
-            Command::Compiler(compiler_cmd) => {
-                // Apply formatting to the compiler command
-                match self.formatter.format_command(compiler_cmd.clone()) {
-                    Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
-                    // If formatting fails, return None
-                    Err(_) => None,
+        if let Some(formatter) = &self.formatter {
+            // If a formatter is configured, format the command
+            match command {
+                Command::Compiler(compiler_cmd) => {
+                    // Apply formatting to the compiler command
+                    match formatter.format_command(compiler_cmd.clone()) {
+                        Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
+                        // If formatting fails, return None
+                        Err(_) => None,
+                    }
                 }
+                // Pass through other command types unchanged
+                other => Some(other),
             }
-            // Pass through other command types unchanged
-            other => Some(other),
+        } else {
+            // If no formatter is configured, return the command as is
+            Some(command)
         }
     }
 }
 
-#[derive(Debug)]
-enum PathFormatter {
-    /// Apply formatting according to the configuration
-    Format {
-        config: PathFormat,
-        current_dir: PathBuf,
-    },
-    /// Skip formatting (pass through unchanged)
-    Skip,
-}
-
-#[derive(Debug, Error)]
-pub enum FormatError {
-    #[error("Path canonicalize failed: {0}")]
-    PathCanonicalize(#[from] io::Error),
-    #[error("Path {0} can't be relative to {1}")]
-    PathsCannotBeRelative(PathBuf, PathBuf),
-}
-
-#[derive(Debug, Error)]
-pub enum FormatConfigurationError {
-    #[error("Only relative paths for 'file' and 'output' when 'directory' is relative")]
-    OnlyRelativePaths,
-    #[error("Getting current directory failed: {0}")]
-    CurrentWorkingDirectory(#[from] io::Error),
+pub(super) struct PathFormatter {
+    config: PathFormat,
+    current_dir: PathBuf,
 }
 
 impl PathFormatter {
     fn format_command(&self, mut cmd: CompilerCommand) -> Result<CompilerCommand, FormatError> {
-        match self {
-            PathFormatter::Skip => Ok(cmd),
-            PathFormatter::Format {
-                config,
-                current_dir,
-            } => {
-                // Format the working directory
-                let working_dir = cmd.working_dir.canonicalize()?;
-                cmd.working_dir = config.directory.resolve(current_dir, &working_dir)?;
+        // Format the working directory
+        let working_dir = cmd.working_dir.canonicalize()?;
+        cmd.working_dir = self
+            .config
+            .directory
+            .resolve(&self.current_dir, &working_dir)?;
 
-                // Format paths in arguments
-                for arg_group in &mut cmd.arguments {
-                    match arg_group.kind {
-                        ArgumentKind::Source => {
-                            // Format source file paths
-                            for arg in &mut arg_group.args {
-                                if let Ok(formatted) =
-                                    Self::format_path(arg, &working_dir, &config.file)
-                                {
-                                    *arg = formatted;
-                                }
-                            }
-                        }
-                        ArgumentKind::Output => {
-                            // Format output file paths
-                            // For output arguments, we need to handle "-o filename" pairs
-                            if arg_group.args.len() >= 2 && arg_group.args[0] == "-o" {
-                                if let Ok(formatted) = Self::format_path(
-                                    &arg_group.args[1],
-                                    &working_dir,
-                                    &config.output,
-                                ) {
-                                    arg_group.args[1] = formatted;
-                                }
-                            }
-                        }
-                        _ => {
-                            // Don't format other argument types for now
-                            // In the future, we might want to format include paths, etc.
+        // Format paths in arguments
+        for arg_group in &mut cmd.arguments {
+            match arg_group.kind {
+                ArgumentKind::Source => {
+                    // Format source file paths
+                    for arg in &mut arg_group.args {
+                        if let Ok(formatted) =
+                            Self::format_path(arg, &working_dir, &self.config.file)
+                        {
+                            *arg = formatted;
                         }
                     }
                 }
-
-                Ok(cmd)
+                ArgumentKind::Output => {
+                    // Format output file paths
+                    // For output arguments, we need to handle "-o filename" pairs
+                    if arg_group.args.len() >= 2 && arg_group.args[0] == "-o" {
+                        if let Ok(formatted) =
+                            Self::format_path(&arg_group.args[1], &working_dir, &self.config.output)
+                        {
+                            arg_group.args[1] = formatted;
+                        }
+                    }
+                }
+                _ => {
+                    // Don't format other argument types for now
+                    // In the future, we might want to format include paths, etc.
+                }
             }
         }
+
+        Ok(cmd)
     }
 
     fn format_path(
@@ -156,6 +132,14 @@ impl PathFormatter {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum FormatError {
+    #[error("Path canonicalize failed: {0}")]
+    PathCanonicalize(#[from] io::Error),
+    #[error("Path {0} can't be relative to {1}")]
+    PathsCannotBeRelative(PathBuf, PathBuf),
+}
+
 impl TryFrom<&PathFormat> for PathFormatter {
     type Error = FormatConfigurationError;
 
@@ -167,11 +151,19 @@ impl TryFrom<&PathFormat> for PathFormatter {
             return Err(FormatConfigurationError::OnlyRelativePaths);
         }
 
-        Ok(Self::Format {
+        Ok(Self {
             config: config.clone(),
             current_dir: env::current_dir()?,
         })
     }
+}
+
+#[derive(Debug, Error)]
+pub enum FormatConfigurationError {
+    #[error("Only relative paths for 'file' and 'output' when 'directory' is relative")]
+    OnlyRelativePaths,
+    #[error("Getting current directory failed: {0}")]
+    CurrentWorkingDirectory(#[from] io::Error),
 }
 
 impl PathResolver {
@@ -331,7 +323,7 @@ mod tests {
         };
         let result = PathFormatter::try_from(&config);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), PathFormatter::Format { .. }));
+        assert!(matches!(result.unwrap(), PathFormatter { .. }));
 
         // Valid configuration: All relative paths
         let config = PathFormat {
@@ -341,7 +333,7 @@ mod tests {
         };
         let result = PathFormatter::try_from(&config);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), PathFormatter::Format { .. }));
+        assert!(matches!(result.unwrap(), PathFormatter { .. }));
     }
 
     #[test]
@@ -398,7 +390,7 @@ mod tests {
         );
 
         {
-            let sut = PathFormatter::Format {
+            let sut = PathFormatter {
                 config: PathFormat {
                     directory: PathResolver::Canonical,
                     file: PathResolver::Canonical,
@@ -431,7 +423,7 @@ mod tests {
             assert_eq!(result.unwrap(), expected);
         }
         {
-            let sut = PathFormatter::Format {
+            let sut = PathFormatter {
                 config: PathFormat {
                     directory: PathResolver::Canonical,
                     file: PathResolver::Relative,
@@ -470,7 +462,7 @@ mod tests {
             assert_eq!(result.unwrap(), expected);
         }
         {
-            let sut = PathFormatter::Format {
+            let sut = PathFormatter {
                 config: PathFormat {
                     directory: PathResolver::Relative,
                     file: PathResolver::Relative,

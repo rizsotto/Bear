@@ -299,13 +299,7 @@ mod impls {
             // Transform and log the events to semantics.
             let semantics = events
                 .into_iter()
-                .inspect(|event| {
-                    log::debug!("Processing event: {event:?}");
-                })
-                .flat_map(|event| self.interpreter.recognize(&event.execution))
-                .inspect(|semantic| {
-                    log::debug!("Recognized semantic: {semantic:?}");
-                });
+                .flat_map(|event| self.interpreter.recognize(&event.execution));
 
             // Consume the entries and write them to the output file.
             self.writer.write(semantics)?;
