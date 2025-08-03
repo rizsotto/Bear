@@ -65,7 +65,6 @@
 //!     paths:
 //!       directory: canonical
 //!       file: canonical
-//!       output: canonical
 //!     entry:
 //!       command_as_array: true
 //!       keep_output_field: true
@@ -348,8 +347,6 @@ mod types {
         pub directory: PathResolver,
         #[serde(default)]
         pub file: PathResolver,
-        #[serde(default)]
-        pub output: PathResolver,
     }
 
     #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
@@ -593,7 +590,6 @@ pub mod loader {
             paths:
               directory: canonical
               file: canonical
-              output: canonical
         "#;
 
             let result = Loader::from_reader(content).unwrap();
@@ -670,7 +666,6 @@ pub mod loader {
                         paths: PathFormat {
                             directory: PathResolver::Canonical,
                             file: PathResolver::Canonical,
-                            output: PathResolver::Canonical,
                         },
                         entry: EntryFormat {
                             command_field_as_array: true,
@@ -728,7 +723,6 @@ pub mod loader {
                         paths: PathFormat {
                             directory: PathResolver::Canonical,
                             file: PathResolver::Canonical,
-                            output: PathResolver::Canonical,
                         },
                         entry: EntryFormat {
                             command_field_as_array: true,
@@ -792,7 +786,6 @@ pub mod loader {
             paths:
               directory: relative
               file: relative
-              output: relative
             entry:
               command_field_as_array: false
               keep_output_field: false
@@ -838,7 +831,6 @@ pub mod loader {
                         paths: PathFormat {
                             directory: PathResolver::Relative,
                             file: PathResolver::Relative,
-                            output: PathResolver::Relative,
                         },
                         entry: EntryFormat {
                             command_field_as_array: false,
