@@ -348,7 +348,7 @@ namespace flags {
             format_options(os, options);
         } else {
             if (!commands_.empty()) {
-                os << " <command>";
+                os << " [command]";
             }
             const auto options = order_by_relevance(options_, std::nullopt);
             format_options(os, options);
