@@ -61,21 +61,21 @@ impl Entry {
         arguments: Vec<String>,
         directory: impl Into<path::PathBuf>,
         output: Option<impl Into<path::PathBuf>>,
-        as_command: bool,
+        as_array: bool,
     ) -> Self {
-        if as_command {
+        if as_array {
             Entry {
                 file: file.into(),
-                arguments: Vec::default(),
-                command: shell_words::join(&arguments),
+                arguments,
+                command: String::default(),
                 directory: directory.into(),
                 output: output.map(|o| o.into()),
             }
         } else {
             Entry {
                 file: file.into(),
-                arguments,
-                command: String::default(),
+                arguments: Vec::default(),
+                command: shell_words::join(&arguments),
                 directory: directory.into(),
                 output: output.map(|o| o.into()),
             }

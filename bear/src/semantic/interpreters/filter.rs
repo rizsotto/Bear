@@ -46,7 +46,7 @@ impl<T: Interpreter> Interpreter for FilteringInterpreter<T> {
                     // Apply filtering to the compiler command
                     match filter.filter_command(&compiler_cmd) {
                         Ok(_) => Some(Command::Compiler(compiler_cmd)),
-                        Err(reason) => Some(Command::Filtered(reason)),
+                        Err(reason) => Some(Command::Ignored(reason)),
                     }
                 }
                 // Pass through other command types unchanged
@@ -66,7 +66,7 @@ pub(super) struct Filter {
 }
 
 impl Filter {
-    fn filter_command(&self, cmd: &CompilerCommand) -> Result<(), String> {
+    fn filter_command(&self, cmd: &CompilerCommand) -> Result<(), &'static str> {
         // Check if the compiler should be filtered
         if let Some(reason) = self.should_filter_compiler(&cmd.executable, &self.compiler_filters) {
             return Err(reason);
@@ -84,13 +84,10 @@ impl Filter {
         &self,
         compiler_path: &PathBuf,
         compiler_filters: &HashMap<PathBuf, config::IgnoreOrConsider>,
-    ) -> Option<String> {
+    ) -> Option<&'static str> {
         if let Some(ignore) = compiler_filters.get(compiler_path) {
             match ignore {
-                config::IgnoreOrConsider::Always => Some(format!(
-                    "Compiler {} is configured to be ignored",
-                    compiler_path.display()
-                )),
+                config::IgnoreOrConsider::Always => Some("Compiler is configured to be ignored"),
                 _ => None,
             }
         } else {
@@ -102,7 +99,7 @@ impl Filter {
         &self,
         cmd: &CompilerCommand,
         source_filters: &[config::DirectoryFilter],
-    ) -> Option<String> {
+    ) -> Option<&'static str> {
         // Get all source files from the command
         let source_files: Vec<&String> = cmd
             .arguments
@@ -124,11 +121,7 @@ impl Filter {
             for filter in source_filters {
                 if source_path.starts_with(&filter.path) {
                     return match filter.ignore {
-                        config::Ignore::Always => Some(format!(
-                            "Source file {} is in filtered directory {}",
-                            source_file,
-                            filter.path.display()
-                        )),
+                        config::Ignore::Always => Some("Source file is in filtered directory"),
                         config::Ignore::Never => None,
                     };
                 }
@@ -355,7 +348,7 @@ mod tests {
         );
 
         let result = sut.recognize(&execution);
-        assert!(matches!(result, Some(Command::Filtered(_))));
+        assert!(matches!(result, Some(Command::Ignored(_))));
     }
 
     #[test]
@@ -393,7 +386,7 @@ mod tests {
         );
 
         let result = sut.recognize(&execution);
-        assert!(matches!(result, Some(Command::Filtered(_))));
+        assert!(matches!(result, Some(Command::Ignored(_))));
     }
 
     #[test]

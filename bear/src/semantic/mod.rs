@@ -35,8 +35,6 @@ pub enum Command {
     Compiler(CompilerCommand),
     /// A command that is intentionally ignored and not processed further.
     Ignored(&'static str),
-    /// A command that is filtered out and not included in the output.
-    Filtered(String),
 }
 
 impl Command {
@@ -45,7 +43,6 @@ impl Command {
         match self {
             Command::Compiler(cmd) => cmd.to_entries(config),
             Command::Ignored(_) => vec![],
-            Command::Filtered(_) => vec![],
         }
     }
 }
@@ -70,6 +67,16 @@ pub struct CompilerCommand {
 pub struct ArgumentGroup {
     pub args: Vec<String>,
     pub kind: ArgumentKind,
+}
+
+impl ArgumentGroup {
+    fn as_file(&self) -> Option<String> {
+        match self.kind {
+            ArgumentKind::Source => self.args.first().cloned(),
+            ArgumentKind::Output => self.args.get(1).cloned(),
+            ArgumentKind::Compiler | ArgumentKind::Other(_) => None,
+        }
+    }
 }
 
 /// Represents the meaning of the argument in the compiler call. Identifies
@@ -133,33 +140,19 @@ impl CompilerCommand {
     /// entries with the executable, arguments, working directory, and output file if present.
     pub(super) fn to_entries(&self, config: &config::EntryFormat) -> Vec<clang::Entry> {
         // Find all source files in the arguments
-        let source_files: Vec<String> = self
-            .arguments
-            .iter()
-            .filter(|arg| matches!(arg.kind, ArgumentKind::Source))
-            .flat_map(|arg| &arg.args)
-            .cloned()
-            .collect();
+        let source_files = self
+            .find_arguments_by_kind(ArgumentKind::Source)
+            .flat_map(ArgumentGroup::as_file)
+            .collect::<Vec<String>>();
 
         // If no source files found, return empty vector
         if source_files.is_empty() {
             return vec![];
         }
 
-        // Build the full command arguments by flattening all argument args
-        let mut command_args = vec![self.executable.to_string_lossy().to_string()];
-        for arg in &self.arguments {
-            command_args.extend(arg.args.iter().cloned());
-        }
-
         // Find output file if present
         let output_file = if config.keep_output_field {
-            self.arguments
-                .iter()
-                .filter(|arg| matches!(arg.kind, ArgumentKind::Output))
-                .flat_map(|arg| &arg.args)
-                .nth(1) // Skip the "-o" flag itself, take the output filename
-                .map(PathBuf::from)
+            self.compute_output_file()
         } else {
             None
         };
@@ -168,15 +161,71 @@ impl CompilerCommand {
         source_files
             .into_iter()
             .map(|source_file| {
+                let command_args = self.build_command_args_for_source(&source_file);
+
                 clang::Entry::new(
                     source_file,
-                    command_args.clone(),
+                    command_args,
                     &self.working_dir,
                     output_file.as_ref(),
-                    !config.command_field_as_array,
+                    config.command_field_as_array,
                 )
             })
             .collect()
+    }
+
+    /// Builds command arguments for a specific source file.
+    ///
+    /// This method constructs the command arguments list that includes the executable,
+    /// all non-source arguments, and the specific source file.
+    /// It ensures that the source file is placed in the correct position relative to output arguments.
+    fn build_command_args_for_source(&self, source_file: &str) -> Vec<String> {
+        // Start with the executable
+        let mut command_args = vec![self.executable.to_string_lossy().to_string()];
+
+        // Process arguments in the correct order for compilation database
+        let mut source_added = false;
+
+        // Add all non-source arguments, while handling source file placement
+        for arg in &self.arguments {
+            if matches!(arg.kind, ArgumentKind::Source) {
+                continue;
+            }
+
+            // If we encounter output arguments and haven't added the source yet,
+            // add the source first, then the output args
+            if matches!(arg.kind, ArgumentKind::Output) && !source_added {
+                command_args.push(source_file.to_string());
+                source_added = true;
+            }
+
+            command_args.extend(arg.args.iter().cloned());
+        }
+
+        // If we haven't added the source yet, add it at the end
+        if !source_added {
+            command_args.push(source_file.to_string());
+        }
+
+        command_args
+    }
+
+    /// Returns arguments of a specific kind from the command.
+    ///
+    /// This method filters arguments by their kind and returns their values as strings.
+    fn find_arguments_by_kind(&self, kind: ArgumentKind) -> impl Iterator<Item = &ArgumentGroup> {
+        self.arguments.iter().filter(move |arg| arg.kind == kind)
+    }
+
+    /// Computes the output file path from the command arguments.
+    ///
+    /// This method examines the output arguments (typically "-o filename")
+    /// and returns the filename as a PathBuf.
+    fn compute_output_file(&self) -> Option<String> {
+        // Find output arguments and convert to a file path
+        self.find_arguments_by_kind(ArgumentKind::Output)
+            .nth(0)
+            .and_then(|arg_group| arg_group.as_file())
     }
 }
 
@@ -234,13 +283,13 @@ mod test {
         let expected = vec![
             clang::Entry::from_arguments_str(
                 "file1.cpp",
-                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"],
+                vec!["/usr/bin/g++", "-c", "file1.cpp"],
                 "/home/user",
                 None,
             ),
             clang::Entry::from_arguments_str(
                 "file2.cpp",
-                vec!["/usr/bin/g++", "-c", "file1.cpp", "file2.cpp"],
+                vec!["/usr/bin/g++", "-c", "file2.cpp"],
                 "/home/user",
                 None,
             ),
