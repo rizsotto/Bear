@@ -77,13 +77,21 @@ impl CommandConverter {
             .map(|source_file| {
                 let command_args = Self::build_command_args_for_source(cmd, &source_file);
 
-                Entry::new(
-                    source_file,
-                    command_args,
-                    &cmd.working_dir,
-                    output_file.as_ref(),
-                    self.format.command_field_as_array,
-                )
+                if self.format.command_field_as_array {
+                    Entry::with_arguments(
+                        source_file,
+                        command_args,
+                        &cmd.working_dir,
+                        output_file.as_ref(),
+                    )
+                } else {
+                    Entry::with_command(
+                        source_file,
+                        command_args,
+                        &cmd.working_dir,
+                        output_file.as_ref(),
+                    )
+                }
             })
             .collect()
     }

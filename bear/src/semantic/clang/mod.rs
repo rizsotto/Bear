@@ -57,30 +57,35 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// Create an Entry from arguments or as a command string.
-    pub fn new(
+    /// Create an Entry with the arguments field populated.
+    pub fn with_arguments(
         file: impl Into<path::PathBuf>,
         arguments: Vec<String>,
         directory: impl Into<path::PathBuf>,
         output: Option<impl Into<path::PathBuf>>,
-        as_array: bool,
     ) -> Self {
-        if as_array {
-            Entry {
-                file: file.into(),
-                arguments,
-                command: String::default(),
-                directory: directory.into(),
-                output: output.map(|o| o.into()),
-            }
-        } else {
-            Entry {
-                file: file.into(),
-                arguments: Vec::default(),
-                command: shell_words::join(&arguments),
-                directory: directory.into(),
-                output: output.map(|o| o.into()),
-            }
+        Entry {
+            file: file.into(),
+            arguments,
+            command: String::default(),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
+        }
+    }
+
+    /// Create an Entry with the command field populated.
+    pub fn with_command(
+        file: impl Into<path::PathBuf>,
+        arguments: Vec<String>,
+        directory: impl Into<path::PathBuf>,
+        output: Option<impl Into<path::PathBuf>>,
+    ) -> Self {
+        Entry {
+            file: file.into(),
+            arguments: Vec::default(),
+            command: shell_words::join(&arguments),
+            directory: directory.into(),
+            output: output.map(|o| o.into()),
         }
     }
 
@@ -220,5 +225,40 @@ mod tests {
             let err = entry.validate().unwrap_err();
             assert_eq!(err, expected_error);
         }
+    }
+
+    #[test]
+    fn test_entry_with_arguments_constructor() {
+        let entry = Entry::with_arguments(
+            "main.cpp",
+            vec!["clang".to_string(), "-c".to_string()],
+            "/tmp",
+            Some("main.o"),
+        );
+
+        assert!(!entry.arguments.is_empty());
+        assert!(entry.command.is_empty());
+        assert_eq!(entry.file, std::path::PathBuf::from("main.cpp"));
+        assert_eq!(entry.directory, std::path::PathBuf::from("/tmp"));
+        assert_eq!(entry.output, Some(std::path::PathBuf::from("main.o")));
+        assert!(entry.validate().is_ok());
+    }
+
+    #[test]
+    fn test_entry_with_command_constructor() {
+        let entry = Entry::with_command(
+            "main.cpp",
+            vec!["clang".to_string(), "-c".to_string()],
+            "/tmp",
+            Some("main.o"),
+        );
+
+        assert!(entry.arguments.is_empty());
+        assert!(!entry.command.is_empty());
+        assert_eq!(entry.command, "clang -c");
+        assert_eq!(entry.file, std::path::PathBuf::from("main.cpp"));
+        assert_eq!(entry.directory, std::path::PathBuf::from("/tmp"));
+        assert_eq!(entry.output, Some(std::path::PathBuf::from("main.o")));
+        assert!(entry.validate().is_ok());
     }
 }
