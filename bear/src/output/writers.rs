@@ -54,14 +54,14 @@ impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
 
 /// The type represents a converter that formats `semantic::Command` instances into `Entry` objects.
 pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
-    format: config::EntryFormat,
+    converter: semantic::clang::CommandConverter,
     writer: T,
 }
 
 impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
     pub(super) fn new(writer: T, format: &config::EntryFormat) -> Self {
         Self {
-            format: format.clone(),
+            converter: semantic::clang::CommandConverter::new(format.clone()),
             writer,
         }
     }
@@ -69,7 +69,7 @@ impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
 
 impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
     fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
-        let entries = semantics.flat_map(|semantic| semantic.to_entries(&self.format));
+        let entries = semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
         self.writer.write(entries)
     }
 }
