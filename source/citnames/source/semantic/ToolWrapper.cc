@@ -56,7 +56,7 @@ namespace cs::semantic {
 
     bool ToolWrapper::is_ccache_call(const fs::path &program) {
         const auto string = program.filename().string();
-        return string == "ccache";
+        return string == "ccache" || string == "sccache";
     }
 
     bool ToolWrapper::is_ccache_query(const std::list<std::string> &arguments) {

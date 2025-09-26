@@ -66,14 +66,19 @@ namespace {
         EXPECT_FALSE(ToolWrapper::is_ccache_call("/usr/bin/g++"));
 
         EXPECT_TRUE(ToolWrapper::is_ccache_call("ccache"));
+        EXPECT_TRUE(ToolWrapper::is_ccache_call("sccache"));
     }
 
     TEST(ToolWrapper, is_ccache_query) {
         EXPECT_TRUE(ToolWrapper::is_ccache_query({"ccache"}));
         EXPECT_TRUE(ToolWrapper::is_ccache_query({"ccache", "-c"}));
         EXPECT_TRUE(ToolWrapper::is_ccache_query({"ccache", "--cleanup"}));
+        EXPECT_TRUE(ToolWrapper::is_ccache_query({"sccache"}));
+        EXPECT_TRUE(ToolWrapper::is_ccache_query({"sccache", "-s"}));
+        EXPECT_TRUE(ToolWrapper::is_ccache_query({"sccache", "-h"}));
 
         EXPECT_FALSE(ToolWrapper::is_ccache_query({"ccache", "cc", "-c"}));
+        EXPECT_FALSE(ToolWrapper::is_ccache_query({"sccache", "cc", "-c"}));
     }
 
     TEST(ToolWrapper, is_distcc_call) {
@@ -90,13 +95,13 @@ namespace {
     }
 
     TEST(ToolWrapper, is_distcc_query) {
-        EXPECT_TRUE(ToolWrapper::is_ccache_query({"distcc"}));
-        EXPECT_TRUE(ToolWrapper::is_ccache_query({"distcc", "--help"}));
-        EXPECT_TRUE(ToolWrapper::is_ccache_query({"distcc", "--show-hosts"}));
-        EXPECT_TRUE(ToolWrapper::is_ccache_query({"distcc", "-j"}));
+        EXPECT_TRUE(ToolWrapper::is_distcc_query({"distcc"}));
+        EXPECT_TRUE(ToolWrapper::is_distcc_query({"distcc", "--help"}));
+        EXPECT_TRUE(ToolWrapper::is_distcc_query({"distcc", "--show-hosts"}));
+        EXPECT_TRUE(ToolWrapper::is_distcc_query({"distcc", "-j"}));
 
-        EXPECT_FALSE(ToolWrapper::is_ccache_query({"distcc", "cc", "--help"}));
-        EXPECT_FALSE(ToolWrapper::is_ccache_query({"distcc", "cc", "-c"}));
+        EXPECT_FALSE(ToolWrapper::is_distcc_query({"distcc", "cc", "--help"}));
+        EXPECT_FALSE(ToolWrapper::is_distcc_query({"distcc", "cc", "-c"}));
     }
 
     TEST(ToolWrapper, remove_wrapper) {
