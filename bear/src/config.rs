@@ -76,7 +76,7 @@
 //! intercept:
 //!   mode: preload
 //! output:
-//!   specification: bear
+//!   specification: clang
 //! ```
 
 // Re-Export the types and the loader module content.
@@ -178,11 +178,12 @@ mod types {
 
     /// Output configuration is used to customize the output format.
     ///
-    /// Allow customizing the output format of the compiler calls.
+    /// Configures how the compiler calls are output in the clang project defined
+    /// "JSON compilation database" format. (The format is used by clang tooling
+    /// and other tools based on that library.)
     ///
-    /// - Clang: Output the compiler calls in the clang project defined "JSON compilation database"
-    ///   format. (The format is used by clang tooling and other tools based on that library.)
-    /// - Semantic: Output the compiler calls in the semantic format. (The format is not defined yet.)
+    /// The configuration allows customization of compiler filtering, source filtering,
+    /// duplicate handling, and output formatting.
     #[derive(Debug, PartialEq, Deserialize, Serialize)]
     #[serde(tag = "specification")]
     pub enum Output {
@@ -197,11 +198,9 @@ mod types {
             #[serde(default)]
             format: Format,
         },
-        #[serde(rename = "bear")]
-        Semantic {},
     }
 
-    /// The default output is the clang format.
+    /// The default output configuration.
     impl Default for Output {
         fn default() -> Self {
             Output::Clang {
@@ -745,17 +744,17 @@ pub mod loader {
           mode: preload
           path: /usr/local/lib/libexec.so
         output:
-          specification: bear
+          specification: clang
         "#;
 
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
+                schema: String::from("4.0"),
                 intercept: Intercept::Preload {
                     path: PathBuf::from("/usr/local/lib/libexec.so"),
                 },
-                output: Output::Semantic {},
-                schema: String::from("4.0"),
+                output: Output::default(),
             };
 
             assert_eq!(expected, result);
@@ -794,6 +793,7 @@ pub mod loader {
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
+                schema: String::from("4.0"),
                 intercept: Intercept::Preload {
                     path: default_preload_library(),
                 },
@@ -838,7 +838,6 @@ pub mod loader {
                         },
                     },
                 },
-                schema: String::from("4.0"),
             };
 
             assert_eq!(expected, result);

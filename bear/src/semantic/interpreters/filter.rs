@@ -13,24 +13,13 @@ use thiserror::Error;
 /// A wrapper interpreter that applies filtering to recognized compiler commands.
 pub(super) struct FilteringInterpreter<T: Interpreter> {
     inner: T,
-    filter: Option<Filter>,
+    filter: Filter,
 }
 
 impl<T: Interpreter> FilteringInterpreter<T> {
-    /// Creates a filtering interpreter from configuration.
-    pub fn from_filter(inner: T, filter: Filter) -> Self {
-        Self {
-            inner,
-            filter: Some(filter),
-        }
-    }
-
-    /// Creates a pass-through filtering interpreter (no filtering applied).
-    pub fn pass_through(inner: T) -> Self {
-        Self {
-            inner,
-            filter: None,
-        }
+    /// Creates a filtering interpreter with the given filter.
+    pub fn new(inner: T, filter: Filter) -> Self {
+        Self { inner, filter }
     }
 }
 
@@ -39,22 +28,17 @@ impl<T: Interpreter> Interpreter for FilteringInterpreter<T> {
         // First, let the inner interpreter recognize the command
         let command = self.inner.recognize(execution)?;
 
-        if let Some(filter) = &self.filter {
-            // If a filter is set, apply it to the recognized command
-            match command {
-                Command::Compiler(compiler_cmd) => {
-                    // Apply filtering to the compiler command
-                    match filter.filter_command(&compiler_cmd) {
-                        Ok(_) => Some(Command::Compiler(compiler_cmd)),
-                        Err(reason) => Some(Command::Ignored(reason)),
-                    }
+        // Apply filtering to the recognized command
+        match command {
+            Command::Compiler(compiler_cmd) => {
+                // Apply filtering to the compiler command
+                match self.filter.filter_command(&compiler_cmd) {
+                    Ok(_) => Some(Command::Compiler(compiler_cmd)),
+                    Err(reason) => Some(Command::Ignored(reason)),
                 }
-                // Pass through other command types unchanged
-                other => Some(other),
             }
-        } else {
-            // If no filter is set, return the command as is
-            Some(command)
+            // Pass through other command types unchanged
+            other => Some(other),
         }
     }
 }
@@ -338,7 +322,7 @@ mod tests {
 
         let filter =
             Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
-        let sut = FilteringInterpreter::from_filter(mock_interpreter, filter);
+        let sut = FilteringInterpreter::new(mock_interpreter, filter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -376,7 +360,7 @@ mod tests {
 
         let filter =
             Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
-        let sut = FilteringInterpreter::from_filter(mock_interpreter, filter);
+        let sut = FilteringInterpreter::new(mock_interpreter, filter);
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -384,54 +368,6 @@ mod tests {
             "/project",
             HashMap::new(),
         );
-
-        let result = sut.recognize(&execution);
-        assert!(matches!(result, Some(Command::Ignored(_))));
-    }
-
-    #[test]
-    fn test_no_filtering_applied() {
-        let mock_cmd = CompilerCommand::from_strings(
-            "/project",
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
-        );
-
-        let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .times(1)
-            .return_const(Some(Command::Compiler(mock_cmd.clone())));
-
-        let sut = FilteringInterpreter::pass_through(mock_interpreter);
-
-        let execution = Execution::from_strings(
-            "/usr/bin/gcc",
-            vec!["gcc", "main.c"],
-            "/project",
-            HashMap::new(),
-        );
-
-        let result = sut.recognize(&execution);
-        if let Some(Command::Compiler(result_cmd)) = result {
-            assert_eq!(result_cmd, mock_cmd);
-        } else {
-            panic!("Expected Command::Compiler, got {result:?}");
-        }
-    }
-
-    #[test]
-    fn test_pass_through_non_compiler_commands() {
-        let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .times(1)
-            .return_const(Some(Command::Ignored("test reason")));
-
-        let sut = FilteringInterpreter::pass_through(mock_interpreter);
-
-        let execution =
-            Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
 
         let result = sut.recognize(&execution);
         assert!(matches!(result, Some(Command::Ignored(_))));

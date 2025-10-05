@@ -83,28 +83,13 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
             ..
         } => {
             let filter = Filter::try_from((compilers.as_slice(), sources))?;
-            let filtering = FilteringInterpreter::from_filter(
-                OutputLogger::new(base_interpreter, "filtering"),
-                filter,
-            );
+            let filtering =
+                FilteringInterpreter::new(OutputLogger::new(base_interpreter, "filtering"), filter);
             let path_formatter = PathFormatter::try_from(&format.paths)?;
-            let formatting = FormattingInterpreter::from_filter(
+            let formatting = FormattingInterpreter::new(
                 OutputLogger::new(filtering, "formatting"),
                 path_formatter,
             );
-            let logger = InputLogger::new(formatting);
-            Ok(logger)
-        }
-        config::Output::Semantic { .. } => {
-            // For semantic output, just use pass-through formatting
-            let filtering = FilteringInterpreter::pass_through(OutputLogger::new(
-                base_interpreter,
-                "pass_through_filtering",
-            ));
-            let formatting = FormattingInterpreter::pass_through(OutputLogger::new(
-                filtering,
-                "pass_through_formatting",
-            ));
             let logger = InputLogger::new(formatting);
             Ok(logger)
         }
@@ -118,7 +103,6 @@ fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
             .filter(|compiler| compiler.ignore == config::IgnoreOrConsider::Always)
             .map(|compiler| compiler.path.clone())
             .collect(),
-        _ => vec![],
     }
 }
 
@@ -134,12 +118,11 @@ fn compilers_to_include(
     }
 
     // Add configured compilers
-    if let config::Output::Clang { compilers, .. } = &config.output {
-        compilers
-            .iter()
-            .filter(|compiler| compiler.ignore != config::IgnoreOrConsider::Always)
-            .for_each(|compiler| result.push(compiler.path.clone()));
-    }
+    let config::Output::Clang { compilers, .. } = &config.output;
+    compilers
+        .iter()
+        .filter(|compiler| compiler.ignore != config::IgnoreOrConsider::Always)
+        .for_each(|compiler| result.push(compiler.path.clone()));
 
     // Add environment compilers
     environment.into_iter().for_each(|(key, path)| {

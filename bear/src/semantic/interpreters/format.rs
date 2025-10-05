@@ -28,24 +28,13 @@ use thiserror::Error;
 /// A wrapper interpreter that applies path formatting to recognized compiler commands.
 pub(super) struct FormattingInterpreter<T: Interpreter> {
     inner: T,
-    formatter: Option<PathFormatter>,
+    formatter: PathFormatter,
 }
 
 impl<T: Interpreter> FormattingInterpreter<T> {
-    /// Creates a formatting interpreter from configuration.
-    pub fn from_filter(inner: T, config: PathFormatter) -> Self {
-        Self {
-            inner,
-            formatter: Some(config),
-        }
-    }
-
-    /// Creates a pass-through formatting interpreter (no formatting applied).
-    pub fn pass_through(inner: T) -> Self {
-        Self {
-            inner,
-            formatter: None,
-        }
+    /// Creates a formatting interpreter with the given path formatter.
+    pub fn new(inner: T, formatter: PathFormatter) -> Self {
+        Self { inner, formatter }
     }
 }
 
@@ -58,23 +47,18 @@ impl<T: Interpreter> Interpreter for FormattingInterpreter<T> {
         // First, let the inner interpreter recognize the command
         let command = self.inner.recognize(execution)?;
 
-        if let Some(formatter) = &self.formatter {
-            // If a formatter is configured, format the command
-            match command {
-                Command::Compiler(compiler_cmd) => {
-                    // Apply formatting to the compiler command
-                    match formatter.format_command(compiler_cmd.clone()) {
-                        Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
-                        // If formatting fails, return None
-                        Err(_) => None,
-                    }
+        // Apply formatting to the command
+        match command {
+            Command::Compiler(compiler_cmd) => {
+                // Apply formatting to the compiler command
+                match self.formatter.format_command(compiler_cmd.clone()) {
+                    Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
+                    // If formatting fails, return None
+                    Err(_) => None,
                 }
-                // Pass through other command types unchanged
-                other => Some(other),
             }
-        } else {
-            // If no formatter is configured, return the command as is
-            Some(command)
+            // Pass through other command types unchanged
+            other => Some(other),
         }
     }
 }
@@ -294,58 +278,9 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::ArgumentGroup;
-    use crate::semantic::MockInterpreter;
-    use std::collections::HashMap;
+    use crate::semantic::{ArgumentKind, CompilerCommand};
     use std::fs;
     use tempfile::tempdir;
-
-    #[test]
-    fn test_pass_through_formatting() {
-        let mock_cmd = CompilerCommand::from_strings(
-            "/project",
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
-        );
-        let expected_cmd = mock_cmd.clone();
-
-        let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .returning(move |_| Some(Command::Compiler(mock_cmd.clone())));
-
-        let sut = FormattingInterpreter::pass_through(mock_interpreter);
-
-        let execution = Execution::from_strings(
-            "/usr/bin/gcc",
-            vec!["gcc", "main.c"],
-            "/project",
-            HashMap::new(),
-        );
-
-        let result = sut.recognize(&execution);
-        if let Some(Command::Compiler(result_cmd)) = result {
-            assert_eq!(result_cmd, expected_cmd);
-        } else {
-            panic!("Expected Command::Compiler, got {result:?}");
-        }
-    }
-
-    #[test]
-    fn test_pass_through_non_compiler_commands() {
-        let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .returning(|_| Some(Command::Ignored("test reason")));
-
-        let sut = FormattingInterpreter::pass_through(mock_interpreter);
-
-        let execution =
-            Execution::from_strings("/usr/bin/ls", vec!["ls"], "/project", HashMap::new());
-
-        let result = sut.recognize(&execution);
-        assert!(matches!(result, Some(Command::Ignored(_))));
-    }
 
     #[test]
     fn test_path_formatter_try_from_valid_configs() {

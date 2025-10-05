@@ -8,7 +8,7 @@
 //! - The execution event database format (internal format of this project.)
 
 use super::json;
-use crate::{intercept, semantic, semantic::clang};
+use crate::{intercept, semantic::clang};
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use thiserror::Error;
@@ -95,31 +95,6 @@ impl SerializationFormat<clang::Entry> for JsonCompilationDatabase {
     }
 }
 
-/// The type represents a JSON semantic database format.
-///
-/// The format is a JSON array format, which is a sequence of JSON objects
-/// enclosed in square brackets. Each object represents a semantic analysis
-/// result.
-///
-/// # Note
-/// The output format is not stable and may change in future versions.
-pub struct JsonSemanticDatabase;
-
-impl SerializationFormat<semantic::Command> for JsonSemanticDatabase {
-    fn write(
-        writer: impl std::io::Write,
-        commands: impl Iterator<Item = semantic::Command>,
-    ) -> Result<(), SerializationError> {
-        json::serialize_seq(writer, commands).map_err(SerializationError::Syntax)
-    }
-    fn read(
-        _: impl std::io::Read,
-    ) -> impl Iterator<Item = Result<semantic::Command, SerializationError>> {
-        // Not implemented! (No reader for the semantic output in this project.)
-        std::iter::empty()
-    }
-}
-
 /// The type represents a database format for execution events.
 ///
 /// The format is a [JSON line format](https://jsonlines.org/), which is a sequence
@@ -153,9 +128,9 @@ impl SerializationFormat<intercept::Event> for ExecutionEventDatabase {
 #[cfg(test)]
 mod test {
     mod compilation_database {
-        use super::super::semantic::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
         use super::super::{SerializationError, SerializationFormat};
+        use crate::semantic::clang::{Entry, EntryError};
         use serde_json::error::Category;
         use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};

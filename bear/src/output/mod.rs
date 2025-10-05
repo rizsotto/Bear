@@ -2,12 +2,11 @@
 
 //! This module is responsible for writing the output of semantic analysis.
 //!
-//! The output can be in different formats, such as JSON compilation databases
-//! or semantic analysis results in JSON format. The module provides functionality
-//! to write these outputs to files, handle duplicates, and format the output
-//! as needed.
+//! The output is written as JSON compilation databases.
+//! The module provides functionality to write these outputs to files,
+//! handle duplicates, and format the output as needed.
 //!
-//! The `OutputWriter` enum represents the main entry point for writing output.
+//! The `OutputWriter` struct represents the main entry point for writing output.
 //! The input to the `OutputWriter` is a stream of `semantic::Command` instances.
 
 mod formats;
@@ -18,7 +17,7 @@ use crate::{args, config, semantic};
 use thiserror::Error;
 use writers::{
     AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter,
-    ConverterClangOutputWriter, IteratorWriter, SemanticOutputWriter, UniqueOutputWriter,
+    ConverterClangOutputWriter, IteratorWriter, UniqueOutputWriter,
 };
 
 // Re-export types for convenience.
@@ -29,18 +28,13 @@ type ClangWriterStack = ConverterClangOutputWriter<
     AppendClangOutputWriter<AtomicClangOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
 >;
 
-/// Represents the output writer, which can handle different types of outputs.
+/// Represents the output writer for JSON compilation databases.
 ///
-/// This enum provides two variants:
-/// - `Clang`: Writes output as a JSON compilation database.
-/// - `Semantic`: Writes output as a JSON semantic analysis result.
-///
-/// The variants are selected at runtime based on the configuration provided.
-pub enum OutputWriter {
+/// The writer handles writing semantic analysis results as JSON compilation databases,
+/// with support for deduplication, atomic writes, and appending to existing files.
+pub struct OutputWriter {
     #[allow(private_interfaces)]
-    Clang(ClangWriterStack),
-    #[allow(private_interfaces)]
-    Semantic(SemanticOutputWriter),
+    writer: ClangWriterStack,
 }
 
 impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
@@ -64,12 +58,9 @@ impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
                 let formatted_writer =
                     ConverterClangOutputWriter::new(append_writer, &format.entry);
 
-                Ok(Self::Clang(formatted_writer))
-            }
-            config::Output::Semantic { .. } => {
-                let path = std::path::Path::new(&args.path);
-                let result = SemanticOutputWriter::try_from(path)?;
-                Ok(Self::Semantic(result))
+                Ok(Self {
+                    writer: formatted_writer,
+                })
             }
         }
     }
@@ -87,10 +78,7 @@ impl OutputWriter {
         self,
         semantics: impl Iterator<Item = semantic::Command>,
     ) -> Result<(), WriterError> {
-        match self {
-            Self::Clang(writer) => writer.write(semantics),
-            Self::Semantic(writer) => writer.write(semantics),
-        }
+        self.writer.write(semantics)
     }
 }
 

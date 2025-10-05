@@ -10,7 +10,6 @@ pub mod interpreters;
 
 use super::intercept::Execution;
 
-use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
 
@@ -29,7 +28,7 @@ pub trait Interpreter: Send {
 ///
 /// This enum aggregates different types of commands that can be recognized
 /// by the semantic analysis system.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     /// A recognized compiler command (e.g., gcc, clang).
     Compiler(CompilerCommand),
@@ -43,7 +42,7 @@ pub enum Command {
 /// the [`executable`] is the path to the compiler binary,
 /// while [`arguments`] contains the command-line arguments annotated
 /// with their meaning (e.g., source files, output files, switches).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CompilerCommand {
     pub working_dir: PathBuf,
     pub executable: PathBuf,
@@ -53,7 +52,7 @@ pub struct CompilerCommand {
 /// Represents a group of arguments of the same intent.
 ///
 /// Groups the arguments which belongs together, and annotate the meaning of them.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ArgumentGroup {
     pub args: Vec<String>,
     pub kind: ArgumentKind,
@@ -78,7 +77,7 @@ impl ArgumentGroup {
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
 /// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
 ///   Can optionally specify which compiler pass the argument affects.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ArgumentKind {
     Compiler,
     Source,
@@ -87,7 +86,7 @@ pub enum ArgumentKind {
 }
 
 /// Represents different compiler passes that an argument might affect.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CompilerPass {
     Info,
     Preprocessing,

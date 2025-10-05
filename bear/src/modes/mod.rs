@@ -276,7 +276,7 @@ mod impls {
         ///
         /// The `output` argument contains the configuration for the output file location,
         /// while the `config` argument contains the configuration for the semantic analysis
-        /// and the output format.
+        /// and clang compilation database formatting.
         pub(super) fn create(
             output: args::BuildSemantic,
             config: &config::Main,

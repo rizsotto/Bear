@@ -44,23 +44,6 @@ where
     Ok(())
 }
 
-/// Serialize entries from an iterator into a JSON array.
-pub fn serialize_seq<W, T>(
-    writer: W,
-    entries: impl Iterator<Item = T>,
-) -> Result<(), serde_json::Error>
-where
-    W: io::Write,
-    T: Serialize,
-{
-    let mut ser = serde_json::Serializer::pretty(writer);
-    let mut seq = ser.serialize_seq(None)?;
-    for entry in entries {
-        seq.serialize_element(&entry)?;
-    }
-    seq.end()
-}
-
 /// Deserialize entries from a JSON array into an iterator.
 ///
 /// from https://github.com/serde-rs/json/issues/404#issuecomment-892957228
@@ -252,7 +235,11 @@ mod tests {
     {
         // Create fake "file"
         let mut buffer = Cursor::new(Vec::new());
-        serialize_seq(&mut buffer, input.iter().cloned()).unwrap();
+        serialize_result_seq(
+            &mut buffer,
+            input.iter().cloned().map(Ok::<_, serde_json::Error>),
+        )
+        .unwrap();
 
         // Use the fake "file" as input
         buffer.seek(SeekFrom::Start(0)).unwrap();

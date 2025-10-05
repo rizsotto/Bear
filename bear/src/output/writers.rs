@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::formats::{
-    JsonCompilationDatabase, JsonSemanticDatabase, SerializationError, SerializationFormat,
-};
+use super::formats::{JsonCompilationDatabase, SerializationError, SerializationFormat};
 use super::{WriterCreationError, WriterError};
 use crate::semantic::clang::{DuplicateEntryFilter, Entry};
 use crate::{config, semantic};
@@ -18,38 +16,6 @@ pub(super) trait IteratorWriter<T> {
     ///
     /// Consumes the iterator and returns either nothing on success or an error.
     fn write(self, items: impl Iterator<Item = T>) -> Result<(), WriterError>;
-}
-
-/// The type represents a writer for semantic analysis results to a file.
-///
-/// # Note
-/// The output format is not stable and may change in future versions.
-/// It reflects the internal representation of the semantic analysis types.
-pub(super) struct SemanticOutputWriter {
-    output: io::BufWriter<fs::File>,
-    path: path::PathBuf,
-}
-
-impl TryFrom<&path::Path> for SemanticOutputWriter {
-    type Error = WriterCreationError;
-
-    fn try_from(output_path: &path::Path) -> Result<Self, Self::Error> {
-        let output = fs::File::create(output_path)
-            .map(io::BufWriter::new)
-            .map_err(|err| WriterCreationError::Io(output_path.to_path_buf(), err))?;
-
-        Ok(Self {
-            output,
-            path: output_path.to_path_buf(),
-        })
-    }
-}
-
-impl IteratorWriter<semantic::Command> for SemanticOutputWriter {
-    fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
-        JsonSemanticDatabase::write(self.output, semantics)
-            .map_err(|err| WriterError::Io(self.path, err))
-    }
 }
 
 /// The type represents a converter that formats `semantic::Command` instances into `Entry` objects.
