@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{ArgumentGroup, ArgumentKind, CompilerCommand, Execution, Interpreter};
+use super::super::{ArgumentKind, BasicArguments, CompilerCommand, Execution, Interpreter};
 use super::matchers::source::looks_like_a_source_file;
 use crate::semantic::Command;
 use std::collections::HashSet;
@@ -29,60 +29,60 @@ impl Interpreter for Generic {
             return None;
         }
 
-        let mut annotated_args = Vec::new();
+        let mut annotated_args: Vec<Box<dyn super::super::Arguments>> = Vec::new();
         let mut iter = execution.arguments.iter().peekable();
 
         // First argument is the compiler itself
         if let Some(first) = iter.next() {
-            annotated_args.push(ArgumentGroup {
-                args: vec![first.clone()],
-                kind: ArgumentKind::Compiler,
-            });
+            annotated_args.push(Box::new(BasicArguments::new(
+                vec![first.clone()],
+                ArgumentKind::Compiler,
+            )) as Box<dyn super::super::Arguments>);
         }
 
         while let Some(arg) = iter.next() {
             if looks_like_a_source_file(arg) {
-                annotated_args.push(ArgumentGroup {
-                    args: vec![arg.clone()],
-                    kind: ArgumentKind::Source,
-                });
+                annotated_args.push(Box::new(BasicArguments::new(
+                    vec![arg.clone()],
+                    ArgumentKind::Source,
+                )) as Box<dyn super::super::Arguments>);
             } else if arg == "-o" {
                 if let Some(output) = iter.next() {
-                    annotated_args.push(ArgumentGroup {
-                        args: vec![arg.clone(), output.clone()],
-                        kind: ArgumentKind::Output,
-                    });
+                    annotated_args.push(Box::new(BasicArguments::new(
+                        vec![arg.clone(), output.clone()],
+                        ArgumentKind::Output,
+                    )) as Box<dyn super::super::Arguments>);
                 } else {
-                    annotated_args.push(ArgumentGroup {
-                        args: vec![arg.clone()],
-                        kind: ArgumentKind::Other(None),
-                    });
+                    annotated_args.push(Box::new(BasicArguments::new(
+                        vec![arg.clone()],
+                        ArgumentKind::Other(None),
+                    )) as Box<dyn super::super::Arguments>);
                 }
             } else if arg.starts_with('-') {
                 // Handle switches with values (e.g., -I include, -D define)
                 if (arg == "-I" || arg == "-D" || arg == "-L") && iter.peek().is_some() {
                     let value = iter.next().unwrap();
-                    annotated_args.push(ArgumentGroup {
-                        args: vec![arg.clone(), value.clone()],
-                        kind: ArgumentKind::Other(None),
-                    });
+                    annotated_args.push(Box::new(BasicArguments::new(
+                        vec![arg.clone(), value.clone()],
+                        ArgumentKind::Other(None),
+                    )) as Box<dyn super::super::Arguments>);
                 } else if arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-L") {
                     // Handle combined flags like -I. or -DFOO=bar
-                    annotated_args.push(ArgumentGroup {
-                        args: vec![arg.clone()],
-                        kind: ArgumentKind::Other(None),
-                    });
+                    annotated_args.push(Box::new(BasicArguments::new(
+                        vec![arg.clone()],
+                        ArgumentKind::Other(None),
+                    )) as Box<dyn super::super::Arguments>);
                 } else {
-                    annotated_args.push(ArgumentGroup {
-                        args: vec![arg.clone()],
-                        kind: ArgumentKind::Other(None),
-                    });
+                    annotated_args.push(Box::new(BasicArguments::new(
+                        vec![arg.clone()],
+                        ArgumentKind::Other(None),
+                    )) as Box<dyn super::super::Arguments>);
                 }
             } else {
-                annotated_args.push(ArgumentGroup {
-                    args: vec![arg.clone()],
-                    kind: ArgumentKind::Other(None),
-                });
+                annotated_args.push(Box::new(BasicArguments::new(
+                    vec![arg.clone()],
+                    ArgumentKind::Other(None),
+                )) as Box<dyn super::super::Arguments>);
             }
         }
 
@@ -125,24 +125,39 @@ mod test {
                 assert_eq!(cmd.arguments.len(), 5);
 
                 // Check compiler argument
-                assert_eq!(cmd.arguments[0].kind, ArgumentKind::Compiler);
-                assert_eq!(cmd.arguments[0].args, vec!["something"]);
+                assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+                assert_eq!(
+                    cmd.arguments[0].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["something"]
+                );
 
                 // Check switch argument
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[1].args, vec!["-Dthis=that"]);
+                assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[1].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-Dthis=that"]
+                );
 
                 // Check switch with value (combined form)
-                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[2].args, vec!["-I."]);
+                assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[2].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-I."]
+                );
 
                 // Check source file
-                assert_eq!(cmd.arguments[3].kind, ArgumentKind::Source);
-                assert_eq!(cmd.arguments[3].args, vec!["source.c"]);
+                assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+                assert_eq!(
+                    cmd.arguments[3].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["source.c"]
+                );
 
                 // Check output
-                assert_eq!(cmd.arguments[4].kind, ArgumentKind::Output);
-                assert_eq!(cmd.arguments[4].args, vec!["-o", "source.c.o"]);
+                assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Output);
+                assert_eq!(
+                    cmd.arguments[4].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-o", "source.c.o"]
+                );
             }
             _ => panic!("Expected Some(Command::Compiler(_))"),
         }
@@ -165,12 +180,18 @@ mod test {
                 assert_eq!(cmd.arguments.len(), 2);
 
                 // Check compiler argument
-                assert_eq!(cmd.arguments[0].kind, ArgumentKind::Compiler);
-                assert_eq!(cmd.arguments[0].args, vec!["something"]);
+                assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+                assert_eq!(
+                    cmd.arguments[0].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["something"]
+                );
 
                 // Check switch argument
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[1].args, vec!["--help"]);
+                assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[1].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["--help"]
+                );
             }
             _ => panic!("Expected Some(Command::Compiler(_))"),
         }
@@ -222,50 +243,89 @@ mod test {
                 assert_eq!(cmd.arguments.len(), 13);
 
                 // Check compiler
-                assert_eq!(cmd.arguments[0].kind, ArgumentKind::Compiler);
-                assert_eq!(cmd.arguments[0].args, vec!["gcc"]);
+                assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+                assert_eq!(
+                    cmd.arguments[0].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["gcc"]
+                );
 
                 // Check various switches
-                assert_eq!(cmd.arguments[1].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[1].args, vec!["-c"]);
+                assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[1].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-c"]
+                );
 
-                assert_eq!(cmd.arguments[2].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[2].args, vec!["-Wall"]);
+                assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[2].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-Wall"]
+                );
 
-                assert_eq!(cmd.arguments[3].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[3].args, vec!["-Werror"]);
+                assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[3].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-Werror"]
+                );
 
                 // Check include paths (both separate and combined forms)
-                assert_eq!(cmd.arguments[4].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[4].args, vec!["-I/usr/include"]);
+                assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[4].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-I/usr/include"]
+                );
 
-                assert_eq!(cmd.arguments[5].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[5].args, vec!["-I."]);
+                assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[5].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-I."]
+                );
 
                 // Check defines
-                assert_eq!(cmd.arguments[6].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[6].args, vec!["-DDEBUG=1"]);
+                assert_eq!(cmd.arguments[6].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[6].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-DDEBUG=1"]
+                );
 
-                assert_eq!(cmd.arguments[7].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[7].args, vec!["-DVERSION=\"1.0\""]);
+                assert_eq!(cmd.arguments[7].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[7].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-DVERSION=\"1.0\""]
+                );
 
                 // Check source files
-                assert_eq!(cmd.arguments[8].kind, ArgumentKind::Source);
-                assert_eq!(cmd.arguments[8].args, vec!["main.c"]);
+                assert_eq!(cmd.arguments[8].kind(), ArgumentKind::Source);
+                assert_eq!(
+                    cmd.arguments[8].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["main.c"]
+                );
 
-                assert_eq!(cmd.arguments[9].kind, ArgumentKind::Source);
-                assert_eq!(cmd.arguments[9].args, vec!["utils.c"]);
+                assert_eq!(cmd.arguments[9].kind(), ArgumentKind::Source);
+                assert_eq!(
+                    cmd.arguments[9].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["utils.c"]
+                );
 
                 // Check output
-                assert_eq!(cmd.arguments[10].kind, ArgumentKind::Output);
-                assert_eq!(cmd.arguments[10].args, vec!["-o", "output.o"]);
+                assert_eq!(cmd.arguments[10].kind(), ArgumentKind::Output);
+                assert_eq!(
+                    cmd.arguments[10].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-o", "output.o"]
+                );
 
                 // Check library link arguments
-                assert_eq!(cmd.arguments[11].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[11].args, vec!["-L/usr/lib"]);
+                assert_eq!(cmd.arguments[11].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[11].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-L/usr/lib"]
+                );
 
-                assert_eq!(cmd.arguments[12].kind, ArgumentKind::Other(None));
-                assert_eq!(cmd.arguments[12].args, vec!["-lmath"]);
+                assert_eq!(cmd.arguments[12].kind(), ArgumentKind::Other(None));
+                assert_eq!(
+                    cmd.arguments[12].as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
+                    vec!["-lmath"]
+                );
             }
             _ => panic!("Expected Some(Command::Compiler(_))"),
         }

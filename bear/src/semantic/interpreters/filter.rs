@@ -85,21 +85,24 @@ impl Filter {
         source_filters: &[config::DirectoryFilter],
     ) -> Option<&'static str> {
         // Get all source files from the command
-        let source_files: Vec<&String> = cmd
+        let path_updater: &dyn Fn(&std::path::Path) -> std::borrow::Cow<std::path::Path> =
+            &|path: &std::path::Path| std::borrow::Cow::Borrowed(path);
+        let source_files: Vec<String> = cmd
             .arguments
             .iter()
-            .filter(|arg| arg.kind == ArgumentKind::Source)
-            .flat_map(|arg| &arg.args)
+            .filter(|arg| arg.kind() == ArgumentKind::Source)
+            .filter_map(|arg| arg.as_file(path_updater))
+            .map(|path| path.to_string_lossy().to_string())
             .collect();
 
         // TODO: handle cases when there are multiple source files, but filtering
         //       keeps at least one source file in the result.
         for source_file in source_files {
             // FIXME: this is not needed if the command is already using absolute paths
-            let source_path = if PathBuf::from(source_file).is_absolute() {
-                PathBuf::from(source_file)
+            let source_path = if PathBuf::from(&source_file).is_absolute() {
+                PathBuf::from(&source_file)
             } else {
-                cmd.working_dir.join(source_file)
+                cmd.working_dir.join(&source_file)
             };
 
             for filter in source_filters {
@@ -308,17 +311,15 @@ mod tests {
             paths: vec![],
         };
 
-        let mock_cmd = CompilerCommand::from_strings(
-            "/project",
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
-        );
-
         let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .times(1)
-            .return_const(Some(Command::Compiler(mock_cmd)));
+        mock_interpreter.expect_recognize().times(1).returning(|_| {
+            let mock_cmd = CompilerCommand::from_strings(
+                "/project",
+                "/usr/bin/gcc",
+                vec![(ArgumentKind::Source, vec!["main.c"])],
+            );
+            Some(Command::Compiler(mock_cmd))
+        });
 
         let filter =
             Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
@@ -346,17 +347,15 @@ mod tests {
             }],
         };
 
-        let mock_cmd = CompilerCommand::from_strings(
-            "/project",
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["tests/test_file.c"])],
-        );
-
         let mut mock_interpreter = MockInterpreter::new();
-        mock_interpreter
-            .expect_recognize()
-            .times(1)
-            .return_const(Some(Command::Compiler(mock_cmd)));
+        mock_interpreter.expect_recognize().times(1).returning(|_| {
+            let mock_cmd = CompilerCommand::from_strings(
+                "/project",
+                "/usr/bin/gcc",
+                vec![(ArgumentKind::Source, vec!["tests/test_file.c"])],
+            );
+            Some(Command::Compiler(mock_cmd))
+        });
 
         let filter =
             Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");

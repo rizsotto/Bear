@@ -28,7 +28,9 @@
 
 use super::Entry;
 use crate::config;
-use crate::semantic::{ArgumentGroup, ArgumentKind, Command, CompilerCommand};
+use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand};
+use std::borrow::Cow;
+use std::path::{Path, PathBuf};
 
 /// Converts commands into compilation database entries.
 ///
@@ -54,13 +56,12 @@ impl CommandConverter {
 
     /// Converts a compiler command into compilation database entries.
     fn convert_compiler_command(&self, cmd: &CompilerCommand) -> Vec<Entry> {
-        // Find all source files in the arguments
-        let source_files = Self::find_arguments_by_kind(cmd, ArgumentKind::Source)
-            .flat_map(ArgumentGroup::as_file)
-            .collect::<Vec<String>>();
+        // Find all source arguments
+        let source_arguments = Self::find_arguments_by_kind(cmd, ArgumentKind::Source)
+            .collect::<Vec<&Box<dyn Arguments>>>();
 
         // If no source files found, return empty vector
-        if source_files.is_empty() {
+        if source_arguments.is_empty() {
             return vec![];
         }
 
@@ -71,26 +72,29 @@ impl CommandConverter {
             None
         };
 
-        // Create one entry per source file
-        source_files
+        // Create one entry per source argument
+        source_arguments
             .into_iter()
-            .map(|source_file| {
-                let command_args = Self::build_command_args_for_source(cmd, &source_file);
+            .filter_map(|source_arg| {
+                let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
+                let source_file = source_arg.as_file(path_updater)?;
+
+                let command_args = Self::build_command_args_for_source(cmd, source_arg.as_ref());
 
                 if self.format.command_field_as_array {
-                    Entry::with_arguments(
+                    Some(Entry::with_arguments(
                         source_file,
                         command_args,
                         &cmd.working_dir,
                         output_file.as_ref(),
-                    )
+                    ))
                 } else {
-                    Entry::with_command(
+                    Some(Entry::with_command(
                         source_file,
                         command_args,
                         &cmd.working_dir,
                         output_file.as_ref(),
-                    )
+                    ))
                 }
             })
             .collect()
@@ -101,32 +105,23 @@ impl CommandConverter {
     /// This method constructs the command arguments list that includes the executable,
     /// all non-source arguments, and the specific source file.
     /// It ensures that the source file is placed in the correct position relative to output arguments.
-    fn build_command_args_for_source(cmd: &CompilerCommand, source_file: &str) -> Vec<String> {
+    fn build_command_args_for_source(
+        cmd: &CompilerCommand,
+        source_arg: &dyn Arguments,
+    ) -> Vec<String> {
         // Start with the executable
         let mut command_args = vec![cmd.executable.to_string_lossy().to_string()];
 
-        // Process arguments in the correct order for compilation database
-        let mut source_added = false;
-
         // Add all non-source arguments, while handling source file placement
+        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
         for arg in &cmd.arguments {
-            if matches!(arg.kind, ArgumentKind::Source) {
+            // Skip this specific source argument (using pointer equality)
+            if matches!(arg.kind(), ArgumentKind::Source) && !std::ptr::eq(arg.as_ref(), source_arg)
+            {
                 continue;
             }
 
-            // If we encounter output arguments and haven't added the source yet,
-            // add the source first, then the output args
-            if matches!(arg.kind, ArgumentKind::Output) && !source_added {
-                command_args.push(source_file.to_string());
-                source_added = true;
-            }
-
-            command_args.extend(arg.args.iter().cloned());
-        }
-
-        // If we haven't added the source yet, add it at the end
-        if !source_added {
-            command_args.push(source_file.to_string());
+            command_args.extend(arg.as_arguments(&path_updater));
         }
 
         command_args
@@ -138,19 +133,20 @@ impl CommandConverter {
     fn find_arguments_by_kind(
         cmd: &CompilerCommand,
         kind: ArgumentKind,
-    ) -> impl Iterator<Item = &ArgumentGroup> {
-        cmd.arguments.iter().filter(move |arg| arg.kind == kind)
+    ) -> impl Iterator<Item = &Box<dyn Arguments>> {
+        cmd.arguments.iter().filter(move |arg| arg.kind() == kind)
     }
 
     /// Computes the output file path from the command arguments.
     ///
     /// This method examines the output arguments (typically "-o filename")
     /// and returns the filename as a PathBuf.
-    fn compute_output_file(cmd: &CompilerCommand) -> Option<String> {
+    fn compute_output_file(cmd: &CompilerCommand) -> Option<PathBuf> {
         // Find output arguments and convert to a file path
+        let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
         Self::find_arguments_by_kind(cmd, ArgumentKind::Output)
             .nth(0)
-            .and_then(|arg_group| arg_group.as_file())
+            .and_then(|arg| arg.as_file(path_updater))
     }
 }
 
