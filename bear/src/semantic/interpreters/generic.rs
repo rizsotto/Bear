@@ -1,11 +1,43 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::super::{ArgumentKind, BasicArguments, CompilerCommand, Execution, Interpreter};
+use super::super::{ArgumentKind, Arguments, CompilerCommand, Execution, Interpreter};
 use super::matchers::source::looks_like_a_source_file;
 use crate::semantic::Command;
+use std::borrow::Cow;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::vec;
+
+/// Basic implementation of Arguments trait for simple argument groups
+#[derive(Debug, Clone, PartialEq)]
+struct BasicArguments {
+    args: Vec<String>,
+    kind: ArgumentKind,
+}
+
+impl BasicArguments {
+    fn new(args: Vec<String>, kind: ArgumentKind) -> Self {
+        Self { args, kind }
+    }
+}
+
+impl Arguments for BasicArguments {
+    fn kind(&self) -> ArgumentKind {
+        self.kind.clone()
+    }
+
+    fn as_arguments(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {
+        self.args.clone()
+    }
+
+    fn as_file(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Option<PathBuf> {
+        match self.kind {
+            ArgumentKind::Source => self.args.first().map(PathBuf::from),
+            ArgumentKind::Output => self.args.get(1).map(PathBuf::from),
+            _ => None,
+        }
+    }
+}
 
 /// A tool to recognize a compiler by executable name.
 pub(super) struct Generic {
@@ -29,7 +61,7 @@ impl Interpreter for Generic {
             return None;
         }
 
-        let mut annotated_args: Vec<Box<dyn super::super::Arguments>> = Vec::new();
+        let mut annotated_args: Vec<Box<dyn Arguments>> = Vec::new();
         let mut iter = execution.arguments.iter().peekable();
 
         // First argument is the compiler itself
@@ -37,7 +69,7 @@ impl Interpreter for Generic {
             annotated_args.push(Box::new(BasicArguments::new(
                 vec![first.clone()],
                 ArgumentKind::Compiler,
-            )) as Box<dyn super::super::Arguments>);
+            )) as Box<dyn Arguments>);
         }
 
         while let Some(arg) = iter.next() {
@@ -45,18 +77,18 @@ impl Interpreter for Generic {
                 annotated_args.push(Box::new(BasicArguments::new(
                     vec![arg.clone()],
                     ArgumentKind::Source,
-                )) as Box<dyn super::super::Arguments>);
+                )) as Box<dyn Arguments>);
             } else if arg == "-o" {
                 if let Some(output) = iter.next() {
                     annotated_args.push(Box::new(BasicArguments::new(
                         vec![arg.clone(), output.clone()],
                         ArgumentKind::Output,
-                    )) as Box<dyn super::super::Arguments>);
+                    )) as Box<dyn Arguments>);
                 } else {
                     annotated_args.push(Box::new(BasicArguments::new(
                         vec![arg.clone()],
                         ArgumentKind::Other(None),
-                    )) as Box<dyn super::super::Arguments>);
+                    )) as Box<dyn Arguments>);
                 }
             } else if arg.starts_with('-') {
                 // Handle switches with values (e.g., -I include, -D define)
@@ -65,24 +97,24 @@ impl Interpreter for Generic {
                     annotated_args.push(Box::new(BasicArguments::new(
                         vec![arg.clone(), value.clone()],
                         ArgumentKind::Other(None),
-                    )) as Box<dyn super::super::Arguments>);
+                    )) as Box<dyn Arguments>);
                 } else if arg.starts_with("-I") || arg.starts_with("-D") || arg.starts_with("-L") {
                     // Handle combined flags like -I. or -DFOO=bar
                     annotated_args.push(Box::new(BasicArguments::new(
                         vec![arg.clone()],
                         ArgumentKind::Other(None),
-                    )) as Box<dyn super::super::Arguments>);
+                    )) as Box<dyn Arguments>);
                 } else {
                     annotated_args.push(Box::new(BasicArguments::new(
                         vec![arg.clone()],
                         ArgumentKind::Other(None),
-                    )) as Box<dyn super::super::Arguments>);
+                    )) as Box<dyn Arguments>);
                 }
             } else {
                 annotated_args.push(Box::new(BasicArguments::new(
                     vec![arg.clone()],
                     ArgumentKind::Other(None),
-                )) as Box<dyn super::super::Arguments>);
+                )) as Box<dyn Arguments>);
             }
         }
 
