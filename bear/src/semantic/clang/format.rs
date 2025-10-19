@@ -16,7 +16,7 @@
 
 use crate::config::{PathFormat, PathResolver};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{absolute, Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -140,21 +140,21 @@ impl PathResolver {
 
 /// Compute the absolute path from the root directory if the path is relative.
 fn absolute_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
-    // TODO: instead of calling `canonicalize` on the path, we should use
-    //       `path::absolute` when the filesystem access is not allowed.
     if path.is_absolute() {
-        Ok(path.canonicalize()?)
+        Ok(absolute(path)?)
     } else {
-        Ok(root.join(path).canonicalize()?)
+        Ok(absolute(root.join(path))?)
     }
 }
 
 /// Compute the relative path from the root directory.
 fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
-    // This is a naive implementation that assumes the root is
-    // on the same filesystem/volume as the path.
-    let mut root_components = root.components();
-    let mut path_components = path.components();
+    // Ensure both paths are absolute for consistent behavior
+    let abs_root = absolute(root)?;
+    let abs_path = absolute(path)?;
+
+    let mut root_components = abs_root.components();
+    let mut path_components = abs_path.components();
 
     let mut remaining_root_components = Vec::new();
     let mut remaining_path_components = Vec::new();
@@ -203,10 +203,7 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
                 // Ignore this (should not happen since we are working with absolute paths)
             }
             _ => {
-                return Err(FormatError::PathsCannotBeRelative(
-                    path.to_path_buf(),
-                    root.to_path_buf(),
-                ));
+                return Err(FormatError::PathsCannotBeRelative(abs_path, abs_root));
             }
         }
     }
@@ -319,6 +316,17 @@ mod tests {
 
         let formatter = ConfigurablePathFormatter::new(config);
         assert!(formatter.is_err());
+    }
+
+    #[test]
+    fn test_relative_to_with_relative_paths() {
+        // Test that relative_to works correctly with relative input paths
+        let root = Path::new("./some/root");
+        let path = Path::new("./some/path/file.txt");
+
+        let result = relative_to(root, path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), PathBuf::from("../path/file.txt"));
     }
 
     #[test]
