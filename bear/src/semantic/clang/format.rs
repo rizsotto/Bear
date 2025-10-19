@@ -13,144 +13,11 @@
 //! The `arguments` attribute contains the compiler flags, where some flags are using
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
-//!
-//! Formatting interpreter that wraps another interpreter to format paths in compiler commands
-//! according to configuration (absolute, relative, canonical).
 
-use crate::config::{PathFormat, PathResolver};
-use crate::semantic::{
-    ArgumentKind, Arguments, BasicArguments, Command, CompilerCommand, Execution, Interpreter,
-};
+use crate::config::PathResolver;
 use std::path::{Path, PathBuf};
-use std::{env, io};
+use std::io;
 use thiserror::Error;
-
-/// A wrapper interpreter that applies path formatting to recognized compiler commands.
-pub(super) struct FormattingInterpreter<T: Interpreter> {
-    inner: T,
-    formatter: PathFormatter,
-}
-
-impl<T: Interpreter> FormattingInterpreter<T> {
-    /// Creates a formatting interpreter with the given path formatter.
-    pub fn new(inner: T, formatter: PathFormatter) -> Self {
-        Self { inner, formatter }
-    }
-}
-
-impl<T: Interpreter> Interpreter for FormattingInterpreter<T> {
-    /// This function formats the recognized command if a formatter is configured.
-    ///
-    /// Implemented as an Interpreter trait method, because it wraps another interpreter
-    /// and applies formatting to the result semantic.
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        // First, let the inner interpreter recognize the command
-        let command = self.inner.recognize(execution)?;
-
-        // Apply formatting to the command
-        match command {
-            Command::Compiler(compiler_cmd) => {
-                // Apply formatting to the compiler command
-                match self.formatter.format_command(compiler_cmd) {
-                    Ok(formatted_cmd) => Some(Command::Compiler(formatted_cmd)),
-                    // If formatting fails, return None
-                    Err(_) => None,
-                }
-            }
-            // Pass through other command types unchanged
-            other => Some(other),
-        }
-    }
-}
-
-/// Represents the path formatting configuration.
-pub(super) struct PathFormatter {
-    config: PathFormat,
-    current_dir: PathBuf,
-}
-
-impl PathFormatter {
-    /// Formats the compiler command according to the configuration.
-    fn format_command(&self, cmd: CompilerCommand) -> Result<CompilerCommand, FormatError> {
-        // Make sure the working directory is absolute, so we can resolve paths correctly,
-        // independently how the path format is requested.
-        let canonic_working_dir = cmd.working_dir.canonicalize()?;
-
-        // Format the working directory
-        let working_dir = self.format_working_dir(&canonic_working_dir)?;
-
-        // Format paths in arguments
-        let arguments = cmd
-            .arguments
-            .iter()
-            .filter_map(|argument| {
-                self.format_argument(argument.as_ref(), &canonic_working_dir)
-                    .ok()
-            })
-            .collect();
-
-        Ok(CompilerCommand {
-            executable: cmd.executable,
-            working_dir,
-            arguments,
-        })
-    }
-
-    fn format_working_dir(&self, working_dir: &Path) -> Result<PathBuf, FormatError> {
-        self.config
-            .directory
-            .resolve(&self.current_dir, working_dir)
-    }
-
-    fn format_argument(
-        &self,
-        arg: &dyn Arguments,
-        working_dir: &Path,
-    ) -> Result<Box<dyn Arguments>, FormatError> {
-        let path_updater: &dyn Fn(&Path) -> std::borrow::Cow<Path> =
-            &|path: &Path| std::borrow::Cow::Borrowed(path);
-        let args = arg.as_arguments(path_updater);
-
-        match arg.kind() {
-            ArgumentKind::Source => {
-                if args.len() != 1 {
-                    panic!("source argument must have exactly one argument");
-                }
-
-                let source = &args[0];
-                Ok(Box::new(BasicArguments::new(
-                    vec![self.format_file(source.as_str(), working_dir)?],
-                    ArgumentKind::Source,
-                )))
-            }
-            ArgumentKind::Output => {
-                if args.len() != 2 {
-                    panic!("output argument must have exactly two arguments");
-                }
-
-                let output = &args[1];
-                Ok(Box::new(BasicArguments::new(
-                    vec![
-                        args[0].clone(), // Keep the first argument (e.g., "-o")
-                        self.format_file(output.as_str(), working_dir)?,
-                    ],
-                    ArgumentKind::Output,
-                )))
-            }
-            _ => {
-                // Don't format other argument types for now
-                // In the future, we might want to format include paths, etc.
-                Ok(Box::new(BasicArguments::new(args, arg.kind())))
-            }
-        }
-    }
-
-    fn format_file(&self, path_str: &str, working_dir: &Path) -> Result<String, FormatError> {
-        let path = PathBuf::from(path_str);
-        let resolved = self.config.file.resolve(working_dir, &path)?;
-        Ok(resolved.to_string_lossy().to_string())
-    }
-}
 
 #[derive(Debug, Error)]
 pub enum FormatError {
@@ -158,29 +25,6 @@ pub enum FormatError {
     PathCanonicalize(#[from] io::Error),
     #[error("Path {0} can't be relative to {1}")]
     PathsCannotBeRelative(PathBuf, PathBuf),
-}
-
-/// Converts the `PathFormat` configuration into a `PathFormatter` instance.
-///
-/// This conversion checks the configuration and ensures that the paths are valid
-/// according to the rules defined in the `PathResolver` enum. And it also captures
-/// the current working directory to resolve relative paths correctly.
-impl TryFrom<&PathFormat> for PathFormatter {
-    type Error = FormatConfigurationError;
-
-    fn try_from(config: &PathFormat) -> Result<Self, Self::Error> {
-        use PathResolver::Relative;
-
-        // When the directory is relative, the file and output must be relative too.
-        if config.directory == Relative && config.file != Relative {
-            return Err(FormatConfigurationError::OnlyRelativePaths);
-        }
-
-        Ok(Self {
-            config: config.clone(),
-            current_dir: env::current_dir()?,
-        })
-    }
 }
 
 #[derive(Debug, Error)]

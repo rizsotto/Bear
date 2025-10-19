@@ -8,7 +8,6 @@ use super::interpreters::combinators::Any;
 use super::interpreters::filter::{
     CompilerFilterConfigurationError, Filter, FilteringInterpreter, SourceFilterConfigurationError,
 };
-use super::interpreters::format::{FormatConfigurationError, FormattingInterpreter, PathFormatter};
 use super::interpreters::generic::Generic;
 use super::interpreters::ignore::IgnoreByPath;
 use super::{Command, Interpreter};
@@ -21,7 +20,6 @@ use thiserror::Error;
 
 mod combinators;
 pub mod filter;
-pub mod format;
 pub mod generic;
 mod ignore;
 mod matchers;
@@ -32,8 +30,6 @@ pub enum InterpreterConfigError {
     CompilerFilter(#[from] CompilerFilterConfigurationError),
     #[error("Source filter configuration error: {0}")]
     SourceFilter(#[from] SourceFilterConfigurationError),
-    #[error("Format configuration error: {0}")]
-    Format(#[from] FormatConfigurationError),
 }
 
 /// Creates an interpreter to recognize the compiler calls.
@@ -77,20 +73,12 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
     // Wrap with filtering and formatting based on output configuration
     match &config.output {
         config::Output::Clang {
-            compilers,
-            sources,
-            format,
-            ..
+            compilers, sources, ..
         } => {
             let filter = Filter::try_from((compilers.as_slice(), sources))?;
             let filtering =
                 FilteringInterpreter::new(OutputLogger::new(base_interpreter, "filtering"), filter);
-            let path_formatter = PathFormatter::try_from(&format.paths)?;
-            let formatting = FormattingInterpreter::new(
-                OutputLogger::new(filtering, "formatting"),
-                path_formatter,
-            );
-            let logger = InputLogger::new(formatting);
+            let logger = InputLogger::new(filtering);
             Ok(logger)
         }
     }

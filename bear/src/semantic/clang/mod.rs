@@ -13,6 +13,7 @@
 
 pub mod converter;
 mod filter;
+mod format;
 
 use serde::{Deserialize, Serialize};
 use shell_words;
