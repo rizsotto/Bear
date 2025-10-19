@@ -25,11 +25,14 @@ pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
 }
 
 impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
-    pub(super) fn new(writer: T, format: &config::EntryFormat) -> Self {
-        Self {
-            converter: semantic::clang::CommandConverter::new(format.clone()),
+    pub(super) fn new(
+        writer: T,
+        format: &config::Format,
+    ) -> Result<Self, semantic::clang::FormatConfigurationError> {
+        Ok(Self {
+            converter: semantic::clang::CommandConverter::new(format.clone())?,
             writer,
-        }
+        })
     }
 }
 

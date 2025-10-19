@@ -14,9 +14,9 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
-use crate::config::PathResolver;
-use std::path::{Path, PathBuf};
+use crate::config::{PathFormat, PathResolver};
 use std::io;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -29,15 +29,102 @@ pub enum FormatError {
 
 #[derive(Debug, Error)]
 pub enum FormatConfigurationError {
-    #[error("Only relative paths for 'file' and 'output' when 'directory' is relative")]
-    OnlyRelativePaths,
+    #[error("Invalid path format configuration: {0}")]
+    InvalidConfiguration(String),
     #[error("Getting current directory failed: {0}")]
     CurrentWorkingDirectory(#[from] io::Error),
 }
 
+/// Trait for formatting paths according to different strategies.
+/// This trait allows for easy mocking in tests and provides a clean abstraction
+/// for path transformation logic.
+#[cfg_attr(test, mockall::automock)]
+pub trait PathFormatter: Send + Sync {
+    /// Format a directory path according to the configured strategy.
+    fn format_directory(
+        &self,
+        working_dir: &Path,
+        directory: &Path,
+    ) -> Result<PathBuf, FormatError>;
+
+    /// Format a file path according to the configured strategy.
+    fn format_file(&self, directory: &Path, file: &Path) -> Result<PathBuf, FormatError>;
+}
+
+/// Implementation of PathFormatter that uses the configuration to determine
+/// how to format paths.
+pub struct ConfigurablePathFormatter {
+    config: PathFormat,
+}
+
+impl ConfigurablePathFormatter {
+    /// Creates a new PathFormatter with the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns `FormatConfigurationError::InvalidConfiguration` if the path format
+    /// configuration violates the rules.
+    /// Returns `FormatConfigurationError::CurrentWorkingDirectory` if getting
+    /// the current working directory fails.
+    pub fn new(config: PathFormat) -> Result<Self, FormatConfigurationError> {
+        // Validate configuration rules
+        Self::validate_path_format_config(&config)?;
+
+        Ok(Self { config })
+    }
+
+    /// Validates the path format configuration according to the rules:
+    /// - When directory is relative, file must be relative too
+    /// - When directory is canonical, file can't be absolute
+    /// - When directory is absolute, file can't be canonical
+    fn validate_path_format_config(config: &PathFormat) -> Result<(), FormatConfigurationError> {
+        use PathResolver::*;
+
+        match (&config.directory, &config.file) {
+            (Relative, Absolute | Canonical) => {
+                Err(FormatConfigurationError::InvalidConfiguration(
+                    "When directory is relative, file must be relative too".to_string(),
+                ))
+            }
+            (Canonical, Absolute) => Err(FormatConfigurationError::InvalidConfiguration(
+                "When directory is canonical, file can't be absolute".to_string(),
+            )),
+            (Absolute, Canonical) => Err(FormatConfigurationError::InvalidConfiguration(
+                "When directory is absolute, file can't be canonical".to_string(),
+            )),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl PathFormatter for ConfigurablePathFormatter {
+    fn format_directory(
+        &self,
+        working_dir: &Path,
+        directory: &Path,
+    ) -> Result<PathBuf, FormatError> {
+        self.config.directory.resolve(working_dir, directory)
+    }
+
+    fn format_file(&self, directory: &Path, file: &Path) -> Result<PathBuf, FormatError> {
+        self.config.file.resolve(directory, file)
+    }
+}
+
 impl PathResolver {
+    /// Resolves a path according to the resolver strategy.
+    ///
+    /// # Parameters
+    ///
+    /// * `base` - The base directory for relative path calculations
+    /// * `path` - The path to resolve
+    ///
+    /// # Returns
+    ///
+    /// The resolved path according to the strategy
     fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
         match self {
+            PathResolver::AsIs => Ok(path.to_path_buf()),
             PathResolver::Canonical => {
                 let result = path.canonicalize()?;
                 Ok(result)
@@ -46,6 +133,7 @@ impl PathResolver {
                 let absolute = absolute_to(base, path)?;
                 relative_to(base, &absolute)
             }
+            PathResolver::Absolute => absolute_to(base, path),
         }
     }
 }
@@ -129,11 +217,119 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PathResolver;
     use std::fs;
     use tempfile::tempdir;
 
-    // TODO: Update tests to work with new Arguments trait system
-    // Tests temporarily disabled during refactoring
+    #[test]
+    fn test_path_format_validation_success() {
+        let valid_configs = vec![
+            PathFormat {
+                directory: PathResolver::AsIs,
+                file: PathResolver::AsIs,
+            },
+            PathFormat {
+                directory: PathResolver::Relative,
+                file: PathResolver::Relative,
+            },
+            PathFormat {
+                directory: PathResolver::Canonical,
+                file: PathResolver::Relative,
+            },
+            PathFormat {
+                directory: PathResolver::Absolute,
+                file: PathResolver::Relative,
+            },
+            PathFormat {
+                directory: PathResolver::Absolute,
+                file: PathResolver::Absolute,
+            },
+        ];
+
+        for config in valid_configs {
+            assert!(
+                ConfigurablePathFormatter::validate_path_format_config(&config).is_ok(),
+                "Config should be valid: {:?}",
+                config
+            );
+        }
+    }
+
+    #[test]
+    fn test_path_format_validation_failures() {
+        let invalid_configs = vec![
+            (
+                PathFormat {
+                    directory: PathResolver::Relative,
+                    file: PathResolver::Absolute,
+                },
+                "When directory is relative, file must be relative too",
+            ),
+            (
+                PathFormat {
+                    directory: PathResolver::Relative,
+                    file: PathResolver::Canonical,
+                },
+                "When directory is relative, file must be relative too",
+            ),
+            (
+                PathFormat {
+                    directory: PathResolver::Canonical,
+                    file: PathResolver::Absolute,
+                },
+                "When directory is canonical, file can't be absolute",
+            ),
+            (
+                PathFormat {
+                    directory: PathResolver::Absolute,
+                    file: PathResolver::Canonical,
+                },
+                "When directory is absolute, file can't be canonical",
+            ),
+        ];
+
+        for (config, expected_error) in invalid_configs {
+            let result = ConfigurablePathFormatter::validate_path_format_config(&config);
+            assert!(result.is_err(), "Config should be invalid: {:?}", config);
+            if let Err(FormatConfigurationError::InvalidConfiguration(msg)) = result {
+                assert_eq!(msg, expected_error);
+            } else {
+                panic!("Expected InvalidConfiguration error");
+            }
+        }
+    }
+
+    #[test]
+    fn test_configurable_path_formatter_new_valid() {
+        let config = PathFormat {
+            directory: PathResolver::AsIs,
+            file: PathResolver::AsIs,
+        };
+
+        let formatter = ConfigurablePathFormatter::new(config);
+        assert!(formatter.is_ok());
+    }
+
+    #[test]
+    fn test_configurable_path_formatter_new_invalid() {
+        let config = PathFormat {
+            directory: PathResolver::Relative,
+            file: PathResolver::Absolute,
+        };
+
+        let formatter = ConfigurablePathFormatter::new(config);
+        assert!(formatter.is_err());
+    }
+
+    #[test]
+    fn test_path_resolver_as_is() {
+        let resolver = PathResolver::AsIs;
+        let base = PathBuf::from("/base");
+        let path = PathBuf::from("some/path");
+
+        let result = resolver.resolve(&base, &path).unwrap();
+        assert_eq!(result, path);
+    }
 
     #[test]
     fn test_absolute_to() {
@@ -183,5 +379,86 @@ mod tests {
 
         let result = relative_to(&a_dir_path, &file_path).unwrap();
         assert_eq!(result, PathBuf::from("file.txt"));
+    }
+
+    #[test]
+    fn test_path_formatter_format_directory() {
+        let config = PathFormat {
+            directory: PathResolver::AsIs,
+            file: PathResolver::AsIs,
+        };
+        let formatter = ConfigurablePathFormatter::new(config).unwrap();
+
+        let working_dir = PathBuf::from("/working");
+        let directory = PathBuf::from("/some/dir");
+
+        let result = formatter
+            .format_directory(&working_dir, &directory)
+            .unwrap();
+        assert_eq!(result, directory);
+    }
+
+    #[test]
+    fn test_path_formatter_format_file() {
+        let config = PathFormat {
+            directory: PathResolver::AsIs,
+            file: PathResolver::AsIs,
+        };
+        let formatter = ConfigurablePathFormatter::new(config).unwrap();
+
+        let directory = PathBuf::from("/some/dir");
+        let file = PathBuf::from("file.c");
+
+        let result = formatter.format_file(&directory, &file).unwrap();
+        assert_eq!(result, file);
+    }
+
+    #[test]
+    fn test_path_resolver_absolute_with_temp_files() {
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        // Create a test file
+        let file_path = temp_path.join("test.txt");
+        fs::write(&file_path, "test content").unwrap();
+
+        let resolver = PathResolver::Absolute;
+        let base = temp_path.clone();
+        let relative_file = PathBuf::from("test.txt");
+
+        let result = resolver.resolve(&base, &relative_file).unwrap();
+        assert_eq!(result, file_path);
+        assert!(result.is_absolute());
+    }
+
+    #[test]
+    fn test_path_resolver_relative_with_temp_files() {
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        // Create a test file
+        let file_path = temp_path.join("test.txt");
+        fs::write(&file_path, "test content").unwrap();
+
+        let resolver = PathResolver::Relative;
+        let result = resolver.resolve(&temp_path, &file_path).unwrap();
+        assert_eq!(result, PathBuf::from("test.txt"));
+    }
+
+    #[test]
+    fn test_path_resolver_canonical_with_temp_files() {
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        // Create a test file
+        let file_path = temp_path.join("test.txt");
+        fs::write(&file_path, "test content").unwrap();
+
+        let resolver = PathResolver::Canonical;
+
+        // Test with the full file path since canonicalize requires the file to exist
+        let result = resolver.resolve(&temp_path, &file_path).unwrap();
+        assert_eq!(result, file_path);
+        assert!(result.is_absolute());
     }
 }

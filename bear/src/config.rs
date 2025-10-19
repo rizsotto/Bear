@@ -340,7 +340,7 @@ mod types {
     }
 
     /// Format configuration of paths in the JSON compilation database.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct PathFormat {
         #[serde(default)]
         pub directory: PathResolver,
@@ -350,13 +350,28 @@ mod types {
 
     #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
     pub enum PathResolver {
-        /// The directory path will be resolved to the canonical path. (Default)
+        /// Leave the path as is without any transformation. (Default)
         #[default]
+        #[serde(rename = "as-is")]
+        AsIs,
+        /// The path will be resolved to the canonical path.
         #[serde(rename = "canonical")]
         Canonical,
-        /// The directory path will be resolved to the relative path to the directory attribute.
+        /// The path will be resolved to the relative path to the directory attribute.
         #[serde(rename = "relative")]
         Relative,
+        /// The path will be resolved to an absolute path.
+        #[serde(rename = "absolute")]
+        Absolute,
+    }
+
+    impl Default for PathFormat {
+        fn default() -> Self {
+            Self {
+                directory: PathResolver::default(),
+                file: PathResolver::default(),
+            }
+        }
     }
 
     /// Configuration for formatting output entries.
@@ -720,8 +735,8 @@ pub mod loader {
                     },
                     format: Format {
                         paths: PathFormat {
-                            directory: PathResolver::Canonical,
-                            file: PathResolver::Canonical,
+                            directory: PathResolver::AsIs,
+                            file: PathResolver::AsIs,
                         },
                         entry: EntryFormat {
                             command_field_as_array: true,
