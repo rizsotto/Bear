@@ -122,7 +122,7 @@ impl PathResolver {
     /// # Returns
     ///
     /// The resolved path according to the strategy
-    fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
+    pub fn resolve(&self, base: &Path, path: &Path) -> Result<PathBuf, FormatError> {
         match self {
             PathResolver::AsIs => Ok(path.to_path_buf()),
             PathResolver::Canonical => {

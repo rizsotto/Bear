@@ -23,7 +23,7 @@ use thiserror::Error;
 // Re-export types for easier access
 pub use converter::CommandConverter;
 pub use filter::DuplicateEntryFilter;
-pub use format::{FormatConfigurationError, PathFormatter};
+pub use format::{FormatConfigurationError, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

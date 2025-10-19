@@ -5,9 +5,11 @@
 
 use super::InterpreterConfigError;
 use crate::config;
+use crate::config::PathResolver;
+
 use crate::semantic::{ArgumentKind, Command, CompilerCommand, Execution, Interpreter};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 /// A wrapper interpreter that applies filtering to recognized compiler commands.
@@ -47,6 +49,7 @@ impl<T: Interpreter> Interpreter for FilteringInterpreter<T> {
 pub(super) struct Filter {
     compiler_filters: HashMap<PathBuf, config::IgnoreOrConsider>,
     source_filters: Vec<config::DirectoryFilter>,
+    only_existing_files: bool,
 }
 
 impl Filter {
@@ -84,37 +87,90 @@ impl Filter {
         cmd: &CompilerCommand,
         source_filters: &[config::DirectoryFilter],
     ) -> Option<&'static str> {
-        // Get all source files from the command
+        // Get all source files from the command using as_file method
         let path_updater: &dyn Fn(&std::path::Path) -> std::borrow::Cow<std::path::Path> =
             &|path: &std::path::Path| std::borrow::Cow::Borrowed(path);
-        let source_files: Vec<String> = cmd
+
+        let source_arguments: Vec<_> = cmd
             .arguments
             .iter()
             .filter(|arg| arg.kind() == ArgumentKind::Source)
-            .filter_map(|arg| arg.as_file(path_updater))
-            .map(|path| path.to_string_lossy().to_string())
             .collect();
 
-        // TODO: handle cases when there are multiple source files, but filtering
-        //       keeps at least one source file in the result.
-        for source_file in source_files {
-            // FIXME: this is not needed if the command is already using absolute paths
-            let source_path = if PathBuf::from(&source_file).is_absolute() {
-                PathBuf::from(&source_file)
-            } else {
-                cmd.working_dir.join(&source_file)
-            };
+        // If no source files found, no filtering needed
+        if source_arguments.is_empty() {
+            return None;
+        }
 
-            for filter in source_filters {
-                if source_path.starts_with(&filter.path) {
-                    return match filter.ignore {
-                        config::Ignore::Always => Some("Source file is in filtered directory"),
-                        config::Ignore::Never => None,
-                    };
+        let mut filtered_count = 0;
+        let total_sources = source_arguments.len();
+
+        for source_arg in source_arguments {
+            if let Some(source_path) = source_arg.as_file(path_updater) {
+                // Use multiple path formatters to check if source should be filtered
+                let path_variants = self.get_path_variants(&source_path, &cmd.working_dir);
+
+                let mut should_filter_this_source = false;
+                for variant_path in path_variants {
+                    for filter in source_filters {
+                        if variant_path.starts_with(&filter.path) {
+                            match filter.ignore {
+                                config::Ignore::Always => {
+                                    should_filter_this_source = true;
+                                    break;
+                                }
+                                config::Ignore::Never => {
+                                    // Never ignore takes precedence
+                                    should_filter_this_source = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if should_filter_this_source {
+                        break;
+                    }
+                }
+
+                if should_filter_this_source {
+                    filtered_count += 1;
                 }
             }
         }
-        None
+
+        // Handle case when there are multiple source files:
+        // Only filter if ALL source files should be filtered
+        if filtered_count > 0 && filtered_count == total_sources {
+            Some("All source files are in filtered directories")
+        } else {
+            None
+        }
+    }
+
+    /// Generate multiple path variants for filtering checks using different formatters
+    fn get_path_variants(&self, source_path: &Path, working_dir: &Path) -> Vec<PathBuf> {
+        let mut variants = Vec::new();
+
+        // Build resolvers array, conditionally including Canonical based on config
+        let mut resolvers = vec![
+            PathResolver::AsIs,
+            PathResolver::Absolute,
+            PathResolver::Relative,
+        ];
+
+        // Only use canonical if only_existing_files is true (respects config)
+        if self.only_existing_files {
+            resolvers.push(PathResolver::Canonical);
+        }
+
+        // Generate variants using PathResolver resolve method
+        for resolver in &resolvers {
+            if let Ok(resolved_path) = resolver.resolve(working_dir, source_path) {
+                variants.push(resolved_path);
+            }
+        }
+
+        variants
     }
 
     /// Validates the compiler configuration.
@@ -253,6 +309,7 @@ impl TryFrom<(&[config::Compiler], &config::SourceFilter)> for Filter {
         Ok(Self {
             compiler_filters,
             source_filters,
+            only_existing_files: sources.only_existing_files,
         })
     }
 }
@@ -573,5 +630,81 @@ mod tests {
                 "Expected invalid configuration to fail: {config:?}"
             );
         }
+    }
+
+    #[test]
+    fn test_only_existing_files_config_behavior() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path();
+
+        // Create an existing file
+        let existing_file = temp_path.join("existing.c");
+        fs::write(&existing_file, "test content").unwrap();
+
+        let compilers = vec![];
+
+        // Test with only_existing_files: true
+        let sources_with_file_access = SourceFilter {
+            only_existing_files: true,
+            paths: vec![DirectoryFilter {
+                path: temp_path.to_path_buf(),
+                ignore: Ignore::Always,
+            }],
+        };
+
+        // Test with only_existing_files: false
+        let sources_without_file_access = SourceFilter {
+            only_existing_files: false,
+            paths: vec![DirectoryFilter {
+                path: temp_path.to_path_buf(),
+                ignore: Ignore::Always,
+            }],
+        };
+
+        let filter_with_access =
+            Filter::try_from((compilers.as_slice(), &sources_with_file_access))
+                .expect("Failed to create filter with file access");
+        let filter_without_access =
+            Filter::try_from((compilers.as_slice(), &sources_without_file_access))
+                .expect("Failed to create filter without file access");
+
+        // Verify that only_existing_files config is stored correctly
+        assert!(filter_with_access.only_existing_files);
+        assert!(!filter_without_access.only_existing_files);
+
+        // Create command with existing file
+        let cmd_existing = CompilerCommand::from_strings(
+            temp_path.to_str().unwrap(),
+            "/usr/bin/gcc",
+            vec![(ArgumentKind::Source, vec!["existing.c"])],
+        );
+
+        // Both should filter since directory is filtered
+        let result_with_access = filter_with_access
+            .should_filter_sources(&cmd_existing, &filter_with_access.source_filters);
+        let result_without_access = filter_without_access
+            .should_filter_sources(&cmd_existing, &filter_without_access.source_filters);
+
+        assert!(result_with_access.is_some());
+        assert!(result_without_access.is_some());
+
+        // Create command with non-existing file
+        let cmd_nonexisting = CompilerCommand::from_strings(
+            temp_path.to_str().unwrap(),
+            "/usr/bin/gcc",
+            vec![(ArgumentKind::Source, vec!["nonexisting.c"])],
+        );
+
+        // Both should filter since directory is filtered regardless of file existence
+        let result_with_access_nonexisting = filter_with_access
+            .should_filter_sources(&cmd_nonexisting, &filter_with_access.source_filters);
+        let result_without_access_nonexisting = filter_without_access
+            .should_filter_sources(&cmd_nonexisting, &filter_without_access.source_filters);
+
+        assert!(result_with_access_nonexisting.is_some());
+        assert!(result_without_access_nonexisting.is_some());
     }
 }
