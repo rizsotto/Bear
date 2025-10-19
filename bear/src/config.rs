@@ -340,7 +340,7 @@ mod types {
     }
 
     /// Format configuration of paths in the JSON compilation database.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
     pub struct PathFormat {
         #[serde(default)]
         pub directory: PathResolver,
@@ -363,15 +363,6 @@ mod types {
         /// The path will be resolved to an absolute path.
         #[serde(rename = "absolute")]
         Absolute,
-    }
-
-    impl Default for PathFormat {
-        fn default() -> Self {
-            Self {
-                directory: PathResolver::default(),
-                file: PathResolver::default(),
-            }
-        }
     }
 
     /// Configuration for formatting output entries.
