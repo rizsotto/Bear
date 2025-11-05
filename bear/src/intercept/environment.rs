@@ -16,11 +16,11 @@ use thiserror::Error;
 ///
 /// `BuildEnvironment` is responsible for configuring the execution environment to enable
 /// Bear's command interception capabilities. It supports two main interception modes:
-/// - **Wrapper mode**: Creates temporary wrapper executables and modifies PATH
-/// - **Preload mode**: Uses LD_PRELOAD to inject a dynamic library for system call interception
-///
-/// The environment includes all necessary environment variables and maintains any temporary
-/// resources (like temporary directories) required for the interception to work properly.
+/// - **Wrapper mode**: Creates a new directory with copies of wrapper executables that
+///                     can intercept compiler executions, and manipulates the environment
+///                     variables so that these executables have precedence.
+/// - **Preload mode**: Changes the environment variables to inject a dynamic library
+///                     for system call interception.
 pub struct BuildEnvironment {
     environment: HashMap<String, String>,
     _temp_dir: Option<TempDir>,
@@ -28,21 +28,37 @@ pub struct BuildEnvironment {
 
 impl BuildEnvironment {
     /// Creates a new `BuildEnvironment` configured for the specified interception method.
-    ///
-    /// This method sets up the execution environment based on the provided configuration
-    /// and establishes communication with the Bear process via the specified socket address.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - The interception configuration specifying the method and parameters
-    /// * `address` - The socket address where the Bear process is listening for intercepted commands
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(BuildEnvironment)` on success, or `Err(ConfigurationError)` if:
-    /// - The configuration is invalid (empty paths, missing executables, etc.)
-    /// - IO operations fail (creating temp directories, hard links, etc.)
-    /// - Environment variable manipulation fails
+    /// 
+    /// In both preload and wrapper mode, the interceptor will report the execution via
+    /// TCP sockets. The interceptor is expected to connect to this process, and the
+    /// address is advertised via a specific environment variable.
+    /// 
+    /// The preload mode requires altering one of the environment variables that the OS
+    /// dynamic linker reads and loads the shared library into the memory of the executed
+    /// process. This will result in all dynamically linked executables reporting back, but
+    /// post processing will filter the relevant compiler executions.
+    /// 
+    /// The wrapper mode is slightly more complicated. We create a temporary directory
+    /// and insert copies of the wrapper executable. To decide how to name the executables
+    /// in the directory, we consider the config file, but also the current environment
+    /// variables. Once these are set up, we alter the `PATH` environment variable to ensure the
+    /// wrappers are executed instead of the real compilers. To instruct the wrappers which
+    /// executables to call, we also create a JSON file.
+    /// 
+    /// The wrapper mode reads the current environment and looks for variables that might
+    /// instruct the build process about the compiler locations. Good candidates for such
+    /// variables are: `CC`, `CXX`, `LD`, `CPP`, etc.
+    /// 
+    /// An executed wrapper reports the execution and executes the intended process. To
+    /// ensure that the wrapper calls the right process, it reads the JSON file from the
+    /// wrapper directory, which contains a map of executable names and paths. Using the
+    /// arguments (which contain the process name) it looks up the real executable.
+    /// 
+    /// Because this process does not execute the compilers, but the build process does,
+    /// we need to alter the build process to use the wrapper executables. This is achieved
+    /// by changing the `PATH` variable. But that has limitations; we need to redefine
+    /// some of the environment variables mentioned above (`CC`, `CXX`, `LD`, `CPP`, etc.),
+    /// allowing the user to use these variables in the build invocations.
     pub fn create(
         config: &config::Intercept,
         address: SocketAddr,
