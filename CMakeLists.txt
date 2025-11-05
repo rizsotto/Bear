@@ -117,6 +117,7 @@ install(DIRECTORY
             ${STAGED_INSTALL_PREFIX}/
         DESTINATION
             .
+        USE_SOURCE_PERMISSIONS
 )
 install(FILES
             COPYING README.md INSTALL.md CONTRIBUTING.md CODE_OF_CONDUCT.md
