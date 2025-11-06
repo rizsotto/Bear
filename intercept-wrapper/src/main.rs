@@ -11,8 +11,8 @@
 //! that directory at the beginning of the PATH variable. Which guarantees
 //! that the wrapper is called instead of the original executable.
 //!
-//! The wrapper reads the PATH variable and finds the next executable with
-//! the same name as the wrapper. It reports the execution of the real
+//! The wrapper reads a JSON configuration file from the wrapper directory
+//! to find the real executable path. It reports the execution of the real
 //! executable and then calls the real executable with the same arguments.
 
 extern crate core;
@@ -20,6 +20,7 @@ extern crate core;
 use anyhow::{Context, Result};
 use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise_execution;
+use bear::intercept::wrapper::{WrapperConfigReader, CONFIG_FILENAME};
 use bear::intercept::{Event, Execution};
 
 /// Implementation of the wrapper process.
@@ -33,8 +34,8 @@ fn main() -> Result<()> {
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
     log::info!("Execution captured: {execution:?}");
-    // Read the PATH variable and find the next executable with the same name
-    let real_executable = next_in_path(&execution.executable)?;
+    // Find the real executable using JSON config
+    let real_executable = find_from_json_config(&execution.executable)?;
     let real_execution = execution.with_executable(&real_executable);
     log::info!("Execution to call: {real_execution:?}");
 
@@ -64,31 +65,70 @@ fn report(real_execution: &Execution) -> Result<()> {
     Ok(())
 }
 
-/// Find the next executable in the PATH variable.
-///
-/// The function reads the PATH variable and tries to find the next executable
-/// with the same name as the given executable. It returns the path to the
-/// executable.
-fn next_in_path(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
-    let target = current_exe
+/// Find the real executable using JSON configuration.
+fn find_from_json_config(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
+    let wrapper_dir = current_exe
+        .parent()
+        .with_context(|| "Cannot get wrapper directory")?;
+
+    let config_path = wrapper_dir.join(CONFIG_FILENAME);
+
+    let config = WrapperConfigReader::read_from_file(&config_path)
+        .with_context(|| format!("Cannot read config file: {}", config_path.display()))?;
+
+    let executable_name = current_exe
         .file_name()
-        .with_context(|| "Cannot get the file name of the executable")?;
-    let path =
-        std::env::var("PATH").with_context(|| "Cannot get the PATH variable from environment")?;
+        .and_then(|name| name.to_str())
+        .with_context(|| "Cannot get executable name")?;
 
-    log::debug!("PATH: {path}");
-
-    std::env::split_paths(&path)
-        .map(|dir| dir.join(target))
-        .filter(|path| path.is_file())
-        .find(|path| {
-            // We need to compare it with the real path of the candidate executable to avoid
-            // calling the same executable again.
-            let real_path = match path.canonicalize() {
-                Ok(path) => path,
-                Err(_) => return false,
-            };
-            real_path != current_exe
+    config
+        .get_executable(executable_name)
+        .cloned()
+        .with_context(|| {
+            format!(
+                "Executable '{}' not found in configuration",
+                executable_name
+            )
         })
-        .ok_or_else(|| anyhow::anyhow!("Cannot find the real executable"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_wrapper_config_reading() {
+        use bear::intercept::wrapper::{WrapperConfig, WrapperConfigWriter, CONFIG_FILENAME};
+
+        let temp_dir = TempDir::new().unwrap();
+        let wrapper_path = temp_dir.path().join("gcc");
+        let config_path = temp_dir.path().join(CONFIG_FILENAME);
+
+        // Create a mock wrapper config
+        let mut config = WrapperConfig::new();
+        config.add_executable("gcc".to_string(), std::path::PathBuf::from("/usr/bin/gcc"));
+        config.add_executable("g++".to_string(), std::path::PathBuf::from("/usr/bin/g++"));
+
+        WrapperConfigWriter::write_to_file(&config, &config_path).unwrap();
+
+        // Test reading the config
+        let result = find_from_json_config(&wrapper_path);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), std::path::PathBuf::from("/usr/bin/gcc"));
+    }
+
+    #[test]
+    fn test_wrapper_config_missing_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let wrapper_path = temp_dir.path().join("gcc");
+
+        // Test with missing config file - should fail since we only use JSON config
+        let result = find_from_json_config(&wrapper_path);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Cannot read config file"));
+    }
 }

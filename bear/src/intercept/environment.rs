@@ -7,238 +7,190 @@ use crate::intercept::supervise;
 use std::collections::HashMap;
 use std::env::JoinPathsError;
 use std::net::SocketAddr;
-
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
-use tempfile::TempDir;
+
 use thiserror::Error;
+
+use crate::intercept::wrapper::{WrapperDirectory, WrapperDirectoryBuilder, WrapperDirectoryError};
 
 /// Manages the environment setup for intercepting build commands during compilation.
 ///
 /// `BuildEnvironment` is responsible for configuring the execution environment to enable
 /// Bear's command interception capabilities. It supports two main interception modes:
 /// - **Wrapper mode**: Creates a new directory with copies of wrapper executables that
-///                     can intercept compiler executions, and manipulates the environment
-///                     variables so that these executables have precedence.
+///   can intercept compiler executions, and manipulates the environment variables so
+///   that these executables have precedence.
 /// - **Preload mode**: Changes the environment variables to inject a dynamic library
-///                     for system call interception.
+///   for system call interception.
 pub struct BuildEnvironment {
-    environment: HashMap<String, String>,
-    _temp_dir: Option<TempDir>,
+    environment_overrides: HashMap<String, String>,
+    _wrapper_directory: Option<WrapperDirectory>,
 }
 
 impl BuildEnvironment {
     /// Creates a new `BuildEnvironment` configured for the specified interception method.
-    /// 
-    /// In both preload and wrapper mode, the interceptor will report the execution via
-    /// TCP sockets. The interceptor is expected to connect to this process, and the
-    /// address is advertised via a specific environment variable.
-    /// 
-    /// The preload mode requires altering one of the environment variables that the OS
-    /// dynamic linker reads and loads the shared library into the memory of the executed
-    /// process. This will result in all dynamically linked executables reporting back, but
-    /// post processing will filter the relevant compiler executions.
-    /// 
-    /// The wrapper mode is slightly more complicated. We create a temporary directory
-    /// and insert copies of the wrapper executable. To decide how to name the executables
-    /// in the directory, we consider the config file, but also the current environment
-    /// variables. Once these are set up, we alter the `PATH` environment variable to ensure the
-    /// wrappers are executed instead of the real compilers. To instruct the wrappers which
-    /// executables to call, we also create a JSON file.
-    /// 
-    /// The wrapper mode reads the current environment and looks for variables that might
-    /// instruct the build process about the compiler locations. Good candidates for such
-    /// variables are: `CC`, `CXX`, `LD`, `CPP`, etc.
-    /// 
-    /// An executed wrapper reports the execution and executes the intended process. To
-    /// ensure that the wrapper calls the right process, it reads the JSON file from the
-    /// wrapper directory, which contains a map of executable names and paths. Using the
-    /// arguments (which contain the process name) it looks up the real executable.
-    /// 
-    /// Because this process does not execute the compilers, but the build process does,
-    /// we need to alter the build process to use the wrapper executables. This is achieved
-    /// by changing the `PATH` variable. But that has limitations; we need to redefine
-    /// some of the environment variables mentioned above (`CC`, `CXX`, `LD`, `CPP`, etc.),
-    /// allowing the user to use these variables in the build invocations.
+    ///
+    /// This method dispatches to the appropriate specialized creation method based on the
+    /// configuration type (wrapper or preload mode). In both modes, the interceptor will
+    /// report execution events via TCP sockets to the specified address.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - The interception configuration specifying the mode and parameters
+    /// * `address` - The socket address where the interceptor should report executions
+    ///
+    /// # Returns
+    ///
+    /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
+    /// if the configuration is invalid or environment setup fails.
     pub fn create(
         config: &config::Intercept,
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        // Validate configuration first
-        Self::validate_config(config)?;
-
-        let mut environment = std::env::vars().collect::<HashMap<String, String>>();
-        environment.insert(KEY_DESTINATION.to_string(), address.to_string());
-
-        let result = match config {
-            config::Intercept::Wrapper {
-                path,
-                directory,
-                executables,
-            } => {
-                // Create temporary directory
-                let temp_dir_handle = tempfile::Builder::new()
-                    .prefix("bear-")
-                    .tempdir_in(directory)
-                    .map_err(ConfigurationError::Io)?;
-
-                // Create hard links for all executables
-                for executable in executables {
-                    let link_path =
-                        temp_dir_handle
-                            .path()
-                            .join(executable.file_name().ok_or_else(|| {
-                                ConfigurationError::ConfigValidation(format!(
-                                    "Invalid executable path: {}",
-                                    executable.display()
-                                ))
-                            })?);
-                    std::fs::hard_link(path, &link_path).map_err(ConfigurationError::Io)?;
-                }
-
-                // Update PATH environment variable
-                let path_original = environment.get(KEY_OS__PATH).cloned().unwrap_or_default();
-                let path_updated =
-                    insert_to_path(&path_original, temp_dir_handle.path().to_path_buf())?;
-                environment.insert(KEY_OS__PATH.to_string(), path_updated);
-
-                Self {
-                    environment,
-                    _temp_dir: Some(temp_dir_handle),
-                }
-            }
-            config::Intercept::Preload { path } => {
-                // Update LD_PRELOAD environment variable
-                let preload_original = environment
-                    .get(KEY_OS__PRELOAD_PATH)
-                    .cloned()
-                    .unwrap_or_default();
-                let preload_updated = insert_to_path(&preload_original, path.clone())?;
-                environment.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
-
-                Self {
-                    environment,
-                    _temp_dir: None,
-                }
-            }
-        };
-
-        Ok(result)
-    }
-
-    /// Validates the provided interception configuration for correctness.
-    ///
-    /// This method performs comprehensive validation of the configuration parameters
-    /// to ensure they are suitable for setting up the build environment. It checks
-    /// for common configuration errors before attempting to create the environment.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - The interception configuration to validate
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the configuration is valid, or `Err(ConfigurationError)`
-    /// if any validation rules are violated.
-    ///
-    /// # Validation Rules
-    ///
-    /// **For Wrapper mode:**
-    /// - Wrapper path must not be empty
-    /// - Directory path must not be empty
-    /// - At least one executable must be specified
-    /// - All executable paths must not be empty
-    ///
-    /// **For Preload mode:**
-    /// - Library path must not be empty
-    fn validate_config(config: &config::Intercept) -> Result<(), ConfigurationError> {
         match config {
             config::Intercept::Wrapper {
                 path,
                 directory,
                 executables,
-            } => {
-                if Self::is_empty_path(path) {
-                    return Err(ConfigurationError::ConfigValidation(
-                        "The wrapper path cannot be empty.".to_string(),
-                    ));
-                }
-                if Self::is_empty_path(directory) {
-                    return Err(ConfigurationError::ConfigValidation(
-                        "The wrapper directory cannot be empty.".to_string(),
-                    ));
-                }
-                if executables.is_empty() {
-                    return Err(ConfigurationError::ConfigValidation(
-                        "At least one executable must be specified for wrapper mode.".to_string(),
-                    ));
-                }
-                for executable in executables {
-                    if Self::is_empty_path(executable) {
-                        return Err(ConfigurationError::ConfigValidation(
-                            "The executable path cannot be empty.".to_string(),
-                        ));
-                    }
-                }
-                Ok(())
-            }
-            config::Intercept::Preload { path } => {
-                if Self::is_empty_path(path) {
-                    return Err(ConfigurationError::ConfigValidation(
-                        "The preload library path cannot be empty.".to_string(),
-                    ));
-                }
-                Ok(())
-            }
+            } => Self::create_as_wrapper(path, directory, executables, address),
+            config::Intercept::Preload { path } => Self::create_as_preload(path, address),
         }
     }
 
-    /// Checks if a given path is empty (contains only an empty string).
+    /// Creates a `BuildEnvironment` configured for wrapper mode interception.
     ///
-    /// This is a utility method used during configuration validation to detect
-    /// paths that have been set to empty strings, which are considered invalid.
+    /// The wrapper mode is more complicated than preload mode. We create a temporary directory
+    /// and insert copies of the wrapper executable. To decide how to name the executables
+    /// in the directory, we consider the config file, but also the current environment
+    /// variables. Once these are set up, we alter the `PATH` environment variable to ensure the
+    /// wrappers are executed instead of the real compilers. To instruct the wrappers which
+    /// executables to call, we also create a JSON file.
+    ///
+    /// The wrapper mode reads the current environment and looks for variables that might
+    /// instruct the build process about the compiler locations. Good candidates for such
+    /// variables are: `CC`, `CXX`, `LD`, `CPP`, etc.
+    ///
+    /// An executed wrapper reports the execution and executes the intended process. To
+    /// ensure that the wrapper calls the right process, it reads the JSON file from the
+    /// wrapper directory, which contains a map of executable names and paths. Using the
+    /// arguments (which contain the process name) it looks up the real executable.
+    ///
+    /// Because this process does not execute the compilers, but the build process does,
+    /// we need to alter the build process to use the wrapper executables. This is achieved
+    /// by changing the `PATH` variable. But that has limitations; we need to redefine
+    /// some of the environment variables mentioned above (`CC`, `CXX`, `LD`, `CPP`, etc.),
+    /// allowing the user to use these variables in the build invocations.
     ///
     /// # Arguments
     ///
-    /// * `path` - The path to check for emptiness
+    /// * `path` - Path to the wrapper executable
+    /// * `directory` - Directory where wrapper copies will be created
+    /// * `executables` - List of executables to create wrappers for
+    /// * `address` - Socket address for interceptor communication
     ///
     /// # Returns
     ///
-    /// Returns `true` if the path converts to an empty string, `false` otherwise.
-    /// If the path cannot be converted to a string, returns `false`.
-    fn is_empty_path(path: &std::path::Path) -> bool {
-        path.to_str().is_some_and(|p| p.is_empty())
+    /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
+    /// if validation fails or wrapper setup encounters errors.
+    fn create_as_wrapper(
+        path: &std::path::Path,
+        directory: &std::path::Path,
+        executables: &[std::path::PathBuf],
+        address: SocketAddr,
+    ) -> Result<Self, ConfigurationError> {
+        // Validate wrapper configuration
+        if path.as_os_str().is_empty() {
+            return Err(ConfigurationError::ConfigValidation(
+                "The wrapper path cannot be empty.".to_string(),
+            ));
+        }
+        if directory.as_os_str().is_empty() {
+            return Err(ConfigurationError::ConfigValidation(
+                "The wrapper directory cannot be empty.".to_string(),
+            ));
+        }
+
+        // Create wrapper directory builder
+        let mut wrapper_dir_builder = WrapperDirectoryBuilder::create(path, directory)?;
+
+        // Register executables from config
+        for executable in executables {
+            wrapper_dir_builder.register_executable(executable.clone())?;
+        }
+
+        // Register executables from environment variables that point to compiler programs
+        // and immediately update the final environment with wrapper paths
+        let mut environment_overrides = HashMap::new();
+        for (key, value) in std::env::vars() {
+            if crate::environment::program_env(&key) && !value.is_empty() {
+                let program_path = std::path::PathBuf::from(&value);
+                let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
+                // Update the environment overrides with the wrapper path
+                environment_overrides.insert(key, wrapper_path.to_string_lossy().to_string());
+            }
+        }
+
+        // Finalize wrapper directory (writes config file)
+        let wrapper_dir = wrapper_dir_builder.build()?;
+
+        // Update PATH environment variable
+        let path_original = std::env::var(KEY_OS__PATH).unwrap_or_default();
+        let path_updated =
+            insert_to_path(&path_original, wrapper_dir.path()).map_err(ConfigurationError::Path)?;
+
+        environment_overrides.insert(KEY_OS__PATH.to_string(), path_updated);
+        environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
+
+        Ok(Self {
+            environment_overrides,
+            _wrapper_directory: Some(wrapper_dir),
+        })
     }
 
-    /// Converts a `BuildCommand` into a `std::process::Command` with the intercepted environment.
+    /// Creates a `BuildEnvironment` configured for preload mode interception.
     ///
-    /// This method creates a system command from the build command arguments and applies
-    /// the configured environment variables (including interception setup) to enable
-    /// command monitoring during execution.
+    /// The preload mode requires altering one of the environment variables that the OS
+    /// dynamic linker reads and loads the shared library into the memory of the executed
+    /// process. This will result in all dynamically linked executables reporting back, but
+    /// post processing will filter the relevant compiler executions.
+    ///
+    /// The interceptor will report executions via TCP sockets to the specified address,
+    /// which is advertised via a specific environment variable.
     ///
     /// # Arguments
     ///
-    /// * `val` - The build command containing the executable and arguments to run
+    /// * `path` - Path to the preload library
+    /// * `address` - Socket address for interceptor communication
     ///
     /// # Returns
     ///
-    /// Returns a `std::process::Command` configured with the build command's arguments
-    /// and the interception environment variables.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the build command has no arguments (empty arguments vector).
-    fn as_command(&self, val: BuildCommand) -> std::process::Command {
-        let mut command = match val.arguments.as_slice() {
-            [] => panic!("BuildCommand arguments cannot be empty"),
-            [executable] => std::process::Command::new(executable),
-            [executable, arguments @ ..] => {
-                let mut cmd = std::process::Command::new(executable);
-                cmd.args(arguments);
-                cmd
-            }
-        };
-        command.envs(self.environment.clone());
-        command
+    /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
+    /// if validation fails or the preload library path is invalid.
+    fn create_as_preload(
+        path: &std::path::Path,
+        address: SocketAddr,
+    ) -> Result<Self, ConfigurationError> {
+        // Validate preload configuration
+        if path.as_os_str().is_empty() {
+            return Err(ConfigurationError::ConfigValidation(
+                "The preload library path cannot be empty.".to_string(),
+            ));
+        }
+
+        // Update LD_PRELOAD environment variable
+        let preload_original = std::env::var(KEY_OS__PRELOAD_PATH).unwrap_or_default();
+        let preload_updated =
+            insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
+
+        let mut environment_overrides = HashMap::new();
+        environment_overrides.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
+        environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
+
+        Ok(Self {
+            environment_overrides,
+            _wrapper_directory: None,
+        })
     }
 
     /// Executes a build command within the configured interception environment.
@@ -260,7 +212,20 @@ impl BuildEnvironment {
         build_command: BuildCommand,
     ) -> Result<ExitStatus, supervise::SuperviseError> {
         log::debug!("Running build command: {build_command:?}");
-        let mut command = self.as_command(build_command);
+
+        let [executable, args @ ..] = build_command.arguments.as_slice() else {
+            // Safe to presume that the build command was already checked.
+            panic!("BuildCommand arguments cannot be empty");
+        };
+
+        let mut command = std::process::Command::new(executable);
+        command.args(args);
+
+        // Set only the environment variables we need to override
+        for (key, value) in &self.environment_overrides {
+            command.env(key, value);
+        }
+
         supervise::supervise(&mut command)
     }
 }
@@ -278,6 +243,8 @@ pub enum ConfigurationError {
     Path(#[from] JoinPathsError),
     #[error("Configuration error: {0}")]
     ConfigValidation(String),
+    #[error("Wrapper directory error: {0}")]
+    WrapperDirectory(#[from] WrapperDirectoryError),
 }
 
 /// Manipulates a `PATH`-like environment variable by inserting a path at the beginning.
@@ -303,18 +270,18 @@ pub enum ConfigurationError {
 /// - If `first` already exists in `original`, it's moved to the front
 /// - If `first` doesn't exist, it's prepended to the existing paths
 /// - Uses platform-appropriate path separators and handles path encoding
-fn insert_to_path(original: &str, first: std::path::PathBuf) -> Result<String, ConfigurationError> {
+fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, JoinPathsError> {
+    let first_path = first.as_ref();
+
     if original.is_empty() {
-        return Ok(first.to_string_lossy().to_string());
+        return Ok(first_path.to_string_lossy().to_string());
     }
 
-    let mut paths: Vec<_> = std::env::split_paths(original)
-        .filter(|path| path != &first)
+    let mut paths: Vec<PathBuf> = std::env::split_paths(original)
+        .filter(|path| path.as_path() != first_path)
         .collect();
-    paths.insert(0, first);
-    std::env::join_paths(paths)
-        .map(|os_string| os_string.into_string().unwrap_or_default())
-        .map_err(ConfigurationError::Path)
+    paths.insert(0, first_path.to_owned());
+    std::env::join_paths(paths).map(|os_string| os_string.into_string().unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -402,76 +369,6 @@ mod test {
     }
 
     #[test]
-    fn test_build_environment_validate_wrapper_valid() {
-        let config = config::Intercept::Wrapper {
-            path: PathBuf::from("/usr/bin/wrapper"),
-            directory: PathBuf::from("/tmp"),
-            executables: vec![PathBuf::from("/usr/bin/cc")],
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_ok());
-    }
-
-    #[test]
-    fn test_build_environment_validate_wrapper_empty_path() {
-        let config = config::Intercept::Wrapper {
-            path: PathBuf::from(""),
-            directory: PathBuf::from("/tmp"),
-            executables: vec![PathBuf::from("/usr/bin/cc")],
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_err());
-    }
-
-    #[test]
-    fn test_build_environment_validate_wrapper_empty_directory() {
-        let config = config::Intercept::Wrapper {
-            path: PathBuf::from("/usr/bin/wrapper"),
-            directory: PathBuf::from(""),
-            executables: vec![PathBuf::from("/usr/bin/cc")],
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_err());
-    }
-
-    #[test]
-    fn test_build_environment_validate_wrapper_empty_executables() {
-        let config = config::Intercept::Wrapper {
-            path: PathBuf::from("/usr/bin/wrapper"),
-            directory: PathBuf::from("/tmp"),
-            executables: vec![],
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_err());
-    }
-
-    #[test]
-    fn test_build_environment_validate_wrapper_empty_executable_path() {
-        let config = config::Intercept::Wrapper {
-            path: PathBuf::from("/usr/bin/wrapper"),
-            directory: PathBuf::from("/tmp"),
-            executables: vec![
-                PathBuf::from("/usr/bin/cc"),
-                PathBuf::from("/usr/bin/c++"),
-                PathBuf::from(""),
-            ],
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_err());
-    }
-
-    #[test]
-    fn test_build_environment_validate_preload_valid() {
-        let config = config::Intercept::Preload {
-            path: PathBuf::from("/usr/local/lib/libexec.so"),
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_ok());
-    }
-
-    #[test]
-    fn test_build_environment_validate_preload_empty_path() {
-        let config = config::Intercept::Preload {
-            path: PathBuf::from(""),
-        };
-        assert!(BuildEnvironment::validate_config(&config).is_err());
-    }
-
-    #[test]
     fn test_build_environment_create_preload() {
         let config = config::Intercept::Preload {
             path: PathBuf::from("/usr/local/lib/libintercept.so"),
@@ -482,12 +379,12 @@ mod test {
 
         // Check that destination is set
         assert_eq!(
-            env.environment.get(KEY_DESTINATION),
+            env.environment_overrides.get(KEY_DESTINATION),
             Some(&"127.0.0.1:8080".to_string())
         );
 
         // Check that LD_PRELOAD contains our library
-        let ld_preload = env.environment.get(KEY_OS__PRELOAD_PATH).unwrap();
+        let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
         assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
     }
 
@@ -507,8 +404,8 @@ mod test {
             path: wrapper_path.clone(),
             directory: temp_path.to_path_buf(),
             executables: vec![
-                std::path::PathBuf::from("gcc"),
-                std::path::PathBuf::from("clang"),
+                std::path::PathBuf::from("/usr/bin/gcc"),
+                std::path::PathBuf::from("/usr/bin/clang"),
             ],
         };
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
@@ -517,18 +414,85 @@ mod test {
 
         // Check that destination is set
         assert_eq!(
-            env.environment.get(KEY_DESTINATION),
+            env.environment_overrides.get(KEY_DESTINATION),
             Some(&"127.0.0.1:8080".to_string())
         );
 
         // Check that PATH is updated (should contain our temp directory at the beginning)
-        let path = env.environment.get("PATH").unwrap();
+        let path = env.environment_overrides.get("PATH").unwrap();
         assert!(
             path.contains(&"bear-".to_string()),
             "PATH should contain bear temp directory: {path}"
         );
 
-        // Verify temp directory is kept alive
-        assert!(env._temp_dir.is_some());
+        // Verify wrapper directory is kept alive
+        assert!(env._wrapper_directory.is_some());
+    }
+
+    #[test]
+    fn test_build_environment_create_wrapper_with_env_vars() {
+        use tempfile::TempDir;
+
+        // Clean up any existing environment variables first
+        std::env::remove_var("CC");
+        std::env::remove_var("CXX");
+
+        // Create a temporary directory for the test
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path();
+
+        // Create a dummy wrapper executable
+        let wrapper_path = temp_path.join("wrapper");
+        std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
+
+        // Set up environment variables that should be detected
+        std::env::set_var("CC", "/usr/bin/gcc");
+        std::env::set_var("CXX", "/usr/bin/g++");
+
+        let config = config::Intercept::Wrapper {
+            path: wrapper_path.clone(),
+            directory: temp_path.to_path_buf(),
+            executables: vec![std::path::PathBuf::from("/usr/bin/clang")],
+        };
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+        let env = BuildEnvironment::create(&config, address).unwrap();
+
+        // Get the wrapper directory from the BuildEnvironment
+        let wrapper_dir = env
+            ._wrapper_directory
+            .as_ref()
+            .expect("Wrapper directory should exist");
+        let config_path = wrapper_dir
+            .path()
+            .join(crate::intercept::wrapper::CONFIG_FILENAME);
+        assert!(config_path.exists(), "JSON config file should exist");
+
+        // Read and verify JSON config content
+        let wrapper_config =
+            crate::intercept::wrapper::WrapperConfigReader::read_from_file(&config_path).unwrap();
+
+        // Should contain executables from both config and environment variables
+        assert!(wrapper_config.get_executable("clang").is_some());
+        assert!(wrapper_config.get_executable("gcc").is_some());
+        assert!(wrapper_config.get_executable("g++").is_some());
+
+        // Check that environment variables were redirected to wrapper executables
+        let cc_value = env.environment_overrides.get("CC").unwrap();
+        let cxx_value = env.environment_overrides.get("CXX").unwrap();
+        assert!(
+            cc_value.contains("bear-"),
+            "CC should point to wrapper: {}",
+            cc_value
+        );
+        assert!(
+            cxx_value.contains("bear-"),
+            "CXX should point to wrapper: {}",
+            cxx_value
+        );
+
+        // Clean up environment variables
+        std::env::remove_var("CC");
+        std::env::remove_var("CXX");
     }
 }

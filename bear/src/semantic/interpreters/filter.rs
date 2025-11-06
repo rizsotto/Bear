@@ -450,7 +450,7 @@ mod tests {
         };
         let result = Filter::validate_source_configuration(&config);
         assert!(
-            matches!(result, Err(SourceFilterConfigurationError::DuplicateSourceInstruction(path)) if path == PathBuf::from("/project/src"))
+            matches!(result, Err(SourceFilterConfigurationError::DuplicateSourceInstruction(path)) if path == Path::new("/project/src"))
         );
     }
 
@@ -475,7 +475,7 @@ mod tests {
         };
         let result = Filter::validate_source_configuration(&config);
         assert!(
-            matches!(result, Err(SourceFilterConfigurationError::DuplicateDirectory(path)) if path == PathBuf::from("/project/src"))
+            matches!(result, Err(SourceFilterConfigurationError::DuplicateDirectory(path)) if path == Path::new("/project/src"))
         );
     }
 

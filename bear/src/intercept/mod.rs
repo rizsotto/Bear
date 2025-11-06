@@ -13,6 +13,7 @@ pub mod environment;
 pub mod reporter;
 pub mod supervise;
 pub mod tcp;
+pub mod wrapper;
 
 use crate::environment::relevant_env;
 use serde::{Deserialize, Serialize};

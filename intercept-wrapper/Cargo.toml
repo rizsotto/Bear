@@ -15,8 +15,12 @@ bear = { path = "../bear" }
 anyhow.workspace = true
 log.workspace = true
 env_logger.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [[bin]]
 name = "wrapper"
 path = "src/main.rs"
-
