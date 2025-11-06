@@ -40,7 +40,6 @@ jobs:
           - windows-latest
           - macOS-latest
         toolchain:
-          - stable 9 months ago
           - stable
           - nightly
     runs-on: ${{ matrix.os }}

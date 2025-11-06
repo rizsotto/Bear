@@ -113,7 +113,11 @@ impl Filter {
                 let mut should_filter_this_source = false;
                 for variant_path in path_variants {
                     for filter in source_filters {
-                        if variant_path.starts_with(&filter.path) {
+                        // Normalize both paths for comparison to handle platform differences
+                        let normalized_variant = self.normalize_path_for_comparison(&variant_path);
+                        let normalized_filter = self.normalize_path_for_comparison(&filter.path);
+
+                        if normalized_variant.starts_with(&normalized_filter) {
                             match filter.ignore {
                                 config::Ignore::Always => {
                                     should_filter_this_source = true;
@@ -171,6 +175,38 @@ impl Filter {
         }
 
         variants
+    }
+
+    /// Normalizes a path for cross-platform comparison by converting to absolute form
+    /// and using consistent separators. Handles non-existing files by normalizing
+    /// the parent directory and appending the filename.
+    fn normalize_path_for_comparison(&self, path: &Path) -> PathBuf {
+        // First try to make the path absolute
+        let absolute_path = match std::path::absolute(path) {
+            Ok(abs) => abs,
+            Err(_) => path.to_path_buf(),
+        };
+
+        // Try to canonicalize if possible (for existing paths)
+        match absolute_path.canonicalize() {
+            Ok(canonical) => canonical,
+            Err(_) => {
+                // If canonicalize fails (e.g., path doesn't exist), try to canonicalize
+                // the parent directory and append the filename
+                if let Some(parent) = absolute_path.parent() {
+                    if let Some(filename) = absolute_path.file_name() {
+                        match parent.canonicalize() {
+                            Ok(canonical_parent) => canonical_parent.join(filename),
+                            Err(_) => absolute_path,
+                        }
+                    } else {
+                        absolute_path
+                    }
+                } else {
+                    absolute_path
+                }
+            }
+        }
     }
 
     /// Validates the compiler configuration.
@@ -706,5 +742,68 @@ mod tests {
 
         assert!(result_with_access_nonexisting.is_some());
         assert!(result_without_access_nonexisting.is_some());
+    }
+
+    #[test]
+    fn test_cross_platform_path_normalization() {
+        use std::fs;
+        use tempfile::tempdir;
+
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path();
+
+        // Create an existing file
+        let existing_file = temp_path.join("test.c");
+        fs::write(&existing_file, "test content").unwrap();
+
+        let compilers = vec![];
+        let sources = SourceFilter {
+            only_existing_files: true,
+            paths: vec![DirectoryFilter {
+                path: temp_path.to_path_buf(),
+                ignore: Ignore::Always,
+            }],
+        };
+
+        let filter =
+            Filter::try_from((compilers.as_slice(), &sources)).expect("Failed to create filter");
+
+        // Test with various path formats that might occur cross-platform
+        let test_cases = vec![
+            // Relative path
+            "test.c", // Path with current directory reference
+            "./test.c",
+        ];
+
+        for source_file in test_cases {
+            let cmd = CompilerCommand::from_strings(
+                temp_path.to_str().unwrap(),
+                "/usr/bin/gcc",
+                vec![(ArgumentKind::Source, vec![source_file])],
+            );
+
+            let result = filter.should_filter_sources(&cmd, &filter.source_filters);
+            assert!(
+                result.is_some(),
+                "Failed to filter source file: {} in temp dir: {:?}",
+                source_file,
+                temp_path
+            );
+        }
+
+        // Test with non-existing file to ensure it's also filtered
+        let cmd_nonexisting = CompilerCommand::from_strings(
+            temp_path.to_str().unwrap(),
+            "/usr/bin/gcc",
+            vec![(ArgumentKind::Source, vec!["nonexisting.c"])],
+        );
+
+        let result_nonexisting =
+            filter.should_filter_sources(&cmd_nonexisting, &filter.source_filters);
+        assert!(
+            result_nonexisting.is_some(),
+            "Failed to filter non-existing source file in temp dir: {:?}",
+            temp_path
+        );
     }
 }
