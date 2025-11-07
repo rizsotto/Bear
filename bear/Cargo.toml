@@ -33,6 +33,7 @@ shell-words.workspace = true
 tempfile.workspace = true
 signal-hook.workspace = true
 crossbeam-channel.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

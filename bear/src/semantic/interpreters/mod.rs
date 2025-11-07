@@ -4,25 +4,27 @@
 //! recognize compiler calls. Based on the configuration, it sets up the
 //! interpreter chain to include or exclude specific compilers.
 
-use super::interpreters::combinators::Any;
-use super::interpreters::filter::{
-    CompilerFilterConfigurationError, Filter, FilteringInterpreter, SourceFilterConfigurationError,
-};
-use super::interpreters::generic::Generic;
-use super::interpreters::ignore::IgnoreByPath;
-use super::{Command, Interpreter};
-use crate::config;
-use crate::environment::program_env;
-use crate::intercept::Execution;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use thiserror::Error;
-
 mod combinators;
+pub mod compilers;
 pub mod filter;
 pub mod generic;
 mod ignore;
 mod matchers;
+
+use super::{Command, Interpreter};
+use crate::config;
+use crate::environment::program_env;
+use crate::intercept::Execution;
+use combinators::Any;
+use compilers::CompilerInterpreter;
+use filter::{
+    CompilerFilterConfigurationError, Filter, FilteringInterpreter, SourceFilterConfigurationError,
+};
+use generic::Generic;
+use ignore::IgnoreByPath;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum InterpreterConfigError {
@@ -58,12 +60,17 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
         interpreters.push(Box::new(tool));
     }
 
+    // Add compiler interpreter that handles recognition and delegation
+    let compiler_tool = OutputLogger::new(CompilerInterpreter::new(), "compiler_to_recognize");
+    interpreters.push(Box::new(compiler_tool));
+
+    // Add generic fallback interpreter for any remaining unrecognized executables
     let environment: HashMap<String, String> = std::env::vars().collect();
     let compilers_to_include = compilers_to_include(config, environment);
     if !compilers_to_include.is_empty() {
         let tool = OutputLogger::new(
             Generic::from(&compilers_to_include),
-            "compilers_to_recognize",
+            "fallback_to_recognize",
         );
         interpreters.push(Box::new(tool));
     }
