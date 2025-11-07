@@ -16,7 +16,7 @@
 //! # Example
 //!
 //! ```rust
-//! use bear::semantic::clang::converter::CommandConverter;
+//! use bear::output::clang::converter::CommandConverter;
 //! use bear::config::Format;
 //!
 //! let config = Format::default();
@@ -26,8 +26,8 @@
 //! // into compilation database entries based on the configured format
 //! ```
 
-use super::format::{ConfigurablePathFormatter, FormatConfigurationError, PathFormatter};
 use super::Entry;
+use super::{ConfigurablePathFormatter, FormatConfigurationError, PathFormatter};
 use crate::config;
 use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand};
 use log::warn;
@@ -251,9 +251,11 @@ impl CommandConverter {
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::clang::format::{FormatError, MockPathFormatter};
     use super::*;
     use crate::config::{EntryFormat, Format, PathFormat};
     use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass};
+    use std::io;
 
     #[test]
     fn test_compiler_command_to_entries_single_source() {
@@ -448,8 +450,6 @@ mod tests {
 
     #[test]
     fn test_path_formatting_with_custom_formatter() {
-        use crate::semantic::clang::format::MockPathFormatter;
-
         let mut mock_formatter = MockPathFormatter::new();
 
         // Set up expectations for the mock
@@ -486,9 +486,6 @@ mod tests {
 
     #[test]
     fn test_path_formatting_error_handling() {
-        use crate::semantic::clang::format::{FormatError, MockPathFormatter};
-        use std::io;
-
         let mut mock_formatter = MockPathFormatter::new();
 
         // Make format_directory fail
@@ -516,9 +513,6 @@ mod tests {
 
     #[test]
     fn test_file_path_formatting_error_handling() {
-        use crate::semantic::clang::format::{FormatError, MockPathFormatter};
-        use std::io;
-
         let mut mock_formatter = MockPathFormatter::new();
 
         // Directory formatting succeeds
@@ -554,9 +548,6 @@ mod tests {
 
     #[test]
     fn test_output_file_formatting_error_handling() {
-        use crate::semantic::clang::format::{FormatError, MockPathFormatter};
-        use std::io;
-
         let mut mock_formatter = MockPathFormatter::new();
 
         // Directory formatting succeeds

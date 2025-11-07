@@ -26,7 +26,6 @@
 //! - [`Arguments`] - Trait for representing different types of compiler arguments
 //! - [`ArgumentKind`] - Classifies the semantic meaning of arguments
 
-pub mod clang;
 pub mod interpreters;
 
 #[cfg(test)]

@@ -7,8 +7,8 @@
 //! - The semantic database format (internal format of this project).
 //! - The execution event database format (internal format of this project.)
 
-use super::json;
-use crate::{intercept, semantic::clang};
+use super::{clang, json};
+use crate::intercept;
 use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
 use thiserror::Error;
@@ -128,9 +128,9 @@ impl SerializationFormat<intercept::Event> for ExecutionEventDatabase {
 #[cfg(test)]
 mod test {
     mod compilation_database {
+        use super::super::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
         use super::super::{SerializationError, SerializationFormat};
-        use crate::semantic::clang::{Entry, EntryError};
         use serde_json::error::Category;
         use serde_json::json;
         use std::io::{Cursor, Seek, SeekFrom};

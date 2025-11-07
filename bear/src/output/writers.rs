@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use super::clang;
 use super::formats::{JsonCompilationDatabase, SerializationError, SerializationFormat};
 use super::{WriterCreationError, WriterError};
-use crate::semantic::clang::{DuplicateEntryFilter, Entry};
 use crate::{config, semantic};
 use std::{fs, io, path};
 
@@ -19,24 +19,26 @@ pub(super) trait IteratorWriter<T> {
 }
 
 /// The type represents a converter that formats `semantic::Command` instances into `Entry` objects.
-pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<Entry>> {
-    converter: semantic::clang::CommandConverter,
+pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
+    converter: clang::CommandConverter,
     writer: T,
 }
 
-impl<T: IteratorWriter<Entry>> ConverterClangOutputWriter<T> {
+impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
     pub(super) fn new(
         writer: T,
         format: &config::Format,
-    ) -> Result<Self, semantic::clang::FormatConfigurationError> {
+    ) -> Result<Self, clang::FormatConfigurationError> {
         Ok(Self {
-            converter: semantic::clang::CommandConverter::new(format.clone())?,
+            converter: clang::CommandConverter::new(format.clone())?,
             writer,
         })
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command>
+    for ConverterClangOutputWriter<T>
+{
     fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         let entries = semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
         self.writer.write(entries)
@@ -52,12 +54,12 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<semantic::Command> for ConverterCl
 ///
 /// # Note
 /// Reading errors will be ignored, and a warning will be logged.
-pub(super) struct AppendClangOutputWriter<T: IteratorWriter<Entry>> {
+pub(super) struct AppendClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     path: Option<path::PathBuf>,
 }
 
-impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
+impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
     pub(super) fn new(writer: T, input_path: &path::Path, append: bool) -> Self {
         let path = if input_path.exists() {
             Some(input_path.to_path_buf())
@@ -76,7 +78,7 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     /// because the logic is not bound to the instance.
     fn read_from_compilation_db(
         source: &path::Path,
-    ) -> Result<impl Iterator<Item = Entry>, SerializationError> {
+    ) -> Result<impl Iterator<Item = clang::Entry>, SerializationError> {
         let file = fs::File::open(source).map(io::BufReader::new)?;
 
         let entries = JsonCompilationDatabase::read_and_ignore(file, |error| {
@@ -86,8 +88,8 @@ impl<T: IteratorWriter<Entry>> AppendClangOutputWriter<T> {
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AppendClangOutputWriter<T> {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         if let Some(path) = &self.path {
             let entries_from_db = Self::read_from_compilation_db(path)
                 .map_err(|err| WriterError::Io(path.clone(), err))?;
@@ -103,13 +105,13 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AppendClangOutputWriter
 ///
 /// The file is first written to a temporary file and then renamed to the final file name.
 /// This ensures that the output file is not left in an inconsistent state in case of errors.
-pub(super) struct AtomicClangOutputWriter<T: IteratorWriter<Entry>> {
+pub(super) struct AtomicClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     temp_path: path::PathBuf,
     final_path: path::PathBuf,
 }
 
-impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
+impl<T: IteratorWriter<clang::Entry>> AtomicClangOutputWriter<T> {
     pub(super) fn new(writer: T, temp_path: &path::Path, final_path: &path::Path) -> Self {
         Self {
             writer,
@@ -119,8 +121,8 @@ impl<T: IteratorWriter<Entry>> AtomicClangOutputWriter<T> {
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AtomicClangOutputWriter<T> {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         self.writer.write(entries)?;
 
         fs::rename(&self.temp_path, &self.final_path)
@@ -134,25 +136,25 @@ impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for AtomicClangOutputWriter
 ///
 /// # Features
 /// - Filters duplicates based on the provided configuration.
-pub(super) struct UniqueOutputWriter<T: IteratorWriter<Entry>> {
+pub(super) struct UniqueOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
-    filter: DuplicateEntryFilter,
+    filter: clang::DuplicateEntryFilter,
 }
 
-impl<T: IteratorWriter<Entry>> UniqueOutputWriter<T> {
+impl<T: IteratorWriter<clang::Entry>> UniqueOutputWriter<T> {
     pub(super) fn create(
         writer: T,
         config: &config::DuplicateFilter,
     ) -> Result<Self, WriterCreationError> {
-        let filter = DuplicateEntryFilter::try_from(config.clone())
+        let filter = clang::DuplicateEntryFilter::try_from(config.clone())
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
         Ok(Self { writer, filter })
     }
 }
 
-impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for UniqueOutputWriter<T> {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         let mut filter = self.filter.clone();
         let filtered_entries = entries.filter(move |entry| filter.unique(entry));
 
@@ -183,8 +185,8 @@ impl ClangOutputWriter {
     }
 }
 
-impl IteratorWriter<Entry> for ClangOutputWriter {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+impl IteratorWriter<clang::Entry> for ClangOutputWriter {
+    fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         JsonCompilationDatabase::write(self.output, entries)
             .map_err(|err| WriterError::Io(self.path, err))
     }
@@ -198,8 +200,8 @@ mod tests {
 
     struct MockWriter;
 
-    impl IteratorWriter<Entry> for MockWriter {
-        fn write(self, _: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
+    impl IteratorWriter<clang::Entry> for MockWriter {
+        fn write(self, _: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
             Ok(())
         }
     }
@@ -261,8 +263,18 @@ mod tests {
         let result_path = dir.path().join("result_file.json");
 
         let entries_to_write = vec![
-            Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str(
+                "file1.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
+            clang::Entry::from_arguments_str(
+                "file2.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
         ];
 
         let writer = ClangOutputWriter::create(&result_path).unwrap();
@@ -284,15 +296,35 @@ mod tests {
 
         // Create the original file with some entries
         let original_entries = vec![
-            Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str(
+                "file3.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
+            clang::Entry::from_arguments_str(
+                "file4.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
         ];
         let writer = ClangOutputWriter::create(&input_path).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
-            Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
-            Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str(
+                "file1.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
+            clang::Entry::from_arguments_str(
+                "file2.cpp",
+                vec!["clang", "-c"],
+                "/path/to/dir",
+                None,
+            ),
         ];
 
         let writer = ClangOutputWriter::create(&result_path).unwrap();

@@ -9,6 +9,7 @@
 //! The `OutputWriter` struct represents the main entry point for writing output.
 //! The input to the `OutputWriter` is a stream of `semantic::Command` instances.
 
+pub mod clang;
 mod formats;
 mod json;
 mod writers;
