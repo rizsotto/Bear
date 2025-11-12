@@ -22,52 +22,32 @@
 //! intercept:
 //!   mode: wrapper
 //!   directory: /tmp
-//!   executables:
-//!     - /usr/bin/cc
-//!     - /usr/bin/c++
-//!     - /usr/bin/clang
-//!     - /usr/bin/clang++
-//! output:
-//!   specification: clang
-//!   compilers:
-//!     - path: /usr/local/bin/cc
-//!       ignore: never
-//!     - path: /usr/bin/cc
-//!       ignore: always
-//!     - path: /usr/bin/c++
-//!       ignore: conditional
-//!       arguments:
-//!         match:
-//!           - -###
-//!     - path: /usr/bin/clang
-//!       ignore: never
-//!       arguments:
-//!         add:
-//!           - -DDEBUG
-//!         remove:
-//!           - -Wall
-//!     - path: /usr/bin/clang++
-//!       arguments:
-//!         remove:
-//!           - -Wall
-//!   sources:
-//!     only_existing_files: true
-//!     paths:
-//!       - path: /opt/project/sources
-//!         ignore: never
-//!       - path: /opt/project/tests
-//!         ignore: always
-//!   duplicates:
-//!     by_fields:
-//!       - file
-//!       - directory
-//!   format:
-//!     paths:
-//!       directory: canonical
-//!       file: canonical
-//!     entry:
-//!       command_as_array: true
-//!       keep_output_field: true
+//!
+//! compilers:
+//!   - path: /usr/local/bin/cc
+//!     as: gcc
+//!   - path: /usr/bin/cc
+//!     ignore: true
+//!   - path: /usr/bin/clang++
+//!     flags:
+//!       add: ["-I/opt/MPI/include"]
+//!       remove: ["-Wall"]
+//!
+//! sources:
+//!   only_existing_files: true
+//!   include: ["/opt/project/sources"]
+//!   exclude: ["/opt/project/tests"]
+//!
+//! duplicates:
+//!   match_on: [file, directory]
+//!
+//! format:
+//!   paths:
+//!     directory: canonical
+//!     file: canonical
+//!   entries:
+//!     use_array_format: true
+//!     include_output_field: true
 //! ```
 //!
 //! ```yaml
@@ -75,8 +55,14 @@
 //!
 //! intercept:
 //!   mode: preload
-//! output:
-//!   specification: clang
+//!
+//! format:
+//!   paths:
+//!     directory: as-is
+//!     file: as-is
+//!   entries:
+//!     use_array_format: true
+//!     include_output_field: true
 //! ```
 
 // Re-Export the types and the loader module content.
@@ -87,7 +73,7 @@ mod types {
     use serde::{Deserialize, Serialize};
     use std::path::PathBuf;
 
-    /// Represents the application configuration.
+    /// Represents the application configuration with flattened structure.
     #[derive(Debug, PartialEq, Deserialize, Serialize)]
     pub struct Main {
         #[serde(deserialize_with = "validate_schema_version")]
@@ -95,7 +81,13 @@ mod types {
         #[serde(default)]
         pub intercept: Intercept,
         #[serde(default)]
-        pub output: Output,
+        pub compilers: Vec<Compiler>,
+        #[serde(default)]
+        pub sources: SourceFilter,
+        #[serde(default)]
+        pub duplicates: DuplicateFilter,
+        #[serde(default)]
+        pub format: Format,
     }
 
     impl Default for Main {
@@ -103,19 +95,15 @@ mod types {
             Self {
                 schema: String::from(SUPPORTED_SCHEMA_VERSION),
                 intercept: Intercept::default(),
-                output: Output::default(),
+                compilers: vec![],
+                sources: SourceFilter::default(),
+                duplicates: DuplicateFilter::default(),
+                format: Format::default(),
             }
         }
     }
 
-    /// Intercept configuration is either a wrapper or a preload mode.
-    ///
-    /// In wrapper mode, the compiler is wrapped with a script that intercepts the compiler calls.
-    /// The configuration for that is capturing the directory where the wrapper scripts are stored
-    /// and the list of executables to wrap.
-    ///
-    /// In preload mode, the compiler is intercepted by a shared library preloaded before
-    /// the compiler is executed. The configuration for that is the path to the shared library.
+    /// Simplified intercept configuration with mode and directory.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     #[serde(tag = "mode")]
     pub enum Intercept {
@@ -125,7 +113,6 @@ mod types {
             path: PathBuf,
             #[serde(default = "default_wrapper_directory")]
             directory: PathBuf,
-            executables: Vec<PathBuf>,
         },
         #[serde(rename = "preload")]
         Preload {
@@ -149,168 +136,67 @@ mod types {
             }
         }
 
-        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        #[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
         fn default() -> Self {
             Intercept::Wrapper {
                 path: default_wrapper_executable(),
                 directory: default_wrapper_directory(),
-                executables: vec![
-                    PathBuf::from("/usr/bin/cc"),
-                    PathBuf::from("/usr/bin/c++"),
-                    PathBuf::from("/usr/bin/clang"),
-                    PathBuf::from("/usr/bin/clang++"),
-                ],
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        fn default() -> Self {
-            Intercept::Wrapper {
-                path: default_wrapper_executable(),
-                directory: default_wrapper_directory(),
-                executables: vec![
-                    PathBuf::from("C:\\msys64\\mingw64\\bin\\gcc.exe"),
-                    PathBuf::from("C:\\msys64\\mingw64\\bin\\g++.exe"),
-                ],
             }
         }
     }
 
-    /// Output configuration is used to customize the output format.
-    ///
-    /// Configures how the compiler calls are output in the clang project defined
-    /// "JSON compilation database" format. (The format is used by clang tooling
-    /// and other tools based on that library.)
-    ///
-    /// The configuration allows customization of compiler filtering, source filtering,
-    /// duplicate handling, and output formatting.
-    #[derive(Debug, PartialEq, Deserialize, Serialize)]
-    #[serde(tag = "specification")]
-    pub enum Output {
-        #[serde(rename = "clang")]
-        Clang {
-            #[serde(default)]
-            compilers: Vec<Compiler>,
-            #[serde(default)]
-            sources: SourceFilter,
-            #[serde(default)]
-            duplicates: DuplicateFilter,
-            #[serde(default)]
-            format: Format,
-        },
-    }
-
-    /// The default output configuration.
-    impl Default for Output {
-        fn default() -> Self {
-            Output::Clang {
-                compilers: vec![],
-                sources: SourceFilter::default(),
-                duplicates: DuplicateFilter::default(),
-                format: Format::default(),
-            }
-        }
-    }
-
-    /// Represents instructions to transform the compiler calls.
-    ///
-    /// Allow transforming the compiler calls by adding or removing arguments.
-    /// It also can instruct to filter out the compiler call from the output.
+    /// Represents compiler configuration matching the YAML format.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct Compiler {
         pub path: PathBuf,
+        #[serde(rename = "as", skip_serializing_if = "Option::is_none")]
+        pub as_: Option<String>,
         #[serde(default)]
-        pub ignore: IgnoreOrConsider,
-        #[serde(default)]
-        pub arguments: Arguments,
+        pub ignore: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub flags: Option<CompilerFlags>,
     }
 
-    /// Represents instructions to ignore the compiler call.
-    ///
-    /// The meaning of the possible values is:
-    /// - Always: Always ignore the compiler call.
-    /// - Never: Never ignore the compiler call. (Default)
-    /// - Conditional: Ignore the compiler call if the arguments match.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
-    pub enum IgnoreOrConsider {
-        #[serde(rename = "always", alias = "true")]
-        Always,
-        #[default]
-        #[serde(rename = "never", alias = "false")]
-        Never,
-        #[serde(rename = "conditional")]
-        Conditional,
-    }
-
-    /// Argument lists to match, add or remove.
-    ///
-    /// The `match` field is used to specify the arguments to match. Can be used only with the
-    /// conditional mode.
-    ///
-    /// The `add` or `remove` fields are used to specify the arguments to add or remove. These can be
-    /// used with the conditional or never ignore mode.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
-    pub struct Arguments {
-        #[serde(default, rename = "match")]
-        pub match_: Vec<String>,
-        #[serde(default)]
+    /// Compiler flags configuration for add/remove operations.
+    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    pub struct CompilerFlags {
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         pub add: Vec<String>,
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
         pub remove: Vec<String>,
     }
 
-    /// Source filter configuration is used to filter the compiler calls based on the source files.
-    ///
-    /// Allow filtering the compiler calls based on the source files.
-    ///
-    /// - Include only existing files: can be true or false.
-    /// - List of directories to include or exclude.
-    ///   (The order of these entries will imply the order of evaluation.)
+    /// Source filter configuration matching the YAML format.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct SourceFilter {
         #[serde(default = "default_enabled")]
         pub only_existing_files: bool,
-        #[serde(default)]
-        pub paths: Vec<DirectoryFilter>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        pub include: Vec<PathBuf>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        pub exclude: Vec<PathBuf>,
     }
 
     impl Default for SourceFilter {
         fn default() -> Self {
             Self {
                 only_existing_files: true,
-                paths: vec![],
+                include: vec![],
+                exclude: vec![],
             }
         }
     }
 
-    /// Directory filter configuration is used to filter the compiler calls based on
-    /// the source file location.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-    pub struct DirectoryFilter {
-        pub path: PathBuf,
-        pub ignore: Ignore,
-    }
-
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-    pub enum Ignore {
-        #[serde(rename = "always", alias = "true")]
-        Always,
-        #[serde(rename = "never", alias = "false")]
-        Never,
-    }
-
-    /// Duplicate filter configuration is used to filter the duplicate compiler calls.
-    ///
-    /// - By fields: Specify the fields of the JSON compilation database record to detect duplicates.
+    /// Duplicate filter configuration matching the YAML format.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct DuplicateFilter {
-        pub by_fields: Vec<OutputFields>,
+        pub match_on: Vec<OutputFields>,
     }
 
     impl Default for DuplicateFilter {
         fn default() -> Self {
             Self {
-                by_fields: vec![OutputFields::File, OutputFields::Arguments],
+                match_on: vec![OutputFields::File, OutputFields::Arguments],
             }
         }
     }
@@ -330,13 +216,13 @@ mod types {
         Output,
     }
 
-    /// Format configuration of the JSON compilation database.
+    /// Format configuration matching the YAML format.
     #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
     pub struct Format {
         #[serde(default)]
         pub paths: PathFormat,
         #[serde(default)]
-        pub entry: EntryFormat,
+        pub entries: EntryFormat,
     }
 
     /// Format configuration of paths in the JSON compilation database.
@@ -348,6 +234,7 @@ mod types {
         pub file: PathResolver,
     }
 
+    /// Path resolver options matching the YAML format.
     #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
     pub enum PathResolver {
         /// Leave the path as is without any transformation. (Default)
@@ -365,25 +252,25 @@ mod types {
         Absolute,
     }
 
-    /// Configuration for formatting output entries.
+    /// Configuration for formatting output entries matching the YAML format.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct EntryFormat {
         #[serde(default = "default_enabled")]
-        pub command_field_as_array: bool,
+        pub use_array_format: bool,
         #[serde(default = "default_enabled")]
-        pub keep_output_field: bool,
+        pub include_output_field: bool,
     }
 
     impl Default for EntryFormat {
         fn default() -> Self {
             Self {
-                command_field_as_array: true,
-                keep_output_field: true,
+                use_array_format: true,
+                include_output_field: true,
             }
         }
     }
 
-    pub(super) const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
+    const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
     const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
     const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 
@@ -547,138 +434,89 @@ pub mod loader {
         #[test]
         fn test_wrapper_config() {
             let content: &[u8] = br#"
-        schema: 4.0
-
-        intercept:
-          mode: wrapper
-          directory: /tmp
-          executables:
-            - /usr/bin/cc
-            - /usr/bin/c++
-            - /usr/bin/clang
-            - /usr/bin/clang++
-        output:
-          specification: clang
-          compilers:
-            - path: /usr/local/bin/cc
-              ignore: always
-            - path: /usr/bin/cc
-              ignore: never
-            - path: /usr/bin/c++
-              ignore: conditional
-              arguments:
-                match:
-                  - -###
-            - path: /usr/bin/clang
-              ignore: never
-              arguments:
-                add:
-                  - -DDEBUG
-                remove:
-                  - -Wall
-            - path: /usr/bin/clang++
-              arguments:
-                remove:
-                  - -Wall
-          sources:
-            only_existing_files: true
-            paths:
-              - path: /opt/project/sources
-                ignore: never
-              - path: /opt/project/tests
-                ignore: always
-          duplicates:
-            by_fields:
-              - file
-              - directory
-          format:
-            paths:
-              directory: canonical
-              file: canonical
-        "#;
+            schema: 4.0
+            
+            intercept:
+                mode: wrapper
+                    path: /usr/local/libexec/bear/wrapper
+                    directory: /tmp
+            
+            compilers:
+              - path: /usr/local/bin/cc
+                as: gcc
+              - path: /usr/bin/cc
+                ignore: true
+              - path: /usr/bin/clang++
+                flags:
+                add: ["-I/opt/MPI/include"]
+                remove: ["-Wall"]
+            
+            sources:
+                only_existing_files: true
+                include: ["/opt/project/sources"]
+                exclude: ["/opt/project/tests"]
+            
+            duplicates:
+                match_on: [file, directory]
+            
+            format:
+                paths:
+                    directory: canonical
+                    file: canonical
+                entries:
+                    use_array_format: true
+                    include_output_field: true
+            "#;
 
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
-                intercept: Intercept::Wrapper {
-                    path: default_wrapper_executable(),
-                    directory: PathBuf::from("/tmp"),
-                    executables: vec![
-                        "/usr/bin/cc",
-                        "/usr/bin/c++",
-                        "/usr/bin/clang",
-                        "/usr/bin/clang++",
-                    ]
-                    .into_iter()
-                    .map(PathBuf::from)
-                    .collect(),
-                },
-                output: Output::Clang {
-                    compilers: vec![
-                        Compiler {
-                            path: PathBuf::from("/usr/local/bin/cc"),
-                            ignore: IgnoreOrConsider::Always,
-                            arguments: Arguments::default(),
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/bin/cc"),
-                            ignore: IgnoreOrConsider::Never,
-                            arguments: Arguments::default(),
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/bin/c++"),
-                            ignore: IgnoreOrConsider::Conditional,
-                            arguments: Arguments {
-                                match_: vec!["-###".into()],
-                                ..Default::default()
-                            },
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/bin/clang"),
-                            ignore: IgnoreOrConsider::Never,
-                            arguments: Arguments {
-                                add: vec!["-DDEBUG".into()],
-                                remove: vec!["-Wall".into()],
-                                ..Default::default()
-                            },
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/bin/clang++"),
-                            ignore: IgnoreOrConsider::Never,
-                            arguments: Arguments {
-                                remove: vec!["-Wall".into()],
-                                ..Default::default()
-                            },
-                        },
-                    ],
-                    sources: SourceFilter {
-                        only_existing_files: true,
-                        paths: vec![
-                            DirectoryFilter {
-                                path: PathBuf::from("/opt/project/sources"),
-                                ignore: Ignore::Never,
-                            },
-                            DirectoryFilter {
-                                path: PathBuf::from("/opt/project/tests"),
-                                ignore: Ignore::Always,
-                            },
-                        ],
-                    },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File, OutputFields::Directory],
-                    },
-                    format: Format {
-                        paths: PathFormat {
-                            directory: PathResolver::Canonical,
-                            file: PathResolver::Canonical,
-                        },
-                        entry: EntryFormat {
-                            command_field_as_array: true,
-                            keep_output_field: true,
-                        },
-                    },
-                },
                 schema: String::from("4.0"),
+                intercept: Intercept::Wrapper {
+                    path: PathBuf::from("/usr/local/libexec/bear/wrapper"),
+                    directory: PathBuf::from("/tmp"),
+                },
+                compilers: vec![
+                    Compiler {
+                        path: PathBuf::from("/usr/local/bin/cc"),
+                        as_: Some("gcc".to_string()),
+                        ignore: false,
+                        flags: None,
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/cc"),
+                        as_: None,
+                        ignore: true,
+                        flags: None,
+                    },
+                    Compiler {
+                        path: PathBuf::from("/usr/bin/clang++"),
+                        as_: None,
+                        ignore: false,
+                        flags: Some(CompilerFlags {
+                            add: vec!["-I/opt/MPI/include".to_string()],
+                            remove: vec!["-Wall".to_string()],
+                        }),
+                    },
+                ],
+                sources: SourceFilter {
+                    only_existing_files: true,
+                    include: vec![PathBuf::from("/opt/project/sources")],
+                    exclude: vec![PathBuf::from("/opt/project/tests")],
+                },
+                duplicates: DuplicateFilter {
+                    match_on: vec![OutputFields::File, OutputFields::Directory],
+                },
+                format: Format {
+                    paths: PathFormat {
+                        directory: PathResolver::Canonical,
+                        file: PathResolver::Canonical,
+                    },
+                    entries: EntryFormat {
+                        use_array_format: true,
+                        include_output_field: true,
+                    },
+                },
             };
 
             assert_eq!(expected, result);
@@ -687,80 +525,44 @@ pub mod loader {
         #[test]
         fn test_incomplete_wrapper_config() {
             let content: &[u8] = br#"
-        schema: 4.0
-
-        intercept:
-          mode: wrapper
-          executables:
-            - /usr/bin/cc
-            - /usr/bin/c++
-        output:
-          specification: clang
-          sources:
-            only_existing_files: true
-          duplicates:
-            by_fields:
-              - file
-              - directory
-        "#;
+            schema: 4.0
+            
+            intercept:
+              mode: wrapper
+            
+            format:
+              paths:
+                directory: canonical
+                file: canonical
+            "#;
 
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
+                schema: String::from("4.0"),
                 intercept: Intercept::Wrapper {
                     path: default_wrapper_executable(),
                     directory: default_wrapper_directory(),
-                    executables: vec!["/usr/bin/cc", "/usr/bin/c++"]
-                        .into_iter()
-                        .map(PathBuf::from)
-                        .collect(),
                 },
-                output: Output::Clang {
-                    compilers: vec![],
-                    sources: SourceFilter {
-                        only_existing_files: true,
-                        paths: vec![],
+                compilers: vec![],
+                sources: SourceFilter {
+                    only_existing_files: true,
+                    include: vec![],
+                    exclude: vec![],
+                },
+                duplicates: DuplicateFilter {
+                    match_on: vec![OutputFields::File, OutputFields::Arguments],
+                },
+                format: Format {
+                    paths: PathFormat {
+                        directory: PathResolver::AsIs,
+                        file: PathResolver::AsIs,
                     },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File, OutputFields::Directory],
-                    },
-                    format: Format {
-                        paths: PathFormat {
-                            directory: PathResolver::AsIs,
-                            file: PathResolver::AsIs,
-                        },
-                        entry: EntryFormat {
-                            command_field_as_array: true,
-                            keep_output_field: true,
-                        },
+                    entries: EntryFormat {
+                        use_array_format: true,
+                        include_output_field: true,
                     },
                 },
-                schema: String::from("4.0"),
-            };
-
-            assert_eq!(expected, result);
-        }
-
-        #[test]
-        fn test_preload_config() {
-            let content: &[u8] = br#"
-        schema: 4.0
-
-        intercept:
-          mode: preload
-          path: /usr/local/lib/libexec.so
-        output:
-          specification: clang
-        "#;
-
-            let result = Loader::from_reader(content).unwrap();
-
-            let expected = Main {
-                schema: String::from("4.0"),
-                intercept: Intercept::Preload {
-                    path: PathBuf::from("/usr/local/lib/libexec.so"),
-                },
-                output: Output::default(),
             };
 
             assert_eq!(expected, result);
@@ -769,79 +571,42 @@ pub mod loader {
         #[test]
         fn test_incomplete_preload_config() {
             let content: &[u8] = br#"
-        schema: 4.0
-
-        intercept:
-          mode: preload
-        output:
-          specification: clang
-          compilers:
-            - path: /usr/local/bin/cc
-            - path: /usr/local/bin/c++
-            - path: /usr/local/bin/clang
-              ignore: always
-            - path: /usr/local/bin/clang++
-              ignore: always
-          sources:
-            only_existing_files: false
-          duplicates:
-            by_fields:
-              - file
-          format:
-            paths:
-              directory: relative
-              file: relative
-            entry:
-              command_field_as_array: false
-              keep_output_field: false
-        "#;
+            schema: 4.0
+    
+            intercept:
+              mode: preload
+            sources:
+              only_existing_files: false
+            format:
+              paths:
+                directory: absolute
+                file: absolute
+            "#;
 
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
                 schema: String::from("4.0"),
                 intercept: Intercept::Preload {
-                    path: default_preload_library(),
+                    path: default_wrapper_executable(),
                 },
-                output: Output::Clang {
-                    compilers: vec![
-                        Compiler {
-                            path: PathBuf::from("/usr/local/bin/cc"),
-                            ignore: IgnoreOrConsider::Never,
-                            arguments: Arguments::default(),
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/local/bin/c++"),
-                            ignore: IgnoreOrConsider::Never,
-                            arguments: Arguments::default(),
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/local/bin/clang"),
-                            ignore: IgnoreOrConsider::Always,
-                            arguments: Arguments::default(),
-                        },
-                        Compiler {
-                            path: PathBuf::from("/usr/local/bin/clang++"),
-                            ignore: IgnoreOrConsider::Always,
-                            arguments: Arguments::default(),
-                        },
-                    ],
-                    sources: SourceFilter {
-                        only_existing_files: false,
-                        paths: vec![],
+                compilers: vec![],
+                sources: SourceFilter {
+                    only_existing_files: false,
+                    include: vec![],
+                    exclude: vec![],
+                },
+                duplicates: DuplicateFilter {
+                    match_on: vec![OutputFields::File, OutputFields::Arguments],
+                },
+                format: Format {
+                    paths: PathFormat {
+                        directory: PathResolver::Absolute,
+                        file: PathResolver::Absolute,
                     },
-                    duplicates: DuplicateFilter {
-                        by_fields: vec![OutputFields::File],
-                    },
-                    format: Format {
-                        paths: PathFormat {
-                            directory: PathResolver::Relative,
-                            file: PathResolver::Relative,
-                        },
-                        entry: EntryFormat {
-                            command_field_as_array: false,
-                            keep_output_field: false,
-                        },
+                    entries: EntryFormat {
+                        use_array_format: true,
+                        include_output_field: true,
                     },
                 },
             };
@@ -854,17 +619,12 @@ pub mod loader {
             let result = Main::default();
 
             let expected = Main {
+                schema: String::from("4.0"),
                 intercept: Intercept::default(),
-                output: Output::Clang {
-                    compilers: vec![],
-                    sources: SourceFilter {
-                        only_existing_files: true,
-                        paths: vec![],
-                    },
-                    duplicates: DuplicateFilter::default(),
-                    format: Format::default(),
-                },
-                schema: String::from(SUPPORTED_SCHEMA_VERSION),
+                compilers: vec![],
+                sources: SourceFilter::default(),
+                duplicates: DuplicateFilter::default(),
+                format: Format::default(),
             };
 
             assert_eq!(expected, result);
@@ -873,15 +633,12 @@ pub mod loader {
         #[test]
         fn test_invalid_schema_version() {
             let content: &[u8] = br#"
-        schema: 3.0
-
-        intercept:
-          mode: wrapper
-          directory: /tmp
-          executables:
-            - /usr/bin/gcc
-            - /usr/bin/g++
-        "#;
+            schema: 3.0
+    
+            intercept:
+            mode: wrapper
+            directory: /tmp
+            "#;
 
             let result: serde_yml::Result<Main> = Loader::from_reader(content);
 
@@ -897,15 +654,15 @@ pub mod loader {
         #[test]
         fn test_failing_config() {
             let content: &[u8] = br#"{
-            "output": {
-                "format": {
-                    "command_as_array": false
-                },
-                "content": {
-                    "duplicates": "files"
+                "output": {
+                    "format": {
+                        "command_as_array": false
+                    },
+                    "content": {
+                        "duplicates": "files"
+                    }
                 }
-            }
-        }"#;
+            }"#;
 
             let result: serde_yml::Result<Main> = Loader::from_reader(content);
 
