@@ -49,8 +49,12 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = environment::BuildEnvironment::create(&config.intercept, address)
-                    .map_err(ConfigurationError::ExecutorCreation)?;
+                let build = environment::BuildEnvironment::create(
+                    &config.intercept,
+                    &config.compilers,
+                    address,
+                )
+                .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::RawEventWriter::create(&output.path)
                     .map_err(ConfigurationError::ConsumerCreation)?;
@@ -80,8 +84,12 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
-                let build = environment::BuildEnvironment::create(&config.intercept, address)
-                    .map_err(ConfigurationError::ExecutorCreation)?;
+                let build = environment::BuildEnvironment::create(
+                    &config.intercept,
+                    &config.compilers,
+                    address,
+                )
+                .map_err(ConfigurationError::ExecutorCreation)?;
 
                 let consumer = impls::SemanticEventWriter::create(output, &config)
                     .map_err(ConfigurationError::ConsumerCreation)?;
@@ -283,7 +291,7 @@ mod impls {
         ) -> Result<Self, WriterCreationError> {
             let interpreter = semantic::interpreters::create(config)
                 .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
-            let writer = output::OutputWriter::try_from((&output, &config.output))?;
+            let writer = output::OutputWriter::try_from((&output, config))?;
 
             Ok(Self {
                 interpreter: Box::new(interpreter),

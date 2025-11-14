@@ -48,7 +48,7 @@ impl CommandConverter {
     pub fn new(format: config::Format) -> Result<Self, FormatConfigurationError> {
         let path_formatter = Box::new(ConfigurablePathFormatter::new(format.paths)?);
         Ok(Self {
-            format: format.entry,
+            format: format.entries,
             path_formatter,
         })
     }
@@ -97,7 +97,7 @@ impl CommandConverter {
         };
 
         // Find output file if present
-        let output_file = if self.format.keep_output_field {
+        let output_file = if self.format.include_output_field {
             Self::compute_output_file(cmd, &formatted_directory, &*self.path_formatter)
         } else {
             None
@@ -119,7 +119,7 @@ impl CommandConverter {
                     &formatted_directory,
                 );
 
-                if self.format.command_field_as_array {
+                if self.format.use_array_format {
                     Some(Entry::with_arguments(
                         formatted_source_file,
                         command_args,
@@ -275,7 +275,7 @@ mod tests {
 
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat::default(),
+            entries: EntryFormat::default(),
         };
         let converter = CommandConverter::new(format).unwrap();
         let entries = converter.to_entries(&command);
@@ -306,7 +306,7 @@ mod tests {
 
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat::default(),
+            entries: EntryFormat::default(),
         };
         let converter = CommandConverter::new(format).unwrap();
         let result = converter.to_entries(&command);
@@ -341,7 +341,7 @@ mod tests {
 
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat::default(),
+            entries: EntryFormat::default(),
         };
         let converter = CommandConverter::new(format).unwrap();
         let result = converter.to_entries(&command);
@@ -366,9 +366,9 @@ mod tests {
         ));
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat {
-                keep_output_field: true,
-                command_field_as_array: false,
+            entries: EntryFormat {
+                include_output_field: true,
+                use_array_format: false,
             },
         };
         let converter = CommandConverter::new(format).unwrap();
@@ -399,9 +399,9 @@ mod tests {
         ));
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat {
-                command_field_as_array: true,
-                keep_output_field: false,
+            entries: EntryFormat {
+                use_array_format: true,
+                include_output_field: false,
             },
         };
         let sut = CommandConverter::new(format).unwrap();
@@ -421,9 +421,9 @@ mod tests {
         // Test that CommandConverter can be used as a public API
         let format = Format {
             paths: PathFormat::default(),
-            entry: EntryFormat {
-                command_field_as_array: true,
-                keep_output_field: false,
+            entries: EntryFormat {
+                use_array_format: true,
+                include_output_field: false,
             },
         };
         let converter = CommandConverter::new(format).unwrap();
@@ -573,8 +573,8 @@ mod tests {
 
         let converter = CommandConverter::with_formatter(
             EntryFormat {
-                keep_output_field: true,
-                command_field_as_array: true,
+                include_output_field: true,
+                use_array_format: true,
             },
             Box::new(mock_formatter),
         );
@@ -606,7 +606,7 @@ mod tests {
                 directory: PathResolver::Relative,
                 file: PathResolver::Absolute,
             },
-            entry: EntryFormat::default(),
+            entries: EntryFormat::default(),
         };
 
         let result = CommandConverter::new(invalid_format);

@@ -45,15 +45,19 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if the configuration is invalid or environment setup fails.
     pub fn create(
-        config: &config::Intercept,
+        intercept: &config::Intercept,
+        compilers: &[config::Compiler],
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        match config {
-            config::Intercept::Wrapper {
-                path,
-                directory,
-                executables,
-            } => Self::create_as_wrapper(path, directory, executables, address),
+        match intercept {
+            config::Intercept::Wrapper { path, directory } => {
+                let executables: Vec<std::path::PathBuf> = compilers
+                    .iter()
+                    .filter(|compiler| !compiler.ignore)
+                    .map(|compiler| compiler.path.clone())
+                    .collect();
+                Self::create_as_wrapper(path, directory, &executables, address)
+            }
             config::Intercept::Preload { path } => Self::create_as_preload(path, address),
         }
     }
@@ -370,12 +374,13 @@ mod test {
 
     #[test]
     fn test_build_environment_create_preload() {
-        let config = config::Intercept::Preload {
+        let intercept = config::Intercept::Preload {
             path: PathBuf::from("/usr/local/lib/libintercept.so"),
         };
+        let compilers = vec![];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&config, address).unwrap();
+        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
 
         // Check that destination is set
         assert_eq!(
@@ -400,17 +405,27 @@ mod test {
         let wrapper_path = temp_path.join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        let config = config::Intercept::Wrapper {
+        let intercept = config::Intercept::Wrapper {
             path: wrapper_path.clone(),
             directory: temp_path.to_path_buf(),
-            executables: vec![
-                std::path::PathBuf::from("/usr/bin/gcc"),
-                std::path::PathBuf::from("/usr/bin/clang"),
-            ],
         };
+        let compilers = vec![
+            config::Compiler {
+                path: PathBuf::from("/usr/bin/gcc"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+            config::Compiler {
+                path: PathBuf::from("/usr/bin/clang"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+        ];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&config, address).unwrap();
+        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
 
         // Check that destination is set
         assert_eq!(
@@ -449,14 +464,19 @@ mod test {
         std::env::set_var("CC", "/usr/bin/gcc");
         std::env::set_var("CXX", "/usr/bin/g++");
 
-        let config = config::Intercept::Wrapper {
-            path: wrapper_path.clone(),
+        let intercept = config::Intercept::Wrapper {
+            path: wrapper_path,
             directory: temp_path.to_path_buf(),
-            executables: vec![std::path::PathBuf::from("/usr/bin/clang")],
         };
+        let compilers = vec![config::Compiler {
+            path: PathBuf::from("/usr/bin/clang"),
+            as_: None,
+            ignore: false,
+            flags: None,
+        }];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&config, address).unwrap();
+        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
 
         // Get the wrapper directory from the BuildEnvironment
         let wrapper_dir = env

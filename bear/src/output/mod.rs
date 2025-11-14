@@ -38,32 +38,25 @@ pub struct OutputWriter {
     writer: ClangWriterStack,
 }
 
-impl TryFrom<(&args::BuildSemantic, &config::Output)> for OutputWriter {
+impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
     type Error = WriterCreationError;
 
-    fn try_from(value: (&args::BuildSemantic, &config::Output)) -> Result<Self, Self::Error> {
+    fn try_from(value: (&args::BuildSemantic, &config::Main)) -> Result<Self, Self::Error> {
         let (args, config) = value;
-        match config {
-            config::Output::Clang {
-                duplicates, format, ..
-            } => {
-                let final_path = &args.path;
-                let temp_path = &args.path.with_extension("tmp");
 
-                let base_writer = ClangOutputWriter::create(temp_path)?;
-                let unique_writer = UniqueOutputWriter::create(base_writer, duplicates)?;
-                let atomic_writer =
-                    AtomicClangOutputWriter::new(unique_writer, temp_path, final_path);
-                let append_writer =
-                    AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
-                let formatted_writer = ConverterClangOutputWriter::new(append_writer, format)
-                    .map_err(|e| WriterCreationError::Configuration(e.to_string()))?;
+        let final_path = &args.path;
+        let temp_path = &args.path.with_extension("tmp");
 
-                Ok(Self {
-                    writer: formatted_writer,
-                })
-            }
-        }
+        let base_writer = ClangOutputWriter::create(temp_path)?;
+        let unique_writer = UniqueOutputWriter::create(base_writer, &config.duplicates)?;
+        let atomic_writer = AtomicClangOutputWriter::new(unique_writer, temp_path, final_path);
+        let append_writer = AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
+        let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format)
+            .map_err(|e| WriterCreationError::Configuration(e.to_string()))?;
+
+        Ok(Self {
+            writer: formatted_writer,
+        })
     }
 }
 

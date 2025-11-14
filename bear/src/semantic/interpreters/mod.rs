@@ -6,7 +6,7 @@
 
 mod combinators;
 pub mod compilers;
-pub mod filter;
+// pub mod filter;
 pub mod generic;
 mod ignore;
 mod matchers;
@@ -17,9 +17,9 @@ use crate::environment::program_env;
 use crate::intercept::Execution;
 use combinators::Any;
 use compilers::CompilerInterpreter;
-use filter::{
-    CompilerFilterConfigurationError, Filter, FilteringInterpreter, SourceFilterConfigurationError,
-};
+// use filter::{
+//     CompilerFilterConfigurationError, Filter, FilteringInterpreter, SourceFilterConfigurationError,
+// };
 use generic::Generic;
 use ignore::IgnoreByPath;
 use std::collections::HashMap;
@@ -28,10 +28,10 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum InterpreterConfigError {
-    #[error("Compiler filter configuration error: {0}")]
-    CompilerFilter(#[from] CompilerFilterConfigurationError),
-    #[error("Source filter configuration error: {0}")]
-    SourceFilter(#[from] SourceFilterConfigurationError),
+    // #[error("Compiler filter configuration error: {0}")]
+    // CompilerFilter(#[from] CompilerFilterConfigurationError),
+    // #[error("Source filter configuration error: {0}")]
+    // SourceFilter(#[from] SourceFilterConfigurationError),
 }
 
 /// Creates an interpreter to recognize the compiler calls.
@@ -66,68 +66,65 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
 
     // Add generic fallback interpreter for any remaining unrecognized executables
     let environment: HashMap<String, String> = std::env::vars().collect();
-    let compilers_to_include = compilers_to_include(config, environment);
-    if !compilers_to_include.is_empty() {
-        let tool = OutputLogger::new(
-            Generic::from(&compilers_to_include),
-            "fallback_to_recognize",
-        );
-        interpreters.push(Box::new(tool));
-    }
+    // let compilers_to_include = compilers_to_include(config, environment);
+    // if !compilers_to_include.is_empty() {
+    //     let tool = OutputLogger::new(
+    //         Generic::from(&compilers_to_include),
+    //         "fallback_to_recognize",
+    //     );
+    //     interpreters.push(Box::new(tool));
+    // }
 
     let base_interpreter = Any::new(interpreters);
 
-    // Wrap with filtering and formatting based on output configuration
-    match &config.output {
-        config::Output::Clang {
-            compilers, sources, ..
-        } => {
-            let filter = Filter::try_from((compilers.as_slice(), sources))?;
-            let filtering =
-                FilteringInterpreter::new(OutputLogger::new(base_interpreter, "filtering"), filter);
-            let logger = InputLogger::new(filtering);
-            Ok(logger)
-        }
-    }
+    // // Wrap with filtering and formatting based on output configuration
+    // let compilers = config.compilers.clone();
+    // let sources = config.sources.clone();
+
+    // let filter = Filter::try_from((compilers.as_slice(), &sources))?;
+    // let filtering =
+    //     FilteringInterpreter::new(OutputLogger::new(base_interpreter, "filtering"), filter);
+    // let logger = InputLogger::new(filtering);
+    // Ok(logger)
+    Ok(base_interpreter)
 }
 
 fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
-    match &config.output {
-        config::Output::Clang { compilers, .. } => compilers
-            .iter()
-            .filter(|compiler| compiler.ignore == config::IgnoreOrConsider::Always)
-            .map(|compiler| compiler.path.clone())
-            .collect(),
-    }
-}
-
-fn compilers_to_include(
-    config: &config::Main,
-    environment: HashMap<String, String>,
-) -> Vec<PathBuf> {
-    let mut result = Vec::new();
-
-    // Add wrapped executables
-    if let config::Intercept::Wrapper { executables, .. } = &config.intercept {
-        result.extend_from_slice(executables);
-    }
-
-    // Add configured compilers
-    let config::Output::Clang { compilers, .. } = &config.output;
-    compilers
+    config
+        .compilers
         .iter()
-        .filter(|compiler| compiler.ignore != config::IgnoreOrConsider::Always)
-        .for_each(|compiler| result.push(compiler.path.clone()));
-
-    // Add environment compilers
-    environment.into_iter().for_each(|(key, path)| {
-        if program_env(&key) {
-            result.push(PathBuf::from(path));
-        }
-    });
-
-    result
+        .filter(|compiler| compiler.ignore)
+        .map(|compiler| compiler.path.clone())
+        .collect()
 }
+
+// fn compilers_to_include(
+//     config: &config::Main,
+//     environment: HashMap<String, String>,
+// ) -> Vec<PathBuf> {
+//     let mut result = Vec::new();
+
+//     // Add wrapped executables
+//     if let config::Intercept::Wrapper { executables, .. } = &config.intercept {
+//         result.extend_from_slice(executables);
+//     }
+
+//     // Add configured compilers
+//     let config::Output::Clang { compilers, .. } = &config.output;
+//     compilers
+//         .iter()
+//         .filter(|compiler| compiler.ignore != config::IgnoreOrConsider::Always)
+//         .for_each(|compiler| result.push(compiler.path.clone()));
+
+//     // Add environment compilers
+//     environment.into_iter().for_each(|(key, path)| {
+//         if program_env(&key) {
+//             result.push(PathBuf::from(path));
+//         }
+//     });
+
+//     result
+// }
 
 struct InputLogger<T: Interpreter> {
     inner: T,

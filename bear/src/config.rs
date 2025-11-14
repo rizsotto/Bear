@@ -435,12 +435,12 @@ pub mod loader {
         fn test_wrapper_config() {
             let content: &[u8] = br#"
             schema: 4.0
-            
+
             intercept:
                 mode: wrapper
-                    path: /usr/local/libexec/bear/wrapper
-                    directory: /tmp
-            
+                path: /usr/local/libexec/bear/wrapper
+                directory: /tmp
+
             compilers:
               - path: /usr/local/bin/cc
                 as: gcc
@@ -448,17 +448,17 @@ pub mod loader {
                 ignore: true
               - path: /usr/bin/clang++
                 flags:
-                add: ["-I/opt/MPI/include"]
-                remove: ["-Wall"]
-            
+                    add: ["-I/opt/MPI/include"]
+                    remove: ["-Wall"]
+
             sources:
                 only_existing_files: true
                 include: ["/opt/project/sources"]
                 exclude: ["/opt/project/tests"]
-            
+
             duplicates:
                 match_on: [file, directory]
-            
+
             format:
                 paths:
                     directory: canonical
@@ -526,14 +526,14 @@ pub mod loader {
         fn test_incomplete_wrapper_config() {
             let content: &[u8] = br#"
             schema: 4.0
-            
+
             intercept:
               mode: wrapper
-            
+
             format:
               paths:
-                directory: canonical
-                file: canonical
+                directory: as-is
+                file: as-is
             "#;
 
             let result = Loader::from_reader(content).unwrap();
@@ -572,7 +572,7 @@ pub mod loader {
         fn test_incomplete_preload_config() {
             let content: &[u8] = br#"
             schema: 4.0
-    
+
             intercept:
               mode: preload
             sources:
@@ -588,7 +588,7 @@ pub mod loader {
             let expected = Main {
                 schema: String::from("4.0"),
                 intercept: Intercept::Preload {
-                    path: default_wrapper_executable(),
+                    path: default_preload_library(),
                 },
                 compilers: vec![],
                 sources: SourceFilter {
@@ -634,10 +634,10 @@ pub mod loader {
         fn test_invalid_schema_version() {
             let content: &[u8] = br#"
             schema: 3.0
-    
+
             intercept:
-            mode: wrapper
-            directory: /tmp
+              mode: wrapper
+              directory: /tmp
             "#;
 
             let result: serde_yml::Result<Main> = Loader::from_reader(content);
@@ -646,7 +646,7 @@ pub mod loader {
 
             let message = result.unwrap_err().to_string();
             assert_eq!(
-                "Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 9",
+                "Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 13",
                 message
             );
         }
