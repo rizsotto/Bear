@@ -103,18 +103,6 @@ impl BuildEnvironment {
         executables: &[std::path::PathBuf],
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        // Validate wrapper configuration
-        if path.as_os_str().is_empty() {
-            return Err(ConfigurationError::ConfigValidation(
-                "The wrapper path cannot be empty.".to_string(),
-            ));
-        }
-        if directory.as_os_str().is_empty() {
-            return Err(ConfigurationError::ConfigValidation(
-                "The wrapper directory cannot be empty.".to_string(),
-            ));
-        }
-
         // Create wrapper directory builder
         let mut wrapper_dir_builder = WrapperDirectoryBuilder::create(path, directory)?;
 
@@ -175,13 +163,6 @@ impl BuildEnvironment {
         path: &std::path::Path,
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        // Validate preload configuration
-        if path.as_os_str().is_empty() {
-            return Err(ConfigurationError::ConfigValidation(
-                "The preload library path cannot be empty.".to_string(),
-            ));
-        }
-
         // Update LD_PRELOAD environment variable
         let preload_original = std::env::var(KEY_OS__PRELOAD_PATH).unwrap_or_default();
         let preload_updated =
@@ -241,12 +222,8 @@ impl BuildEnvironment {
 /// specific context about what went wrong during the configuration process.
 #[derive(Error, Debug)]
 pub enum ConfigurationError {
-    #[error("Generic IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Invalid configuration: {0}")]
+    #[error("Invalid characters in path to join: {0}")]
     Path(#[from] JoinPathsError),
-    #[error("Configuration error: {0}")]
-    ConfigValidation(String),
     #[error("Wrapper directory error: {0}")]
     WrapperDirectory(#[from] WrapperDirectoryError),
 }

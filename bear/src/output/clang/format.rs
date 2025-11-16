@@ -14,7 +14,7 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
-use crate::config::{PathFormat, PathResolver};
+use crate::config::{PathFormat, PathResolver, Validator};
 use std::io;
 use std::path::{absolute, Path, PathBuf};
 use thiserror::Error;
@@ -30,7 +30,7 @@ pub enum FormatError {
 #[derive(Debug, Error)]
 pub enum FormatConfigurationError {
     #[error("Invalid path format configuration: {0}")]
-    InvalidConfiguration(String),
+    InvalidConfiguration(&'static str),
     #[error("Getting current directory failed: {0}")]
     CurrentWorkingDirectory(#[from] io::Error),
 }
@@ -67,31 +67,40 @@ impl ConfigurablePathFormatter {
     /// Returns `FormatConfigurationError::CurrentWorkingDirectory` if getting
     /// the current working directory fails.
     pub fn new(config: PathFormat) -> Result<Self, FormatConfigurationError> {
-        // Validate configuration rules
-        Self::validate_path_format_config(&config)?;
+        // Validate configuration rules using the Validator trait
+        PathFormat::validate(&config)?;
 
         Ok(Self { config })
     }
+}
+
+impl Validator<PathFormat> for PathFormat {
+    type Error = FormatConfigurationError;
 
     /// Validates the path format configuration according to the rules:
     /// - When directory is relative, file must be relative too
     /// - When directory is canonical, file can't be absolute
     /// - When directory is absolute, file can't be canonical
-    fn validate_path_format_config(config: &PathFormat) -> Result<(), FormatConfigurationError> {
+    fn validate(config: &PathFormat) -> Result<(), Self::Error> {
         use PathResolver::*;
 
         match (&config.directory, &config.file) {
             (Relative, Absolute | Canonical) => {
                 Err(FormatConfigurationError::InvalidConfiguration(
-                    "When directory is relative, file must be relative too".to_string(),
+                    "When directory is relative, file must be relative too",
                 ))
             }
             (Canonical, Absolute) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory is canonical, file can't be absolute".to_string(),
+                "When directory is canonical, file can't be absolute",
             )),
             (Absolute, Canonical) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory is absolute, file can't be canonical".to_string(),
+                "When directory is absolute, file can't be canonical",
             )),
+            (AsIs, Absolute | Relative | Canonical) => {
+                Err(FormatConfigurationError::InvalidConfiguration(
+                    "When directory as-is, file should be the same",
+                ))
+            }
             _ => Ok(()),
         }
     }
@@ -245,7 +254,7 @@ mod tests {
 
         for config in valid_configs {
             assert!(
-                ConfigurablePathFormatter::validate_path_format_config(&config).is_ok(),
+                PathFormat::validate(&config).is_ok(),
                 "Config should be valid: {:?}",
                 config
             );
@@ -283,10 +292,17 @@ mod tests {
                 },
                 "When directory is absolute, file can't be canonical",
             ),
+            (
+                PathFormat {
+                    directory: PathResolver::AsIs,
+                    file: PathResolver::Canonical,
+                },
+                "When directory as-is, file should be the same",
+            ),
         ];
 
         for (config, expected_error) in invalid_configs {
-            let result = ConfigurablePathFormatter::validate_path_format_config(&config);
+            let result = PathFormat::validate(&config);
             assert!(result.is_err(), "Config should be invalid: {:?}", config);
             if let Err(FormatConfigurationError::InvalidConfiguration(msg)) = result {
                 assert_eq!(msg, expected_error);
@@ -294,28 +310,6 @@ mod tests {
                 panic!("Expected InvalidConfiguration error");
             }
         }
-    }
-
-    #[test]
-    fn test_configurable_path_formatter_new_valid() {
-        let config = PathFormat {
-            directory: PathResolver::AsIs,
-            file: PathResolver::AsIs,
-        };
-
-        let formatter = ConfigurablePathFormatter::new(config);
-        assert!(formatter.is_ok());
-    }
-
-    #[test]
-    fn test_configurable_path_formatter_new_invalid() {
-        let config = PathFormat {
-            directory: PathResolver::Relative,
-            file: PathResolver::Absolute,
-        };
-
-        let formatter = ConfigurablePathFormatter::new(config);
-        assert!(formatter.is_err());
     }
 
     #[test]
