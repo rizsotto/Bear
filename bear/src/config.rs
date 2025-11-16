@@ -66,8 +66,9 @@
 //! ```
 
 // Re-Export the types and the loader module content.
-pub use loader::Loader;
+pub use loader::{ConfigError, Loader};
 pub use types::*;
+pub use validation::Validator;
 
 mod types {
     use serde::{Deserialize, Serialize};
@@ -310,8 +311,318 @@ mod types {
     }
 }
 
+pub mod validation {
+
+    use super::types::*;
+    use thiserror::Error;
+
+    /// Trait for validating configuration objects
+    pub trait Validator<T> {
+        type Error: std::error::Error;
+
+        fn validate(config: &T) -> Result<(), Self::Error>;
+    }
+
+    /// Validation errors for configuration
+    #[derive(Debug, Error)]
+    pub enum ValidationError {
+        #[error("Empty string value for field '{field}'")]
+        EmptyString { field: String },
+        #[error("Path does not exist: '{path}'")]
+        PathNotFound { path: String },
+        #[error("Multiple validation errors: {errors:?}")]
+        Multiple { errors: Vec<ValidationError> },
+    }
+
+    /// Combinator for collecting and handling validation errors
+    #[derive(Default)]
+    struct ValidationCollector {
+        errors: Vec<ValidationError>,
+    }
+
+    impl ValidationCollector {
+        fn new() -> Self {
+            Self { errors: Vec::new() }
+        }
+
+        fn add(&mut self, error: ValidationError) {
+            self.errors.push(error);
+        }
+
+        fn add_result(&mut self, result: Result<(), ValidationError>) {
+            if let Err(error) = result {
+                match error {
+                    ValidationError::Multiple { errors } => {
+                        self.errors.extend(errors);
+                    }
+                    single_error => self.errors.push(single_error),
+                }
+            }
+        }
+
+        fn finish(self) -> Result<(), ValidationError> {
+            if self.errors.is_empty() {
+                Ok(())
+            } else if self.errors.len() == 1 {
+                Err(self.errors.into_iter().next().unwrap())
+            } else {
+                Err(ValidationError::Multiple {
+                    errors: self.errors,
+                })
+            }
+        }
+    }
+
+    impl Validator<Main> for Main {
+        type Error = ValidationError;
+
+        fn validate(config: &Main) -> Result<(), Self::Error> {
+            let mut collector = ValidationCollector::new();
+
+            // Validate intercept configuration
+            collector.add_result(Intercept::validate(&config.intercept));
+
+            // Validate each compiler configuration
+            for compiler in config.compilers.iter() {
+                collector.add_result(Compiler::validate(compiler));
+            }
+
+            // Validate source filter configuration
+            collector.add_result(SourceFilter::validate(&config.sources));
+
+            collector.finish()
+        }
+    }
+
+    impl Validator<Intercept> for Intercept {
+        type Error = ValidationError;
+
+        fn validate(config: &Intercept) -> Result<(), Self::Error> {
+            match config {
+                Intercept::Wrapper { path, directory } => {
+                    let mut collector = ValidationCollector::new();
+
+                    if !path.exists() {
+                        collector.add(ValidationError::PathNotFound {
+                            path: path.display().to_string(),
+                        });
+                    }
+
+                    if !directory.exists() {
+                        collector.add(ValidationError::PathNotFound {
+                            path: directory.display().to_string(),
+                        });
+                    }
+
+                    collector.finish()
+                }
+                Intercept::Preload { path } => {
+                    if !path.exists() {
+                        Err(ValidationError::PathNotFound {
+                            path: path.display().to_string(),
+                        })
+                    } else {
+                        Ok(())
+                    }
+                }
+            }
+        }
+    }
+
+    impl Validator<Compiler> for Compiler {
+        type Error = ValidationError;
+
+        fn validate(config: &Compiler) -> Result<(), Self::Error> {
+            let mut collector = ValidationCollector::new();
+
+            // Check if compiler path exists
+            if !config.path.exists() {
+                collector.add(ValidationError::PathNotFound {
+                    path: config.path.display().to_string(),
+                });
+            }
+
+            // Check if 'as' field is empty when present
+            if let Some(ref as_name) = config.as_ {
+                if as_name.trim().is_empty() {
+                    collector.add(ValidationError::EmptyString {
+                        field: "as".to_string(),
+                    });
+                }
+            }
+
+            // Validate compiler flags if present
+            if let Some(ref flags) = config.flags {
+                collector.add_result(CompilerFlags::validate(flags));
+            }
+
+            collector.finish()
+        }
+    }
+
+    impl Validator<CompilerFlags> for CompilerFlags {
+        type Error = ValidationError;
+
+        fn validate(config: &CompilerFlags) -> Result<(), Self::Error> {
+            let mut collector = ValidationCollector::new();
+
+            // Check add flags for empty strings
+            for (idx, flag) in config.add.iter().enumerate() {
+                if flag.trim().is_empty() {
+                    collector.add(ValidationError::EmptyString {
+                        field: format!("flags.add[{}]", idx),
+                    });
+                }
+            }
+
+            // Check remove flags for empty strings
+            for (idx, flag) in config.remove.iter().enumerate() {
+                if flag.trim().is_empty() {
+                    collector.add(ValidationError::EmptyString {
+                        field: format!("flags.remove[{}]", idx),
+                    });
+                }
+            }
+
+            collector.finish()
+        }
+    }
+
+    impl Validator<SourceFilter> for SourceFilter {
+        type Error = ValidationError;
+
+        fn validate(config: &SourceFilter) -> Result<(), Self::Error> {
+            // Note: We don't validate path existence for include/exclude paths
+            // as mentioned in the requirements - these are "future values"
+            // We only need to ensure they're not empty paths if specified
+            let mut collector = ValidationCollector::new();
+
+            // Check include paths for empty strings
+            for (idx, path) in config.include.iter().enumerate() {
+                if path.as_os_str().is_empty() {
+                    collector.add(ValidationError::EmptyString {
+                        field: format!("sources.include[{}]", idx),
+                    });
+                }
+            }
+
+            // Check exclude paths for empty strings
+            for (idx, path) in config.exclude.iter().enumerate() {
+                if path.as_os_str().is_empty() {
+                    collector.add(ValidationError::EmptyString {
+                        field: format!("sources.exclude[{}]", idx),
+                    });
+                }
+            }
+
+            collector.finish()
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use std::path::PathBuf;
+        use tempfile::TempDir;
+
+        #[test]
+        fn test_validate_intercept_wrapper_valid_paths() {
+            let temp_dir = TempDir::new().unwrap();
+            let temp_file = temp_dir.path().join("test_file");
+            std::fs::write(&temp_file, "test").unwrap();
+
+            let config = Intercept::Wrapper {
+                path: temp_file,
+                directory: temp_dir.path().to_path_buf(),
+            };
+
+            assert!(Intercept::validate(&config).is_ok());
+        }
+
+        #[test]
+        fn test_validate_intercept_wrapper_invalid_paths() {
+            let config = Intercept::Wrapper {
+                path: PathBuf::from("/nonexistent/path"),
+                directory: PathBuf::from("/nonexistent/directory"),
+            };
+
+            let result = Intercept::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::Multiple { errors } => {
+                    assert_eq!(errors.len(), 2);
+                }
+                _ => panic!("Expected multiple validation errors"),
+            }
+        }
+
+        #[test]
+        fn test_validate_compiler_empty_as_field() {
+            let config = Compiler {
+                path: PathBuf::from("/nonexistent/compiler"),
+                as_: Some("".to_string()),
+                ignore: false,
+                flags: None,
+            };
+
+            let result = Compiler::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::Multiple { errors } => {
+                    assert!(errors.iter().any(
+                        |e| matches!(e, ValidationError::EmptyString { field } if field == "as")
+                    ));
+                    assert!(errors
+                        .iter()
+                        .any(|e| matches!(e, ValidationError::PathNotFound { .. })));
+                }
+                _ => panic!("Expected multiple validation errors"),
+            }
+        }
+
+        #[test]
+        fn test_validate_compiler_flags_empty_strings() {
+            let flags = CompilerFlags {
+                add: vec!["valid_flag".to_string(), "".to_string()],
+                remove: vec!["".to_string()],
+            };
+
+            let result = CompilerFlags::validate(&flags);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::Multiple { errors } => {
+                    assert_eq!(errors.len(), 2);
+                }
+                _ => panic!("Expected multiple validation errors"),
+            }
+        }
+
+        #[test]
+        fn test_validate_source_filter_empty_paths() {
+            let config = SourceFilter {
+                only_existing_files: true,
+                include: vec![PathBuf::from("valid/path"), PathBuf::from("")],
+                exclude: vec![PathBuf::from("")],
+            };
+
+            let result = SourceFilter::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::Multiple { errors } => {
+                    assert_eq!(errors.len(), 2);
+                }
+                _ => panic!("Expected multiple validation errors"),
+            }
+        }
+    }
+}
+
 pub mod loader {
-    use super::Main;
+    use super::{Main, Validator};
     use directories::{BaseDirs, ProjectDirs};
     use log::{debug, info};
     use std::fs::OpenOptions;
@@ -391,6 +702,12 @@ pub mod loader {
                     source,
                 })?;
 
+            // Validate the loaded configuration
+            Main::validate(&content).map_err(|source| ConfigError::ValidationError {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
             Ok(content)
         }
 
@@ -424,10 +741,18 @@ pub mod loader {
         /// Error when the schema version is not supported.
         #[error("Unsupported schema version: {found}. Expected: {expected}")]
         UnsupportedSchema { found: String, expected: String },
+        /// Error when configuration validation fails.
+        #[error("Configuration validation failed: {source}")]
+        ValidationError {
+            path: PathBuf,
+            #[source]
+            source: crate::config::validation::ValidationError,
+        },
     }
 
     #[cfg(test)]
     mod test {
+        use super::super::validation::ValidationError;
         use super::super::*;
         use super::*;
 
@@ -667,6 +992,61 @@ pub mod loader {
             let result: serde_yml::Result<Main> = Loader::from_reader(content);
 
             assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_validation_error_on_invalid_config() {
+            use std::fs;
+            use tempfile::TempDir;
+
+            // Create a temporary directory for testing
+            let temp_dir = TempDir::new().unwrap();
+            let config_file = temp_dir.path().join("bear.yml");
+
+            // Create a config with invalid paths that will fail validation
+            let invalid_config = r#"
+            schema: 4.0
+
+            intercept:
+                mode: wrapper
+                path: /nonexistent/wrapper/path
+                directory: /nonexistent/directory
+
+            compilers:
+              - path: /nonexistent/compiler
+                as: ""
+                flags:
+                    add: [""]
+                    remove: ["valid", ""]
+            "#;
+
+            fs::write(&config_file, invalid_config).unwrap();
+
+            // Try to load the config - should fail validation
+            let result = Loader::from_file(&config_file);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ConfigError::ValidationError { source, .. } => {
+                    // Verify we got validation errors
+                    match source {
+                        ValidationError::Multiple { errors } => {
+                            assert!(!errors.is_empty());
+                            // Should contain path not found and empty string errors
+                            let has_path_error = errors
+                                .iter()
+                                .any(|e| matches!(e, ValidationError::PathNotFound { .. }));
+                            let has_empty_string_error = errors
+                                .iter()
+                                .any(|e| matches!(e, ValidationError::EmptyString { .. }));
+                            assert!(has_path_error);
+                            assert!(has_empty_string_error);
+                        }
+                        _ => panic!("Expected multiple validation errors"),
+                    }
+                }
+                other => panic!("Expected ValidationError, got: {:?}", other),
+            }
         }
     }
 }
