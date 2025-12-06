@@ -6,77 +6,169 @@
 //! using regular expressions instead of separate hard-coded lists and pattern
 //! matching functions for each compiler.
 
+use crate::config::{Compiler, CompilerType};
 use regex::Regex;
 use std::collections::HashMap;
-use std::path::Path;
-
-/// Compiler types that we can recognize
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CompilerType {
-    Gcc,
-    Clang,
-    Fortran,
-    IntelFortran,
-    CrayFortran,
-}
-
-impl CompilerType {
-    /// Returns the display name for this compiler type
-    #[allow(dead_code)]
-    pub fn name(&self) -> &'static str {
-        match self {
-            CompilerType::Gcc => "GCC",
-            CompilerType::Clang => "Clang",
-            CompilerType::Fortran => "Fortran",
-            CompilerType::IntelFortran => "Intel Fortran",
-            CompilerType::CrayFortran => "Cray Fortran",
-        }
-    }
-}
+use std::path::{Path, PathBuf};
 
 /// A unified compiler recognizer that uses regex patterns
 pub struct CompilerRecognizer {
-    patterns: HashMap<CompilerType, Regex>,
+    patterns: Vec<(CompilerType, Regex)>,
+    hints: HashMap<PathBuf, CompilerType>,
 }
 
 impl CompilerRecognizer {
-    /// Creates a new compiler recognizer with default patterns
-    pub fn new() -> Self {
-        let mut patterns = HashMap::new();
-
-        // GCC pattern: matches gcc, g++, cc, c++, cross-compilation variants, and versioned variants
+    /// Returns the default set of regex patterns used to recognize compiler types.
+    ///
+    /// This method provides built-in patterns for recognizing common compiler executables
+    /// based on their names. The patterns are designed to handle various scenarios including:
+    /// - Cross-compilation prefixes (e.g., `arm-linux-gnueabihf-gcc`)
+    /// - Versioned executables (e.g., `gcc-11`, `clang-15`)
+    /// - Multiple naming conventions for the same compiler family
+    ///
+    /// # Supported Compiler Patterns
+    ///
+    /// - **GCC**: Matches `gcc`, `g++`, `cc`, `c++` with optional cross-compilation prefixes and version suffixes
+    /// - **Clang**: Matches `clang`, `clang++` with optional cross-compilation prefixes and version suffixes
+    /// - **Fortran**: Matches `gfortran`, `f77`, `f90`, `f95`, `f03`, `f08` with optional prefixes and versions
+    /// - **Intel Fortran**: Matches `ifort`, `ifx` with optional version suffixes
+    /// - **Cray Fortran**: Matches `crayftn`, `ftn` with optional version suffixes
+    ///
+    /// # Returns
+    ///
+    /// A vector of tuples where each tuple contains:
+    /// - `CompilerType`: The type of compiler the pattern identifies
+    /// - `Regex`: The compiled regular expression pattern for matching executable names
+    ///
+    /// # Examples
+    ///
+    /// The returned patterns will match executables like:
+    /// - `gcc`, `arm-linux-gnueabihf-gcc`, `gcc-11`
+    /// - `clang++`, `x86_64-pc-linux-gnu-clang`, `clang-15`
+    /// - `gfortran`, `aarch64-linux-gnu-gfortran-9`
+    /// - `ifort`, `ifx-2023`
+    /// - `crayftn`, `ftn`
+    fn default_patterns() -> Vec<(CompilerType, Regex)> {
         let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?$")
             .expect("Invalid GCC regex pattern");
-        patterns.insert(CompilerType::Gcc, gcc_pattern);
 
         // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
         let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
             .expect("Invalid Clang regex pattern");
-        patterns.insert(CompilerType::Clang, clang_pattern);
 
         // Fortran pattern: matches gfortran, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
         let fortran_pattern =
             Regex::new(r"^(?:[^/]*-)?(?:gfortran|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
                 .expect("Invalid Fortran regex pattern");
-        patterns.insert(CompilerType::Fortran, fortran_pattern);
 
         // Intel Fortran pattern: matches ifort, ifx, and versioned variants
         let intel_fortran_pattern = Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?$")
             .expect("Invalid Intel Fortran regex pattern");
-        patterns.insert(CompilerType::IntelFortran, intel_fortran_pattern);
 
         // Cray Fortran pattern: matches crayftn, ftn
         let cray_fortran_pattern = Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?$")
             .expect("Invalid Cray Fortran regex pattern");
-        patterns.insert(CompilerType::CrayFortran, cray_fortran_pattern);
 
-        Self { patterns }
+        vec![
+            (CompilerType::Gcc, gcc_pattern),
+            (CompilerType::Clang, clang_pattern),
+            (CompilerType::Fortran, fortran_pattern),
+            (CompilerType::IntelFortran, intel_fortran_pattern),
+            (CompilerType::CrayFortran, cray_fortran_pattern),
+        ]
+    }
+
+    /// Creates a hint lookup table from compiler configuration.
+    ///
+    /// This method processes a slice of [`Compiler`] configurations and builds a mapping
+    /// from filesystem paths to compiler types. This allows for explicit compiler type
+    /// specification that overrides pattern-based recognition.
+    ///
+    /// # Arguments
+    ///
+    /// * `compilers` - A slice of [`Compiler`] configurations from which to extract hints
+    ///
+    /// # Returns
+    ///
+    /// A [`HashMap`] mapping canonicalized [`PathBuf`]s to their corresponding [`CompilerType`]s.
+    /// Only compilers that:
+    /// - Are not marked as `ignore = true`
+    /// - Have an explicit `as_` field specifying the compiler type
+    ///
+    /// will be included in the returned mapping.
+    ///
+    /// # Path Canonicalization
+    ///
+    /// The method attempts to canonicalize each compiler path using [`PathBuf::canonicalize()`].
+    /// If canonicalization fails (e.g., due to the path not existing), the original path
+    /// is used instead. This helps with matching paths that may be specified differently
+    /// but refer to the same executable.
+    ///
+    /// # Examples
+    ///
+    /// Given a configuration like:
+    /// ```yaml
+    /// compilers:
+    ///   - path: /usr/bin/my-custom-gcc
+    ///     as: gcc
+    ///   - path: /opt/llvm/bin/clang
+    ///     as: clang
+    ///   - path: /usr/bin/ignored-compiler
+    ///     ignore: true
+    /// ```
+    ///
+    /// This method would return a mapping containing entries for the first two compilers
+    /// but exclude the third due to the `ignore` flag.
+    fn build_hints_map(compilers: &[Compiler]) -> HashMap<PathBuf, CompilerType> {
+        let mut hints = HashMap::new();
+
+        for compiler in compilers {
+            // ignored compilers should not be checked.
+            if compiler.ignore {
+                continue;
+            }
+            // we can only deal with compilers which has hints.
+            if let Some(compiler_type) = compiler.as_ {
+                // Try to canonicalize the path for better matching
+                let canonical_path = compiler
+                    .path
+                    .canonicalize()
+                    .unwrap_or_else(|_| compiler.path.clone());
+                hints.insert(canonical_path, compiler_type);
+            }
+        }
+
+        hints
+    }
+
+    /// Creates a new compiler recognizer with default patterns
+    pub fn new() -> Self {
+        Self {
+            patterns: Self::default_patterns(),
+            hints: Self::build_hints_map(&[]),
+        }
+    }
+
+    /// Creates a new compiler recognizer with configuration-based hints
+    ///
+    /// # Arguments
+    ///
+    /// * `compilers` - Slice of compiler configurations with optional type hints
+    ///
+    /// # Returns
+    ///
+    /// A new CompilerRecognizer that will prioritize configured hints over regex detection
+    pub fn new_with_config(compilers: &[Compiler]) -> Self {
+        Self {
+            patterns: Self::default_patterns(),
+            hints: Self::build_hints_map(compilers),
+        }
     }
 
     /// Recognizes the compiler type from an executable path
     ///
-    /// This function ignores the directory path and only looks at the filename
-    /// to determine the compiler type.
+    /// This function first checks for configured hints, then falls back to
+    /// regex-based detection using the filename.
     ///
     /// # Arguments
     ///
@@ -85,40 +177,28 @@ impl CompilerRecognizer {
     /// # Returns
     ///
     /// `Some(CompilerType)` if the executable is recognized, `None` otherwise
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::path::Path;
-    /// use bear::semantic::interpreters::compilers::compiler_recognition::{CompilerRecognizer, CompilerType};
-    ///
-    /// let recognizer = CompilerRecognizer::new();
-    ///
-    /// // Basic compiler names
-    /// assert_eq!(recognizer.recognize(Path::new("gcc")), Some(CompilerType::Gcc));
-    /// assert_eq!(recognizer.recognize(Path::new("clang")), Some(CompilerType::Clang));
-    ///
-    /// // With full paths (path is ignored)
-    /// assert_eq!(recognizer.recognize(Path::new("/usr/bin/gcc")), Some(CompilerType::Gcc));
-    /// assert_eq!(recognizer.recognize(Path::new("/opt/clang/bin/clang++")), Some(CompilerType::Clang));
-    ///
-    /// // Cross-compilation variants
-    /// assert_eq!(recognizer.recognize(Path::new("arm-linux-gnueabi-gcc")), Some(CompilerType::Gcc));
-    /// assert_eq!(recognizer.recognize(Path::new("aarch64-linux-gnu-clang")), Some(CompilerType::Clang));
-    ///
-    /// // Versioned variants
-    /// assert_eq!(recognizer.recognize(Path::new("gcc-11")), Some(CompilerType::Gcc));
-    /// assert_eq!(recognizer.recognize(Path::new("clang-15")), Some(CompilerType::Clang));
-    ///
-    /// // Unrecognized
-    /// assert_eq!(recognizer.recognize(Path::new("unknown-compiler")), None);
-    /// ```
     pub fn recognize(&self, executable_path: &Path) -> Option<CompilerType> {
-        let filename = executable_path.file_name()?.to_str()?;
+        // 1. Check configured hints first (by canonical path matching)
+        if let Some(hint_type) = self.lookup_hint(executable_path) {
+            return Some(hint_type);
+        }
 
-        // Check each compiler pattern
-        for (&compiler_type, pattern) in &self.patterns {
-            if pattern.is_match(filename) {
+        // 2. Fall back to regex-based recognition
+        self.recognize_by_regex(executable_path)
+    }
+
+    /// Looks up a hint for the given executable path
+    ///
+    /// Tries both the original path and its canonicalized version
+    fn lookup_hint(&self, executable_path: &Path) -> Option<CompilerType> {
+        // Try original path first
+        if let Some(&compiler_type) = self.hints.get(executable_path) {
+            return Some(compiler_type);
+        }
+
+        // Try canonicalized path
+        if let Ok(canonical_path) = executable_path.canonicalize() {
+            if let Some(&compiler_type) = self.hints.get(&canonical_path) {
                 return Some(compiler_type);
             }
         }
@@ -126,47 +206,21 @@ impl CompilerRecognizer {
         None
     }
 
-    /// Checks if an executable is of a specific compiler type
+    /// Internal regex-based recognition
     ///
-    /// # Arguments
-    ///
-    /// * `executable_path` - The path to the executable
-    /// * `compiler_type` - The compiler type to check for
-    ///
-    /// # Returns
-    ///
-    /// `true` if the executable matches the specified compiler type
-    pub fn is_compiler_type(&self, executable_path: &Path, compiler_type: CompilerType) -> bool {
-        self.recognize(executable_path) == Some(compiler_type)
-    }
+    /// This function ignores the directory path and only looks at the filename
+    /// to determine the compiler type using regex patterns.
+    fn recognize_by_regex(&self, executable_path: &Path) -> Option<CompilerType> {
+        let filename = executable_path.file_name()?.to_str()?;
 
-    /// Gets all supported compiler types
-    #[allow(dead_code)]
-    pub fn supported_compilers(&self) -> Vec<CompilerType> {
-        self.patterns.keys().copied().collect()
-    }
+        // Check each compiler pattern
+        for (compiler_type, pattern) in &self.patterns {
+            if pattern.is_match(filename) {
+                return Some(*compiler_type);
+            }
+        }
 
-    /// Adds or updates a pattern for a compiler type
-    ///
-    /// This allows customization of recognition patterns at runtime.
-    ///
-    /// # Arguments
-    ///
-    /// * `compiler_type` - The compiler type to add/update
-    /// * `pattern` - The regex pattern string
-    ///
-    /// # Returns
-    ///
-    /// `Ok(())` if the pattern was valid and added, `Err` with regex error otherwise
-    #[allow(dead_code)]
-    pub fn add_pattern(
-        &mut self,
-        compiler_type: CompilerType,
-        pattern: &str,
-    ) -> Result<(), regex::Error> {
-        let regex = Regex::new(pattern)?;
-        self.patterns.insert(compiler_type, regex);
-        Ok(())
+        None
     }
 }
 
@@ -403,46 +457,73 @@ mod tests {
     }
 
     #[test]
+    fn test_recognize_with_config_hints() {
+        use crate::config::Compiler;
+        use std::path::PathBuf;
+
+        // Create test compiler configurations with hints
+        let compilers = vec![
+            Compiler {
+                path: PathBuf::from("custom-gcc-wrapper"),
+                as_: Some(CompilerType::Gcc),
+                ignore: false,
+                flags: None,
+            },
+            Compiler {
+                path: PathBuf::from("weird-clang-name"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+
+        // Configured hints take priority
+        assert_eq!(
+            recognizer.recognize(path("custom-gcc-wrapper")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("weird-clang-name")),
+            Some(CompilerType::Clang)
+        );
+
+        // Regex detection still works for non-configured compilers
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("unknown-compiler")), None);
+    }
+
+    #[test]
     fn test_is_compiler_type() {
         let recognizer = CompilerRecognizer::new();
 
-        assert!(recognizer.is_compiler_type(path("gcc"), CompilerType::Gcc));
-        assert!(recognizer.is_compiler_type(path("clang"), CompilerType::Clang));
-        assert!(!recognizer.is_compiler_type(path("gcc"), CompilerType::Clang));
-        assert!(!recognizer.is_compiler_type(path("clang"), CompilerType::Gcc));
-    }
-
-    #[test]
-    fn test_custom_patterns() {
-        let mut recognizer = CompilerRecognizer::new();
-
-        // Add a custom pattern for a hypothetical compiler
-        assert!(recognizer
-            .add_pattern(CompilerType::Gcc, r"^my-custom-gcc$")
-            .is_ok());
-
-        // Should now recognize our custom compiler
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
         assert_eq!(
-            recognizer.recognize(path("my-custom-gcc")),
-            Some(CompilerType::Gcc)
+            recognizer.recognize(path("clang")),
+            Some(CompilerType::Clang)
         );
-
-        // Invalid regex should return error
-        assert!(recognizer
-            .add_pattern(CompilerType::Gcc, r"[invalid(regex")
-            .is_err());
+        assert_ne!(recognizer.recognize(path("gcc")), Some(CompilerType::Clang));
+        assert_ne!(recognizer.recognize(path("clang")), Some(CompilerType::Gcc));
     }
 
     #[test]
-    fn test_supported_compilers() {
-        let recognizer = CompilerRecognizer::new();
-        let supported = recognizer.supported_compilers();
+    fn test_empty_config() {
+        // Test that recognizer with empty config works the same as new()
+        let recognizer_new = CompilerRecognizer::new();
+        let recognizer_empty_config = CompilerRecognizer::new_with_config(&[]);
 
-        // Should have all the compiler types we defined
-        assert!(supported.contains(&CompilerType::Gcc));
-        assert!(supported.contains(&CompilerType::Clang));
-        assert!(supported.contains(&CompilerType::Fortran));
-        assert!(supported.contains(&CompilerType::IntelFortran));
-        assert!(supported.contains(&CompilerType::CrayFortran));
+        assert_eq!(
+            recognizer_new.recognize(path("gcc")),
+            recognizer_empty_config.recognize(path("gcc"))
+        );
+        assert_eq!(
+            recognizer_new.recognize(path("clang")),
+            recognizer_empty_config.recognize(path("clang"))
+        );
+        assert_eq!(
+            recognizer_new.recognize(path("unknown")),
+            recognizer_empty_config.recognize(path("unknown"))
+        );
     }
 }

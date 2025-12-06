@@ -151,11 +151,40 @@ mod types {
     pub struct Compiler {
         pub path: PathBuf,
         #[serde(rename = "as", skip_serializing_if = "Option::is_none")]
-        pub as_: Option<String>,
+        pub as_: Option<CompilerType>,
         #[serde(default)]
         pub ignore: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub flags: Option<CompilerFlags>,
+    }
+
+    /// Compiler types that we can recognize and configure
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    pub enum CompilerType {
+        #[serde(alias = "gcc", alias = "gnu")]
+        Gcc,
+        #[serde(alias = "clang", alias = "llvm")]
+        Clang,
+        #[serde(alias = "fortran", alias = "gfortran")]
+        Fortran,
+        #[serde(alias = "ifort", alias = "intel-fortran", alias = "intel_fortran")]
+        IntelFortran,
+        #[serde(alias = "crayftn", alias = "cray-fortran", alias = "cray_fortran")]
+        CrayFortran,
+    }
+
+    impl std::fmt::Display for CompilerType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let name = match self {
+                CompilerType::Gcc => "GCC",
+                CompilerType::Clang => "Clang",
+                CompilerType::Fortran => "Fortran",
+                CompilerType::IntelFortran => "Intel Fortran",
+                CompilerType::CrayFortran => "Cray Fortran",
+            };
+            write!(f, "{}", name)
+        }
     }
 
     /// Compiler flags configuration for add/remove operations.
@@ -442,15 +471,6 @@ pub mod validation {
                 });
             }
 
-            // Check if 'as' field is empty when present
-            if let Some(ref as_name) = config.as_ {
-                if as_name.trim().is_empty() {
-                    collector.add(ValidationError::EmptyString {
-                        field: "as".to_string(),
-                    });
-                }
-            }
-
             // Validate compiler flags if present
             if let Some(ref flags) = config.flags {
                 collector.add_result(CompilerFlags::validate(flags));
@@ -558,10 +578,10 @@ pub mod validation {
         }
 
         #[test]
-        fn test_validate_compiler_empty_as_field() {
+        fn test_validate_compiler_invalid_path() {
             let config = Compiler {
                 path: PathBuf::from("/nonexistent/compiler"),
-                as_: Some("".to_string()),
+                as_: Some(CompilerType::Gcc),
                 ignore: false,
                 flags: None,
             };
@@ -570,15 +590,10 @@ pub mod validation {
             assert!(result.is_err());
 
             match result.unwrap_err() {
-                ValidationError::Multiple { errors } => {
-                    assert!(errors.iter().any(
-                        |e| matches!(e, ValidationError::EmptyString { field } if field == "as")
-                    ));
-                    assert!(errors
-                        .iter()
-                        .any(|e| matches!(e, ValidationError::PathNotFound { .. })));
+                ValidationError::PathNotFound { .. } => {
+                    // Expected - path doesn't exist
                 }
-                _ => panic!("Expected multiple validation errors"),
+                _ => panic!("Expected PathNotFound validation error"),
             }
         }
 
@@ -752,9 +767,10 @@ pub mod loader {
 
     #[cfg(test)]
     mod test {
-        use super::super::validation::ValidationError;
+
         use super::super::*;
         use super::*;
+        use std::fs;
 
         #[test]
         fn test_wrapper_config() {
@@ -804,7 +820,7 @@ pub mod loader {
                 compilers: vec![
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/cc"),
-                        as_: Some("gcc".to_string()),
+                        as_: Some(CompilerType::Gcc),
                         ignore: false,
                         flags: None,
                     },
@@ -996,16 +1012,13 @@ pub mod loader {
 
         #[test]
         fn test_validation_error_on_invalid_config() {
-            use std::fs;
-            use tempfile::TempDir;
+            use tempfile;
 
-            // Create a temporary directory for testing
-            let temp_dir = TempDir::new().unwrap();
+            let temp_dir = tempfile::tempdir().unwrap();
             let config_file = temp_dir.path().join("bear.yml");
 
-            // Create a config with invalid paths that will fail validation
             let invalid_config = r#"
-            schema: 4.0
+            schema: "4.0"
 
             intercept:
                 mode: wrapper
@@ -1014,7 +1027,7 @@ pub mod loader {
 
             compilers:
               - path: /nonexistent/compiler
-                as: ""
+                as: "invalid_compiler_type"
                 flags:
                     add: [""]
                     remove: ["valid", ""]
@@ -1027,26 +1040,133 @@ pub mod loader {
             assert!(result.is_err());
 
             match result.unwrap_err() {
-                ConfigError::ValidationError { source, .. } => {
-                    // Verify we got validation errors
-                    match source {
-                        ValidationError::Multiple { errors } => {
-                            assert!(!errors.is_empty());
-                            // Should contain path not found and empty string errors
-                            let has_path_error = errors
-                                .iter()
-                                .any(|e| matches!(e, ValidationError::PathNotFound { .. }));
-                            let has_empty_string_error = errors
-                                .iter()
-                                .any(|e| matches!(e, ValidationError::EmptyString { .. }));
-                            assert!(has_path_error);
-                            assert!(has_empty_string_error);
-                        }
-                        _ => panic!("Expected multiple validation errors"),
-                    }
+                ConfigError::ParseError { source, .. } => {
+                    // Verify we got a parse error for invalid compiler type
+                    let error_msg = source.to_string();
+                    assert!(error_msg.contains("unknown variant"));
+                    assert!(error_msg.contains("invalid_compiler_type"));
                 }
-                other => panic!("Expected ValidationError, got: {:?}", other),
+                other => panic!(
+                    "Expected ParseError for invalid compiler type, got: {:?}",
+                    other
+                ),
             }
+        }
+
+        #[test]
+        fn test_compiler_type_serialization() {
+            fn assert_compiler_type_deserializes(json_str: &str, expected: CompilerType) {
+                use serde_json;
+
+                let result = serde_json::from_str::<CompilerType>(json_str).unwrap();
+                assert_eq!(result, expected);
+            }
+
+            // Test canonical names
+            assert_compiler_type_deserializes("\"gcc\"", CompilerType::Gcc);
+            assert_compiler_type_deserializes("\"clang\"", CompilerType::Clang);
+            assert_compiler_type_deserializes("\"fortran\"", CompilerType::Fortran);
+            assert_compiler_type_deserializes("\"intelfortran\"", CompilerType::IntelFortran);
+            assert_compiler_type_deserializes("\"crayfortran\"", CompilerType::CrayFortran);
+
+            // Test aliases for GCC
+            assert_compiler_type_deserializes("\"gnu\"", CompilerType::Gcc);
+
+            // Test aliases for Clang
+            assert_compiler_type_deserializes("\"llvm\"", CompilerType::Clang);
+
+            // Test aliases for Fortran
+            assert_compiler_type_deserializes("\"gfortran\"", CompilerType::Fortran);
+
+            // Test aliases for Intel Fortran
+            assert_compiler_type_deserializes("\"ifort\"", CompilerType::IntelFortran);
+            assert_compiler_type_deserializes("\"intel-fortran\"", CompilerType::IntelFortran);
+            assert_compiler_type_deserializes("\"intel_fortran\"", CompilerType::IntelFortran);
+
+            // Test aliases for Cray Fortran
+            assert_compiler_type_deserializes("\"crayftn\"", CompilerType::CrayFortran);
+            assert_compiler_type_deserializes("\"cray-fortran\"", CompilerType::CrayFortran);
+            assert_compiler_type_deserializes("\"cray_fortran\"", CompilerType::CrayFortran);
+        }
+
+        #[test]
+        fn test_compiler_config_with_type_hints() {
+            let temp_dir = tempfile::tempdir().unwrap();
+            let config_file = temp_dir.path().join("bear.yml");
+
+            // Create temporary compiler files for validation
+            let gcc_wrapper = temp_dir.path().join("custom-gcc-wrapper");
+            let clang_wrapper = temp_dir.path().join("custom-clang");
+            let fortran_wrapper = temp_dir.path().join("my-fortran");
+            let intel_wrapper = temp_dir.path().join("ifort-wrapper");
+            let cray_wrapper = temp_dir.path().join("ftn-wrapper");
+
+            fs::write(&gcc_wrapper, "#!/bin/bash\necho gcc wrapper").unwrap();
+            fs::write(&clang_wrapper, "#!/bin/bash\necho clang wrapper").unwrap();
+            fs::write(&fortran_wrapper, "#!/bin/bash\necho fortran wrapper").unwrap();
+            fs::write(&intel_wrapper, "#!/bin/bash\necho intel wrapper").unwrap();
+            fs::write(&cray_wrapper, "#!/bin/bash\necho cray wrapper").unwrap();
+
+            // Create wrapper executable and directory for validation
+            let wrapper_dir = temp_dir.path().join("wrapper");
+            std::fs::create_dir(&wrapper_dir).unwrap();
+            let wrapper_exe = wrapper_dir.join("wrapper");
+            fs::write(&wrapper_exe, "#!/bin/bash\necho wrapper").unwrap();
+
+            let config_with_hints = format!(
+                r#"
+                schema: "4.0"
+
+                intercept:
+                    mode: wrapper
+                    path: {}
+                    directory: {}
+
+                compilers:
+                  - path: {}
+                    as: "gcc"
+                  - path: {}
+                    as: "llvm"
+                  - path: {}
+                    as: "gfortran"
+                  - path: {}
+                    as: "intel-fortran"
+                  - path: {}
+                    as: "cray_fortran"
+                "#,
+                wrapper_exe.display(),
+                wrapper_dir.display(),
+                gcc_wrapper.display(),
+                clang_wrapper.display(),
+                fortran_wrapper.display(),
+                intel_wrapper.display(),
+                cray_wrapper.display()
+            );
+
+            fs::write(&config_file, config_with_hints).unwrap();
+
+            let result = Loader::from_file(&config_file);
+
+            assert!(result.is_ok());
+
+            let config = result.unwrap();
+            assert_eq!(config.compilers.len(), 5);
+
+            // Verify compiler type hints are correctly parsed
+            assert_eq!(config.compilers[0].as_, Some(CompilerType::Gcc));
+            assert_eq!(config.compilers[1].as_, Some(CompilerType::Clang));
+            assert_eq!(config.compilers[2].as_, Some(CompilerType::Fortran));
+            assert_eq!(config.compilers[3].as_, Some(CompilerType::IntelFortran));
+            assert_eq!(config.compilers[4].as_, Some(CompilerType::CrayFortran));
+        }
+
+        #[test]
+        fn test_compiler_type_display() {
+            assert_eq!(CompilerType::Gcc.to_string(), "GCC");
+            assert_eq!(CompilerType::Clang.to_string(), "Clang");
+            assert_eq!(CompilerType::Fortran.to_string(), "Fortran");
+            assert_eq!(CompilerType::IntelFortran.to_string(), "Intel Fortran");
+            assert_eq!(CompilerType::CrayFortran.to_string(), "Cray Fortran");
         }
     }
 }

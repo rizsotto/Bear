@@ -10,10 +10,12 @@ pub mod clang;
 pub mod compiler_recognition;
 pub mod gcc;
 
+use super::combinators::OutputLogger;
+use crate::config::CompilerType;
 use crate::intercept::Execution;
 use crate::semantic::{Command, Interpreter};
 use clang::ClangInterpreter;
-use compiler_recognition::{CompilerRecognizer, CompilerType};
+use compiler_recognition::CompilerRecognizer;
 use gcc::GccInterpreter;
 
 /// A meta-interpreter that recognizes compiler types and delegates parsing to specific interpreters.
@@ -27,28 +29,18 @@ use gcc::GccInterpreter;
 pub struct CompilerInterpreter {
     /// Unified compiler recognizer for identifying compiler types
     recognizer: CompilerRecognizer,
-    /// GCC-specific argument parser
-    gcc_interpreter: GccInterpreter,
-    /// Clang-specific argument parser
-    clang_interpreter: ClangInterpreter,
+    /// GCC-specific argument parser with logging
+    gcc_interpreter: OutputLogger<GccInterpreter>,
+    /// Clang-specific argument parser with logging
+    clang_interpreter: OutputLogger<ClangInterpreter>,
 }
 
 impl CompilerInterpreter {
-    /// Creates a new compiler interpreter with default settings.
-    pub fn new() -> Self {
+    /// Creates a new compiler interpreter with configuration-based compiler hints.
+    pub fn new_with_config(compilers: &[crate::config::Compiler]) -> Self {
         Self {
-            recognizer: CompilerRecognizer::new(),
-            gcc_interpreter: GccInterpreter::new(),
-            clang_interpreter: ClangInterpreter::new(),
-        }
-    }
-
-    /// Creates a compiler interpreter with a custom recognizer.
-    pub fn with_recognizer(recognizer: CompilerRecognizer) -> Self {
-        Self {
-            recognizer,
-            gcc_interpreter: GccInterpreter::new(),
-            clang_interpreter: ClangInterpreter::new(),
+            recognizer: CompilerRecognizer::new_with_config(compilers),
+            ..Default::default()
         }
     }
 
@@ -85,7 +77,11 @@ impl CompilerInterpreter {
 
 impl Default for CompilerInterpreter {
     fn default() -> Self {
-        Self::new()
+        Self {
+            recognizer: CompilerRecognizer::default(),
+            gcc_interpreter: OutputLogger::new(GccInterpreter::default(), "gcc_compiler"),
+            clang_interpreter: OutputLogger::new(ClangInterpreter::default(), "clang_compiler"),
+        }
     }
 }
 
@@ -98,8 +94,11 @@ impl Interpreter for CompilerInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Compiler, CompilerType};
+    use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
+    use crate::semantic::Interpreter;
     use std::collections::HashMap;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     fn create_execution(executable: &str, args: Vec<&str>, working_dir: &str) -> Execution {
         Execution {
@@ -112,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_gcc_recognition_and_delegation() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         // Test various GCC executable names
         let gcc_executables = vec![
@@ -146,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_clang_recognition_and_delegation() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         // Test various Clang executable names
         let clang_executables = vec![
@@ -178,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_fortran_recognition_and_delegation() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         // Test various Fortran executable names
         let fortran_executables = vec![
@@ -211,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_intel_fortran_recognition() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         let intel_executables = vec!["ifort", "ifx"];
 
@@ -229,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_cray_fortran_recognition() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         let cray_executables = vec!["crayftn", "ftn"];
 
@@ -247,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_unrecognized_compiler() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         let unknown_executables = vec!["rustc", "javac", "make", "cmake", "unknown-compiler"];
 
@@ -265,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_delegation_preserves_execution_details() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         let exec = create_execution(
             "/custom/path/gcc-11",
@@ -299,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_path_independence() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         // Same compiler name with different paths should be recognized identically
         let paths = vec![
@@ -324,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_compiler_type_delegation_separation() {
-        let interpreter = CompilerInterpreter::new();
+        let interpreter = CompilerInterpreter::default();
 
         // Test that GCC and Clang are handled by different interpreters
         // This is more of a design verification than functional test
@@ -343,5 +342,244 @@ mod tests {
         );
 
         // The actual parsing differences would be tested in the specific interpreter tests
+    }
+
+    #[test]
+    fn test_end_to_end_config_based_compiler_hints() {
+        // Simulate a configuration where users have specified custom compiler wrappers
+        // with explicit type hints that override automatic detection
+        let compilers = vec![
+            Compiler {
+                path: PathBuf::from("custom-gcc-wrapper"),
+                as_: Some(CompilerType::Gcc),
+                ignore: false,
+                flags: None,
+            },
+            Compiler {
+                path: PathBuf::from("weird-clang-binary"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+            Compiler {
+                path: PathBuf::from("intel-fortran-custom"),
+                as_: Some(CompilerType::IntelFortran),
+                ignore: false,
+                flags: None,
+            },
+            // This one has no hint, should use auto-detection
+            Compiler {
+                path: PathBuf::from("gcc"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        // Create interpreter with configuration-based hints
+        let interpreter = CompilerInterpreter::new_with_config(&compilers);
+
+        // Test 1: Custom GCC wrapper should be recognized as GCC due to hint
+        let gcc_execution = create_execution(
+            "custom-gcc-wrapper",
+            vec!["custom-gcc-wrapper", "-c", "-o", "output.o", "input.c"],
+            "/project",
+        );
+        let gcc_result = interpreter.recognize(&gcc_execution);
+        assert!(
+            gcc_result.is_some(),
+            "Custom GCC wrapper should be recognized due to configuration hint"
+        );
+
+        // Test 2: Weird Clang binary should be recognized as Clang due to hint
+        let clang_execution = create_execution(
+            "weird-clang-binary",
+            vec!["weird-clang-binary", "-c", "-o", "output.o", "input.cpp"],
+            "/project",
+        );
+        let clang_result = interpreter.recognize(&clang_execution);
+        assert!(
+            clang_result.is_some(),
+            "Weird Clang binary should be recognized due to configuration hint"
+        );
+
+        // Test 3: Intel Fortran custom should be recognized due to hint
+        let intel_execution = create_execution(
+            "intel-fortran-custom",
+            vec!["intel-fortran-custom", "-c", "-o", "output.o", "input.f90"],
+            "/project",
+        );
+        let intel_result = interpreter.recognize(&intel_execution);
+        assert!(
+            intel_result.is_some(),
+            "Intel Fortran custom should be recognized due to configuration hint"
+        );
+
+        // Test 4: Regular gcc should still work with auto-detection (no hint configured)
+        let regular_gcc_execution = create_execution(
+            "gcc",
+            vec!["gcc", "-c", "-o", "output.o", "input.c"],
+            "/project",
+        );
+        let regular_gcc_result = interpreter.recognize(&regular_gcc_execution);
+        assert!(
+            regular_gcc_result.is_some(),
+            "Regular GCC should be auto-detected even without configuration hint"
+        );
+
+        // Test 5: Unknown compiler should not be recognized
+        let unknown_execution = create_execution(
+            "unknown-compiler",
+            vec!["unknown-compiler", "input.file"],
+            "/project",
+        );
+        let unknown_result = interpreter.recognize(&unknown_execution);
+        assert!(
+            unknown_result.is_none(),
+            "Unknown compiler should not be recognized"
+        );
+    }
+
+    #[test]
+    fn test_recognizer_hint_priority_over_regex() {
+        // Test that configuration hints take priority over regex-based detection
+        let compilers = vec![
+            // This would normally be detected as GCC by regex, but we force it to be Clang
+            Compiler {
+                path: PathBuf::from("gcc"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+
+        // The hint should override regex detection
+        assert_eq!(
+            recognizer.recognize(Path::new("gcc")),
+            Some(CompilerType::Clang),
+            "Configuration hint should override regex-based detection"
+        );
+    }
+
+    #[test]
+    fn test_path_canonicalization_in_hints() {
+        // Test that path canonicalization works correctly for hints
+        // This is important for matching paths that might be specified differently
+        // in config vs. what appears in execution
+        let compilers = vec![Compiler {
+            path: PathBuf::from("./custom-compiler"),
+            as_: Some(CompilerType::Gcc),
+            ignore: false,
+            flags: None,
+        }];
+
+        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+
+        // Should have a hint (even though canonicalization might change the path)
+        assert_eq!(
+            recognizer.recognize(Path::new("./custom-compiler")),
+            Some(CompilerType::Gcc)
+        );
+    }
+
+    #[test]
+    fn test_mixed_configuration_scenario() {
+        // Test a realistic scenario with a mix of hints and auto-detection
+        let compilers = vec![
+            // Build system uses custom wrapper for cross-compilation
+            Compiler {
+                path: PathBuf::from("arm-linux-gnueabi-gcc-wrapper"),
+                as_: Some(CompilerType::Gcc),
+                ignore: false,
+                flags: None,
+            },
+            // Custom Clang wrapper that doesn't follow naming conventions
+            Compiler {
+                path: PathBuf::from("project-clang"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+            // Standard compilers with no hints - should auto-detect
+            Compiler {
+                path: PathBuf::from("clang-15"),
+                as_: None, // Should auto-detect as Clang
+                ignore: false,
+                flags: None,
+            },
+            Compiler {
+                path: PathBuf::from("gfortran"),
+                as_: None, // Should auto-detect as Fortran
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        let interpreter = CompilerInterpreter::new_with_config(&compilers);
+
+        // Test the cross-compilation wrapper (with hint)
+        let cross_gcc = create_execution(
+            "arm-linux-gnueabi-gcc-wrapper",
+            vec!["arm-linux-gnueabi-gcc-wrapper", "-c", "test.c"],
+            "/project",
+        );
+        assert!(interpreter.recognize(&cross_gcc).is_some());
+
+        // Test the custom Clang wrapper (with hint)
+        let custom_clang = create_execution(
+            "project-clang",
+            vec!["project-clang", "-c", "test.cpp"],
+            "/project",
+        );
+        assert!(interpreter.recognize(&custom_clang).is_some());
+
+        // Test standard compilers (auto-detection)
+        let standard_clang =
+            create_execution("clang-15", vec!["clang-15", "-c", "test.c"], "/project");
+        assert!(interpreter.recognize(&standard_clang).is_some());
+
+        let standard_fortran =
+            create_execution("gfortran", vec!["gfortran", "-c", "test.f90"], "/project");
+        assert!(interpreter.recognize(&standard_fortran).is_some());
+    }
+
+    #[test]
+    fn test_hint_validation_warnings() {
+        // Test the hint validation functionality that can be used to warn users
+        // about potential misconfigurations
+        let compilers = vec![
+            // Correctly hinted compiler
+            Compiler {
+                path: PathBuf::from("gcc"),
+                as_: Some(CompilerType::Gcc),
+                ignore: false,
+                flags: None,
+            },
+            // Incorrectly hinted compiler (would be detected as GCC but hinted as Clang)
+            Compiler {
+                path: PathBuf::from("g++"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+
+        // Validation should pass for correctly hinted compiler
+        assert_eq!(
+            recognizer.recognize(Path::new("gcc")),
+            Some(CompilerType::Gcc),
+            "Validation should pass when hint matches auto-detection"
+        );
+
+        // But the hint should still take priority in actual recognition
+        assert_eq!(
+            recognizer.recognize(Path::new("g++")),
+            Some(CompilerType::Clang),
+            "Hint should take priority even when it conflicts with auto-detection"
+        );
     }
 }

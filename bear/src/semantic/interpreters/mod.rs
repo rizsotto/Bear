@@ -5,7 +5,7 @@
 //! interpreter chain to include or exclude specific compilers.
 
 mod combinators;
-pub mod compilers;
+mod compilers;
 mod ignore;
 mod matchers;
 
@@ -51,8 +51,8 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
     }
 
     // Add compiler interpreter that handles recognition and delegation
-    let compiler_tool = OutputLogger::new(CompilerInterpreter::new(), "compiler_to_recognize");
-    interpreters.push(Box::new(compiler_tool));
+    let tool = CompilerInterpreter::new_with_config(&config.compilers);
+    interpreters.push(Box::new(tool));
 
     Ok(InputLogger::new(Any::new(interpreters)))
 }
