@@ -9,10 +9,10 @@ pub mod compilers;
 mod ignore;
 mod matchers;
 
-use super::{Command, Interpreter};
+use super::Interpreter;
 use crate::config;
-use crate::intercept::Execution;
-use combinators::Any;
+
+use combinators::{Any, InputLogger, OutputLogger};
 use compilers::CompilerInterpreter;
 use ignore::IgnoreByPath;
 use std::path::PathBuf;
@@ -66,48 +66,14 @@ fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
         .collect()
 }
 
-struct InputLogger<T: Interpreter> {
-    inner: T,
-}
-
-impl<T: Interpreter> InputLogger<T> {
-    pub fn new(inner: T) -> Self {
-        Self { inner }
-    }
-}
-
-impl<T: Interpreter> Interpreter for InputLogger<T> {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        log::debug!("Recognizing execution: {execution:?}");
-        self.inner.recognize(execution)
-    }
-}
-
-struct OutputLogger<T: Interpreter> {
-    inner: T,
-    name: &'static str,
-}
-
-impl<T: Interpreter> OutputLogger<T> {
-    pub fn new(inner: T, name: &'static str) -> Self {
-        Self { inner, name }
-    }
-}
-
-impl<T: Interpreter> Interpreter for OutputLogger<T> {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        let result = self.inner.recognize(execution);
-        log::debug!("{:20}: {result:?}", self.name);
-        result
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
 
     use super::*;
     use crate::config;
+    use crate::intercept::Execution;
+    use crate::semantic::Command;
 
     #[test]
     fn test_create_interpreter_with_default_config() {
@@ -210,49 +176,5 @@ mod test {
         let excluded = compilers_to_exclude(&config);
         assert_eq!(excluded.len(), 1);
         assert_eq!(excluded[0], PathBuf::from("/usr/bin/gcc"));
-    }
-
-    #[test]
-    fn test_input_logger_passes_through_results() {
-        let execution = Execution::from_strings(
-            "/usr/bin/gcc",
-            vec!["gcc", "-c", "main.c"],
-            "/home/user",
-            HashMap::new(),
-        );
-
-        // Create a simple mock interpreter that always returns None
-        struct MockInterpreter;
-        impl Interpreter for MockInterpreter {
-            fn recognize(&self, _execution: &Execution) -> Option<Command> {
-                None
-            }
-        }
-
-        let logger = InputLogger::new(MockInterpreter);
-        let result = logger.recognize(&execution);
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_output_logger_passes_through_results() {
-        let execution = Execution::from_strings(
-            "/usr/bin/gcc",
-            vec!["gcc", "-c", "main.c"],
-            "/home/user",
-            HashMap::new(),
-        );
-
-        // Create a simple mock interpreter that always returns None
-        struct MockInterpreter;
-        impl Interpreter for MockInterpreter {
-            fn recognize(&self, _execution: &Execution) -> Option<Command> {
-                None
-            }
-        }
-
-        let logger = OutputLogger::new(MockInterpreter, "test");
-        let result = logger.recognize(&execution);
-        assert!(result.is_none());
     }
 }

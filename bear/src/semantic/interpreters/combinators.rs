@@ -29,6 +29,44 @@ impl Interpreter for Any {
     }
 }
 
+/// A combinator that logs the input execution before delegating to the inner interpreter.
+pub(super) struct InputLogger<T: Interpreter> {
+    inner: T,
+}
+
+impl<T: Interpreter> InputLogger<T> {
+    pub(super) fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T: Interpreter> Interpreter for InputLogger<T> {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        log::debug!("Recognizing execution: {execution:?}");
+        self.inner.recognize(execution)
+    }
+}
+
+/// A combinator that logs the output result after delegating to the inner interpreter.
+pub(super) struct OutputLogger<T: Interpreter> {
+    inner: T,
+    name: &'static str,
+}
+
+impl<T: Interpreter> OutputLogger<T> {
+    pub(super) fn new(inner: T, name: &'static str) -> Self {
+        Self { inner, name }
+    }
+}
+
+impl<T: Interpreter> Interpreter for OutputLogger<T> {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        let result = self.inner.recognize(execution);
+        log::debug!("{:20}: {result:?}", self.name);
+        result
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -96,5 +134,49 @@ mod test {
 
     fn command_fixture() -> Command {
         Command::Compiler(CompilerCommand::new(PathBuf::new(), PathBuf::new(), vec![]))
+    }
+
+    #[test]
+    fn test_input_logger_passes_through_results() {
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        // Create a simple mock interpreter that always returns None
+        struct MockInterpreter;
+        impl Interpreter for MockInterpreter {
+            fn recognize(&self, _execution: &Execution) -> Option<Command> {
+                None
+            }
+        }
+
+        let logger = InputLogger::new(MockInterpreter);
+        let result = logger.recognize(&execution);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_output_logger_passes_through_results() {
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        // Create a simple mock interpreter that always returns None
+        struct MockInterpreter;
+        impl Interpreter for MockInterpreter {
+            fn recognize(&self, _execution: &Execution) -> Option<Command> {
+                None
+            }
+        }
+
+        let logger = OutputLogger::new(MockInterpreter, "test");
+        let result = logger.recognize(&execution);
+        assert!(result.is_none());
     }
 }
