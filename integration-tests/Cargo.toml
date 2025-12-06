@@ -9,6 +9,7 @@ edition.workspace = true
 publish = false
 
 [features]
+# Feature to enable integration testing with locally built binaries from target directory
 allow-integration-tests = []
 
 [dev-dependencies]
