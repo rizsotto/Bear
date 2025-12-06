@@ -22,8 +22,6 @@ use thiserror::Error;
 pub enum InterpreterConfigError {
     // #[error("Compiler filter configuration error: {0}")]
     // CompilerFilter(#[from] CompilerFilterConfigurationError),
-    // #[error("Source filter configuration error: {0}")]
-    // SourceFilter(#[from] SourceFilterConfigurationError),
 }
 
 /// Creates an interpreter to recognize the compiler calls.
@@ -104,69 +102,157 @@ impl<T: Interpreter> Interpreter for OutputLogger<T> {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use std::collections::HashMap;
-//
-//     use super::*;
-//     use crate::config;
-//     use crate::intercept::{execution, Execution};
-//
-//     #[test]
-//     fn test_create_interpreter_with_default_config() {
-//         let config = config::Main::default();
-//
-//         let interpreter = create(&config);
-//
-//         let result = interpreter.recognize(&EXECUTION);
-//         assert!(matches!(result, Some(_)));
-//     }
-//
-//     #[test]
-//     fn test_create_interpreter_with_compilers_to_include() {
-//         let config = config::Main {
-//             intercept: config::Intercept::Wrapper {
-//                 executables: vec!["/usr/bin/cc".into()],
-//                 path: "/usr/libexec/bear".into(),
-//                 directory: "/tmp".into(),
-//             },
-//             ..Default::default()
-//         };
-//
-//         let interpreter = create(&config);
-//
-//         let result = interpreter.recognize(&EXECUTION);
-//         assert!(matches!(result, Some(_)));
-//     }
-//
-//     #[test]
-//     fn test_create_interpreter_with_compilers_to_exclude() {
-//         let config = config::Main {
-//             output: config::Output::Clang {
-//                 compilers: vec![config::Compiler {
-//                     path: PathBuf::from("/usr/bin/cc"),
-//                     ignore: config::IgnoreOrConsider::Always,
-//                     arguments: config::Arguments::default(),
-//                 }],
-//                 sources: config::SourceFilter::default(),
-//                 duplicates: config::DuplicateFilter::default(),
-//                 format: config::Format::default(),
-//             },
-//             ..Default::default()
-//         };
-//
-//         let interpreter = create(&config);
-//
-//         let result = interpreter.recognize(&EXECUTION);
-//         assert!(matches!(result, Recognition::Ignored(_)));
-//     }
-//
-//     static EXECUTION: std::sync::LazyLock<Execution> = std::sync::LazyLock::new(|| {
-//         execution(
-//             "/usr/bin/cc",
-//             vec!["cc", "-c", "-Wall", "main.c"],
-//             "/home/user",
-//             HashMap::new(),
-//         )
-//     });
-// }
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::config;
+
+    #[test]
+    fn test_create_interpreter_with_default_config() {
+        let config = config::Main::default();
+        let interpreter = create(&config);
+
+        // Test that the interpreter can be created without errors
+        assert!(interpreter.is_ok());
+    }
+
+    #[test]
+    fn test_create_interpreter_recognizes_compiler() {
+        let config = config::Main::default();
+        let interpreter = create(&config).unwrap();
+
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "-Wall", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&execution);
+        assert!(result.is_some());
+        match result.unwrap() {
+            Command::Compiler(_) => (), // Expected
+            Command::Ignored(_) => panic!("Expected compiler command, got ignored"),
+        }
+    }
+
+    #[test]
+    fn test_create_interpreter_ignores_coreutils() {
+        let config = config::Main::default();
+        let interpreter = create(&config).unwrap();
+
+        let execution = Execution::from_strings(
+            "/usr/bin/ls",
+            vec!["ls", "-la"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&execution);
+        assert!(result.is_some());
+        match result.unwrap() {
+            Command::Ignored(_) => (), // Expected
+            Command::Compiler(_) => panic!("Expected ignored command, got compiler"),
+        }
+    }
+
+    #[test]
+    fn test_create_interpreter_with_compilers_to_exclude() {
+        let config = config::Main {
+            compilers: vec![config::Compiler {
+                path: PathBuf::from("/usr/bin/gcc"),
+                as_: None,
+                ignore: true,
+                flags: None,
+            }],
+            ..Default::default()
+        };
+
+        let interpreter = create(&config).unwrap();
+
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&execution);
+        assert!(result.is_some());
+        match result.unwrap() {
+            Command::Ignored(_) => (), // Expected - gcc should be ignored
+            Command::Compiler(_) => panic!("Expected ignored command, got compiler"),
+        }
+    }
+
+    #[test]
+    fn test_compilers_to_exclude_function() {
+        let config = config::Main {
+            compilers: vec![
+                config::Compiler {
+                    path: PathBuf::from("/usr/bin/gcc"),
+                    as_: None,
+                    ignore: true,
+                    flags: None,
+                },
+                config::Compiler {
+                    path: PathBuf::from("/usr/bin/clang"),
+                    as_: None,
+                    ignore: false,
+                    flags: None,
+                },
+            ],
+            ..Default::default()
+        };
+
+        let excluded = compilers_to_exclude(&config);
+        assert_eq!(excluded.len(), 1);
+        assert_eq!(excluded[0], PathBuf::from("/usr/bin/gcc"));
+    }
+
+    #[test]
+    fn test_input_logger_passes_through_results() {
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        // Create a simple mock interpreter that always returns None
+        struct MockInterpreter;
+        impl Interpreter for MockInterpreter {
+            fn recognize(&self, _execution: &Execution) -> Option<Command> {
+                None
+            }
+        }
+
+        let logger = InputLogger::new(MockInterpreter);
+        let result = logger.recognize(&execution);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_output_logger_passes_through_results() {
+        let execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "main.c"],
+            "/home/user",
+            HashMap::new(),
+        );
+
+        // Create a simple mock interpreter that always returns None
+        struct MockInterpreter;
+        impl Interpreter for MockInterpreter {
+            fn recognize(&self, _execution: &Execution) -> Option<Command> {
+                None
+            }
+        }
+
+        let logger = OutputLogger::new(MockInterpreter, "test");
+        let result = logger.recognize(&execution);
+        assert!(result.is_none());
+    }
+}
