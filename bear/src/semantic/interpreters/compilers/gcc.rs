@@ -51,10 +51,36 @@ impl GccInterpreter {
             matcher: FlagAnalyzer::new(&GCC_FLAGS),
         }
     }
+
+    /// Check if the execution represents a GCC internal executable that should be ignored.
+    fn is_gcc_internal_executable(execution: &Execution) -> bool {
+        if let Some(filename) = execution.executable.file_name() {
+            if let Some(filename_str) = filename.to_str() {
+                return GCC_INTERNAL_EXECUTABLES.contains(&filename_str);
+            }
+        }
+        false
+    }
 }
+
+/// GCC internal executables that should be ignored
+/// These are implementation details of GCC's compilation process
+static GCC_INTERNAL_EXECUTABLES: [&str; 6] = [
+    "cc1",        // C compiler proper
+    "cc1plus",    // C++ compiler proper
+    "cc1obj",     // Objective-C compiler proper
+    "cc1objplus", // Objective-C++ compiler proper
+    "collect2",   // Linker wrapper
+    "lto1",       // Link-time optimization pass
+];
 
 impl Interpreter for GccInterpreter {
     fn recognize(&self, execution: &Execution) -> Option<Command> {
+        // Check if this is a GCC internal executable that should be ignored
+        if Self::is_gcc_internal_executable(execution) {
+            return Some(Command::Ignored("GCC internal executable"));
+        }
+
         // Parse both command-line arguments and environment variables
         let annotated_args = parse_arguments_and_environment(&self.matcher, execution);
 
@@ -1387,6 +1413,63 @@ mod tests {
                     ArgumentKind::Other(Some(CompilerPass::Preprocessing))
                 );
             }
+        }
+    }
+
+    #[test]
+    fn test_gcc_internal_executables_are_ignored() {
+        let interpreter = GccInterpreter::new();
+
+        // Test cc1 (C compiler proper)
+        let cc1_execution = create_execution(
+            "/usr/libexec/gcc/x86_64-linux-gnu/11/cc1",
+            vec!["cc1", "-quiet", "test.c"],
+            "/home/user",
+        );
+
+        if let Some(Command::Ignored(reason)) = interpreter.recognize(&cc1_execution) {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for cc1");
+        }
+
+        // Test cc1plus (C++ compiler proper)
+        let cc1plus_execution = create_execution(
+            "/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus",
+            vec!["cc1plus", "-quiet", "test.cpp"],
+            "/home/user",
+        );
+
+        if let Some(Command::Ignored(reason)) = interpreter.recognize(&cc1plus_execution) {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for cc1plus");
+        }
+
+        // Test collect2 (linker wrapper)
+        let collect2_execution = create_execution(
+            "/usr/libexec/gcc/x86_64-linux-gnu/11/collect2",
+            vec!["collect2", "-o", "program", "main.o"],
+            "/home/user",
+        );
+
+        if let Some(Command::Ignored(reason)) = interpreter.recognize(&collect2_execution) {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for collect2");
+        }
+
+        // Test that regular gcc commands are still recognized as compilers
+        let gcc_execution = create_execution(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "-O2", "main.c"],
+            "/home/user",
+        );
+
+        if let Some(Command::Compiler(_)) = interpreter.recognize(&gcc_execution) {
+            // This is expected
+        } else {
+            panic!("Expected compiler command for regular gcc");
         }
     }
 }

@@ -50,10 +50,22 @@ impl ClangInterpreter {
             matcher: FlagAnalyzer::new(&CLANG_FLAGS),
         }
     }
+
+    /// Checks if the execution is an internal clang -cc1 frontend invocation.
+    /// These are internal compiler calls that happen after the user-facing command.
+    fn is_cc1_invocation(execution: &Execution) -> bool {
+        execution.arguments.iter().any(|arg| arg == "-cc1")
+    }
 }
 
 impl Interpreter for ClangInterpreter {
     fn recognize(&self, execution: &Execution) -> Option<Command> {
+        // Skip internal clang -cc1 invocations (clang's internal frontend)
+        // These are internal compiler calls that happen after the user-facing command
+        if Self::is_cc1_invocation(execution) {
+            return Some(Command::Ignored("clang internal invocation"));
+        }
+
         // Parse both command-line arguments and environment variables
         let annotated_args = parse_arguments_and_environment(&self.matcher, execution);
 
@@ -1095,6 +1107,98 @@ mod tests {
             assert!(args_as_strings.contains(&"-isystem".to_string()));
         } else {
             panic!("Expected compiler command");
+        }
+    }
+
+    #[test]
+    fn test_clang_cc1_invocation_ignored() {
+        let interpreter = ClangInterpreter::new();
+
+        // Test the user-facing clang command (should be recognized)
+        let user_execution = create_execution(
+            "clang++",
+            vec![
+                "clang++",
+                "-c",
+                "-std=c++23",
+                "-o",
+                "hello-world",
+                "hello-world.cpp",
+            ],
+            "/home/user/project",
+        );
+
+        if let Some(Command::Compiler(cmd)) = interpreter.recognize(&user_execution) {
+            assert_eq!(cmd.arguments.len(), 5);
+            assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+        } else {
+            panic!("Expected compiler command for user-facing invocation");
+        }
+
+        // Test the internal -cc1 clang command (should be ignored)
+        let cc1_execution = create_execution(
+            "clang++",
+            vec![
+                "clang++",
+                "-cc1",
+                "-triple",
+                "x86_64-pc-linux-gnu",
+                "-emit-obj",
+                "-dumpdir",
+                "hello-world-",
+                "-disable-free",
+                "-clear-ast-before-backend",
+                "-disable-llvm-verifier",
+                "-discard-value-names",
+                "-main-file-name",
+                "hello-world.cpp",
+                "-mrelocation-model",
+                "pic",
+                "-pic-level",
+                "2",
+                "-pic-is-pie",
+                "-mframe-pointer=all",
+                "-fmath-errno",
+                "-ffp-contract=on",
+                "-fno-rounding-math",
+                "-mconstructor-aliases",
+                "-funwind-tables=2",
+                "-target-cpu",
+                "x86-64",
+                "-tune-cpu",
+                "generic",
+                "-debugger-tuning=gdb",
+                "-fdebug-compilation-dir=/home/user/project",
+                "-fcoverage-compilation-dir=/home/user/project",
+                "-resource-dir",
+                "/usr/lib/clang/20",
+                "-std=c++23",
+                "-fdeprecated-macro",
+                "-ferror-limit",
+                "19",
+                "-stack-protector",
+                "2",
+                "-fgnuc-version=4.2.1",
+                "-fno-implicit-modules",
+                "-fskip-odr-check-in-gmf",
+                "-fcxx-exceptions",
+                "-fexceptions",
+                "-fcolor-diagnostics",
+                "-faddrsig",
+                "-D__GCC_HAVE_DWARF2_CFI_ASM=1",
+                "-x",
+                "c++",
+                "-o",
+                "/tmp/hello-world-bd186e.o",
+                "hello-world.cpp",
+            ],
+            "/home/user/project",
+        );
+
+        if let Some(Command::Ignored(reason)) = interpreter.recognize(&cc1_execution) {
+            assert_eq!(reason, "clang internal invocation");
+        } else {
+            panic!("Expected ignored command for -cc1 invocation");
         }
     }
 }

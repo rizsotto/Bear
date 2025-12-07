@@ -322,6 +322,65 @@ mod tests {
     }
 
     #[test]
+    fn test_gcc_internal_executable_end_to_end() {
+        let interpreter = CompilerInterpreter::new_with_config(&[]);
+
+        // Test that cc1 is recognized and routed to GccInterpreter, then ignored
+        let cc1_execution = Execution::from_strings(
+            "/usr/libexec/gcc/x86_64-linux-gnu/11/cc1",
+            vec!["cc1", "-quiet", "test.c"],
+            "/home/user",
+            std::collections::HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&cc1_execution);
+        assert!(result.is_some());
+
+        if let Some(Command::Ignored(reason)) = result {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for cc1, got: {:?}", result);
+        }
+
+        // Test that cc1plus is recognized and routed to GccInterpreter, then ignored
+        let cc1plus_execution = Execution::from_strings(
+            "/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus",
+            vec!["cc1plus", "-quiet", "test.cpp"],
+            "/home/user",
+            std::collections::HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&cc1plus_execution);
+        assert!(result.is_some());
+
+        if let Some(Command::Ignored(reason)) = result {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for cc1plus, got: {:?}", result);
+        }
+
+        // Test that regular gcc commands still work normally
+        let gcc_execution = Execution::from_strings(
+            "/usr/bin/gcc",
+            vec!["gcc", "-c", "-O2", "main.c"],
+            "/home/user",
+            std::collections::HashMap::new(),
+        );
+
+        let result = interpreter.recognize(&gcc_execution);
+        assert!(result.is_some());
+
+        if let Some(Command::Compiler(_)) = result {
+            // This is expected - regular gcc commands should be processed as compiler commands
+        } else {
+            panic!(
+                "Expected compiler command for regular gcc, got: {:?}",
+                result
+            );
+        }
+    }
+
+    #[test]
     fn test_compiler_type_delegation_separation() {
         let interpreter = CompilerInterpreter::default();
 

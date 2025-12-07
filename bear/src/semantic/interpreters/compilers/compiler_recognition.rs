@@ -52,6 +52,13 @@ impl CompilerRecognizer {
         let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?$")
             .expect("Invalid GCC regex pattern");
 
+        // GCC internal executables pattern: matches GCC's internal compiler phases
+        // These are implementation details of GCC's compilation process that should be
+        // routed to GccInterpreter for proper handling (typically to be ignored).
+        // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
+        let gcc_internal_pattern = Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)$")
+            .expect("Invalid GCC internal regex pattern");
+
         // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
         let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
             .expect("Invalid Clang regex pattern");
@@ -71,6 +78,7 @@ impl CompilerRecognizer {
 
         vec![
             (CompilerType::Gcc, gcc_pattern),
+            (CompilerType::Gcc, gcc_internal_pattern),
             (CompilerType::Clang, clang_pattern),
             (CompilerType::Fortran, fortran_pattern),
             (CompilerType::IntelFortran, intel_fortran_pattern),
@@ -525,5 +533,44 @@ mod tests {
             recognizer_new.recognize(path("unknown")),
             recognizer_empty_config.recognize(path("unknown"))
         );
+    }
+
+    #[test]
+    fn test_gcc_internal_executables_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        // Test that GCC internal executables are recognized as GCC type
+        assert_eq!(recognizer.recognize(path("cc1")), Some(CompilerType::Gcc));
+        assert_eq!(
+            recognizer.recognize(path("cc1plus")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("cc1obj")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("cc1objplus")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("collect2")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(recognizer.recognize(path("lto1")), Some(CompilerType::Gcc));
+
+        // Test with full paths
+        assert_eq!(
+            recognizer.recognize(path("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus")),
+            Some(CompilerType::Gcc)
+        );
+
+        // Test that non-GCC internal executables are not matched by this pattern
+        assert_eq!(recognizer.recognize(path("cc1foo")), None);
+        assert_eq!(recognizer.recognize(path("foo-cc1")), None);
     }
 }
