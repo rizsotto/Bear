@@ -927,16 +927,19 @@ pub mod validation {
 
             #[cfg(unix)]
             {
+                // On Unix, only forward slash paths match the forward slash rule
                 assert!(!filter.should_include(std::path::Path::new("src/lib/utils.c")));
+                // Backslash paths don't match on Unix - default include
                 assert!(filter.should_include(std::path::Path::new("src\\lib\\utils.c")));
-                // default include - wrong separator
             }
 
             #[cfg(windows)]
             {
+                // On Windows, both separators are normalized and should match the rule
                 assert!(!filter.should_include(std::path::Path::new("src\\lib\\utils.c")));
-                assert!(filter.should_include(std::path::Path::new("src/lib/utils.c")));
-                // default include - wrong separator
+                assert!(!filter.should_include(std::path::Path::new("src/lib/utils.c")));
+                // Test a path that doesn't match the rule
+                assert!(filter.should_include(std::path::Path::new("other/path/utils.c")));
             }
         }
 

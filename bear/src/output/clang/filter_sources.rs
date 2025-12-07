@@ -322,16 +322,19 @@ mod tests {
 
         #[cfg(unix)]
         {
+            // On Unix, only forward slash paths match the forward slash rule
             assert!(!filter.should_include(&create_test_entry("src/lib/utils.c", "/project")));
+            // Backslash paths don't match on Unix - default include
             assert!(filter.should_include(&create_test_entry("src\\lib\\utils.c", "/project")));
-            // default include - wrong separator
         }
 
         #[cfg(windows)]
         {
+            // On Windows, both separators are normalized and should match the rule
             assert!(!filter.should_include(&create_test_entry("src\\lib\\utils.c", "/project")));
-            assert!(filter.should_include(&create_test_entry("src/lib/utils.c", "/project")));
-            // default include - wrong separator
+            assert!(!filter.should_include(&create_test_entry("src/lib/utils.c", "/project")));
+            // Test a path that doesn't match the rule
+            assert!(filter.should_include(&create_test_entry("other/path/utils.c", "/project")));
         }
     }
 
