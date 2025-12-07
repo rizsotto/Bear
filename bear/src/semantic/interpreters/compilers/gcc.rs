@@ -65,7 +65,7 @@ impl GccInterpreter {
 
 /// GCC internal executables that should be ignored
 /// These are implementation details of GCC's compilation process
-static GCC_INTERNAL_EXECUTABLES: [&str; 6] = [
+const GCC_INTERNAL_EXECUTABLES: [&str; 6] = [
     "cc1",        // C compiler proper
     "cc1plus",    // C++ compiler proper
     "cc1obj",     // Objective-C compiler proper

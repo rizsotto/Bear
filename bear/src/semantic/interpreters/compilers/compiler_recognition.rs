@@ -10,6 +10,75 @@ use crate::config::{Compiler, CompilerType};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::LazyLock;
+
+/// Compile-time initialized default regex patterns for compiler recognition
+///
+/// This method provides built-in patterns for recognizing common compiler executables
+/// based on their names. The patterns are designed to handle various scenarios including:
+/// - Cross-compilation prefixes (e.g., `arm-linux-gnueabihf-gcc`)
+/// - Versioned executables (e.g., `gcc-11`, `clang-15`)
+/// - Multiple naming conventions for the same compiler family
+///
+/// # Supported Compiler Patterns
+///
+/// - **GCC**: Matches `gcc`, `g++`, `cc`, `c++` with optional cross-compilation prefixes and version suffixes
+/// - **Clang**: Matches `clang`, `clang++` with optional cross-compilation prefixes and version suffixes
+/// - **Fortran**: Matches `gfortran`, `f77`, `f90`, `f95`, `f03`, `f08` with optional prefixes and versions
+/// - **Intel Fortran**: Matches `ifort`, `ifx` with optional version suffixes
+/// - **Cray Fortran**: Matches `crayftn`, `ftn` with optional version suffixes
+///
+/// # Returns
+///
+/// A vector of tuples where each tuple contains:
+/// - `CompilerType`: The type of compiler the pattern identifies
+/// - `Regex`: The compiled regular expression pattern for matching executable names
+///
+/// # Examples
+///
+/// The returned patterns will match executables like:
+/// - `gcc`, `arm-linux-gnueabihf-gcc`, `gcc-11`
+/// - `clang++`, `x86_64-pc-linux-gnu-clang`, `clang-15`
+/// - `gfortran`, `aarch64-linux-gnu-gfortran-9`
+/// - `ifort`, `ifx-2023`
+/// - `crayftn`, `ftn`
+static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
+    // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
+    let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?$")
+        .expect("Invalid GCC regex pattern");
+
+    // GCC internal executables pattern: matches GCC's internal compiler phases
+    // These are implementation details of GCC's compilation process that should be
+    // routed to GccInterpreter for proper handling (typically to be ignored).
+    // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
+    let gcc_internal_pattern = Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)$")
+        .expect("Invalid GCC internal regex pattern");
+
+    // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
+    let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
+        .expect("Invalid Clang regex pattern");
+
+    // Fortran pattern: matches gfortran, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
+    let fortran_pattern = Regex::new(r"^(?:[^/]*-)?(?:gfortran|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
+        .expect("Invalid Fortran regex pattern");
+
+    // Intel Fortran pattern: matches ifort, ifx, and versioned variants
+    let intel_fortran_pattern =
+        Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?$").expect("Invalid Intel Fortran regex pattern");
+
+    // Cray Fortran pattern: matches crayftn, ftn
+    let cray_fortran_pattern =
+        Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?$").expect("Invalid Cray Fortran regex pattern");
+
+    vec![
+        (CompilerType::Gcc, gcc_pattern),
+        (CompilerType::Gcc, gcc_internal_pattern),
+        (CompilerType::Clang, clang_pattern),
+        (CompilerType::Fortran, fortran_pattern),
+        (CompilerType::IntelFortran, intel_fortran_pattern),
+        (CompilerType::CrayFortran, cray_fortran_pattern),
+    ]
+});
 
 /// A unified compiler recognizer that uses regex patterns
 pub struct CompilerRecognizer {
@@ -18,74 +87,6 @@ pub struct CompilerRecognizer {
 }
 
 impl CompilerRecognizer {
-    /// Returns the default set of regex patterns used to recognize compiler types.
-    ///
-    /// This method provides built-in patterns for recognizing common compiler executables
-    /// based on their names. The patterns are designed to handle various scenarios including:
-    /// - Cross-compilation prefixes (e.g., `arm-linux-gnueabihf-gcc`)
-    /// - Versioned executables (e.g., `gcc-11`, `clang-15`)
-    /// - Multiple naming conventions for the same compiler family
-    ///
-    /// # Supported Compiler Patterns
-    ///
-    /// - **GCC**: Matches `gcc`, `g++`, `cc`, `c++` with optional cross-compilation prefixes and version suffixes
-    /// - **Clang**: Matches `clang`, `clang++` with optional cross-compilation prefixes and version suffixes
-    /// - **Fortran**: Matches `gfortran`, `f77`, `f90`, `f95`, `f03`, `f08` with optional prefixes and versions
-    /// - **Intel Fortran**: Matches `ifort`, `ifx` with optional version suffixes
-    /// - **Cray Fortran**: Matches `crayftn`, `ftn` with optional version suffixes
-    ///
-    /// # Returns
-    ///
-    /// A vector of tuples where each tuple contains:
-    /// - `CompilerType`: The type of compiler the pattern identifies
-    /// - `Regex`: The compiled regular expression pattern for matching executable names
-    ///
-    /// # Examples
-    ///
-    /// The returned patterns will match executables like:
-    /// - `gcc`, `arm-linux-gnueabihf-gcc`, `gcc-11`
-    /// - `clang++`, `x86_64-pc-linux-gnu-clang`, `clang-15`
-    /// - `gfortran`, `aarch64-linux-gnu-gfortran-9`
-    /// - `ifort`, `ifx-2023`
-    /// - `crayftn`, `ftn`
-    fn default_patterns() -> Vec<(CompilerType, Regex)> {
-        let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?$")
-            .expect("Invalid GCC regex pattern");
-
-        // GCC internal executables pattern: matches GCC's internal compiler phases
-        // These are implementation details of GCC's compilation process that should be
-        // routed to GccInterpreter for proper handling (typically to be ignored).
-        // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
-        let gcc_internal_pattern = Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)$")
-            .expect("Invalid GCC internal regex pattern");
-
-        // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
-        let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
-            .expect("Invalid Clang regex pattern");
-
-        // Fortran pattern: matches gfortran, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
-        let fortran_pattern =
-            Regex::new(r"^(?:[^/]*-)?(?:gfortran|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
-                .expect("Invalid Fortran regex pattern");
-
-        // Intel Fortran pattern: matches ifort, ifx, and versioned variants
-        let intel_fortran_pattern = Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?$")
-            .expect("Invalid Intel Fortran regex pattern");
-
-        // Cray Fortran pattern: matches crayftn, ftn
-        let cray_fortran_pattern = Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?$")
-            .expect("Invalid Cray Fortran regex pattern");
-
-        vec![
-            (CompilerType::Gcc, gcc_pattern),
-            (CompilerType::Gcc, gcc_internal_pattern),
-            (CompilerType::Clang, clang_pattern),
-            (CompilerType::Fortran, fortran_pattern),
-            (CompilerType::IntelFortran, intel_fortran_pattern),
-            (CompilerType::CrayFortran, cray_fortran_pattern),
-        ]
-    }
-
     /// Creates a hint lookup table from compiler configuration.
     ///
     /// This method processes a slice of [`Compiler`] configurations and builds a mapping
@@ -135,9 +136,6 @@ impl CompilerRecognizer {
     fn build_hints_map(compilers: &[Compiler]) -> HashMap<PathBuf, CompilerType> {
         let mut hints = HashMap::new();
 
-        // Get default patterns for fallback recognition
-        let default_patterns = Self::default_patterns();
-
         for compiler in compilers {
             // Skip ignored compilers
             if compiler.ignore {
@@ -161,7 +159,7 @@ impl CompilerRecognizer {
                     .and_then(|name| name.to_str())
                     .unwrap_or("");
 
-                let guessed_type = default_patterns
+                let guessed_type = DEFAULT_PATTERNS
                     .iter()
                     .find(|(_, pattern)| pattern.is_match(filename))
                     .map(|(compiler_type, _)| *compiler_type);
@@ -179,7 +177,7 @@ impl CompilerRecognizer {
     /// Creates a new compiler recognizer with default patterns
     pub fn new() -> Self {
         Self {
-            patterns: Self::default_patterns(),
+            patterns: DEFAULT_PATTERNS.clone(),
             hints: Self::build_hints_map(&[]),
         }
     }
@@ -195,7 +193,7 @@ impl CompilerRecognizer {
     /// A new CompilerRecognizer that will prioritize configured hints over regex detection
     pub fn new_with_config(compilers: &[Compiler]) -> Self {
         Self {
-            patterns: Self::default_patterns(),
+            patterns: DEFAULT_PATTERNS.clone(),
             hints: Self::build_hints_map(compilers),
         }
     }

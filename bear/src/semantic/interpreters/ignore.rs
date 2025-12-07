@@ -49,7 +49,7 @@ impl Interpreter for IgnoreByPath {
     }
 }
 
-static COREUTILS_FILES: [&str; 106] = [
+const COREUTILS_FILES: [&str; 106] = [
     "/usr/bin/[",
     "/usr/bin/arch",
     "/usr/bin/b2sum",
