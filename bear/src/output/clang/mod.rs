@@ -12,7 +12,8 @@
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
 pub mod converter;
-mod filter;
+mod filter_duplicates;
+mod filter_sources;
 mod format;
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,8 @@ use thiserror::Error;
 
 // Re-export types for easier access
 pub use converter::CommandConverter;
-pub use filter::DuplicateEntryFilter;
+pub use filter_duplicates::DuplicateEntryFilter;
+pub use filter_sources::{SourceEntryFilter, SourceFilterError};
 pub use format::{ConfigurablePathFormatter, FormatConfigurationError, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.

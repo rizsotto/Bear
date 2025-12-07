@@ -35,8 +35,11 @@
 //!
 //! sources:
 //!   only_existing_files: true
-//!   include: ["/opt/project/sources"]
-//!   exclude: ["/opt/project/tests"]
+//!   directories:
+//!     - path: "/opt/project/sources"
+//!       action: include
+//!     - path: "/opt/project/tests"
+//!       action: exclude
 //!
 //! duplicates:
 //!   match_on: [file, directory]
@@ -196,23 +199,91 @@ mod types {
         pub remove: Vec<String>,
     }
 
-    /// Source filter configuration matching the YAML format.
+    /// Action to take for files matching a directory rule
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[serde(rename_all = "lowercase")]
+    pub enum DirectoryAction {
+        Include,
+        Exclude,
+    }
+
+    /// A rule that specifies how to handle files within a directory
+    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    pub struct DirectoryRule {
+        pub path: PathBuf,
+        pub action: DirectoryAction,
+    }
+
+    /// Source filter configuration for controlling which files are included in the compilation database.
+    ///
+    /// Uses directory-based rules with order-based evaluation semantics:
+    ///
+    /// 1. **Order-based evaluation**: For each source file, the *last* rule whose path prefix
+    ///    matches determines inclusion/exclusion.
+    /// 2. **Empty directories list**: Interpreted as "include everything" (no filtering).
+    /// 3. **No-match behavior**: If no rule matches a file, the file is *included*.
+    /// 4. **Path matching**: Simple prefix matching, no normalization.
+    /// 5. **Case sensitivity**: Always case-sensitive on all platforms.
+    /// 6. **Path separators**: Platform-specific (`/` on Unix, `\` on Windows).
+    /// 7. **Symlinks**: No symlink resolution — match literal paths only.
+    /// 8. **Directory matching**: A rule matches both files directly in the directory and files in subdirectories.
+    /// 9. **Empty path fields**: Invalid — validation must fail.
+    ///
+    /// **Important**: For matching to work correctly, rule paths should use the same format as
+    /// configured in `format.paths.file`. This consistency is the user's responsibility.
     #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
     pub struct SourceFilter {
         #[serde(default = "default_enabled")]
         pub only_existing_files: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        pub include: Vec<PathBuf>,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        pub exclude: Vec<PathBuf>,
+        pub directories: Vec<DirectoryRule>,
+    }
+
+    impl SourceFilter {
+        /// Evaluates whether a source file should be included in the compilation database
+        /// based on the configured directory rules.
+        ///
+        /// # Arguments
+        ///
+        /// * `file_path` - The path of the source file to evaluate
+        ///
+        /// # Returns
+        ///
+        /// `true` if the file should be included, `false` if it should be excluded
+        ///
+        /// # Evaluation Rules
+        ///
+        /// - If `directories` is empty, returns `true` (include everything)
+        /// - Iterates through rules in order, updating result when path prefix matches
+        /// - The *last* matching rule determines the final result
+        /// - If no rule matches, returns `true` (include by default)
+        pub fn should_include(&self, file_path: &std::path::Path) -> bool {
+            // Empty directories list means include everything
+            if self.directories.is_empty() {
+                return true;
+            }
+
+            let mut result = true; // Default: include if no rule matches
+
+            // Order-based evaluation: last matching rule wins
+            for rule in &self.directories {
+                if file_path.starts_with(&rule.path) {
+                    result = match rule.action {
+                        DirectoryAction::Include => true,
+                        DirectoryAction::Exclude => false,
+                    };
+                }
+            }
+
+            result
+        }
     }
 
     impl Default for SourceFilter {
         fn default() -> Self {
             Self {
                 only_existing_files: true,
-                include: vec![],
-                exclude: vec![],
+                directories: vec![],
             }
         }
     }
@@ -512,25 +583,13 @@ pub mod validation {
         type Error = ValidationError;
 
         fn validate(config: &SourceFilter) -> Result<(), Self::Error> {
-            // Note: We don't validate path existence for include/exclude paths
-            // as mentioned in the requirements - these are "future values"
-            // We only need to ensure they're not empty paths if specified
+            // Validate that directory rule paths are not empty
             let mut collector = ValidationCollector::new();
 
-            // Check include paths for empty strings
-            for (idx, path) in config.include.iter().enumerate() {
-                if path.as_os_str().is_empty() {
+            for (idx, rule) in config.directories.iter().enumerate() {
+                if rule.path.as_os_str().is_empty() {
                     collector.add(ValidationError::EmptyString {
-                        field: format!("sources.include[{}]", idx),
-                    });
-                }
-            }
-
-            // Check exclude paths for empty strings
-            for (idx, path) in config.exclude.iter().enumerate() {
-                if path.as_os_str().is_empty() {
-                    collector.add(ValidationError::EmptyString {
-                        field: format!("sources.exclude[{}]", idx),
+                        field: format!("sources.directories[{}].path", idx),
                     });
                 }
             }
@@ -619,8 +678,47 @@ pub mod validation {
         fn test_validate_source_filter_empty_paths() {
             let config = SourceFilter {
                 only_existing_files: true,
-                include: vec![PathBuf::from("valid/path"), PathBuf::from("")],
-                exclude: vec![PathBuf::from("")],
+                directories: vec![
+                    DirectoryRule {
+                        path: PathBuf::from("valid/path"),
+                        action: DirectoryAction::Include,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from(""),
+                        action: DirectoryAction::Exclude,
+                    },
+                ],
+            };
+
+            let result = SourceFilter::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::EmptyString { field } => {
+                    assert_eq!(field, "sources.directories[1].path");
+                }
+                _ => panic!("Expected empty string validation error"),
+            }
+        }
+
+        #[test]
+        fn test_validate_source_filter_multiple_empty_paths() {
+            let config = SourceFilter {
+                only_existing_files: true,
+                directories: vec![
+                    DirectoryRule {
+                        path: PathBuf::from(""),
+                        action: DirectoryAction::Include,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("valid/path"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from(""),
+                        action: DirectoryAction::Include,
+                    },
+                ],
             };
 
             let result = SourceFilter::validate(&config);
@@ -632,6 +730,269 @@ pub mod validation {
                 }
                 _ => panic!("Expected multiple validation errors"),
             }
+        }
+
+        #[test]
+        fn test_validate_source_filter_valid_config() {
+            let config = SourceFilter {
+                only_existing_files: true,
+                directories: vec![
+                    DirectoryRule {
+                        path: PathBuf::from("/usr/include"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("src"),
+                        action: DirectoryAction::Include,
+                    },
+                ],
+            };
+
+            let result = SourceFilter::validate(&config);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_validate_source_filter_empty_directories() {
+            let config = SourceFilter {
+                only_existing_files: false,
+                directories: vec![],
+            };
+
+            let result = SourceFilter::validate(&config);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_source_filter_empty_directories_includes_all() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![],
+            };
+
+            assert!(filter.should_include(std::path::Path::new("any/path.c")));
+            assert!(filter.should_include(std::path::Path::new("/absolute/path.cpp")));
+            assert!(filter.should_include(std::path::Path::new("src/main.rs")));
+        }
+
+        #[test]
+        fn test_source_filter_order_based_evaluation() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![
+                    DirectoryRule {
+                        path: PathBuf::from("src"),
+                        action: DirectoryAction::Include,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("src/test"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("src/test/integration"),
+                        action: DirectoryAction::Include,
+                    },
+                ],
+            };
+
+            // Files in src are included (first rule)
+            assert!(filter.should_include(std::path::Path::new("src/main.c")));
+            assert!(filter.should_include(std::path::Path::new("src/lib/utils.c")));
+
+            // Files in src/test are excluded (second rule overrides first)
+            assert!(!filter.should_include(std::path::Path::new("src/test/unit.c")));
+            assert!(!filter.should_include(std::path::Path::new("src/test/mock.c")));
+
+            // Files in src/test/integration are included (third rule overrides second)
+            assert!(filter.should_include(std::path::Path::new("src/test/integration/api.c")));
+            assert!(filter.should_include(std::path::Path::new("src/test/integration/db.c")));
+        }
+
+        #[test]
+        fn test_source_filter_no_match_behavior() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![
+                    DirectoryRule {
+                        path: PathBuf::from("src"),
+                        action: DirectoryAction::Include,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("/usr/include"),
+                        action: DirectoryAction::Exclude,
+                    },
+                ],
+            };
+
+            // Files that don't match any rule are included by default
+            assert!(filter.should_include(std::path::Path::new("lib/external.c")));
+            assert!(filter.should_include(std::path::Path::new("vendor/third_party.cpp")));
+            assert!(filter.should_include(std::path::Path::new("/opt/custom/tool.c")));
+        }
+
+        #[test]
+        fn test_source_filter_exact_path_matching() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src/main.c"),
+                    action: DirectoryAction::Exclude,
+                }],
+            };
+
+            // Exact file match
+            assert!(!filter.should_include(std::path::Path::new("src/main.c")));
+
+            // Similar but different files are not affected
+            assert!(filter.should_include(std::path::Path::new("src/main.cpp")));
+            assert!(filter.should_include(std::path::Path::new("src/main.c.backup")));
+            assert!(filter.should_include(std::path::Path::new("src/main_test.c")));
+        }
+
+        #[test]
+        fn test_source_filter_prefix_matching() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src"),
+                    action: DirectoryAction::Include,
+                }],
+            };
+
+            // Directory prefix matches
+            assert!(filter.should_include(std::path::Path::new("src/main.c")));
+            assert!(filter.should_include(std::path::Path::new("src/lib/utils.c")));
+            assert!(filter.should_include(std::path::Path::new("src/deeply/nested/file.c")));
+
+            // Non-prefix matches don't work
+            assert!(filter.should_include(std::path::Path::new("not_src/main.c"))); // default include
+            assert!(filter.should_include(std::path::Path::new("prefix_src/main.c")));
+            // default include
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn test_source_filter_case_sensitivity_unix() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src"),
+                    action: DirectoryAction::Exclude,
+                }],
+            };
+
+            // Case-sensitive matching on Unix
+            assert!(!filter.should_include(std::path::Path::new("src/main.c")));
+            assert!(filter.should_include(std::path::Path::new("Src/main.c"))); // default include
+            assert!(filter.should_include(std::path::Path::new("SRC/main.c"))); // default include
+        }
+
+        #[cfg(windows)]
+        #[test]
+        fn test_source_filter_case_sensitivity_windows() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src"),
+                    action: DirectoryAction::Exclude,
+                }],
+            };
+
+            // Case-sensitive matching on Windows (even though filesystem is case-insensitive)
+            assert!(!filter.should_include(std::path::Path::new("src\\main.c")));
+            assert!(filter.should_include(std::path::Path::new("Src\\main.c"))); // default include
+            assert!(filter.should_include(std::path::Path::new("SRC\\main.c")));
+            // default include
+        }
+
+        #[test]
+        fn test_source_filter_platform_separators() {
+            #[cfg(unix)]
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src/lib"),
+                    action: DirectoryAction::Exclude,
+                }],
+            };
+
+            #[cfg(windows)]
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![DirectoryRule {
+                    path: PathBuf::from("src\\lib"),
+                    action: DirectoryAction::Exclude,
+                }],
+            };
+
+            #[cfg(unix)]
+            {
+                assert!(!filter.should_include(std::path::Path::new("src/lib/utils.c")));
+                assert!(filter.should_include(std::path::Path::new("src\\lib\\utils.c")));
+                // default include - wrong separator
+            }
+
+            #[cfg(windows)]
+            {
+                assert!(!filter.should_include(std::path::Path::new("src\\lib\\utils.c")));
+                assert!(filter.should_include(std::path::Path::new("src/lib/utils.c")));
+                // default include - wrong separator
+            }
+        }
+
+        #[test]
+        fn test_source_filter_complex_scenario() {
+            let filter = SourceFilter {
+                only_existing_files: true,
+                directories: vec![
+                    // Include everything in project
+                    DirectoryRule {
+                        path: PathBuf::from("."),
+                        action: DirectoryAction::Include,
+                    },
+                    // Exclude system headers
+                    DirectoryRule {
+                        path: PathBuf::from("/usr/include"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("/usr/local/include"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    // Exclude build artifacts
+                    DirectoryRule {
+                        path: PathBuf::from("build"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    DirectoryRule {
+                        path: PathBuf::from("target"),
+                        action: DirectoryAction::Exclude,
+                    },
+                    // But include specific build config files
+                    DirectoryRule {
+                        path: PathBuf::from("build/config"),
+                        action: DirectoryAction::Include,
+                    },
+                ],
+            };
+
+            // Project files are included
+            assert!(filter.should_include(std::path::Path::new("./src/main.c")));
+            assert!(filter.should_include(std::path::Path::new("./lib/utils.c")));
+
+            // System headers are excluded
+            assert!(!filter.should_include(std::path::Path::new("/usr/include/stdio.h")));
+            assert!(!filter.should_include(std::path::Path::new(
+                "/usr/local/include/boost/algorithm.hpp"
+            )));
+
+            // Build artifacts are excluded
+            assert!(!filter.should_include(std::path::Path::new("build/main.o")));
+            assert!(!filter.should_include(std::path::Path::new("target/release/app")));
+
+            // But specific build config is included (last rule wins)
+            assert!(filter.should_include(std::path::Path::new("build/config/settings.h")));
+            assert!(filter.should_include(std::path::Path::new("build/config/generated/defs.h")));
         }
     }
 }
@@ -794,8 +1155,11 @@ pub mod loader {
 
             sources:
                 only_existing_files: true
-                include: ["/opt/project/sources"]
-                exclude: ["/opt/project/tests"]
+                directories:
+                  - path: "/opt/project/sources"
+                    action: include
+                  - path: "/opt/project/tests"
+                    action: exclude
 
             duplicates:
                 match_on: [file, directory]
@@ -842,8 +1206,16 @@ pub mod loader {
                 ],
                 sources: SourceFilter {
                     only_existing_files: true,
-                    include: vec![PathBuf::from("/opt/project/sources")],
-                    exclude: vec![PathBuf::from("/opt/project/tests")],
+                    directories: vec![
+                        DirectoryRule {
+                            path: PathBuf::from("/opt/project/sources"),
+                            action: DirectoryAction::Include,
+                        },
+                        DirectoryRule {
+                            path: PathBuf::from("/opt/project/tests"),
+                            action: DirectoryAction::Exclude,
+                        },
+                    ],
                 },
                 duplicates: DuplicateFilter {
                     match_on: vec![OutputFields::File, OutputFields::Directory],
@@ -888,8 +1260,7 @@ pub mod loader {
                 compilers: vec![],
                 sources: SourceFilter {
                     only_existing_files: true,
-                    include: vec![],
-                    exclude: vec![],
+                    directories: vec![],
                 },
                 duplicates: DuplicateFilter {
                     match_on: vec![OutputFields::File, OutputFields::Arguments],
@@ -934,8 +1305,7 @@ pub mod loader {
                 compilers: vec![],
                 sources: SourceFilter {
                     only_existing_files: false,
-                    include: vec![],
-                    exclude: vec![],
+                    directories: vec![],
                 },
                 duplicates: DuplicateFilter {
                     match_on: vec![OutputFields::File, OutputFields::Arguments],
