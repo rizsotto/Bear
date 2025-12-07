@@ -99,11 +99,15 @@ impl CompilerRecognizer {
     /// # Returns
     ///
     /// A [`HashMap`] mapping canonicalized [`PathBuf`]s to their corresponding [`CompilerType`]s.
-    /// Only compilers that:
-    /// - Are not marked as `ignore = true`
-    /// - Have an explicit `as_` field specifying the compiler type
+    /// All compilers that are not marked as `ignore = true` will be included in the mapping.
     ///
-    /// will be included in the returned mapping.
+    /// # Compiler Type Resolution
+    ///
+    /// For each non-ignored compiler, the compiler type is determined as follows:
+    /// 1. **Explicit `as_` field**: If the compiler has an `as_` field specified, that type is used
+    /// 2. **Pattern matching**: If `as_` is `None`, the filename is matched against default patterns
+    ///    (GCC, Clang, Fortran, Intel Fortran, Cray Fortran)
+    /// 3. **Fallback**: If no pattern matches, defaults to [`CompilerType::Gcc`]
     ///
     /// # Path Canonicalization
     ///
@@ -119,31 +123,54 @@ impl CompilerRecognizer {
     /// compilers:
     ///   - path: /usr/bin/my-custom-gcc
     ///     as: gcc
-    ///   - path: /opt/llvm/bin/clang
-    ///     as: clang
+    ///   - path: /opt/llvm/bin/clang++        # No 'as' field - will be guessed as Clang
+    ///   - path: /usr/bin/unknown-compiler    # No 'as' field - will default to GCC
     ///   - path: /usr/bin/ignored-compiler
     ///     ignore: true
     /// ```
     ///
-    /// This method would return a mapping containing entries for the first two compilers
-    /// but exclude the third due to the `ignore` flag.
+    /// This method would return a mapping containing entries for the first three compilers
+    /// but exclude the fourth due to the `ignore` flag. The second compiler would be
+    /// recognized as Clang through pattern matching, and the third would default to GCC.
     fn build_hints_map(compilers: &[Compiler]) -> HashMap<PathBuf, CompilerType> {
         let mut hints = HashMap::new();
 
+        // Get default patterns for fallback recognition
+        let default_patterns = Self::default_patterns();
+
         for compiler in compilers {
-            // ignored compilers should not be checked.
+            // Skip ignored compilers
             if compiler.ignore {
                 continue;
             }
-            // we can only deal with compilers which has hints.
-            if let Some(compiler_type) = compiler.as_ {
-                // Try to canonicalize the path for better matching
-                let canonical_path = compiler
+
+            // Try to canonicalize the path for better matching
+            let canonical_path = compiler
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| compiler.path.clone());
+
+            let compiler_type = if let Some(as_type) = compiler.as_ {
+                // Use explicitly configured compiler type
+                as_type
+            } else {
+                // Guess compiler type using default patterns
+                let filename = compiler
                     .path
-                    .canonicalize()
-                    .unwrap_or_else(|_| compiler.path.clone());
-                hints.insert(canonical_path, compiler_type);
-            }
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("");
+
+                let guessed_type = default_patterns
+                    .iter()
+                    .find(|(_, pattern)| pattern.is_match(filename))
+                    .map(|(compiler_type, _)| *compiler_type);
+
+                // Fall back to GCC if no pattern matches
+                guessed_type.unwrap_or(CompilerType::Gcc)
+            };
+
+            hints.insert(canonical_path, compiler_type);
         }
 
         hints
@@ -572,5 +599,82 @@ mod tests {
         // Test that non-GCC internal executables are not matched by this pattern
         assert_eq!(recognizer.recognize(path("cc1foo")), None);
         assert_eq!(recognizer.recognize(path("foo-cc1")), None);
+    }
+
+    #[test]
+    fn test_build_hints_map_improved_behavior() {
+        use crate::config::Compiler;
+        use std::path::PathBuf;
+
+        // Create test compiler configurations with various scenarios
+        let compilers = vec![
+            // Compiler with explicit 'as' field - should use that type
+            Compiler {
+                path: PathBuf::from("custom-wrapper"),
+                as_: Some(CompilerType::Clang),
+                ignore: false,
+                flags: None,
+            },
+            // Compiler without 'as' field but matches default pattern - should guess Clang
+            Compiler {
+                path: PathBuf::from("clang++"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+            // Compiler without 'as' field and no pattern match - should fall back to GCC
+            Compiler {
+                path: PathBuf::from("unknown-compiler"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+            // Ignored compiler - should not be included in hints
+            Compiler {
+                path: PathBuf::from("ignored-gcc"),
+                as_: Some(CompilerType::Gcc),
+                ignore: true,
+                flags: None,
+            },
+            // Another compiler without 'as' field matching Fortran pattern
+            Compiler {
+                path: PathBuf::from("gfortran"),
+                as_: None,
+                ignore: false,
+                flags: None,
+            },
+        ];
+
+        let recognizer = CompilerRecognizer::new_with_config(&compilers);
+
+        // Test explicit 'as' field is used
+        assert_eq!(
+            recognizer.recognize(path("custom-wrapper")),
+            Some(CompilerType::Clang)
+        );
+
+        // Test pattern matching works when 'as' is None
+        assert_eq!(
+            recognizer.recognize(path("clang++")),
+            Some(CompilerType::Clang)
+        );
+
+        // Test fallback to GCC when no pattern matches
+        assert_eq!(
+            recognizer.recognize(path("unknown-compiler")),
+            Some(CompilerType::Gcc)
+        );
+
+        // Test ignored compiler is not recognized via hints
+        assert_eq!(
+            recognizer.recognize(path("ignored-gcc")),
+            Some(CompilerType::Gcc) // Should fall back to regex pattern, not hint
+        );
+
+        // Test Fortran pattern matching when 'as' is None
+        assert_eq!(
+            recognizer.recognize(path("gfortran")),
+            Some(CompilerType::Fortran)
+        );
     }
 }

@@ -43,36 +43,6 @@ impl CompilerInterpreter {
             ..Default::default()
         }
     }
-
-    /// Recognizes the compiler type and delegates to the appropriate interpreter.
-    fn delegate_to_interpreter(&self, execution: &Execution) -> Option<Command> {
-        match self.recognizer.recognize(&execution.executable) {
-            Some(CompilerType::Gcc) => {
-                // Delegate to GCC interpreter for argument parsing
-                self.gcc_interpreter.recognize(execution)
-            }
-            Some(CompilerType::Clang) => {
-                // Delegate to Clang interpreter for argument parsing
-                self.clang_interpreter.recognize(execution)
-            }
-            Some(CompilerType::Fortran) => {
-                // For now, treat Fortran compilers like GCC (they often are GCC-based)
-                self.gcc_interpreter.recognize(execution)
-            }
-            Some(CompilerType::IntelFortran) => {
-                // Intel Fortran often has GCC-compatible syntax
-                self.gcc_interpreter.recognize(execution)
-            }
-            Some(CompilerType::CrayFortran) => {
-                // Cray Fortran often has GCC-compatible syntax
-                self.gcc_interpreter.recognize(execution)
-            }
-            None => {
-                // Compiler not recognized - no parsing performed
-                None
-            }
-        }
-    }
 }
 
 impl Default for CompilerInterpreter {
@@ -87,7 +57,35 @@ impl Default for CompilerInterpreter {
 
 impl Interpreter for CompilerInterpreter {
     fn recognize(&self, execution: &Execution) -> Option<Command> {
-        self.delegate_to_interpreter(execution)
+        {
+            let this = &self;
+            match this.recognizer.recognize(&execution.executable) {
+                Some(CompilerType::Gcc) => {
+                    // Delegate to GCC interpreter for argument parsing
+                    this.gcc_interpreter.recognize(execution)
+                }
+                Some(CompilerType::Clang) => {
+                    // Delegate to Clang interpreter for argument parsing
+                    this.clang_interpreter.recognize(execution)
+                }
+                Some(CompilerType::Fortran) => {
+                    // For now, treat Fortran compilers like GCC (they often are GCC-based)
+                    this.gcc_interpreter.recognize(execution)
+                }
+                Some(CompilerType::IntelFortran) => {
+                    // Intel Fortran often has GCC-compatible syntax
+                    this.gcc_interpreter.recognize(execution)
+                }
+                Some(CompilerType::CrayFortran) => {
+                    // Cray Fortran often has GCC-compatible syntax
+                    this.gcc_interpreter.recognize(execution)
+                }
+                None => {
+                    // Compiler not recognized - no parsing performed
+                    None
+                }
+            }
+        }
     }
 }
 
