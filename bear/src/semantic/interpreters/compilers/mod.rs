@@ -8,15 +8,19 @@
 pub mod arguments;
 pub mod clang;
 pub mod compiler_recognition;
+pub mod cray_fortran;
 pub mod gcc;
+pub mod intel_fortran;
 
 use super::combinators::OutputLogger;
 use crate::config::CompilerType;
 use crate::intercept::Execution;
 use crate::semantic::{Command, Interpreter};
-use clang::ClangInterpreter;
+use clang::{ClangInterpreter, FlangInterpreter};
 use compiler_recognition::CompilerRecognizer;
+use cray_fortran::CrayFortranInterpreter;
 use gcc::GccInterpreter;
+use intel_fortran::IntelFortranInterpreter;
 
 /// A meta-interpreter that recognizes compiler types and delegates parsing to specific interpreters.
 ///
@@ -33,6 +37,12 @@ pub struct CompilerInterpreter {
     gcc_interpreter: OutputLogger<GccInterpreter>,
     /// Clang-specific argument parser with logging
     clang_interpreter: OutputLogger<ClangInterpreter>,
+    /// Flang-specific argument parser with logging
+    flang_interpreter: OutputLogger<FlangInterpreter>,
+    /// Intel Fortran-specific argument parser with logging
+    intel_fortran_interpreter: OutputLogger<IntelFortranInterpreter>,
+    /// Cray Fortran-specific argument parser with logging
+    cray_fortran_interpreter: OutputLogger<CrayFortranInterpreter>,
 }
 
 impl CompilerInterpreter {
@@ -40,7 +50,17 @@ impl CompilerInterpreter {
     pub fn new_with_config(compilers: &[crate::config::Compiler]) -> Self {
         Self {
             recognizer: CompilerRecognizer::new_with_config(compilers),
-            ..Default::default()
+            gcc_interpreter: OutputLogger::new(GccInterpreter::default(), "gcc"),
+            clang_interpreter: OutputLogger::new(ClangInterpreter::default(), "clang"),
+            flang_interpreter: OutputLogger::new(FlangInterpreter::default(), "flang"),
+            intel_fortran_interpreter: OutputLogger::new(
+                IntelFortranInterpreter::default(),
+                "intel_fortran",
+            ),
+            cray_fortran_interpreter: OutputLogger::new(
+                CrayFortranInterpreter::default(),
+                "cray_fortran",
+            ),
         }
     }
 }
@@ -49,8 +69,17 @@ impl Default for CompilerInterpreter {
     fn default() -> Self {
         Self {
             recognizer: CompilerRecognizer::default(),
-            gcc_interpreter: OutputLogger::new(GccInterpreter::default(), "gcc_compiler"),
-            clang_interpreter: OutputLogger::new(ClangInterpreter::default(), "clang_compiler"),
+            gcc_interpreter: OutputLogger::new(GccInterpreter::default(), "gcc"),
+            clang_interpreter: OutputLogger::new(ClangInterpreter::default(), "clang"),
+            flang_interpreter: OutputLogger::new(FlangInterpreter::default(), "flang"),
+            intel_fortran_interpreter: OutputLogger::new(
+                IntelFortranInterpreter::default(),
+                "intel_fortran",
+            ),
+            cray_fortran_interpreter: OutputLogger::new(
+                CrayFortranInterpreter::default(),
+                "cray_fortran",
+            ),
         }
     }
 }
@@ -68,17 +97,17 @@ impl Interpreter for CompilerInterpreter {
                     // Delegate to Clang interpreter for argument parsing
                     this.clang_interpreter.recognize(execution)
                 }
-                Some(CompilerType::Fortran) => {
-                    // For now, treat Fortran compilers like GCC (they often are GCC-based)
-                    this.gcc_interpreter.recognize(execution)
+                Some(CompilerType::Flang) => {
+                    // Delegate to Flang interpreter for Fortran compilation
+                    this.flang_interpreter.recognize(execution)
                 }
                 Some(CompilerType::IntelFortran) => {
-                    // Intel Fortran often has GCC-compatible syntax
-                    this.gcc_interpreter.recognize(execution)
+                    // Delegate to Intel Fortran interpreter
+                    this.intel_fortran_interpreter.recognize(execution)
                 }
                 Some(CompilerType::CrayFortran) => {
-                    // Cray Fortran often has GCC-compatible syntax
-                    this.gcc_interpreter.recognize(execution)
+                    // Delegate to Cray Fortran interpreter
+                    this.cray_fortran_interpreter.recognize(execution)
                 }
                 None => {
                     // Compiler not recognized - no parsing performed
@@ -174,11 +203,11 @@ mod tests {
     }
 
     #[test]
-    fn test_fortran_recognition_and_delegation() {
+    fn test_flang_recognition_and_delegation() {
         let interpreter = CompilerInterpreter::default();
 
-        // Test various Fortran executable names
-        let fortran_executables = vec![
+        // Test various Flang executable names
+        let flang_executables = vec![
             "gfortran",
             "f77",
             "f90",
@@ -187,13 +216,13 @@ mod tests {
             "arm-linux-gnueabi-gfortran",
         ];
 
-        for executable in fortran_executables {
+        for executable in flang_executables {
             let exec = create_execution(executable, vec![executable, "-c", "main.f90"], "/project");
             let result = interpreter.recognize(&exec);
 
             assert!(
                 result.is_some(),
-                "Failed to recognize Fortran executable: {}",
+                "Failed to recognize Flang executable: {}",
                 executable
             );
 

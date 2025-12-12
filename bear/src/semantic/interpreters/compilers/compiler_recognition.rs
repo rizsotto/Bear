@@ -58,9 +58,10 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
         .expect("Invalid Clang regex pattern");
 
-    // Fortran pattern: matches gfortran, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
-    let fortran_pattern = Regex::new(r"^(?:[^/]*-)?(?:gfortran|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
-        .expect("Invalid Fortran regex pattern");
+    // Fortran pattern: matches gfortran, flang, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
+    let fortran_pattern =
+        Regex::new(r"^(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
+            .expect("Invalid Fortran regex pattern");
 
     // Intel Fortran pattern: matches ifort, ifx, and versioned variants
     let intel_fortran_pattern =
@@ -74,7 +75,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         (CompilerType::Gcc, gcc_pattern),
         (CompilerType::Gcc, gcc_internal_pattern),
         (CompilerType::Clang, clang_pattern),
-        (CompilerType::Fortran, fortran_pattern),
+        (CompilerType::Flang, fortran_pattern),
         (CompilerType::IntelFortran, intel_fortran_pattern),
         (CompilerType::CrayFortran, cray_fortran_pattern),
     ]
@@ -374,43 +375,32 @@ mod tests {
         // Basic Fortran names
         assert_eq!(
             recognizer.recognize(path("gfortran")),
-            Some(CompilerType::Fortran)
+            Some(CompilerType::Flang)
         );
         assert_eq!(
-            recognizer.recognize(path("f77")),
-            Some(CompilerType::Fortran)
+            recognizer.recognize(path("flang")),
+            Some(CompilerType::Flang)
         );
-        assert_eq!(
-            recognizer.recognize(path("f90")),
-            Some(CompilerType::Fortran)
-        );
-        assert_eq!(
-            recognizer.recognize(path("f95")),
-            Some(CompilerType::Fortran)
-        );
-        assert_eq!(
-            recognizer.recognize(path("f03")),
-            Some(CompilerType::Fortran)
-        );
-        assert_eq!(
-            recognizer.recognize(path("f08")),
-            Some(CompilerType::Fortran)
-        );
+        assert_eq!(recognizer.recognize(path("f77")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("f90")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("f95")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("f03")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("f08")), Some(CompilerType::Flang));
 
         // Cross-compilation variants
         assert_eq!(
             recognizer.recognize(path("arm-linux-gnueabi-gfortran")),
-            Some(CompilerType::Fortran)
+            Some(CompilerType::Flang)
         );
 
         // Versioned variants
         assert_eq!(
             recognizer.recognize(path("gfortran-11")),
-            Some(CompilerType::Fortran)
+            Some(CompilerType::Flang)
         );
         assert_eq!(
             recognizer.recognize(path("f90-4.8")),
-            Some(CompilerType::Fortran)
+            Some(CompilerType::Flang)
         );
     }
 
@@ -665,7 +655,7 @@ mod tests {
         // Test Fortran pattern matching when 'as' is None
         assert_eq!(
             recognizer.recognize(path("gfortran")),
-            Some(CompilerType::Fortran)
+            Some(CompilerType::Flang)
         );
     }
 }

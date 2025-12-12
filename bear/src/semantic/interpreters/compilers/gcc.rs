@@ -96,10 +96,18 @@ impl Interpreter for GccInterpreter {
 ///
 /// https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
 pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
+    // Generated flag definitions converted from C++ Bear project ToolGcc.cc
     let mut flags = vec![
-        // Basic compilation control flags
+        FlagRule::new(
+            FlagPattern::Exactly("-x", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("-c", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-S", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(
@@ -107,14 +115,21 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-S", 0),
-            ArgumentKind::Other(Some(CompilerPass::Assembling)),
+            FlagPattern::ExactlyWithGluedOrSep("-o"),
+            ArgumentKind::Output,
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-r", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            FlagPattern::Exactly("-dumpbase", 1),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-dumpbase-ext", 1),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dumpdir", 1),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("-v", 0),
             ArgumentKind::Other(Some(CompilerPass::Info)),
@@ -128,47 +143,159 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
         FlagRule::new(
+            FlagPattern::Exactly("--target-help", 0),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
+        FlagRule::new(
             FlagPattern::Exactly("--version", 0),
             ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-ansi", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::Exactly("-pass-exit-codes", 0),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        // Debug information flags - using prefix for -g family
         FlagRule::new(
-            FlagPattern::Prefix("-g", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::Exactly("-pipe", 0),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        // Optimization flags - using prefix for comprehensive coverage
         FlagRule::new(
-            FlagPattern::Prefix("-O", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::ExactlyWithEq("-specs"),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        // Warning flags - comprehensive prefix coverage
-        FlagRule::new(FlagPattern::Exactly("-w", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(None)),
-        // Feature flags - comprehensive prefix coverage
         FlagRule::new(
-            FlagPattern::Prefix("-f", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::Exactly("-wrapper", 1),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        // Machine/target flags - comprehensive prefix coverage
         FlagRule::new(
-            FlagPattern::Prefix("-m", 0),
+            FlagPattern::ExactlyWithEq("-ffile-prefix-map"),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-fplugin"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Include directories and system includes
+        FlagRule::new(
+            FlagPattern::Prefix("-fplugin-arg-", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("@", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-A"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-D"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-U"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-include"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-imacros", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-undef", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-pthread", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-M", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MM", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MG", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MP", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MD", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MMD", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MF", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MT", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MQ", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-C", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-CC", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-P", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-traditional", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-trigraphs", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-remap", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-H", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xpreprocessor", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-Wp,", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-I"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-isystem", 1),
+            FlagPattern::ExactlyWithEq("-iplugindir"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-iquote", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-isystem", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
@@ -188,28 +315,31 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-imultilib", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
             FlagPattern::Exactly("-isysroot", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("--sysroot"),
+            FlagPattern::Exactly("-imultilib", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nostdinc", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nostdinc++", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        // Library directories and libraries
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-L"),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-B"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--sysroot"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-flinker-output"),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-fuse-ld"),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
@@ -225,31 +355,19 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
+            FlagPattern::Exactly("-nolibc", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
             FlagPattern::Exactly("-nostdlib", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-nostdlib++", 0),
+            FlagPattern::Exactly("-e", 1),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-static", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-static-libgcc", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-static-libstdc++", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-shared", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-shared-libgcc", 0),
+            FlagPattern::ExactlyWithEq("-entry"),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
@@ -257,76 +375,39 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
+            FlagPattern::Exactly("-no-pie", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-static-pie", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-r", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
             FlagPattern::Exactly("-rdynamic", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        // Preprocessor defines and undefines
         FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-D"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            FlagPattern::Exactly("-s", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-U"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            FlagPattern::Exactly("-symbolic", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-include"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        // Output file
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-o"),
-            ArgumentKind::Output,
-        ),
-        // Language and standard specification
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("-std"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::Prefix("-static", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-x"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        // Dependency generation flags
-        FlagRule::new(
-            FlagPattern::Exactly("-M", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            FlagPattern::Prefix("-shared", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-MM", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MD", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MMD", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MF", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MG", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MP", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MT", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MQ", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        // Linker flags
-        FlagRule::new(
-            FlagPattern::Prefix("-Wl,", 0),
+            FlagPattern::Exactly("-T", 1),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
@@ -334,7 +415,7 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-T", 1),
+            FlagPattern::Prefix("-Wl,", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
         FlagRule::new(
@@ -345,103 +426,49 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             FlagPattern::Exactly("-z", 1),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        // Assembler flags
-        FlagRule::new(
-            FlagPattern::Prefix("-Wa,", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
         FlagRule::new(
             FlagPattern::Exactly("-Xassembler", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(None),
         ),
-        // Preprocessor flags
+        FlagRule::new(FlagPattern::Prefix("-Wa,", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(None)),
         FlagRule::new(
-            FlagPattern::Prefix("-Wp,", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            FlagPattern::Exactly("-aux-info", 1),
+            ArgumentKind::Other(None),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-Xpreprocessor", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        // Directory search flags
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-B"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        // Response files
-        FlagRule::new(FlagPattern::Prefix("@", 0), ArgumentKind::Other(None)),
-        // Plugin flags
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("-fplugin"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        // Threading
-        FlagRule::new(
-            FlagPattern::Exactly("-pthread", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        // Profile and instrumentation
-        FlagRule::new(
-            FlagPattern::Exactly("-p", 0),
+            FlagPattern::ExactlyWithEqOrSep("-std"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("-pg", 0),
+            FlagPattern::Prefix("-O", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(
-            FlagPattern::Exactly("--coverage", 0),
+            FlagPattern::Prefix("-g", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Preprocessor control flags
         FlagRule::new(
-            FlagPattern::Exactly("-C", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-CC", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-P", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-traditional", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-traditional-cpp", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-trigraphs", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-undef", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        // Dump flags - using prefix for comprehensive coverage
-        FlagRule::new(
-            FlagPattern::Prefix("-d", 0),
+            FlagPattern::Prefix("-f", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Save temporary files
         FlagRule::new(
-            FlagPattern::Prefix("-save-temps", 0),
+            FlagPattern::Prefix("-m", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Specs files
+        FlagRule::new(FlagPattern::Prefix("-p", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-tno", 0), ArgumentKind::Other(None)),
         FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("-specs"),
+            FlagPattern::Prefix("-save", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Wrapper
-        FlagRule::new(
-            FlagPattern::Exactly("-wrapper", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-d", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-Q", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-Y", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("--", 0), ArgumentKind::Other(None)),
     ];
 
     // Sort by flag length descending to ensure longer matches are tried first

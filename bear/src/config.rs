@@ -164,8 +164,8 @@ mod types {
         Gcc,
         #[serde(alias = "clang", alias = "llvm")]
         Clang,
-        #[serde(alias = "fortran", alias = "gfortran")]
-        Fortran,
+        #[serde(alias = "fortran", alias = "gfortran", alias = "flang")]
+        Flang,
         #[serde(alias = "ifort", alias = "intel-fortran", alias = "intel_fortran")]
         IntelFortran,
         #[serde(alias = "crayftn", alias = "cray-fortran", alias = "cray_fortran")]
@@ -177,7 +177,7 @@ mod types {
             let name = match self {
                 CompilerType::Gcc => "GCC",
                 CompilerType::Clang => "Clang",
-                CompilerType::Fortran => "Fortran",
+                CompilerType::Flang => "Flang",
                 CompilerType::IntelFortran => "Intel Fortran",
                 CompilerType::CrayFortran => "Cray Fortran",
             };
@@ -1091,7 +1091,7 @@ pub mod loader {
             // Test canonical names
             assert_compiler_type_deserializes("\"gcc\"", CompilerType::Gcc);
             assert_compiler_type_deserializes("\"clang\"", CompilerType::Clang);
-            assert_compiler_type_deserializes("\"fortran\"", CompilerType::Fortran);
+            assert_compiler_type_deserializes("\"fortran\"", CompilerType::Flang);
             assert_compiler_type_deserializes("\"intelfortran\"", CompilerType::IntelFortran);
             assert_compiler_type_deserializes("\"crayfortran\"", CompilerType::CrayFortran);
 
@@ -1102,7 +1102,7 @@ pub mod loader {
             assert_compiler_type_deserializes("\"llvm\"", CompilerType::Clang);
 
             // Test aliases for Fortran
-            assert_compiler_type_deserializes("\"gfortran\"", CompilerType::Fortran);
+            assert_compiler_type_deserializes("\"gfortran\"", CompilerType::Flang);
 
             // Test aliases for Intel Fortran
             assert_compiler_type_deserializes("\"ifort\"", CompilerType::IntelFortran);
@@ -1181,7 +1181,7 @@ pub mod loader {
             // Verify compiler type hints are correctly parsed
             assert_eq!(config.compilers[0].as_, Some(CompilerType::Gcc));
             assert_eq!(config.compilers[1].as_, Some(CompilerType::Clang));
-            assert_eq!(config.compilers[2].as_, Some(CompilerType::Fortran));
+            assert_eq!(config.compilers[2].as_, Some(CompilerType::Flang));
             assert_eq!(config.compilers[3].as_, Some(CompilerType::IntelFortran));
             assert_eq!(config.compilers[4].as_, Some(CompilerType::CrayFortran));
         }
@@ -1190,7 +1190,7 @@ pub mod loader {
         fn test_compiler_type_display() {
             assert_eq!(CompilerType::Gcc.to_string(), "GCC");
             assert_eq!(CompilerType::Clang.to_string(), "Clang");
-            assert_eq!(CompilerType::Fortran.to_string(), "Fortran");
+            assert_eq!(CompilerType::Flang.to_string(), "Flang");
             assert_eq!(CompilerType::IntelFortran.to_string(), "Intel Fortran");
             assert_eq!(CompilerType::CrayFortran.to_string(), "Cray Fortran");
         }

@@ -81,9 +81,271 @@ impl Interpreter for ClangInterpreter {
 ///
 /// https://clang.llvm.org/docs/ClangCommandLineReference.html
 static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
-    // Start with Clang-specific flags first to give them priority over GCC prefix matchers
+    // Generated flag definitions converted from C++ Bear project ToolClang.cc - CLANG_FLAG_DEFINITION
     let mut flags = vec![
-        // Clang target specification (not covered by any GCC prefix)
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--prefix"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-F", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-ObjC", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-ObjC++", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-Xarch", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-Xcuda", 1), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xopenmp-target", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-Xopenmp-target=", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Z", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-a", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--profile-blocks", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-all_load", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-allowable_client", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--analyze", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("--analyzer-output"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xanalyzer", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-arch", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-arch_only", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--autocomplete"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-bind_at_load", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-bundle", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-bundle_loader", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-client_name", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--config", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--cuda-host-only", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-cuid"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-current_version"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dead_strip", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dependency-dot", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dependency-file", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-dsym-dir"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dumpmachine", 0),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dumpversion", 0),
+            ArgumentKind::Other(Some(CompilerPass::Info)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("--dyld-prefix"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dylib_file", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dylinker", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dynamic", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-dynamiclib", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-emit-ast", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-faligned-new"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-force_load", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-framework", 1),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--gcc-toolchain"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-gcodeview", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-gcodeview-ghash", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--hip-link", 0),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--hip-version"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-ibuiltininc", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-image_base", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-index-header-map", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-init", 1), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-install_name", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-lazy", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-EB", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("--migrate", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("-mllvm"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-multiply_defined", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("--output"),
+            ArgumentKind::Output,
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-objcmt", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-object", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--profile", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("--pipe", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-r", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Prefix("--save", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-sect", 3), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-seg1addr"),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-seg_", 1), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-segaddr", 2),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-segcreate", 3),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-seglinkedit", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-segprot", 3),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-single_module", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-sub_", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("--sysroot"),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--target"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -92,39 +354,68 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Exactly("-target", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
+        FlagRule::new(FlagPattern::Exactly("-time", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Prefix("--traditional", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-traditional", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-twolevel", 0),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-umbrella", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-unwindlib"),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--unwindlib"),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("--language"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xassembler", 1),
+            ArgumentKind::Other(None),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xclang", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xpreprocessor", 1),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        // Additional flags for compatibility with existing tests
         FlagRule::new(
             FlagPattern::Exactly("-triple", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        // Clang static analysis (not covered by GCC)
-        FlagRule::new(
-            FlagPattern::Exactly("--analyze", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xanalyzer", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-analyzer-config", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang code generation (not covered by -f prefix due to no dash)
         FlagRule::new(
             FlagPattern::Exactly("-emit-llvm", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang resource directory (not covered by any prefix)
         FlagRule::new(
             FlagPattern::Exactly("-resource-dir", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang compilation database (not covered by any prefix)
         FlagRule::new(
             FlagPattern::Exactly("-MJ", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        // Clang CUDA support (--cuda-* not covered by any prefix)
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--cuda-path"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -133,21 +424,14 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEqOrSep("--cuda-gpu-arch"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang HIP support (not covered by any prefix)
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--hip-path"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        // Clang cross-compilation toolchain support (not covered by any prefix)
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("--gcc-toolchain"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--gcc-install-dir"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang plugin support (not covered by any prefix)
         FlagRule::new(
             FlagPattern::Exactly("-load", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -160,23 +444,167 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Prefix("-plugin-arg-", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        // Clang framework support (macOS/iOS) - -F not covered by GCC
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-F"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-framework", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        // Clang LLVM option passing (must be before -m prefix matcher)
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("-mllvm"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
     ];
 
     // Add GCC-compatible flags as the base (after Clang-specific ones for priority)
+    flags.extend(GCC_FLAGS.iter().cloned());
+
+    // Sort by flag length descending to ensure longer matches are tried first
+    flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+
+    flags
+});
+
+/// Flang (Fortran) compiler interpreter.
+///
+/// This interpreter recognizes Flang Fortran compiler commands and their associated flags.
+/// It extends the base GCC flag set with Fortran-specific flags and patterns.
+pub struct FlangInterpreter {
+    /// Flag analyzer that recognizes and categorizes Flang command-line flags
+    /// (includes GCC-compatible flags plus Flang-specific extensions)
+    matcher: FlagAnalyzer,
+}
+
+impl Default for FlangInterpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FlangInterpreter {
+    /// Creates a new Flang interpreter with comprehensive Fortran flag definitions.
+    ///
+    /// This combines Flang-specific flags with the base GCC flag set to provide
+    /// complete Fortran compilation command recognition.
+    pub fn new() -> Self {
+        Self {
+            matcher: FlagAnalyzer::new(&FLANG_FLAGS),
+        }
+    }
+}
+
+impl Interpreter for FlangInterpreter {
+    fn recognize(&self, execution: &Execution) -> Option<Command> {
+        // Parse both command-line arguments and environment variables
+        let annotated_args = parse_arguments_and_environment(&self.matcher, execution);
+
+        Some(Command::Compiler(CompilerCommand::new(
+            execution.working_dir.clone(),
+            execution.executable.clone(),
+            annotated_args,
+        )))
+    }
+}
+
+/// Flang-specific flags that extend the GCC flag set.
+///
+/// https://flang.llvm.org/docs/FlangDriver.html
+static FLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
+    // Generated flag definitions converted from C++ Bear project ToolClang.cc - FLANG_FLAG_DEFINITION
+    let mut flags = vec![
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-J"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xflang", 1),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-cpp", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-nocpp", 0),
+            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fbackslash", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-backslash", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-fconvert"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fdefault-real-8", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fdisable-real-10", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fdisable-real-3", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-ffixed-form", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-ffree-form", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fimplicit-none", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-flarge-sizes", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-automatic", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-frealloc-lhs", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-realloc-lhs", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-funderscoring", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-underscoring", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-funsigned", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-unsigned", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fxor-operator", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-fno-xor-operator", 0),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-module-dir"),
+            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("--romc-path"),
+            ArgumentKind::Other(Some(CompilerPass::Linking)),
+        ),
+    ];
+
+    // Extend with GCC flags as base
     flags.extend(GCC_FLAGS.iter().cloned());
 
     // Sort by flag length descending to ensure longer matches are tried first
@@ -1199,6 +1627,49 @@ mod tests {
             assert_eq!(reason, "clang internal invocation");
         } else {
             panic!("Expected ignored command for -cc1 invocation");
+        }
+    }
+
+    #[test]
+    fn test_flang_interpreter_basic() {
+        let interpreter = FlangInterpreter::new();
+
+        // Test basic Fortran compilation with Flang-specific flags
+        let execution = create_execution(
+            "flang",
+            vec![
+                "flang",
+                "-fbackslash",
+                "-ffree-form",
+                "-J/path/to/modules",
+                "-cpp",
+                "main.f90",
+            ],
+            "/project",
+        );
+
+        if let Some(Command::Compiler(cmd)) = interpreter.recognize(&execution) {
+            assert_eq!(cmd.arguments.len(), 6);
+
+            // Check that Flang-specific flags are recognized
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Compiling))
+            ); // -fbackslash
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Compiling))
+            ); // -ffree-form
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Compiling))
+            ); // -J
+            assert_eq!(
+                cmd.arguments[4].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
+            ); // -cpp
+        } else {
+            panic!("Expected compiler command for Flang");
         }
     }
 }
