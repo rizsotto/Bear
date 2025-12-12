@@ -500,13 +500,11 @@ mod tests {
                 path: PathBuf::from("custom-gcc-wrapper"),
                 as_: Some(CompilerType::Gcc),
                 ignore: false,
-                flags: None,
             },
             Compiler {
                 path: PathBuf::from("weird-clang-name"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
         ];
 
@@ -611,35 +609,30 @@ mod tests {
                 path: PathBuf::from("custom-wrapper"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
             // Compiler without 'as' field but matches default pattern - should guess Clang
             Compiler {
                 path: PathBuf::from("clang++"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
             // Compiler without 'as' field and no pattern match - should fall back to GCC
             Compiler {
                 path: PathBuf::from("unknown-compiler"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
             // Ignored compiler - should not be included in hints
             Compiler {
                 path: PathBuf::from("ignored-gcc"),
                 as_: Some(CompilerType::Gcc),
                 ignore: true,
-                flags: None,
             },
             // Another compiler without 'as' field matching Fortran pattern
             Compiler {
                 path: PathBuf::from("gfortran"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
         ];
 

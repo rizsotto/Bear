@@ -410,26 +410,22 @@ mod tests {
                 path: PathBuf::from("custom-gcc-wrapper"),
                 as_: Some(CompilerType::Gcc),
                 ignore: false,
-                flags: None,
             },
             Compiler {
                 path: PathBuf::from("weird-clang-binary"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
             Compiler {
                 path: PathBuf::from("intel-fortran-custom"),
                 as_: Some(CompilerType::IntelFortran),
                 ignore: false,
-                flags: None,
             },
             // This one has no hint, should use auto-detection
             Compiler {
                 path: PathBuf::from("gcc"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
         ];
 
@@ -506,7 +502,6 @@ mod tests {
                 path: PathBuf::from("gcc"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
         ];
 
@@ -529,7 +524,6 @@ mod tests {
             path: PathBuf::from("./custom-compiler"),
             as_: Some(CompilerType::Gcc),
             ignore: false,
-            flags: None,
         }];
 
         let recognizer = CompilerRecognizer::new_with_config(&compilers);
@@ -550,27 +544,23 @@ mod tests {
                 path: PathBuf::from("arm-linux-gnueabi-gcc-wrapper"),
                 as_: Some(CompilerType::Gcc),
                 ignore: false,
-                flags: None,
             },
             // Custom Clang wrapper that doesn't follow naming conventions
             Compiler {
                 path: PathBuf::from("project-clang"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
             // Standard compilers with no hints - should auto-detect
             Compiler {
                 path: PathBuf::from("clang-15"),
                 as_: None, // Should auto-detect as Clang
                 ignore: false,
-                flags: None,
             },
             Compiler {
                 path: PathBuf::from("gfortran"),
                 as_: None, // Should auto-detect as Fortran
                 ignore: false,
-                flags: None,
             },
         ];
 
@@ -612,14 +602,12 @@ mod tests {
                 path: PathBuf::from("gcc"),
                 as_: Some(CompilerType::Gcc),
                 ignore: false,
-                flags: None,
             },
             // Incorrectly hinted compiler (would be detected as GCC but hinted as Clang)
             Compiler {
                 path: PathBuf::from("g++"),
                 as_: Some(CompilerType::Clang),
                 ignore: false,
-                flags: None,
             },
         ];
 

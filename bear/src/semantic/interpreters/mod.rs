@@ -131,7 +131,6 @@ mod test {
                 path: PathBuf::from("/usr/bin/gcc"),
                 as_: None,
                 ignore: true,
-                flags: None,
             }],
             ..Default::default()
         };
@@ -161,13 +160,11 @@ mod test {
                     path: PathBuf::from("/usr/bin/gcc"),
                     as_: None,
                     ignore: true,
-                    flags: None,
                 },
                 config::Compiler {
                     path: PathBuf::from("/usr/bin/clang"),
                     as_: None,
                     ignore: false,
-                    flags: None,
                 },
             ],
             ..Default::default()

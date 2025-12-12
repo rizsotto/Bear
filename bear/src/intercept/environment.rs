@@ -391,13 +391,11 @@ mod test {
                 path: PathBuf::from("/usr/bin/gcc"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
             config::Compiler {
                 path: PathBuf::from("/usr/bin/clang"),
                 as_: None,
                 ignore: false,
-                flags: None,
             },
         ];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
@@ -449,7 +447,6 @@ mod test {
             path: PathBuf::from("/usr/bin/clang"),
             as_: None,
             ignore: false,
-            flags: None,
         }];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 

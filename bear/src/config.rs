@@ -29,9 +29,6 @@
 //!   - path: /usr/bin/cc
 //!     ignore: true
 //!   - path: /usr/bin/clang++
-//!     flags:
-//!       add: ["-I/opt/MPI/include"]
-//!       remove: ["-Wall"]
 //!
 //! sources:
 //!   only_existing_files: true
@@ -157,8 +154,6 @@ mod types {
         pub as_: Option<CompilerType>,
         #[serde(default)]
         pub ignore: bool,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub flags: Option<CompilerFlags>,
     }
 
     /// Compiler types that we can recognize and configure
@@ -188,15 +183,6 @@ mod types {
             };
             write!(f, "{}", name)
         }
-    }
-
-    /// Compiler flags configuration for add/remove operations.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-    pub struct CompilerFlags {
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        pub add: Vec<String>,
-        #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        pub remove: Vec<String>,
     }
 
     /// Action to take for files matching a directory rule
@@ -502,39 +488,6 @@ pub mod validation {
                 });
             }
 
-            // Validate compiler flags if present
-            if let Some(ref flags) = config.flags {
-                collector.add_result(CompilerFlags::validate(flags));
-            }
-
-            collector.finish()
-        }
-    }
-
-    impl Validator<CompilerFlags> for CompilerFlags {
-        type Error = ValidationError;
-
-        fn validate(config: &CompilerFlags) -> Result<(), Self::Error> {
-            let mut collector = ValidationCollector::new();
-
-            // Check add flags for empty strings
-            for (idx, flag) in config.add.iter().enumerate() {
-                if flag.trim().is_empty() {
-                    collector.add(ValidationError::EmptyString {
-                        field: format!("flags.add[{}]", idx),
-                    });
-                }
-            }
-
-            // Check remove flags for empty strings
-            for (idx, flag) in config.remove.iter().enumerate() {
-                if flag.trim().is_empty() {
-                    collector.add(ValidationError::EmptyString {
-                        field: format!("flags.remove[{}]", idx),
-                    });
-                }
-            }
-
             collector.finish()
         }
     }
@@ -602,7 +555,6 @@ pub mod validation {
                 path: PathBuf::from("/nonexistent/compiler"),
                 as_: Some(CompilerType::Gcc),
                 ignore: false,
-                flags: None,
             };
 
             let result = Compiler::validate(&config);
@@ -613,24 +565,6 @@ pub mod validation {
                     // Expected - path doesn't exist
                 }
                 _ => panic!("Expected PathNotFound validation error"),
-            }
-        }
-
-        #[test]
-        fn test_validate_compiler_flags_empty_strings() {
-            let flags = CompilerFlags {
-                add: vec!["valid_flag".to_string(), "".to_string()],
-                remove: vec!["".to_string()],
-            };
-
-            let result = CompilerFlags::validate(&flags);
-            assert!(result.is_err());
-
-            match result.unwrap_err() {
-                ValidationError::Multiple { errors } => {
-                    assert_eq!(errors.len(), 2);
-                }
-                _ => panic!("Expected multiple validation errors"),
             }
         }
 
@@ -914,22 +848,16 @@ pub mod loader {
                         path: PathBuf::from("/usr/local/bin/cc"),
                         as_: Some(CompilerType::Gcc),
                         ignore: false,
-                        flags: None,
                     },
                     Compiler {
                         path: PathBuf::from("/usr/bin/cc"),
                         as_: None,
                         ignore: true,
-                        flags: None,
                     },
                     Compiler {
                         path: PathBuf::from("/usr/bin/clang++"),
                         as_: None,
                         ignore: false,
-                        flags: Some(CompilerFlags {
-                            add: vec!["-I/opt/MPI/include".to_string()],
-                            remove: vec!["-Wall".to_string()],
-                        }),
                     },
                 ],
                 sources: SourceFilter {
