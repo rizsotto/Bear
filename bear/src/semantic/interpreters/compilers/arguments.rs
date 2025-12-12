@@ -36,7 +36,7 @@ impl OtherArguments {
 
 impl Arguments for OtherArguments {
     fn kind(&self) -> ArgumentKind {
-        self.kind.clone()
+        self.kind
     }
 
     fn as_arguments(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {

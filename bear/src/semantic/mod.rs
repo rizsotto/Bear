@@ -123,7 +123,7 @@ pub trait Arguments: std::fmt::Debug {
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
 /// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
 ///   Can optionally specify which compiler pass the argument affects.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArgumentKind {
     Compiler,
     Source,
@@ -132,7 +132,7 @@ pub enum ArgumentKind {
 }
 
 /// Represents different compiler passes that an argument might affect.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CompilerPass {
     Info,
     Preprocessing,

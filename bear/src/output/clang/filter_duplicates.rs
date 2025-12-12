@@ -12,7 +12,7 @@ use super::Entry;
 use crate::config;
 use thiserror::Error;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DuplicateEntryFilter {
     /// The fields to use for filtering duplicate entries.
     fields: Vec<config::OutputFields>,
@@ -67,7 +67,7 @@ impl TryFrom<config::DuplicateFilter> for DuplicateEntryFilter {
         let mut already_seen = HashSet::new();
         for field in &config.match_on {
             if !already_seen.insert(field) {
-                return Err(ConfigurationError::DuplicateField(field.clone()));
+                return Err(ConfigurationError::DuplicateField(*field));
             }
         }
 

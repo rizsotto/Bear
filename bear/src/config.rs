@@ -71,11 +71,11 @@ pub use types::*;
 pub use validation::Validator;
 
 mod types {
-    use serde::{Deserialize, Serialize};
+    use serde::Deserialize;
     use std::path::PathBuf;
 
     /// Represents the application configuration with flattened structure.
-    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct Main {
         #[serde(deserialize_with = "validate_schema_version")]
         pub schema: String,
@@ -105,7 +105,7 @@ mod types {
     }
 
     /// Simplified intercept configuration with mode and directory.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     #[serde(tag = "mode")]
     pub enum Intercept {
         #[serde(rename = "wrapper")]
@@ -147,7 +147,7 @@ mod types {
     }
 
     /// Represents compiler configuration matching the YAML format.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct Compiler {
         pub path: PathBuf,
         #[serde(rename = "as", skip_serializing_if = "Option::is_none")]
@@ -157,7 +157,7 @@ mod types {
     }
 
     /// Compiler types that we can recognize and configure
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
     #[serde(rename_all = "lowercase")]
     pub enum CompilerType {
         #[serde(alias = "gcc", alias = "gnu")]
@@ -186,7 +186,7 @@ mod types {
     }
 
     /// Action to take for files matching a directory rule
-    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
     #[serde(rename_all = "lowercase")]
     pub enum DirectoryAction {
         Include,
@@ -194,7 +194,7 @@ mod types {
     }
 
     /// A rule that specifies how to handle files within a directory
-    #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct DirectoryRule {
         pub path: PathBuf,
         pub action: DirectoryAction,
@@ -217,7 +217,7 @@ mod types {
     ///
     /// **Important**: For matching to work correctly, rule paths should use the same format as
     /// configured in `format.paths.file`. This consistency is the user's responsibility.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct SourceFilter {
         #[serde(default = "default_enabled")]
         pub only_existing_files: bool,
@@ -235,7 +235,7 @@ mod types {
     }
 
     /// Duplicate filter configuration matching the YAML format.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct DuplicateFilter {
         pub match_on: Vec<OutputFields>,
     }
@@ -249,7 +249,7 @@ mod types {
     }
 
     /// Represent the fields of the JSON compilation database record.
-    #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
     pub enum OutputFields {
         #[serde(rename = "directory")]
         Directory,
@@ -264,7 +264,7 @@ mod types {
     }
 
     /// Format configuration matching the YAML format.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct Format {
         #[serde(default)]
         pub paths: PathFormat,
@@ -273,7 +273,7 @@ mod types {
     }
 
     /// Format configuration of paths in the JSON compilation database.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct PathFormat {
         #[serde(default)]
         pub directory: PathResolver,
@@ -282,7 +282,7 @@ mod types {
     }
 
     /// Path resolver options matching the YAML format.
-    #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
     pub enum PathResolver {
         /// Leave the path as is without any transformation. (Default)
         #[default]
@@ -300,7 +300,7 @@ mod types {
     }
 
     /// Configuration for formatting output entries matching the YAML format.
-    #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct EntryFormat {
         #[serde(default = "default_enabled")]
         pub use_array_format: bool,

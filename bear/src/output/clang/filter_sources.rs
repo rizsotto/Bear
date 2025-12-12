@@ -39,7 +39,7 @@ use thiserror::Error;
 
 /// A filter that determines which compilation database entries should be included
 /// based on source file paths and directory-based rules.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SourceEntryFilter {
     /// The source filter configuration containing directory rules.
     config: SourceFilter,

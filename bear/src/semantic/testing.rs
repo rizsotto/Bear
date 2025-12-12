@@ -27,7 +27,7 @@ impl TestArguments {
 
 impl Arguments for TestArguments {
     fn kind(&self) -> ArgumentKind {
-        self.kind.clone()
+        self.kind
     }
 
     fn as_arguments(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {

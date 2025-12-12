@@ -16,7 +16,6 @@ mod filter_duplicates;
 mod filter_sources;
 mod format;
 
-use serde::{Deserialize, Serialize};
 use shell_words;
 use std::path;
 use thiserror::Error;
@@ -28,7 +27,7 @@ pub use filter_sources::{SourceEntryFilter, SourceFilterError};
 pub use format::{ConfigurablePathFormatter, FormatConfigurationError, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Entry {
     /// The main translation unit source processed by this compilation step.
     /// This is used by tools as the key into the compilation database.
@@ -175,7 +174,7 @@ mod tests {
         assert!(entry.command.is_empty());
         assert!(!entry.arguments.is_empty());
 
-        assert!(entry.clone().validate().is_ok());
+        assert!(entry.validate().is_ok());
     }
 
     #[test]
@@ -185,7 +184,7 @@ mod tests {
         assert!(!entry.command.is_empty());
         assert!(entry.arguments.is_empty());
 
-        assert!(entry.clone().validate().is_ok());
+        assert!(entry.validate().is_ok());
     }
 
     #[test]

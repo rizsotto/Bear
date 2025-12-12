@@ -144,9 +144,9 @@ pub(super) struct UniqueOutputWriter<T: IteratorWriter<clang::Entry>> {
 impl<T: IteratorWriter<clang::Entry>> UniqueOutputWriter<T> {
     pub(super) fn create(
         writer: T,
-        config: &config::DuplicateFilter,
+        config: config::DuplicateFilter,
     ) -> Result<Self, WriterCreationError> {
-        let filter = clang::DuplicateEntryFilter::try_from(config.clone())
+        let filter = clang::DuplicateEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
         Ok(Self { writer, filter })
@@ -155,7 +155,7 @@ impl<T: IteratorWriter<clang::Entry>> UniqueOutputWriter<T> {
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for UniqueOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        let mut filter = self.filter.clone();
+        let mut filter = self.filter;
         let filtered_entries = entries.filter(move |entry| filter.unique(entry));
 
         self.writer.write(filtered_entries)
@@ -175,9 +175,9 @@ pub(super) struct SourceFilterOutputWriter<T: IteratorWriter<clang::Entry>> {
 impl<T: IteratorWriter<clang::Entry>> SourceFilterOutputWriter<T> {
     pub(super) fn create(
         writer: T,
-        config: &config::SourceFilter,
+        config: config::SourceFilter,
     ) -> Result<Self, WriterCreationError> {
-        let filter = clang::SourceEntryFilter::try_from(config.clone())
+        let filter = clang::SourceEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
         Ok(Self { writer, filter })
@@ -335,7 +335,7 @@ mod tests {
             ],
         };
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, &config).unwrap();
+        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
 
         let entries = vec![
             clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
@@ -360,7 +360,7 @@ mod tests {
             directories: vec![],
         };
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, &config).unwrap();
+        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
 
         let entries = vec![clang::Entry::from_arguments_str(
             "any/file.c",
@@ -392,7 +392,7 @@ mod tests {
             ],
         };
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, &config).unwrap();
+        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
 
         let entries = vec![
             clang::Entry::from_arguments_str("./src/main.c", vec!["gcc", "-c"], "/project", None),
@@ -435,9 +435,9 @@ mod tests {
 
         // Build the writer pipeline: base -> unique -> source_filter
         let base_writer = ClangOutputWriter::create(&output_path).unwrap();
-        let unique_writer = UniqueOutputWriter::create(base_writer, &duplicate_config).unwrap();
+        let unique_writer = UniqueOutputWriter::create(base_writer, duplicate_config).unwrap();
         let source_filter_writer =
-            SourceFilterOutputWriter::create(unique_writer, &source_config).unwrap();
+            SourceFilterOutputWriter::create(unique_writer, source_config).unwrap();
 
         // Test entries: some should be filtered, some should pass through
         let entries = vec![

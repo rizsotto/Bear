@@ -50,9 +50,9 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
         let temp_path = &args.path.with_extension("tmp");
 
         let base_writer = ClangOutputWriter::create(temp_path)?;
-        let unique_writer = UniqueOutputWriter::create(base_writer, &config.duplicates)?;
+        let unique_writer = UniqueOutputWriter::create(base_writer, config.duplicates.clone())?;
         let source_filter_writer =
-            SourceFilterOutputWriter::create(unique_writer, &config.sources)?;
+            SourceFilterOutputWriter::create(unique_writer, config.sources.clone())?;
         let atomic_writer =
             AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
         let append_writer = AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
