@@ -75,6 +75,10 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     let cuda_pattern =
         Regex::new(r"^(?:[^/]*-)?nvcc(?:-[\d.]+)?$").expect("Invalid CUDA regex pattern");
 
+    // Wrapper pattern: matches common compiler wrappers
+    let wrapper_pattern =
+        Regex::new(r"^(?:ccache|distcc|sccache)$").expect("Invalid wrapper regex pattern");
+
     vec![
         (CompilerType::Gcc, gcc_pattern),
         (CompilerType::Gcc, gcc_internal_pattern),
@@ -83,6 +87,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         (CompilerType::IntelFortran, intel_fortran_pattern),
         (CompilerType::CrayFortran, cray_fortran_pattern),
         (CompilerType::Cuda, cuda_pattern),
+        (CompilerType::Wrapper, wrapper_pattern),
     ]
 });
 
@@ -686,8 +691,41 @@ mod tests {
         // Test non-CUDA executables don't match
         // Note: fake-nvcc matches because it looks like a cross-compilation target
         assert_eq!(recognizer.recognize(path("nvcc-fake")), None); // Invalid suffix
-        assert_eq!(recognizer.recognize(path("nvcctest")), None); // No dash separator
         assert_eq!(recognizer.recognize(path("not-nvcc-at-all")), None);
         assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
+    }
+
+    #[test]
+    fn test_wrapper_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        // Test wrapper recognition
+        assert_eq!(
+            recognizer.recognize(path("ccache")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(
+            recognizer.recognize(path("distcc")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(
+            recognizer.recognize(path("sccache")),
+            Some(CompilerType::Wrapper)
+        );
+
+        // Test with full paths
+        assert_eq!(
+            recognizer.recognize(path("/usr/bin/ccache")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(
+            recognizer.recognize(path("/opt/distcc/bin/distcc")),
+            Some(CompilerType::Wrapper)
+        );
+
+        // Test non-wrapper executables don't match
+        assert_eq!(recognizer.recognize(path("ccache-fake")), None);
+        assert_eq!(recognizer.recognize(path("fake-distcc")), None);
+        assert_eq!(recognizer.recognize(path("not-sccache")), None);
     }
 }

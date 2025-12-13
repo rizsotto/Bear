@@ -50,12 +50,15 @@ impl<T: Interpreter> Interpreter for InputLogger<T> {
 /// A combinator that logs the output result after delegating to the inner interpreter.
 pub(super) struct OutputLogger<T: Interpreter> {
     inner: T,
-    name: &'static str,
+    name: String,
 }
 
 impl<T: Interpreter> OutputLogger<T> {
-    pub(super) fn new(inner: T, name: &'static str) -> Self {
-        Self { inner, name }
+    pub(super) fn new(inner: T, name: impl Into<String>) -> Self {
+        Self {
+            inner,
+            name: name.into(),
+        }
     }
 }
 

@@ -172,6 +172,8 @@ mod types {
         CrayFortran,
         #[serde(alias = "nvcc", alias = "cuda")]
         Cuda,
+        #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
+        Wrapper,
     }
 
     impl std::fmt::Display for CompilerType {
@@ -183,6 +185,7 @@ mod types {
                 CompilerType::IntelFortran => "Intel Fortran",
                 CompilerType::CrayFortran => "Cray Fortran",
                 CompilerType::Cuda => "CUDA",
+                CompilerType::Wrapper => "Wrapper",
             };
             write!(f, "{}", name)
         }

@@ -43,7 +43,7 @@ use std::path::{Path, PathBuf};
 /// a known command (such as a compiler or interpreter). If recognized, they
 /// return a [`Command`] representing the semantic meaning of the execution.
 #[cfg_attr(test, mockall::automock)]
-pub trait Interpreter: Send {
+pub trait Interpreter: Send + Sync {
     /// An [`Option<Command>`] containing the recognized command, or `None` if not recognized.
     fn recognize(&self, execution: &Execution) -> Option<Command>;
 }
