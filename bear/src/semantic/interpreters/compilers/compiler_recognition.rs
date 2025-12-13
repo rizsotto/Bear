@@ -71,6 +71,10 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     let cray_fortran_pattern =
         Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?$").expect("Invalid Cray Fortran regex pattern");
 
+    // CUDA pattern: matches nvcc (NVIDIA CUDA Compiler) with optional cross-compilation prefixes and version suffixes
+    let cuda_pattern =
+        Regex::new(r"^(?:[^/]*-)?nvcc(?:-[\d.]+)?$").expect("Invalid CUDA regex pattern");
+
     vec![
         (CompilerType::Gcc, gcc_pattern),
         (CompilerType::Gcc, gcc_internal_pattern),
@@ -78,6 +82,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         (CompilerType::Flang, fortran_pattern),
         (CompilerType::IntelFortran, intel_fortran_pattern),
         (CompilerType::CrayFortran, cray_fortran_pattern),
+        (CompilerType::Cuda, cuda_pattern),
     ]
 });
 
@@ -657,5 +662,32 @@ mod tests {
             recognizer.recognize(path("gfortran")),
             Some(CompilerType::Flang)
         );
+    }
+
+    #[test]
+    fn test_cuda_recognition() {
+        let recognizer = CompilerRecognizer::default();
+
+        // Test basic CUDA compiler recognition
+        assert_eq!(recognizer.recognize(path("nvcc")), Some(CompilerType::Cuda));
+
+        // Test versioned CUDA compiler
+        assert_eq!(
+            recognizer.recognize(path("nvcc-12.0")),
+            Some(CompilerType::Cuda)
+        );
+
+        // Test cross-compilation CUDA compiler
+        assert_eq!(
+            recognizer.recognize(path("aarch64-linux-gnu-nvcc")),
+            Some(CompilerType::Cuda)
+        );
+
+        // Test non-CUDA executables don't match
+        // Note: fake-nvcc matches because it looks like a cross-compilation target
+        assert_eq!(recognizer.recognize(path("nvcc-fake")), None); // Invalid suffix
+        assert_eq!(recognizer.recognize(path("nvcctest")), None); // No dash separator
+        assert_eq!(recognizer.recognize(path("not-nvcc-at-all")), None);
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
     }
 }

@@ -170,6 +170,8 @@ mod types {
         IntelFortran,
         #[serde(alias = "crayftn", alias = "cray-fortran", alias = "cray_fortran")]
         CrayFortran,
+        #[serde(alias = "nvcc", alias = "cuda")]
+        Cuda,
     }
 
     impl std::fmt::Display for CompilerType {
@@ -180,6 +182,7 @@ mod types {
                 CompilerType::Flang => "Flang",
                 CompilerType::IntelFortran => "Intel Fortran",
                 CompilerType::CrayFortran => "Cray Fortran",
+                CompilerType::Cuda => "CUDA",
             };
             write!(f, "{}", name)
         }

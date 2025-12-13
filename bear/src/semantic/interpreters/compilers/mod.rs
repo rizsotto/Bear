@@ -9,6 +9,7 @@ pub mod arguments;
 pub mod clang;
 pub mod compiler_recognition;
 pub mod cray_fortran;
+pub mod cuda;
 pub mod gcc;
 pub mod intel_fortran;
 
@@ -19,6 +20,7 @@ use crate::semantic::{Command, Interpreter};
 use clang::{ClangInterpreter, FlangInterpreter};
 use compiler_recognition::CompilerRecognizer;
 use cray_fortran::CrayFortranInterpreter;
+use cuda::CudaInterpreter;
 use gcc::GccInterpreter;
 use intel_fortran::IntelFortranInterpreter;
 
@@ -43,6 +45,8 @@ pub struct CompilerInterpreter {
     intel_fortran_interpreter: OutputLogger<IntelFortranInterpreter>,
     /// Cray Fortran-specific argument parser with logging
     cray_fortran_interpreter: OutputLogger<CrayFortranInterpreter>,
+    /// CUDA-specific argument parser with logging
+    cuda_interpreter: OutputLogger<CudaInterpreter>,
 }
 
 impl CompilerInterpreter {
@@ -61,6 +65,7 @@ impl CompilerInterpreter {
                 CrayFortranInterpreter::default(),
                 "cray_fortran",
             ),
+            cuda_interpreter: OutputLogger::new(CudaInterpreter::default(), "cuda"),
         }
     }
 }
@@ -80,6 +85,7 @@ impl Default for CompilerInterpreter {
                 CrayFortranInterpreter::default(),
                 "cray_fortran",
             ),
+            cuda_interpreter: OutputLogger::new(CudaInterpreter::default(), "cuda"),
         }
     }
 }
@@ -108,6 +114,10 @@ impl Interpreter for CompilerInterpreter {
                 Some(CompilerType::CrayFortran) => {
                     // Delegate to Cray Fortran interpreter
                     this.cray_fortran_interpreter.recognize(execution)
+                }
+                Some(CompilerType::Cuda) => {
+                    // Delegate to CUDA interpreter
+                    this.cuda_interpreter.recognize(execution)
                 }
                 None => {
                     // Compiler not recognized - no parsing performed
@@ -655,5 +665,49 @@ mod tests {
             Some(CompilerType::Clang),
             "Hint should take priority even when it conflicts with auto-detection"
         );
+    }
+
+    #[test]
+    fn test_cuda_recognition_and_delegation() {
+        use crate::config;
+        use crate::semantic::interpreters::create;
+        use crate::semantic::{ArgumentKind, CompilerPass};
+
+        let config = config::Main::default();
+        let interpreter = create(&config).unwrap();
+
+        let execution = create_execution(
+            "nvcc",
+            vec![
+                "nvcc",
+                "--gpu-architecture=sm_80",
+                "-c",
+                "kernel.cu",
+                "-o",
+                "kernel.o",
+            ],
+            "/project",
+        );
+
+        let result = interpreter.recognize(&execution);
+        assert!(result.is_some());
+        match result.unwrap() {
+            Command::Compiler(cmd) => {
+                // Verify it's recognized as a compiler command
+                assert_eq!(cmd.arguments.len(), 5);
+                assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+                assert_eq!(
+                    cmd.arguments[1].kind(),
+                    ArgumentKind::Other(Some(CompilerPass::Compiling))
+                );
+                assert_eq!(
+                    cmd.arguments[2].kind(),
+                    ArgumentKind::Other(Some(CompilerPass::Compiling))
+                );
+                assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+                assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Output);
+            }
+            Command::Ignored(_) => panic!("Expected compiler command, got ignored"),
+        }
     }
 }
