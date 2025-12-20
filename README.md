@@ -14,8 +14,8 @@ The [JSON compilation database][JSONCDB] is used in the clang project
 to provide information on how a single compilation unit is processed.
 With this, it is easy to re-run the compilation with alternate programs.
 
-Some build system natively supports the generation of JSON compilation
-database. For projects which does not use such build tool, Bear generates
+Some build systems natively support the generation of JSON compilation
+database. For projects that do not use such build tools, Bear generates
 the JSON file during the build process.
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
@@ -36,11 +36,11 @@ After installation the usage is like this:
 
 The output file called `compile_commands.json` is saved in the current directory.
 
-For more options you can check the man page or pass `--help` parameter. Note
-that if you want to pass parameter to Bear, pass those _before_ the `--` sign,
-everything after that will be the build command. 
+For more options, you can check the man page or pass the `--help` parameter. Note
+that if you want to pass parameters to Bear, pass those _before_ the `--` sign;
+everything after that will be the build command.
 
-Please be aware that some package manager still ship our old 2.4.x release. 
+Please be aware that some package managers still ship our old 2.4.x release.
 In that case please omit the extra `--` sign or consult your local documentation.
 
 For more, read the man pages or [wiki][WIKI] of the project, which talks about
@@ -66,8 +66,3 @@ Please follow the [contribution guide][GUIDE] when you do these.
   [WIKI]: https://github.com/rizsotto/Bear/wiki
   [CHAT]: https://gitter.im/rizsotto/Bear
   [GUIDE]: https://github.com/rizsotto/Bear/blob/master/CONTRIBUTING.md
-
----
-
-Thanks to [JetBrains](https://www.jetbrains.com/?from=Bear)
-for donating product licenses to help develop Bear

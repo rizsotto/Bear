@@ -34,12 +34,10 @@ and generate a JSON compilation database.
 
 The basic flow is as follows:
 1. **Interception:**
-   - On Linux and other Unix-like systems, Bear uses a dynamic library loaded via `LD_PRELOAD` to intercept
-     system calls that execute commands during the build.
+   - On Linux and other Unix-like systems, Bear uses a dynamic library loaded via `LD_PRELOAD` to intercept system calls that execute commands during the build.
    - On other platforms, Bear provides a wrapper executable to achieve similar command interception.
 2. **Semantic Analysis:**
-   - Bear applies a semantic analysis layer to filter out non-compiler commands, ensuring only relevant
-     compilation commands are processed.
+   - Bear applies a semantic analysis layer to filter out non-compiler commands, ensuring only relevant compilation commands are processed.
 3. **Formatting and Output:**
    - The filtered commands are formatted according to user-provided configuration.
    - The resulting compilation database is written as a JSON file, typically named `compile_commands.json`.
@@ -65,3 +63,12 @@ For new contributors, we recommend starting with:
 - Complex algorithms should include explanatory comments.
 - Avoid unnecessary dependencies and update them regularly.
 - Use CI for formatting, linting, and testing to catch issues early.
+
+## Agent Protocol & Decision Logic
+Communication Rules:
+1. **The "Pause" Rule:** For any task involving architectural changes or new features, you MUST provide a "Decision Log" before writing code.
+2. **Decision Log Format:**
+   - Proposed Approach
+   - Alternatives Considered
+   - Trade-offs (Performance vs. Simplicity)
+   - Await my "GO" before implementation.
