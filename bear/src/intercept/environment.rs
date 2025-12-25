@@ -45,6 +45,7 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if the configuration is invalid or environment setup fails.
     pub fn create(
+        context: &crate::context::Context,
         intercept: &config::Intercept,
         compilers: &[config::Compiler],
         address: SocketAddr,
@@ -56,9 +57,9 @@ impl BuildEnvironment {
                     .filter(|compiler| !compiler.ignore)
                     .map(|compiler| compiler.path.clone())
                     .collect();
-                Self::create_as_wrapper(path, directory, &executables, address)
+                Self::create_as_wrapper(context, path, directory, &executables, address)
             }
-            config::Intercept::Preload { path } => Self::create_as_preload(path, address),
+            config::Intercept::Preload { path } => Self::create_as_preload(context, path, address),
         }
     }
 
@@ -98,6 +99,7 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if validation fails or wrapper setup encounters errors.
     fn create_as_wrapper(
+        context: &crate::context::Context,
         path: &std::path::Path,
         directory: &std::path::Path,
         executables: &[std::path::PathBuf],
@@ -114,12 +116,13 @@ impl BuildEnvironment {
         // Register executables from environment variables that point to compiler programs
         // and immediately update the final environment with wrapper paths
         let mut environment_overrides = HashMap::new();
-        for (key, value) in std::env::vars() {
-            if crate::environment::program_env(&key) && !value.is_empty() {
-                let program_path = std::path::PathBuf::from(&value);
+        for (key, value) in &context.environment {
+            if crate::environment::program_env(key) && !value.is_empty() {
+                let program_path = std::path::PathBuf::from(value);
                 let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
                 // Update the environment overrides with the wrapper path
-                environment_overrides.insert(key, wrapper_path.to_string_lossy().to_string());
+                environment_overrides
+                    .insert(key.clone(), wrapper_path.to_string_lossy().to_string());
             }
         }
 
@@ -127,7 +130,11 @@ impl BuildEnvironment {
         let wrapper_dir = wrapper_dir_builder.build()?;
 
         // Update PATH environment variable
-        let path_original = std::env::var(KEY_OS__PATH).unwrap_or_default();
+        let path_original = context
+            .environment
+            .get(KEY_OS__PATH)
+            .cloned()
+            .unwrap_or_default();
         let path_updated =
             insert_to_path(&path_original, wrapper_dir.path()).map_err(ConfigurationError::Path)?;
 
@@ -160,11 +167,16 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if validation fails or the preload library path is invalid.
     fn create_as_preload(
+        context: &crate::context::Context,
         path: &std::path::Path,
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
         // Update LD_PRELOAD environment variable
-        let preload_original = std::env::var(KEY_OS__PRELOAD_PATH).unwrap_or_default();
+        let preload_original = context
+            .environment
+            .get(KEY_OS__PRELOAD_PATH)
+            .cloned()
+            .unwrap_or_default();
         let preload_updated =
             insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
 
@@ -268,8 +280,23 @@ fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, Jo
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr};
     use std::path::PathBuf;
+
+    fn create_test_context() -> crate::context::Context {
+        let mut environment = HashMap::new();
+        environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
+        environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
+        environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
+        environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+
+        crate::context::Context {
+            current_executable: PathBuf::from("/usr/bin/bear"),
+            current_directory: PathBuf::from("/tmp"),
+            environment,
+        }
+    }
 
     #[test]
     fn test_insert_to_path_empty_original() {
@@ -357,7 +384,8 @@ mod test {
         let compilers = vec![];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
+        let context = create_test_context();
+        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Check that destination is set
         assert_eq!(
@@ -400,7 +428,8 @@ mod test {
         ];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
+        let context = create_test_context();
+        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Check that destination is set
         assert_eq!(
@@ -450,7 +479,8 @@ mod test {
         }];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let env = BuildEnvironment::create(&intercept, &compilers, address).unwrap();
+        let context = create_test_context();
+        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Get the wrapper directory from the BuildEnvironment
         let wrapper_dir = env

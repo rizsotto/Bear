@@ -681,13 +681,16 @@ pub mod loader {
         /// If the configuration file is specified, it will be used. Otherwise, the default locations
         /// will be searched for the configuration file. If the configuration file is not found, the
         /// default configuration will be returned.
-        pub fn load(filename: &Option<String>) -> Result<Main, ConfigError> {
+        pub fn load(
+            context: &crate::context::Context,
+            filename: &Option<String>,
+        ) -> Result<Main, ConfigError> {
             if let Some(path) = filename {
                 // If the configuration file is specified, use it.
                 Self::from_file(Path::new(path))
             } else {
                 // Otherwise, try to find the configuration file in the default locations.
-                let locations = Self::file_locations();
+                let locations = Self::file_locations(context);
                 for location in locations {
                     debug!("Checking configuration file: {}", location.display());
                     if location.exists() {
@@ -708,12 +711,10 @@ pub mod loader {
         /// - The configuration directory of the user.
         /// - The local configuration directory of the application.
         /// - The configuration directory of the application.
-        fn file_locations() -> Vec<PathBuf> {
+        fn file_locations(context: &crate::context::Context) -> Vec<PathBuf> {
             let mut locations = Vec::new();
 
-            if let Ok(current_dir) = std::env::current_dir() {
-                locations.push(current_dir);
-            }
+            locations.push(context.current_directory.clone());
             if let Some(base_dirs) = BaseDirs::new() {
                 locations.push(base_dirs.config_local_dir().to_path_buf());
                 locations.push(base_dirs.config_dir().to_path_buf());

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::{args, config, modes};
+use bear::{args, config, context, modes};
 use std::env;
 use std::process::ExitCode;
 
@@ -12,19 +12,24 @@ fn main() -> anyhow::Result<ExitCode> {
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");
     log::debug!("{pkg_name} v{pkg_version}");
+    let os = env::consts::OS;
+    let family = env::consts::FAMILY;
+    let arch = env::consts::ARCH;
+    log::debug!("Running on... {family}/{os} {arch}");
 
+    // Capture application context.
+    let context = context::Context::capture()?;
+    log::debug!("{}", context);
     // Parse the command line arguments.
     let matches = args::cli().get_matches();
     let arguments = args::Arguments::try_from(matches)?;
-
-    // Print the arguments.
     log::debug!("Arguments: {arguments:?}");
     // Load the configuration.
-    let configuration = config::Loader::load(&arguments.config)?;
+    let configuration = config::Loader::load(&context, &arguments.config)?;
     log::debug!("Configuration: {configuration:?}");
 
     // Run the application.
-    let application = modes::Mode::configure(arguments, configuration)?;
+    let application = modes::Mode::configure(context, arguments, configuration)?;
     log::debug!("Configuration complete, running the build now...");
     let result = application.run();
     log::debug!("Exit code: {result:?}");

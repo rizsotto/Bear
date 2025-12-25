@@ -10,7 +10,7 @@ mod execution;
 
 use crate::intercept::environment;
 use crate::intercept::tcp::CollectorOnTcp;
-use crate::{args, config, output};
+use crate::{args, config, context, output};
 use std::process::ExitCode;
 use std::sync::Arc;
 
@@ -39,6 +39,7 @@ impl Mode {
     /// If the arguments are valid, we create the appropriate mode instance.
     /// If that is not the case, we try to return a useful error message.
     pub fn configure(
+        context: context::Context,
         args: args::Arguments,
         config: config::Main,
     ) -> Result<Self, ConfigurationError> {
@@ -50,6 +51,7 @@ impl Mode {
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
                 let build = environment::BuildEnvironment::create(
+                    &context,
                     &config.intercept,
                     &config.compilers,
                     address,
@@ -85,6 +87,7 @@ impl Mode {
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
                 let build = environment::BuildEnvironment::create(
+                    &context,
                     &config.intercept,
                     &config.compilers,
                     address,
