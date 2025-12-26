@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::args::BuildCommand;
-use crate::config;
 use crate::environment::{KEY_DESTINATION, KEY_OS__PATH, KEY_OS__PRELOAD_PATH};
 use crate::intercept::supervise;
+use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
+use crate::{args, config, context};
 use std::collections::HashMap;
+#[cfg(windows)]
+use std::env::consts::EXE_EXTENSION;
 use std::env::JoinPathsError;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -45,7 +47,7 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if the configuration is invalid or environment setup fails.
     pub fn create(
-        context: &crate::context::Context,
+        context: &context::Context,
         intercept: &config::Intercept,
         compilers: &[config::Compiler],
         address: SocketAddr,
@@ -99,7 +101,7 @@ impl BuildEnvironment {
     /// Returns a configured `BuildEnvironment` on success, or a `ConfigurationError`
     /// if validation fails or wrapper setup encounters errors.
     fn create_as_wrapper(
-        context: &crate::context::Context,
+        context: &context::Context,
         path: &std::path::Path,
         directory: &std::path::Path,
         executables: &[std::path::PathBuf],
@@ -126,6 +128,16 @@ impl BuildEnvironment {
             }
         }
 
+        // PATH-based discovery (only if no config executables)
+        if executables.is_empty() {
+            let compiler_recognizer = CompilerRecognizer::new();
+            let predicate = |path: &Path| -> bool { compiler_recognizer.recognize(path).is_some() };
+
+            for candidate in Self::compiler_candidates(context, predicate) {
+                wrapper_dir_builder.register_executable(candidate)?;
+            }
+        }
+
         // Finalize wrapper directory (writes config file)
         let wrapper_dir = wrapper_dir_builder.build()?;
 
@@ -145,6 +157,40 @@ impl BuildEnvironment {
             environment_overrides,
             _wrapper_directory: Some(wrapper_dir),
         })
+    }
+
+    /// Discovers compiler executables in PATH directories using a predicate function.
+    ///
+    /// This function scans all directories in the PATH environment variable and applies
+    /// the provided predicate to each executable file found. Executables that match
+    /// the predicate are returned.
+    fn compiler_candidates<P>(
+        context: &context::Context,
+        predicate: P,
+    ) -> impl Iterator<Item = PathBuf>
+    where
+        P: Fn(&Path) -> bool,
+    {
+        context
+            .paths()
+            .into_iter()
+            .filter(|dir| dir.exists())
+            .inspect(|dir| log::debug!("Inspecting directory for compilers: {}", dir.display()))
+            .flat_map(|dir| match std::fs::read_dir(dir) {
+                Ok(entries) => entries
+                    .filter_map(|entry| match entry {
+                        Ok(e) => Some(e.path()),
+                        Err(_) => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+                Err(e) => {
+                    log::debug!("Failed to read directory: {}", e);
+                    Vec::new().into_iter()
+                }
+            })
+            .filter(move |path| is_executable_file(path) && predicate(path))
+            .inspect(|path| log::debug!("Found compiler candidate: {}", path.display()))
     }
 
     /// Creates a `BuildEnvironment` configured for preload mode interception.
@@ -206,9 +252,9 @@ impl BuildEnvironment {
     /// or `Err(SuperviseError)` if the command execution fails or cannot be supervised.
     pub fn run_build(
         &self,
-        build_command: BuildCommand,
+        build_command: args::BuildCommand,
     ) -> Result<ExitStatus, supervise::SuperviseError> {
-        log::debug!("Running build command: {build_command:?}");
+        log::info!("Build command to run: {build_command:?}");
 
         let [executable, args @ ..] = build_command.arguments.as_slice() else {
             // Safe to presume that the build command was already checked.
@@ -220,6 +266,7 @@ impl BuildEnvironment {
 
         // Set only the environment variables we need to override
         for (key, value) in &self.environment_overrides {
+            log::info!("Build command environment override: {key}={value}");
             command.env(key, value);
         }
 
@@ -238,6 +285,8 @@ pub enum ConfigurationError {
     Path(#[from] JoinPathsError),
     #[error("Wrapper directory error: {0}")]
     WrapperDirectory(#[from] WrapperDirectoryError),
+    #[error("Could not find PATH variable")]
+    PathNotFound,
 }
 
 /// Manipulates a `PATH`-like environment variable by inserting a path at the beginning.
@@ -275,6 +324,30 @@ fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, Jo
         .collect();
     paths.insert(0, first_path.to_owned());
     std::env::join_paths(paths).map(|os_string| os_string.into_string().unwrap_or_default())
+}
+
+/// Checks if a path represents an executable file.
+fn is_executable_file(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+
+    // Check if file is executable
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = path.metadata() {
+            metadata.permissions().mode() & 0o111 != 0
+        } else {
+            false
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        // On Windows, assume .exe files are executable, others might be scripts
+        path.extension().map_or(false, |ext| ext == EXE_EXTENSION)
+    }
 }
 
 #[cfg(test)]
@@ -518,5 +591,104 @@ mod test {
         // Clean up environment variables
         std::env::remove_var("CC");
         std::env::remove_var("CXX");
+    }
+
+    #[test]
+    fn test_path_discovery_with_empty_executables() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        // Create a temporary directory with mock compilers
+        let temp_dir = TempDir::new().unwrap();
+        let bin_dir = temp_dir.path().join("bin");
+        fs::create_dir(&bin_dir).unwrap();
+
+        // Create mock compiler executables
+        let compilers = ["gcc", "g++", "clang", "notacompiler"];
+        for compiler in &compilers {
+            let compiler_path = bin_dir.join(compiler);
+            fs::write(&compiler_path, "#!/bin/sh\necho mock compiler").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&compiler_path, fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
+
+        // Create test context with custom PATH
+        let mut env = std::collections::HashMap::new();
+        env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
+
+        let context = crate::context::Context {
+            current_executable: std::path::PathBuf::from("/usr/bin/bear"),
+            current_directory: std::path::PathBuf::from("/tmp"),
+            environment: env,
+        };
+
+        // Test with empty executables - should trigger PATH discovery
+        let wrapper_dir = TempDir::new().unwrap();
+        let wrapper_exe = wrapper_dir.path().join("bear-wrapper");
+        fs::write(&wrapper_exe, "wrapper").unwrap();
+
+        let address = "127.0.0.1:12345".parse().unwrap();
+
+        let result = BuildEnvironment::create_as_wrapper(
+            &context,
+            &wrapper_exe,
+            wrapper_dir.path(),
+            &[], // Empty executables - should trigger PATH discovery
+            address,
+        );
+
+        assert!(result.is_ok(), "PATH discovery should succeed");
+
+        // Verify that the PATH was updated to include the wrapper directory
+        let build_env = result.unwrap();
+        let updated_path = build_env.environment_overrides.get("PATH").unwrap();
+        assert!(
+            updated_path.contains("bear-"),
+            "PATH should contain wrapper directory"
+        );
+    }
+
+    #[test]
+    fn test_path_discovery_skipped_with_executables() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        // Create test context with PATH containing compilers
+        let temp_dir = TempDir::new().unwrap();
+        let bin_dir = temp_dir.path().join("bin");
+        fs::create_dir(&bin_dir).unwrap();
+
+        let gcc_path = bin_dir.join("gcc");
+        fs::write(&gcc_path, "#!/bin/sh\necho gcc").unwrap();
+
+        let mut env = std::collections::HashMap::new();
+        env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
+
+        let context = crate::context::Context {
+            current_executable: std::path::PathBuf::from("/usr/bin/bear"),
+            current_directory: std::path::PathBuf::from("/tmp"),
+            environment: env,
+        };
+
+        // Test with non-empty executables - should skip PATH discovery
+        let wrapper_dir = TempDir::new().unwrap();
+        let wrapper_exe = wrapper_dir.path().join("bear-wrapper");
+        fs::write(&wrapper_exe, "wrapper").unwrap();
+
+        let address = "127.0.0.1:12345".parse().unwrap();
+        let custom_compiler = std::path::PathBuf::from("/usr/bin/custom-gcc");
+
+        let result = BuildEnvironment::create_as_wrapper(
+            &context,
+            &wrapper_exe,
+            wrapper_dir.path(),
+            &[custom_compiler], // Non-empty executables - should skip PATH discovery
+            address,
+        );
+
+        assert!(result.is_ok(), "Should succeed with explicit executables");
     }
 }

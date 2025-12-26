@@ -5,7 +5,7 @@
 //! interpreter chain to include or exclude specific compilers.
 
 mod combinators;
-mod compilers;
+pub mod compilers;
 mod ignore;
 mod matchers;
 

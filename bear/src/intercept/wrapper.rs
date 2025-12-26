@@ -10,6 +10,7 @@ pub const CONFIG_FILENAME: &str = "wrappers.cfg";
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -48,6 +49,22 @@ impl WrapperConfig {
     /// Gets the real executable path for a given wrapper name.
     pub fn get_executable(&self, name: &str) -> Option<&PathBuf> {
         self.executables.get(name)
+    }
+}
+
+impl Display for WrapperConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.executables.is_empty() {
+            write!(f, "No executables configured")
+        } else {
+            for (i, (name, path)) in self.executables.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{} -> {}", name, path.display())?;
+            }
+            Ok(())
+        }
     }
 }
 
@@ -132,8 +149,7 @@ impl WrapperDirectoryBuilder {
     /// Registers an executable to be wrapped.
     ///
     /// This method checks for filename uniqueness and creates the hard link immediately.
-    /// Returns the path to the wrapper executable on success, or an error if the filename
-    /// is already registered or if link creation fails.
+    /// Returns the path to the wrapper executable on success, or an error if link creation fails.
     pub fn register_executable(
         &mut self,
         executable_path: PathBuf,
@@ -145,15 +161,8 @@ impl WrapperDirectoryBuilder {
             .to_string();
 
         // Check for filename uniqueness
-        if let Some(existing_path) = self.config.get_executable(&executable_name) {
-            if existing_path != &executable_path {
-                return Err(WrapperDirectoryError::DuplicateExecutableName {
-                    name: executable_name,
-                    existing_path: existing_path.clone(),
-                    new_path: executable_path,
-                });
-            }
-            // Same path already registered, return existing wrapper path
+        if self.config.get_executable(&executable_name).is_some() {
+            // Same executable is already registered, return existing wrapper path
             return Ok(self.wrapper_dir.path().join(&executable_name));
         }
 
@@ -174,6 +183,12 @@ impl WrapperDirectoryBuilder {
         let config_path = self.wrapper_dir.path().join(CONFIG_FILENAME);
         WrapperConfigWriter::write_to_file(&self.config, &config_path)
             .map_err(WrapperDirectoryError::ConfigWrite)?;
+
+        log::info!(
+            "Set up wrapper directory: {}",
+            self.wrapper_dir.path().display()
+        );
+        log::info!("Set up wrappers as: {}", self.config);
 
         Ok(WrapperDirectory {
             wrapper_dir: self.wrapper_dir,
@@ -211,12 +226,6 @@ impl WrapperDirectory {
 pub enum WrapperDirectoryError {
     #[error("Invalid executable path: {0}")]
     InvalidExecutablePath(PathBuf),
-    #[error("Duplicate executable name '{name}': existing path {existing_path:?}, new path {new_path:?}")]
-    DuplicateExecutableName {
-        name: String,
-        existing_path: PathBuf,
-        new_path: PathBuf,
-    },
     #[error("Failed to create hard link: {0}")]
     LinkCreation(#[from] std::io::Error),
     #[error("Failed to write configuration file: {0}")]
@@ -377,11 +386,8 @@ mod tests {
 
         // Try to register different executable with same name - should fail
         let result = builder.register_executable(PathBuf::from("/usr/local/bin/gcc"));
-        assert!(result.is_err());
-        assert!(matches!(
-            result.unwrap_err(),
-            WrapperDirectoryError::DuplicateExecutableName { .. }
-        ));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), _gcc_wrapper);
     }
 
     #[test]

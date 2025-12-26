@@ -382,6 +382,8 @@ pub mod validation {
         EmptyString { field: String },
         #[error("Path does not exist: '{path}'")]
         PathNotFound { path: String },
+        #[error("Duplicate {field} entry at: {idx}")]
+        DuplicateEntry { field: &'static str, idx: usize },
         #[error("Multiple validation errors: {errors:?}")]
         Multiple { errors: Vec<ValidationError> },
     }
@@ -439,8 +441,22 @@ pub mod validation {
                 collector.add_result(Compiler::validate(compiler));
             }
 
+            // Check for duplicate compiler paths
+            let mut seen_paths = std::collections::HashSet::new();
+            for (idx, compiler) in config.compilers.iter().enumerate() {
+                if !seen_paths.insert(&compiler.path) {
+                    collector.add(ValidationError::DuplicateEntry {
+                        field: "compiler",
+                        idx,
+                    });
+                }
+            }
+
             // Validate source filter configuration
             collector.add_result(SourceFilter::validate(&config.sources));
+
+            // Validate duplicate filter configuration
+            collector.add_result(DuplicateFilter::validate(&config.duplicates));
 
             collector.finish()
         }
@@ -509,6 +525,27 @@ pub mod validation {
                 if rule.path.as_os_str().is_empty() {
                     collector.add(ValidationError::EmptyString {
                         field: format!("sources.directories[{}].path", idx),
+                    });
+                }
+            }
+
+            collector.finish()
+        }
+    }
+
+    impl Validator<DuplicateFilter> for DuplicateFilter {
+        type Error = ValidationError;
+
+        fn validate(config: &DuplicateFilter) -> Result<(), Self::Error> {
+            // Check for duplicate OutputFields in match_on
+            let mut collector = ValidationCollector::new();
+            let mut seen_fields = std::collections::HashSet::new();
+
+            for (idx, field) in config.match_on.iter().enumerate() {
+                if !seen_fields.insert(field) {
+                    collector.add(ValidationError::DuplicateEntry {
+                        field: "duplicates.match_on",
+                        idx,
                     });
                 }
             }
@@ -660,6 +697,73 @@ pub mod validation {
             };
 
             let result = SourceFilter::validate(&config);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_validate_duplicate_filter_no_duplicates() {
+            let config = DuplicateFilter {
+                match_on: vec![
+                    OutputFields::File,
+                    OutputFields::Arguments,
+                    OutputFields::Directory,
+                ],
+            };
+
+            let result = DuplicateFilter::validate(&config);
+            assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_validate_duplicate_filter_with_duplicates() {
+            let config = DuplicateFilter {
+                match_on: vec![
+                    OutputFields::File,
+                    OutputFields::Arguments,
+                    OutputFields::File,
+                ],
+            };
+
+            let result = DuplicateFilter::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::DuplicateEntry { field, idx } => {
+                    assert_eq!(field, "duplicates.match_on");
+                    assert_eq!(idx, 2);
+                }
+                _ => panic!("Expected DuplicateEntry validation error"),
+            }
+        }
+
+        #[test]
+        fn test_validate_duplicate_filter_multiple_duplicates() {
+            let config = DuplicateFilter {
+                match_on: vec![
+                    OutputFields::File,
+                    OutputFields::Arguments,
+                    OutputFields::File,
+                    OutputFields::Directory,
+                    OutputFields::Arguments,
+                ],
+            };
+
+            let result = DuplicateFilter::validate(&config);
+            assert!(result.is_err());
+
+            match result.unwrap_err() {
+                ValidationError::Multiple { errors } => {
+                    assert_eq!(errors.len(), 2);
+                }
+                _ => panic!("Expected multiple validation errors"),
+            }
+        }
+
+        #[test]
+        fn test_validate_duplicate_filter_empty_match_on() {
+            let config = DuplicateFilter { match_on: vec![] };
+
+            let result = DuplicateFilter::validate(&config);
             assert!(result.is_ok());
         }
     }

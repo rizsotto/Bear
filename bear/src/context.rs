@@ -43,6 +43,14 @@ impl Context {
             environment,
         })
     }
+
+    /// Parses the PATH environment variable from context into a vector of directories.
+    pub fn paths(&self) -> Vec<PathBuf> {
+        self.environment
+            .get("PATH")
+            .map(|path| std::env::split_paths(path).collect())
+            .unwrap_or(vec![])
+    }
 }
 
 impl fmt::Display for Context {
