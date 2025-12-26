@@ -1499,4 +1499,161 @@ mod tests {
             panic!("Expected compiler command for regular gcc");
         }
     }
+
+    #[test]
+    fn test_linker_command_with_object_files() {
+        let interpreter = GccInterpreter::new();
+
+        // Test the specific command: gcc -o a.out source1.o source2.o -lx -L/usr/local/lib
+        let execution = create_execution(
+            "gcc",
+            vec![
+                "gcc",
+                "-o",
+                "a.out",
+                "source1.o",
+                "source2.o",
+                "-lx",
+                "-L/usr/local/lib",
+            ],
+            "/project",
+        );
+
+        let result = interpreter.recognize(&execution).unwrap();
+        if let Command::Compiler(cmd) = result {
+            assert_eq!(cmd.arguments.len(), 6);
+
+            // Check compiler argument
+            assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
+
+            // Check output argument (-o a.out)
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Output);
+            assert_eq!(
+                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                vec!["-o", "a.out"]
+            );
+
+            // Check object files - these should be treated as Other arguments since
+            // looks_like_a_source_file() doesn't recognize .o extensions
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
+            assert_eq!(
+                cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
+                vec!["source1.o"]
+            );
+
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
+            assert_eq!(
+                cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
+                vec!["source2.o"]
+            );
+
+            // Check library link flag (-lx)
+            assert_eq!(
+                cmd.arguments[4].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Linking))
+            );
+            assert_eq!(
+                cmd.arguments[4].as_arguments(&|p| Cow::Borrowed(p)),
+                vec!["-lx"]
+            );
+
+            // Check library path flag (-L/usr/local/lib)
+            assert_eq!(
+                cmd.arguments[5].kind(),
+                ArgumentKind::Other(Some(CompilerPass::Linking))
+            );
+            assert_eq!(
+                cmd.arguments[5].as_arguments(&|p| Cow::Borrowed(p)),
+                vec!["-L/usr/local/lib"]
+            );
+        } else {
+            panic!("Expected compiler command");
+        }
+    }
+
+    #[test]
+    fn test_comprehensive_linker_scenarios() {
+        let interpreter = GccInterpreter::new();
+
+        // Test mixed compilation and linking with various flag formats
+        let execution = create_execution(
+            "gcc",
+            vec![
+                "gcc",
+                "-o",
+                "myprogram",
+                "main.o",
+                "utils.o",
+                "lib.a", // Object files and static library
+                "-L/usr/lib",
+                "-L",
+                "/opt/lib", // Library paths (glued and separate)
+                "-lmath",
+                "-l",
+                "pthread",         // Libraries (glued and separate)
+                "-Wl,--as-needed", // Linker-specific flags
+                "-static",         // Static linking
+                "-pie",            // Position independent executable
+            ],
+            "/project",
+        );
+
+        let result = interpreter.recognize(&execution).unwrap();
+        if let Command::Compiler(cmd) = result {
+            // Verify we have all arguments parsed
+            assert!(cmd.arguments.len() >= 10);
+
+            // Count linking-related arguments
+            let linking_args: Vec<_> = cmd
+                .arguments
+                .iter()
+                .filter(|arg| {
+                    matches!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Linking)))
+                })
+                .collect();
+
+            // Should have: -L/usr/lib, -L /opt/lib, -lmath, -l pthread, -Wl,--as-needed, -static, -pie
+            assert_eq!(linking_args.len(), 7);
+        }
+
+        // Test pure linking command (no source files, only object files)
+        let pure_linking = create_execution(
+            "gcc",
+            vec![
+                "gcc",
+                "-o",
+                "final_program",
+                "obj1.o",
+                "obj2.o",
+                "obj3.o",
+                "libstatic.a",
+                "-lssl",
+                "-lcrypto",
+                "-L/usr/local/ssl/lib",
+                "-Wl,-rpath,/usr/local/ssl/lib",
+            ],
+            "/build",
+        );
+
+        let result = interpreter.recognize(&pure_linking).unwrap();
+        if let Command::Compiler(cmd) = result {
+            // All .o and .a files should be classified as Other (not Source)
+            let object_files: Vec<_> = cmd
+                .arguments
+                .iter()
+                .filter(|arg| {
+                    let args = arg.as_arguments(&|p| Cow::Borrowed(p));
+                    args.len() == 1 && (args[0].ends_with(".o") || args[0].ends_with(".a"))
+                })
+                .collect();
+
+            // Should have obj1.o, obj2.o, obj3.o, libstatic.a
+            assert_eq!(object_files.len(), 4);
+
+            // All should be classified as Other(None) since they're not recognized source extensions
+            for obj_file in object_files {
+                assert_eq!(obj_file.kind(), ArgumentKind::Other(None));
+            }
+        }
+    }
 }
