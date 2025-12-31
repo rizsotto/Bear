@@ -11,14 +11,8 @@ use anyhow::Result;
 use serde_json::{self, Value};
 
 /// Test basic command interception with preload mechanism
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(target_family = "unix")]
 #[cfg(has_executable_compiler_c)]
 fn basic_command_interception() -> Result<()> {
     let env = TestEnvironment::new("basic_intercept")?;
@@ -26,7 +20,7 @@ fn basic_command_interception() -> Result<()> {
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Run intercept mode to capture commands
-    let _output = env.run_bear_success(&[
+    env.run_bear_success(&[
         "intercept",
         "--output",
         "events.json",
@@ -36,59 +30,40 @@ fn basic_command_interception() -> Result<()> {
         "test.c",
     ])?;
 
-    // Load and verify events file
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .map(|line| serde_json::from_str(line))
-        .collect::<Result<Vec<_>, _>>()?;
+    // Load and verify events using the new abstraction
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should have at least one event
+    assert!(!events.events().is_empty());
 
-    // Should contain command execution event
-    let has_exec_event = events.iter().any(|event| {
-        event.get("execution").is_some()
-            && event
-                .get("execution")
-                .and_then(|e| e.get("executable"))
-                .and_then(|exe| exe.as_str())
-                .map(|exe| exe.contains("gcc") || exe.contains("cc") || exe == COMPILER_C_PATH)
-                .unwrap_or(false)
-    });
-
-    assert!(
-        has_exec_event,
-        "No compiler execution event found in intercept output"
-    );
+    // Should contain compiler execution event
+    let compiler_matcher = event_matcher!(executable_path: COMPILER_C_PATH.to_string());
+    events.assert_contains(&compiler_matcher)?;
 
     Ok(())
 }
 
 /// Test shell command interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_echo, has_executable_shell))]
 fn shell_command_interception() -> Result<()> {
     let env = TestEnvironment::new("shell_intercept")?;
 
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Create shell script that runs compiler
-    let build_commands = format!(
-        "echo \"Starting build...\"\n{} -c test.c -o test.o\necho \"Build complete\"",
-        COMPILER_C_PATH
-    );
+    let build_commands = [
+        format!("{} \"Starting build...\"", ECHO_PATH),
+        format!("{} -c test.c -o test.o", COMPILER_C_PATH),
+        format!("{} \"Build complete\"", ECHO_PATH),
+    ]
+    .join("\n");
 
     let script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Intercept shell script execution
-    let _output = env.run_bear_success(&[
+    env.run_bear_success(&[
         "intercept",
         "--output",
         "events.json",
@@ -97,70 +72,39 @@ fn shell_command_interception() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Verify intercepted events
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    // Load and verify events using the new abstraction
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should have captured events
+    assert!(!events.events().is_empty());
 
-    // Should capture both shell and compiler execution
-    let shell_events = events
-        .iter()
-        .filter(|event| {
-            event
-                .get("execution")
-                .and_then(|e| e.get("executable"))
-                .and_then(|exe| exe.as_str())
-                .map(|exe| exe.contains("sh"))
-                .unwrap_or(false)
-        })
-        .count();
+    // Should capture shell execution
+    let shell_matcher = event_matcher!(executable_name: "sh".to_string());
+    events.assert_contains(&shell_matcher)?;
 
-    let compiler_events = events
-        .iter()
-        .filter(|event| {
-            event
-                .get("execution")
-                .and_then(|e| e.get("executable"))
-                .and_then(|exe| exe.as_str())
-                .map(|exe| exe.contains("cc") || exe == COMPILER_C_PATH)
-                .unwrap_or(false)
-        })
-        .count();
-
-    assert!(shell_events >= 1, "Should capture shell execution");
-    assert!(compiler_events >= 1, "Should capture compiler execution");
+    // Should capture compiler execution
+    let compiler_matcher = event_matcher!(executable_path: COMPILER_C_PATH.to_string());
+    events.assert_contains(&compiler_matcher)?;
 
     Ok(())
 }
 
 /// Test shell commands without shebang
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_echo, has_executable_shell))]
 fn shell_commands_without_shebang() -> Result<()> {
     let env = TestEnvironment::new("shell_no_shebang")?;
 
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Create shell script WITHOUT shebang
-    let shell_script = format!(
-        r#"echo "Building without shebang..."
-{cc} -c test.c
-echo "Done"
-"#,
-        cc = COMPILER_C_PATH
-    );
-
+    let shell_script = [
+        format!("{} \"Building without shebang...\"", ECHO_PATH),
+        format!("{} -c test.c", COMPILER_C_PATH),
+        format!("{} \"Done\"", ECHO_PATH),
+    ]
+    .join("\n");
     let script_path = env.create_build_script("build_no_shebang.sh", &shell_script)?;
 
     let _output = env.run_bear_success(&[
@@ -185,15 +129,9 @@ echo "Done"
 }
 
 /// Test parallel command interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn parallel_command_interception() -> Result<()> {
     let env = TestEnvironment::new("parallel_intercept")?;
 
@@ -206,14 +144,17 @@ fn parallel_command_interception() -> Result<()> {
     }
 
     // Create parallel build script
-    let build_commands = format!(
-        "{} -c test_1.c &\n{} -c test_2.c &\n{} -c test_3.c &\n{} -c test_4.c &\nwait",
-        COMPILER_C_PATH, COMPILER_C_PATH, COMPILER_C_PATH, COMPILER_C_PATH
-    );
-
+    let build_commands = [
+        format!("{} -c test_1.c &", filename_of(COMPILER_C_PATH)),
+        format!("{} -c test_2.c &", filename_of(COMPILER_C_PATH)),
+        format!("{} -c test_3.c &", filename_of(COMPILER_C_PATH)),
+        format!("{} -c test_4.c &", filename_of(COMPILER_C_PATH)),
+        format!("wait"),
+    ]
+    .join("\n");
     let script_path = env.create_shell_script("parallel_build.sh", &build_commands)?;
 
-    let _output = env.run_bear_success(&[
+    env.run_bear_success(&[
         "intercept",
         "--output",
         "events.json",
@@ -222,52 +163,48 @@ fn parallel_command_interception() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Should capture all parallel executions
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    // Load and verify events using the new abstraction
+    let events = env.load_events_file("events.json")?;
 
-    // Should have events for all 4 compiler invocations
-    let compiler_events = events
-        .iter()
-        .filter(|event| {
-            event
-                .get("execution")
-                .and_then(|e| e.get("executable"))
-                .and_then(|exe| exe.as_str())
-                .map(|exe| exe.contains("cc") || exe == COMPILER_C_PATH)
-                .unwrap_or(false)
-        })
-        .count();
+    // Should have captured all 4 parallel compiler invocations
+    let compiler_matcher = event_matcher!(executable_name: filename_of(COMPILER_C_PATH));
+    events.assert_count_matching(&compiler_matcher, 4)?;
 
-    assert!(
-        compiler_events >= 4,
-        "Should capture all 4 parallel compiler invocations"
-    );
+    // Verify each individual compiler invocation was captured
+    for i in 1..=4 {
+        let specific_compiler_matcher = EventMatcher::new().arguments(vec![
+            filename_of(COMPILER_C_PATH).to_string(),
+            "-c".to_string(),
+            format!("test_{}.c", i),
+        ]);
+        events.assert_contains(&specific_compiler_matcher)?;
+    }
 
     Ok(())
 }
 
 /// Test build stdout capture during interception
 #[test]
+#[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn build_stdout_capture() -> Result<()> {
     let env = TestEnvironment::new("stdout_capture")?;
 
     // Create script that outputs to stdout
-    let script_commands = r#"echo "This goes to stdout"
-echo "This also goes to stdout"
-true"#;
+    let script_commands = [
+        format!("\"{}\" \"This goes to stdout\"", ECHO_PATH),
+        format!("\"{}\" \"This also goes to stdout\"", ECHO_PATH),
+        format!("\"{}\"", TRUE_PATH),
+    ]
+    .join("\n");
 
-    let script_path = env.create_shell_script("stdout_test.sh", script_commands)?;
+    let script_path = env.create_shell_script("stdout_test.sh", &script_commands)?;
 
     let output = env.run_bear_success(&[
         "intercept",
         "--output",
         "events.json",
         "--",
-        "sh",
+        SHELL_PATH,
         script_path.to_str().unwrap(),
     ])?;
 
@@ -284,15 +221,19 @@ true"#;
 
 /// Test build stderr capture during interception
 #[test]
+#[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn build_stderr_capture() -> Result<()> {
     let env = TestEnvironment::new("stderr_capture")?;
 
     // Create script that outputs to stderr
-    let script_commands = r#"echo "This goes to stderr" >&2
-echo "This also goes to stderr" >&2
-true"#;
+    let script_commands = [
+        format!("\"{}\" \"This goes to stderr\" >&2", ECHO_PATH),
+        format!("\"{}\" \"This also goes to stderr\" >&2", ECHO_PATH),
+        format!("\"{}\"", TRUE_PATH),
+    ]
+    .join("\n");
 
-    let script_path = env.create_shell_script("stderr_test.sh", script_commands)?;
+    let script_path = env.create_shell_script("stderr_test.sh", &script_commands)?;
 
     let output = env.run_bear_success(&[
         "intercept",
@@ -315,15 +256,9 @@ true"#;
 }
 
 /// Test interception with empty environment
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_env))]
 fn intercept_empty_environment() -> Result<()> {
     let env = TestEnvironment::new("empty_env_intercept")?;
 
@@ -335,7 +270,7 @@ fn intercept_empty_environment() -> Result<()> {
         "--output",
         "events.json",
         "--",
-        "env",
+        ENV_PATH,
         "-i",
         "PATH=/usr/bin:/bin",
         COMPILER_C_PATH,
@@ -359,14 +294,8 @@ fn intercept_empty_environment() -> Result<()> {
 ///
 /// Note: This test might be fragile test, because libtool versions are different.
 /// eg.: MacOS CI was failing to complain about "unknown option character `-' in: --mode=compile".
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_libtool, has_executable_compiler_c))]
 fn libtool_command_interception() -> Result<()> {
     let env = TestEnvironment::new("libtool_intercept")?;
@@ -416,7 +345,8 @@ fn libtool_command_interception() -> Result<()> {
 
 /// Test wrapper-based interception
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn wrapper_based_interception() -> Result<()> {
     let env = TestEnvironment::new("wrapper_intercept")?;
 
@@ -424,9 +354,9 @@ fn wrapper_based_interception() -> Result<()> {
 
     // Create a wrapper script
     let wrapper_commands = format!(
-        r#"echo "Wrapper called with: $@"
+        r#"{} "Wrapper called with: $@"
 exec {} "$@""#,
-        COMPILER_C_PATH
+        ECHO_PATH, COMPILER_C_PATH
     );
 
     let wrapper_path = env.create_shell_script("cc-wrapper", &wrapper_commands)?;
@@ -456,23 +386,26 @@ exec {} "$@""#,
 
 /// Test Unicode handling in shell commands
 #[test]
-#[cfg(has_executable_shell)]
+#[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn unicode_shell_commands() -> Result<()> {
     let env = TestEnvironment::new("unicode_intercept")?;
 
     // Create script with Unicode content
-    let unicode_commands = r#"echo "Testing Unicode: αβγδε 中文 🚀"
-echo "Файл с русскими именами"
-true"#;
+    let unicode_commands = [
+        format!("\"{}\" \"Testing Unicode: αβγδε 中文 🚀\"", ECHO_PATH),
+        format!("\"{}\" \"Файл с русскими именами\"", ECHO_PATH),
+        format!("\"{}\"", TRUE_PATH),
+    ]
+    .join("\n");
 
-    let script_path = env.create_shell_script("unicode_test.sh", unicode_commands)?;
+    let script_path = env.create_shell_script("unicode_test.sh", &unicode_commands)?;
 
     let output = env.run_bear_success(&[
         "intercept",
         "--output",
         "events.json",
         "--",
-        "sh",
+        SHELL_PATH,
         script_path.to_str().unwrap(),
     ])?;
 
@@ -490,13 +423,17 @@ true"#;
 
 /// Test interception with ISO-8859-2 encoding
 #[test]
-#[cfg(has_executable_shell)]
+#[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn iso8859_2_encoding() -> Result<()> {
     let env = TestEnvironment::new("iso8859_2")?;
 
     // Create script with ISO-8859-2 characters
-    let script_commands = "echo 'Testing ISO-8859-2: ąęłńóśźż'\ntrue";
-    let script_path = env.create_shell_script("iso_test.sh", script_commands)?;
+    let script_commands = [
+        format!("\"{}\" 'Testing ISO-8859-2: ąęłńóśźż'", ECHO_PATH),
+        format!("\"{}\"", TRUE_PATH),
+    ]
+    .join("\n");
+    let script_path = env.create_shell_script("iso_test.sh", &script_commands)?;
 
     let _output = env.run_bear_success(&[
         "intercept",
@@ -515,14 +452,8 @@ fn iso8859_2_encoding() -> Result<()> {
 }
 
 /// Test Valgrind integration
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(target_family = "unix")]
 #[cfg(all(has_executable_valgrind, has_executable_compiler_c))]
 fn valgrind_integration() -> Result<()> {
     let env = TestEnvironment::new("valgrind_intercept")?;
@@ -554,14 +485,8 @@ fn valgrind_integration() -> Result<()> {
 }
 
 /// Test fakeroot integration
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(target_family = "unix")]
 #[cfg(all(has_executable_fakeroot, has_executable_compiler_c))]
 fn fakeroot_integration() -> Result<()> {
     let env = TestEnvironment::new("fakeroot_intercept")?;

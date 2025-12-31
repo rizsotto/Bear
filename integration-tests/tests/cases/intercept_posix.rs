@@ -14,15 +14,9 @@ use serde_json::Value;
 use std::fs;
 
 /// Test execve system call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn execve_interception() -> Result<()> {
     let env = TestEnvironment::new("execve_intercept")?;
 
@@ -89,15 +83,9 @@ int main() {{
 }
 
 /// Test execl system call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn execle_interception() -> Result<()> {
     let env = TestEnvironment::new("execl_intercept")?;
 
@@ -139,15 +127,9 @@ int main() {{
 }
 
 /// Test execlp system call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn execv_interception() -> Result<()> {
     let env = TestEnvironment::new("execlp_intercept")?;
 
@@ -184,16 +166,10 @@ int main() {
     Ok(())
 }
 
-/// Test execvp system call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
+/// Test popen system call interception
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn execvp_interception() -> Result<()> {
     let env = TestEnvironment::new("execvp_intercept")?;
 
@@ -233,47 +209,45 @@ int main() {
 }
 
 /// Test popen system call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_cat)]
 fn popen_interception() -> Result<()> {
     let env = TestEnvironment::new("popen_intercept")?;
 
-    let c_program = r#"#include <stdio.h>
+    let c_program = format!(
+        r#"#include <stdio.h>
 #include <stdlib.h>
 
-void write_data(FILE *stream) {
+void write_data(FILE *stream) {{
     int i;
-    for (i = 0; i < 10; i++) {
+    for (i = 0; i < 10; i++) {{
         fprintf(stream, "%d\n", i);
-    }
-    if (ferror(stream)) {
+    }}
+    if (ferror(stream)) {{
         fprintf(stderr, "Output to stream failed.\n");
         exit(EXIT_FAILURE);
-    }
-}
+    }}
+}}
 
-int main(void) {
+int main(void) {{
     FILE *output;
 
-    output = popen("cat", "w");
-    if (!output) {
+    output = popen("{}", "w");
+    if (!output) {{
         fprintf(stderr, "Could not run cat.\n");
         return EXIT_FAILURE;
-    }
+    }}
     write_data(output);
-    if (pclose(output) != 0) {
+    if (pclose(output) != 0) {{
         fprintf(stderr, "Could not run cat or other error.\n");
-    }
+    }}
     return EXIT_SUCCESS;
-}"#;
+}}"#,
+        CAT_PATH
+    );
 
-    env.create_source_files(&[("test_popen.c", c_program)])?;
+    env.create_source_files(&[("test_popen.c", &c_program)])?;
 
     #[cfg(has_executable_compiler_c)]
     {
@@ -311,15 +285,9 @@ int main(void) {
 }
 
 /// Test system() call interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn system_interception() -> Result<()> {
     let env = TestEnvironment::new("system_intercept")?;
 
@@ -377,15 +345,9 @@ int main() {{
 }
 
 /// Test posix_spawn interception
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn posix_spawn_interception() -> Result<()> {
     let env = TestEnvironment::new("posix_spawn_intercept")?;
 
@@ -445,14 +407,8 @@ int main() {{
 }
 
 /// Test posix_spawnp interception (searches PATH)
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 fn posix_spawnp_interception() -> Result<()> {
     let env = TestEnvironment::new("posix_spawnp_intercept")?;
 
@@ -520,14 +476,8 @@ int main() {
 }
 
 /// Test errno handling with failed exec calls
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 fn test_failed_exec_errno_handling() -> Result<()> {
     let env = TestEnvironment::new("failed_exec_errno")?;
 
@@ -582,15 +532,9 @@ int main() {
     Ok(())
 }
 
-/// Test that non-exec programs don't generate spurious events
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
+/// Test that programs with no exec calls don't generate events
 #[test]
+#[cfg(has_preload_library)]
 fn test_no_exec_calls() -> Result<()> {
     let env = TestEnvironment::new("no_exec")?;
 
@@ -644,15 +588,9 @@ int main() {
 
 /// Test execvpe system call (non-standard but common extension)
 /// Some systems support execvpe which combines execvp with explicit environment
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
-#[cfg(has_executable_echo)]
 #[test]
+#[cfg(has_preload_library)]
+#[cfg(has_executable_echo)]
 fn execvpe_interception() -> Result<()> {
     let env = TestEnvironment::new("execvpe_intercept")?;
 

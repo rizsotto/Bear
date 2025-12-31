@@ -49,14 +49,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
-      - name: Build all packages
-        run: cargo build --verbose
-      - name: Run unit tests
-        run: cargo test --verbose
       - name: Run integration tests
         run: |
           cargo clean
-          cargo build --features allow-integration-tests
+          cargo build --verbose --features allow-integration-tests
           cargo test --verbose --features allow-integration-tests
         env:
           BEAR_TEST_VERBOSE: 1

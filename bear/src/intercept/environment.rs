@@ -142,15 +142,17 @@ impl BuildEnvironment {
         let wrapper_dir = wrapper_dir_builder.build()?;
 
         // Update PATH environment variable
-        let path_original = context
-            .environment
-            .get(KEY_OS__PATH)
-            .cloned()
-            .unwrap_or_default();
-        let path_updated =
-            insert_to_path(&path_original, wrapper_dir.path()).map_err(ConfigurationError::Path)?;
+        if let Some((path_key, path_value)) = context.path() {
+            let path_updated = insert_to_path(&path_value, wrapper_dir.path())
+                .map_err(ConfigurationError::Path)?;
 
-        environment_overrides.insert(KEY_OS__PATH.to_string(), path_updated);
+            environment_overrides.insert(path_key, path_updated);
+        } else {
+            environment_overrides.insert(
+                KEY_OS__PATH.to_string(),
+                wrapper_dir.path().to_string_lossy().to_string(),
+            );
+        }
         environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
 
         Ok(Self {
@@ -175,7 +177,6 @@ impl BuildEnvironment {
             .paths()
             .into_iter()
             .filter(|dir| dir.exists())
-            .inspect(|dir| log::debug!("Inspecting directory for compilers: {}", dir.display()))
             .flat_map(|dir| match std::fs::read_dir(dir) {
                 Ok(entries) => entries
                     .filter_map(|entry| match entry {
@@ -690,5 +691,41 @@ mod test {
         );
 
         assert!(result.is_ok(), "Should succeed with explicit executables");
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_insert_to_path_windows_mingw_preservation() {
+        // Test the exact Windows CI failure scenario - MinGW PATH preservation
+        let original = "C:\\mingw64\\bin;C:\\Windows\\System32;C:\\Program Files\\Git\\bin";
+        let wrapper_dir = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\bear-xyz";
+        let first = PathBuf::from(wrapper_dir);
+
+        let result = insert_to_path(original, first).unwrap();
+
+        // Critical assertion: MinGW path must be preserved for gcc.exe to be found
+        assert!(
+            result.contains("mingw64\\bin"),
+            "MinGW path should be preserved so gcc.exe can be found. Original: {}, Result: {}",
+            original,
+            result
+        );
+
+        // Wrapper should be first in PATH
+        assert!(
+            result.starts_with(wrapper_dir),
+            "Wrapper directory should be first in PATH. Result: {}",
+            result
+        );
+
+        // Should have all original paths plus wrapper (4 total)
+        let path_count = result.split(';').filter(|s| !s.is_empty()).count();
+        assert_eq!(
+            path_count, 4,
+            "Should preserve all original paths plus wrapper, got: {}",
+            path_count
+        );
+
+        println!("Windows PATH preservation test passed. Result: {}", result);
     }
 }

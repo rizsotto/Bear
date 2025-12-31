@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::environment;
+use crate::environment::KEY_OS__PATH;
 use anyhow::{Context as AnyhowContext, Result};
 use std::collections::HashMap;
 use std::env;
@@ -44,12 +45,22 @@ impl Context {
         })
     }
 
+    /// Returns the PATH environment variable key and value.
+    ///
+    /// This is relevant for Windows where the PATH is not capitalized and the lookup
+    /// should be case insensitive.
+    pub fn path(&self) -> Option<(String, String)> {
+        self.environment
+            .iter()
+            .find(|(key, _)| key.to_uppercase() == KEY_OS__PATH)
+            .map(|(key, value)| (key.clone(), value.clone()))
+    }
+
     /// Parses the PATH environment variable from context into a vector of directories.
     pub fn paths(&self) -> Vec<PathBuf> {
-        self.environment
-            .get("PATH")
-            .map(|path| std::env::split_paths(path).collect())
-            .unwrap_or(vec![])
+        self.path()
+            .map(|(_, path)| std::env::split_paths(&path).collect())
+            .unwrap_or_default()
     }
 }
 

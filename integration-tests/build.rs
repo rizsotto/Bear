@@ -36,6 +36,10 @@ fn main() {
     check_executable_exists("false");
     check_executable_exists("echo");
     check_executable_exists("sleep");
+    check_executable_exists("cat");
+    check_executable_exists("ls");
+    check_executable_exists("mkdir");
+    check_executable_exists("rm");
     check_one_executable_exists("shell", &["sh", "zsh", "bash"]);
     check_one_executable_exists("make", &["make", "gmake", "mingw32-make"]);
     check_one_executable_exists("compiler_c", &["gcc", "clang", "cc"]);
@@ -46,6 +50,10 @@ fn main() {
     check_executable_exists("fakeroot");
     check_executable_exists("valgrind");
     check_executable_exists("ar");
+    check_executable_exists("env");
+
+    // Check for preload library availability
+    check_preload_library_availability(&preload_path);
 }
 
 fn find_intercept_artifacts() -> (String, String) {
@@ -129,4 +137,26 @@ fn check_one_executable_exists(define: &str, executables: &[&str]) {
         "cargo:warning=Checking for executable: {} ... missing",
         define
     );
+}
+
+fn check_preload_library_availability(preload_path: &str) {
+    // Check if we're on a platform that supports LD_PRELOAD (Unix-like systems)
+    let platform_supports_preload = !cfg!(windows);
+
+    // Check if the preload library file exists
+    let preload_file_exists = std::path::Path::new(preload_path).exists();
+
+    if platform_supports_preload && preload_file_exists {
+        println!("cargo:rustc-cfg=has_preload_library");
+        println!("cargo:rustc-check-cfg=cfg(has_preload_library)");
+        println!(
+            "cargo:warning=Preload library available at: {}",
+            preload_path
+        );
+    } else {
+        println!(
+            "cargo:warning=Preload library not available (platform_supports: {}, file_exists: {})",
+            platform_supports_preload, preload_file_exists
+        );
+    }
 }

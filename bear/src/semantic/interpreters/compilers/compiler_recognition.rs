@@ -49,11 +49,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     /// - `base_pattern`: The core regex pattern without anchors or .exe suffix
     /// - `with_version_capture`: If true, creates capturing groups for version extraction
     fn create_compiler_regex(base_pattern: &str, with_version: bool) -> Regex {
-        let exe_suffix = if cfg!(target_os = "windows") {
-            r"\.exe" // Required on Windows
-        } else {
-            r"(?:\.exe)?" // Optional on Unix-like systems
-        };
+        let exe_suffix = r"(?:\.exe)?";
 
         // Add version pattern (with or without capturing group) if requested
         let pattern_with_version = if with_version {

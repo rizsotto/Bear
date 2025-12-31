@@ -6,19 +6,8 @@
 //! for various build scenarios, ported from the Python/lit test suite.
 
 use crate::fixtures::constants::*;
-use crate::fixtures::infrastructure::{compilation_entry, TestEnvironment};
+use crate::fixtures::infrastructure::{compilation_entry, filename_of, TestEnvironment};
 use anyhow::Result;
-use std::path::Path;
-
-/// Helper function to get the appropriate compiler command for build scripts
-/// Always uses just the filename to ensure compatibility across all platforms
-fn filename_of(compiler_path: &str) -> String {
-    Path::new(compiler_path)
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .to_string()
-}
 
 /// Test compilation with build script that calls compiler
 /// This generates events that the semantic analyzer can process
@@ -31,7 +20,10 @@ fn simple_single_file_compilation() -> Result<()> {
     env.create_source_files(&[("simple.c", "int main() { return 0; }")])?;
 
     // Create a shell script that calls the compiler
-    let build_commands = format!("{} -c simple.c -o simple.o", filename_of(COMPILER_C_PATH));
+    let build_commands = format!(
+        "\"{}\" -c simple.c -o simple.o",
+        filename_of(COMPILER_C_PATH)
+    );
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Step 1: Run intercept command to capture events from the build script
@@ -101,10 +93,19 @@ fn successful_build_multiple_sources() -> Result<()> {
     ])?;
 
     // Create build script that compiles all files
-    let build_commands = format!(
-        "{} -c -o test1.o test1.c\n{} -c -o test2.o test2.c\n{} -c -o test3.o test3.cpp\n{} -c -o test4.o test4.cpp",
-        filename_of(COMPILER_C_PATH), filename_of(COMPILER_C_PATH), filename_of(COMPILER_CXX_PATH), filename_of(COMPILER_CXX_PATH)
-    );
+    let build_commands = [
+        format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH)),
+        format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH)),
+        format!(
+            "\"{}\" -c -o test3.o test3.cpp",
+            filename_of(COMPILER_CXX_PATH)
+        ),
+        format!(
+            "\"{}\" -c -o test4.o test4.cpp",
+            filename_of(COMPILER_CXX_PATH)
+        ),
+    ]
+    .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Run bear
@@ -190,11 +191,14 @@ fn broken_build_partial_success() -> Result<()> {
     ])?;
 
     // Create build script that tries to compile both (one will fail)
-    let build_commands = format!(
-        "{} -c -o valid.o valid.c\n{} -c -o invalid.o invalid.c",
-        filename_of(COMPILER_C_PATH),
-        filename_of(COMPILER_C_PATH)
-    );
+    let build_commands = [
+        format!("\"{}\" -c -o valid.o valid.c", filename_of(COMPILER_C_PATH)),
+        format!(
+            "\"{}\" -c -o invalid.o invalid.c",
+            filename_of(COMPILER_C_PATH)
+        ),
+    ]
+    .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Run bear - should fail due to compilation error but generate partial DB
@@ -248,12 +252,12 @@ fn broken_build_partial_success() -> Result<()> {
 /// Test empty build - should generate empty compilation database
 /// Verifies Bear handles builds with no compilation commands
 #[test]
-#[cfg(all(has_executable_true, has_executable_shell))]
+#[cfg(all(has_executable_true, has_executable_shell, has_executable_echo))]
 fn empty_build_generates_empty_database() -> Result<()> {
     let env = TestEnvironment::new("empty_build_generates_empty_database")?;
 
     // Create shell script that doesn't compile anything
-    let build_commands = format!("{} && echo 'Build completed'", TRUE_PATH);
+    let build_commands = format!("\"{}\" && \"{}\" 'Build completed'", TRUE_PATH, ECHO_PATH);
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     let result = env.run_bear(&[
@@ -288,7 +292,10 @@ fn multiple_sources_single_command() -> Result<()> {
     ])?;
 
     // Create build script with single command compiling multiple files
-    let build_commands = format!("{} -c src1.c src2.c src3.c", filename_of(COMPILER_C_PATH));
+    let build_commands = format!(
+        "\"{}\" -c src1.c src2.c src3.c",
+        filename_of(COMPILER_C_PATH)
+    );
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Run bear with build script

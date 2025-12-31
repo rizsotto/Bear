@@ -1,18 +1,7 @@
-use crate::fixtures::infrastructure::compilation_entry;
+use crate::fixtures::infrastructure::{compilation_entry, filename_of};
 use crate::fixtures::*;
 use anyhow::Result;
 use serde_json::json;
-use std::path::Path;
-
-/// Helper function to get the appropriate compiler command for build scripts
-/// Always uses just the filename to ensure compatibility across all platforms
-fn filename_of(compiler_path: &str) -> String {
-    Path::new(compiler_path)
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .to_string()
-}
 
 #[test]
 #[cfg(has_executable_compiler_c)]
@@ -364,7 +353,7 @@ fn semantic_clang_plugins() -> Result<()> {
 }
 
 #[test]
-#[cfg(has_executable_compiler_c)]
+#[cfg(all(has_executable_compiler_c, has_executable_ls))]
 fn semantic_with_filtering() -> Result<()> {
     let env = TestEnvironment::new("semantic_filtering")?;
 
@@ -384,8 +373,8 @@ fn semantic_with_filtering() -> Result<()> {
     let event2 = json!({
         "pid": 12346,
         "execution": {
-            "executable": "/bin/ls",
-            "arguments": ["ls", "-la"],
+            "executable": LS_PATH,
+            "arguments": [LS_PATH, "-la"],
             "working_dir": temp_dir,
             "environment": {}
         }
@@ -484,6 +473,7 @@ fn semantic_malformed_events() -> Result<()> {
 }
 
 #[test]
+#[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]
 fn semantic_non_compilation_events() -> Result<()> {
     let env = TestEnvironment::new("semantic_non_compilation")?;
 
@@ -493,7 +483,7 @@ fn semantic_non_compilation_events() -> Result<()> {
     let event1 = json!({
         "pid": 12345,
         "execution": {
-            "executable": "/bin/echo",
+            "executable": ECHO_PATH,
             "arguments": ["hello"],
             "working_dir": temp_dir,
             "environment": {}
@@ -503,7 +493,7 @@ fn semantic_non_compilation_events() -> Result<()> {
     let event2 = json!({
         "pid": 12346,
         "execution": {
-            "executable": "/bin/mkdir",
+            "executable": MKDIR_PATH,
             "arguments": ["-p", "build"],
             "working_dir": temp_dir,
             "environment": {}
@@ -513,7 +503,7 @@ fn semantic_non_compilation_events() -> Result<()> {
     let event3 = json!({
         "pid": 12347,
         "execution": {
-            "executable": "/bin/rm",
+            "executable": RM_PATH,
             "arguments": ["-f", "temp.txt"],
             "working_dir": temp_dir,
             "environment": {}

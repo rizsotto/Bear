@@ -114,12 +114,14 @@ static GCC_INCLUDE_KEYS: std::sync::LazyLock<HashSet<&'static str>> =
     });
 
 pub fn relevant_env(key: &str) -> bool {
-    matches!(key, KEY_DESTINATION | KEY_OS__PRELOAD_PATH | KEY_OS__PATH)
+    matches!(key, KEY_DESTINATION | KEY_OS__PRELOAD_PATH)
         || MAKE_PROGRAM_KEYS.contains(key)
         || MAKE_FLAGS_KEYS.contains(key)
         || CARGO_PROGRAM_KEYS.contains(key)
         || CARGO_FLAGS_KEYS.contains(key)
         || GCC_INCLUDE_KEYS.contains(key)
+        // Windows PATH variable is case sensitive and not always capitalized
+        || key.to_uppercase() == KEY_OS__PATH
 }
 
 pub fn program_env(key: &str) -> bool {

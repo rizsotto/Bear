@@ -30,6 +30,16 @@ pub const FAKEROOT_PATH: &str = env!("FAKEROOT_PATH");
 pub const VALGRIND_PATH: &str = env!("VALGRIND_PATH");
 #[cfg(has_executable_ar)]
 pub const AR_PATH: &str = env!("AR_PATH");
+#[cfg(has_executable_env)]
+pub const ENV_PATH: &str = env!("ENV_PATH");
+#[cfg(has_executable_cat)]
+pub const CAT_PATH: &str = env!("CAT_PATH");
+#[cfg(has_executable_ls)]
+pub const LS_PATH: &str = env!("LS_PATH");
+#[cfg(has_executable_mkdir)]
+pub const MKDIR_PATH: &str = env!("MKDIR_PATH");
+#[cfg(has_executable_rm)]
+pub const RM_PATH: &str = env!("RM_PATH");
 
 // Intercept artifact paths - only available when integration tests are enabled
 #[cfg(feature = "allow-integration-tests")]

@@ -11,14 +11,8 @@ use anyhow::Result;
 
 /// Test basic configuration file loading
 /// Verifies Bear can load a valid configuration file
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn basic_config_loading() -> Result<()> {
     let env = TestEnvironment::new("basic_config")?;
@@ -59,7 +53,7 @@ format:
         "--config",
         config_path.to_str().unwrap(),
         "--",
-        "sh",
+        SHELL_PATH,
         script_path.to_str().unwrap(),
     ])?;
 
@@ -72,14 +66,8 @@ format:
 
 /// Test compiler ignore functionality
 /// Verifies that compilers marked with ignore: true are excluded
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(
     has_executable_compiler_c,
     has_executable_compiler_cxx,
@@ -130,7 +118,7 @@ sources:
         "--config",
         config_path.to_str().unwrap(),
         "--",
-        "sh",
+        SHELL_PATH,
         script_path.to_str().unwrap(),
     ])?;
 
@@ -162,14 +150,8 @@ sources:
 
 /// Test source file filtering
 /// Verifies only_existing_files configuration option
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn source_file_filtering() -> Result<()> {
     let env = TestEnvironment::new("source_filtering")?;
@@ -207,7 +189,7 @@ sources:
         "--config",
         config_path.to_str().unwrap(),
         "--",
-        "sh",
+        SHELL_PATH,
         script_path.to_str().unwrap(),
     ])?;
 
@@ -237,14 +219,8 @@ sources:
 
 /// Test path format configuration
 /// Verifies different path formatting options
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn path_format_config() -> Result<()> {
     let env = TestEnvironment::new("path_format")?;
@@ -346,14 +322,8 @@ fn invalid_config_handling() -> Result<()> {
 
 /// Test unsupported schema version
 /// Verifies Bear rejects unsupported schema versions
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn unsupported_schema_version() -> Result<()> {
     let env = TestEnvironment::new("unsupported_schema")?;
@@ -401,14 +371,8 @@ sources:
 
 /// Test duplicate filter configuration
 /// Verifies duplicate filtering options work
-#[cfg(any(
-    target_os = "linux",
-    target_os = "freebsd",
-    target_os = "netbsd",
-    target_os = "openbsd",
-    target_os = "dragonfly"
-))]
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn duplicate_filter_config() -> Result<()> {
     let env = TestEnvironment::new("duplicate_filter")?;

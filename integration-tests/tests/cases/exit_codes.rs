@@ -59,7 +59,6 @@ fn exit_code_for_invalid_argument() -> Result<()> {
 }
 
 #[test]
-#[cfg(target_os = "linux")] // FIXME: compiler wrappers does not work yet
 fn exit_code_for_non_existing_command() -> Result<()> {
     // Executing a non-existing command should always has non-zero exit code,
     // and print relevant information about the reason about the failure.
@@ -74,7 +73,6 @@ fn exit_code_for_non_existing_command() -> Result<()> {
 }
 
 #[test]
-#[cfg(target_os = "linux")] // FIXME: compiler wrappers does not work yet
 #[cfg(has_executable_true)]
 fn exit_code_for_true() -> Result<()> {
     // When the executed command returns successfully, Bear exit code should be zero.
@@ -132,8 +130,8 @@ fn exit_code_when_signaled() -> Result<()> {
 }
 
 /// Test that bear returns 0 for successful compilation interception
-#[cfg(has_executable_compiler_c)]
 #[test]
+#[cfg(has_executable_compiler_c)]
 fn exit_code_for_successful_compilation() -> Result<()> {
     let env = TestEnvironment::new("exit_code_for_successful_compilation")?;
 
@@ -156,8 +154,8 @@ fn exit_code_for_successful_compilation() -> Result<()> {
 }
 
 /// Test that bear propagates build failure exit codes
-#[cfg(has_executable_compiler_c)]
 #[test]
+#[cfg(has_executable_compiler_c)]
 fn exit_code_for_failed_compilation() -> Result<()> {
     let env = TestEnvironment::new("exit_code_for_failed_compilation")?;
 
@@ -177,8 +175,8 @@ fn exit_code_for_failed_compilation() -> Result<()> {
 }
 
 /// Test that bear returns 0 when no build commands are executed
-#[cfg(has_executable_true)]
 #[test]
+#[cfg(has_executable_true)]
 fn exit_code_for_empty_build() -> Result<()> {
     let env = TestEnvironment::new("exit_code_for_empty_build")?;
 
@@ -195,8 +193,8 @@ fn exit_code_for_empty_build() -> Result<()> {
 // Intercept mode exit code tests
 
 /// Test that intercept command returns 0 for successful interception
-#[cfg(has_executable_true)]
 #[test]
+#[cfg(has_executable_true)]
 fn intercept_exit_code_for_success() -> Result<()> {
     let env = TestEnvironment::new("intercept_exit_code_for_success")?;
 
@@ -206,8 +204,8 @@ fn intercept_exit_code_for_success() -> Result<()> {
 }
 
 /// Test that intercept command propagates command failure exit codes
-#[cfg(has_executable_false)]
 #[test]
+#[cfg(has_executable_false)]
 fn intercept_exit_code_for_failure() -> Result<()> {
     let env = TestEnvironment::new("intercept_exit_code_for_failure")?;
 
