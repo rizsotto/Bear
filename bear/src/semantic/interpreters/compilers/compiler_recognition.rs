@@ -43,52 +43,73 @@ use std::sync::LazyLock;
 /// - `ifort`, `ifx-2023`
 /// - `crayftn`, `ftn`
 static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
-    // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
-    let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?(?:\.exe)?$")
-        .expect("Invalid GCC regex pattern");
+    /// Helper function for creating compiler regex patterns with platform-specific .exe handling
+    ///
+    /// # Parameters
+    /// - `base_pattern`: The core regex pattern without anchors or .exe suffix
+    /// - `with_version_capture`: If true, creates capturing groups for version extraction
+    fn create_compiler_regex(base_pattern: &str, with_version: bool) -> Regex {
+        let exe_suffix = if cfg!(target_os = "windows") {
+            r"\.exe" // Required on Windows
+        } else {
+            r"(?:\.exe)?" // Optional on Unix-like systems
+        };
 
-    // GCC internal executables pattern: matches GCC's internal compiler phases
-    // These are implementation details of GCC's compilation process that should be
-    // routed to GccInterpreter for proper handling (typically to be ignored).
-    // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
-    let gcc_internal_pattern =
-        Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)(?:\.exe)?$")
-            .expect("Invalid GCC internal regex pattern");
+        // Add version pattern (with or without capturing group) if requested
+        let pattern_with_version = if with_version {
+            format!(r"{}(?:[-_]([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base_pattern)
+        } else {
+            base_pattern.to_string()
+        };
 
-    // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
-    let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?(?:\.exe)?$")
-        .expect("Invalid Clang regex pattern");
-
-    // Fortran pattern: matches gfortran, flang, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
-    let fortran_pattern =
-        Regex::new(r"^(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)(?:-[\d.]+)?(?:\.exe)?$")
-            .expect("Invalid Fortran regex pattern");
-
-    // Intel Fortran pattern: matches ifort, ifx, and versioned variants
-    let intel_fortran_pattern = Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?(?:\.exe)?$")
-        .expect("Invalid Intel Fortran regex pattern");
-
-    // Cray Fortran pattern: matches crayftn, ftn
-    let cray_fortran_pattern = Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?(?:\.exe)?$")
-        .expect("Invalid Cray Fortran regex pattern");
-
-    // CUDA pattern: matches nvcc (NVIDIA CUDA Compiler) with optional cross-compilation prefixes and version suffixes
-    let cuda_pattern =
-        Regex::new(r"^(?:[^/]*-)?nvcc(?:-[\d.]+)?(?:\.exe)?$").expect("Invalid CUDA regex pattern");
-
-    // Wrapper pattern: matches common compiler wrappers
-    let wrapper_pattern = Regex::new(r"^(?:ccache|distcc|sccache)(?:\.exe)?$")
-        .expect("Invalid wrapper regex pattern");
-
+        let full_pattern = format!("^{}{}$", pattern_with_version, exe_suffix);
+        Regex::new(&full_pattern)
+            .unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
+    }
     vec![
-        (CompilerType::Gcc, gcc_pattern),
-        (CompilerType::Gcc, gcc_internal_pattern),
-        (CompilerType::Clang, clang_pattern),
-        (CompilerType::Flang, fortran_pattern),
-        (CompilerType::IntelFortran, intel_fortran_pattern),
-        (CompilerType::CrayFortran, cray_fortran_pattern),
-        (CompilerType::Cuda, cuda_pattern),
-        (CompilerType::Wrapper, wrapper_pattern),
+        // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
+        (
+            CompilerType::Gcc,
+            create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)", true),
+        ),
+        // GCC internal executables pattern: matches GCC's internal compiler phases
+        // These are implementation details of GCC's compilation process that should be
+        // routed to GccInterpreter for proper handling (typically to be ignored).
+        // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
+        (
+            CompilerType::Gcc,
+            create_compiler_regex(r"(?:cc1(?:plus|obj|objplus)?|collect2|lto1)", false),
+        ),
+        // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
+        (
+            CompilerType::Clang,
+            create_compiler_regex(r"(?:[^/]*-)?clang(?:\+\+)?", true),
+        ),
+        // Fortran pattern: matches gfortran, flang, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
+        (
+            CompilerType::Flang,
+            create_compiler_regex(r"(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)", true),
+        ),
+        // Intel Fortran pattern: matches ifort, ifx, and versioned variants
+        (
+            CompilerType::IntelFortran,
+            create_compiler_regex(r"(?:ifort|ifx)", true),
+        ),
+        // Cray Fortran pattern: matches crayftn, ftn
+        (
+            CompilerType::CrayFortran,
+            create_compiler_regex(r"(?:crayftn|ftn)", true),
+        ),
+        // CUDA pattern: matches nvcc (NVIDIA CUDA Compiler) with optional cross-compilation prefixes and version suffixes
+        (
+            CompilerType::Cuda,
+            create_compiler_regex(r"(?:[^/]*-)?nvcc", true),
+        ),
+        // Wrapper pattern: matches common compiler wrappers (no version support)
+        (
+            CompilerType::Wrapper,
+            create_compiler_regex(r"(?:ccache|distcc|sccache)", false),
+        ),
     ]
 });
 
@@ -858,5 +879,85 @@ mod tests {
         assert_eq!(recognizer.recognize(path("ccache-fake")), None);
         assert_eq!(recognizer.recognize(path("fake-distcc")), None);
         assert_eq!(recognizer.recognize(path("not-sccache")), None);
+    }
+
+    #[test]
+    fn test_version_capture_functionality() {
+        // Test that the DEFAULT_PATTERNS contain regexes that can extract version numbers
+        let recognizer = CompilerRecognizer::new();
+
+        // Test basic dash-separated versions
+        assert_eq!(
+            recognizer.recognize(path("gcc-11")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("g++-9.3.0")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("clang-15")),
+            Some(CompilerType::Clang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("clang-12.1")),
+            Some(CompilerType::Clang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("gfortran-12")),
+            Some(CompilerType::Flang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("ifort-2023")),
+            Some(CompilerType::IntelFortran)
+        );
+        assert_eq!(
+            recognizer.recognize(path("nvcc-11.8")),
+            Some(CompilerType::Cuda)
+        );
+
+        // Test underscore-separated versions
+        assert_eq!(
+            recognizer.recognize(path("gcc_11")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("clang_15.0.7")),
+            Some(CompilerType::Clang)
+        );
+
+        // Test that non-versioned compilers still work
+        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
+        assert_eq!(
+            recognizer.recognize(path("clang")),
+            Some(CompilerType::Clang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("gfortran")),
+            Some(CompilerType::Flang)
+        );
+
+        // Test that wrapper executables don't have version patterns (as expected)
+        assert_eq!(
+            recognizer.recognize(path("ccache")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(recognizer.recognize(path("ccache-1.0")), None); // No version pattern for wrappers
+
+        // Verify that the patterns created with version capture actually have capture groups
+        // by manually testing the regex structure
+        let gcc_patterns: Vec<_> = DEFAULT_PATTERNS
+            .iter()
+            .filter(|(compiler_type, _)| *compiler_type == CompilerType::Gcc)
+            .collect();
+
+        // At least one GCC pattern should have capture groups (the versioned one)
+        let has_capture_groups = gcc_patterns
+            .iter()
+            .any(|(_, regex)| regex.captures_len() > 1);
+        assert!(
+            has_capture_groups,
+            "GCC patterns should include version capture groups"
+        );
     }
 }
