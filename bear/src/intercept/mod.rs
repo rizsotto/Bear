@@ -15,6 +15,7 @@ pub mod supervise;
 pub mod tcp;
 pub mod wrapper;
 
+use crate::args::BuildCommand;
 use crate::environment::relevant_env;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -166,5 +167,77 @@ impl Event {
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Event pid={}, execution={}", self.pid, self.execution)
+    }
+}
+
+impl From<&BuildCommand> for Event {
+    /// Creates an event from a build command with automatic environment trimming.
+    ///
+    /// This conversion creates an `Event` suitable for the interception pipeline.
+    /// The resulting event uses a constant PID of 0 to indicate it represents
+    /// the initial command rather than an intercepted process.
+    ///
+    /// The working directory is obtained from the current process, and environment
+    /// variables are automatically filtered to include only those relevant for
+    /// compilation database generation.
+    fn from(command: &BuildCommand) -> Self {
+        let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let environment = std::env::vars().collect();
+
+        let execution = Execution {
+            executable: PathBuf::from(&command.arguments[0]),
+            arguments: command.arguments.clone(),
+            working_dir,
+            environment,
+        }
+        .trim();
+
+        Event {
+            pid: 0, // Constant zero PID for initial command events
+            execution,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_command_to_event_from_trait() {
+        let command = BuildCommand {
+            arguments: vec![
+                "/usr/bin/gcc".to_string(),
+                "-c".to_string(),
+                "test.c".to_string(),
+            ],
+        };
+
+        let event = Event::from(&command);
+
+        assert_eq!(event.pid, 0);
+        assert_eq!(event.execution.executable, PathBuf::from("/usr/bin/gcc"));
+        assert_eq!(
+            event.execution.arguments,
+            vec!["/usr/bin/gcc", "-c", "test.c"]
+        );
+        assert!(event.execution.working_dir.is_absolute());
+        // Environment should be trimmed to only relevant variables
+        for key in event.execution.environment.keys() {
+            assert!(relevant_env(key), "Non-relevant env var found: {}", key);
+        }
+    }
+
+    #[test]
+    fn test_build_command_to_event_into_trait() {
+        let command = BuildCommand {
+            arguments: vec!["make".to_string()],
+        };
+
+        let event: Event = (&command).into();
+
+        assert_eq!(event.pid, 0);
+        assert_eq!(event.execution.executable, PathBuf::from("make"));
+        assert_eq!(event.execution.arguments, vec!["make"]);
     }
 }

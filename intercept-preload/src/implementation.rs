@@ -79,6 +79,13 @@ type PosixSpawnpFunc = unsafe extern "C" fn(
     envp: *const *const c_char,
 ) -> c_int;
 
+#[cfg(has_symbol_popen)]
+type PopenFunc =
+    unsafe extern "C" fn(command: *const c_char, mode: *const c_char) -> *mut libc::FILE;
+
+#[cfg(has_symbol_system)]
+type SystemFunc = unsafe extern "C" fn(command: *const c_char) -> c_int;
+
 // Dynamic loading related constants and types
 const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 
@@ -139,6 +146,20 @@ static REAL_POSIX_SPAWN: AtomicPtr<libc::c_void> = {
 #[ctor]
 static REAL_POSIX_SPAWNP: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"posix_spawnp".as_ptr() as *const _) };
+    AtomicPtr::new(ptr)
+};
+
+#[cfg(has_symbol_popen)]
+#[ctor]
+static REAL_POPEN: AtomicPtr<libc::c_void> = {
+    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"popen".as_ptr() as *const _) };
+    AtomicPtr::new(ptr)
+};
+
+#[cfg(has_symbol_system)]
+#[ctor]
+static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
+    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"system".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
@@ -492,6 +513,112 @@ pub unsafe extern "C" fn posix_spawnp(
     } else {
         log::error!("Real posix_spawnp function not found");
         libc::ENOSYS
+    }
+}
+
+/// Intercept popen function calls
+///
+/// # Safety
+/// This function is unsafe because it:
+/// - Dereferences raw pointers (`command` and `mode`) which could be null or invalid
+/// - Calls the original popen function through a function pointer
+/// - Returns a raw pointer to a FILE structure
+///
+/// The caller must ensure that `command` and `mode` are valid null-terminated C strings.
+#[cfg(has_symbol_popen)]
+#[no_mangle]
+pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
+    // For popen, we need to parse the shell command to extract the executable
+    if !command.is_null() {
+        let command_str = match CStr::from_ptr(command).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                log::warn!("Failed to parse popen command as UTF-8");
+                let func_ptr = REAL_POPEN.load(Ordering::SeqCst);
+                if !func_ptr.is_null() {
+                    let real_func_ptr: PopenFunc = std::mem::transmute(func_ptr);
+                    return real_func_ptr(command, mode);
+                }
+                return ptr::null_mut();
+            }
+        };
+
+        // Parse the shell command - for simplicity, we'll report it as a shell execution
+        report(|| {
+            let result = Execution {
+                executable: PathBuf::from("/bin/sh"),
+                arguments: vec![
+                    "/bin/sh".to_string(),
+                    "-c".to_string(),
+                    command_str.to_string(),
+                ],
+                working_dir: working_dir()?,
+                environment: environment(),
+            };
+            Ok(result)
+        });
+    }
+
+    let func_ptr = REAL_POPEN.load(Ordering::SeqCst);
+    if !func_ptr.is_null() {
+        let real_func_ptr: PopenFunc = std::mem::transmute(func_ptr);
+        real_func_ptr(command, mode)
+    } else {
+        log::error!("Real popen function not found");
+        ptr::null_mut()
+    }
+}
+
+/// Intercept system function calls
+///
+/// # Safety
+/// This function is unsafe because it:
+/// - Dereferences a raw pointer (`command`) which could be null or invalid
+/// - Calls the original system function through a function pointer
+/// - Executes arbitrary shell commands which can have system-wide effects
+///
+/// The caller must ensure that `command` is a valid null-terminated C string.
+#[cfg(has_symbol_system)]
+#[no_mangle]
+pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
+    // For system, we need to parse the shell command to extract the executable
+    if !command.is_null() {
+        let command_str = match CStr::from_ptr(command).to_str() {
+            Ok(s) => s,
+            Err(_) => {
+                log::warn!("Failed to parse system command as UTF-8");
+                let func_ptr = REAL_SYSTEM.load(Ordering::SeqCst);
+                if !func_ptr.is_null() {
+                    let real_func_ptr: SystemFunc = std::mem::transmute(func_ptr);
+                    return real_func_ptr(command);
+                }
+                return -1;
+            }
+        };
+
+        // Parse the shell command - for simplicity, we'll report it as a shell execution
+        report(|| {
+            let result = Execution {
+                executable: PathBuf::from("/bin/sh"),
+                arguments: vec![
+                    "/bin/sh".to_string(),
+                    "-c".to_string(),
+                    command_str.to_string(),
+                ],
+                working_dir: working_dir()?,
+                environment: environment(),
+            };
+            Ok(result)
+        });
+    }
+
+    let func_ptr = REAL_SYSTEM.load(Ordering::SeqCst);
+    if !func_ptr.is_null() {
+        let real_func_ptr: SystemFunc = std::mem::transmute(func_ptr);
+        real_func_ptr(command)
+    } else {
+        log::error!("Real system function not found");
+        -1
     }
 }
 

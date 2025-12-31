@@ -30,3 +30,11 @@ pub const FAKEROOT_PATH: &str = env!("FAKEROOT_PATH");
 pub const VALGRIND_PATH: &str = env!("VALGRIND_PATH");
 #[cfg(has_executable_ar)]
 pub const AR_PATH: &str = env!("AR_PATH");
+
+// Intercept artifact paths - only available when integration tests are enabled
+#[cfg(feature = "allow-integration-tests")]
+#[allow(dead_code)]
+pub const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
+#[cfg(feature = "allow-integration-tests")]
+#[allow(dead_code)]
+pub const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");

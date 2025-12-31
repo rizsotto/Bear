@@ -138,6 +138,9 @@ impl Interceptor {
     pub fn run(self, command: BuildCommand) -> Result<ExitCode, RuntimeError> {
         let (sender, receiver) = unbounded::<intercept::Event>();
 
+        // Inject initial command event
+        let _ = sender.send((&command).into());
+
         let producer_thread = {
             let producer = Arc::clone(&self.producer);
             std::thread::spawn(move || producer.produce(sender))
@@ -564,8 +567,16 @@ mod tests {
         let consumed_events = captured_events
             .lock()
             .expect("Failed to lock captured_events mutex");
-        assert_eq!(consumed_events.len(), 2);
-        assert_eq!(*consumed_events, events);
+        assert_eq!(consumed_events.len(), 3);
+
+        // Verify the first event is the initial command event
+        let initial_event = &consumed_events[0];
+        assert_eq!(initial_event.pid, 0);
+        assert_eq!(initial_event.execution.executable.to_str().unwrap(), "make");
+        assert_eq!(initial_event.execution.arguments, vec!["make", "all"]);
+
+        // Verify the remaining events match the mock producer events
+        assert_eq!(consumed_events[1..], events);
         assert_eq!(producer_mock.cancel_call_count(), 1);
     }
 
@@ -778,8 +789,16 @@ mod tests {
         let consumed_events = captured_events
             .lock()
             .expect("Failed to lock captured_events mutex");
-        assert_eq!(consumed_events.len(), 3);
-        assert_eq!(*consumed_events, events);
+        assert_eq!(consumed_events.len(), 4);
+
+        // Verify the first event is the initial command event
+        let initial_event = &consumed_events[0];
+        assert_eq!(initial_event.pid, 0);
+        assert_eq!(initial_event.execution.executable.to_str().unwrap(), "make");
+        assert_eq!(initial_event.execution.arguments, vec!["make", "all"]);
+
+        // Verify the remaining events match the mock producer events
+        assert_eq!(consumed_events[1..], events);
         assert_eq!(producer_mock.cancel_call_count(), 1);
     }
 

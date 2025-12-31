@@ -112,12 +112,12 @@ impl WrapperConfigWriter {
 /// Builder for creating wrapper directories with executable links and configuration.
 ///
 /// This type acts as a builder that collects executable mappings and creates
-/// the necessary directory structure, hard links, and configuration file.
+/// the necessary directory structure, hard links (or file copies on Windows), and configuration file.
 /// It owns and manages the temporary directory for the wrapper setup.
 /// Builder for creating wrapper directories with executable links and configuration.
 ///
 /// This type acts as a builder that collects executable mappings and creates
-/// the necessary directory structure, hard links, and configuration file.
+/// the necessary directory structure, hard links (or file copies on Windows), and configuration file.
 /// It owns and manages the temporary directory for the wrapper setup.
 pub struct WrapperDirectoryBuilder {
     wrapper_executable_path: PathBuf,
@@ -148,7 +148,7 @@ impl WrapperDirectoryBuilder {
 
     /// Registers an executable to be wrapped.
     ///
-    /// This method checks for filename uniqueness and creates the hard link immediately.
+    /// This method checks for filename uniqueness and creates the hard link (or file copy on Windows) immediately.
     /// Returns the path to the wrapper executable on success, or an error if link creation fails.
     pub fn register_executable(
         &mut self,
@@ -166,8 +166,13 @@ impl WrapperDirectoryBuilder {
             return Ok(self.wrapper_dir.path().join(&executable_name));
         }
 
-        // Create hard link immediately
+        // Create hard link immediately (or copy on Windows)
         let wrapper_path = self.wrapper_dir.path().join(&executable_name);
+        #[cfg(windows)]
+        std::fs::copy(&self.wrapper_executable_path, &wrapper_path)
+            .map(|_| ())
+            .map_err(WrapperDirectoryError::LinkCreation)?;
+        #[cfg(not(windows))]
         std::fs::hard_link(&self.wrapper_executable_path, &wrapper_path)
             .map_err(WrapperDirectoryError::LinkCreation)?;
 
@@ -226,7 +231,7 @@ impl WrapperDirectory {
 pub enum WrapperDirectoryError {
     #[error("Invalid executable path: {0}")]
     InvalidExecutablePath(PathBuf),
-    #[error("Failed to create hard link: {0}")]
+    #[error("Failed to create wrapper executable: {0}")]
     LinkCreation(#[from] std::io::Error),
     #[error("Failed to write configuration file: {0}")]
     ConfigWrite(#[from] ConfigError),

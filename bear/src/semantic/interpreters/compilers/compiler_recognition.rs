@@ -44,40 +44,41 @@ use std::sync::LazyLock;
 /// - `crayftn`, `ftn`
 static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
     // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
-    let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?$")
+    let gcc_pattern = Regex::new(r"^(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)(?:-[\d.]+)?(?:\.exe)?$")
         .expect("Invalid GCC regex pattern");
 
     // GCC internal executables pattern: matches GCC's internal compiler phases
     // These are implementation details of GCC's compilation process that should be
     // routed to GccInterpreter for proper handling (typically to be ignored).
     // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
-    let gcc_internal_pattern = Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)$")
-        .expect("Invalid GCC internal regex pattern");
+    let gcc_internal_pattern =
+        Regex::new(r"^(?:cc1(?:plus|obj|objplus)?|collect2|lto1)(?:\.exe)?$")
+            .expect("Invalid GCC internal regex pattern");
 
     // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
-    let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?$")
+    let clang_pattern = Regex::new(r"^(?:[^/]*-)?clang(?:\+\+)?(?:-[\d.]+)?(?:\.exe)?$")
         .expect("Invalid Clang regex pattern");
 
     // Fortran pattern: matches gfortran, flang, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
     let fortran_pattern =
-        Regex::new(r"^(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)(?:-[\d.]+)?$")
+        Regex::new(r"^(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)(?:-[\d.]+)?(?:\.exe)?$")
             .expect("Invalid Fortran regex pattern");
 
     // Intel Fortran pattern: matches ifort, ifx, and versioned variants
-    let intel_fortran_pattern =
-        Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?$").expect("Invalid Intel Fortran regex pattern");
+    let intel_fortran_pattern = Regex::new(r"^(?:ifort|ifx)(?:-[\d.]+)?(?:\.exe)?$")
+        .expect("Invalid Intel Fortran regex pattern");
 
     // Cray Fortran pattern: matches crayftn, ftn
-    let cray_fortran_pattern =
-        Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?$").expect("Invalid Cray Fortran regex pattern");
+    let cray_fortran_pattern = Regex::new(r"^(?:crayftn|ftn)(?:-[\d.]+)?(?:\.exe)?$")
+        .expect("Invalid Cray Fortran regex pattern");
 
     // CUDA pattern: matches nvcc (NVIDIA CUDA Compiler) with optional cross-compilation prefixes and version suffixes
     let cuda_pattern =
-        Regex::new(r"^(?:[^/]*-)?nvcc(?:-[\d.]+)?$").expect("Invalid CUDA regex pattern");
+        Regex::new(r"^(?:[^/]*-)?nvcc(?:-[\d.]+)?(?:\.exe)?$").expect("Invalid CUDA regex pattern");
 
     // Wrapper pattern: matches common compiler wrappers
-    let wrapper_pattern =
-        Regex::new(r"^(?:ccache|distcc|sccache)$").expect("Invalid wrapper regex pattern");
+    let wrapper_pattern = Regex::new(r"^(?:ccache|distcc|sccache)(?:\.exe)?$")
+        .expect("Invalid wrapper regex pattern");
 
     vec![
         (CompilerType::Gcc, gcc_pattern),
@@ -374,6 +375,136 @@ mod tests {
         );
         assert_eq!(
             recognizer.recognize(path("/opt/llvm/bin/clang++")),
+            Some(CompilerType::Clang)
+        );
+    }
+
+    #[test]
+    fn test_windows_exe_extensions() {
+        let recognizer = CompilerRecognizer::new();
+
+        // GCC with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("gcc.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("g++.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("cc.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("c++.exe")),
+            Some(CompilerType::Gcc)
+        );
+
+        // Cross-compilation variants with .exe
+        assert_eq!(
+            recognizer.recognize(path("arm-linux-gnueabi-gcc.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("x86_64-w64-mingw32-g++.exe")),
+            Some(CompilerType::Gcc)
+        );
+
+        // Versioned variants with .exe
+        assert_eq!(
+            recognizer.recognize(path("gcc-9.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("g++-11.2.exe")),
+            Some(CompilerType::Gcc)
+        );
+
+        // Clang with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("clang.exe")),
+            Some(CompilerType::Clang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("clang++.exe")),
+            Some(CompilerType::Clang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("clang-15.exe")),
+            Some(CompilerType::Clang)
+        );
+
+        // Fortran with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("gfortran.exe")),
+            Some(CompilerType::Flang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("flang.exe")),
+            Some(CompilerType::Flang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("f77.exe")),
+            Some(CompilerType::Flang)
+        );
+        assert_eq!(
+            recognizer.recognize(path("f90.exe")),
+            Some(CompilerType::Flang)
+        );
+
+        // Intel Fortran with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("ifort.exe")),
+            Some(CompilerType::IntelFortran)
+        );
+        assert_eq!(
+            recognizer.recognize(path("ifx.exe")),
+            Some(CompilerType::IntelFortran)
+        );
+
+        // Cray Fortran with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("crayftn.exe")),
+            Some(CompilerType::CrayFortran)
+        );
+        assert_eq!(
+            recognizer.recognize(path("ftn.exe")),
+            Some(CompilerType::CrayFortran)
+        );
+
+        // CUDA with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("nvcc.exe")),
+            Some(CompilerType::Cuda)
+        );
+
+        // Wrapper tools with .exe extensions
+        assert_eq!(
+            recognizer.recognize(path("ccache.exe")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(
+            recognizer.recognize(path("distcc.exe")),
+            Some(CompilerType::Wrapper)
+        );
+        assert_eq!(
+            recognizer.recognize(path("sccache.exe")),
+            Some(CompilerType::Wrapper)
+        );
+    }
+
+    #[test]
+    fn test_windows_paths_with_exe() {
+        let recognizer = CompilerRecognizer::new();
+
+        // Simple Unix-style paths with .exe (should work cross-platform)
+        assert_eq!(
+            recognizer.recognize(path("/mingw64/bin/gcc.exe")),
+            Some(CompilerType::Gcc)
+        );
+        assert_eq!(
+            recognizer.recognize(path("/usr/bin/clang.exe")),
             Some(CompilerType::Clang)
         );
     }

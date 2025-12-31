@@ -6,6 +6,13 @@
  * original bear/build.rs.
  */
 
+#[cfg(windows)]
+const WRAPPER_NAME: &str = "wrapper.exe";
+#[cfg(not(windows))]
+const WRAPPER_NAME: &str = "wrapper";
+
+const PRELOAD_NAME: &str = "libexec.so";
+
 fn main() {
     // Set up paths for wrapper and preload artifacts
     let (wrapper_path, preload_path) = find_intercept_artifacts();
@@ -17,6 +24,10 @@ fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
     println!("cargo:rerun-if-env-changed=PROFILE");
 
+    // Re-run if bear or intercept-preload artifacts change
+    println!("cargo:rerun-if-changed=../bear/src");
+    println!("cargo:rerun-if-changed=../intercept-preload/src");
+
     // Perform system checks for headers and symbols
     platform_checks::perform_system_checks();
 
@@ -27,8 +38,8 @@ fn main() {
     check_executable_exists("sleep");
     check_one_executable_exists("shell", &["sh", "zsh", "bash"]);
     check_one_executable_exists("make", &["make", "gmake", "mingw32-make"]);
-    check_one_executable_exists("compiler_c", &["cc", "gcc", "clang"]);
-    check_one_executable_exists("compiler_cxx", &["c++", "g++", "clang++"]);
+    check_one_executable_exists("compiler_c", &["gcc", "clang", "cc"]);
+    check_one_executable_exists("compiler_cxx", &["g++", "clang++", "c++"]);
     check_one_executable_exists("compiler_fortran", &["gfortran", "flang"]);
     check_one_executable_exists("compiler_cuda", &["nvcc"]);
     check_executable_exists("libtool");
@@ -38,63 +49,19 @@ fn main() {
 }
 
 fn find_intercept_artifacts() -> (String, String) {
-    use std::path::PathBuf;
+    let out_dir = std::env::var("OUT_DIR").unwrap();
+    let target_dir = std::path::Path::new(&out_dir)
+        .ancestors()
+        .nth(3) // Go up from out_dir to target/debug or target/release
+        .unwrap();
 
-    // Get the target directory from CARGO_TARGET_DIR or default to target/
-    let target_dir = std::env::var("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            // Find workspace root by looking for Cargo.toml with [workspace]
-            let mut current = std::env::current_dir().expect("Failed to get current directory");
-            loop {
-                let cargo_toml = current.join("Cargo.toml");
-                if cargo_toml.exists() {
-                    if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
-                        if content.contains("[workspace]") {
-                            return current.join("target");
-                        }
-                    }
-                }
-                if !current.pop() {
-                    break;
-                }
-            }
-            PathBuf::from("target")
-        });
+    let wrapper_path = target_dir.join(WRAPPER_NAME);
+    let preload_path = target_dir.join(PRELOAD_NAME);
 
-    // Determine build profile (debug or release)
-    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "debug".to_string());
-    let profile_dir = target_dir.join(&profile);
-
-    // Construct paths for the intercept artifacts
-    let wrapper_path = profile_dir.join("wrapper");
-
-    // For the preload library, we need to handle the platform-specific naming
-    let preload_path = if cfg!(target_os = "macos") {
-        profile_dir.join("deps").join("libexec.dylib")
-    } else if cfg!(target_os = "windows") {
-        profile_dir.join("deps").join("exec.dll")
-    } else {
-        profile_dir.join("deps").join("libexec.so")
-    };
-
-    // If artifacts don't exist yet, fall back to system paths for installed version
-    let wrapper_final = if wrapper_path.exists() {
-        wrapper_path.to_string_lossy().to_string()
-    } else {
-        "/usr/libexec/bear/wrapper".to_string()
-    };
-
-    let preload_final = if preload_path.exists() {
-        preload_path.to_string_lossy().to_string()
-    } else {
-        "/usr/libexec/bear/$LIB/libexec.so".to_string()
-    };
-
-    println!("cargo:warning=Using wrapper path: {}", wrapper_final);
-    println!("cargo:warning=Using preload path: {}", preload_final);
-
-    (wrapper_final, preload_final)
+    (
+        format!("{}", wrapper_path.display()),
+        format!("{}", preload_path.display()),
+    )
 }
 
 fn check_executable_exists(executable: &str) {
@@ -125,17 +92,35 @@ fn check_executable_exists(executable: &str) {
 fn check_one_executable_exists(define: &str, executables: &[&str]) {
     for executable in executables {
         if let Ok(path) = which::which(executable) {
+            // For integration tests, prefer real compiler paths over ccache wrappers
+            let final_path = if path.to_string_lossy().contains("ccache") {
+                // Try to find the real compiler in /usr/bin
+                let real_path = std::path::Path::new("/usr/bin").join(executable);
+                if real_path.exists() {
+                    println!(
+                        "cargo:warning=Preferring real compiler {} over ccache wrapper {}",
+                        real_path.display(),
+                        path.display()
+                    );
+                    real_path
+                } else {
+                    path
+                }
+            } else {
+                path
+            };
+
             println!("cargo:rustc-cfg=has_executable_{}", define);
             println!("cargo:rustc-check-cfg=cfg(has_executable_{})", define);
             println!(
                 "cargo:rustc-env={}_PATH={}",
                 define.to_uppercase(),
-                path.display()
+                final_path.display()
             );
             println!(
                 "cargo:warning=Checking for executable: {} ... {}",
                 define,
-                path.display()
+                final_path.display()
             );
             return;
         }

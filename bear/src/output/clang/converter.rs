@@ -226,7 +226,7 @@ impl CommandConverter {
         formatted_directory: &Path,
     ) -> Vec<String> {
         // Start with the executable
-        let mut command_args = vec![cmd.executable.to_string_lossy().to_string()];
+        let mut command_args = vec![];
 
         // Add all non-source arguments, while handling source file placement
         for arg in &cmd.arguments {
@@ -268,6 +268,17 @@ impl CommandConverter {
                         })
                         .collect::<Vec<_>>();
                     command_args.extend(formatted_args);
+                }
+                ArgumentKind::Compiler => {
+                    if let Some(executable_name) = cmd.executable.file_name() {
+                        if let Some(name_str) = executable_name.to_str() {
+                            command_args.push(name_str.to_string());
+                        } else {
+                            command_args.extend(original_args);
+                        }
+                    } else {
+                        command_args.extend(original_args);
+                    }
                 }
                 _ => {
                     // Non-file arguments, use as-is
@@ -325,12 +336,23 @@ impl CommandConverter {
     /// A command is considered preprocessing-only if it contains arguments
     /// classified as `CompilerPass::Preprocessing` by the semantic analysis.
     fn is_preprocessing_only(&self, cmd: &CompilerCommand) -> bool {
-        cmd.arguments.iter().any(|arg| {
+        // A command is preprocessing-only if it has preprocessing flags but NO compilation flags
+        let has_preprocessing = cmd.arguments.iter().any(|arg| {
             matches!(
                 arg.kind(),
                 ArgumentKind::Other(Some(crate::semantic::CompilerPass::Preprocessing))
             )
-        })
+        });
+
+        let has_compilation = cmd.arguments.iter().any(|arg| {
+            matches!(
+                arg.kind(),
+                ArgumentKind::Other(Some(crate::semantic::CompilerPass::Compiling))
+            )
+        });
+
+        // Only preprocessing-only if it has preprocessing flags but no compilation flags
+        has_preprocessing && !has_compilation
     }
 
     /// Determines if a compiler command is info-only.
@@ -410,6 +432,7 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (
                     ArgumentKind::Other(Some(CompilerPass::Compiling)),
                     vec!["-c"],
@@ -429,7 +452,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
+            vec!["gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
             "/home/user",
             Some("main.o"),
         )];
@@ -442,6 +465,7 @@ mod tests {
             "/home/user",
             "/usr/bin/g++",
             vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/g++"]),
                 (
                     ArgumentKind::Other(Some(CompilerPass::Compiling)),
                     vec!["-c"],
@@ -461,13 +485,13 @@ mod tests {
         let expected = vec![
             Entry::from_arguments_str(
                 "file1.cpp",
-                vec!["/usr/bin/g++", "-c", "file1.cpp"],
+                vec!["g++", "-c", "file1.cpp"],
                 "/home/user",
                 None,
             ),
             Entry::from_arguments_str(
                 "file2.cpp",
-                vec!["/usr/bin/g++", "-c", "file2.cpp"],
+                vec!["g++", "-c", "file2.cpp"],
                 "/home/user",
                 None,
             ),
@@ -503,6 +527,7 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (
                     ArgumentKind::Other(Some(CompilerPass::Compiling)),
                     vec!["-c"],
@@ -523,7 +548,7 @@ mod tests {
 
         let expected = vec![Entry::from_command_str(
             "main.c",
-            "/usr/bin/gcc -c main.c -o main.o",
+            "gcc -c main.c -o main.o",
             "/home/user",
             Some("main.o"),
         )];
@@ -536,6 +561,7 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (
                     ArgumentKind::Other(Some(CompilerPass::Compiling)),
                     vec!["-c"],
@@ -556,7 +582,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["/usr/bin/gcc", "-c", "main.c", "-o", "main.o"],
+            vec!["gcc", "-c", "main.c", "-o", "main.o"],
             "/home/user",
             None,
         )];
@@ -1047,6 +1073,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
+                (ArgumentKind::Compiler, vec!["gcc"]),
                 (
                     ArgumentKind::Other(Some(CompilerPass::Compiling)),
                     vec!["-c"],
@@ -1078,5 +1105,81 @@ mod tests {
         assert!(entry.arguments.contains(&"main.c".to_string()));
         assert!(entry.arguments.contains(&"-o".to_string()));
         assert!(entry.arguments.contains(&"main.o".to_string()));
+    }
+
+    #[test]
+    fn test_preprocessing_and_compilation_flags_generates_entries() {
+        let format = Format {
+            paths: PathFormat::default(),
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format).unwrap();
+
+        // Test command with both preprocessing flags (-D) and compilation flags (-c)
+        let compiler_cmd = CompilerCommand::from_strings(
+            "/home/user",
+            "gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["gcc"]),
+                (
+                    ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+                    vec!["-DWRAPPER_FLAG"],
+                ),
+                (
+                    ArgumentKind::Other(Some(CompilerPass::Compiling)),
+                    vec!["-c"],
+                ),
+                (ArgumentKind::Source, vec!["test.c"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let result = converter.to_entries(&command);
+
+        // Should generate entries because it has compilation flags, not just preprocessing
+        assert_eq!(result.len(), 1);
+
+        let entry = &result[0];
+        assert_eq!(entry.file, PathBuf::from("test.c"));
+        assert_eq!(entry.directory, PathBuf::from("/home/user"));
+
+        // Verify the arguments include both preprocessing and compilation flags
+        assert!(entry.arguments.contains(&"gcc".to_string()));
+        assert!(entry.arguments.contains(&"-DWRAPPER_FLAG".to_string()));
+        assert!(entry.arguments.contains(&"-c".to_string()));
+        assert!(entry.arguments.contains(&"test.c".to_string()));
+    }
+
+    #[test]
+    fn test_preprocessing_only_with_defines_no_entries() {
+        let format = Format {
+            paths: PathFormat::default(),
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format).unwrap();
+
+        // Test command with only preprocessing flags (no -c flag)
+        let compiler_cmd = CompilerCommand::from_strings(
+            "/home/user",
+            "gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["gcc"]),
+                (
+                    ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+                    vec!["-E"],
+                ),
+                (
+                    ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+                    vec!["-DSOME_DEFINE"],
+                ),
+                (ArgumentKind::Source, vec!["test.c"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let result = converter.to_entries(&command);
+
+        // Should NOT generate entries because it's preprocessing-only (no compilation flags)
+        assert_eq!(result.len(), 0);
     }
 }

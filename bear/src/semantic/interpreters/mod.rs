@@ -174,4 +174,75 @@ mod test {
         assert_eq!(excluded.len(), 1);
         assert_eq!(excluded[0], PathBuf::from("/usr/bin/gcc"));
     }
+
+    #[test]
+    fn test_windows_gcc_exe_regression() {
+        // Regression test for Windows CI failure where gcc.exe was not recognized
+        let config = config::Main::default();
+        let interpreter = create(&config).unwrap();
+
+        // Test with .exe extension - this simulates Windows executables
+        let execution = Execution::from_strings(
+            "gcc.exe",
+            vec!["gcc.exe", "-fplugin=libexample.so", "-c", "test.c"],
+            "/tmp",
+            HashMap::new(),
+        );
+
+        // This should recognize gcc.exe as a compiler, not ignore it
+        let result = interpreter.recognize(&execution);
+        assert!(
+            result.is_some(),
+            "gcc.exe should be recognized as a compiler command"
+        );
+
+        match result.unwrap() {
+            Command::Compiler(_) => {
+                // This is expected - gcc.exe should be recognized as a compiler
+            }
+            Command::Ignored(_) => {
+                panic!("gcc.exe was incorrectly ignored instead of being recognized as a compiler");
+            }
+        }
+    }
+
+    #[test]
+    fn test_various_windows_exe_compilers() {
+        let config = config::Main::default();
+        let interpreter = create(&config).unwrap();
+
+        let test_cases = vec![
+            "gcc.exe",
+            "g++.exe",
+            "clang.exe",
+            "clang++.exe",
+            "gfortran.exe",
+            "nvcc.exe",
+        ];
+
+        for executable_name in test_cases {
+            let execution = Execution::from_strings(
+                executable_name,
+                vec![executable_name, "-c", "test.c"],
+                "/tmp",
+                HashMap::new(),
+            );
+
+            let result = interpreter.recognize(&execution);
+            assert!(
+                result.is_some(),
+                "{} should be recognized as a compiler",
+                executable_name
+            );
+
+            match result.unwrap() {
+                Command::Compiler(_) => {
+                    // Expected
+                }
+                Command::Ignored(_) => {
+                    panic!("{} was incorrectly ignored", executable_name);
+                }
+            }
+        }
+    }
 }

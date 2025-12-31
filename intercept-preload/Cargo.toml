@@ -10,6 +10,10 @@ homepage.workspace = true
 license.workspace = true
 edition.workspace = true
 
+[features]
+# Feature to enable integration testing with locally built binaries from target directory
+allow-integration-tests = []
+
 [lib]
 name = "exec"
 path = "src/lib.rs"
