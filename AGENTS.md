@@ -6,14 +6,14 @@ It is intended for developers who need to integrate clang-based tools with their
 ## Development Guidelines
 
 ### Required Before Each Commit
-- Run `cargo fmt` to ensure proper code formatting.
-- Run `cargo clippy -- -D warnings` to ensure the code passes all linter checks.
+- Run format check to ensure proper code formatting.
+- Run linter to ensure the code passes all linter checks.
 
 ### Development Workflow
-- Build the project: `cargo build --verbose`
+- Build the project: `cargo build --verbose --features allow-integration-tests`
 - Run unit tests: `cargo test`
 - Run integration tests: `cargo test --features allow-integration-tests`
-- Run the linter: `cargo clippy -- -D warnings`
+- Run the linter: `cargo clippy --all-targets -- -D warnings`
 
 ## Repository Structure
 - `bear/`: Library code and executable for Bear
