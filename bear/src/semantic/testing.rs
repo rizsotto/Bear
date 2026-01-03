@@ -73,10 +73,8 @@ impl CompilerCommand {
             arguments: arguments
                 .into_iter()
                 .map(|(kind, args)| {
-                    Box::new(TestArguments::new(
-                        args.into_iter().map(String::from).collect(),
-                        kind,
-                    )) as Box<dyn Arguments>
+                    Box::new(TestArguments::new(args.into_iter().map(String::from).collect(), kind))
+                        as Box<dyn Arguments>
                 })
                 .collect(),
         }
@@ -99,13 +97,9 @@ impl CompilerCommand {
 
         let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
 
-        self.arguments
-            .iter()
-            .zip(other.arguments.iter())
-            .all(|(a, b)| {
-                a.kind() == b.kind()
-                    && a.as_arguments(&path_updater) == b.as_arguments(&path_updater)
-            })
+        self.arguments.iter().zip(other.arguments.iter()).all(|(a, b)| {
+            a.kind() == b.kind() && a.as_arguments(&path_updater) == b.as_arguments(&path_updater)
+        })
     }
 }
 
@@ -118,28 +112,19 @@ mod tests {
         let cmd1 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
+            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
         );
 
         let cmd2 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
+            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
         );
 
         let cmd3 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source, vec!["other.c"]),
-                (ArgumentKind::Output, vec!["-o", "other.o"]),
-            ],
+            vec![(ArgumentKind::Source, vec!["other.c"]), (ArgumentKind::Output, vec!["-o", "other.o"])],
         );
 
         // Same arguments should be equal
@@ -172,10 +157,7 @@ mod tests {
         let cmd1 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![
-                (ArgumentKind::Source, vec!["main.c"]),
-                (ArgumentKind::Output, vec!["-o", "main.o"]),
-            ],
+            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
         );
 
         let cmd2 = CompilerCommand::from_strings(
@@ -191,10 +173,8 @@ mod tests {
     #[test]
     fn test_test_arguments_implementation() {
         let source_arg = TestArguments::new(vec!["main.c".to_string()], ArgumentKind::Source);
-        let output_arg = TestArguments::new(
-            vec!["-o".to_string(), "main.o".to_string()],
-            ArgumentKind::Output,
-        );
+        let output_arg =
+            TestArguments::new(vec!["-o".to_string(), "main.o".to_string()], ArgumentKind::Output);
         let other_arg = TestArguments::new(vec!["-Wall".to_string()], ArgumentKind::Other(None));
 
         // Test kind method
@@ -209,14 +189,8 @@ mod tests {
         assert_eq!(other_arg.as_arguments(path_updater), vec!["-Wall"]);
 
         // Test as_file method
-        assert_eq!(
-            source_arg.as_file(path_updater),
-            Some(PathBuf::from("main.c"))
-        );
-        assert_eq!(
-            output_arg.as_file(path_updater),
-            Some(PathBuf::from("main.o"))
-        );
+        assert_eq!(source_arg.as_file(path_updater), Some(PathBuf::from("main.c")));
+        assert_eq!(output_arg.as_file(path_updater), Some(PathBuf::from("main.o")));
         assert_eq!(other_arg.as_file(path_updater), None);
     }
 }

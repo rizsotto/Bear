@@ -5,7 +5,7 @@ use crate::intercept;
 use crate::intercept::reporter::ReporterError;
 use crate::intercept::supervise::SuperviseError;
 use crate::output::WriterError;
-use crossbeam_channel::{bounded, unbounded, Receiver};
+use crossbeam_channel::{Receiver, bounded, unbounded};
 use std::process::{ExitCode, ExitStatus};
 use std::sync::Arc;
 use thiserror::Error;
@@ -49,10 +49,7 @@ pub trait Producer: Send + Sync {
     /// # Returns
     /// * `Ok(())` - All items were successfully produced
     /// * `Err(ReporterError)` - An error occurred during production
-    fn produce(
-        &self,
-        sender: crossbeam_channel::Sender<intercept::Event>,
-    ) -> Result<(), ReporterError>;
+    fn produce(&self, sender: crossbeam_channel::Sender<intercept::Event>) -> Result<(), ReporterError>;
 }
 
 /// A trait for cancelling ongoing operations.
@@ -120,11 +117,7 @@ impl Interceptor {
         consumer: Box<dyn Consumer>,
         build: Box<dyn Executor>,
     ) -> Self {
-        Self {
-            producer,
-            consumer,
-            build,
-        }
+        Self { producer, consumer, build }
     }
 
     /// Runs live command interception for the given build command.
@@ -169,10 +162,8 @@ impl Interceptor {
 
         // The exit code is not always available. When the process is killed by a signal,
         // the exit code is not available. In this case, we return the `FAILURE` exit code.
-        let exit_code = exit_status
-            .code()
-            .map(|code| ExitCode::from(code as u8))
-            .unwrap_or(ExitCode::FAILURE);
+        let exit_code =
+            exit_status.code().map(|code| ExitCode::from(code as u8)).unwrap_or(ExitCode::FAILURE);
 
         Ok(exit_code)
     }
@@ -302,18 +293,12 @@ mod tests {
         }
 
         fn cancel_call_count(&self) -> usize {
-            *self
-                .cancel_count
-                .lock()
-                .expect("Failed to lock cancel_count mutex")
+            *self.cancel_count.lock().expect("Failed to lock cancel_count mutex")
         }
     }
 
     impl Producer for MockCancellableProducer {
-        fn produce(
-            &self,
-            sender: crossbeam_channel::Sender<intercept::Event>,
-        ) -> Result<(), ReporterError> {
+        fn produce(&self, sender: crossbeam_channel::Sender<intercept::Event>) -> Result<(), ReporterError> {
             if self.should_fail_produce {
                 return Err(ReporterError::Network(std::io::Error::new(
                     std::io::ErrorKind::ConnectionRefused,
@@ -335,14 +320,9 @@ mod tests {
 
     impl Cancellable for MockCancellableProducer {
         fn cancel(&self) -> Result<(), ReporterError> {
-            *self
-                .cancel_count
-                .lock()
-                .expect("Failed to lock cancel_count mutex") += 1;
+            *self.cancel_count.lock().expect("Failed to lock cancel_count mutex") += 1;
             if self.should_fail_cancel {
-                return Err(ReporterError::Network(std::io::Error::other(
-                    "Cancel failure",
-                )));
+                return Err(ReporterError::Network(std::io::Error::other("Cancel failure")));
             }
             Ok(())
         }
@@ -351,19 +331,11 @@ mod tests {
     impl CancellableProducer for MockCancellableProducer {}
 
     fn create_test_event(pid: u32, executable: &str) -> Event {
-        Event::from_strings(
-            pid,
-            executable,
-            vec!["arg1", "arg2"],
-            "/tmp",
-            HashMap::new(),
-        )
+        Event::from_strings(pid, executable, vec!["arg1", "arg2"], "/tmp", HashMap::new())
     }
 
     fn create_test_command() -> BuildCommand {
-        BuildCommand {
-            arguments: vec!["make".to_string(), "all".to_string()],
-        }
+        BuildCommand { arguments: vec!["make".to_string(), "all".to_string()] }
     }
 
     fn create_success_exit_status() -> ExitStatus {
@@ -395,34 +367,25 @@ mod tests {
         let captured_events_clone = Arc::clone(&captured_events);
 
         let mut producer_mock = MockProducer::new();
-        producer_mock
-            .expect_produce()
-            .times(1)
-            .returning(move |sender| {
-                let test_events = vec![
-                    create_test_event(1001, "/usr/bin/gcc"),
-                    create_test_event(1002, "/usr/bin/clang"),
-                    create_test_event(1003, "/usr/bin/g++"),
-                ];
-                for event in test_events {
-                    sender.send(event).expect("Failed to send test event");
-                }
-                Ok(())
-            });
+        producer_mock.expect_produce().times(1).returning(move |sender| {
+            let test_events = vec![
+                create_test_event(1001, "/usr/bin/gcc"),
+                create_test_event(1002, "/usr/bin/clang"),
+                create_test_event(1003, "/usr/bin/g++"),
+            ];
+            for event in test_events {
+                sender.send(event).expect("Failed to send test event");
+            }
+            Ok(())
+        });
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(move |receiver| {
-                for event in receiver {
-                    captured_events_clone
-                        .lock()
-                        .expect("Failed to lock captured_events mutex")
-                        .push(event);
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for event in receiver {
+                captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
+            }
+            Ok(())
+        });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
         let result = replayer.run();
@@ -430,9 +393,7 @@ mod tests {
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in happy path test"));
 
-        let consumed_events = captured_events
-            .lock()
-            .expect("Failed to lock captured_events mutex");
+        let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
     }
@@ -452,19 +413,14 @@ mod tests {
         let result = replayer.run();
 
         assert!(result.is_err());
-        matches!(
-            result.unwrap_err(),
-            RuntimeError::Producer(ReporterError::Network(_))
-        );
+        matches!(result.unwrap_err(), RuntimeError::Producer(ReporterError::Network(_)));
     }
 
     #[test]
     fn test_replayer_consumer_failure() {
         let mut producer_mock = MockProducer::new();
         producer_mock.expect_produce().times(1).returning(|sender| {
-            sender
-                .send(create_test_event(1001, "/usr/bin/gcc"))
-                .expect("Failed to send test event");
+            sender.send(create_test_event(1001, "/usr/bin/gcc")).expect("Failed to send test event");
             Ok(())
         });
 
@@ -489,45 +445,27 @@ mod tests {
         let captured_events_clone = Arc::clone(&captured_events);
 
         let mut producer_mock = MockProducer::new();
-        producer_mock
-            .expect_produce()
-            .times(1)
-            .returning(|_| Ok(()));
+        producer_mock.expect_produce().times(1).returning(|_| Ok(()));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(move |receiver| {
-                for event in receiver {
-                    captured_events_clone
-                        .lock()
-                        .expect("Failed to lock captured_events mutex")
-                        .push(event);
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for event in receiver {
+                captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
+            }
+            Ok(())
+        });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
         let result = replayer.run();
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in empty events test"));
-        assert_eq!(
-            captured_events
-                .lock()
-                .expect("Failed to lock captured_events mutex")
-                .len(),
-            0
-        );
+        assert_eq!(captured_events.lock().expect("Failed to lock captured_events mutex").len(), 0);
     }
 
     #[test]
     fn test_interceptor_happy_path() {
-        let events = vec![
-            create_test_event(2001, "/usr/bin/gcc"),
-            create_test_event(2002, "/usr/bin/clang"),
-        ];
+        let events = vec![create_test_event(2001, "/usr/bin/gcc"), create_test_event(2002, "/usr/bin/clang")];
 
         let captured_events = Arc::new(Mutex::new(Vec::new()));
         let captured_events_clone = Arc::clone(&captured_events);
@@ -535,38 +473,24 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(events.clone()));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(move |receiver| {
-                for event in receiver {
-                    captured_events_clone
-                        .lock()
-                        .expect("Failed to lock captured_events mutex")
-                        .push(event);
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for event in receiver {
+                captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
+            }
+            Ok(())
+        });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock
-            .expect_run()
-            .times(1)
-            .returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
 
-        let interceptor = Interceptor::new(
-            producer_mock.clone(),
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor =
+            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in interceptor happy path test"));
 
-        let consumed_events = captured_events
-            .lock()
-            .expect("Failed to lock captured_events mutex");
+        let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
 
         // Verify the first event is the initial command event
@@ -593,11 +517,7 @@ mod tests {
             )))
         });
 
-        let interceptor = Interceptor::new(
-            producer_mock,
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
@@ -610,29 +530,20 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::with_produce_failure(events));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(|receiver| {
-                // Actually consume all events from the channel to prevent race condition
-                // where the channel is closed before the producer finishes sending
-                while receiver.recv().is_ok() {
-                    // Consume events until channel is closed
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(|receiver| {
+            // Actually consume all events from the channel to prevent race condition
+            // where the channel is closed before the producer finishes sending
+            while receiver.recv().is_ok() {
+                // Consume events until channel is closed
+            }
+            Ok(())
+        });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock
-            .expect_run()
-            .times(1)
-            .returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
 
-        let interceptor = Interceptor::new(
-            producer_mock.clone(),
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor =
+            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
@@ -654,16 +565,10 @@ mod tests {
         });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock
-            .expect_run()
-            .times(1)
-            .returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
 
-        let interceptor = Interceptor::new(
-            producer_mock.clone(),
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor =
+            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
@@ -677,29 +582,20 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::with_cancel_failure(events));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(|receiver| {
-                // Actually consume all events from the channel to prevent race condition
-                // where the channel is closed before the producer finishes sending
-                while receiver.recv().is_ok() {
-                    // Consume events until channel is closed
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(|receiver| {
+            // Actually consume all events from the channel to prevent race condition
+            // where the channel is closed before the producer finishes sending
+            while receiver.recv().is_ok() {
+                // Consume events until channel is closed
+            }
+            Ok(())
+        });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock
-            .expect_run()
-            .times(1)
-            .returning(|_| Ok(create_success_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_success_exit_status()));
 
-        let interceptor = Interceptor::new(
-            producer_mock.clone(),
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor =
+            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_err());
@@ -713,29 +609,19 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(events));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(|receiver| {
-                // Actually consume all events from the channel to prevent race condition
-                // where the channel is closed before the producer finishes sending
-                while receiver.recv().is_ok() {
-                    // Consume events until channel is closed
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(|receiver| {
+            // Actually consume all events from the channel to prevent race condition
+            // where the channel is closed before the producer finishes sending
+            while receiver.recv().is_ok() {
+                // Consume events until channel is closed
+            }
+            Ok(())
+        });
 
         let mut executor_mock = MockExecutor::new();
-        executor_mock
-            .expect_run()
-            .times(1)
-            .returning(|_| Ok(create_failure_exit_status()));
+        executor_mock.expect_run().times(1).returning(|_| Ok(create_failure_exit_status()));
 
-        let interceptor = Interceptor::new(
-            producer_mock,
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
@@ -756,19 +642,13 @@ mod tests {
         let producer_mock = Arc::new(MockCancellableProducer::new(events.clone()));
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(move |receiver| {
-                for event in receiver {
-                    std::thread::sleep(Duration::from_millis(5));
-                    captured_events_clone
-                        .lock()
-                        .expect("Failed to lock captured_events mutex")
-                        .push(event);
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for event in receiver {
+                std::thread::sleep(Duration::from_millis(5));
+                captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
+            }
+            Ok(())
+        });
 
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(|_| {
@@ -776,19 +656,14 @@ mod tests {
             Ok(create_success_exit_status())
         });
 
-        let interceptor = Interceptor::new(
-            producer_mock.clone(),
-            Box::new(consumer_mock),
-            Box::new(executor_mock),
-        );
+        let interceptor =
+            Interceptor::new(producer_mock.clone(), Box::new(consumer_mock), Box::new(executor_mock));
         let result = interceptor.run(create_test_command());
 
         assert!(result.is_ok());
         assert_is_success(result.expect("Failed to get result in coordination timing test"));
 
-        let consumed_events = captured_events
-            .lock()
-            .expect("Failed to lock captured_events mutex");
+        let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 4);
 
         // Verify the first event is the initial command event
@@ -814,49 +689,36 @@ mod tests {
         let captured_events_clone = Arc::clone(&captured_events);
 
         let mut producer_mock = MockProducer::new();
-        producer_mock
-            .expect_produce()
-            .times(1)
-            .returning(move |sender| {
-                let test_events = vec![
-                    create_test_event(4001, "/usr/bin/gcc"),
-                    create_test_event(4002, "/usr/bin/clang"),
-                    create_test_event(4003, "/usr/bin/g++"),
-                ];
-                for event in test_events {
-                    std::thread::sleep(Duration::from_millis(5));
-                    sender.send(event).expect("Failed to send test event");
-                }
-                Ok(())
-            });
+        producer_mock.expect_produce().times(1).returning(move |sender| {
+            let test_events = vec![
+                create_test_event(4001, "/usr/bin/gcc"),
+                create_test_event(4002, "/usr/bin/clang"),
+                create_test_event(4003, "/usr/bin/g++"),
+            ];
+            for event in test_events {
+                std::thread::sleep(Duration::from_millis(5));
+                sender.send(event).expect("Failed to send test event");
+            }
+            Ok(())
+        });
 
         let mut consumer_mock = MockConsumer::new();
-        consumer_mock
-            .expect_consume()
-            .times(1)
-            .returning(move |receiver| {
-                for event in receiver {
-                    std::thread::sleep(Duration::from_millis(10));
-                    captured_events_clone
-                        .lock()
-                        .expect("Failed to lock captured_events mutex")
-                        .push(event);
-                }
-                Ok(())
-            });
+        consumer_mock.expect_consume().times(1).returning(move |receiver| {
+            for event in receiver {
+                std::thread::sleep(Duration::from_millis(10));
+                captured_events_clone.lock().expect("Failed to lock captured_events mutex").push(event);
+            }
+            Ok(())
+        });
 
         let replayer = Replayer::new(Box::new(producer_mock), Box::new(consumer_mock));
 
         let result = replayer.run();
 
         assert!(result.is_ok());
-        assert_is_success(
-            result.expect("Failed to get result in replayer coordination timing test"),
-        );
+        assert_is_success(result.expect("Failed to get result in replayer coordination timing test"));
 
-        let consumed_events = captured_events
-            .lock()
-            .expect("Failed to lock captured_events mutex");
+        let consumed_events = captured_events.lock().expect("Failed to lock captured_events mutex");
         assert_eq!(consumed_events.len(), 3);
         assert_eq!(*consumed_events, events);
     }

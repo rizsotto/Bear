@@ -2,8 +2,8 @@
 
 use crate::intercept::Execution;
 use std::process::ExitStatus;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time;
 use thiserror::Error;

@@ -9,8 +9,8 @@
 
 use super::{clang, json};
 use crate::intercept;
-use serde_json::de::IoRead;
 use serde_json::StreamDeserializer;
+use serde_json::de::IoRead;
 use thiserror::Error;
 
 /// Represents errors that can occur while working with file formats.
@@ -30,10 +30,7 @@ pub enum SerializationError {
 /// provides a type-independent abstraction over file formats.
 pub trait SerializationFormat<T> {
     /// Writes an iterator of items to the specified writer.
-    fn write(
-        writer: impl std::io::Write,
-        items: impl Iterator<Item = T>,
-    ) -> Result<(), SerializationError>;
+    fn write(writer: impl std::io::Write, items: impl Iterator<Item = T>) -> Result<(), SerializationError>;
 
     /// Reads items from the specified reader, returning an iterator of results.
     fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<T, SerializationError>>;
@@ -41,10 +38,7 @@ pub trait SerializationFormat<T> {
     /// Reads entries from the file and ignores any errors.
     ///
     /// This is not always feasible when the file format is strict.
-    fn read_and_ignore(
-        reader: impl std::io::Read,
-        message_writer: impl Fn(&str),
-    ) -> impl Iterator<Item = T> {
+    fn read_and_ignore(reader: impl std::io::Read, message_writer: impl Fn(&str)) -> impl Iterator<Item = T> {
         Self::read(reader).filter_map(move |result| match result {
             Ok(value) => Some(value),
             Err(error) => {
@@ -81,9 +75,7 @@ impl SerializationFormat<clang::Entry> for JsonCompilationDatabase {
         )
     }
 
-    fn read(
-        reader: impl std::io::Read,
-    ) -> impl Iterator<Item = Result<clang::Entry, SerializationError>> {
+    fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<clang::Entry, SerializationError>> {
         json::deserialize_seq(reader).map(|res| {
             res.map_err(SerializationError::Syntax)
                 // Ensure only valid entries are returned.
@@ -128,8 +120,8 @@ impl SerializationFormat<intercept::Event> for ExecutionEventDatabase {
 #[cfg(test)]
 mod test {
     mod compilation_database {
-        use super::super::clang::{Entry, EntryError};
         use super::super::JsonCompilationDatabase as Sut;
+        use super::super::clang::{Entry, EntryError};
         use super::super::{SerializationError, SerializationFormat};
         use serde_json::error::Category;
         use serde_json::json;
@@ -148,10 +140,7 @@ mod test {
 
         macro_rules! assert_format_error {
             ($x:expr) => {
-                assert!(
-                    matches!($x, Some(Err(SerializationError::Semantic(_)))),
-                    "should be format error"
-                );
+                assert!(matches!($x, Some(Err(SerializationError::Semantic(_)))), "should be format error");
             };
         }
 
@@ -246,12 +235,7 @@ mod test {
 
         fn expected_values_with_command() -> Vec<Entry> {
             vec![
-                Entry::from_command_str(
-                    "./file_a.c",
-                    "cc -c ./file_a.c -o ./file_a.o",
-                    "/home/user",
-                    None,
-                ),
+                Entry::from_command_str("./file_a.c", "cc -c ./file_a.c -o ./file_a.o", "/home/user", None),
                 Entry::from_command_str(
                     "./file_b.c",
                     "cc -c ./file_b.c -o ./file_b.o",
@@ -335,29 +319,13 @@ mod test {
             vec![
                 Entry::from_arguments_str(
                     "./file_a.c",
-                    vec![
-                        "cc",
-                        "-c",
-                        "-D",
-                        r#"name=\"me\""#,
-                        "./file_a.c",
-                        "-o",
-                        "./file_a.o",
-                    ],
+                    vec!["cc", "-c", "-D", r#"name=\"me\""#, "./file_a.c", "-o", "./file_a.o"],
                     "/home/user",
                     None,
                 ),
                 Entry::from_arguments_str(
                     "./file_b.c",
-                    vec![
-                        "cc",
-                        "-c",
-                        "-D",
-                        r#"name="me""#,
-                        "./file_b.c",
-                        "-o",
-                        "./file_b.o",
-                    ],
+                    vec!["cc", "-c", "-D", r#"name="me""#, "./file_b.c", "-o", "./file_b.o"],
                     "/home/user",
                     None,
                 ),

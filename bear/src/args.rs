@@ -6,7 +6,7 @@
 //! The module defines types to represent a structured form of program invocation.
 //! The `Arguments` type is used to represent all possible invocations of the program.
 
-use clap::{arg, command, ArgAction, ArgMatches, Command};
+use clap::{ArgAction, ArgMatches, Command, arg, command};
 use std::fmt;
 
 /// Common constants used in the module.
@@ -27,18 +27,9 @@ pub struct Arguments {
 /// Represents the mode of the application.
 #[derive(Debug, PartialEq)]
 pub enum Mode {
-    Intercept {
-        input: BuildCommand,
-        output: BuildEvents,
-    },
-    Semantic {
-        input: BuildEvents,
-        output: BuildSemantic,
-    },
-    Combined {
-        input: BuildCommand,
-        output: BuildSemantic,
-    },
+    Intercept { input: BuildCommand, output: BuildEvents },
+    Semantic { input: BuildEvents, output: BuildSemantic },
+    Combined { input: BuildCommand, output: BuildSemantic },
 }
 
 /// Represents the execution of a command.
@@ -105,12 +96,7 @@ impl fmt::Display for BuildCommand {
 
 impl fmt::Display for BuildSemantic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Semantic Output: {} (append: {})",
-            self.path.display(),
-            self.append
-        )
+        write!(f, "Semantic Output: {} (append: {})", self.path.display(), self.append)
     }
 }
 
@@ -143,10 +129,7 @@ impl TryFrom<ArgMatches> for Mode {
                     .map(std::path::PathBuf::from)
                     .expect("output is defaulted");
 
-                Ok(Mode::Intercept {
-                    input,
-                    output: BuildEvents { path },
-                })
+                Ok(Mode::Intercept { input, output: BuildEvents { path } })
             }
             Some((MODE_SEMANTIC_SUBCOMMAND, semantic_matches)) => {
                 let path = semantic_matches
@@ -155,10 +138,7 @@ impl TryFrom<ArgMatches> for Mode {
                     .expect("input is defaulted");
 
                 let output = BuildSemantic::try_from(semantic_matches)?;
-                Ok(Mode::Semantic {
-                    input: BuildEvents { path },
-                    output,
-                })
+                Ok(Mode::Semantic { input: BuildEvents { path }, output })
             }
             None => {
                 let input = BuildCommand::try_from(&matches)?;
@@ -174,11 +154,8 @@ impl TryFrom<&ArgMatches> for BuildCommand {
     type Error = ParseError;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
-        let arguments: Vec<_> = matches
-            .get_many("BUILD_COMMAND")
-            .ok_or(ParseError::MissingBuildCommand)?
-            .cloned()
-            .collect();
+        let arguments: Vec<_> =
+            matches.get_many("BUILD_COMMAND").ok_or(ParseError::MissingBuildCommand)?.cloned().collect();
 
         // The arguments must not be empty, and that is enforced by the CLI definition.
         Ok(BuildCommand { arguments })
@@ -189,10 +166,8 @@ impl TryFrom<&ArgMatches> for BuildSemantic {
     type Error = ParseError;
 
     fn try_from(matches: &ArgMatches) -> Result<Self, Self::Error> {
-        let path = matches
-            .get_one::<String>("output")
-            .map(std::path::PathBuf::from)
-            .expect("output is defaulted");
+        let path =
+            matches.get_one::<String>("output").map(std::path::PathBuf::from).expect("output is defaulted");
         let append = *matches.get_one::<bool>("append").unwrap_or(&false);
         Ok(BuildSemantic { path, append })
     }
@@ -245,8 +220,7 @@ pub fn cli() -> Command {
                     arg!(-o --output <FILE> "Path of the result file")
                         .default_value(DEFAULT_OUTPUT_FILE)
                         .hide_default_value(false),
-                    arg!(-a --append "Append result to an existing output file")
-                        .action(ArgAction::SetTrue),
+                    arg!(-a --append "Append result to an existing output file").action(ArgAction::SetTrue),
                 ])
                 .arg_required_else_help(false),
         )
@@ -270,17 +244,8 @@ mod test {
 
     #[test]
     fn test_intercept_call() {
-        let execution = vec![
-            "bear",
-            "-c",
-            "~/bear.yaml",
-            "intercept",
-            "-o",
-            "custom.json",
-            "--",
-            "make",
-            "all",
-        ];
+        let execution =
+            vec!["bear", "-c", "~/bear.yaml", "intercept", "-o", "custom.json", "--", "make", "all"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
@@ -293,9 +258,7 @@ mod test {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
-                    output: BuildEvents {
-                        path: "custom.json".into()
-                    },
+                    output: BuildEvents { path: "custom.json".into() },
                 },
             }
         );
@@ -316,9 +279,7 @@ mod test {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
-                    output: BuildEvents {
-                        path: "events.json".into()
-                    },
+                    output: BuildEvents { path: "events.json".into() },
                 },
             }
         );
@@ -326,17 +287,8 @@ mod test {
 
     #[test]
     fn test_semantic_call() {
-        let execution = vec![
-            "bear",
-            "-c",
-            "~/bear.yaml",
-            "semantic",
-            "-i",
-            "custom.json",
-            "-o",
-            "result.json",
-            "-a",
-        ];
+        let execution =
+            vec!["bear", "-c", "~/bear.yaml", "semantic", "-i", "custom.json", "-o", "result.json", "-a"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
@@ -346,13 +298,8 @@ mod test {
             Arguments {
                 config: Some("~/bear.yaml".into()),
                 mode: Mode::Semantic {
-                    input: BuildEvents {
-                        path: "custom.json".into()
-                    },
-                    output: BuildSemantic {
-                        path: "result.json".into(),
-                        append: true
-                    },
+                    input: BuildEvents { path: "custom.json".into() },
+                    output: BuildSemantic { path: "result.json".into(), append: true },
                 },
             }
         );
@@ -370,13 +317,8 @@ mod test {
             Arguments {
                 config: None,
                 mode: Mode::Semantic {
-                    input: BuildEvents {
-                        path: "events.json".into()
-                    },
-                    output: BuildSemantic {
-                        path: "compile_commands.json".into(),
-                        append: false
-                    },
+                    input: BuildEvents { path: "events.json".into() },
+                    output: BuildSemantic { path: "compile_commands.json".into(), append: false },
                 },
             }
         );
@@ -384,17 +326,7 @@ mod test {
 
     #[test]
     fn test_all_call() {
-        let execution = vec![
-            "bear",
-            "-c",
-            "~/bear.yaml",
-            "-o",
-            "result.json",
-            "-a",
-            "--",
-            "make",
-            "all",
-        ];
+        let execution = vec!["bear", "-c", "~/bear.yaml", "-o", "result.json", "-a", "--", "make", "all"];
 
         let matches = cli().get_matches_from(execution);
         let arguments = Arguments::try_from(matches).unwrap();
@@ -407,10 +339,7 @@ mod test {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect()
                     },
-                    output: BuildSemantic {
-                        path: "result.json".into(),
-                        append: true
-                    },
+                    output: BuildSemantic { path: "result.json".into(), append: true },
                 },
             }
         );
@@ -431,10 +360,7 @@ mod test {
                     input: BuildCommand {
                         arguments: vec!["make", "all"].into_iter().map(String::from).collect(),
                     },
-                    output: BuildSemantic {
-                        path: "compile_commands.json".into(),
-                        append: false
-                    },
+                    output: BuildSemantic { path: "compile_commands.json".into(), append: false },
                 },
             }
         );

@@ -41,11 +41,11 @@
 
 use super::constants::*;
 use anyhow::{Context, Result};
-use assert_cmd::cargo::cargo_bin;
 use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin;
 // TempDir and predicates are infrastructure for future tests
 #[allow(unused_imports)]
-use assert_fs::{prelude::*, TempDir};
+use assert_fs::{TempDir, prelude::*};
 #[allow(unused_imports)]
 use predicates::prelude::*;
 use serde_json::{self, Value};
@@ -123,8 +123,7 @@ impl TestEnvironment {
                 fs::create_dir_all(parent)
                     .with_context(|| format!("Failed to create directory: {:?}", parent))?;
             }
-            fs::write(&file_path, content)
-                .with_context(|| format!("Failed to write file: {}", path))?;
+            fs::write(&file_path, content).with_context(|| format!("Failed to write file: {}", path))?;
         }
         Ok(())
     }
@@ -174,18 +173,12 @@ impl TestEnvironment {
     /// Run bear with the given arguments
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
         let mut cmd = Command::new(cargo_bin(BEAR_BIN));
-        cmd.current_dir(self.temp_dir())
-            .env("RUST_LOG", "debug")
-            .env("RUST_BACKTRACE", "1")
-            .args(args);
+        cmd.current_dir(self.temp_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args(args);
 
         let output = cmd.output()?;
 
-        let bear_output = BearOutput {
-            output,
-            temp_dir: self.temp_dir().to_path_buf(),
-            verbose: self.verbose,
-        };
+        let bear_output =
+            BearOutput { output, temp_dir: self.temp_dir().to_path_buf(), verbose: self.verbose };
 
         // Store the output for potential later display
         *self.last_bear_output.borrow_mut() = Some(bear_output.clone());
@@ -229,8 +222,8 @@ impl TestEnvironment {
         let content = fs::read_to_string(&db_path)
             .with_context(|| format!("Failed to read compilation database: {:?}", db_path))?;
 
-        let entries: Vec<Value> = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse compilation database JSON")?;
+        let entries: Vec<Value> =
+            serde_json::from_str(&content).with_context(|| "Failed to parse compilation database JSON")?;
 
         Ok(CompilationDatabase {
             entries,
@@ -439,17 +432,12 @@ impl CompilationDatabase {
                     eprintln!(
                         "  Entry {}: {}",
                         i,
-                        serde_json::to_string_pretty(entry)
-                            .unwrap_or_else(|_| format!("{:?}", entry))
+                        serde_json::to_string_pretty(entry).unwrap_or_else(|_| format!("{:?}", entry))
                     );
                 }
                 eprintln!("=== End Debug Info ===\n");
             }
-            anyhow::bail!(
-                "Expected {} compilation entries, but found {}",
-                expected,
-                actual
-            );
+            anyhow::bail!("Expected {} compilation entries, but found {}", expected, actual);
         }
         Ok(())
     }
@@ -474,8 +462,7 @@ impl CompilationDatabase {
                     eprintln!(
                         "  Entry {}: {}",
                         i,
-                        serde_json::to_string_pretty(entry)
-                            .unwrap_or_else(|_| format!("{:?}", entry))
+                        serde_json::to_string_pretty(entry).unwrap_or_else(|_| format!("{:?}", entry))
                     );
                 }
                 eprintln!("=== End Debug Info ===\n");
@@ -507,12 +494,7 @@ pub struct CompilationEntryMatcher {
 
 impl CompilationEntryMatcher {
     pub fn new() -> Self {
-        Self {
-            file: None,
-            directory: None,
-            arguments: None,
-            output: None,
-        }
+        Self { file: None, directory: None, arguments: None, output: None }
     }
 
     pub fn file<S: Into<String>>(mut self, file: S) -> Self {
@@ -550,8 +532,8 @@ impl CompilationEntryMatcher {
         if let Some(ref expected_dir) = self.directory {
             if let Some(actual_dir) = entry.get("directory").and_then(|v| v.as_str()) {
                 // Canonicalize both paths for comparison on platforms with symlinks (e.g., macOS /var -> /private/var)
-                let expected_canonical = std::fs::canonicalize(expected_dir)
-                    .unwrap_or_else(|_| PathBuf::from(expected_dir));
+                let expected_canonical =
+                    std::fs::canonicalize(expected_dir).unwrap_or_else(|_| PathBuf::from(expected_dir));
                 let actual_canonical =
                     std::fs::canonicalize(actual_dir).unwrap_or_else(|_| PathBuf::from(actual_dir));
 
@@ -565,19 +547,14 @@ impl CompilationEntryMatcher {
 
         if let Some(ref expected_args) = self.arguments {
             // Check both 'arguments' field (array) and 'command' field (string)
-            let actual_args =
-                if let Some(args_array) = entry.get("arguments").and_then(|v| v.as_array()) {
-                    args_array
-                        .iter()
-                        .filter_map(|v| v.as_str())
-                        .map(|s| s.to_string())
-                        .collect::<Vec<_>>()
-                } else if let Some(command_str) = entry.get("command").and_then(|v| v.as_str()) {
-                    // Parse shell command string into arguments
-                    shell_words::split(command_str).unwrap_or_default()
-                } else {
-                    return false;
-                };
+            let actual_args = if let Some(args_array) = entry.get("arguments").and_then(|v| v.as_array()) {
+                args_array.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect::<Vec<_>>()
+            } else if let Some(command_str) = entry.get("command").and_then(|v| v.as_str()) {
+                // Parse shell command string into arguments
+                shell_words::split(command_str).unwrap_or_default()
+            } else {
+                return false;
+            };
 
             if &actual_args != expected_args {
                 return false;
@@ -628,17 +605,12 @@ impl InterceptEvents {
                     eprintln!(
                         "  Event {}: {}",
                         i,
-                        serde_json::to_string_pretty(event)
-                            .unwrap_or_else(|_| format!("{:?}", event))
+                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
                     );
                 }
                 eprintln!("=== End Debug Info ===\n");
             }
-            anyhow::bail!(
-                "Expected {} intercept events, but found {}",
-                expected,
-                actual
-            );
+            anyhow::bail!("Expected {} intercept events, but found {}", expected, actual);
         }
         Ok(())
     }
@@ -663,8 +635,7 @@ impl InterceptEvents {
                     eprintln!(
                         "  Event {}: {}",
                         i,
-                        serde_json::to_string_pretty(event)
-                            .unwrap_or_else(|_| format!("{:?}", event))
+                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
                     );
                 }
                 eprintln!("=== End Debug Info ===\n");
@@ -681,10 +652,7 @@ impl InterceptEvents {
     /// Count events matching specific criteria
     #[allow(dead_code)]
     pub fn count_matching(&self, matcher: &EventMatcher) -> usize {
-        self.events
-            .iter()
-            .filter(|event| matcher.matches(event))
-            .count()
+        self.events.iter().filter(|event| matcher.matches(event)).count()
     }
 
     /// Assert that events contain a specific number of entries matching the criteria
@@ -701,18 +669,14 @@ impl InterceptEvents {
                 }
 
                 eprintln!("=== Events File Debug Info ===");
-                eprintln!(
-                    "Expected {} events matching {:?}, but found {}",
-                    expected, matcher, actual
-                );
+                eprintln!("Expected {} events matching {:?}, but found {}", expected, matcher, actual);
                 eprintln!("Matching events:");
                 for (i, event) in self.events.iter().enumerate() {
                     if matcher.matches(event) {
                         eprintln!(
                             "  Event {}: {}",
                             i,
-                            serde_json::to_string_pretty(event)
-                                .unwrap_or_else(|_| format!("{:?}", event))
+                            serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
                         );
                     }
                 }
@@ -835,11 +799,8 @@ impl EventMatcher {
         // Check arguments
         if let Some(ref expected_args) = self.arguments {
             if let Some(actual_args) = execution.get("arguments").and_then(|v| v.as_array()) {
-                let actual_str_args: Vec<String> = actual_args
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .collect();
+                let actual_str_args: Vec<String> =
+                    actual_args.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect();
                 if &actual_str_args != expected_args {
                     return false;
                 }
@@ -852,8 +813,8 @@ impl EventMatcher {
         if let Some(ref expected_dir) = self.working_directory {
             if let Some(actual_dir) = execution.get("working_directory").and_then(|v| v.as_str()) {
                 // Canonicalize both paths for comparison
-                let expected_canonical = std::fs::canonicalize(expected_dir)
-                    .unwrap_or_else(|_| PathBuf::from(expected_dir));
+                let expected_canonical =
+                    std::fs::canonicalize(expected_dir).unwrap_or_else(|_| PathBuf::from(expected_dir));
                 let actual_canonical =
                     std::fs::canonicalize(actual_dir).unwrap_or_else(|_| PathBuf::from(actual_dir));
 
@@ -907,9 +868,7 @@ macro_rules! event_matcher {
         $crate::fixtures::infrastructure::EventMatcher::new().executable_name($name)
     };
     (executable_path: $path:expr, arguments: $args:expr) => {
-        $crate::fixtures::infrastructure::EventMatcher::new()
-            .executable_path($path)
-            .arguments($args)
+        $crate::fixtures::infrastructure::EventMatcher::new().executable_path($path).arguments($args)
     };
 }
 
@@ -922,11 +881,7 @@ pub use event_matcher;
 /// Helper function to get the appropriate compiler command for build scripts
 /// Always uses just the filename to ensure compatibility across all platforms
 pub fn filename_of(compiler_path: &str) -> String {
-    Path::new(compiler_path)
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .to_string()
+    Path::new(compiler_path).file_name().unwrap().to_string_lossy().to_string()
 }
 
 // Test helper functions for common operations
@@ -977,11 +932,7 @@ mod tests {
         let matcher = CompilationEntryMatcher::new()
             .file("/path/to/test.c")
             .directory("/path/to")
-            .arguments(vec![
-                "gcc".to_string(),
-                "-c".to_string(),
-                "test.c".to_string(),
-            ]);
+            .arguments(vec!["gcc".to_string(), "-c".to_string(), "test.c".to_string()]);
 
         assert!(matcher.matches(&entry));
     }
@@ -1050,11 +1001,8 @@ mod tests {
         assert!(matcher.matches(&event));
 
         // Test non-matching arguments
-        let matcher_no_match = EventMatcher::new().arguments(vec![
-            "gcc".to_string(),
-            "-c".to_string(),
-            "other.c".to_string(),
-        ]);
+        let matcher_no_match =
+            EventMatcher::new().arguments(vec!["gcc".to_string(), "-c".to_string(), "other.c".to_string()]);
 
         assert!(!matcher_no_match.matches(&event));
     }

@@ -17,18 +17,12 @@ pub(super) struct IgnoreByPath {
 impl IgnoreByPath {
     pub(super) fn new() -> Self {
         let executables = COREUTILS_FILES.iter().map(PathBuf::from).collect();
-        Self {
-            executables,
-            reason: COREUTILS_MESSAGE,
-        }
+        Self { executables, reason: COREUTILS_MESSAGE }
     }
 
     pub(super) fn from(compilers: &[PathBuf]) -> Self {
         let executables = compilers.iter().cloned().collect();
-        Self {
-            executables,
-            reason: COMPILER_MESSAGE,
-        }
+        Self { executables, reason: COMPILER_MESSAGE }
     }
 }
 

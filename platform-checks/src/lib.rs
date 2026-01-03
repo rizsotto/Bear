@@ -78,8 +78,7 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
         .keep()
         .expect("Failed to keep temp file");
 
-    file.write_all(check_code.as_bytes())
-        .expect("Failed to write to temp file");
+    file.write_all(check_code.as_bytes()).expect("Failed to write to temp file");
     file.flush().expect("Failed to flush temp file");
 
     let result = cc::Build::new()

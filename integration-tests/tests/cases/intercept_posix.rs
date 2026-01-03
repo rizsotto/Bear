@@ -38,33 +38,21 @@ int main() {{
     // Compile the test program
     #[cfg(has_executable_compiler_c)]
     {
-        let compile_output =
-            env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execve", "test_execve.c"])?;
+        let compile_output = env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execve", "test_execve.c"])?;
         compile_output.assert_success()?;
 
         // Run intercept on the compiled program
-        let intercept_output = env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_execve",
-        ])?;
+        let intercept_output =
+            env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execve"])?;
         intercept_output.assert_success()?;
 
         // Verify intercepted events
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         // Should have at least 1 event: the echo command
-        assert!(
-            events.len() >= 1,
-            "Expected at least 1 event, got {}",
-            events.len()
-        );
+        assert!(events.len() >= 1, "Expected at least 1 event, got {}", events.len());
 
         // Should contain the echo command
         let has_echo_event = events.iter().any(|event| {
@@ -104,23 +92,16 @@ int main() {{
     #[cfg(has_executable_compiler_c)]
     {
         // Compile and test
-        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execl", "test_execl.c"])?
-            .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execl", "test_execl.c"])?.assert_success()?;
 
-        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execl"])?
-            .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execl"])?.assert_success()?;
 
         // Verify events were captured
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
-        assert!(
-            events.len() >= 1,
-            "Expected at least 1 event for execl test"
-        );
+        assert!(events.len() >= 1, "Expected at least 1 event for execl test");
     }
 
     Ok(())
@@ -144,23 +125,12 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execlp", "test_execlp.c"])?
-            .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execlp", "test_execlp.c"])?.assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_execlp",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execlp"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        assert!(
-            !events_content.is_empty(),
-            "Events file should not be empty"
-        );
+        assert!(!events_content.is_empty(), "Events file should not be empty");
     }
 
     Ok(())
@@ -184,23 +154,13 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execvp", "test_execvp.c"])?
-            .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execvp", "test_execvp.c"])?.assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_execvp",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execvp"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         assert!(events.len() >= 1, "Should capture execvp events");
     }
@@ -251,17 +211,13 @@ int main(void) {{
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_popen", "test_popen.c"])?
-            .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_popen", "test_popen.c"])?.assert_success()?;
 
-        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_popen"])?
-            .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_popen"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         // Should capture the popen'd cat command
         assert!(events.len() >= 1, "Should capture popen events");
@@ -271,10 +227,7 @@ int main(void) {{
                 .get("execution")
                 .and_then(|e| e.get("arguments"))
                 .and_then(|args| args.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .any(|arg| arg.as_str().map(|s| s.contains("cat")).unwrap_or(false))
-                })
+                .map(|arr| arr.iter().any(|arg| arg.as_str().map(|s| s.contains("cat")).unwrap_or(false)))
                 .unwrap_or(false)
         });
 
@@ -304,23 +257,13 @@ int main() {{
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_system", "test_system.c"])?
-            .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_system", "test_system.c"])?.assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_system",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_system"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         assert!(events.len() >= 1, "Should capture system() call events");
 
@@ -335,10 +278,7 @@ int main() {{
                 .unwrap_or(false)
         });
 
-        assert!(
-            has_echo_event,
-            "Should capture echo command from system() call"
-        );
+        assert!(has_echo_event, "Should capture echo command from system() call");
     }
 
     Ok(())
@@ -376,29 +316,15 @@ int main() {{
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&[
-            "--",
-            COMPILER_C_PATH,
-            "-o",
-            "test_posix_spawn",
-            "test_posix_spawn.c",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_posix_spawn", "test_posix_spawn.c"])?
+            .assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_posix_spawn",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_posix_spawn"])?
+            .assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         assert!(events.len() >= 1, "Should capture posix_spawn events");
     }
@@ -434,29 +360,15 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&[
-            "--",
-            COMPILER_C_PATH,
-            "-o",
-            "test_posix_spawnp",
-            "test_posix_spawnp.c",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_posix_spawnp", "test_posix_spawnp.c"])?
+            .assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_posix_spawnp",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_posix_spawnp"])?
+            .assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
         assert!(events.len() >= 1, "Should capture execvpe events");
 
         // Should contain echo execution
@@ -501,32 +413,18 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&[
-            "--",
-            COMPILER_C_PATH,
-            "-o",
-            "test_failed_exec",
-            "test_failed_exec.c",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_failed_exec", "test_failed_exec.c"])?
+            .assert_success()?;
 
-        let intercept_output = env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_failed_exec",
-        ])?;
+        let intercept_output =
+            env.run_bear(&["intercept", "--output", "events.json", "--", "./test_failed_exec"])?;
 
         // The program should fail (non-zero exit) but intercept should still work
         intercept_output.assert_failure()?;
 
         // Should still capture the attempted exec
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        assert!(
-            !events_content.is_empty(),
-            "Should capture failed exec attempt"
-        );
+        assert!(!events_content.is_empty(), "Should capture failed exec attempt");
     }
 
     Ok(())
@@ -553,29 +451,13 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&[
-            "--",
-            COMPILER_C_PATH,
-            "-o",
-            "test_no_exec",
-            "test_no_exec.c",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_no_exec", "test_no_exec.c"])?.assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_no_exec",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_no_exec"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
         // Should only have events for the test program itself, no child processes
         // For programs that don't call exec functions, we may see 0 events
@@ -614,29 +496,13 @@ int main() {
 
     #[cfg(has_executable_compiler_c)]
     {
-        env.run_bear(&[
-            "--",
-            COMPILER_C_PATH,
-            "-o",
-            "test_execvpe",
-            "test_execvpe.c",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["--", COMPILER_C_PATH, "-o", "test_execvpe", "test_execvpe.c"])?.assert_success()?;
 
-        env.run_bear(&[
-            "intercept",
-            "--output",
-            "events.json",
-            "--",
-            "./test_execvpe",
-        ])?
-        .assert_success()?;
+        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execvpe"])?.assert_success()?;
 
         let events_content = fs::read_to_string(env.temp_dir().join("events.json"))?;
-        let events: Vec<Value> = events_content
-            .lines()
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect();
+        let events: Vec<Value> =
+            events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
         assert!(events.len() >= 1, "Should capture execvpe/execvp events");
 
         // Should contain echo execution
@@ -649,10 +515,7 @@ int main() {
                 .unwrap_or(false)
         });
 
-        assert!(
-            has_echo_event,
-            "Should capture echo execution via execvpe/execvp"
-        );
+        assert!(has_echo_event, "Should capture echo execution via execvpe/execvp");
     }
 
     Ok(())

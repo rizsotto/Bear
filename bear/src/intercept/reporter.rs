@@ -18,7 +18,7 @@
 //! collector, with the destination specified by the `KEY_DESTINATION` environment variable.
 
 use crate::environment::KEY_DESTINATION;
-use crate::intercept::{tcp, Event};
+use crate::intercept::{Event, tcp};
 use std::sync::atomic::AtomicPtr;
 use thiserror::Error;
 

@@ -77,10 +77,7 @@ impl TryFrom<config::DuplicateFilter> for DuplicateEntryFilter {
             return Err(ConfigurationError::CommandAndArgumentsBothSpecified);
         }
 
-        Ok(DuplicateEntryFilter {
-            fields: config.match_on,
-            hash_values: HashSet::new(),
-        })
+        Ok(DuplicateEntryFilter { fields: config.match_on, hash_values: HashSet::new() })
     }
 }
 
@@ -113,27 +110,16 @@ mod tests {
         };
 
         let result = DuplicateEntryFilter::try_from(config);
-        assert!(matches!(
-            result,
-            Err(ConfigurationError::DuplicateField(
-                config::OutputFields::File
-            ))
-        ));
+        assert!(matches!(result, Err(ConfigurationError::DuplicateField(config::OutputFields::File))));
     }
 
     #[test]
     fn test_try_from_failure_command_and_arguments() {
         let config = config::DuplicateFilter {
-            match_on: vec![
-                config::OutputFields::Command,
-                config::OutputFields::Arguments,
-            ],
+            match_on: vec![config::OutputFields::Command, config::OutputFields::Arguments],
         };
         let result = DuplicateEntryFilter::try_from(config);
-        assert!(matches!(
-            result,
-            Err(ConfigurationError::CommandAndArgumentsBothSpecified)
-        ));
+        assert!(matches!(result, Err(ConfigurationError::CommandAndArgumentsBothSpecified)));
     }
 
     #[test]
@@ -162,9 +148,7 @@ mod tests {
 
     #[test]
     fn test_is_duplicate_with_output_field() {
-        let config = config::DuplicateFilter {
-            match_on: vec![config::OutputFields::Output],
-        };
+        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::Output] };
         let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
@@ -186,9 +170,7 @@ mod tests {
 
     #[test]
     fn test_is_duplicate_with_arguments_field() {
-        let config = config::DuplicateFilter {
-            match_on: vec![config::OutputFields::Arguments],
-        };
+        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::Arguments] };
         let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(
@@ -210,9 +192,7 @@ mod tests {
 
     #[test]
     fn test_is_unique() {
-        let config = config::DuplicateFilter {
-            match_on: vec![config::OutputFields::File],
-        };
+        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::File] };
         let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
         let entry1 = Entry::from_arguments_str(

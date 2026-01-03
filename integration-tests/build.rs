@@ -66,10 +66,7 @@ fn find_intercept_artifacts() -> (String, String) {
     let wrapper_path = target_dir.join(WRAPPER_NAME);
     let preload_path = target_dir.join(PRELOAD_NAME);
 
-    (
-        format!("{}", wrapper_path.display()),
-        format!("{}", preload_path.display()),
-    )
+    (format!("{}", wrapper_path.display()), format!("{}", preload_path.display()))
 }
 
 fn check_executable_exists(executable: &str) {
@@ -77,22 +74,11 @@ fn check_executable_exists(executable: &str) {
         Ok(path) => {
             println!("cargo:rustc-cfg=has_executable_{}", executable);
             println!("cargo:rustc-check-cfg=cfg(has_executable_{})", executable);
-            println!(
-                "cargo:rustc-env={}_PATH={}",
-                executable.to_uppercase(),
-                path.display()
-            );
-            println!(
-                "cargo:warning=Checking for executable: {} ... {}",
-                executable,
-                path.display()
-            );
+            println!("cargo:rustc-env={}_PATH={}", executable.to_uppercase(), path.display());
+            println!("cargo:warning=Checking for executable: {} ... {}", executable, path.display());
         }
         Err(_) => {
-            println!(
-                "cargo:warning=Checking for executable: {} ... missing",
-                executable
-            );
+            println!("cargo:warning=Checking for executable: {} ... missing", executable);
         }
     }
 }
@@ -120,23 +106,12 @@ fn check_one_executable_exists(define: &str, executables: &[&str]) {
 
             println!("cargo:rustc-cfg=has_executable_{}", define);
             println!("cargo:rustc-check-cfg=cfg(has_executable_{})", define);
-            println!(
-                "cargo:rustc-env={}_PATH={}",
-                define.to_uppercase(),
-                final_path.display()
-            );
-            println!(
-                "cargo:warning=Checking for executable: {} ... {}",
-                define,
-                final_path.display()
-            );
+            println!("cargo:rustc-env={}_PATH={}", define.to_uppercase(), final_path.display());
+            println!("cargo:warning=Checking for executable: {} ... {}", define, final_path.display());
             return;
         }
     }
-    println!(
-        "cargo:warning=Checking for executable: {} ... missing",
-        define
-    );
+    println!("cargo:warning=Checking for executable: {} ... missing", define);
 }
 
 fn check_preload_library_availability(preload_path: &str) {
@@ -149,10 +124,7 @@ fn check_preload_library_availability(preload_path: &str) {
     if platform_supports_preload && preload_file_exists {
         println!("cargo:rustc-cfg=has_preload_library");
         println!("cargo:rustc-check-cfg=cfg(has_preload_library)");
-        println!(
-            "cargo:warning=Preload library available at: {}",
-            preload_path
-        );
+        println!("cargo:warning=Preload library available at: {}", preload_path);
     } else {
         println!(
             "cargo:warning=Preload library not available (platform_supports: {}, file_exists: {})",

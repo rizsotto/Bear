@@ -37,18 +37,12 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Exactly("-static-libgcc", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nogen-interfaces", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-nogen-interfaces", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("shared-libgcc", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-gen-interfaces", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-gen-interfaces", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("-nostartfiles", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
@@ -61,34 +55,16 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Exactly("-gen-dep", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dumpmachine", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("--version", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nostdlib", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dumpmachine", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-nostdlib", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
         FlagRule::new(
             FlagPattern::Exactly("-pthread", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dryrun", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-shared", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-static", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dryrun", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-shared", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-static", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
         FlagRule::new(
             FlagPattern::Exactly("-isystem", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -105,14 +81,8 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Exactly("-iquote", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xlinker", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-debug", 1),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-debug", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::Exactly("-nofpp", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -121,10 +91,7 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Exactly("-undef", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("--help", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--help", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::Exactly("-MMD", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -133,63 +100,21 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Exactly("-fpp", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Ep", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MF", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MD", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-T", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-C", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-u", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-V", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-X", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-c", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-E", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-Ep", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-MF", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MD", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-T", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-C", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-u", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-V", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-X", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
-        FlagRule::new(
-            FlagPattern::Exactly("-P", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-r", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-S", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-s", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-P", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-r", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-S", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-s", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
         FlagRule::new(
             FlagPattern::Prefix("-Xoption,link", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
@@ -202,10 +127,7 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::Prefix("-Xoption,cpp", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Xoption,asm", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-Xoption,asm", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("--sysroot"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -234,46 +156,22 @@ static INTEL_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
             FlagPattern::ExactlyWithGluedOrSep("-U"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEq("-std"),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithEq("-std"), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-diag-", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Prefix("--help", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-FA", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Fa", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Wl", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Wp", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("--help", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Prefix("-FA", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Prefix("-Fa", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Prefix("-Wl", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Prefix("-Wp", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(FlagPattern::Prefix("--", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-f", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-g", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-m", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-O", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Prefix("-v", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-v", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(FlagPattern::Prefix("-x", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Prefix("@", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("@", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
     ];
 
     // Sort by flag length descending to ensure longer matches are tried first
@@ -300,9 +198,7 @@ impl Default for IntelFortranInterpreter {
 impl IntelFortranInterpreter {
     /// Create a new Intel Fortran interpreter.
     pub fn new() -> Self {
-        Self {
-            analyzer: FlagAnalyzer::new(&INTEL_FORTRAN_FLAGS),
-        }
+        Self { analyzer: FlagAnalyzer::new(&INTEL_FORTRAN_FLAGS) }
     }
 }
 
@@ -343,10 +239,7 @@ mod tests {
             assert_eq!(parsed.arguments.len(), 3);
 
             // Check -c flag
-            assert_eq!(
-                parsed.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
         }
     }
 
@@ -364,41 +257,26 @@ mod tests {
 
         if let Some(Command::Compiler(parsed)) = result {
             // Check -fpp flag (preprocessing)
-            assert_eq!(
-                parsed.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
             // Check -D flag (preprocessing)
-            assert_eq!(
-                parsed.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
+            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
         }
     }
 
     #[test]
     fn test_intel_fortran_linking_flags() {
         let interpreter = IntelFortranInterpreter::new();
-        let execution = create_execution(
-            "ifort",
-            vec!["ifort", "-shared-intel", "-lm", "test.o"],
-            "/project",
-        );
+        let execution =
+            create_execution("ifort", vec!["ifort", "-shared-intel", "-lm", "test.o"], "/project");
 
         let result = interpreter.recognize(&execution);
         assert!(result.is_some());
 
         if let Some(Command::Compiler(parsed)) = result {
             // Check -shared-intel flag (linking)
-            assert_eq!(
-                parsed.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
             // Check -l flag (linking)
-            assert_eq!(
-                parsed.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
         }
     }
 
@@ -412,10 +290,7 @@ mod tests {
 
         if let Some(Command::Compiler(parsed)) = result {
             // Check --version flag (info)
-            assert_eq!(
-                parsed.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Info))
-            );
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Info)));
         }
     }
 }

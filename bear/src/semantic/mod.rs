@@ -142,15 +142,7 @@ pub enum CompilerPass {
 }
 
 impl CompilerCommand {
-    pub fn new(
-        working_dir: PathBuf,
-        executable: PathBuf,
-        arguments: Vec<Box<dyn Arguments>>,
-    ) -> Self {
-        Self {
-            working_dir,
-            executable,
-            arguments,
-        }
+    pub fn new(working_dir: PathBuf, executable: PathBuf, arguments: Vec<Box<dyn Arguments>>) -> Self {
+        Self { working_dir, executable, arguments }
     }
 }

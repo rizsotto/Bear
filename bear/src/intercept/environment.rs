@@ -5,9 +5,9 @@ use crate::intercept::supervise;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, context};
 use std::collections::HashMap;
+use std::env::JoinPathsError;
 #[cfg(windows)]
 use std::env::consts::EXE_EXTENSION;
-use std::env::JoinPathsError;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
@@ -123,8 +123,7 @@ impl BuildEnvironment {
                 let program_path = std::path::PathBuf::from(value);
                 let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
                 // Update the environment overrides with the wrapper path
-                environment_overrides
-                    .insert(key.clone(), wrapper_path.to_string_lossy().to_string());
+                environment_overrides.insert(key.clone(), wrapper_path.to_string_lossy().to_string());
             }
         }
 
@@ -143,22 +142,17 @@ impl BuildEnvironment {
 
         // Update PATH environment variable
         if let Some((path_key, path_value)) = context.path() {
-            let path_updated = insert_to_path(&path_value, wrapper_dir.path())
-                .map_err(ConfigurationError::Path)?;
+            let path_updated =
+                insert_to_path(&path_value, wrapper_dir.path()).map_err(ConfigurationError::Path)?;
 
             environment_overrides.insert(path_key, path_updated);
         } else {
-            environment_overrides.insert(
-                KEY_OS__PATH.to_string(),
-                wrapper_dir.path().to_string_lossy().to_string(),
-            );
+            environment_overrides
+                .insert(KEY_OS__PATH.to_string(), wrapper_dir.path().to_string_lossy().to_string());
         }
         environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
 
-        Ok(Self {
-            environment_overrides,
-            _wrapper_directory: Some(wrapper_dir),
-        })
+        Ok(Self { environment_overrides, _wrapper_directory: Some(wrapper_dir) })
     }
 
     /// Discovers compiler executables in PATH directories using a predicate function.
@@ -166,10 +160,7 @@ impl BuildEnvironment {
     /// This function scans all directories in the PATH environment variable and applies
     /// the provided predicate to each executable file found. Executables that match
     /// the predicate are returned.
-    fn compiler_candidates<P>(
-        context: &context::Context,
-        predicate: P,
-    ) -> impl Iterator<Item = PathBuf>
+    fn compiler_candidates<P>(context: &context::Context, predicate: P) -> impl Iterator<Item = PathBuf>
     where
         P: Fn(&Path) -> bool,
     {
@@ -219,22 +210,14 @@ impl BuildEnvironment {
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
         // Update LD_PRELOAD environment variable
-        let preload_original = context
-            .environment
-            .get(KEY_OS__PRELOAD_PATH)
-            .cloned()
-            .unwrap_or_default();
-        let preload_updated =
-            insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
+        let preload_original = context.environment.get(KEY_OS__PRELOAD_PATH).cloned().unwrap_or_default();
+        let preload_updated = insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
 
         let mut environment_overrides = HashMap::new();
         environment_overrides.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
         environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
 
-        Ok(Self {
-            environment_overrides,
-            _wrapper_directory: None,
-        })
+        Ok(Self { environment_overrides, _wrapper_directory: None })
     }
 
     /// Executes a build command within the configured interception environment.
@@ -320,9 +303,8 @@ fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, Jo
         return Ok(first_path.to_string_lossy().to_string());
     }
 
-    let mut paths: Vec<PathBuf> = std::env::split_paths(original)
-        .filter(|path| path.as_path() != first_path)
-        .collect();
+    let mut paths: Vec<PathBuf> =
+        std::env::split_paths(original).filter(|path| path.as_path() != first_path).collect();
     paths.insert(0, first_path.to_owned());
     std::env::join_paths(paths).map(|os_string| os_string.into_string().unwrap_or_default())
 }
@@ -337,11 +319,7 @@ fn is_executable_file(path: &Path) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Ok(metadata) = path.metadata() {
-            metadata.permissions().mode() & 0o111 != 0
-        } else {
-            false
-        }
+        if let Ok(metadata) = path.metadata() { metadata.permissions().mode() & 0o111 != 0 } else { false }
     }
 
     #[cfg(not(unix))]
@@ -389,19 +367,15 @@ mod test {
         let usr_local_bin = PathBuf::from("/usr/local/bin");
 
         // Join the original paths using platform-specific separator
-        let original = std::env::join_paths([usr_bin.clone(), bin.clone()])
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        let original =
+            std::env::join_paths([usr_bin.clone(), bin.clone()]).unwrap().to_string_lossy().to_string();
 
         // Apply our function
         let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
 
         // Create expected result using platform-specific separator
-        let expected = std::env::join_paths([usr_local_bin, usr_bin, bin])
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        let expected =
+            std::env::join_paths([usr_local_bin, usr_bin, bin]).unwrap().to_string_lossy().to_string();
 
         assert_eq!(result, expected);
     }
@@ -423,10 +397,8 @@ mod test {
         let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
 
         // Create expected result using platform-specific separator
-        let expected = std::env::join_paths([usr_local_bin, usr_bin, bin])
-            .unwrap()
-            .to_string_lossy()
-            .to_string();
+        let expected =
+            std::env::join_paths([usr_local_bin, usr_bin, bin]).unwrap().to_string_lossy().to_string();
 
         assert_eq!(result, expected);
     }
@@ -452,9 +424,7 @@ mod test {
 
     #[test]
     fn test_build_environment_create_preload() {
-        let intercept = config::Intercept::Preload {
-            path: PathBuf::from("/usr/local/lib/libintercept.so"),
-        };
+        let intercept = config::Intercept::Preload { path: PathBuf::from("/usr/local/lib/libintercept.so") };
         let compilers = vec![];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
@@ -462,10 +432,7 @@ mod test {
         let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Check that destination is set
-        assert_eq!(
-            env.environment_overrides.get(KEY_DESTINATION),
-            Some(&"127.0.0.1:8080".to_string())
-        );
+        assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
 
         // Check that LD_PRELOAD contains our library
         let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
@@ -484,21 +451,11 @@ mod test {
         let wrapper_path = temp_path.join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        let intercept = config::Intercept::Wrapper {
-            path: wrapper_path.clone(),
-            directory: temp_path.to_path_buf(),
-        };
+        let intercept =
+            config::Intercept::Wrapper { path: wrapper_path.clone(), directory: temp_path.to_path_buf() };
         let compilers = vec![
-            config::Compiler {
-                path: PathBuf::from("/usr/bin/gcc"),
-                as_: None,
-                ignore: false,
-            },
-            config::Compiler {
-                path: PathBuf::from("/usr/bin/clang"),
-                as_: None,
-                ignore: false,
-            },
+            config::Compiler { path: PathBuf::from("/usr/bin/gcc"), as_: None, ignore: false },
+            config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
         ];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
@@ -506,17 +463,11 @@ mod test {
         let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Check that destination is set
-        assert_eq!(
-            env.environment_overrides.get(KEY_DESTINATION),
-            Some(&"127.0.0.1:8080".to_string())
-        );
+        assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
 
         // Check that PATH is updated (should contain our temp directory at the beginning)
         let path = env.environment_overrides.get("PATH").unwrap();
-        assert!(
-            path.contains(&"bear-".to_string()),
-            "PATH should contain bear temp directory: {path}"
-        );
+        assert!(path.contains(&"bear-".to_string()), "PATH should contain bear temp directory: {path}");
 
         // Verify wrapper directory is kept alive
         assert!(env._wrapper_directory.is_some());
@@ -527,8 +478,10 @@ mod test {
         use tempfile::TempDir;
 
         // Clean up any existing environment variables first
-        std::env::remove_var("CC");
-        std::env::remove_var("CXX");
+        unsafe {
+            std::env::remove_var("CC");
+            std::env::remove_var("CXX");
+        }
 
         // Create a temporary directory for the test
         let temp_dir = TempDir::new().unwrap();
@@ -539,31 +492,22 @@ mod test {
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
         // Set up environment variables that should be detected
-        std::env::set_var("CC", "/usr/bin/gcc");
-        std::env::set_var("CXX", "/usr/bin/g++");
+        unsafe {
+            std::env::set_var("CC", "/usr/bin/gcc");
+            std::env::set_var("CXX", "/usr/bin/g++");
+        }
 
-        let intercept = config::Intercept::Wrapper {
-            path: wrapper_path,
-            directory: temp_path.to_path_buf(),
-        };
-        let compilers = vec![config::Compiler {
-            path: PathBuf::from("/usr/bin/clang"),
-            as_: None,
-            ignore: false,
-        }];
+        let intercept = config::Intercept::Wrapper { path: wrapper_path, directory: temp_path.to_path_buf() };
+        let compilers =
+            vec![config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false }];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
         let context = create_test_context();
         let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Get the wrapper directory from the BuildEnvironment
-        let wrapper_dir = env
-            ._wrapper_directory
-            .as_ref()
-            .expect("Wrapper directory should exist");
-        let config_path = wrapper_dir
-            .path()
-            .join(crate::intercept::wrapper::CONFIG_FILENAME);
+        let wrapper_dir = env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let config_path = wrapper_dir.path().join(crate::intercept::wrapper::CONFIG_FILENAME);
         assert!(config_path.exists(), "JSON config file should exist");
 
         // Read and verify JSON config content
@@ -578,20 +522,14 @@ mod test {
         // Check that environment variables were redirected to wrapper executables
         let cc_value = env.environment_overrides.get("CC").unwrap();
         let cxx_value = env.environment_overrides.get("CXX").unwrap();
-        assert!(
-            cc_value.contains("bear-"),
-            "CC should point to wrapper: {}",
-            cc_value
-        );
-        assert!(
-            cxx_value.contains("bear-"),
-            "CXX should point to wrapper: {}",
-            cxx_value
-        );
+        assert!(cc_value.contains("bear-"), "CC should point to wrapper: {}", cc_value);
+        assert!(cxx_value.contains("bear-"), "CXX should point to wrapper: {}", cxx_value);
 
         // Clean up environment variables
-        std::env::remove_var("CC");
-        std::env::remove_var("CXX");
+        unsafe {
+            std::env::remove_var("CC");
+            std::env::remove_var("CXX");
+        }
     }
 
     #[test]
@@ -646,10 +584,7 @@ mod test {
         // Verify that the PATH was updated to include the wrapper directory
         let build_env = result.unwrap();
         let updated_path = build_env.environment_overrides.get("PATH").unwrap();
-        assert!(
-            updated_path.contains("bear-"),
-            "PATH should contain wrapper directory"
-        );
+        assert!(updated_path.contains("bear-"), "PATH should contain wrapper directory");
     }
 
     #[test]
@@ -720,11 +655,7 @@ mod test {
 
         // Should have all original paths plus wrapper (4 total)
         let path_count = result.split(';').filter(|s| !s.is_empty()).count();
-        assert_eq!(
-            path_count, 4,
-            "Should preserve all original paths plus wrapper, got: {}",
-            path_count
-        );
+        assert_eq!(path_count, 4, "Should preserve all original paths plus wrapper, got: {}", path_count);
 
         println!("Windows PATH preservation test passed. Result: {}", result);
     }

@@ -10,7 +10,7 @@
 //! The interpreter assumes compiler recognition has been handled by the compiler_interpreter
 //! and focuses solely on argument parsing and semantic analysis of command-line flags.
 
-use super::super::matchers::{looks_like_a_source_file, FlagAnalyzer, FlagPattern, FlagRule};
+use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule, looks_like_a_source_file};
 use super::arguments::{OtherArguments, OutputArgument, SourceArgument};
 use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
@@ -47,17 +47,15 @@ impl GccInterpreter {
     /// including optimization flags, warning flags, include directories, preprocessor
     /// definitions, and various compilation options.
     pub fn new() -> Self {
-        Self {
-            matcher: FlagAnalyzer::new(&GCC_FLAGS),
-        }
+        Self { matcher: FlagAnalyzer::new(&GCC_FLAGS) }
     }
 
     /// Check if the execution represents a GCC internal executable that should be ignored.
     fn is_gcc_internal_executable(execution: &Execution) -> bool {
-        if let Some(filename) = execution.executable.file_name() {
-            if let Some(filename_str) = filename.to_str() {
-                return GCC_INTERNAL_EXECUTABLES.contains(&filename_str);
-            }
+        if let Some(filename) = execution.executable.file_name()
+            && let Some(filename_str) = filename.to_str()
+        {
+            return GCC_INTERNAL_EXECUTABLES.contains(&filename_str);
         }
         false
     }
@@ -98,74 +96,32 @@ impl Interpreter for GccInterpreter {
 pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
     // Generated flag definitions converted from C++ Bear project ToolGcc.cc
     let mut flags = vec![
-        FlagRule::new(
-            FlagPattern::Exactly("-x", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-c", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-S", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-E", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-o"),
-            ArgumentKind::Output,
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dumpbase", 1),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-x", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-S", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
+        FlagRule::new(FlagPattern::Exactly("-dumpbase", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::Exactly("-dumpbase-ext", 1),
             ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dumpdir", 1),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-v", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-###", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("--help", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dumpdir", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-###", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Prefix("--help", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::Exactly("--target-help", 0),
             ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("--version", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::Exactly("-pass-exit-codes", 0),
             ArgumentKind::Other(Some(CompilerPass::Info)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-pipe", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEq("-specs"),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-wrapper", 1),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::ExactlyWithEq("-specs"), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-wrapper", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-ffile-prefix-map"),
             ArgumentKind::Other(Some(CompilerPass::Info)),
@@ -178,10 +134,7 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             FlagPattern::Prefix("-fplugin-arg-", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("@", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("@", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-A"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -210,54 +163,21 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             FlagPattern::Exactly("-pthread", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-M", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MM", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MG", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MP", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MD", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-M", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MM", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MG", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MP", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MD", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(
             FlagPattern::Exactly("-MMD", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MF", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MT", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MQ", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-C", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-CC", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-P", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-MF", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MT", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-MQ", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-C", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-CC", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(FlagPattern::Exactly("-P", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(
             FlagPattern::Prefix("-traditional", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -270,18 +190,12 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             FlagPattern::Exactly("-remap", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-H", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-H", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(
             FlagPattern::Exactly("-Xpreprocessor", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Wp,", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-Wp,", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-I"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -354,116 +268,44 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             FlagPattern::Exactly("-nodefaultlibs", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nolibc", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-nostdlib", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-e", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEq("-entry"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-pie", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-no-pie", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-nolibc", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-nostdlib", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-e", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::ExactlyWithEq("-entry"), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-pie", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-no-pie", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
         FlagRule::new(
             FlagPattern::Exactly("-static-pie", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-r", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-rdynamic", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-s", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-symbolic", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-static", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-shared", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-T", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xlinker", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Wl,", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-u", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-z", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xassembler", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-r", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-rdynamic", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-s", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-symbolic", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Prefix("-static", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Prefix("-shared", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-T", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Prefix("-Wl,", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-u", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-z", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("-Xassembler", 1), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-Wa,", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("-aux-info", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-aux-info", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-std"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-O", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-g", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-f", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-m", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-O", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Prefix("-g", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Prefix("-f", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Prefix("-m", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Prefix("-p", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-tno", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Prefix("-save", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-save", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Prefix("-d", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-Q", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(None)),
@@ -487,10 +329,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 
         // Handle the first argument (compiler name)
         if i == 0 {
-            result.push(Box::new(OtherArguments::new(
-                vec![args[0].clone()],
-                ArgumentKind::Compiler,
-            )));
+            result.push(Box::new(OtherArguments::new(vec![args[0].clone()], ArgumentKind::Compiler)));
             i += 1;
             continue;
         }
@@ -547,10 +386,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
             i += consumed_count;
         } else {
             // Unknown flag - treat as simple flag
-            result.push(Box::new(OtherArguments::new(
-                vec![current_arg.clone()],
-                ArgumentKind::Other(None),
-            )));
+            result.push(Box::new(OtherArguments::new(vec![current_arg.clone()], ArgumentKind::Other(None))));
             i += 1;
         }
     }
@@ -565,17 +401,11 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 /// Returns a vector of Arguments representing the environment-based include directories.
 /// This vector can be concatenated with the result of `parse_arguments` to create
 /// a complete argument list.
-fn parse_environment(
-    environment: &std::collections::HashMap<String, String>,
-) -> Vec<Box<dyn Arguments>> {
+fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Box<dyn Arguments>> {
     let mut args: Vec<Box<dyn Arguments>> = Vec::new();
 
     // Process the three GCC include environment variables that use -I
-    for env_key in [
-        KEY_GCC__C_INCLUDE_1,
-        KEY_GCC__C_INCLUDE_2,
-        KEY_GCC__C_INCLUDE_3,
-    ] {
+    for env_key in [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3] {
         if let Some(env_value) = environment.get(env_key) {
             // Use std::env::split_paths for platform-correct path splitting
             for path in std::env::split_paths(env_value) {
@@ -651,22 +481,14 @@ mod tests {
     /// Creates a platform-specific path string from individual path components.
     /// On Windows, paths are separated by semicolons; on Unix-like systems, by colons.
     fn create_path_string(paths: &[&str]) -> String {
-        let path_bufs: Vec<std::path::PathBuf> =
-            paths.iter().map(std::path::PathBuf::from).collect();
-        std::env::join_paths(path_bufs)
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
+        let path_bufs: Vec<std::path::PathBuf> = paths.iter().map(std::path::PathBuf::from).collect();
+        std::env::join_paths(path_bufs).unwrap().to_string_lossy().to_string()
     }
 
     #[test]
     fn test_simple_compilation() {
         let interpreter = GccInterpreter::new();
-        let execution = create_execution(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-        );
+        let execution = create_execution("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project");
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -677,10 +499,7 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Check -c flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check source file
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
@@ -707,31 +526,16 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 5);
 
             // Check combined include flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-I/usr/include"]
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-I/usr/include"]);
 
             // Check combined define flag
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
-            assert_eq!(
-                cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-DDEBUG=1"]
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["-DDEBUG=1"]);
 
             // Check output
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
-            assert_eq!(
-                cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-o", "main"]
-            );
+            assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["-o", "main"]);
 
             // Check source
             assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source);
@@ -743,11 +547,8 @@ mod tests {
     #[test]
     fn test_separate_flags() {
         let interpreter = GccInterpreter::new();
-        let execution = create_execution(
-            "gcc",
-            vec!["gcc", "-I", "/usr/include", "-D", "DEBUG=1", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("gcc", vec!["gcc", "-I", "/usr/include", "-D", "DEBUG=1", "main.c"], "/project");
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -755,24 +556,12 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 4);
 
             // Check separate include flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-I", "/usr/include"]
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-I", "/usr/include"]);
 
             // Check separate define flag
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
-            assert_eq!(
-                cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-D", "DEBUG=1"]
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["-D", "DEBUG=1"]);
 
             // Check source
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
@@ -793,10 +582,7 @@ mod tests {
 
             // Check response file
             assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["@response.txt"]
-            );
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["@response.txt"]);
         } else {
             panic!("Expected compiler command");
         }
@@ -805,11 +591,8 @@ mod tests {
     #[test]
     fn test_warning_flags() {
         let interpreter = GccInterpreter::new();
-        let execution = create_execution(
-            "gcc",
-            vec!["gcc", "-Wall", "-Wextra", "-Wno-unused", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("gcc", vec!["gcc", "-Wall", "-Wextra", "-Wno-unused", "main.c"], "/project");
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -818,20 +601,14 @@ mod tests {
 
             // Check -Wall (exact match)
             assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-Wall"]
-            );
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-Wall"]);
 
             // Check -Wextra (exact match)
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
 
             // Check -Wno-unused (prefix match with -W)
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
-            assert_eq!(
-                cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-Wno-unused"]
-            );
+            assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["-Wno-unused"]);
         } else {
             panic!("Expected compiler command");
         }
@@ -845,28 +622,16 @@ mod tests {
         let execution = create_execution("gcc", vec!["gcc", "-std", "c99", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-std", "c99"]
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-std", "c99"]);
         }
 
         // Test equals form: -std=c99
         let execution = create_execution("gcc", vec!["gcc", "-std=c99", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-std=c99"]
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-std=c99"]);
         }
     }
 
@@ -940,10 +705,7 @@ mod tests {
 
             // Check that arguments are parsed correctly
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
         } else {
@@ -956,51 +718,32 @@ mod tests {
         let interpreter = GccInterpreter::new();
 
         // Test optimization flags with prefix matching
-        let execution = create_execution(
-            "gcc",
-            vec!["gcc", "-O2", "-Os", "-Ofast", "-Og", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("gcc", vec!["gcc", "-O2", "-Os", "-Ofast", "-Og", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // All -O* flags should be recognized
             assert!(cmd.arguments.len() >= 5);
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
         }
 
         // Test debug flags with prefix matching
-        let execution = create_execution(
-            "gcc",
-            vec!["gcc", "-g", "-g3", "-gdwarf-4", "-ggdb", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("gcc", vec!["gcc", "-g", "-g3", "-gdwarf-4", "-ggdb", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // All -g* flags should be recognized
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
         }
 
         // Test warning flags with prefix matching
         let execution = create_execution(
             "gcc",
-            vec![
-                "gcc",
-                "-Wall",
-                "-Wextra",
-                "-Wno-unused",
-                "-Werror=format",
-                "main.c",
-            ],
+            vec!["gcc", "-Wall", "-Wextra", "-Wno-unused", "-Werror=format", "main.c"],
             "/project",
         );
         let result = interpreter.recognize(&execution).unwrap();
@@ -1014,48 +757,28 @@ mod tests {
         // Test feature flags with prefix matching
         let execution = create_execution(
             "gcc",
-            vec![
-                "gcc",
-                "-fPIC",
-                "-fstack-protector",
-                "-fno-omit-frame-pointer",
-                "-flto",
-                "main.c",
-            ],
+            vec!["gcc", "-fPIC", "-fstack-protector", "-fno-omit-frame-pointer", "-flto", "main.c"],
             "/project",
         );
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // All -f* flags should be recognized
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
         }
 
         // Test machine flags with prefix matching
         let execution = create_execution(
             "gcc",
-            vec![
-                "gcc",
-                "-m64",
-                "-march=native",
-                "-mtune=generic",
-                "-msse4.2",
-                "main.c",
-            ],
+            vec!["gcc", "-m64", "-march=native", "-mtune=generic", "-msse4.2", "main.c"],
             "/project",
         );
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // All -m* flags should be recognized
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
         }
     }
@@ -1082,18 +805,9 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify linker flags are recognized
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
         }
 
         // Test system include and library paths
@@ -1113,18 +827,9 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify system paths are recognized with correct passes
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
         }
     }
 
@@ -1149,18 +854,9 @@ mod tests {
         if let Command::Compiler(cmd) = result {
             // All should be recognized as compilation flags
             assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None)); // @file
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // plugin
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // plugin-arg
-            assert_eq!(
-                cmd.arguments[4].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // save-temps
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // plugin
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // plugin-arg
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // save-temps
         }
     }
 
@@ -1171,12 +867,8 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("CPATH", cpath.as_str());
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1205,12 +897,8 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("C_INCLUDE_PATH", "/usr/local/include");
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1237,12 +925,8 @@ mod tests {
         let mut env = HashMap::new();
         env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
 
-        let execution = create_execution_with_env(
-            "g++",
-            vec!["g++", "-c", "main.cpp", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("g++", vec!["g++", "-c", "main.cpp", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1272,12 +956,8 @@ mod tests {
         env.insert("C_INCLUDE_PATH", "/usr/local/include");
         env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1304,17 +984,12 @@ mod tests {
     #[test]
     fn test_environment_variables_objc_include_path() {
         let interpreter = GccInterpreter::new();
-        let objc_include_path =
-            create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
+        let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
         let mut env = HashMap::new();
         env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.m", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.m", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1345,12 +1020,8 @@ mod tests {
         env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
         env.insert("OBJC_INCLUDE_PATH", "/System/Library/Frameworks");
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1384,12 +1055,8 @@ mod tests {
         env.insert("CPATH", "");
         env.insert("C_INCLUDE_PATH", c_include_path.as_str()); // Empty paths should be filtered out
 
-        let execution = create_execution_with_env(
-            "gcc",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
-            "/project",
-            env,
-        );
+        let execution =
+            create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
 
         let result = interpreter.recognize(&execution).unwrap();
 
@@ -1429,16 +1096,10 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify preprocessor flags are correctly categorized
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
             // Most preprocessor control flags should be preprocessing
             for i in 2..13 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
             }
         }
     }
@@ -1487,11 +1148,8 @@ mod tests {
         }
 
         // Test that regular gcc commands are still recognized as compilers
-        let gcc_execution = create_execution(
-            "/usr/bin/gcc",
-            vec!["gcc", "-c", "-O2", "main.c"],
-            "/home/user",
-        );
+        let gcc_execution =
+            create_execution("/usr/bin/gcc", vec!["gcc", "-c", "-O2", "main.c"], "/home/user");
 
         if let Some(Command::Compiler(_)) = interpreter.recognize(&gcc_execution) {
             // This is expected
@@ -1507,15 +1165,7 @@ mod tests {
         // Test the specific command: gcc -o a.out source1.o source2.o -lx -L/usr/local/lib
         let execution = create_execution(
             "gcc",
-            vec![
-                "gcc",
-                "-o",
-                "a.out",
-                "source1.o",
-                "source2.o",
-                "-lx",
-                "-L/usr/local/lib",
-            ],
+            vec!["gcc", "-o", "a.out", "source1.o", "source2.o", "-lx", "-L/usr/local/lib"],
             "/project",
         );
 
@@ -1528,44 +1178,23 @@ mod tests {
 
             // Check output argument (-o a.out)
             assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Output);
-            assert_eq!(
-                cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-o", "a.out"]
-            );
+            assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-o", "a.out"]);
 
             // Check object files - these should be treated as Other arguments since
             // looks_like_a_source_file() doesn't recognize .o extensions
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
-            assert_eq!(
-                cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["source1.o"]
-            );
+            assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["source1.o"]);
 
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
-            assert_eq!(
-                cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["source2.o"]
-            );
+            assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["source2.o"]);
 
             // Check library link flag (-lx)
-            assert_eq!(
-                cmd.arguments[4].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
-            assert_eq!(
-                cmd.arguments[4].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-lx"]
-            );
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(cmd.arguments[4].as_arguments(&|p| Cow::Borrowed(p)), vec!["-lx"]);
 
             // Check library path flag (-L/usr/local/lib)
-            assert_eq!(
-                cmd.arguments[5].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
-            assert_eq!(
-                cmd.arguments[5].as_arguments(&|p| Cow::Borrowed(p)),
-                vec!["-L/usr/local/lib"]
-            );
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(cmd.arguments[5].as_arguments(&|p| Cow::Borrowed(p)), vec!["-L/usr/local/lib"]);
         } else {
             panic!("Expected compiler command");
         }
@@ -1607,9 +1236,7 @@ mod tests {
             let linking_args: Vec<_> = cmd
                 .arguments
                 .iter()
-                .filter(|arg| {
-                    matches!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Linking)))
-                })
+                .filter(|arg| matches!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Linking))))
                 .collect();
 
             // Should have: -L/usr/lib, -L /opt/lib, -lmath, -l pthread, -Wl,--as-needed, -static, -pie

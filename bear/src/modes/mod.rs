@@ -138,16 +138,14 @@ pub enum ConfigurationError {
 }
 
 mod impls {
-    use super::execution;
     use super::ConfigurationError;
+    use super::execution;
     use crate::args::BuildCommand;
     use crate::intercept::environment;
     use crate::intercept::reporter::ReporterError;
     use crate::intercept::supervise::SuperviseError;
     use crate::intercept::tcp::CollectorOnTcp;
-    use crate::output::{
-        ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError,
-    };
+    use crate::output::{ExecutionEventDatabase, SerializationFormat, WriterCreationError, WriterError};
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use std::process::ExitStatus;
@@ -209,9 +207,7 @@ mod impls {
                 )));
             }
 
-            Ok(Self {
-                path: path.to_path_buf(),
-            })
+            Ok(Self { path: path.to_path_buf() })
         }
     }
 
@@ -219,9 +215,8 @@ mod impls {
         /// Opens the event file and reads the events while dispatching them to
         /// the destination channel. Errors are logged and ignored.
         fn produce(&self, destination: Sender<intercept::Event>) -> Result<(), ReporterError> {
-            let source = fs::File::open(&self.path)
-                .map(io::BufReader::new)
-                .map_err(ReporterError::Network)?;
+            let source =
+                fs::File::open(&self.path).map(io::BufReader::new).map_err(ReporterError::Network)?;
 
             let events = ExecutionEventDatabase::read_and_ignore(source, |error| {
                 log::warn!("Event file reading issue: {error:?}");
@@ -255,10 +250,7 @@ mod impls {
                 .map(io::BufWriter::new)
                 .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-            Ok(Self {
-                path: path.to_path_buf(),
-                destination,
-            })
+            Ok(Self { path: path.to_path_buf(), destination })
         }
     }
 
@@ -295,10 +287,7 @@ mod impls {
                 .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
             let writer = output::OutputWriter::try_from((&output, config))?;
 
-            Ok(Self {
-                interpreter: Box::new(interpreter),
-                writer,
-            })
+            Ok(Self { interpreter: Box::new(interpreter), writer })
         }
     }
 
@@ -307,9 +296,7 @@ mod impls {
         /// and write them into the target file (with the right format).
         fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), WriterError> {
             // Transform and log the events to semantics.
-            let semantics = events
-                .into_iter()
-                .flat_map(|event| self.interpreter.recognize(&event.execution));
+            let semantics = events.into_iter().flat_map(|event| self.interpreter.recognize(&event.execution));
 
             // Consume the entries and write them to the output file.
             self.writer.write(semantics)?;

@@ -35,19 +35,11 @@ fn basic_semantic_conversion() -> Result<()> {
 
     let events_content = format!("{}\n{}", event1, event2);
 
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("test.c", "int main() { return 0; }"),
-    ])?;
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
 
     // Run semantic to convert events to compilation database
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     // Verify compilation database was created
     let db = env.load_compilation_database("compile_commands.json")?;
@@ -110,13 +102,8 @@ fn semantic_multiple_entries() -> Result<()> {
         ("test3.c", "int func3() { return 3; }"),
     ])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(3)?;
@@ -165,19 +152,11 @@ fn semantic_format_conversion() -> Result<()> {
 
     env.create_source_files(&[
         ("events.json", &events_content),
-        (
-            "test.c",
-            "#include <stdio.h>\nint main() { printf(\"Hello\\n\"); return 0; }",
-        ),
+        ("test.c", "#include <stdio.h>\nint main() { printf(\"Hello\\n\"); return 0; }"),
     ])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
@@ -217,18 +196,10 @@ fn semantic_relative_paths() -> Result<()> {
 
     let events_content = event1.to_string();
 
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("src/main.c", "int main() { return 0; }"),
-    ])?;
+    env.create_source_files(&[("events.json", &events_content), ("src/main.c", "int main() { return 0; }")])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
@@ -269,19 +240,11 @@ fn semantic_wrapper_flags() -> Result<()> {
 
     env.create_source_files(&[
         ("events.json", &events_content),
-        (
-            "test.c",
-            "#ifdef WRAPPER_FLAG\nint main() { return 0; }\n#endif",
-        ),
+        ("test.c", "#ifdef WRAPPER_FLAG\nint main() { return 0; }\n#endif"),
     ])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
@@ -321,18 +284,10 @@ fn semantic_clang_plugins() -> Result<()> {
 
     let events_content = event1.to_string();
 
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("test.c", "int main() { return 0; }"),
-    ])?;
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
@@ -398,13 +353,8 @@ fn semantic_with_filtering() -> Result<()> {
         ("test2.c", "int func() { return 1; }"),
     ])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     // Should only contain the 2 compilation commands, not the ls command
@@ -432,13 +382,8 @@ fn semantic_empty_events() -> Result<()> {
 
     env.create_source_files(&[("events.json", "")])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(0)?;
@@ -458,13 +403,8 @@ fn semantic_malformed_events() -> Result<()> {
     )])?;
 
     // Bear should handle malformed events gracefully
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(0)?;
@@ -514,13 +454,8 @@ fn semantic_non_compilation_events() -> Result<()> {
 
     env.create_source_files(&[("events.json", &events_content)])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     // Should contain no entries since none are compilation commands
@@ -548,18 +483,10 @@ fn semantic_output_format() -> Result<()> {
 
     let events_content = event1.to_string();
 
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("test.c", "int main() { return 0; }"),
-    ])?;
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
 
-    let _output = env.run_bear_success(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let _output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;

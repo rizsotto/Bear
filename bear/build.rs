@@ -21,14 +21,8 @@ fn main() {
         let wrapper_path = target_dir.join(WRAPPER_NAME);
         let preload_path = target_dir.join(PRELOAD_NAME);
 
-        println!(
-            "cargo:rustc-env=WRAPPER_EXECUTABLE_PATH={}",
-            wrapper_path.display()
-        );
-        println!(
-            "cargo:rustc-env=PRELOAD_LIBRARY_PATH={}",
-            preload_path.display()
-        );
+        println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH={}", wrapper_path.display());
+        println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path.display());
     } else {
         // Use default system paths for production
         println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH=/usr/local/libexec/bear/wrapper");

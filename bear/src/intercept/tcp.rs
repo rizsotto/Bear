@@ -2,12 +2,12 @@
 
 //! The module contains the implementation of the TCP collector and reporter.
 
-use super::reporter::{Reporter, ReporterError};
 use super::Event;
+use super::reporter::{Reporter, ReporterError};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The serializer for events to transmit over the network.
 ///
@@ -127,8 +127,7 @@ impl Reporter for ReporterOnTcp {
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), ReporterError> {
-        let mut socket =
-            TcpStream::connect(self.destination.clone()).map_err(ReporterError::Network)?;
+        let mut socket = TcpStream::connect(self.destination.clone()).map_err(ReporterError::Network)?;
         EventWireSerializer::write(&mut socket, event.trim())?;
 
         Ok(())
@@ -227,32 +226,25 @@ mod tests {
         use super::*;
         use std::collections::HashMap;
 
-        pub(super) static EVENTS: std::sync::LazyLock<Vec<Event>> =
-            std::sync::LazyLock::new(|| {
-                vec![
-                    Event::from_strings(
-                        3425,
-                        "/usr/bin/ls",
-                        vec!["ls", "-l"],
-                        "/tmp",
-                        HashMap::new(),
-                    ),
-                    Event::from_strings(
-                        3492,
-                        "/usr/bin/cc",
-                        vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
-                        "/home/user",
-                        HashMap::from([("PATH", "/usr/bin:/bin"), ("CC", "gcc")]),
-                    ),
-                    Event::from_strings(
-                        3522,
-                        "/usr/bin/ld",
-                        vec!["ld", "-o", "./file_a", "./file_a.o"],
-                        "/opt/project",
-                        HashMap::from([("PATH", "/usr/bin:/bin"), ("LD_PRELOAD", "/usr/lib:/lib")]),
-                    ),
-                ]
-            });
+        pub(super) static EVENTS: std::sync::LazyLock<Vec<Event>> = std::sync::LazyLock::new(|| {
+            vec![
+                Event::from_strings(3425, "/usr/bin/ls", vec!["ls", "-l"], "/tmp", HashMap::new()),
+                Event::from_strings(
+                    3492,
+                    "/usr/bin/cc",
+                    vec!["cc", "-c", "./file_a.c", "-o", "./file_a.o"],
+                    "/home/user",
+                    HashMap::from([("PATH", "/usr/bin:/bin"), ("CC", "gcc")]),
+                ),
+                Event::from_strings(
+                    3522,
+                    "/usr/bin/ld",
+                    vec!["ld", "-o", "./file_a", "./file_a.o"],
+                    "/opt/project",
+                    HashMap::from([("PATH", "/usr/bin:/bin"), ("LD_PRELOAD", "/usr/lib:/lib")]),
+                ),
+            ]
+        });
 
         #[test]
         fn events_are_not_changed_when_trimmed() {

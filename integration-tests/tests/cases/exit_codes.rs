@@ -66,9 +66,7 @@ fn exit_code_for_non_existing_command() -> Result<()> {
 
     let result = env.run_bear(&["--", "invalid_command"])?;
     result.assert_failure()?;
-    assert!(result
-        .stderr()
-        .contains("Bear: Executor error: Failed to spawn child process"));
+    assert!(result.stderr().contains("Bear: Executor error: Failed to spawn child process"));
     Ok(())
 }
 
@@ -122,10 +120,7 @@ fn exit_code_when_signaled() -> Result<()> {
     let wait_end = Instant::now();
 
     assert!(!status.success());
-    assert!(
-        wait_end.duration_since(kill_time).as_secs() < 1,
-        "Process took too long to terminate.",
-    );
+    assert!(wait_end.duration_since(kill_time).as_secs() < 1, "Process took too long to terminate.",);
     Ok(())
 }
 
@@ -138,14 +133,8 @@ fn exit_code_for_successful_compilation() -> Result<()> {
     // Create a simple source file
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
-    let result = env.run_bear(&[
-        "--output",
-        "compile_commands.json",
-        "--",
-        COMPILER_C_PATH,
-        "-c",
-        "test.c",
-    ])?;
+    let result =
+        env.run_bear(&["--output", "compile_commands.json", "--", COMPILER_C_PATH, "-c", "test.c"])?;
     result.assert_success()?;
 
     // Verify compilation database was created
@@ -162,14 +151,8 @@ fn exit_code_for_failed_compilation() -> Result<()> {
     // Create an invalid source file that will cause compilation to fail
     env.create_source_files(&[("invalid.c", "this is not valid C code")])?;
 
-    let result = env.run_bear(&[
-        "--output",
-        "compile_commands.json",
-        "--",
-        COMPILER_C_PATH,
-        "-c",
-        "invalid.c",
-    ])?;
+    let result =
+        env.run_bear(&["--output", "compile_commands.json", "--", COMPILER_C_PATH, "-c", "invalid.c"])?;
     result.assert_failure()?;
     Ok(())
 }
@@ -225,13 +208,8 @@ fn semantic_exit_code_for_success() -> Result<()> {
     let events_content = r#"{"pid":12345,"execution":{"executable":"/usr/bin/gcc","arguments":["-c","test.c"],"working_dir":"/tmp","environment":{}}}"#;
     env.create_source_files(&[("events.json", events_content)])?;
 
-    let result = env.run_bear(&[
-        "semantic",
-        "--input",
-        "events.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let result =
+        env.run_bear(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
     result.assert_success()?;
     Ok(())
 }
@@ -241,13 +219,8 @@ fn semantic_exit_code_for_success() -> Result<()> {
 fn semantic_exit_code_for_missing_input() -> Result<()> {
     let env = TestEnvironment::new("semantic_exit_code_for_missing_input")?;
 
-    let result = env.run_bear(&[
-        "semantic",
-        "--input",
-        "nonexistent.json",
-        "--output",
-        "compile_commands.json",
-    ])?;
+    let result =
+        env.run_bear(&["semantic", "--input", "nonexistent.json", "--output", "compile_commands.json"])?;
     result.assert_failure()?;
     Ok(())
 }

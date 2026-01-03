@@ -35,18 +35,12 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
     // Build the base interpreter chain
     let mut interpreters: Vec<Box<dyn Interpreter>> = vec![
         // ignore executables which are not compilers,
-        Box::new(OutputLogger::new(
-            IgnoreByPath::default(),
-            "coreutils_to_ignore",
-        )),
+        Box::new(OutputLogger::new(IgnoreByPath::default(), "coreutils_to_ignore")),
     ];
 
     let compilers_to_exclude = compilers_to_exclude(config);
     if !compilers_to_exclude.is_empty() {
-        let tool = OutputLogger::new(
-            IgnoreByPath::from(&compilers_to_exclude),
-            "compilers_to_ignore",
-        );
+        let tool = OutputLogger::new(IgnoreByPath::from(&compilers_to_exclude), "compilers_to_ignore");
         interpreters.push(Box::new(tool));
     }
 
@@ -58,12 +52,7 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
 }
 
 fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
-    config
-        .compilers
-        .iter()
-        .filter(|compiler| compiler.ignore)
-        .map(|compiler| compiler.path.clone())
-        .collect()
+    config.compilers.iter().filter(|compiler| compiler.ignore).map(|compiler| compiler.path.clone()).collect()
 }
 
 #[cfg(test)]
@@ -109,12 +98,8 @@ mod test {
         let config = config::Main::default();
         let interpreter = create(&config).unwrap();
 
-        let execution = Execution::from_strings(
-            "/usr/bin/ls",
-            vec!["ls", "-la"],
-            "/home/user",
-            HashMap::new(),
-        );
+        let execution =
+            Execution::from_strings("/usr/bin/ls", vec!["ls", "-la"], "/home/user", HashMap::new());
 
         let result = interpreter.recognize(&execution);
         assert!(result.is_some());
@@ -156,16 +141,8 @@ mod test {
     fn test_compilers_to_exclude_function() {
         let config = config::Main {
             compilers: vec![
-                config::Compiler {
-                    path: PathBuf::from("/usr/bin/gcc"),
-                    as_: None,
-                    ignore: true,
-                },
-                config::Compiler {
-                    path: PathBuf::from("/usr/bin/clang"),
-                    as_: None,
-                    ignore: false,
-                },
+                config::Compiler { path: PathBuf::from("/usr/bin/gcc"), as_: None, ignore: true },
+                config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
             ],
             ..Default::default()
         };
@@ -191,10 +168,7 @@ mod test {
 
         // This should recognize gcc.exe as a compiler, not ignore it
         let result = interpreter.recognize(&execution);
-        assert!(
-            result.is_some(),
-            "gcc.exe should be recognized as a compiler command"
-        );
+        assert!(result.is_some(), "gcc.exe should be recognized as a compiler command");
 
         match result.unwrap() {
             Command::Compiler(_) => {
@@ -211,14 +185,7 @@ mod test {
         let config = config::Main::default();
         let interpreter = create(&config).unwrap();
 
-        let test_cases = vec![
-            "gcc.exe",
-            "g++.exe",
-            "clang.exe",
-            "clang++.exe",
-            "gfortran.exe",
-            "nvcc.exe",
-        ];
+        let test_cases = vec!["gcc.exe", "g++.exe", "clang.exe", "clang++.exe", "gfortran.exe", "nvcc.exe"];
 
         for executable_name in test_cases {
             let execution = Execution::from_strings(
@@ -229,11 +196,7 @@ mod test {
             );
 
             let result = interpreter.recognize(&execution);
-            assert!(
-                result.is_some(),
-                "{} should be recognized as a compiler",
-                executable_name
-            );
+            assert!(result.is_some(), "{} should be recognized as a compiler", executable_name);
 
             match result.unwrap() {
                 Command::Compiler(_) => {

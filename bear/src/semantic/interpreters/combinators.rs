@@ -11,9 +11,7 @@ pub(super) struct Any {
 
 impl Any {
     pub(super) fn new(tools: Vec<Box<dyn Interpreter>>) -> Self {
-        Self {
-            interpreters: tools,
-        }
+        Self { interpreters: tools }
     }
 }
 
@@ -55,10 +53,7 @@ pub(super) struct OutputLogger<T: Interpreter> {
 
 impl<T: Interpreter> OutputLogger<T> {
     pub(super) fn new(inner: T, name: impl Into<String>) -> Self {
-        Self {
-            inner,
-            name: name.into(),
-        }
+        Self { inner, name: name.into() }
     }
 }
 
@@ -89,16 +84,11 @@ mod test {
         mock2.expect_recognize().returning(|_| None);
         mock3.expect_recognize().returning(|_| None);
 
-        let sut = Any {
-            interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)],
-        };
+        let sut = Any { interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)] };
 
         let input = execution_fixture();
 
-        assert!(
-            sut.recognize(&input).is_none(),
-            "Expected None, but got a match"
-        );
+        assert!(sut.recognize(&input).is_none(), "Expected None, but got a match");
     }
 
     #[test]
@@ -109,21 +99,14 @@ mod test {
 
         // First mock returns None, second returns Some, third should not be called
         mock1.expect_recognize().returning(|_| None);
-        mock2
-            .expect_recognize()
-            .returning(|_| Some(command_fixture()));
+        mock2.expect_recognize().returning(|_| Some(command_fixture()));
         // mock3 should not be called since mock2 returns a match
 
-        let sut = Any {
-            interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)],
-        };
+        let sut = Any { interpreters: vec![Box::new(mock1), Box::new(mock2), Box::new(mock3)] };
 
         let input = execution_fixture();
 
-        assert!(
-            sut.recognize(&input).is_some(),
-            "Expected Some(_), got a match"
-        );
+        assert!(sut.recognize(&input).is_some(), "Expected Some(_), got a match");
     }
 
     fn execution_fixture() -> Execution {

@@ -38,11 +38,7 @@ impl Context {
 
         let environment = env::vars().collect::<HashMap<String, String>>();
 
-        Ok(Context {
-            current_executable,
-            current_directory,
-            environment,
-        })
+        Ok(Context { current_executable, current_directory, environment })
     }
 
     /// Returns the PATH environment variable key and value.
@@ -58,26 +54,16 @@ impl Context {
 
     /// Parses the PATH environment variable from context into a vector of directories.
     pub fn paths(&self) -> Vec<PathBuf> {
-        self.path()
-            .map(|(_, path)| std::env::split_paths(&path).collect())
-            .unwrap_or_default()
+        self.path().map(|(_, path)| std::env::split_paths(&path).collect()).unwrap_or_default()
     }
 }
 
 impl fmt::Display for Context {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Application Context:")?;
-        writeln!(
-            f,
-            "Current Executable: {}",
-            self.current_executable.display()
-        )?;
+        writeln!(f, "Current Executable: {}", self.current_executable.display())?;
         writeln!(f, "Current Directory: {}", self.current_directory.display())?;
-        writeln!(
-            f,
-            "Total Environment Variables: {} entries",
-            self.environment.len()
-        )?;
+        writeln!(f, "Total Environment Variables: {} entries", self.environment.len())?;
 
         // Display relevant environment variables by iterating directly
         writeln!(f, "Relevant Environment Variables:")?;

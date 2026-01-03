@@ -13,5 +13,5 @@ mod implementation;
 pub use implementation::*;
 
 /// Version information for the library
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static LIBEAR_VERSION: &[u8; 6] = b"4.0.0\0";

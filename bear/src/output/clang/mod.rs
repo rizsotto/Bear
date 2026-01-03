@@ -132,12 +132,7 @@ impl Entry {
 
     /// Constructor method for testing purposes.
     #[cfg(test)]
-    pub fn from_command_str(
-        file: &str,
-        command: &str,
-        directory: &str,
-        output: Option<&str>,
-    ) -> Self {
+    pub fn from_command_str(file: &str, command: &str, directory: &str, output: Option<&str>) -> Self {
         Self {
             file: file.into(),
             arguments: Vec::default(),
@@ -190,10 +185,7 @@ mod tests {
     #[test]
     fn test_entry_validate_errors() {
         let cases = vec![
-            (
-                Entry::from_arguments_str("", vec!["clang", "-c"], "/tmp", None),
-                EntryError::EmptyFileName,
-            ),
+            (Entry::from_arguments_str("", vec!["clang", "-c"], "/tmp", None), EntryError::EmptyFileName),
             (
                 Entry::from_arguments_str("main.cpp", vec!["clang", "-c"], "", None),
                 EntryError::EmptyDirectory,

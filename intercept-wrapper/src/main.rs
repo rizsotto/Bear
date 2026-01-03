@@ -20,7 +20,7 @@ extern crate core;
 use anyhow::{Context, Result};
 use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise_execution;
-use bear::intercept::wrapper::{WrapperConfigReader, CONFIG_FILENAME};
+use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfigReader};
 use bear::intercept::{Event, Execution};
 use std::io::Write;
 
@@ -70,9 +70,7 @@ fn report(real_execution: &Execution) -> Result<()> {
 
 /// Find the real executable using JSON configuration.
 fn find_from_json_config(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
-    let wrapper_dir = current_exe
-        .parent()
-        .with_context(|| "Cannot get wrapper directory")?;
+    let wrapper_dir = current_exe.parent().with_context(|| "Cannot get wrapper directory")?;
 
     let config_path = wrapper_dir.join(CONFIG_FILENAME);
 
@@ -87,12 +85,7 @@ fn find_from_json_config(current_exe: &std::path::Path) -> Result<std::path::Pat
     config
         .get_executable(executable_name)
         .cloned()
-        .with_context(|| {
-            format!(
-                "Executable '{}' not found in configuration",
-                executable_name
-            )
-        })
+        .with_context(|| format!("Executable '{}' not found in configuration", executable_name))
 }
 
 #[cfg(test)]
@@ -102,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_wrapper_config_reading() {
-        use bear::intercept::wrapper::{WrapperConfig, WrapperConfigWriter, CONFIG_FILENAME};
+        use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigWriter};
 
         let temp_dir = TempDir::new().unwrap();
         let wrapper_path = temp_dir.path().join("gcc");
@@ -129,9 +122,6 @@ mod tests {
         // Test with missing config file - should fail since we only use JSON config
         let result = find_from_json_config(&wrapper_path);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Cannot read config file"));
+        assert!(result.unwrap_err().to_string().contains("Cannot read config file"));
     }
 }

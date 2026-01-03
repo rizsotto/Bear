@@ -11,10 +11,8 @@
 //! compilation database entries for Clang-based toolchains.
 
 use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
-use super::gcc::{parse_arguments_and_environment, GCC_FLAGS};
-use crate::semantic::{
-    ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter,
-};
+use super::gcc::{GCC_FLAGS, parse_arguments_and_environment};
+use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter};
 
 /// Clang command-line argument parser that extracts semantic information from compiler invocations.
 ///
@@ -46,9 +44,7 @@ impl ClangInterpreter {
     /// and Clang-specific extensions including sanitizers, static analysis options,
     /// LLVM optimization passes, and Clang's unique command-line syntax variations.
     pub fn new() -> Self {
-        Self {
-            matcher: FlagAnalyzer::new(&CLANG_FLAGS),
-        }
+        Self { matcher: FlagAnalyzer::new(&CLANG_FLAGS) }
     }
 
     /// Checks if the execution is an internal clang -cc1 frontend invocation.
@@ -87,33 +83,15 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEq("--prefix"),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-F", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-F", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Exactly("-ObjC", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("-ObjC++", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-ObjC++", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-Xarch", 1), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-Xcuda", 1), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xopenmp-target", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Xopenmp-target=", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Z", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-a", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-Xopenmp-target", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-Xopenmp-target=", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-Z", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Prefix("-a", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--profile-blocks", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -138,54 +116,21 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Exactly("-Xanalyzer", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-arch", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-arch_only", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEq("--autocomplete"),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-bind_at_load", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-bundle", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-bundle_loader", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-client_name", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("--config", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-arch", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-arch_only", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithEq("--autocomplete"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-bind_at_load", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-bundle", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-bundle_loader", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Prefix("-client_name", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("--config", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("--cuda-host-only", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEq("-cuid"),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-current_version"),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dead_strip", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithEq("-cuid"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-current_version"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dead_strip", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("-dependency-dot", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -194,38 +139,14 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Exactly("-dependency-file", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-dsym-dir"),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dumpmachine", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dumpversion", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("--dyld-prefix"),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dylib_file", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dylinker", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dynamic", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dynamiclib", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-dsym-dir"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dumpmachine", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-dumpversion", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--dyld-prefix"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dylib_file", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dylinker", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dynamic", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-dynamiclib", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("-emit-ast", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -234,10 +155,7 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEq("-faligned-new"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-force_load", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-force_load", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("-framework", 1),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
@@ -266,19 +184,13 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Exactly("-ibuiltininc", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-image_base", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-image_base", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("-index-header-map", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(FlagPattern::Exactly("-init", 1), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("-install_name", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-install_name", 1), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-lazy", 1), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Exactly("-EB", 0), ArgumentKind::Other(None)),
         FlagRule::new(
@@ -289,58 +201,25 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEqOrSep("-mllvm"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-multiply_defined", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("--output"),
-            ArgumentKind::Output,
-        ),
-        FlagRule::new(
-            FlagPattern::Prefix("-objcmt", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-object", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-multiply_defined", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--output"), ArgumentKind::Output),
+        FlagRule::new(FlagPattern::Prefix("-objcmt", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-object", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Exactly("--profile", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         FlagRule::new(FlagPattern::Exactly("--pipe", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-r", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Prefix("--save", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("--save", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Prefix("-sect", 3), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-seg1addr"),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-seg1addr"), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-seg_", 1), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("-segaddr", 2),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-segcreate", 3),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-seglinkedit", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-segprot", 3),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-single_module", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-segaddr", 2), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-segcreate", 3), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-seglinkedit", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-segprot", 3), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-single_module", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Prefix("-sub_", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--sysroot"),
@@ -350,10 +229,7 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEqOrSep("--target"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-target", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-target", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(FlagPattern::Exactly("-time", 0), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::Prefix("--traditional", 0),
@@ -363,14 +239,8 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Prefix("-traditional", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-twolevel", 0),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-umbrella", 1),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-twolevel", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-umbrella", 1), ArgumentKind::Other(None)),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-unwindlib"),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
@@ -383,23 +253,14 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEqOrSep("--language"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xassembler", 1),
-            ArgumentKind::Other(None),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xclang", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-Xassembler", 1), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-Xclang", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("-Xpreprocessor", 1),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
         // Additional flags for compatibility with existing tests
-        FlagRule::new(
-            FlagPattern::Exactly("-triple", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-triple", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("-analyzer-config", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -412,10 +273,7 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::Exactly("-resource-dir", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-MJ", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-MJ", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--cuda-path"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -432,14 +290,8 @@ static CLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithEqOrSep("--gcc-install-dir"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-load", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("-plugin", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-load", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("-plugin", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Prefix("-plugin-arg-", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -477,9 +329,7 @@ impl FlangInterpreter {
     /// This combines Flang-specific flags with the base GCC flag set to provide
     /// complete Fortran compilation command recognition.
     pub fn new() -> Self {
-        Self {
-            matcher: FlagAnalyzer::new(&FLANG_FLAGS),
-        }
+        Self { matcher: FlagAnalyzer::new(&FLANG_FLAGS) }
     }
 }
 
@@ -506,10 +356,7 @@ static FLANG_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::ne
             FlagPattern::ExactlyWithGluedOrSep("-J"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-Xflang", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-Xflang", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("-cpp", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
@@ -636,12 +483,8 @@ mod tests {
     /// Creates a platform-specific path string from individual path components.
     /// On Windows, paths are separated by semicolons; on Unix-like systems, by colons.
     fn create_path_string(paths: &[&str]) -> String {
-        let path_bufs: Vec<std::path::PathBuf> =
-            paths.iter().map(std::path::PathBuf::from).collect();
-        std::env::join_paths(path_bufs)
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
+        let path_bufs: Vec<std::path::PathBuf> = paths.iter().map(std::path::PathBuf::from).collect();
+        std::env::join_paths(path_bufs).unwrap().to_string_lossy().to_string()
     }
 
     #[test]
@@ -657,16 +500,10 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Check -c flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check -O2 flag
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check source file
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
@@ -703,10 +540,7 @@ mod tests {
             assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
 
             // Check --target flag (separate form)
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(
                 cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
                 vec!["--target", "x86_64-apple-darwin"]
@@ -725,13 +559,7 @@ mod tests {
 
         let execution = create_execution(
             "clang",
-            vec![
-                "clang",
-                "-O3",
-                "-flto",
-                "-fsave-optimization-record",
-                "main.c",
-            ],
+            vec!["clang", "-O3", "-flto", "-fsave-optimization-record", "main.c"],
             "/project",
         );
 
@@ -740,10 +568,7 @@ mod tests {
 
             // All flags should be recognized as compilation flags
             for i in 1..4 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
 
             // Check source file
@@ -758,11 +583,8 @@ mod tests {
         let interpreter = ClangInterpreter::new();
 
         // Test --target form
-        let execution = create_execution(
-            "clang",
-            vec!["clang", "--target", "arm64-apple-macos", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("clang", vec!["clang", "--target", "arm64-apple-macos", "main.c"], "/project");
 
         if let Some(Command::Compiler(cmd)) = interpreter.recognize(&execution) {
             assert_eq!(cmd.arguments.len(), 3);
@@ -773,11 +595,8 @@ mod tests {
         }
 
         // Test -target form
-        let execution = create_execution(
-            "clang",
-            vec!["clang", "-target", "arm64-apple-macos", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("clang", vec!["clang", "-target", "arm64-apple-macos", "main.c"], "/project");
 
         if let Some(Command::Compiler(cmd)) = interpreter.recognize(&execution) {
             assert_eq!(cmd.arguments.len(), 3);
@@ -809,10 +628,7 @@ mod tests {
 
             // All sanitizer flags should be recognized
             for i in 1..4 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
 
             // Check source file
@@ -828,13 +644,7 @@ mod tests {
 
         let execution = create_execution(
             "clang",
-            vec![
-                "clang",
-                "-O2",
-                "-mllvm",
-                "-inline-threshold=100",
-                "myfile.c",
-            ],
+            vec!["clang", "-O2", "-mllvm", "-inline-threshold=100", "myfile.c"],
             "/project",
         );
 
@@ -842,16 +652,10 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 4);
 
             // Check -O2 flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check -mllvm flag
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(
                 cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
                 vec!["-mllvm", "-inline-threshold=100"]
@@ -878,16 +682,10 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 4);
 
             // Check -O2 flag
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check -mllvm flag with equals form
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(
                 cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
                 vec!["-mllvm=-inline-threshold=100"]
@@ -914,10 +712,7 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 4);
 
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
         } else {
@@ -956,7 +751,7 @@ mod tests {
             for i in 1..12 {
                 match cmd.arguments[i].kind() {
                     ArgumentKind::Other(Some(_)) => {} // Expected for compilation flags
-                    ArgumentKind::Other(None) => {} // Expected for warning flags like -Wall, -Weverything
+                    ArgumentKind::Other(None) => {}    // Expected for warning flags like -Wall, -Weverything
                     other => panic!("Unexpected argument kind at index {}: {:?}", i, other),
                 }
             }
@@ -991,10 +786,7 @@ mod tests {
 
             // All cross-compilation flags should be recognized
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
         } else {
             panic!("Expected compiler command");
@@ -1024,10 +816,7 @@ mod tests {
 
             // All CUDA and OpenMP flags should be recognized
             for i in 1..6 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
 
             // Check source file
@@ -1061,23 +850,14 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 6);
 
             // Framework flag (-F/System/Library/Frameworks)
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Framework name (-framework Foundation)
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
 
             // Plugin flags (-load and -plugin)
             for i in 3..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
 
             // Source file
@@ -1109,24 +889,12 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 6);
 
             // Analysis flags
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Codegen flags
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
-            assert_eq!(
-                cmd.arguments[4].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Check source file
             assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
@@ -1139,20 +907,14 @@ mod tests {
     fn test_clang_compilation_database_flag() {
         let interpreter = ClangInterpreter::new();
 
-        let execution = create_execution(
-            "clang",
-            vec!["clang", "-MJ", "compile_commands.json", "main.c"],
-            "/project",
-        );
+        let execution =
+            create_execution("clang", vec!["clang", "-MJ", "compile_commands.json", "main.c"], "/project");
 
         if let Some(Command::Compiler(cmd)) = interpreter.recognize(&execution) {
             assert_eq!(cmd.arguments.len(), 3);
 
             // Check -MJ flag (Clang-specific compilation database)
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
             assert_eq!(
                 cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
                 vec!["-MJ", "compile_commands.json"]
@@ -1187,22 +949,12 @@ mod tests {
             clang_flags.iter().map(|f| f.pattern.flag()).collect();
 
         // Verify that all GCC flags are present in Clang flags
-        let missing_flags: Vec<&str> = gcc_flag_strings
-            .difference(&clang_flag_strings)
-            .cloned()
-            .collect();
+        let missing_flags: Vec<&str> = gcc_flag_strings.difference(&clang_flag_strings).cloned().collect();
 
-        assert!(
-            missing_flags.is_empty(),
-            "These GCC flags are missing from Clang: {:?}",
-            missing_flags
-        );
+        assert!(missing_flags.is_empty(), "These GCC flags are missing from Clang: {:?}", missing_flags);
 
         // Find Clang-specific flags (flags in Clang but not in GCC)
-        let clang_specific: Vec<&str> = clang_flag_strings
-            .difference(&gcc_flag_strings)
-            .cloned()
-            .collect();
+        let clang_specific: Vec<&str> = clang_flag_strings.difference(&gcc_flag_strings).cloned().collect();
 
         // Verify some expected Clang-specific flags are present
         let expected_clang_flags = vec!["--target", "-target", "-triple", "--analyze", "-MJ"];
@@ -1290,10 +1042,7 @@ mod tests {
 
         if let Some(Command::Compiler(cmd)) = interpreter.recognize(&execution) {
             // -mllvm should still be recognized via GCC's -m prefix matcher
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
         } else {
             panic!("Expected compiler command");
         }
@@ -1466,8 +1215,7 @@ mod tests {
     #[test]
     fn test_environment_variables_objc_include_path() {
         let interpreter = ClangInterpreter::new();
-        let objc_include_path =
-            create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
+        let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
         let mut env = HashMap::new();
         env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
 
@@ -1545,14 +1293,7 @@ mod tests {
         // Test the user-facing clang command (should be recognized)
         let user_execution = create_execution(
             "clang++",
-            vec![
-                "clang++",
-                "-c",
-                "-std=c++23",
-                "-o",
-                "hello-world",
-                "hello-world.cpp",
-            ],
+            vec!["clang++", "-c", "-std=c++23", "-o", "hello-world", "hello-world.cpp"],
             "/home/user/project",
         );
 
@@ -1637,14 +1378,7 @@ mod tests {
         // Test basic Fortran compilation with Flang-specific flags
         let execution = create_execution(
             "flang",
-            vec![
-                "flang",
-                "-fbackslash",
-                "-ffree-form",
-                "-J/path/to/modules",
-                "-cpp",
-                "main.f90",
-            ],
+            vec!["flang", "-fbackslash", "-ffree-form", "-J/path/to/modules", "-cpp", "main.f90"],
             "/project",
         );
 
@@ -1652,22 +1386,10 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 6);
 
             // Check that Flang-specific flags are recognized
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // -fbackslash
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // -ffree-form
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            ); // -J
-            assert_eq!(
-                cmd.arguments[4].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-            ); // -cpp
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // -fbackslash
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // -ffree-form
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // -J
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing))); // -cpp
         } else {
             panic!("Expected compiler command for Flang");
         }

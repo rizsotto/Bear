@@ -13,19 +13,16 @@
 
 use std::io;
 
+use serde::Serializer;
 use serde::de::DeserializeOwned;
 use serde::ser::{Serialize, SerializeSeq};
-use serde::Serializer;
 
 /// Serialize entries from an iterator into a JSON array.
 ///
 /// The iterator must yield `Result<T, E>` where `T` is the type to be serialized
 /// and `E` is the error type. If an error occurs during serialization,
 /// the function will return that error.
-pub fn serialize_result_seq<W, T, E>(
-    writer: W,
-    entries: impl Iterator<Item = Result<T, E>>,
-) -> Result<(), E>
+pub fn serialize_result_seq<W, T, E>(writer: W, entries: impl Iterator<Item = Result<T, E>>) -> Result<(), E>
 where
     W: io::Write,
     T: Serialize,
@@ -72,18 +69,13 @@ struct PeekableReader<R> {
 
 impl<R: io::Read> PeekableReader<R> {
     fn new(reader: R) -> Self {
-        PeekableReader {
-            reader,
-            peeked: None,
-        }
+        PeekableReader { reader, peeked: None }
     }
 
     fn peek(&mut self) -> Result<u8, serde_json::Error> {
         if self.peeked.is_none() {
             let mut byte = 0u8;
-            self.reader
-                .read_exact(std::slice::from_mut(&mut byte))
-                .map_err(serde_json::Error::io)?;
+            self.reader.read_exact(std::slice::from_mut(&mut byte)).map_err(serde_json::Error::io)?;
             self.peeked = Some(byte);
         }
         Ok(self.peeked.unwrap())
@@ -94,9 +86,7 @@ impl<R: io::Read> PeekableReader<R> {
             Ok(byte)
         } else {
             let mut byte = 0u8;
-            self.reader
-                .read_exact(std::slice::from_mut(&mut byte))
-                .map_err(serde_json::Error::io)?;
+            self.reader.read_exact(std::slice::from_mut(&mut byte)).map_err(serde_json::Error::io)?;
             Ok(byte)
         }
     }
@@ -194,9 +184,7 @@ where
     T: DeserializeOwned,
     R: io::Read,
 {
-    let next_obj = serde_json::Deserializer::from_reader(reader)
-        .into_iter::<T>()
-        .next();
+    let next_obj = serde_json::Deserializer::from_reader(reader).into_iter::<T>().next();
     match next_obj {
         Some(result) => result,
         None => Err(serde::de::Error::custom("premature EOF")),
@@ -235,17 +223,11 @@ mod tests {
     {
         // Create fake "file"
         let mut buffer = Cursor::new(Vec::new());
-        serialize_result_seq(
-            &mut buffer,
-            input.iter().cloned().map(Ok::<_, serde_json::Error>),
-        )
-        .unwrap();
+        serialize_result_seq(&mut buffer, input.iter().cloned().map(Ok::<_, serde_json::Error>)).unwrap();
 
         // Use the fake "file" as input
         buffer.seek(SeekFrom::Start(0)).unwrap();
-        let result: Vec<T> = deserialize_seq(&mut buffer)
-            .collect::<Result<_, serde_json::Error>>()
-            .unwrap();
+        let result: Vec<T> = deserialize_seq(&mut buffer).collect::<Result<_, serde_json::Error>>().unwrap();
 
         assert_eq!(result, input.to_vec());
     }
@@ -255,9 +237,8 @@ mod tests {
         let buffer = "[ 1 , 5 , 0 , 2 , 9 ]".as_bytes();
 
         let mut cursor = Cursor::new(buffer);
-        let result: Vec<i32> = deserialize_seq(&mut cursor)
-            .collect::<Result<_, serde_json::Error>>()
-            .unwrap();
+        let result: Vec<i32> =
+            deserialize_seq(&mut cursor).collect::<Result<_, serde_json::Error>>().unwrap();
 
         assert_eq!(result, vec![1, 5, 0, 2, 9]);
     }

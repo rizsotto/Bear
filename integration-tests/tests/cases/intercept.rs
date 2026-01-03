@@ -20,15 +20,7 @@ fn basic_command_interception() -> Result<()> {
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Run intercept mode to capture commands
-    env.run_bear_success(&[
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        COMPILER_C_PATH,
-        "-c",
-        "test.c",
-    ])?;
+    env.run_bear_success(&["intercept", "--output", "events.json", "--", COMPILER_C_PATH, "-c", "test.c"])?;
 
     // Load and verify events using the new abstraction
     let events = env.load_events_file("events.json")?;
@@ -118,10 +110,8 @@ fn shell_commands_without_shebang() -> Result<()> {
 
     // Should still capture commands even without shebang
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 
@@ -280,10 +270,8 @@ fn intercept_empty_environment() -> Result<()> {
 
     // Should still capture execution even with empty environment
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 
@@ -318,10 +306,8 @@ fn libtool_command_interception() -> Result<()> {
 
     // Should capture libtool and compiler invocations
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 
@@ -374,10 +360,8 @@ exec {} "$@""#,
 
     // Should capture wrapper execution
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 
@@ -428,11 +412,9 @@ fn iso8859_2_encoding() -> Result<()> {
     let env = TestEnvironment::new("iso8859_2")?;
 
     // Create script with ISO-8859-2 characters
-    let script_commands = [
-        format!("\"{}\" 'Testing ISO-8859-2: ąęłńóśźż'", ECHO_PATH),
-        format!("\"{}\"", TRUE_PATH),
-    ]
-    .join("\n");
+    let script_commands =
+        [format!("\"{}\" 'Testing ISO-8859-2: ąęłńóśźż'", ECHO_PATH), format!("\"{}\"", TRUE_PATH)]
+            .join("\n");
     let script_path = env.create_shell_script("iso_test.sh", &script_commands)?;
 
     let _output = env.run_bear_success(&[
@@ -474,10 +456,8 @@ fn valgrind_integration() -> Result<()> {
 
     // Should capture valgrind execution
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 
@@ -506,10 +486,8 @@ fn fakeroot_integration() -> Result<()> {
 
     // Should capture fakeroot execution
     let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> = events_content
-        .lines()
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect();
+    let events: Vec<Value> =
+        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
 
     assert!(!events.is_empty());
 

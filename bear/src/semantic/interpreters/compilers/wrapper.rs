@@ -29,10 +29,7 @@ pub struct WrapperInterpreter {
 impl WrapperInterpreter {
     /// Creates a new wrapper interpreter with weak references to the recognizer and delegate.
     pub fn new(recognizer: Weak<CompilerRecognizer>, delegate: Weak<dyn Interpreter>) -> Self {
-        Self {
-            recognizer,
-            delegate,
-        }
+        Self { recognizer, delegate }
     }
 
     /// Detects the wrapper type from the executable name.
@@ -45,11 +42,7 @@ impl WrapperInterpreter {
     }
 
     /// Extracts the real compiler path and filtered arguments from wrapper invocation.
-    fn extract_real_compiler(
-        &self,
-        wrapper_name: &str,
-        args: &[String],
-    ) -> Option<(PathBuf, Vec<String>)> {
+    fn extract_real_compiler(&self, wrapper_name: &str, args: &[String]) -> Option<(PathBuf, Vec<String>)> {
         match wrapper_name {
             "ccache" => self.handle_ccache(args),
             "distcc" => self.handle_distcc(args),
@@ -108,10 +101,10 @@ impl WrapperInterpreter {
 
         if compiler_index < args.len() {
             let compiler_path = PathBuf::from(&args[compiler_index]);
-            if let Some(compiler_type) = recognizer.recognize(&compiler_path) {
-                if !matches!(compiler_type, CompilerType::Wrapper) {
-                    return Some((compiler_path, args[compiler_index + 1..].to_vec()));
-                }
+            if let Some(compiler_type) = recognizer.recognize(&compiler_path)
+                && !matches!(compiler_type, CompilerType::Wrapper)
+            {
+                return Some((compiler_path, args[compiler_index + 1..].to_vec()));
             }
         }
 
@@ -180,11 +173,7 @@ mod tests {
         }
     }
 
-    fn create_wrapper_interpreter() -> (
-        Arc<CompilerRecognizer>,
-        Arc<TestDelegate>,
-        WrapperInterpreter,
-    ) {
+    fn create_wrapper_interpreter() -> (Arc<CompilerRecognizer>, Arc<TestDelegate>, WrapperInterpreter) {
         let config = vec![];
         let recognizer = Arc::new(CompilerRecognizer::new_with_config(&config));
         let delegate = Arc::new(TestDelegate);
@@ -208,14 +197,8 @@ mod tests {
             interpreter.detect_wrapper_name(&PathBuf::from("/opt/distcc")),
             Some("distcc".to_string())
         );
-        assert_eq!(
-            interpreter.detect_wrapper_name(&PathBuf::from("sccache")),
-            Some("sccache".to_string())
-        );
-        assert_eq!(
-            interpreter.detect_wrapper_name(&PathBuf::from("/usr/bin/gcc")),
-            None
-        );
+        assert_eq!(interpreter.detect_wrapper_name(&PathBuf::from("sccache")), Some("sccache".to_string()));
+        assert_eq!(interpreter.detect_wrapper_name(&PathBuf::from("/usr/bin/gcc")), None);
     }
 
     #[test]
@@ -246,12 +229,7 @@ mod tests {
 
         // This test would need the recognizer to be properly mocked to work fully
         // For now, we just test that the method doesn't panic
-        let args = vec![
-            "ccache".to_string(),
-            "gcc".to_string(),
-            "-c".to_string(),
-            "main.c".to_string(),
-        ];
+        let args = vec!["ccache".to_string(), "gcc".to_string(), "-c".to_string(), "main.c".to_string()];
 
         let _result = interpreter.extract_real_compiler("ccache", &args);
         // In a real test, we'd assert on the result, but that requires mocking the recognizer

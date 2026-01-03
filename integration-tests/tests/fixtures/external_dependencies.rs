@@ -37,10 +37,7 @@ fn sleep_works() {
 fn shell_works() {
     // Testing shell to execute a built it function.
     // Testing with `--help` or `--version` is not a portable test. Debian `dash` is failing with those arguments.
-    Command::new(SHELL_PATH)
-        .args(["-c", "true"])
-        .assert()
-        .success();
+    Command::new(SHELL_PATH).args(["-c", "true"]).assert().success();
 }
 
 #[cfg(has_executable_make)]
@@ -54,40 +51,28 @@ fn make_works() {
 #[test]
 fn compiler_c_works() {
     // Testing compiler by querying its version.
-    Command::new(COMPILER_C_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(COMPILER_C_PATH).arg("--version").assert().success();
 }
 
 #[cfg(has_executable_compiler_cxx)]
 #[test]
 fn compiler_cxx_works() {
     // Testing compiler by querying its version.
-    Command::new(COMPILER_CXX_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(COMPILER_CXX_PATH).arg("--version").assert().success();
 }
 
 #[cfg(has_executable_compiler_fortran)]
 #[test]
 fn compiler_fortran_works() {
     // Testing compiler by querying its version.
-    Command::new(COMPILER_FORTRAN_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(COMPILER_FORTRAN_PATH).arg("--version").assert().success();
 }
 
 #[cfg(has_executable_compiler_cuda)]
 #[test]
 fn compiler_cuda_works() {
     // Testing compiler by querying its version.
-    Command::new(COMPILER_CUDA_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(COMPILER_CUDA_PATH).arg("--version").assert().success();
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -96,30 +81,21 @@ fn compiler_cuda_works() {
 fn libtool_works() {
     // Testing libtool by querying its version.
     // FIXME: libtool does not have version or help parameters on macOS
-    Command::new(LIBTOOL_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(LIBTOOL_PATH).arg("--version").assert().success();
 }
 
 #[cfg(has_executable_fakeroot)]
 #[test]
 fn fakeroot_works() {
     // Testing fakeroot by querying its version.
-    Command::new(FAKEROOT_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(FAKEROOT_PATH).arg("--version").assert().success();
 }
 
 #[cfg(has_executable_valgrind)]
 #[test]
 fn valgrind_works() {
     // Testing valgrind by querying its version.
-    Command::new(VALGRIND_PATH)
-        .arg("--version")
-        .assert()
-        .success();
+    Command::new(VALGRIND_PATH).arg("--version").assert().success();
 }
 
 #[cfg(not(target_os = "macos"))]

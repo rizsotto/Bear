@@ -68,11 +68,7 @@ format:
 /// Verifies that compilers marked with ignore: true are excluded
 #[test]
 #[cfg(has_preload_library)]
-#[cfg(all(
-    has_executable_compiler_c,
-    has_executable_compiler_cxx,
-    has_executable_shell
-))]
+#[cfg(all(has_executable_compiler_c, has_executable_compiler_cxx, has_executable_shell))]
 fn compiler_ignore_config() -> Result<()> {
     let env = TestEnvironment::new("compiler_ignore")?;
 
@@ -82,10 +78,7 @@ fn compiler_ignore_config() -> Result<()> {
         ("source.cpp", "int main() { return 0; }"),
     ])?;
 
-    let build_commands = format!(
-        "{} -c source.c\n{} -c source.cpp",
-        COMPILER_C_PATH, COMPILER_CXX_PATH
-    );
+    let build_commands = format!("{} -c source.c\n{} -c source.cpp", COMPILER_C_PATH, COMPILER_CXX_PATH);
     let script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Create config that ignores the C++ compiler
@@ -136,10 +129,7 @@ sources:
 
     // Check that arguments contain the compiler and source file
     let args = entry.get("arguments").unwrap().as_array().unwrap();
-    let arg_strings: Vec<String> = args
-        .iter()
-        .map(|v| v.as_str().unwrap().to_string())
-        .collect();
+    let arg_strings: Vec<String> = args.iter().map(|v| v.as_str().unwrap().to_string()).collect();
 
     assert!(arg_strings.iter().any(|arg| arg.contains("gcc")));
     assert!(arg_strings.contains(&"-c".to_string()));
@@ -209,10 +199,7 @@ sources:
         })
         .collect();
 
-    assert!(
-        !existing_entries.is_empty(),
-        "Should have at least one entry for existing.c"
-    );
+    assert!(!existing_entries.is_empty(), "Should have at least one entry for existing.c");
 
     Ok(())
 }
@@ -272,11 +259,7 @@ sources:
 
         // Directory should be absolute path
         if let Some(directory) = entry.get("directory").and_then(|v| v.as_str()) {
-            assert!(
-                directory.starts_with('/'),
-                "Directory should be absolute: {}",
-                directory
-            );
+            assert!(directory.starts_with('/'), "Directory should be absolute: {}", directory);
         }
 
         // File should be absolute path
@@ -380,10 +363,7 @@ fn duplicate_filter_config() -> Result<()> {
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Build script that might generate duplicate entries
-    let build_commands = format!(
-        "{} -c test.c\n{} -c test.c",
-        COMPILER_C_PATH, COMPILER_C_PATH
-    );
+    let build_commands = format!("{} -c test.c\n{} -c test.c", COMPILER_C_PATH, COMPILER_C_PATH);
     let script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Config with duplicate filtering
@@ -422,10 +402,7 @@ sources:
 
     // Should have deduplicated the entries
     let entries = db.entries();
-    assert!(
-        !entries.is_empty(),
-        "Should have at least one compilation entry"
-    );
+    assert!(!entries.is_empty(), "Should have at least one compilation entry");
 
     Ok(())
 }

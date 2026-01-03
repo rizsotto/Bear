@@ -120,18 +120,12 @@ impl FlagAnalyzer {
                 if current_arg == flag {
                     if required_args == 0 {
                         // No additional arguments required
-                        Some(FlagMatch {
-                            rule: definition.clone(),
-                            consumed_args: vec![current_arg.clone()],
-                        })
+                        Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                     } else if args.len() > required_args {
                         // Has required separate arguments
                         let mut consumed = vec![current_arg.clone()];
                         consumed.extend(args.iter().take(required_args + 1).skip(1).cloned());
-                        Some(FlagMatch {
-                            rule: definition.clone(),
-                            consumed_args: consumed,
-                        })
+                        Some(FlagMatch { rule: definition.clone(), consumed_args: consumed })
                     } else {
                         None
                     }
@@ -143,10 +137,7 @@ impl FlagAnalyzer {
             FlagPattern::ExactlyWithEq(_) => {
                 if current_arg.starts_with(&format!("{}=", flag)) {
                     // Flag with value glued with = (required)
-                    Some(FlagMatch {
-                        rule: definition.clone(),
-                        consumed_args: vec![current_arg.clone()],
-                    })
+                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                 } else {
                     None
                 }
@@ -161,10 +152,7 @@ impl FlagAnalyzer {
                     })
                 } else if current_arg.starts_with(&format!("{}=", flag)) {
                     // Flag with value glued with = (required)
-                    Some(FlagMatch {
-                        rule: definition.clone(),
-                        consumed_args: vec![current_arg.clone()],
-                    })
+                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                 } else {
                     None
                 }
@@ -179,10 +167,7 @@ impl FlagAnalyzer {
                     })
                 } else if current_arg.starts_with(flag) && current_arg.len() > flag.len() {
                     // Flag with value glued (no separator, required)
-                    Some(FlagMatch {
-                        rule: definition.clone(),
-                        consumed_args: vec![current_arg.clone()],
-                    })
+                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                 } else {
                     None
                 }
@@ -194,10 +179,7 @@ impl FlagAnalyzer {
 
                     if required_args == 0 {
                         // No additional arguments required
-                        Some(FlagMatch {
-                            rule: definition.clone(),
-                            consumed_args: vec![current_arg.clone()],
-                        })
+                        Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                     } else if args.len() > required_args {
                         // Check if we have enough additional arguments and they don't start with '-'
                         let mut all_args_valid = true;
@@ -212,10 +194,7 @@ impl FlagAnalyzer {
                             // Consume the flag plus required additional arguments
                             let mut consumed = vec![current_arg.clone()];
                             consumed.extend(args.iter().take(required_args + 1).skip(1).cloned());
-                            Some(FlagMatch {
-                                rule: definition.clone(),
-                                consumed_args: consumed,
-                            })
+                            Some(FlagMatch { rule: definition.clone(), consumed_args: consumed })
                         } else {
                             // Fall back to consuming just the flag if additional args start with '-'
                             Some(FlagMatch {
@@ -251,10 +230,7 @@ mod tests {
     // Create test-specific flags (not compiler-specific)
     static TEST_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
         let mut flags = vec![
-            FlagRule::new(
-                FlagPattern::Exactly("-c", 0),
-                ArgumentKind::Other(Some(CompilerPass::Compiling)),
-            ),
+            FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
             FlagRule::new(
                 FlagPattern::ExactlyWithEqOrSep("-std"),
                 ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -263,10 +239,7 @@ mod tests {
                 FlagPattern::ExactlyWithGluedOrSep("-I"),
                 ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
             ),
-            FlagRule::new(
-                FlagPattern::Prefix("-W", 0),
-                ArgumentKind::Other(Some(CompilerPass::Compiling)),
-            ),
+            FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
             FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
         ];
 

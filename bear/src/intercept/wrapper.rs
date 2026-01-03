@@ -8,7 +8,6 @@
 /// The filename used for wrapper configuration files.
 pub const CONFIG_FILENAME: &str = "wrappers.cfg";
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -21,7 +20,7 @@ use thiserror::Error;
 /// This structure contains the mapping from wrapper executable names to their
 /// corresponding real executable paths. It is designed to be minimal and focused
 /// solely on the executable mappings.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WrapperConfig {
     /// Map from wrapper executable name to the real executable path
     pub executables: HashMap<String, PathBuf>,
@@ -36,9 +35,7 @@ impl Default for WrapperConfig {
 impl WrapperConfig {
     /// Creates a new empty wrapper configuration.
     pub fn new() -> Self {
-        Self {
-            executables: HashMap::new(),
-        }
+        Self { executables: HashMap::new() }
     }
 
     /// Adds an executable mapping to the configuration.
@@ -97,10 +94,7 @@ impl WrapperConfigWriter {
     }
 
     /// Writes wrapper configuration to a file path.
-    pub fn write_to_file<P: AsRef<Path>>(
-        config: &WrapperConfig,
-        path: P,
-    ) -> Result<(), ConfigError> {
+    pub fn write_to_file<P: AsRef<Path>>(config: &WrapperConfig, path: P) -> Result<(), ConfigError> {
         let file = std::fs::File::create(path.as_ref()).map_err(ConfigError::Io)?;
         Self::write(config, file)
     }
@@ -127,10 +121,7 @@ impl WrapperDirectoryBuilder {
     ///
     /// This is a convenience method that combines directory creation with setup.
     /// The WrapperDirectoryBuilder takes ownership of the temporary directory.
-    pub fn create(
-        wrapper_executable_path: &Path,
-        parent_dir: &Path,
-    ) -> Result<Self, WrapperDirectoryError> {
+    pub fn create(wrapper_executable_path: &Path, parent_dir: &Path) -> Result<Self, WrapperDirectoryError> {
         let wrapper_dir = tempfile::Builder::new()
             .prefix("bear-")
             .tempdir_in(parent_dir)
@@ -171,21 +162,15 @@ impl WrapperDirectoryBuilder {
             .map_err(WrapperDirectoryError::LinkCreation)?;
         #[cfg(not(windows))]
         // Try hard link first, fall back to copy if it fails (e.g., in containers with overlay fs)
-        if let Err(hard_link_error) =
-            std::fs::hard_link(&self.wrapper_executable_path, &wrapper_path)
-        {
-            log::debug!(
-                "Hard link failed ({}), falling back to copy",
-                hard_link_error
-            );
+        if let Err(hard_link_error) = std::fs::hard_link(&self.wrapper_executable_path, &wrapper_path) {
+            log::debug!("Hard link failed ({}), falling back to copy", hard_link_error);
             std::fs::copy(&self.wrapper_executable_path, &wrapper_path)
                 .map(|_| ())
                 .map_err(WrapperDirectoryError::LinkCreation)?;
         }
 
         // Register the mapping
-        self.config
-            .add_executable(executable_name.clone(), executable_path);
+        self.config.add_executable(executable_name.clone(), executable_path);
 
         Ok(wrapper_path)
     }
@@ -196,10 +181,7 @@ impl WrapperDirectoryBuilder {
         WrapperConfigWriter::write_to_file(&self.config, &config_path)
             .map_err(WrapperDirectoryError::ConfigWrite)?;
 
-        let wrapper_directory = WrapperDirectory {
-            wrapper_dir: self.wrapper_dir,
-            _config: self.config,
-        };
+        let wrapper_directory = WrapperDirectory { wrapper_dir: self.wrapper_dir, _config: self.config };
 
         log::info!("{}", wrapper_directory);
 
@@ -233,11 +215,7 @@ impl WrapperDirectory {
 
 impl Display for WrapperDirectory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Set up wrapper directory: {}",
-            self.wrapper_dir.path().display()
-        )?;
+        writeln!(f, "Set up wrapper directory: {}", self.wrapper_dir.path().display())?;
         if self._config.executables.is_empty() {
             write!(f, "   No wrappers configured")
         } else {
@@ -290,10 +268,7 @@ mod tests {
         config.add_executable("gcc".to_string(), PathBuf::from("/usr/bin/gcc"));
 
         assert_eq!(config.executables.len(), 1);
-        assert_eq!(
-            config.get_executable("gcc"),
-            Some(&PathBuf::from("/usr/bin/gcc"))
-        );
+        assert_eq!(config.get_executable("gcc"), Some(&PathBuf::from("/usr/bin/gcc")));
     }
 
     #[test]
@@ -302,14 +277,8 @@ mod tests {
         config.add_executable("gcc".to_string(), PathBuf::from("/usr/bin/gcc"));
         config.add_executable("g++".to_string(), PathBuf::from("/usr/bin/g++"));
 
-        assert_eq!(
-            config.get_executable("gcc"),
-            Some(&PathBuf::from("/usr/bin/gcc"))
-        );
-        assert_eq!(
-            config.get_executable("g++"),
-            Some(&PathBuf::from("/usr/bin/g++"))
-        );
+        assert_eq!(config.get_executable("gcc"), Some(&PathBuf::from("/usr/bin/gcc")));
+        assert_eq!(config.get_executable("g++"), Some(&PathBuf::from("/usr/bin/g++")));
         assert_eq!(config.get_executable("clang"), None);
     }
 
@@ -378,12 +347,8 @@ mod tests {
         let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_dir.path()).unwrap();
 
         // Register some executables
-        let gcc_wrapper = builder
-            .register_executable(PathBuf::from("/usr/bin/gcc"))
-            .unwrap();
-        let gpp_wrapper = builder
-            .register_executable(PathBuf::from("/usr/bin/g++"))
-            .unwrap();
+        let gcc_wrapper = builder.register_executable(PathBuf::from("/usr/bin/gcc")).unwrap();
+        let gpp_wrapper = builder.register_executable(PathBuf::from("/usr/bin/g++")).unwrap();
 
         // Verify links were created
         assert!(builder.path().join("gcc").exists());
@@ -409,9 +374,7 @@ mod tests {
         let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_dir.path()).unwrap();
 
         // Register first executable
-        let _gcc_wrapper = builder
-            .register_executable(PathBuf::from("/usr/bin/gcc"))
-            .unwrap();
+        let _gcc_wrapper = builder.register_executable(PathBuf::from("/usr/bin/gcc")).unwrap();
 
         // Try to register different executable with same name - should fail
         let result = builder.register_executable(PathBuf::from("/usr/local/bin/gcc"));
@@ -444,12 +407,9 @@ mod tests {
         let wrapper_path = temp_parent.path().join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        let mut builder =
-            WrapperDirectoryBuilder::create(&wrapper_path, temp_parent.path()).unwrap();
+        let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_parent.path()).unwrap();
 
-        let clang_wrapper = builder
-            .register_executable(PathBuf::from("/usr/bin/clang"))
-            .unwrap();
+        let clang_wrapper = builder.register_executable(PathBuf::from("/usr/bin/clang")).unwrap();
 
         // Verify link was created in wrapper directory
         assert!(builder.path().join("clang").exists());

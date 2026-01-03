@@ -8,7 +8,7 @@ members = [
   "intercept-wrapper",
   "integration-tests"
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = "4.0.0"
@@ -16,7 +16,7 @@ authors = ["László Nagy <rizsotto at gmail dot com>"]
 repository = "https://github.com/rizsotto/Bear"
 homepage = "https://github.com/rizsotto/Bear"
 license = "GPL-3"
-edition = "2021"
+edition = "2024"
 
 [workspace.dependencies]
 thiserror = "2.0"

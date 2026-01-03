@@ -105,10 +105,7 @@ impl Arguments for OutputArgument {
     fn as_arguments(&self, path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {
         let path = Path::new(&self.path);
         let updated_path = path_updater(path);
-        vec![
-            self.flag.clone(),
-            updated_path.to_string_lossy().to_string(),
-        ]
+        vec![self.flag.clone(), updated_path.to_string_lossy().to_string()]
     }
 
     fn as_file(&self, path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Option<PathBuf> {
@@ -125,15 +122,10 @@ mod tests {
 
     #[test]
     fn test_other_arguments_new_with_simple_flag() {
-        let arg = OtherArguments::new(
-            vec!["-c".to_string()],
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        );
+        let arg =
+            OtherArguments::new(vec!["-c".to_string()], ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
-        assert_eq!(
-            arg.kind(),
-            ArgumentKind::Other(Some(CompilerPass::Compiling))
-        );
+        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-c"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
@@ -145,14 +137,8 @@ mod tests {
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(
-            arg.kind(),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-        );
-        assert_eq!(
-            arg.as_arguments(&|p| Cow::Borrowed(p)),
-            vec!["-I", "/usr/include"]
-        );
+        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-I", "/usr/include"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
 
@@ -163,14 +149,8 @@ mod tests {
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(
-            arg.kind(),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-        );
-        assert_eq!(
-            arg.as_arguments(&|p| Cow::Borrowed(p)),
-            vec!["-I/usr/include"]
-        );
+        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-I/usr/include"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
 
@@ -188,10 +168,7 @@ mod tests {
         let arg = OtherArguments::new(vec!["@response.txt".to_string()], ArgumentKind::Other(None));
 
         assert_eq!(arg.kind(), ArgumentKind::Other(None));
-        assert_eq!(
-            arg.as_arguments(&|p| Cow::Borrowed(p)),
-            vec!["@response.txt"]
-        );
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["@response.txt"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
 
@@ -201,10 +178,7 @@ mod tests {
 
         assert_eq!(arg.kind(), ArgumentKind::Source);
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["main.c"]);
-        assert_eq!(
-            arg.as_file(&|p| Cow::Borrowed(p)),
-            Some(PathBuf::from("main.c"))
-        );
+        assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), Some(PathBuf::from("main.c")));
     }
 
     #[test]
@@ -212,14 +186,8 @@ mod tests {
         let arg = OutputArgument::new("-o".to_string(), "main.o".to_string());
 
         assert_eq!(arg.kind(), ArgumentKind::Output);
-        assert_eq!(
-            arg.as_arguments(&|p| Cow::Borrowed(p)),
-            vec!["-o", "main.o"]
-        );
-        assert_eq!(
-            arg.as_file(&|p| Cow::Borrowed(p)),
-            Some(PathBuf::from("main.o"))
-        );
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-o", "main.o"]);
+        assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), Some(PathBuf::from("main.o")));
     }
 
     #[test]
@@ -227,14 +195,8 @@ mod tests {
         let arg = SourceArgument::new("src/main.c".to_string());
 
         // Test with identity path updater (no change)
-        assert_eq!(
-            arg.as_arguments(&|p| std::borrow::Cow::Borrowed(p)),
-            vec!["src/main.c"]
-        );
-        assert_eq!(
-            arg.as_file(&|p| std::borrow::Cow::Borrowed(p)),
-            Some(PathBuf::from("src/main.c"))
-        );
+        assert_eq!(arg.as_arguments(&|p| std::borrow::Cow::Borrowed(p)), vec!["src/main.c"]);
+        assert_eq!(arg.as_file(&|p| std::borrow::Cow::Borrowed(p)), Some(PathBuf::from("src/main.c")));
     }
 
     #[test]
@@ -244,14 +206,8 @@ mod tests {
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(
-            arg.kind(),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing))
-        );
-        assert_eq!(
-            arg.as_arguments(&|p| Cow::Borrowed(p)),
-            vec!["-D", "MACRO=value"]
-        );
+        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-D", "MACRO=value"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
 }

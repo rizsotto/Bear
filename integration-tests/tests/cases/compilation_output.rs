@@ -6,7 +6,7 @@
 //! for various build scenarios, ported from the Python/lit test suite.
 
 use crate::fixtures::constants::*;
-use crate::fixtures::infrastructure::{compilation_entry, filename_of, TestEnvironment};
+use crate::fixtures::infrastructure::{TestEnvironment, compilation_entry, filename_of};
 use anyhow::Result;
 
 /// Test compilation with build script that calls compiler
@@ -20,10 +20,7 @@ fn simple_single_file_compilation() -> Result<()> {
     env.create_source_files(&[("simple.c", "int main() { return 0; }")])?;
 
     // Create a shell script that calls the compiler
-    let build_commands = format!(
-        "\"{}\" -c simple.c -o simple.o",
-        filename_of(COMPILER_C_PATH)
-    );
+    let build_commands = format!("\"{}\" -c simple.c -o simple.o", filename_of(COMPILER_C_PATH));
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Step 1: Run intercept command to capture events from the build script
@@ -41,13 +38,7 @@ fn simple_single_file_compilation() -> Result<()> {
     assert!(env.file_exists("events.json"));
 
     // Step 2: Run semantic command to convert events to compilation database
-    let result = env.run_bear(&[
-        "semantic",
-        "-i",
-        "events.json",
-        "-o",
-        "compile_commands.json",
-    ])?;
+    let result = env.run_bear(&["semantic", "-i", "events.json", "-o", "compile_commands.json"])?;
     result.assert_success()?;
 
     // Verify compilation database was created
@@ -76,11 +67,7 @@ fn simple_single_file_compilation() -> Result<()> {
 /// Test successful build with multiple sources (C and C++)
 /// Verifies Bear handles mixed compilation units
 #[test]
-#[cfg(all(
-    has_executable_compiler_c,
-    has_executable_compiler_cxx,
-    has_executable_shell
-))]
+#[cfg(all(has_executable_compiler_c, has_executable_compiler_cxx, has_executable_shell))]
 fn successful_build_multiple_sources() -> Result<()> {
     let env = TestEnvironment::new("successful_build_multiple_sources")?;
 
@@ -96,14 +83,8 @@ fn successful_build_multiple_sources() -> Result<()> {
     let build_commands = [
         format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH)),
         format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH)),
-        format!(
-            "\"{}\" -c -o test3.o test3.cpp",
-            filename_of(COMPILER_CXX_PATH)
-        ),
-        format!(
-            "\"{}\" -c -o test4.o test4.cpp",
-            filename_of(COMPILER_CXX_PATH)
-        ),
+        format!("\"{}\" -c -o test3.o test3.cpp", filename_of(COMPILER_CXX_PATH)),
+        format!("\"{}\" -c -o test4.o test4.cpp", filename_of(COMPILER_CXX_PATH)),
     ]
     .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
@@ -193,10 +174,7 @@ fn broken_build_partial_success() -> Result<()> {
     // Create build script that tries to compile both (one will fail)
     let build_commands = [
         format!("\"{}\" -c -o valid.o valid.c", filename_of(COMPILER_C_PATH)),
-        format!(
-            "\"{}\" -c -o invalid.o invalid.c",
-            filename_of(COMPILER_C_PATH)
-        ),
+        format!("\"{}\" -c -o invalid.o invalid.c", filename_of(COMPILER_C_PATH)),
     ]
     .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
@@ -292,10 +270,7 @@ fn multiple_sources_single_command() -> Result<()> {
     ])?;
 
     // Create build script with single command compiling multiple files
-    let build_commands = format!(
-        "\"{}\" -c src1.c src2.c src3.c",
-        filename_of(COMPILER_C_PATH)
-    );
+    let build_commands = format!("\"{}\" -c src1.c src2.c src3.c", filename_of(COMPILER_C_PATH));
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Run bear with build script

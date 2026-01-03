@@ -57,10 +57,7 @@ impl CompilerInterpreter {
         result.register(CompilerType::Gcc, GccInterpreter::default());
         result.register(CompilerType::Clang, ClangInterpreter::default());
         result.register(CompilerType::Flang, FlangInterpreter::default());
-        result.register(
-            CompilerType::IntelFortran,
-            IntelFortranInterpreter::default(),
-        );
+        result.register(CompilerType::IntelFortran, IntelFortranInterpreter::default());
         result.register(CompilerType::CrayFortran, CrayFortranInterpreter::default());
         result.register(CompilerType::Cuda, CudaInterpreter::default());
 
@@ -72,10 +69,9 @@ impl CompilerInterpreter {
             );
 
             // Store wrapper interpreter in OnceLock
-            let _ = result.wrapper_interpreter.set(Box::new(OutputLogger::new(
-                wrapper_interpreter,
-                CompilerType::Wrapper.to_string(),
-            )));
+            let _ = result
+                .wrapper_interpreter
+                .set(Box::new(OutputLogger::new(wrapper_interpreter, CompilerType::Wrapper.to_string())));
 
             result
         })
@@ -85,19 +81,14 @@ impl CompilerInterpreter {
     /// This is the basic constructor. Use `new_with_config` for a fully
     /// configured interpreter with all compiler types registered.
     fn new(recognizer: Arc<CompilerRecognizer>) -> Self {
-        Self {
-            recognizer,
-            interpreters: HashMap::new(),
-            wrapper_interpreter: OnceLock::new(),
-        }
+        Self { recognizer, interpreters: HashMap::new(), wrapper_interpreter: OnceLock::new() }
     }
 
     /// Registers an interpreter for a specific compiler type.
     /// The interpreter will be automatically wrapped with OutputLogger using the compiler type name.
     fn register(&mut self, compiler_type: CompilerType, interpreter: impl Interpreter + 'static) {
         let logged_interpreter = OutputLogger::new(interpreter, compiler_type.to_string());
-        self.interpreters
-            .insert(compiler_type, Box::new(logged_interpreter));
+        self.interpreters.insert(compiler_type, Box::new(logged_interpreter));
     }
 }
 
@@ -181,10 +172,7 @@ mod tests {
 
         let result = sut.recognize(&execution);
 
-        assert!(
-            result.is_none(),
-            "Unknown compiler should not be recognized"
-        );
+        assert!(result.is_none(), "Unknown compiler should not be recognized");
     }
 
     #[test]
@@ -216,16 +204,8 @@ mod tests {
         use crate::config::{Compiler, CompilerType};
 
         let config = vec![
-            Compiler {
-                path: "/custom/path/my-gcc".into(),
-                as_: Some(CompilerType::Gcc),
-                ignore: false,
-            },
-            Compiler {
-                path: "/opt/clang/bin/clang++".into(),
-                as_: Some(CompilerType::Clang),
-                ignore: false,
-            },
+            Compiler { path: "/custom/path/my-gcc".into(), as_: Some(CompilerType::Gcc), ignore: false },
+            Compiler { path: "/opt/clang/bin/clang++".into(), as_: Some(CompilerType::Clang), ignore: false },
         ];
 
         let sut = CompilerInterpreter::new_with_config(&config);
@@ -233,18 +213,12 @@ mod tests {
         // Test custom GCC path
         let custom_gcc = create_execution("/custom/path/my-gcc", vec!["-c", "test.c"]);
         let result = sut.recognize(&custom_gcc);
-        assert!(
-            result.is_some(),
-            "Custom GCC path should be recognized via config hint"
-        );
+        assert!(result.is_some(), "Custom GCC path should be recognized via config hint");
 
         // Test custom Clang path
         let custom_clang = create_execution("/opt/clang/bin/clang++", vec!["-c", "main.cpp"]);
         let result = sut.recognize(&custom_clang);
-        assert!(
-            result.is_some(),
-            "Custom Clang path should be recognized via config hint"
-        );
+        assert!(result.is_some(), "Custom Clang path should be recognized via config hint");
 
         // Test that normal compiler paths still work
         let normal_gcc = create_execution("gcc", vec!["-c", "normal.c"]);
@@ -296,11 +270,7 @@ mod tests {
             if let Some(compiler_type) = recognized_type {
                 // If it's recognized, it should delegate properly through the map
                 let result = sut.interpreters.get(&compiler_type);
-                assert!(
-                    result.is_some(),
-                    "Interpreter should be registered for {}",
-                    executable
-                );
+                assert!(result.is_some(), "Interpreter should be registered for {}", executable);
             }
         }
     }

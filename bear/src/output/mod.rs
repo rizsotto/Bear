@@ -17,8 +17,8 @@ mod writers;
 use crate::{args, config, semantic};
 use thiserror::Error;
 use writers::{
-    AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter,
-    ConverterClangOutputWriter, IteratorWriter, SourceFilterOutputWriter, UniqueOutputWriter,
+    AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter, ConverterClangOutputWriter,
+    IteratorWriter, SourceFilterOutputWriter, UniqueOutputWriter,
 };
 
 // Re-export types for convenience.
@@ -51,17 +51,13 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
 
         let base_writer = ClangOutputWriter::create(temp_path)?;
         let unique_writer = UniqueOutputWriter::create(base_writer, config.duplicates.clone())?;
-        let source_filter_writer =
-            SourceFilterOutputWriter::create(unique_writer, config.sources.clone())?;
-        let atomic_writer =
-            AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
+        let source_filter_writer = SourceFilterOutputWriter::create(unique_writer, config.sources.clone())?;
+        let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
         let append_writer = AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
         let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format)
             .map_err(|e| WriterCreationError::Configuration(e.to_string()))?;
 
-        Ok(Self {
-            writer: formatted_writer,
-        })
+        Ok(Self { writer: formatted_writer })
     }
 }
 
@@ -73,10 +69,7 @@ impl OutputWriter {
     ///
     /// # Returns
     /// `Ok(())` on success, or a `WriterError` if writing fails.
-    pub fn write(
-        self,
-        semantics: impl Iterator<Item = semantic::Command>,
-    ) -> Result<(), WriterError> {
+    pub fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         self.writer.write(semantics)
     }
 }

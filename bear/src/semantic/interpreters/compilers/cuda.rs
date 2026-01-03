@@ -12,10 +12,8 @@
 //! compilation database entries for CUDA-based projects.
 
 use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
-use super::gcc::{parse_arguments_and_environment, GCC_FLAGS};
-use crate::semantic::{
-    ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter,
-};
+use super::gcc::{GCC_FLAGS, parse_arguments_and_environment};
+use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter};
 
 /// CUDA compiler (nvcc) command-line argument parser that extracts semantic information from compiler invocations.
 ///
@@ -47,9 +45,7 @@ impl CudaInterpreter {
     /// and CUDA-specific extensions including GPU architecture specifications,
     /// device/host compilation modes, CUDA runtime flags, and nvcc-specific options.
     pub fn new() -> Self {
-        Self {
-            matcher: FlagAnalyzer::new(&CUDA_FLAGS),
-        }
+        Self { matcher: FlagAnalyzer::new(&CUDA_FLAGS) }
     }
 }
 
@@ -105,42 +101,24 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::Exactly("--compile", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-c", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--device-c", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dc", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dc", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--device-w", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dw", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dw", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--device-link", 0),
             ArgumentKind::Other(Some(CompilerPass::Linking)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-dlink", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("--link", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("--lib", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-dlink", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("--link", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(FlagPattern::Exactly("--lib", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
         FlagRule::new(FlagPattern::Exactly("--run", 0), ArgumentKind::Other(None)),
         // CUDA Runtime and Toolkit
         FlagRule::new(
@@ -164,10 +142,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::Prefix("-Xcompiler", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Prefix("-Xlinker", 1),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-Xlinker", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
         // Device-Specific Options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--maxrregcount"),
@@ -185,10 +160,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::Exactly("-use_fast_math", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("--ftz", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--ftz", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--prec-div", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -197,19 +169,10 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::Exactly("--prec-sqrt", 1),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("--fmad", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--fmad", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         // PTX and SASS Options
-        FlagRule::new(
-            FlagPattern::Exactly("--ptx", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
-        FlagRule::new(
-            FlagPattern::Exactly("--cubin", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--ptx", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(FlagPattern::Exactly("--cubin", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--fatbin", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -219,10 +182,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::Exactly("--device-debug", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-G", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-G", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Exactly("--generate-line-info", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -254,10 +214,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             FlagPattern::ExactlyWithEqOrSep("--relocatable-device-code"),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-rdc", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-rdc", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         // Extended Lambda
         FlagRule::new(
             FlagPattern::Exactly("--extended-lambda", 0),
@@ -277,39 +234,21 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
         ),
         // Output Options
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("--output-file"),
-            ArgumentKind::Output,
-        ),
-        FlagRule::new(
-            FlagPattern::ExactlyWithGluedOrSep("-o"),
-            ArgumentKind::Output,
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("--output-file"), ArgumentKind::Output),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
         // Preprocessing
         FlagRule::new(
             FlagPattern::Exactly("--preprocess", 0),
             ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(
-            FlagPattern::Exactly("-E", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
-        ),
+        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
         // Verbose and Information
-        FlagRule::new(
-            FlagPattern::Exactly("--verbose", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--verbose", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::Exactly("--version", 0),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(None)),
         FlagRule::new(FlagPattern::Exactly("--help", 0), ArgumentKind::Other(None)),
         // Warnings
-        FlagRule::new(
-            FlagPattern::Prefix("-W", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
-        ),
+        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
             FlagPattern::Prefix("--disable-warnings", 0),
             ArgumentKind::Other(Some(CompilerPass::Compiling)),
@@ -321,10 +260,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
         ),
         // Keep intermediate files
         FlagRule::new(FlagPattern::Exactly("--keep", 0), ArgumentKind::Other(None)),
-        FlagRule::new(
-            FlagPattern::ExactlyWithEqOrSep("--keep-dir"),
-            ArgumentKind::Other(None),
-        ),
+        FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--keep-dir"), ArgumentKind::Other(None)),
         // Machine and Target Options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--machine"),
@@ -360,10 +296,8 @@ mod tests {
     #[test]
     fn test_basic_cuda_compilation() {
         let interpreter = CudaInterpreter::new();
-        let execution = create_execution(
-            "/usr/local/cuda/bin/nvcc",
-            vec!["nvcc", "-c", "kernel.cu", "-o", "kernel.o"],
-        );
+        let execution =
+            create_execution("/usr/local/cuda/bin/nvcc", vec!["nvcc", "-c", "kernel.cu", "-o", "kernel.o"]);
 
         let result = interpreter.recognize(&execution);
         assert!(result.is_some());
@@ -375,10 +309,7 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Index 1: -c (compilation flag)
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Index 2: kernel.cu (source file)
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
@@ -417,25 +348,13 @@ mod tests {
 
             // Check that GPU architecture flags are recognized as compilation flags
             // Index 1: --gpu-architecture=sm_80
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             // Index 2: -arch=sm_70
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             // Index 3: --gpu-code=sm_80,compute_80
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             // Index 4: -c
-            assert_eq!(
-                cmd.arguments[4].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             // Index 5: kernel.cu (source file)
             assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
         } else {
@@ -448,14 +367,7 @@ mod tests {
         let interpreter = CudaInterpreter::new();
         let execution = create_execution(
             "nvcc",
-            vec![
-                "nvcc",
-                "--device-c",
-                "--relocatable-device-code=true",
-                "kernel.cu",
-                "-o",
-                "kernel.o",
-            ],
+            vec!["nvcc", "--device-c", "--relocatable-device-code=true", "kernel.cu", "-o", "kernel.o"],
         );
 
         let result = interpreter.recognize(&execution);
@@ -465,16 +377,10 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 5);
 
             // Index 1: --device-c
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Index 2: --relocatable-device-code=true
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Index 3: kernel.cu (source file)
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
@@ -491,14 +397,7 @@ mod tests {
         let interpreter = CudaInterpreter::new();
         let execution = create_execution(
             "nvcc",
-            vec![
-                "nvcc",
-                "-Xcompiler",
-                "-Wall",
-                "-Xlinker",
-                "-rpath=/usr/lib",
-                "main.cu",
-            ],
+            vec!["nvcc", "-Xcompiler", "-Wall", "-Xlinker", "-rpath=/usr/lib", "main.cu"],
         );
 
         let result = interpreter.recognize(&execution);
@@ -511,22 +410,13 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Index 1: -Xcompiler
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Index 2: -Wall
-            assert_eq!(
-                cmd.arguments[2].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
 
             // Index 3: -Xlinker
-            assert_eq!(
-                cmd.arguments[3].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Linking))
-            );
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
 
             // Index 4: -rpath=/usr/lib
             assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(None));
@@ -543,14 +433,7 @@ mod tests {
         let interpreter = CudaInterpreter::new();
         let execution = create_execution(
             "nvcc",
-            vec![
-                "nvcc",
-                "-G",
-                "--generate-line-info",
-                "-O2",
-                "--use_fast_math",
-                "kernel.cu",
-            ],
+            vec!["nvcc", "-G", "--generate-line-info", "-O2", "--use_fast_math", "kernel.cu"],
         );
 
         let result = interpreter.recognize(&execution);
@@ -564,10 +447,7 @@ mod tests {
 
             // Index 1-4: All compilation flags
             for i in 1..5 {
-                assert_eq!(
-                    cmd.arguments[i].kind(),
-                    ArgumentKind::Other(Some(CompilerPass::Compiling))
-                );
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             }
 
             // Index 5: Source file
@@ -582,32 +462,21 @@ mod tests {
         let interpreter = CudaInterpreter::new();
 
         // Test equals format
-        let execution = create_execution(
-            "nvcc",
-            vec!["nvcc", "--gpu-architecture=sm_80", "-c", "kernel.cu"],
-        );
+        let execution = create_execution("nvcc", vec!["nvcc", "--gpu-architecture=sm_80", "-c", "kernel.cu"]);
         let result = interpreter.recognize(&execution);
         if let Some(Command::Compiler(cmd)) = result {
             assert_eq!(cmd.arguments.len(), 4);
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
         }
 
         // Test separate format
-        let execution = create_execution(
-            "nvcc",
-            vec!["nvcc", "--gpu-architecture", "sm_80", "-c", "kernel.cu"],
-        );
+        let execution =
+            create_execution("nvcc", vec!["nvcc", "--gpu-architecture", "sm_80", "-c", "kernel.cu"]);
         let result = interpreter.recognize(&execution);
         if let Some(Command::Compiler(cmd)) = result {
             // Separate format creates one argument that consumes both the flag and value
             assert_eq!(cmd.arguments.len(), 4);
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
         }
     }
 
@@ -624,10 +493,7 @@ mod tests {
         if let Some(Command::Compiler(cmd)) = result {
             assert_eq!(cmd.arguments.len(), 3);
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
-            assert_eq!(
-                cmd.arguments[1].kind(),
-                ArgumentKind::Other(Some(CompilerPass::Compiling))
-            );
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
         } else {
             panic!("Expected compiler command");

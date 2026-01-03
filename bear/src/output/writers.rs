@@ -25,20 +25,12 @@ pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
 }
 
 impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
-    pub(super) fn new(
-        writer: T,
-        format: &config::Format,
-    ) -> Result<Self, clang::FormatConfigurationError> {
-        Ok(Self {
-            converter: clang::CommandConverter::new(format.clone())?,
-            writer,
-        })
+    pub(super) fn new(writer: T, format: &config::Format) -> Result<Self, clang::FormatConfigurationError> {
+        Ok(Self { converter: clang::CommandConverter::new(format.clone())?, writer })
     }
 }
 
-impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command>
-    for ConverterClangOutputWriter<T>
-{
+impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
     fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         let entries = semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
         self.writer.write(entries)
@@ -91,8 +83,8 @@ impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AppendClangOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         if let Some(path) = &self.path {
-            let entries_from_db = Self::read_from_compilation_db(path)
-                .map_err(|err| WriterError::Io(path.clone(), err))?;
+            let entries_from_db =
+                Self::read_from_compilation_db(path).map_err(|err| WriterError::Io(path.clone(), err))?;
             let final_entries = entries_from_db.chain(entries);
             self.writer.write(final_entries)
         } else {
@@ -113,11 +105,7 @@ pub(super) struct AtomicClangOutputWriter<T: IteratorWriter<clang::Entry>> {
 
 impl<T: IteratorWriter<clang::Entry>> AtomicClangOutputWriter<T> {
     pub(super) fn new(writer: T, temp_path: &path::Path, final_path: &path::Path) -> Self {
-        Self {
-            writer,
-            temp_path: temp_path.to_path_buf(),
-            final_path: final_path.to_path_buf(),
-        }
+        Self { writer, temp_path: temp_path.to_path_buf(), final_path: final_path.to_path_buf() }
     }
 }
 
@@ -142,10 +130,7 @@ pub(super) struct UniqueOutputWriter<T: IteratorWriter<clang::Entry>> {
 }
 
 impl<T: IteratorWriter<clang::Entry>> UniqueOutputWriter<T> {
-    pub(super) fn create(
-        writer: T,
-        config: config::DuplicateFilter,
-    ) -> Result<Self, WriterCreationError> {
+    pub(super) fn create(writer: T, config: config::DuplicateFilter) -> Result<Self, WriterCreationError> {
         let filter = clang::DuplicateEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
@@ -173,10 +158,7 @@ pub(super) struct SourceFilterOutputWriter<T: IteratorWriter<clang::Entry>> {
 }
 
 impl<T: IteratorWriter<clang::Entry>> SourceFilterOutputWriter<T> {
-    pub(super) fn create(
-        writer: T,
-        config: config::SourceFilter,
-    ) -> Result<Self, WriterCreationError> {
+    pub(super) fn create(writer: T, config: config::SourceFilter) -> Result<Self, WriterCreationError> {
         let filter = clang::SourceEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
@@ -207,17 +189,13 @@ impl ClangOutputWriter {
             .map(io::BufWriter::new)
             .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-        Ok(Self {
-            output,
-            path: path.to_path_buf(),
-        })
+        Ok(Self { output, path: path.to_path_buf() })
     }
 }
 
 impl IteratorWriter<clang::Entry> for ClangOutputWriter {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        JsonCompilationDatabase::write(self.output, entries)
-            .map_err(|err| WriterError::Io(self.path, err))
+        JsonCompilationDatabase::write(self.output, entries).map_err(|err| WriterError::Io(self.path, err))
     }
 }
 
@@ -294,18 +272,8 @@ mod tests {
         let result_path = dir.path().join("result_file.json");
 
         let entries_to_write = vec![
-            clang::Entry::from_arguments_str(
-                "file1.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
-            clang::Entry::from_arguments_str(
-                "file2.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
+            clang::Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
         let writer = ClangOutputWriter::create(&result_path).unwrap();
@@ -324,14 +292,8 @@ mod tests {
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("src"),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("/usr/include"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
             ],
         };
 
@@ -339,12 +301,7 @@ mod tests {
 
         let entries = vec![
             clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
-            clang::Entry::from_arguments_str(
-                "/usr/include/stdio.h",
-                vec!["gcc", "-c"],
-                "/project",
-                None,
-            ),
+            clang::Entry::from_arguments_str("/usr/include/stdio.h", vec!["gcc", "-c"], "/project", None),
             clang::Entry::from_arguments_str("lib/utils.c", vec!["gcc", "-c"], "/project", None),
         ];
 
@@ -355,19 +312,12 @@ mod tests {
 
     #[test]
     fn test_source_filter_output_writer_empty_config() {
-        let config = SourceFilter {
-            only_existing_files: true,
-            directories: vec![],
-        };
+        let config = SourceFilter { only_existing_files: true, directories: vec![] };
 
         let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
 
-        let entries = vec![clang::Entry::from_arguments_str(
-            "any/file.c",
-            vec!["gcc", "-c"],
-            "/project",
-            None,
-        )];
+        let entries =
+            vec![clang::Entry::from_arguments_str("any/file.c", vec!["gcc", "-c"], "/project", None)];
 
         assert!(writer.write(entries.into_iter()).is_ok());
     }
@@ -377,18 +327,9 @@ mod tests {
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("."),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("build"),
-                    action: DirectoryAction::Exclude,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("build/config"),
-                    action: DirectoryAction::Include,
-                },
+                DirectoryRule { path: PathBuf::from("."), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("build"), action: DirectoryAction::Exclude },
+                DirectoryRule { path: PathBuf::from("build/config"), action: DirectoryAction::Include },
             ],
         };
 
@@ -397,12 +338,7 @@ mod tests {
         let entries = vec![
             clang::Entry::from_arguments_str("./src/main.c", vec!["gcc", "-c"], "/project", None),
             clang::Entry::from_arguments_str("build/main.o", vec!["gcc", "-c"], "/project", None),
-            clang::Entry::from_arguments_str(
-                "build/config/defs.h",
-                vec!["gcc", "-c"],
-                "/project",
-                None,
-            ),
+            clang::Entry::from_arguments_str("build/config/defs.h", vec!["gcc", "-c"], "/project", None),
         ];
 
         assert!(writer.write(entries.into_iter()).is_ok());
@@ -417,14 +353,8 @@ mod tests {
         let source_config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("src"),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("/usr/include"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
             ],
         };
 
@@ -436,18 +366,12 @@ mod tests {
         // Build the writer pipeline: base -> unique -> source_filter
         let base_writer = ClangOutputWriter::create(&output_path).unwrap();
         let unique_writer = UniqueOutputWriter::create(base_writer, duplicate_config).unwrap();
-        let source_filter_writer =
-            SourceFilterOutputWriter::create(unique_writer, source_config).unwrap();
+        let source_filter_writer = SourceFilterOutputWriter::create(unique_writer, source_config).unwrap();
 
         // Test entries: some should be filtered, some should pass through
         let entries = vec![
             clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
-            clang::Entry::from_arguments_str(
-                "/usr/include/stdio.h",
-                vec!["gcc", "-c"],
-                "/project",
-                None,
-            ), // should be excluded
+            clang::Entry::from_arguments_str("/usr/include/stdio.h", vec!["gcc", "-c"], "/project", None), // should be excluded
             clang::Entry::from_arguments_str("lib/utils.c", vec!["gcc", "-c"], "/project", None), // should be included (no match)
             clang::Entry::from_arguments_str("src/helper.c", vec!["gcc", "-c"], "/project", None),
         ];
@@ -474,35 +398,15 @@ mod tests {
 
         // Create the original file with some entries
         let original_entries = vec![
-            clang::Entry::from_arguments_str(
-                "file3.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
-            clang::Entry::from_arguments_str(
-                "file4.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
+            clang::Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
         let writer = ClangOutputWriter::create(&input_path).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
-            clang::Entry::from_arguments_str(
-                "file1.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
-            clang::Entry::from_arguments_str(
-                "file2.cpp",
-                vec!["clang", "-c"],
-                "/path/to/dir",
-                None,
-            ),
+            clang::Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
         let writer = ClangOutputWriter::create(&result_path).unwrap();

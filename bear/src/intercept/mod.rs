@@ -17,7 +17,6 @@ pub mod wrapper;
 
 use crate::args::BuildCommand;
 use crate::environment::relevant_env;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -35,7 +34,7 @@ use thiserror::Error;
 ///   Includes the executable itself as the first argument.
 /// - `working_dir`: The current working directory of the process.
 /// - `environment`: The environment variables that were set for the process.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Execution {
     pub executable: PathBuf,
     pub arguments: Vec<String>,
@@ -58,12 +57,7 @@ impl Execution {
         let working_dir = std::env::current_dir().map_err(CaptureError::CurrentDirectory)?;
         let environment = std::env::vars().collect();
 
-        Ok(Self {
-            executable,
-            arguments,
-            working_dir,
-            environment,
-        })
+        Ok(Self { executable, arguments, working_dir, environment })
     }
 
     pub fn with_executable(self, executable: &Path) -> Self {
@@ -74,15 +68,8 @@ impl Execution {
 
     /// Trims the execution information to only contain relevant environment variables.
     pub fn trim(self) -> Self {
-        let environment = self
-            .environment
-            .into_iter()
-            .filter(|(k, _)| relevant_env(k))
-            .collect();
-        Self {
-            environment,
-            ..self
-        }
+        let environment = self.environment.into_iter().filter(|(k, _)| relevant_env(k)).collect();
+        Self { environment, ..self }
     }
 
     #[cfg(test)]
@@ -96,22 +83,14 @@ impl Execution {
             executable: PathBuf::from(executable),
             arguments: arguments.iter().map(|s| s.to_string()).collect(),
             working_dir: PathBuf::from(working_dir),
-            environment: environment
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
+            environment: environment.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
         }
     }
 }
 
 impl fmt::Display for Execution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Execution path={}, args=[{}]",
-            self.executable.display(),
-            self.arguments.join(",")
-        )
+        write!(f, "Execution path={}, args=[{}]", self.executable.display(), self.arguments.join(","))
     }
 }
 
@@ -129,7 +108,7 @@ pub enum CaptureError {
 /// In the current implementation, we only have one event, the `Started` event.
 /// This event is sent when a process is started. It contains the process id
 /// and the execution information.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Event {
     pub pid: u32,
     pub execution: Execution,
@@ -157,10 +136,7 @@ impl Event {
         working_dir: &str,
         environment: HashMap<&str, &str>,
     ) -> Self {
-        Self {
-            pid,
-            execution: Execution::from_strings(executable, arguments, working_dir, environment),
-        }
+        Self { pid, execution: Execution::from_strings(executable, arguments, working_dir, environment) }
     }
 }
 
@@ -206,21 +182,14 @@ mod tests {
     #[test]
     fn test_build_command_to_event_from_trait() {
         let command = BuildCommand {
-            arguments: vec![
-                "/usr/bin/gcc".to_string(),
-                "-c".to_string(),
-                "test.c".to_string(),
-            ],
+            arguments: vec!["/usr/bin/gcc".to_string(), "-c".to_string(), "test.c".to_string()],
         };
 
         let event = Event::from(&command);
 
         assert_eq!(event.pid, 0);
         assert_eq!(event.execution.executable, PathBuf::from("/usr/bin/gcc"));
-        assert_eq!(
-            event.execution.arguments,
-            vec!["/usr/bin/gcc", "-c", "test.c"]
-        );
+        assert_eq!(event.execution.arguments, vec!["/usr/bin/gcc", "-c", "test.c"]);
         assert!(event.execution.working_dir.is_absolute());
         // Environment should be trimmed to only relevant variables
         for key in event.execution.environment.keys() {
@@ -230,9 +199,7 @@ mod tests {
 
     #[test]
     fn test_build_command_to_event_into_trait() {
-        let command = BuildCommand {
-            arguments: vec!["make".to_string()],
-        };
+        let command = BuildCommand { arguments: vec!["make".to_string()] };
 
         let event: Event = (&command).into();
 

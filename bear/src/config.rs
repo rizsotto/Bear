@@ -150,17 +150,12 @@ mod types {
             target_os = "dragonfly"
         ))]
         fn default() -> Self {
-            Intercept::Preload {
-                path: default_preload_library(),
-            }
+            Intercept::Preload { path: default_preload_library() }
         }
 
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
         fn default() -> Self {
-            Intercept::Wrapper {
-                path: default_wrapper_executable(),
-                directory: default_wrapper_directory(),
-            }
+            Intercept::Wrapper { path: default_wrapper_executable(), directory: default_wrapper_directory() }
         }
     }
 
@@ -251,10 +246,7 @@ mod types {
 
     impl Default for SourceFilter {
         fn default() -> Self {
-            Self {
-                only_existing_files: true,
-                directories: vec![],
-            }
+            Self { only_existing_files: true, directories: vec![] }
         }
     }
 
@@ -266,9 +258,7 @@ mod types {
 
     impl Default for DuplicateFilter {
         fn default() -> Self {
-            Self {
-                match_on: vec![OutputFields::File, OutputFields::Arguments],
-            }
+            Self { match_on: vec![OutputFields::File, OutputFields::Arguments] }
         }
     }
 
@@ -334,10 +324,7 @@ mod types {
 
     impl Default for EntryFormat {
         fn default() -> Self {
-            Self {
-                use_array_format: true,
-                include_output_field: true,
-            }
+            Self { use_array_format: true, include_output_field: true }
         }
     }
 
@@ -438,9 +425,7 @@ pub mod validation {
             } else if self.errors.len() == 1 {
                 Err(self.errors.into_iter().next().unwrap())
             } else {
-                Err(ValidationError::Multiple {
-                    errors: self.errors,
-                })
+                Err(ValidationError::Multiple { errors: self.errors })
             }
         }
     }
@@ -463,10 +448,7 @@ pub mod validation {
             let mut seen_paths = std::collections::HashSet::new();
             for (idx, compiler) in config.compilers.iter().enumerate() {
                 if !seen_paths.insert(&compiler.path) {
-                    collector.add(ValidationError::DuplicateEntry {
-                        field: "compiler",
-                        idx,
-                    });
+                    collector.add(ValidationError::DuplicateEntry { field: "compiler", idx });
                 }
             }
 
@@ -489,24 +471,19 @@ pub mod validation {
                     let mut collector = ValidationCollector::new();
 
                     if !path.exists() {
-                        collector.add(ValidationError::PathNotFound {
-                            path: path.display().to_string(),
-                        });
+                        collector.add(ValidationError::PathNotFound { path: path.display().to_string() });
                     }
 
                     if !directory.exists() {
-                        collector.add(ValidationError::PathNotFound {
-                            path: directory.display().to_string(),
-                        });
+                        collector
+                            .add(ValidationError::PathNotFound { path: directory.display().to_string() });
                     }
 
                     collector.finish()
                 }
                 Intercept::Preload { path } => {
                     if !path.exists() {
-                        Err(ValidationError::PathNotFound {
-                            path: path.display().to_string(),
-                        })
+                        Err(ValidationError::PathNotFound { path: path.display().to_string() })
                     } else {
                         Ok(())
                     }
@@ -523,9 +500,7 @@ pub mod validation {
 
             // Check if compiler path exists
             if !config.path.exists() {
-                collector.add(ValidationError::PathNotFound {
-                    path: config.path.display().to_string(),
-                });
+                collector.add(ValidationError::PathNotFound { path: config.path.display().to_string() });
             }
 
             collector.finish()
@@ -561,10 +536,7 @@ pub mod validation {
 
             for (idx, field) in config.match_on.iter().enumerate() {
                 if !seen_fields.insert(field) {
-                    collector.add(ValidationError::DuplicateEntry {
-                        field: "duplicates.match_on",
-                        idx,
-                    });
+                    collector.add(ValidationError::DuplicateEntry { field: "duplicates.match_on", idx });
                 }
             }
 
@@ -584,10 +556,7 @@ pub mod validation {
             let temp_file = temp_dir.path().join("test_file");
             std::fs::write(&temp_file, "test").unwrap();
 
-            let config = Intercept::Wrapper {
-                path: temp_file,
-                directory: temp_dir.path().to_path_buf(),
-            };
+            let config = Intercept::Wrapper { path: temp_file, directory: temp_dir.path().to_path_buf() };
 
             assert!(Intercept::validate(&config).is_ok());
         }
@@ -634,14 +603,8 @@ pub mod validation {
             let config = SourceFilter {
                 only_existing_files: true,
                 directories: vec![
-                    DirectoryRule {
-                        path: PathBuf::from("valid/path"),
-                        action: DirectoryAction::Include,
-                    },
-                    DirectoryRule {
-                        path: PathBuf::from(""),
-                        action: DirectoryAction::Exclude,
-                    },
+                    DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Include },
+                    DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Exclude },
                 ],
             };
 
@@ -661,18 +624,9 @@ pub mod validation {
             let config = SourceFilter {
                 only_existing_files: true,
                 directories: vec![
-                    DirectoryRule {
-                        path: PathBuf::from(""),
-                        action: DirectoryAction::Include,
-                    },
-                    DirectoryRule {
-                        path: PathBuf::from("valid/path"),
-                        action: DirectoryAction::Exclude,
-                    },
-                    DirectoryRule {
-                        path: PathBuf::from(""),
-                        action: DirectoryAction::Include,
-                    },
+                    DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Include },
+                    DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Exclude },
+                    DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Include },
                 ],
             };
 
@@ -692,14 +646,8 @@ pub mod validation {
             let config = SourceFilter {
                 only_existing_files: true,
                 directories: vec![
-                    DirectoryRule {
-                        path: PathBuf::from("/usr/include"),
-                        action: DirectoryAction::Exclude,
-                    },
-                    DirectoryRule {
-                        path: PathBuf::from("src"),
-                        action: DirectoryAction::Include,
-                    },
+                    DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
+                    DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 ],
             };
 
@@ -709,10 +657,7 @@ pub mod validation {
 
         #[test]
         fn test_validate_source_filter_empty_directories() {
-            let config = SourceFilter {
-                only_existing_files: false,
-                directories: vec![],
-            };
+            let config = SourceFilter { only_existing_files: false, directories: vec![] };
 
             let result = SourceFilter::validate(&config);
             assert!(result.is_ok());
@@ -721,11 +666,7 @@ pub mod validation {
         #[test]
         fn test_validate_duplicate_filter_no_duplicates() {
             let config = DuplicateFilter {
-                match_on: vec![
-                    OutputFields::File,
-                    OutputFields::Arguments,
-                    OutputFields::Directory,
-                ],
+                match_on: vec![OutputFields::File, OutputFields::Arguments, OutputFields::Directory],
             };
 
             let result = DuplicateFilter::validate(&config);
@@ -735,11 +676,7 @@ pub mod validation {
         #[test]
         fn test_validate_duplicate_filter_with_duplicates() {
             let config = DuplicateFilter {
-                match_on: vec![
-                    OutputFields::File,
-                    OutputFields::Arguments,
-                    OutputFields::File,
-                ],
+                match_on: vec![OutputFields::File, OutputFields::Arguments, OutputFields::File],
             };
 
             let result = DuplicateFilter::validate(&config);
@@ -856,24 +793,17 @@ pub mod loader {
         pub fn from_file(path: &Path) -> Result<Main, ConfigError> {
             info!("Loading configuration file: {}", path.display());
 
-            let reader = OpenOptions::new().read(true).open(path).map_err(|source| {
-                ConfigError::FileAccess {
-                    path: path.to_path_buf(),
-                    source,
-                }
-            })?;
+            let reader = OpenOptions::new()
+                .read(true)
+                .open(path)
+                .map_err(|source| ConfigError::FileAccess { path: path.to_path_buf(), source })?;
 
-            let content: Main =
-                Self::from_reader(reader).map_err(|source| ConfigError::ParseError {
-                    path: path.to_path_buf(),
-                    source,
-                })?;
+            let content: Main = Self::from_reader(reader)
+                .map_err(|source| ConfigError::ParseError { path: path.to_path_buf(), source })?;
 
             // Validate the loaded configuration
-            Main::validate(&content).map_err(|source| ConfigError::ValidationError {
-                path: path.to_path_buf(),
-                source,
-            })?;
+            Main::validate(&content)
+                .map_err(|source| ConfigError::ValidationError { path: path.to_path_buf(), source })?;
 
             Ok(content)
         }
@@ -978,16 +908,8 @@ pub mod loader {
                         as_: Some(CompilerType::Gcc),
                         ignore: false,
                     },
-                    Compiler {
-                        path: PathBuf::from("/usr/bin/cc"),
-                        as_: None,
-                        ignore: true,
-                    },
-                    Compiler {
-                        path: PathBuf::from("/usr/bin/clang++"),
-                        as_: None,
-                        ignore: false,
-                    },
+                    Compiler { path: PathBuf::from("/usr/bin/cc"), as_: None, ignore: true },
+                    Compiler { path: PathBuf::from("/usr/bin/clang++"), as_: None, ignore: false },
                 ],
                 sources: SourceFilter {
                     only_existing_files: true,
@@ -1002,18 +924,10 @@ pub mod loader {
                         },
                     ],
                 },
-                duplicates: DuplicateFilter {
-                    match_on: vec![OutputFields::File, OutputFields::Directory],
-                },
+                duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Directory] },
                 format: Format {
-                    paths: PathFormat {
-                        directory: PathResolver::Canonical,
-                        file: PathResolver::Canonical,
-                    },
-                    entries: EntryFormat {
-                        use_array_format: true,
-                        include_output_field: true,
-                    },
+                    paths: PathFormat { directory: PathResolver::Canonical, file: PathResolver::Canonical },
+                    entries: EntryFormat { use_array_format: true, include_output_field: true },
                 },
             };
 
@@ -1043,22 +957,11 @@ pub mod loader {
                     directory: default_wrapper_directory(),
                 },
                 compilers: vec![],
-                sources: SourceFilter {
-                    only_existing_files: true,
-                    directories: vec![],
-                },
-                duplicates: DuplicateFilter {
-                    match_on: vec![OutputFields::File, OutputFields::Arguments],
-                },
+                sources: SourceFilter { only_existing_files: true, directories: vec![] },
+                duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Arguments] },
                 format: Format {
-                    paths: PathFormat {
-                        directory: PathResolver::AsIs,
-                        file: PathResolver::AsIs,
-                    },
-                    entries: EntryFormat {
-                        use_array_format: true,
-                        include_output_field: true,
-                    },
+                    paths: PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
+                    entries: EntryFormat { use_array_format: true, include_output_field: true },
                 },
             };
 
@@ -1084,26 +987,13 @@ pub mod loader {
 
             let expected = Main {
                 schema: String::from("4.0"),
-                intercept: Intercept::Preload {
-                    path: default_preload_library(),
-                },
+                intercept: Intercept::Preload { path: default_preload_library() },
                 compilers: vec![],
-                sources: SourceFilter {
-                    only_existing_files: false,
-                    directories: vec![],
-                },
-                duplicates: DuplicateFilter {
-                    match_on: vec![OutputFields::File, OutputFields::Arguments],
-                },
+                sources: SourceFilter { only_existing_files: false, directories: vec![] },
+                duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Arguments] },
                 format: Format {
-                    paths: PathFormat {
-                        directory: PathResolver::Absolute,
-                        file: PathResolver::Absolute,
-                    },
-                    entries: EntryFormat {
-                        use_array_format: true,
-                        include_output_field: true,
-                    },
+                    paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
+                    entries: EntryFormat { use_array_format: true, include_output_field: true },
                 },
             };
 
@@ -1141,10 +1031,7 @@ pub mod loader {
             assert!(result.is_err());
 
             let message = result.unwrap_err().to_string();
-            assert_eq!(
-                "Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 13",
-                message
-            );
+            assert_eq!("Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 13", message);
         }
 
         #[test]
@@ -1201,10 +1088,7 @@ pub mod loader {
                     assert!(error_msg.contains("unknown variant"));
                     assert!(error_msg.contains("invalid_compiler_type"));
                 }
-                other => panic!(
-                    "Expected ParseError for invalid compiler type, got: {:?}",
-                    other
-                ),
+                other => panic!("Expected ParseError for invalid compiler type, got: {:?}", other),
             }
         }
 

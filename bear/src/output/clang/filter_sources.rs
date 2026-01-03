@@ -134,10 +134,7 @@ mod tests {
     where
         I: IntoIterator<Item = Entry>,
     {
-        entries
-            .into_iter()
-            .filter(|entry| filter.should_include(entry))
-            .collect()
+        entries.into_iter().filter(|entry| filter.should_include(entry)).collect()
     }
 
     fn create_test_entry(file_path: &str, directory: &str) -> Entry {
@@ -146,10 +143,7 @@ mod tests {
 
     #[test]
     fn test_empty_directories_includes_all() {
-        let config = SourceFilter {
-            only_existing_files: true,
-            directories: vec![],
-        };
+        let config = SourceFilter { only_existing_files: true, directories: vec![] };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
         let entry1 = create_test_entry("any/path.c", "/project");
@@ -166,14 +160,8 @@ mod tests {
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("src"),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("src/test"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("src/test"), action: DirectoryAction::Exclude },
                 DirectoryRule {
                     path: PathBuf::from("src/test/integration"),
                     action: DirectoryAction::Include,
@@ -200,14 +188,8 @@ mod tests {
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("src"),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("/usr/include"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
             ],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -242,10 +224,7 @@ mod tests {
     fn test_prefix_matching() {
         let config = SourceFilter {
             only_existing_files: true,
-            directories: vec![DirectoryRule {
-                path: PathBuf::from("src"),
-                action: DirectoryAction::Include,
-            }],
+            directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
@@ -265,10 +244,7 @@ mod tests {
     fn test_case_sensitivity_unix() {
         let config = SourceFilter {
             only_existing_files: true,
-            directories: vec![DirectoryRule {
-                path: PathBuf::from("src"),
-                action: DirectoryAction::Exclude,
-            }],
+            directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
@@ -284,10 +260,7 @@ mod tests {
     fn test_case_sensitivity_windows() {
         let config = SourceFilter {
             only_existing_files: true,
-            directories: vec![DirectoryRule {
-                path: PathBuf::from("src"),
-                action: DirectoryAction::Exclude,
-            }],
+            directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
@@ -344,33 +317,15 @@ mod tests {
             only_existing_files: true,
             directories: vec![
                 // Include everything in project
-                DirectoryRule {
-                    path: PathBuf::from("."),
-                    action: DirectoryAction::Include,
-                },
+                DirectoryRule { path: PathBuf::from("."), action: DirectoryAction::Include },
                 // Exclude system headers
-                DirectoryRule {
-                    path: PathBuf::from("/usr/include"),
-                    action: DirectoryAction::Exclude,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("/usr/local/include"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
+                DirectoryRule { path: PathBuf::from("/usr/local/include"), action: DirectoryAction::Exclude },
                 // Exclude build artifacts
-                DirectoryRule {
-                    path: PathBuf::from("build"),
-                    action: DirectoryAction::Exclude,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("target"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("build"), action: DirectoryAction::Exclude },
+                DirectoryRule { path: PathBuf::from("target"), action: DirectoryAction::Exclude },
                 // But include specific build config files
-                DirectoryRule {
-                    path: PathBuf::from("build/config"),
-                    action: DirectoryAction::Include,
-                },
+                DirectoryRule { path: PathBuf::from("build/config"), action: DirectoryAction::Include },
             ],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -381,10 +336,9 @@ mod tests {
 
         // System headers are excluded
         assert!(!filter.should_include(&create_test_entry("/usr/include/stdio.h", "/project")));
-        assert!(!filter.should_include(&create_test_entry(
-            "/usr/local/include/boost/algorithm.hpp",
-            "/project"
-        )));
+        assert!(
+            !filter.should_include(&create_test_entry("/usr/local/include/boost/algorithm.hpp", "/project"))
+        );
 
         // Build artifacts are excluded
         assert!(!filter.should_include(&create_test_entry("build/main.o", "/project")));
@@ -392,10 +346,7 @@ mod tests {
 
         // But specific build config is included (last rule wins)
         assert!(filter.should_include(&create_test_entry("build/config/settings.h", "/project")));
-        assert!(filter.should_include(&create_test_entry(
-            "build/config/generated/defs.h",
-            "/project"
-        )));
+        assert!(filter.should_include(&create_test_entry("build/config/generated/defs.h", "/project")));
     }
 
     #[test]
@@ -403,14 +354,8 @@ mod tests {
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
-                DirectoryRule {
-                    path: PathBuf::from("src"),
-                    action: DirectoryAction::Include,
-                },
-                DirectoryRule {
-                    path: PathBuf::from("/usr"),
-                    action: DirectoryAction::Exclude,
-                },
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/usr"), action: DirectoryAction::Exclude },
             ],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -434,10 +379,7 @@ mod tests {
     fn test_should_include_path_method() {
         let config = SourceFilter {
             only_existing_files: true,
-            directories: vec![DirectoryRule {
-                path: PathBuf::from("src"),
-                action: DirectoryAction::Include,
-            }],
+            directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
@@ -450,10 +392,7 @@ mod tests {
     fn test_try_from_success() {
         let config = SourceFilter {
             only_existing_files: true,
-            directories: vec![DirectoryRule {
-                path: PathBuf::from("src"),
-                action: DirectoryAction::Include,
-            }],
+            directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
 
         let result = SourceEntryFilter::try_from(config);
@@ -462,10 +401,7 @@ mod tests {
 
     #[test]
     fn test_try_from_empty_config() {
-        let config = SourceFilter {
-            only_existing_files: false,
-            directories: vec![],
-        };
+        let config = SourceFilter { only_existing_files: false, directories: vec![] };
 
         let result = SourceEntryFilter::try_from(config);
         assert!(result.is_ok());
