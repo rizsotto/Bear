@@ -12,7 +12,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -24,7 +24,7 @@ jobs:
     name: Compile
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -45,13 +45,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: [compile]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
       - name: Run integration tests
         run: |
-          cargo clean
           cargo build --verbose --features allow-integration-tests
           cargo test --verbose --features allow-integration-tests
         env:
@@ -61,7 +60,7 @@ jobs:
     name: Generate Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
@@ -71,7 +70,7 @@ jobs:
     name: Spell Check Documentation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Codespell
         run: pip install codespell
       - name: Run Codespell
@@ -81,7 +80,7 @@ jobs:
     name: Generate Copyright Notes
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Cargo License
         run: cargo install cargo-license
       - name: Generate License Report
@@ -90,10 +89,9 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    # move this to a separate job when merged to master
-    # https://github.com/rustsec/audit-check
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install Cargo Audit
         run: cargo install cargo-audit
       - name: Run Cargo Audit

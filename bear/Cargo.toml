@@ -41,4 +41,4 @@ regex.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
-mockall = "0.13"
+mockall = "0.14"
