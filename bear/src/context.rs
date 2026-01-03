@@ -69,25 +69,21 @@ impl fmt::Display for Context {
         writeln!(f, "Application Context:")?;
         writeln!(
             f,
-            "  Current Executable: {}",
+            "Current Executable: {}",
             self.current_executable.display()
         )?;
+        writeln!(f, "Current Directory: {}", self.current_directory.display())?;
         writeln!(
             f,
-            "  Current Directory: {}",
-            self.current_directory.display()
-        )?;
-        writeln!(
-            f,
-            "  Total Environment Variables: {} entries",
+            "Total Environment Variables: {} entries",
             self.environment.len()
         )?;
 
         // Display relevant environment variables by iterating directly
-        writeln!(f, "  Relevant Environment Variables:")?;
+        writeln!(f, "Relevant Environment Variables:")?;
         for (key, value) in &self.environment {
             if environment::relevant_env(key) {
-                writeln!(f, "    {}={}", key, value)?;
+                writeln!(f, "  {}={}", key, value)?;
             }
         }
 

@@ -73,8 +73,6 @@ impl ReporterFactory {
     pub fn create_as_ptr() -> AtomicPtr<tcp::ReporterOnTcp> {
         match Self::create() {
             Ok(reporter) => {
-                log::debug!("Reporter created successfully");
-
                 // Leak the reporter to get a stable pointer for the lifetime of the program
                 let boxed_reporter = Box::new(reporter);
                 let ptr = Box::into_raw(boxed_reporter);
@@ -82,7 +80,7 @@ impl ReporterFactory {
                 AtomicPtr::new(ptr)
             }
             Err(err) => {
-                log::error!("Failed to create reporter: {err}");
+                log::warn!("Failed to create reporter: {err}");
                 AtomicPtr::new(std::ptr::null_mut())
             }
         }

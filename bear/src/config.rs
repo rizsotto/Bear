@@ -72,6 +72,7 @@ pub use validation::Validator;
 
 mod types {
     use serde::Deserialize;
+    use std::fmt;
     use std::path::PathBuf;
 
     /// Represents the application configuration with flattened structure.
@@ -100,6 +101,23 @@ mod types {
                 sources: SourceFilter::default(),
                 duplicates: DuplicateFilter::default(),
                 format: Format::default(),
+            }
+        }
+    }
+
+    impl fmt::Display for Main {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            writeln!(f, "Configuration:")?;
+            match serde_yml::to_string(self) {
+                Ok(yaml_string) => {
+                    for line in yaml_string.lines() {
+                        writeln!(f, "{}", line)?;
+                    }
+                    Ok(())
+                }
+                Err(_) => {
+                    panic!("configuration can't be serialized")
+                }
             }
         }
     }

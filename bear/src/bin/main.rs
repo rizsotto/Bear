@@ -11,22 +11,22 @@ fn main() -> anyhow::Result<ExitCode> {
     // Get the package name and version from Cargo
     let pkg_name = env!("CARGO_PKG_NAME");
     let pkg_version = env!("CARGO_PKG_VERSION");
-    log::debug!("{pkg_name} v{pkg_version}");
+    log::info!("{pkg_name} v{pkg_version}");
     let os = env::consts::OS;
     let family = env::consts::FAMILY;
     let arch = env::consts::ARCH;
-    log::debug!("Running on... {family}/{os} {arch}");
+    log::info!("Running on... {family}/{os} {arch}");
 
     // Capture application context.
     let context = context::Context::capture()?;
-    log::debug!("{}", context);
+    log::info!("{context}");
     // Parse the command line arguments.
     let matches = args::cli().get_matches();
     let arguments = args::Arguments::try_from(matches)?;
-    log::debug!("Arguments: {arguments:?}");
+    log::info!("{arguments}");
     // Load the configuration.
     let configuration = config::Loader::load(&context, &arguments.config)?;
-    log::debug!("Configuration: {configuration:?}");
+    log::info!("{configuration}");
 
     // Run the application.
     let application = modes::Mode::configure(context, arguments, configuration)?;

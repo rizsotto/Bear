@@ -7,6 +7,7 @@
 //! The `Arguments` type is used to represent all possible invocations of the program.
 
 use clap::{arg, command, ArgAction, ArgMatches, Command};
+use std::fmt;
 
 /// Common constants used in the module.
 const MODE_INTERCEPT_SUBCOMMAND: &str = "intercept";
@@ -61,6 +62,62 @@ pub struct BuildSemantic {
 pub struct BuildEvents {
     /// The path to the events file.
     pub path: std::path::PathBuf,
+}
+
+impl fmt::Display for Arguments {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Arguments:")?;
+        match &self.config {
+            Some(config) => writeln!(f, "Configuration File: {}", config)?,
+            None => writeln!(f, "Configuration File: <default>")?,
+        }
+        write!(f, "Mode: {}", self.mode)
+    }
+}
+
+impl fmt::Display for Mode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Mode::Intercept { input, output } => {
+                writeln!(f, "Intercept")?;
+                writeln!(f, "  Input: {}", input)?;
+                write!(f, "  Output: {}", output)
+            }
+            Mode::Semantic { input, output } => {
+                writeln!(f, "Semantic Analysis")?;
+                writeln!(f, "  Input: {}", input)?;
+                write!(f, "  Output: {}", output)
+            }
+            Mode::Combined { input, output } => {
+                writeln!(f, "Combined (Intercept + Semantic Analysis)")?;
+                writeln!(f, "  Input: {}", input)?;
+                write!(f, "  Output: {}", output)
+            }
+        }
+    }
+}
+
+impl fmt::Display for BuildCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Build Command: {}", self.arguments.join(" "))
+    }
+}
+
+impl fmt::Display for BuildSemantic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Semantic Output: {} (append: {})",
+            self.path.display(),
+            self.append
+        )
+    }
+}
+
+impl fmt::Display for BuildEvents {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Events Output: {}", self.path.display())
+    }
 }
 
 impl TryFrom<ArgMatches> for Arguments {

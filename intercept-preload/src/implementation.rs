@@ -14,6 +14,8 @@
 
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+#[cfg(not(test))]
+use std::io::Write;
 use std::path::PathBuf;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -96,7 +98,15 @@ const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 #[ctor]
 unsafe fn on_load() {
     #[cfg(not(test))]
-    let _ = env_logger::try_init();
+    {
+        let pid = std::process::id();
+        env_logger::Builder::from_default_env()
+            .format(move |buf, record| {
+                let timestamp = buf.timestamp();
+                writeln!(buf, "[{timestamp} preload/{pid}] {}", record.args())
+            })
+            .init();
+    }
     log::debug!("Initializing intercept-preload library");
 }
 
@@ -629,7 +639,6 @@ where
 {
     let reporter = REPORTER.load(Ordering::SeqCst);
     if reporter.is_null() {
-        log::debug!("No reporter available, skipping report");
         return;
     }
 
@@ -643,8 +652,6 @@ where
 
     if let Err(err) = unsafe { (*reporter).report(event) } {
         log::debug!("Failed to report execution: {err}",);
-    } else {
-        log::debug!("Execution reported successfully");
     }
 }
 

@@ -57,11 +57,8 @@ impl Display for WrapperConfig {
         if self.executables.is_empty() {
             write!(f, "No executables configured")
         } else {
-            for (i, (name, path)) in self.executables.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{} -> {}", name, path.display())?;
+            for (name, path) in self.executables.iter() {
+                writeln!(f, "    {} -> {}", name, path.display())?;
             }
             Ok(())
         }
@@ -199,16 +196,14 @@ impl WrapperDirectoryBuilder {
         WrapperConfigWriter::write_to_file(&self.config, &config_path)
             .map_err(WrapperDirectoryError::ConfigWrite)?;
 
-        log::info!(
-            "Set up wrapper directory: {}",
-            self.wrapper_dir.path().display()
-        );
-        log::info!("Set up wrappers as: {}", self.config);
-
-        Ok(WrapperDirectory {
+        let wrapper_directory = WrapperDirectory {
             wrapper_dir: self.wrapper_dir,
             _config: self.config,
-        })
+        };
+
+        log::info!("{}", wrapper_directory);
+
+        Ok(wrapper_directory)
     }
 
     /// Gets the path to the wrapper directory.
@@ -233,6 +228,25 @@ impl WrapperDirectory {
     #[cfg(test)]
     pub fn config(&self) -> &WrapperConfig {
         &self._config
+    }
+}
+
+impl Display for WrapperDirectory {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Set up wrapper directory: {}",
+            self.wrapper_dir.path().display()
+        )?;
+        if self._config.executables.is_empty() {
+            write!(f, "   No wrappers configured")
+        } else {
+            writeln!(f, "   Set up wrappers as:")?;
+            for (name, path) in self._config.executables.iter() {
+                writeln!(f, "     {} -> {}", name, path.display())?;
+            }
+            Ok(())
+        }
     }
 }
 
