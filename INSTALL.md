@@ -30,19 +30,33 @@ To build and install Bear, run the following commands:
    cargo build --release
    ```
 
-3. Install the binary:
+3. Install the binaries:
+
+To install the binaries only can run the following commands:
+
    ```bash
-   cargo install --path .
+   sudo mkdir -p /usr/local/libexec/bear
+   sudo install -m 755 target/release/bear /usr/local/bin/
+   sudo install -m 755 target/release/wrapper /usr/local/libexec/bear/
    ```
 
-This will install the `bear` binary to your Cargo bin directory (usually `~/.cargo/bin`).
+To install the preload library, you need to estabilish what the dynamic linker expects
+to resolve the `$LIB` symbol. (Read `man ld.so` to get more about this.)
 
-## Running Tests
+   ```bash
+   # For RedHat, Fedora, Arch based systems
+   export INSTALL_LIBDIR=lib64
+   
+   # For Debian based systems
+   export INSTALL_LIBDIR=lib/x86_64-linux-gnu
+   ```
 
-To run the tests, use:
-```bash
-cargo test
-```
+Then run the following commands:
+
+   ```bash
+   sudo mkdir -p /usr/local/libexec/bear/$INSTALL_LIBDIR
+   sudo install -m 755 target/release/libexec.so /usr/local/libexec/bear/$INSTALL_LIBDIR/
+   ```
 
 ## OS-specific Notes
 
