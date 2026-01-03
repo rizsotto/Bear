@@ -157,6 +157,56 @@ fn successful_build_multiple_sources() -> Result<()> {
     Ok(())
 }
 
+/// Test output is overwritten when no append flag
+#[test]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn without_append_output_is_overwritten() -> Result<()> {
+    let env = TestEnvironment::new("without_append_output_is_overwritten")?;
+
+    // Create multiple source files
+    env.create_source_files(&[
+        ("test1.c", "int func1() { return 1; }"),
+        ("test2.c", "int func2() { return 2; }"),
+    ])?;
+
+    // Create build script that compiles all files
+    let build_command1 = format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH));
+    let build_script1_path = env.create_shell_script("build1.sh", &build_command1)?;
+
+    let build_command2 = format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH));
+    let build_script2_path = env.create_shell_script("build2.sh", &build_command2)?;
+
+    // Run bear once
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        build_script1_path.to_str().unwrap(),
+    ])?;
+
+    // Verify compilation database
+    assert!(env.file_exists("compile_commands.json"));
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    // Run bear again with append
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        build_script2_path.to_str().unwrap(),
+    ])?;
+
+    // Verify compilation database
+    assert!(env.file_exists("compile_commands.json"));
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    Ok(())
+}
+
 /// Test append functionality
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]

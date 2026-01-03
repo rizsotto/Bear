@@ -53,10 +53,10 @@ pub(super) struct AppendClangOutputWriter<T: IteratorWriter<clang::Entry>> {
 
 impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
     pub(super) fn new(writer: T, input_path: &path::Path, append: bool) -> Self {
-        let path = if input_path.exists() {
+        let path = if input_path.exists() && append {
             Some(input_path.to_path_buf())
         } else {
-            if append {
+            if append && !input_path.exists() {
                 log::warn!("The output file does not exist, the append option is ignored.");
             }
             None
@@ -410,7 +410,7 @@ mod tests {
         ];
 
         let writer = ClangOutputWriter::create(&result_path).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true);
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains both original and new entries
@@ -420,5 +420,37 @@ mod tests {
         assert!(content.contains("file2.cpp"));
         assert!(content.contains("file3.cpp"));
         assert!(content.contains("file4.cpp"));
+    }
+
+    #[test]
+    fn test_append_clang_output_writer_overwrite_existing_file() {
+        let dir = tempdir().unwrap();
+        let input_path = dir.path().join("file_to_overwrite.json");
+        let result_path = dir.path().join("result_file.json");
+
+        // Create the original file with some entries
+        let original_entries = vec![
+            clang::Entry::from_arguments_str("old_file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str("old_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+        ];
+        let writer = ClangOutputWriter::create(&input_path).unwrap();
+        writer.write(original_entries.into_iter()).unwrap();
+
+        let new_entries = vec![
+            clang::Entry::from_arguments_str("new_file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+            clang::Entry::from_arguments_str("new_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
+        ];
+
+        let writer = ClangOutputWriter::create(&result_path).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
+        sut.write(new_entries.into_iter()).unwrap();
+
+        // Verify the result file contains only new entries (no original entries)
+        assert!(result_path.exists());
+        let content = fs::read_to_string(&result_path).unwrap();
+        assert!(content.contains("new_file1.cpp"));
+        assert!(content.contains("new_file2.cpp"));
+        assert!(!content.contains("old_file1.cpp"));
+        assert!(!content.contains("old_file2.cpp"));
     }
 }
