@@ -14,15 +14,9 @@ The [JSON compilation database][JSONCDB] is used in the clang project to
 provide information on how a single compilation unit is processed. With this,
 it is easy to re-run the compilation with alternate programs.
 
-<<<<<<< HEAD
-Some build systems natively support the generation of a JSON compilation
-database. For projects that do not use such a build tool, Bear generates the
-JSON file during the build process.
-=======
 Some build systems natively support the generation of JSON compilation
 database. For projects that do not use such build tools, Bear generates
 the JSON file during the build process.
->>>>>>> 4.0-rc
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
 
@@ -42,21 +36,12 @@ After installation, use Bear like this:
 
 The output file, `compile_commands.json`, is saved in the current directory.
 
-<<<<<<< HEAD
-For more options, check the man page or pass the `--help` parameter. Note that
-if you want to pass parameters to Bear, pass those _before_ the `--` sign,
-everything after that will be the build command.
-
-Please be aware that some package managers still ship our old 2.4.x release. In
-that case, please omit the extra `--` sign or consult your local documentation.
-=======
 For more options, you can check the man page or pass the `--help` parameter. Note
 that if you want to pass parameters to Bear, pass those _before_ the `--` sign;
 everything after that will be the build command.
 
 Please be aware that some package managers still ship our old 2.4.x release.
 In that case please omit the extra `--` sign or consult your local documentation.
->>>>>>> 4.0-rc
 
 For more, read the man pages or [wiki][WIKI] of the project, which talks about
 limitations, known issues and platform-specific usage.
