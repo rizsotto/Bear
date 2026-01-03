@@ -1,111 +1,81 @@
 How to build
 ============
 
-Bear should be quite portable on UNIX operating systems. It has been
-tested on FreeBSD, GNU/Linux and OS X.
+Bear is now implemented in Rust and can be built and installed using the Rust toolchain.
 
-## Build dependencies
+## Prerequisites
 
-1. **C++ compiler**, to compile the sources. (Should support
-   [C++17 dialect](https://en.cppreference.com/w/cpp/compiler_support#cpp17).)
-2. **CMake**, to configure the build. (Minimum version is 3.12) And a
-   build tool [supported](https://cmake.org/cmake/help/v3.5/manual/cmake-generators.7.html)
-   by CMake.
-3. **pkg-config** to look up dependencies' compiler flags.
-4. **protoc** and **grpc_cpp_plugin** commands. (See gRPC dependencies.)
+**Rust toolchain**: Install Rust using [rustup](https://rustup.rs/).
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
+   Ensure `cargo` and `rustc` are available in your PATH:
+   ```bash
+   rustc --version
+   cargo --version
+   ```
 
-## Dependencies
+## Build and Install
 
-The dependencies can come from OS packages or the build will fetch the sources
-and build locally.
+To build and install Bear, run the following commands:
 
-- [gRPC](https://github.com/grpc/grpc) >= 1.26
-- [fmt](https://github.com/fmtlib/fmt) >= 6.2
-- [spdlog](https://github.com/gabime/spdlog) >= 1.5
-- [json](https://github.com/nlohmann/json) >= 3.7 and != 3.10.3
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-repo/bear.git
+   cd bear
+   ```
 
-Developer dependencies:
+2. Build:
+   ```bash
+   cargo build --release
+   ```
 
-- [python](https://www.python.org/) >= 3.5
-- [googletest](https://github.com/google/googletest) >= 1.10
-- [lit](https://pypi.org/project/lit/0.7.1/) >= 0.7
+3. Install:
+   ```bash
+   sudo mkdir -p /usr/local/libexec/bear
+   sudo mkdir -p /usr/local/man/man1
+   sudo install -m 755 target/release/bear /usr/local/bin/
+   sudo install -m 755 target/release/wrapper /usr/local/libexec/bear/
+   sudo install -m 644 man/bear.1 /usr/local/man/man1/
+   ```
 
-## Build commands
+To install the preload library, you need to establish what the dynamic linker expects
+to resolve the `$LIB` symbol. (Read `man ld.so` to get more about this.)
 
-Ideally, you should build Bear in a separate build directory.
+   ```bash
+   # For RedHat, Fedora, Arch based systems
+   export INSTALL_LIBDIR=lib64
+   
+   # For Debian based systems
+   export INSTALL_LIBDIR=lib/x86_64-linux-gnu
+   ```
 
-    cmake -DENABLE_UNIT_TESTS=OFF -DENABLE_FUNC_TESTS=OFF $BEAR_SOURCE_DIR
-    make all
-    make install
+Then run the following commands:
 
-You can configure the build process with passing arguments to cmake.
+   ```bash
+   sudo mkdir -p /usr/local/libexec/bear/$INSTALL_LIBDIR
+   sudo install -m 755 target/release/libexec.so /usr/local/libexec/bear/$INSTALL_LIBDIR/
+   ```
 
-One of the flags you might want to pay attention is the `CMAKE_INSTALL_LIBDIR`
-flag, which has to be the directory name for libraries. The value of this
-varies for different distribution: debian derivatives are using
-`lib/i386-linux-gnu` and `lib/x86_64-linux-gnu`, while many other distributions
-are simple `lib` and `lib64` directories. Check out where the system `libc.so`
-is. And use that directory name for the `CMAKE_INSTALL_LIBDIR`. (If your system
-has it as `/lib/x86_64-linux-gnu/libc.so`, then `lib/x86_64-linux-gnu` is the
-value you need to use.) Passing the flag looks like this:
+## OS-specific Notes
 
-    cmake -DCMAKE_INSTALL_LIBDIR=lib/x86_64-linux-gnu ... $BEAR_SOURCE_DIR
+### Fedora/Red Hat-based systems
+Install the Rust toolchain using the system package manager:
+```bash
+dnf install rust cargo
+```
 
-To enable multilib support, an extra CMake flag is needed. `ENABLE_MULTILIB`
-is defined by this project and will change where Bear looks for files. To use
-multilib, you need to make the `CMAKE_INSTALL_LIBDIR` set right. (See the
-paragraph above.) Passing the flag looks like this: 
+### Debian/Ubuntu-based systems
+Install the Rust toolchain using the system package manager:
+```bash
+apt-get install rustc cargo
+```
 
-    cmake -DENABLE_MULTILIB=ON ... $BEAR_SOURCE_DIR
+### macOS
+Install Rust using [Homebrew](https://brew.sh/):
+```bash
+brew install rust
+```
 
-To run test during the build process, you will need to install the
-test frameworks and re-configure the build. For unit testing Bear
-uses googletest, which will be built from source if not already installed.
-
-    # install `lit` the functional test framework into a python virtualenv
-    mkvirtualenv bear
-    pip install lit
-    # it's important to re-run the configure step again
-    cmake $BEAR_SOURCE_DIR
-    cmake --build $build_dir --parallel 4
-
-## OS specific notes
-
-Install dependencies from packages on Fedora 32/33
-
-    dnf install python cmake pkg-config
-    dnf install json-devel spdlog-devel fmt-devel grpc-devel grpc-plugins
-    dnf install gtest-devel gmock-devel # optional for running the tests
-    
-Install dependencies from packages on Arch
-
-    pacman -S python cmake pkg-config
-    pacman -S grpc spdlog fmt nlohmann-json
-    pacman -S gtest gmock # optional for running the tests
-
-Install dependencies from packages on Ubuntu 20.04
-
-    apt-get install python cmake pkg-config
-    apt-get install libfmt-dev libspdlog-dev nlohmann-json3-dev \
-                    libgrpc++-dev protobuf-compiler-grpc libssl-dev
-
-Install dependencies from packages from Brew
-
-    brew install fmt spdlog nlohmann-json grpc pkg-config
-
-Install dependencies from packages on Alpine edge
-
-    apk add git cmake pkgconf make g++
-    apk add fmt-dev spdlog-dev nlohmann-json protobuf-dev grpc-dev c-ares-dev
-
-### Platform: macOS
-
-Xcode < 11 or macOS < 10.15 users should get [LLVM Clang](https://releases.llvm.org)
-binaries and headers. Make sure that `clang++ -v` returns the correct `InstalledDir`.
-This is because `std::filesystem` is not available on Clang supplied with Xcode < 11,
-and `std::filesystem::path` is not available in system C++ dylib for macOS < 10.15.
-
-If OpenSSL is installed via Brew, and it's keg-only, run the following (before the
-build) for pkg-config to find it as grpc's dependency:
-    
-    export PKG_CONFIG_PATH=$(brew --prefix)/opt/openssl@1.1/lib/pkgconfig
+### Windows
+Install Rust using [rustup](https://rustup.rs/).

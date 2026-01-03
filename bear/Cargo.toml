@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "bear"
+description = "Bear is a tool that generates a compilation database for clang tooling."
+keywords = ["clang", "clang-tooling", "compilation-database"]
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[features]
+# Feature to enable integration testing with locally built binaries from target directory
+allow-integration-tests = []
+
+[lib]
+name = "bear"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bear"
+path = "src/bin/main.rs"
+
+[dependencies]
+thiserror.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yml.workspace = true
+clap.workspace = true
+directories.workspace = true
+log.workspace = true
+env_logger.workspace = true
+shell-words.workspace = true
+tempfile.workspace = true
+signal-hook.workspace = true
+crossbeam-channel.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+mockall = "0.14"

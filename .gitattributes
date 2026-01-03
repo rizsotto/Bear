@@ -1,0 +1,19 @@
+# Rust code
+*.rs text eol=lf
+*.toml text eol=lf
+*.lock text eol=lf
+
+# Misc scripting files
+Makefile text eol=lf
+*.mk text eol=lf
+*.sh text eol=lf
+
+# Human-readable files
+*.md eol=lf
+README.* text eol=lf
+COPYING text eol=lf
+*.txt text eol=lf
+
+# Git configuration files
+.gitignore text eol=lf
+.gitattributes text eol=lf

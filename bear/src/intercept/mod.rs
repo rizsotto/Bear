@@ -1,0 +1,210 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+//! The module contains the intercept reporting and collecting functionality.
+//!
+//! When a command execution is intercepted, the interceptor sends the event to the collector.
+//! This happens in two different processes, requiring a communication channel between these
+//! processes.
+//!
+//! The module provides abstractions for the reporter and the collector. And it also defines
+//! the data structures that are used to represent the events.
+
+pub mod environment;
+pub mod reporter;
+pub mod supervise;
+pub mod tcp;
+pub mod wrapper;
+
+use crate::args::BuildCommand;
+use crate::environment::relevant_env;
+use std::collections::HashMap;
+use std::fmt;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
+
+/// Execution is a representation of a process execution.
+///
+/// It does not contain information about the outcome of the execution,
+/// like the exit code or the duration of the execution. It only contains
+/// the information that is necessary to reproduce the execution.
+///
+/// # Fields
+/// - `executable`: The path to the executable that was run.
+/// - `arguments`: The command line arguments that were passed to the executable.
+///   Includes the executable itself as the first argument.
+/// - `working_dir`: The current working directory of the process.
+/// - `environment`: The environment variables that were set for the process.
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Execution {
+    pub executable: PathBuf,
+    pub arguments: Vec<String>,
+    pub working_dir: PathBuf,
+    pub environment: HashMap<String, String>,
+}
+
+impl Execution {
+    /// Captures the execution information of the current process.
+    ///
+    /// This method retrieves the executable path, command-line arguments,
+    /// current working directory, and environment variables of the process.
+    ///
+    /// **Security Note**: This method captures ALL environment variables from
+    /// the current process, which may include sensitive information. Consider
+    /// using the `trim()` method to filter to only relevant environment variables.
+    pub fn capture() -> Result<Self, CaptureError> {
+        let executable = std::env::current_exe().map_err(CaptureError::CurrentExecutable)?;
+        let arguments = std::env::args().collect();
+        let working_dir = std::env::current_dir().map_err(CaptureError::CurrentDirectory)?;
+        let environment = std::env::vars().collect();
+
+        Ok(Self { executable, arguments, working_dir, environment })
+    }
+
+    pub fn with_executable(self, executable: &Path) -> Self {
+        let mut updated = self;
+        updated.executable = executable.to_path_buf();
+        updated
+    }
+
+    /// Trims the execution information to only contain relevant environment variables.
+    pub fn trim(self) -> Self {
+        let environment = self.environment.into_iter().filter(|(k, _)| relevant_env(k)).collect();
+        Self { environment, ..self }
+    }
+
+    #[cfg(test)]
+    pub fn from_strings(
+        executable: &str,
+        arguments: Vec<&str>,
+        working_dir: &str,
+        environment: HashMap<&str, &str>,
+    ) -> Self {
+        Self {
+            executable: PathBuf::from(executable),
+            arguments: arguments.iter().map(|s| s.to_string()).collect(),
+            working_dir: PathBuf::from(working_dir),
+            environment: environment.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+        }
+    }
+}
+
+impl fmt::Display for Execution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Execution path={}, args=[{}]", self.executable.display(), self.arguments.join(","))
+    }
+}
+
+/// Represents errors that can occur while capturing the execution information.
+#[derive(Error, Debug)]
+pub enum CaptureError {
+    #[error("Failed to capture execution: {0}")]
+    CurrentExecutable(std::io::Error),
+    #[error("Failed to capture current directory: {0}")]
+    CurrentDirectory(std::io::Error),
+}
+
+/// Represent a relevant life cycle event of a process.
+///
+/// In the current implementation, we only have one event, the `Started` event.
+/// This event is sent when a process is started. It contains the process id
+/// and the execution information.
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Event {
+    pub pid: u32,
+    pub execution: Execution,
+}
+
+impl Event {
+    /// Creates a new event that is originated from the current process.
+    pub fn new(execution: Execution) -> Self {
+        let pid = std::process::id();
+        Event { pid, execution }
+    }
+
+    /// Create a new event from the current, where the new event execution
+    /// is trimmed to only contain relevant environment variables.
+    pub fn trim(self) -> Self {
+        let execution = self.execution.trim();
+        Self { execution, ..self }
+    }
+
+    #[cfg(test)]
+    pub fn from_strings(
+        pid: u32,
+        executable: &str,
+        arguments: Vec<&str>,
+        working_dir: &str,
+        environment: HashMap<&str, &str>,
+    ) -> Self {
+        Self { pid, execution: Execution::from_strings(executable, arguments, working_dir, environment) }
+    }
+}
+
+impl fmt::Display for Event {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Event pid={}, execution={}", self.pid, self.execution)
+    }
+}
+
+impl From<&BuildCommand> for Event {
+    /// Creates an event from a build command with automatic environment trimming.
+    ///
+    /// This conversion creates an `Event` suitable for the interception pipeline.
+    /// The resulting event uses a constant PID of 0 to indicate it represents
+    /// the initial command rather than an intercepted process.
+    ///
+    /// The working directory is obtained from the current process, and environment
+    /// variables are automatically filtered to include only those relevant for
+    /// compilation database generation.
+    fn from(command: &BuildCommand) -> Self {
+        let working_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let environment = std::env::vars().collect();
+
+        let execution = Execution {
+            executable: PathBuf::from(&command.arguments[0]),
+            arguments: command.arguments.clone(),
+            working_dir,
+            environment,
+        }
+        .trim();
+
+        Event {
+            pid: 0, // Constant zero PID for initial command events
+            execution,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_command_to_event_from_trait() {
+        let command = BuildCommand {
+            arguments: vec!["/usr/bin/gcc".to_string(), "-c".to_string(), "test.c".to_string()],
+        };
+
+        let event = Event::from(&command);
+
+        assert_eq!(event.pid, 0);
+        assert_eq!(event.execution.executable, PathBuf::from("/usr/bin/gcc"));
+        assert_eq!(event.execution.arguments, vec!["/usr/bin/gcc", "-c", "test.c"]);
+        assert!(event.execution.working_dir.is_absolute());
+        // Environment should be trimmed to only relevant variables
+        for key in event.execution.environment.keys() {
+            assert!(relevant_env(key), "Non-relevant env var found: {}", key);
+        }
+    }
+
+    #[test]
+    fn test_build_command_to_event_into_trait() {
+        let command = BuildCommand { arguments: vec!["make".to_string()] };
+
+        let event: Event = (&command).into();
+
+        assert_eq!(event.pid, 0);
+        assert_eq!(event.execution.executable, PathBuf::from("make"));
+        assert_eq!(event.execution.arguments, vec!["make"]);
+    }
+}

@@ -1,0 +1,7 @@
+# https://rust-lang.github.io/rustfmt/
+style_edition = "2024"
+newline_style = "Unix"
+max_width = 110
+use_field_init_shorthand = true
+use_try_shorthand = true
+use_small_heuristics = "Max"

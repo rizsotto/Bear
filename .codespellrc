@@ -1,0 +1,8 @@
+[codespell]
+skip = *.lock,*.toml,./man/*.1,./bear/build.rs
+count = true
+quiet-level = 3
+
+# serde -> ser
+# abd -> source matcher for ADA files
+ignore-words-list = ser,abd,exect

@@ -1,0 +1,98 @@
+name: rust CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: clippy,rustfmt
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo fmt -- --check
+
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: cargo build --verbose --release
+
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macOS-latest
+        toolchain:
+          - stable
+          - nightly
+    runs-on: ${{ matrix.os }}
+    needs: [compile]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: Run integration tests
+        run: |
+          cargo build --verbose --features allow-integration-tests
+          cargo test --verbose --features allow-integration-tests
+        env:
+          BEAR_TEST_VERBOSE: 1
+
+  doc:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - run: cargo doc --no-deps
+
+  spellcheck:
+    name: Spell Check Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Codespell
+        run: pip install codespell
+      - name: Run Codespell
+        run: codespell
+
+  copyright:
+    name: Generate Copyright Notes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Cargo License
+        run: cargo install cargo-license
+      - name: Generate License Report
+        run: cargo license
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit
+      - name: Run Cargo Audit
+        run: cargo audit

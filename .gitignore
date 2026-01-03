@@ -1,7 +1,11 @@
-.idea/
 cmake-build*/
+cmake-build-debug/
 Output/
-Cargo.lock
 target/
 .DS_Store
-cmake-build-debug/
+
+.idea/
+.vscode
+.vs
+settings.json
+*~

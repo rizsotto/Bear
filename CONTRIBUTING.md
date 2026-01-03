@@ -8,7 +8,7 @@ Thank you for taking the time to contribute!
 
 - Ensure that the bug was not already reported by searching on GitHub under Issues.
 
-- If you have not found an open issue addressing the problem, open a new one. Be sure to include a title and clear description, with as much relevant information as possible. You might also attach the output of the tool, this case try to run it with verbose flags.
+- If you have not found an open issue addressing the problem, open a new one. Be sure to include a title and clear description, with as much relevant information as possible. You might also attach the output of the tool, this case try to run verbose mode.
 
 - For more detailed information on submitting a bug report and creating an issue, visit our reporting guidelines.
 

@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-# -*- coding: iso-8859-2 -*-
-
-$ECHO "árvíztûrõ tükörfúrógép";
-$TRUE;
