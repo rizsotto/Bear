@@ -32,7 +32,7 @@ pub fn supervise(command: &mut std::process::Command) -> Result<ExitStatus, Supe
         // Check if the child process has exited
         match child.try_wait() {
             Ok(Some(exit_status)) => {
-                log::debug!("Child process exited");
+                log::debug!("Child process exited: {exit_status:?}");
                 return Ok(exit_status);
             }
             Ok(None) => {

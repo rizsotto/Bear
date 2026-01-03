@@ -168,7 +168,6 @@ mod impls {
             for event in self.source.events() {
                 match event {
                     Ok(event) => {
-                        log::debug!("Forwarding event: {event:?}");
                         if let Err(error) = destination.send(event) {
                             log::error!("Failed to forward event: {error}");
                         }

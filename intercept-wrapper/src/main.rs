@@ -22,6 +22,7 @@ use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise_execution;
 use bear::intercept::wrapper::{WrapperConfigReader, CONFIG_FILENAME};
 use bear::intercept::{Event, Execution};
+use std::io::Write;
 
 /// Implementation of the wrapper process.
 ///
@@ -30,26 +31,28 @@ use bear::intercept::{Event, Execution};
 /// wrapper process logs the execution and the relevant steps leading to
 /// the execution.
 fn main() -> Result<()> {
-    env_logger::init();
+    let pid = std::process::id();
+    env_logger::Builder::from_default_env()
+        .format(move |buf, record| {
+            let timestamp = buf.timestamp();
+            writeln!(buf, "[{timestamp} wrapper/{pid}] {}", record.args())
+        })
+        .init();
+
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
-    log::info!("Execution captured: {execution:?}");
     // Find the real executable using JSON config
     let real_executable = find_from_json_config(&execution.executable)?;
     let real_execution = execution.with_executable(&real_executable);
-    log::info!("Execution to call: {real_execution:?}");
 
     // Reporting failures shall not fail this process. Therefore, errors will be logged
     // but not propagated. The process will continue to execute the real executable.
     if let Err(err) = report(&real_execution) {
         log::error!("Failed to report the execution: {err}");
-    } else {
-        log::info!("Execution reported successfully");
     }
 
     // Execute the real executable with the same arguments
     let exit_status = supervise_execution(real_execution)?;
-    log::info!("Execution finished with status: {exit_status:?}");
     // Return the child process status code
     std::process::exit(exit_status.code().unwrap_or(1));
 }
@@ -57,10 +60,10 @@ fn main() -> Result<()> {
 /// Report the execution to the remote collector.
 fn report(real_execution: &Execution) -> Result<()> {
     let reporter = ReporterFactory::create().with_context(|| "Failed to create the reporter")?;
-    let event = Event::new(real_execution.clone());
-    reporter
-        .report(event)
-        .with_context(|| "Failed to send report")?;
+    // Trim environment variables when reporting to collector
+    let event = Event::new(real_execution.clone()).trim();
+    log::info!("Execution reported: {event:?}");
+    reporter.report(event)?;
 
     Ok(())
 }

@@ -31,8 +31,8 @@ fn main() {
         );
     } else {
         // Use default system paths for production
-        println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH=/usr/libexec/bear/wrapper");
-        println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH=/usr/libexec/bear/$LIB/libexec.so");
+        println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH=/usr/local/libexec/bear/wrapper");
+        println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH=/usr/local/libexec/bear/$LIB/libexec.so");
     }
 
     // Re-run build script if env changes

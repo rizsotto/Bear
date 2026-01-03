@@ -40,7 +40,7 @@ To install the binaries only can run the following commands:
    sudo install -m 755 target/release/wrapper /usr/local/libexec/bear/
    ```
 
-To install the preload library, you need to estabilish what the dynamic linker expects
+To install the preload library, you need to establish what the dynamic linker expects
 to resolve the `$LIB` symbol. (Read `man ld.so` to get more about this.)
 
    ```bash

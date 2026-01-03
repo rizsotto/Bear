@@ -166,15 +166,25 @@ impl WrapperDirectoryBuilder {
             return Ok(self.wrapper_dir.path().join(&executable_name));
         }
 
-        // Create hard link immediately (or copy on Windows)
+        // Create hard link immediately (or copy on Windows/when hard link fails)
         let wrapper_path = self.wrapper_dir.path().join(&executable_name);
         #[cfg(windows)]
         std::fs::copy(&self.wrapper_executable_path, &wrapper_path)
             .map(|_| ())
             .map_err(WrapperDirectoryError::LinkCreation)?;
         #[cfg(not(windows))]
-        std::fs::hard_link(&self.wrapper_executable_path, &wrapper_path)
-            .map_err(WrapperDirectoryError::LinkCreation)?;
+        // Try hard link first, fall back to copy if it fails (e.g., in containers with overlay fs)
+        if let Err(hard_link_error) =
+            std::fs::hard_link(&self.wrapper_executable_path, &wrapper_path)
+        {
+            log::debug!(
+                "Hard link failed ({}), falling back to copy",
+                hard_link_error
+            );
+            std::fs::copy(&self.wrapper_executable_path, &wrapper_path)
+                .map(|_| ())
+                .map_err(WrapperDirectoryError::LinkCreation)?;
+        }
 
         // Register the mapping
         self.config
