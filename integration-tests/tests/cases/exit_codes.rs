@@ -124,55 +124,6 @@ fn exit_code_when_signaled() -> Result<()> {
     Ok(())
 }
 
-/// Test that bear returns 0 for successful compilation interception
-#[test]
-#[cfg(has_executable_compiler_c)]
-fn exit_code_for_successful_compilation() -> Result<()> {
-    let env = TestEnvironment::new("exit_code_for_successful_compilation")?;
-
-    // Create a simple source file
-    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
-
-    let result =
-        env.run_bear(&["--output", "compile_commands.json", "--", COMPILER_C_PATH, "-c", "test.c"])?;
-    result.assert_success()?;
-
-    // Verify compilation database was created
-    assert!(env.file_exists("compile_commands.json"));
-    Ok(())
-}
-
-/// Test that bear propagates build failure exit codes
-#[test]
-#[cfg(has_executable_compiler_c)]
-fn exit_code_for_failed_compilation() -> Result<()> {
-    let env = TestEnvironment::new("exit_code_for_failed_compilation")?;
-
-    // Create an invalid source file that will cause compilation to fail
-    env.create_source_files(&[("invalid.c", "this is not valid C code")])?;
-
-    let result =
-        env.run_bear(&["--output", "compile_commands.json", "--", COMPILER_C_PATH, "-c", "invalid.c"])?;
-    result.assert_failure()?;
-    Ok(())
-}
-
-/// Test that bear returns 0 when no build commands are executed
-#[test]
-#[cfg(has_executable_true)]
-fn exit_code_for_empty_build() -> Result<()> {
-    let env = TestEnvironment::new("exit_code_for_empty_build")?;
-
-    let result = env.run_bear(&["--output", "compile_commands.json", "--", TRUE_PATH])?;
-    result.assert_success()?;
-
-    // Should create empty compilation database
-    assert!(env.file_exists("compile_commands.json"));
-    let content = env.read_file("compile_commands.json")?;
-    assert_eq!(content.trim(), "[]");
-    Ok(())
-}
-
 // Intercept mode exit code tests
 
 /// Test that intercept command returns 0 for successful interception

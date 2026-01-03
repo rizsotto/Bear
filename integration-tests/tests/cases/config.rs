@@ -61,6 +61,16 @@ format:
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
 
+    // Verify the entry contains the expected compilation command
+    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test.c".to_string()];
+
+    let matcher = CompilationEntryMatcher::new()
+        .file("test.c")
+        .directory(env.temp_dir().to_str().unwrap())
+        .arguments(expected_args);
+
+    db.assert_contains(&matcher)?;
+
     Ok(())
 }
 
@@ -119,21 +129,15 @@ sources:
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
 
-    // Verify only C file is included (Bear may produce relative paths)
-    let entries = db.entries();
-    let entry = &entries[0];
+    // Verify the entry contains the expected C compilation command
+    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "source.c".to_string()];
 
-    // Check that we have a C source file
-    let file_path = entry.get("file").unwrap().as_str().unwrap();
-    assert!(file_path.contains("source.c"));
+    let matcher = CompilationEntryMatcher::new()
+        .file("source.c")
+        .directory(env.temp_dir().to_str().unwrap())
+        .arguments(expected_args);
 
-    // Check that arguments contain the compiler and source file
-    let args = entry.get("arguments").unwrap().as_array().unwrap();
-    let arg_strings: Vec<String> = args.iter().map(|v| v.as_str().unwrap().to_string()).collect();
-
-    assert!(arg_strings.iter().any(|arg| arg.contains("gcc")));
-    assert!(arg_strings.contains(&"-c".to_string()));
-    assert!(arg_strings.contains(&"source.c".to_string()));
+    db.assert_contains(&matcher)?;
 
     Ok(())
 }
@@ -186,20 +190,15 @@ sources:
     // Only existing.c should be in the output
     let db = env.load_compilation_database("compile_commands.json")?;
 
-    // Filter entries to only those referencing existing files
-    let entries = db.entries();
-    let existing_entries: Vec<_> = entries
-        .iter()
-        .filter(|entry| {
-            if let Some(file_path) = entry.get("file").and_then(|v| v.as_str()) {
-                file_path.contains("existing.c")
-            } else {
-                false
-            }
-        })
-        .collect();
+    // Verify that we have entries and at least one is for existing.c
+    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "existing.c".to_string()];
 
-    assert!(!existing_entries.is_empty(), "Should have at least one entry for existing.c");
+    let matcher = CompilationEntryMatcher::new()
+        .file("existing.c")
+        .directory(env.temp_dir().to_str().unwrap())
+        .arguments(expected_args);
+
+    db.assert_contains(&matcher)?;
 
     Ok(())
 }
@@ -252,21 +251,28 @@ sources:
 
     // Verify the format is applied
     let db = env.load_compilation_database("compile_commands.json")?;
-    let entries = db.entries();
+    db.assert_count(1)?;
 
-    if !entries.is_empty() {
-        let entry = &entries[0];
+    // Verify the entry contains the expected compilation command
+    // When absolute path format is used, the source file argument is also absolute
+    let src_dir = env.temp_dir().join("src");
+    let absolute_src_dir = src_dir.canonicalize().unwrap_or_else(|_| src_dir.clone());
+    let absolute_file_path = absolute_src_dir.join("main.c");
 
-        // Directory should be absolute path
-        if let Some(directory) = entry.get("directory").and_then(|v| v.as_str()) {
-            assert!(directory.starts_with('/'), "Directory should be absolute: {}", directory);
-        }
+    let expected_args = vec![
+        filename_of(COMPILER_C_PATH),
+        "-c".to_string(),
+        absolute_file_path.to_str().unwrap().to_string(),
+    ];
 
-        // File should be absolute path
-        if let Some(file) = entry.get("file").and_then(|v| v.as_str()) {
-            assert!(file.starts_with('/'), "File should be absolute: {}", file);
-        }
-    }
+    // For absolute path format, we expect the file and directory to be absolute paths
+
+    let matcher = CompilationEntryMatcher::new()
+        .file(absolute_file_path.to_str().unwrap())
+        .directory(absolute_src_dir.to_str().unwrap())
+        .arguments(expected_args);
+
+    db.assert_contains(&matcher)?;
 
     Ok(())
 }
@@ -399,10 +405,7 @@ sources:
 
     // Verify duplicate filtering worked
     let db = env.load_compilation_database("compile_commands.json")?;
-
-    // Should have deduplicated the entries
-    let entries = db.entries();
-    assert!(!entries.is_empty(), "Should have at least one compilation entry");
+    db.assert_count(1)?;
 
     Ok(())
 }

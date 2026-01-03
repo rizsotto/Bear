@@ -8,7 +8,7 @@
 use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::*;
 use anyhow::Result;
-use serde_json::{self, Value};
+use encoding_rs;
 
 /// Test basic command interception with preload mechanism
 #[test]
@@ -16,13 +16,12 @@ use serde_json::{self, Value};
 #[cfg(has_executable_compiler_c)]
 fn basic_command_interception() -> Result<()> {
     let env = TestEnvironment::new("basic_intercept")?;
-
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
     // Run intercept mode to capture commands
     env.run_bear_success(&["intercept", "--output", "events.json", "--", COMPILER_C_PATH, "-c", "test.c"])?;
 
-    // Load and verify events using the new abstraction
+    // Load and verify events
     let events = env.load_events_file("events.json")?;
 
     // Should have at least one event
@@ -64,7 +63,7 @@ fn shell_command_interception() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Load and verify events using the new abstraction
+    // Load and verify events
     let events = env.load_events_file("events.json")?;
 
     // Should have captured events
@@ -108,12 +107,11 @@ fn shell_commands_without_shebang() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Should still capture commands even without shebang
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should still capture commands even without shebang
+    events.assert_min_count(1)?;
 
     Ok(())
 }
@@ -153,7 +151,7 @@ fn parallel_command_interception() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Load and verify events using the new abstraction
+    // Load and verify events
     let events = env.load_events_file("events.json")?;
 
     // Should have captured all 4 parallel compiler invocations
@@ -202,9 +200,11 @@ fn build_stdout_capture() -> Result<()> {
     assert!(output.stdout().contains("This goes to stdout"));
     assert!(output.stdout().contains("This also goes to stdout"));
 
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
+
     // Events should still be captured
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    assert!(!events_content.is_empty());
+    events.assert_min_count(1)?;
 
     Ok(())
 }
@@ -238,9 +238,11 @@ fn build_stderr_capture() -> Result<()> {
     assert!(output.stderr().contains("This goes to stderr"));
     assert!(output.stderr().contains("This also goes to stderr"));
 
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
+
     // Events should still be captured
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    assert!(!events_content.is_empty());
+    events.assert_min_count(1)?;
 
     Ok(())
 }
@@ -268,12 +270,11 @@ fn intercept_empty_environment() -> Result<()> {
         "test.c",
     ])?;
 
-    // Should still capture execution even with empty environment
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should still capture execution even with empty environment
+    events.assert_min_count(1)?;
 
     Ok(())
 }
@@ -304,27 +305,15 @@ fn libtool_command_interception() -> Result<()> {
         "lib.c",
     ])?;
 
-    // Should capture libtool and compiler invocations
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should capture libtool and compiler invocations
+    events.assert_min_count(1)?;
 
     // Should have captured libtool execution
-    let libtool_events = events
-        .iter()
-        .filter(|event| {
-            event
-                .get("execution")
-                .and_then(|e| e.get("executable"))
-                .and_then(|exe| exe.as_str())
-                .map(|exe| exe.contains("libtool"))
-                .unwrap_or(false)
-        })
-        .count();
-
-    assert!(libtool_events >= 1, "Should capture libtool execution");
+    let libtool_matcher = EventMatcher::new().executable_name("libtool".to_string());
+    events.assert_contains(&libtool_matcher)?;
 
     Ok(())
 }
@@ -358,18 +347,22 @@ exec {} "$@""#,
         "test.c",
     ])?;
 
-    // Should capture wrapper execution
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should capture wrapper execution
+    events.assert_min_count(1)?;
+
+    // Should contain wrapper execution
+    let wrapper_matcher = EventMatcher::new().executable_name("cc-wrapper".to_string());
+    events.assert_contains(&wrapper_matcher)?;
 
     Ok(())
 }
 
 /// Test Unicode handling in shell commands
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn unicode_shell_commands() -> Result<()> {
     let env = TestEnvironment::new("unicode_intercept")?;
@@ -398,24 +391,54 @@ fn unicode_shell_commands() -> Result<()> {
     assert!(output.stdout().contains("中文"));
     assert!(output.stdout().contains("🚀"));
 
-    // Events file should be created
-    let events_path = env.temp_dir().join("events.json");
-    assert!(events_path.exists());
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
+
+    // Events should be captured properly despite Unicode content
+    events.assert_min_count(2)?;
 
     Ok(())
 }
 
 /// Test interception with ISO-8859-2 encoding
+///
+/// This test verifies that Bear can properly intercept commands from shell scripts
+/// that are encoded in ISO-8859-2 (Latin-2) character encoding, which is commonly
+/// used in Central and Eastern European languages.
+///
+/// The test:
+/// 1. Creates a shell script with Polish characters (ąęłńóśźż) that exist in ISO-8859-2
+/// 2. Ensures the script file is actually written with ISO-8859-2 encoding (not UTF-8)
+/// 3. Verifies that Bear can intercept commands from such encoded scripts
+/// 4. Confirms that the encoding doesn't interfere with event capture
+///
+/// This addresses real-world scenarios where legacy build systems or scripts
+/// may use non-UTF-8 encodings, particularly in European development environments.
 #[test]
+#[cfg(has_preload_library)]
 #[cfg(all(has_executable_shell, has_executable_echo, has_executable_true))]
 fn iso8859_2_encoding() -> Result<()> {
     let env = TestEnvironment::new("iso8859_2")?;
 
-    // Create script with ISO-8859-2 characters
+    // Create script with ISO-8859-2 characters (Polish characters that exist in ISO-8859-2)
+    // These specific characters (ąęłńóśźż) are chosen because they:
+    // - Are valid in ISO-8859-2 encoding
+    // - Would be encoded differently in UTF-8
+    // - Represent common characters in Polish and other Central European languages
     let script_commands =
         [format!("\"{}\" 'Testing ISO-8859-2: ąęłńóśźż'", ECHO_PATH), format!("\"{}\"", TRUE_PATH)]
             .join("\n");
-    let script_path = env.create_shell_script("iso_test.sh", &script_commands)?;
+
+    // Create the script with ISO-8859-2 encoding (not UTF-8)
+    let script_path =
+        env.create_shell_script_with_encoding("iso_test.sh", &script_commands, encoding_rs::ISO_8859_2)?;
+
+    // Verify the script file is actually encoded in ISO-8859-2
+    // This is the key improvement: we now actually verify the encoding is correct
+    assert!(
+        env.verify_file_encoding(&script_path, encoding_rs::ISO_8859_2)?,
+        "Script file should be encoded in ISO-8859-2"
+    );
 
     let _output = env.run_bear_success(&[
         "intercept",
@@ -426,9 +449,12 @@ fn iso8859_2_encoding() -> Result<()> {
         script_path.to_str().unwrap(),
     ])?;
 
-    // Should handle encoding properly
-    let events_path = env.temp_dir().join("events.json");
-    assert!(events_path.exists());
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
+
+    // Should handle encoding properly - Bear should intercept commands successfully
+    // regardless of the script's character encoding
+    events.assert_min_count(2)?;
 
     Ok(())
 }
@@ -454,12 +480,15 @@ fn valgrind_integration() -> Result<()> {
         "test.c",
     ])?;
 
-    // Should capture valgrind execution
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should capture valgrind execution
+    events.assert_min_count(1)?;
+
+    // Should contain valgrind execution
+    let valgrind_matcher = EventMatcher::new().executable_name("valgrind".to_string());
+    events.assert_contains(&valgrind_matcher)?;
 
     Ok(())
 }
@@ -484,12 +513,15 @@ fn fakeroot_integration() -> Result<()> {
         "test.c",
     ])?;
 
-    // Should capture fakeroot execution
-    let events_content = std::fs::read_to_string(env.temp_dir().join("events.json"))?;
-    let events: Vec<Value> =
-        events_content.lines().filter_map(|line| serde_json::from_str(line).ok()).collect();
+    // Load and verify events
+    let events = env.load_events_file("events.json")?;
 
-    assert!(!events.is_empty());
+    // Should capture fakeroot execution
+    events.assert_min_count(1)?;
+
+    // Should contain fakeroot execution
+    let fakeroot_matcher = EventMatcher::new().executable_name("fakeroot".to_string());
+    events.assert_contains(&fakeroot_matcher)?;
 
     Ok(())
 }

@@ -25,6 +25,7 @@ serde_json.workspace = true
 serde_yml.workspace = true
 shell-words.workspace = true
 which.workspace = true
+encoding_rs = "0.8"
 
 [build-dependencies]
 platform-checks = { path = "../platform-checks" }

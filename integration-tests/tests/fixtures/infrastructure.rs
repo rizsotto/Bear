@@ -46,6 +46,7 @@ use assert_cmd::cargo::cargo_bin;
 // TempDir and predicates are infrastructure for future tests
 #[allow(unused_imports)]
 use assert_fs::{TempDir, prelude::*};
+use encoding_rs;
 #[allow(unused_imports)]
 use predicates::prelude::*;
 use serde_json::{self, Value};
@@ -154,6 +155,64 @@ impl TestEnvironment {
         self.create_build_script(script_name, &content)
     }
 
+    /// Create shell script with specific encoding
+    #[allow(dead_code)]
+    #[cfg(has_executable_shell)]
+    pub fn create_shell_script_with_encoding(
+        &self,
+        script_name: &str,
+        commands: &str,
+        encoding: &'static encoding_rs::Encoding,
+    ) -> Result<PathBuf> {
+        let content = format!("#!{}\n{}", SHELL_PATH, commands);
+        self.create_build_script_with_encoding(script_name, &content, encoding)
+    }
+
+    /// Create build script with specific encoding
+    pub fn create_build_script_with_encoding(
+        &self,
+        script_name: &str,
+        content: &str,
+        encoding: &'static encoding_rs::Encoding,
+    ) -> Result<PathBuf> {
+        let script_path = self.temp_dir().join(script_name);
+
+        // Encode content using the specified encoding
+        let (encoded_bytes, _, had_errors) = encoding.encode(content);
+        if had_errors {
+            return Err(anyhow::anyhow!("Failed to encode content with {:?}", encoding.name()));
+        }
+
+        // Write the encoded bytes to file
+        fs::write(&script_path, &*encoded_bytes)?;
+
+        // Make executable on Unix systems
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&script_path)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&script_path, perms)?;
+        }
+
+        Ok(script_path)
+    }
+
+    /// Verify that a file is encoded with the specified encoding
+    pub fn verify_file_encoding(
+        &self,
+        file_path: &Path,
+        expected_encoding: &'static encoding_rs::Encoding,
+    ) -> Result<bool> {
+        let bytes = fs::read(file_path)?;
+
+        // Try to decode with the expected encoding
+        let (decoded_string, encoding_used, had_errors) = expected_encoding.decode(&bytes);
+
+        // Check if decoding was successful and used the expected encoding
+        Ok(!had_errors && encoding_used == expected_encoding && !decoded_string.is_empty())
+    }
+
     /// Create a Makefile in the test directory
     #[allow(dead_code)]
     pub fn create_makefile(&self, makefile_name: &str, content: &str) -> Result<PathBuf> {
@@ -200,6 +259,58 @@ impl TestEnvironment {
         let result = self.run_bear(args)?;
         result.assert_failure()?;
         Ok(result)
+    }
+
+    /// Run C compiler directly (without Bear) to compile test programs
+    ///
+    /// This method provides semantic separation between compilation and Bear interception.
+    /// Use this for compiling test programs that will later be executed under Bear's
+    /// intercept mode, rather than using `run_bear` which would run the compiler through Bear.
+    ///
+    /// # Arguments
+    /// * `output_name` - Name of the executable to produce
+    /// * `source_files` - Array of source file paths to compile
+    ///
+    /// # Example
+    /// ```ignore
+    /// env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+    /// let executable_path = env.run_c_compiler("test_program", &["test.c"])?;
+    /// env.run_bear(&["intercept", "--output", "events.json", "--", "./test_program"])?;
+    /// ```
+    #[allow(dead_code)]
+    #[cfg(has_executable_compiler_c)]
+    pub fn run_c_compiler(&self, output_name: &str, source_files: &[&str]) -> Result<PathBuf> {
+        let mut cmd = std::process::Command::new(COMPILER_C_PATH);
+        cmd.current_dir(self.temp_dir());
+
+        // Add output flag
+        cmd.arg("-o").arg(output_name);
+
+        // Add source files
+        for source in source_files {
+            cmd.arg(source);
+        }
+
+        let output =
+            cmd.output().with_context(|| format!("Failed to run C compiler: {}", COMPILER_C_PATH))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            anyhow::bail!(
+                "C compiler failed with exit code {:?}:\nstdout: {}\nstderr: {}",
+                output.status.code(),
+                stdout,
+                stderr
+            );
+        }
+
+        // On Windows, executables have .exe extension
+        let executable_name =
+            if cfg!(windows) { format!("{}.exe", output_name) } else { output_name.to_string() };
+
+        let executable_path = self.temp_dir().join(executable_name);
+        Ok(executable_path)
     }
 
     /// Check if a file exists in the test directory
@@ -692,6 +803,36 @@ impl InterceptEvents {
         Ok(())
     }
 
+    /// Assert that there are at least the minimum number of events
+    #[allow(dead_code)]
+    pub fn assert_min_count(&self, min_expected: usize) -> Result<()> {
+        let actual = self.events.len();
+        if actual < min_expected {
+            if self.verbose {
+                // Show Bear command output first
+                if let Some(ref bear_output) = self.bear_output {
+                    eprintln!("\n=== Bear Command Output ===");
+                    bear_output.show_verbose_output();
+                    eprintln!("=== End Bear Output ===\n");
+                }
+
+                eprintln!("=== Events File Debug Info ===");
+                eprintln!("Expected at least {} events, but found {}", min_expected, actual);
+                eprintln!("Actual events:");
+                for (i, event) in self.events.iter().enumerate() {
+                    eprintln!(
+                        "  Event {}: {}",
+                        i,
+                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
+                    );
+                }
+                eprintln!("=== End Debug Info ===\n");
+            }
+            anyhow::bail!("Expected at least {} intercept events, but found {}", min_expected, actual);
+        }
+        Ok(())
+    }
+
     /// Get all events
     #[allow(dead_code)]
     pub fn events(&self) -> &[Value] {
@@ -1021,5 +1162,87 @@ mod tests {
         // Should match if not looking for execution-specific fields
         let empty_matcher = EventMatcher::new();
         assert!(empty_matcher.matches(&event));
+    }
+
+    #[test]
+    #[cfg(has_executable_compiler_c)]
+    fn run_c_compiler_basic() -> Result<()> {
+        let env = TestEnvironment::new("test_c_compiler")?;
+
+        // Create a simple C program
+        env.create_source_files(&[(
+            "hello.c",
+            r#"
+#include <stdio.h>
+int main() {
+    printf("Hello, World!\n");
+    return 0;
+}
+"#,
+        )])?;
+
+        // Compile it using our new method
+        let executable_path = env.run_c_compiler("hello", &["hello.c"])?;
+
+        // Verify the executable exists at the returned path
+        assert!(executable_path.exists());
+
+        // Verify the executable actually works by running it
+        let output = std::process::Command::new(&executable_path)
+            .current_dir(env.temp_dir())
+            .output()
+            .expect("Failed to run compiled executable");
+
+        assert!(output.status.success());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains("Hello, World!"));
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(has_executable_compiler_c)]
+    fn run_c_compiler_error_handling() -> Result<()> {
+        let env = TestEnvironment::new("test_c_compiler_error")?;
+
+        // Create a C program with syntax errors
+        env.create_source_files(&[(
+            "broken.c",
+            r#"
+#include <stdio.h>
+int main() {
+    printf("Hello, World!\n"  // Missing closing parenthesis and semicolon
+    return 0;
+}
+"#,
+        )])?;
+
+        // Compilation should fail and return an error
+        let compile_result = env.run_c_compiler("broken", &["broken.c"]);
+        assert!(compile_result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn assert_min_count_test() -> Result<()> {
+        use serde_json::json;
+
+        // Create mock events
+        let events = vec![
+            json!({"execution": {"executable": "/usr/bin/gcc", "arguments": ["gcc", "-c", "test.c"]}}),
+            json!({"execution": {"executable": "/usr/bin/gcc", "arguments": ["gcc", "-c", "test2.c"]}}),
+        ];
+
+        let intercept_events = InterceptEvents { events, verbose: false, bear_output: None };
+
+        // Should pass when actual >= min_expected
+        assert!(intercept_events.assert_min_count(1).is_ok());
+        assert!(intercept_events.assert_min_count(2).is_ok());
+
+        // Should fail when actual < min_expected
+        assert!(intercept_events.assert_min_count(3).is_err());
+
+        Ok(())
     }
 }
