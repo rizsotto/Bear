@@ -1,5 +1,5 @@
 [codespell]
-skip = *.lock,*.toml,./bear/build.rs
+skip = *.lock,*.toml,./man/*.1,./bear/build.rs
 count = true
 quiet-level = 3
 

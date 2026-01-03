@@ -25,19 +25,18 @@ To build and install Bear, run the following commands:
    cd bear
    ```
 
-2. Build the project:
+2. Build:
    ```bash
    cargo build --release
    ```
 
-3. Install the binaries:
-
-To install the binaries only can run the following commands:
-
+3. Install:
    ```bash
    sudo mkdir -p /usr/local/libexec/bear
+   sudo mkdir -p /usr/local/man/man1
    sudo install -m 755 target/release/bear /usr/local/bin/
    sudo install -m 755 target/release/wrapper /usr/local/libexec/bear/
+   sudo install -m 644 man/bear.1 /usr/local/man/man1/
    ```
 
 To install the preload library, you need to establish what the dynamic linker expects
