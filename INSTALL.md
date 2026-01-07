@@ -21,7 +21,7 @@ To build and install Bear, run the following commands:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/bear.git
+   git clone [https://github.com/your-repo/bear.git](https://github.com/rizsotto/Bear.git)
    cd bear
    ```
 
