@@ -6,6 +6,9 @@ pub const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
 
 // man page for `ld.so` (Linux dynamic linker/loader)
 pub const KEY_OS__PRELOAD_PATH: &str = "LD_PRELOAD";
+// man page for `dyld` (macOS dynamic linker)
+pub const KEY_OS__MACOS_PRELOAD_PATH: &str = "DYLD_INSERT_LIBRARIES";
+pub const KEY_OS__MACOS_FLAT_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
 // man page for `exec` (Linux system call)
 pub const KEY_OS__PATH: &str = "PATH";
 
@@ -102,7 +105,7 @@ static GCC_INCLUDE_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync:
 });
 
 pub fn relevant_env(key: &str) -> bool {
-    matches!(key, KEY_DESTINATION | KEY_OS__PRELOAD_PATH)
+    matches!(key, KEY_DESTINATION | KEY_OS__PRELOAD_PATH | KEY_OS__MACOS_PRELOAD_PATH | KEY_OS__MACOS_FLAT_NAMESPACE)
         || MAKE_PROGRAM_KEYS.contains(key)
         || MAKE_FLAGS_KEYS.contains(key)
         || CARGO_PROGRAM_KEYS.contains(key)

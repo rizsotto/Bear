@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::environment::{KEY_DESTINATION, KEY_OS__PATH, KEY_OS__PRELOAD_PATH};
+use crate::environment::{
+    KEY_DESTINATION, KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH, KEY_OS__PATH,
+    KEY_OS__PRELOAD_PATH,
+};
 use crate::intercept::supervise;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, context};
@@ -209,12 +212,27 @@ impl BuildEnvironment {
         path: &std::path::Path,
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        // Update LD_PRELOAD environment variable
-        let preload_original = context.environment.get(KEY_OS__PRELOAD_PATH).cloned().unwrap_or_default();
-        let preload_updated = insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
-
         let mut environment_overrides = HashMap::new();
-        environment_overrides.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
+
+        // Platform-specific preload configuration
+        if cfg!(target_os = "macos") {
+            // macOS uses DYLD_INSERT_LIBRARIES and DYLD_FORCE_FLAT_NAMESPACE
+            let preload_original =
+                context.environment.get(KEY_OS__MACOS_PRELOAD_PATH).cloned().unwrap_or_default();
+            let preload_updated =
+                insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
+
+            environment_overrides.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), preload_updated);
+            environment_overrides.insert(KEY_OS__MACOS_FLAT_NAMESPACE.to_string(), "1".to_string());
+        } else {
+            // Linux and other Unix-like systems use LD_PRELOAD
+            let preload_original = context.environment.get(KEY_OS__PRELOAD_PATH).cloned().unwrap_or_default();
+            let preload_updated =
+                insert_to_path(&preload_original, path).map_err(ConfigurationError::Path)?;
+
+            environment_overrides.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
+        }
+
         environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
 
         Ok(Self { environment_overrides, _wrapper_directory: None })
@@ -340,6 +358,7 @@ mod test {
         let mut environment = HashMap::new();
         environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
         environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
+        environment.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), "".to_string());
         environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
         environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
 
@@ -434,9 +453,19 @@ mod test {
         // Check that destination is set
         assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
 
-        // Check that LD_PRELOAD contains our library
-        let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
-        assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
+        // Check platform-specific preload configuration
+        if cfg!(target_os = "macos") {
+            // Check that DYLD_INSERT_LIBRARIES contains our library
+            let dyld_preload = env.environment_overrides.get(KEY_OS__MACOS_PRELOAD_PATH).unwrap();
+            assert!(dyld_preload.starts_with("/usr/local/lib/libintercept.so"));
+
+            // Check that DYLD_FORCE_FLAT_NAMESPACE is set to "1"
+            assert_eq!(env.environment_overrides.get(KEY_OS__MACOS_FLAT_NAMESPACE), Some(&"1".to_string()));
+        } else {
+            // Check that LD_PRELOAD contains our library
+            let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
+            assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
+        }
     }
 
     #[test]
