@@ -11,7 +11,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "4.0.0"
+version = "4.0.1"
 authors = ["László Nagy <rizsotto at gmail dot com>"]
 repository = "https://github.com/rizsotto/Bear"
 homepage = "https://github.com/rizsotto/Bear"
