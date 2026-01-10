@@ -1,7 +1,14 @@
-How to build
-============
+# How to install
 
-Bear is now implemented in Rust and can be built and installed using the Rust toolchain.
+Bear has been around for a while, and packages are available in many
+distributions. For an easy installation, check your machine's package manager
+for available packages. These packages are well-tested and should be your first
+choice for installation.
+
+# How to build
+
+Bear is now implemented in Rust and can be built and installed using the Rust
+toolchain.
 
 ## Prerequisites
 
@@ -9,7 +16,9 @@ Bear is now implemented in Rust and can be built and installed using the Rust to
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
-   Ensure `cargo` and `rustc` are available in your PATH:
+
+Ensure `cargo` and `rustc` are available in your PATH:
+
    ```bash
    rustc --version
    cargo --version
@@ -21,7 +30,7 @@ To build and install Bear, run the following commands:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/bear.git
+   git clone https://github.com/rizsotto/Bear.git
    cd bear
    ```
 
@@ -39,8 +48,9 @@ To build and install Bear, run the following commands:
    sudo install -m 644 man/bear.1 /usr/local/man/man1/
    ```
 
-To install the preload library, you need to establish what the dynamic linker expects
-to resolve the `$LIB` symbol. (Read `man ld.so` to get more about this.)
+To install the preload library, you need to determine the directory the dynamic
+linker uses to resolve the `$LIB` symbol. You can find more information about
+this in the `ld.so` man page (`man ld.so`).
 
    ```bash
    # For RedHat, Fedora, Arch based systems
@@ -57,25 +67,24 @@ Then run the following commands:
    sudo install -m 755 target/release/libexec.so /usr/local/libexec/bear/$INSTALL_LIBDIR/
    ```
 
-## OS-specific Notes
+# How to package
 
-### Fedora/Red Hat-based systems
-Install the Rust toolchain using the system package manager:
-```bash
-dnf install rust cargo
-```
+If you are a package maintainer for a distribution, there are a few extra
+things you might want to know:
 
-### Debian/Ubuntu-based systems
-Install the Rust toolchain using the system package manager:
-```bash
-apt-get install rustc cargo
-```
-
-### macOS
-Install Rust using [Homebrew](https://brew.sh/):
-```bash
-brew install rust
-```
-
-### Windows
-Install Rust using [rustup](https://rustup.rs/).
+- The Bear executable contains hardcoded paths to the `wrapper` executable and
+  the `libexec.so` shared library. If you change the location of these
+  binaries, you also need to change the `bear/build.rs` file where these paths
+  are set.
+- Package the release build of this software. You can run the unit tests as
+  part of the package build. Running the integration tests requires rebuilding
+  the executables, so it is recommended to isolate the two steps as much as
+  possible. Consult the CI configuration in `.github/workflows/build_rust.yml`
+  for details.
+- The preload mode is only enabled on Linux at the moment. Including
+  `libexec.so` only makes sense on this OS. This might be extended to other
+  operating systems in the future. Consult `intercept-preload/build.rs` for
+  details.
+- The preload library path contains a `$LIB` string, which the dynamic linker
+  understands and resolves. This is useful in a multilib context. Consult the
+  `ld.so` man page (`man ld.so`) for details.
