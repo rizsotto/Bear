@@ -14,7 +14,7 @@
 //! file paths. In the current implementation, the `arguments` attribute is not
 //! transformed.
 
-use crate::config::{PathFormat, PathResolver, Validator};
+use crate::config::{PathFormat, PathResolver};
 use std::io;
 use std::path::{Path, PathBuf, absolute};
 use thiserror::Error;
@@ -25,14 +25,6 @@ pub enum FormatError {
     PathCanonicalize(#[from] io::Error),
     #[error("Path {0} can't be relative to {1}")]
     PathsCannotBeRelative(PathBuf, PathBuf),
-}
-
-#[derive(Debug, Error)]
-pub enum FormatConfigurationError {
-    #[error("Invalid path format configuration: {0}")]
-    InvalidConfiguration(&'static str),
-    #[error("Getting current directory failed: {0}")]
-    CurrentWorkingDirectory(#[from] io::Error),
 }
 
 /// Trait for formatting paths according to different strategies.
@@ -56,45 +48,9 @@ pub struct ConfigurablePathFormatter {
 impl ConfigurablePathFormatter {
     /// Creates a new PathFormatter with the given configuration.
     ///
-    /// # Errors
-    ///
-    /// Returns `FormatConfigurationError::InvalidConfiguration` if the path format
-    /// configuration violates the rules.
-    /// Returns `FormatConfigurationError::CurrentWorkingDirectory` if getting
-    /// the current working directory fails.
-    pub fn new(config: PathFormat) -> Result<Self, FormatConfigurationError> {
-        // Validate configuration rules using the Validator trait
-        PathFormat::validate(&config)?;
-
-        Ok(Self { config })
-    }
-}
-
-impl Validator<PathFormat> for PathFormat {
-    type Error = FormatConfigurationError;
-
-    /// Validates the path format configuration according to the rules:
-    /// - When directory is relative, file must be relative too
-    /// - When directory is canonical, file can't be absolute
-    /// - When directory is absolute, file can't be canonical
-    fn validate(config: &PathFormat) -> Result<(), Self::Error> {
-        use PathResolver::*;
-
-        match (&config.directory, &config.file) {
-            (Relative, Absolute | Canonical) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory is relative, file must be relative too",
-            )),
-            (Canonical, Absolute) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory is canonical, file can't be absolute",
-            )),
-            (Absolute, Canonical) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory is absolute, file can't be canonical",
-            )),
-            (AsIs, Absolute | Relative | Canonical) => Err(FormatConfigurationError::InvalidConfiguration(
-                "When directory as-is, file should be the same",
-            )),
-            _ => Ok(()),
-        }
+    /// The configuration is expected to be pre-validated by the config loader.
+    pub fn new(config: PathFormat) -> Self {
+        Self { config }
     }
 }
 
@@ -212,57 +168,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_path_format_validation_success() {
-        let valid_configs = vec![
-            PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
-            PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
-            PathFormat { directory: PathResolver::Canonical, file: PathResolver::Relative },
-            PathFormat { directory: PathResolver::Absolute, file: PathResolver::Relative },
-            PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
-        ];
-
-        for config in valid_configs {
-            assert!(PathFormat::validate(&config).is_ok(), "Config should be valid: {:?}", config);
-        }
-    }
-
-    #[test]
-    fn test_path_format_validation_failures() {
-        let invalid_configs = vec![
-            (
-                PathFormat { directory: PathResolver::Relative, file: PathResolver::Absolute },
-                "When directory is relative, file must be relative too",
-            ),
-            (
-                PathFormat { directory: PathResolver::Relative, file: PathResolver::Canonical },
-                "When directory is relative, file must be relative too",
-            ),
-            (
-                PathFormat { directory: PathResolver::Canonical, file: PathResolver::Absolute },
-                "When directory is canonical, file can't be absolute",
-            ),
-            (
-                PathFormat { directory: PathResolver::Absolute, file: PathResolver::Canonical },
-                "When directory is absolute, file can't be canonical",
-            ),
-            (
-                PathFormat { directory: PathResolver::AsIs, file: PathResolver::Canonical },
-                "When directory as-is, file should be the same",
-            ),
-        ];
-
-        for (config, expected_error) in invalid_configs {
-            let result = PathFormat::validate(&config);
-            assert!(result.is_err(), "Config should be invalid: {:?}", config);
-            if let Err(FormatConfigurationError::InvalidConfiguration(msg)) = result {
-                assert_eq!(msg, expected_error);
-            } else {
-                panic!("Expected InvalidConfiguration error");
-            }
-        }
-    }
-
-    #[test]
     fn test_relative_to_with_relative_paths() {
         // Test that relative_to works correctly with relative input paths
         let root = Path::new("./some/root");
@@ -333,7 +238,7 @@ mod tests {
     #[test]
     fn test_path_formatter_format_directory() {
         let config = PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs };
-        let formatter = ConfigurablePathFormatter::new(config).unwrap();
+        let formatter = ConfigurablePathFormatter::new(config);
 
         let working_dir = PathBuf::from("/working");
         let directory = PathBuf::from("/some/dir");
@@ -345,7 +250,7 @@ mod tests {
     #[test]
     fn test_path_formatter_format_file() {
         let config = PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs };
-        let formatter = ConfigurablePathFormatter::new(config).unwrap();
+        let formatter = ConfigurablePathFormatter::new(config);
 
         let directory = PathBuf::from("/some/dir");
         let file = PathBuf::from("file.c");

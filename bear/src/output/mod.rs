@@ -54,8 +54,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
         let source_filter_writer = SourceFilterOutputWriter::create(unique_writer, config.sources.clone())?;
         let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
         let append_writer = AppendClangOutputWriter::new(atomic_writer, final_path, args.append);
-        let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format)
-            .map_err(|e| WriterCreationError::Configuration(e.to_string()))?;
+        let formatted_writer = ConverterClangOutputWriter::new(append_writer, &config.format);
 
         Ok(Self { writer: formatted_writer })
     }

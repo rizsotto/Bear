@@ -25,8 +25,8 @@ pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
 }
 
 impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
-    pub(super) fn new(writer: T, format: &config::Format) -> Result<Self, clang::FormatConfigurationError> {
-        Ok(Self { converter: clang::CommandConverter::new(format.clone())?, writer })
+    pub(super) fn new(writer: T, format: &config::Format) -> Self {
+        Self { converter: clang::CommandConverter::new(format.clone()), writer }
     }
 }
 

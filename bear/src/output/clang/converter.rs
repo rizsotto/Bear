@@ -41,14 +41,14 @@
 //! use bear::config::Format;
 //!
 //! let config = Format::default();
-//! let converter = CommandConverter::new(config).unwrap();
+//! let converter = CommandConverter::new(config);
 //!
 //! // The converter can be used to convert semantic Command instances
 //! // into compilation database entries based on the configured format
 //! ```
 
 use super::Entry;
-use super::{ConfigurablePathFormatter, FormatConfigurationError, PathFormatter};
+use super::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
 use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand};
 use log::warn;
@@ -66,9 +66,9 @@ pub struct CommandConverter {
 
 impl CommandConverter {
     /// Creates a new CommandConverter with the specified format configuration.
-    pub fn new(format: config::Format) -> Result<Self, FormatConfigurationError> {
-        let path_formatter = Box::new(ConfigurablePathFormatter::new(format.paths)?);
-        Ok(Self { format: format.entries, path_formatter })
+    pub fn new(format: config::Format) -> Self {
+        let path_formatter = Box::new(ConfigurablePathFormatter::new(format.paths));
+        Self { format: format.entries, path_formatter }
     }
 
     /// Creates a new CommandConverter with a custom path formatter for testing.
@@ -395,7 +395,7 @@ mod tests {
         ));
 
         let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
         let entries = converter.to_entries(&command);
 
         let expected = vec![Entry::from_arguments_str(
@@ -421,7 +421,7 @@ mod tests {
         ));
 
         let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
         let result = converter.to_entries(&command);
 
         let expected = vec![
@@ -440,7 +440,7 @@ mod tests {
         ));
 
         let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
         let result = converter.to_entries(&command);
 
         let expected: Vec<Entry> = vec![];
@@ -463,7 +463,7 @@ mod tests {
             paths: PathFormat::default(),
             entries: EntryFormat { include_output_field: true, use_array_format: false },
         };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
         let entries = converter.to_entries(&command);
 
         let expected =
@@ -487,7 +487,7 @@ mod tests {
             paths: PathFormat::default(),
             entries: EntryFormat { use_array_format: true, include_output_field: false },
         };
-        let sut = CommandConverter::new(format).unwrap();
+        let sut = CommandConverter::new(format);
         let result = sut.to_entries(&command);
 
         let expected = vec![Entry::from_arguments_str(
@@ -506,7 +506,7 @@ mod tests {
             paths: PathFormat::default(),
             entries: EntryFormat { use_array_format: true, include_output_field: false },
         };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
 
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
@@ -650,22 +650,9 @@ mod tests {
     }
 
     #[test]
-    fn test_configuration_validation_failure() {
-        use crate::config::{PathFormat, PathResolver};
-
-        let invalid_format = Format {
-            paths: PathFormat { directory: PathResolver::Relative, file: PathResolver::Absolute },
-            entries: EntryFormat::default(),
-        };
-
-        let result = CommandConverter::new(invalid_format);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_preprocessing_only_command_no_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
@@ -683,8 +670,8 @@ mod tests {
 
     #[test]
     fn test_linking_only_command_no_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         // Linking object files (no -c flag, object file inputs)
         let compiler_cmd = CompilerCommand::from_strings(
@@ -704,8 +691,8 @@ mod tests {
 
     #[test]
     fn test_compile_only_command_generates_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
@@ -729,7 +716,7 @@ mod tests {
             paths: PathFormat::default(),
             entries: EntryFormat { use_array_format: true, include_output_field: false },
         };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
 
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
@@ -758,8 +745,8 @@ mod tests {
 
     #[test]
     fn test_info_command_no_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
@@ -774,8 +761,8 @@ mod tests {
 
     #[test]
     fn test_realistic_source_file_detection() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         // Test compile-and-link with real source files (should generate entries)
         let compiler_cmd = CompilerCommand::from_strings(
@@ -810,8 +797,8 @@ mod tests {
 
     #[test]
     fn test_semantic_classification_vs_raw_flags() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         // Test that we rely on semantic classification, not raw flag strings
         // This tests a hypothetical case where a flag might look like "-E" but
@@ -894,7 +881,7 @@ mod tests {
             paths: PathFormat::default(),
             entries: EntryFormat { use_array_format: true, include_output_field: true },
         };
-        let converter = CommandConverter::new(format).unwrap();
+        let converter = CommandConverter::new(format);
 
         // Test that all three formatting methods work consistently
         let compiler_cmd = CompilerCommand::from_strings(
@@ -934,8 +921,8 @@ mod tests {
 
     #[test]
     fn test_preprocessing_and_compilation_flags_generates_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         // Test command with both preprocessing flags (-D) and compilation flags (-c)
         let compiler_cmd = CompilerCommand::from_strings(
@@ -968,8 +955,8 @@ mod tests {
 
     #[test]
     fn test_preprocessing_only_with_defines_no_entries() {
-        let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
-        let converter = CommandConverter::new(format).unwrap();
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
 
         // Test command with only preprocessing flags (no -c flag)
         let compiler_cmd = CompilerCommand::from_strings(

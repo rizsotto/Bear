@@ -389,6 +389,8 @@ pub mod validation {
         PathNotFound { path: String },
         #[error("Duplicate {field} entry at: {idx}")]
         DuplicateEntry { field: &'static str, idx: usize },
+        #[error("Path format error: {message}")]
+        PathFormatError { message: &'static str },
         #[error("Multiple validation errors: {errors:?}")]
         Multiple { errors: Vec<ValidationError> },
     }
@@ -457,6 +459,9 @@ pub mod validation {
 
             // Validate duplicate filter configuration
             collector.add_result(DuplicateFilter::validate(&config.duplicates));
+
+            // Validate path format configuration
+            collector.add_result(PathFormat::validate(&config.format.paths));
 
             collector.finish()
         }
@@ -541,6 +546,34 @@ pub mod validation {
             }
 
             collector.finish()
+        }
+    }
+
+    impl Validator<PathFormat> for PathFormat {
+        type Error = ValidationError;
+
+        /// Validates the path format configuration according to the rules:
+        /// - When directory is relative, file must be relative too
+        /// - When directory is canonical, file can't be absolute
+        /// - When directory is absolute, file can't be canonical
+        fn validate(config: &PathFormat) -> Result<(), Self::Error> {
+            use PathResolver::*;
+
+            match (&config.directory, &config.file) {
+                (Relative, Absolute | Canonical) => Err(ValidationError::PathFormatError {
+                    message: "When directory is relative, file must be relative too",
+                }),
+                (Canonical, Absolute) => Err(ValidationError::PathFormatError {
+                    message: "When directory is canonical, file can't be absolute",
+                }),
+                (Absolute, Canonical) => Err(ValidationError::PathFormatError {
+                    message: "When directory is absolute, file can't be canonical",
+                }),
+                (AsIs, Absolute | Relative | Canonical) => Err(ValidationError::PathFormatError {
+                    message: "When directory as-is, file should be the same",
+                }),
+                _ => Ok(()),
+            }
         }
     }
 
@@ -720,6 +753,57 @@ pub mod validation {
 
             let result = DuplicateFilter::validate(&config);
             assert!(result.is_ok());
+        }
+
+        #[test]
+        fn test_validate_path_format_success() {
+            let valid_configs = vec![
+                PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
+                PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
+                PathFormat { directory: PathResolver::Canonical, file: PathResolver::Relative },
+                PathFormat { directory: PathResolver::Absolute, file: PathResolver::Relative },
+                PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
+            ];
+
+            for config in valid_configs {
+                assert!(PathFormat::validate(&config).is_ok(), "Config should be valid: {:?}", config);
+            }
+        }
+
+        #[test]
+        fn test_validate_path_format_failures() {
+            let invalid_configs = vec![
+                (
+                    PathFormat { directory: PathResolver::Relative, file: PathResolver::Absolute },
+                    "When directory is relative, file must be relative too",
+                ),
+                (
+                    PathFormat { directory: PathResolver::Relative, file: PathResolver::Canonical },
+                    "When directory is relative, file must be relative too",
+                ),
+                (
+                    PathFormat { directory: PathResolver::Canonical, file: PathResolver::Absolute },
+                    "When directory is canonical, file can't be absolute",
+                ),
+                (
+                    PathFormat { directory: PathResolver::Absolute, file: PathResolver::Canonical },
+                    "When directory is absolute, file can't be canonical",
+                ),
+                (
+                    PathFormat { directory: PathResolver::AsIs, file: PathResolver::Canonical },
+                    "When directory as-is, file should be the same",
+                ),
+            ];
+
+            for (config, expected_error) in invalid_configs {
+                let result = PathFormat::validate(&config);
+                assert!(result.is_err(), "Config should be invalid: {:?}", config);
+                if let Err(ValidationError::PathFormatError { message }) = result {
+                    assert_eq!(message, expected_error);
+                } else {
+                    panic!("Expected PathFormatError, got: {:?}", result);
+                }
+            }
         }
     }
 }

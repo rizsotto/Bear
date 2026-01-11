@@ -24,7 +24,7 @@ use thiserror::Error;
 pub use converter::CommandConverter;
 pub use filter_duplicates::DuplicateEntryFilter;
 pub use filter_sources::{SourceEntryFilter, SourceFilterError};
-pub use format::{ConfigurablePathFormatter, FormatConfigurationError, FormatError, PathFormatter};
+pub use format::{ConfigurablePathFormatter, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
