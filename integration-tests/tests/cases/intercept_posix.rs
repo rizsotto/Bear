@@ -10,12 +10,24 @@ use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::*;
 use anyhow::Result;
 
+const CONFIG: &str = concat!(
+    r#"schema: '4.0'
+
+intercept:
+  mode: preload
+  path: "#,
+    env!("PRELOAD_LIBRARY_PATH"),
+    r#"
+"#
+);
+
 /// Test execve system call interception
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execve_interception() -> Result<()> {
     let env = TestEnvironment::new("execve_intercept")?;
+    env.create_config(CONFIG)?;
 
     // Create a C program that uses execve
     let c_program = format!(
@@ -33,7 +45,15 @@ int main() {{
     env.run_c_compiler("test_execve", &["test_execve.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear_success(&["intercept", "--output", "events.json", "--", "./test_execve"])?;
+    env.run_bear_success(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_execve",
+    ])?;
 
     // Verify intercepted events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -48,6 +68,7 @@ int main() {{
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execle_interception() -> Result<()> {
     let env = TestEnvironment::new("execl_intercept")?;
+    env.create_config(CONFIG)?;
 
     // Create a C program that uses execl
     let c_program = format!(
@@ -62,7 +83,8 @@ int main() {{
     env.run_c_compiler("test_execl", &["test_execl.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execl"])?.assert_success()?;
+    env.run_bear(&["--config", "config.yml", "intercept", "--output", "events.json", "--", "./test_execl"])?
+        .assert_success()?;
 
     // Verify events were captured using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -77,6 +99,7 @@ int main() {{
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execv_interception() -> Result<()> {
     let env = TestEnvironment::new("execlp_intercept")?;
+    env.create_config(CONFIG)?;
 
     // Create a C program that uses execlp (searches PATH)
     let c_program = r#"#include <unistd.h>
@@ -89,7 +112,8 @@ int main() {
     env.run_c_compiler("test_execlp", &["test_execlp.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execlp"])?.assert_success()?;
+    env.run_bear(&["--config", "config.yml", "intercept", "--output", "events.json", "--", "./test_execlp"])?
+        .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -104,6 +128,7 @@ int main() {
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execvp_interception() -> Result<()> {
     let env = TestEnvironment::new("execvp_intercept")?;
+    env.create_config(CONFIG)?;
 
     let c_program = r#"#include <unistd.h>
 
@@ -116,7 +141,8 @@ int main() {
     env.run_c_compiler("test_execvp", &["test_execvp.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execvp"])?.assert_success()?;
+    env.run_bear(&["--config", "config.yml", "intercept", "--output", "events.json", "--", "./test_execvp"])?
+        .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -131,6 +157,7 @@ int main() {
 #[cfg(all(has_executable_compiler_c, has_executable_cat))]
 fn popen_interception() -> Result<()> {
     let env = TestEnvironment::new("popen_intercept")?;
+    env.create_config(CONFIG)?;
 
     let c_program = format!(
         r#"#include <stdio.h>
@@ -168,7 +195,8 @@ int main(void) {{
     env.run_c_compiler("test_popen", &["test_popen.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_popen"])?.assert_success()?;
+    env.run_bear(&["--config", "config.yml", "intercept", "--output", "events.json", "--", "./test_popen"])?
+        .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -183,6 +211,7 @@ int main(void) {{
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn system_interception() -> Result<()> {
     let env = TestEnvironment::new("system_intercept")?;
+    env.create_config(CONFIG)?;
 
     let c_program = format!(
         r#"#include <stdlib.h>
@@ -197,7 +226,8 @@ int main() {{
     env.run_c_compiler("test_system", &["test_system.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_system"])?.assert_success()?;
+    env.run_bear(&["--config", "config.yml", "intercept", "--output", "events.json", "--", "./test_system"])?
+        .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -212,6 +242,7 @@ int main() {{
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn posix_spawn_interception() -> Result<()> {
     let env = TestEnvironment::new("posix_spawn_intercept")?;
+    env.create_config(CONFIG)?;
 
     let c_program = format!(
         r#"#include <spawn.h>
@@ -238,7 +269,16 @@ int main() {{
     env.run_c_compiler("test_posix_spawn", &["test_posix_spawn.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_posix_spawn"])?.assert_success()?;
+    env.run_bear(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_posix_spawn",
+    ])?
+    .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -253,6 +293,7 @@ int main() {{
 #[cfg(has_executable_compiler_c)]
 fn posix_spawnp_interception() -> Result<()> {
     let env = TestEnvironment::new("posix_spawnp_intercept")?;
+    env.create_config(CONFIG)?;
 
     let c_program = r#"#include <spawn.h>
 #include <sys/wait.h>
@@ -276,7 +317,16 @@ int main() {
     env.run_c_compiler("test_posix_spawnp", &["test_posix_spawnp.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_posix_spawnp"])?.assert_success()?;
+    env.run_bear(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_posix_spawnp",
+    ])?
+    .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -291,6 +341,7 @@ int main() {
 #[cfg(has_executable_compiler_c)]
 fn test_failed_exec_errno_handling() -> Result<()> {
     let env = TestEnvironment::new("failed_exec_errno")?;
+    env.create_config(CONFIG)?;
 
     let c_program = r#"#include <unistd.h>
 #include <stdio.h>
@@ -312,8 +363,15 @@ int main() {
     env.run_c_compiler("test_failed_exec", &["test_failed_exec.c"])?;
 
     // Run intercept on the compiled program
-    let intercept_output =
-        env.run_bear(&["intercept", "--output", "events.json", "--", "./test_failed_exec"])?;
+    let intercept_output = env.run_bear(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_failed_exec",
+    ])?;
 
     // The program should fail (non-zero exit) but intercept should still work
     intercept_output.assert_failure()?;
@@ -334,6 +392,7 @@ int main() {
 #[cfg(has_executable_compiler_c)]
 fn test_no_exec_calls() -> Result<()> {
     let env = TestEnvironment::new("no_exec")?;
+    env.create_config(CONFIG)?;
 
     let c_program = r#"#include <stdio.h>
 #include <stdlib.h>
@@ -350,7 +409,16 @@ int main() {
     env.run_c_compiler("test_no_exec", &["test_no_exec.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_no_exec"])?.assert_success()?;
+    env.run_bear(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_no_exec",
+    ])?
+    .assert_success()?;
 
     // Verify minimal events using infrastructure assertions
     let events = env.load_events_file("events.json")?;
@@ -372,6 +440,7 @@ int main() {
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execvpe_interception() -> Result<()> {
     let env = TestEnvironment::new("execvpe_intercept")?;
+    env.create_config(CONFIG)?;
 
     // Note: execvpe is not POSIX standard, may not be available on all systems
     let c_program = r#"#define _GNU_SOURCE
@@ -392,7 +461,16 @@ int main() {
     env.run_c_compiler("test_execvpe", &["test_execvpe.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear(&["intercept", "--output", "events.json", "--", "./test_execvpe"])?.assert_success()?;
+    env.run_bear(&[
+        "--config",
+        "config.yml",
+        "intercept",
+        "--output",
+        "events.json",
+        "--",
+        "./test_execvpe",
+    ])?
+    .assert_success()?;
 
     // Verify events using infrastructure assertions
     let events = env.load_events_file("events.json")?;

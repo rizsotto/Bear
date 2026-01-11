@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::environment::{
-    KEY_DESTINATION, KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH, KEY_OS__PATH,
-    KEY_OS__PRELOAD_PATH,
-};
+#[cfg(not(target_os = "macos"))]
+use crate::environment::KEY_OS__PRELOAD_PATH;
+use crate::environment::{KEY_DESTINATION, KEY_OS__PATH};
+#[cfg(target_os = "macos")]
+use crate::environment::{KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH};
 use crate::intercept::supervise;
 use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, context};
@@ -185,7 +186,6 @@ impl BuildEnvironment {
                 }
             })
             .filter(move |path| is_executable_file(path) && predicate(path))
-            .inspect(|path| log::debug!("Found compiler candidate: {}", path.display()))
     }
 
     /// Creates a `BuildEnvironment` configured for preload mode interception.
@@ -212,10 +212,20 @@ impl BuildEnvironment {
         path: &std::path::Path,
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
+        // Check if preload is supported on this system
+        if !context.preload_supported {
+            return Err(ConfigurationError::UnsupportedInterceptMode(
+                "Preload-based interception is not supported on this system. \
+                 This may be due to platform restrictions (e.g., Windows) or \
+                 security features (e.g., macOS System Integrity Protection). \
+                 Consider using wrapper mode instead.",
+            ));
+        }
         let mut environment_overrides = HashMap::new();
 
         // Platform-specific preload configuration
-        if cfg!(target_os = "macos") {
+        #[cfg(target_os = "macos")]
+        {
             // macOS uses DYLD_INSERT_LIBRARIES and DYLD_FORCE_FLAT_NAMESPACE
             let preload_original =
                 context.environment.get(KEY_OS__MACOS_PRELOAD_PATH).cloned().unwrap_or_default();
@@ -224,7 +234,9 @@ impl BuildEnvironment {
 
             environment_overrides.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), preload_updated);
             environment_overrides.insert(KEY_OS__MACOS_FLAT_NAMESPACE.to_string(), "1".to_string());
-        } else {
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
             // Linux and other Unix-like systems use LD_PRELOAD
             let preload_original = context.environment.get(KEY_OS__PRELOAD_PATH).cloned().unwrap_or_default();
             let preload_updated =
@@ -289,6 +301,8 @@ pub enum ConfigurationError {
     WrapperDirectory(#[from] WrapperDirectoryError),
     #[error("Could not find PATH variable")]
     PathNotFound,
+    #[error("Unsupported intercept mode: {0}")]
+    UnsupportedInterceptMode(&'static str),
 }
 
 /// Manipulates a `PATH`-like environment variable by inserting a path at the beginning.
@@ -357,7 +371,9 @@ mod test {
     fn create_test_context() -> crate::context::Context {
         let mut environment = HashMap::new();
         environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
+        #[cfg(not(target_os = "macos"))]
         environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
+        #[cfg(target_os = "macos")]
         environment.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), "".to_string());
         environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
         environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
@@ -366,6 +382,7 @@ mod test {
             current_executable: PathBuf::from("/usr/bin/bear"),
             current_directory: PathBuf::from("/tmp"),
             environment,
+            preload_supported: true,
         }
     }
 
@@ -454,14 +471,17 @@ mod test {
         assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
 
         // Check platform-specific preload configuration
-        if cfg!(target_os = "macos") {
+        #[cfg(target_os = "macos")]
+        {
             // Check that DYLD_INSERT_LIBRARIES contains our library
             let dyld_preload = env.environment_overrides.get(KEY_OS__MACOS_PRELOAD_PATH).unwrap();
             assert!(dyld_preload.starts_with("/usr/local/lib/libintercept.so"));
 
             // Check that DYLD_FORCE_FLAT_NAMESPACE is set to "1"
             assert_eq!(env.environment_overrides.get(KEY_OS__MACOS_FLAT_NAMESPACE), Some(&"1".to_string()));
-        } else {
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
             // Check that LD_PRELOAD contains our library
             let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
             assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
@@ -591,6 +611,7 @@ mod test {
             current_executable: std::path::PathBuf::from("/usr/bin/bear"),
             current_directory: std::path::PathBuf::from("/tmp"),
             environment: env,
+            preload_supported: true,
         };
 
         // Test with empty executables - should trigger PATH discovery
@@ -636,6 +657,7 @@ mod test {
             current_executable: std::path::PathBuf::from("/usr/bin/bear"),
             current_directory: std::path::PathBuf::from("/tmp"),
             environment: env,
+            preload_supported: true,
         };
 
         // Test with non-empty executables - should skip PATH discovery

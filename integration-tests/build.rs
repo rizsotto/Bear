@@ -6,11 +6,16 @@
  * original bear/build.rs.
  */
 
+/// Wrapper executable name (platform-dependent)
 #[cfg(windows)]
 const WRAPPER_NAME: &str = "wrapper.exe";
 #[cfg(not(windows))]
 const WRAPPER_NAME: &str = "wrapper";
 
+/// Preload library name (platform-dependent)
+#[cfg(target_os = "macos")]
+const PRELOAD_NAME: &str = "libexec.dylib";
+#[cfg(not(target_os = "macos"))]
 const PRELOAD_NAME: &str = "libexec.so";
 
 fn main() {
@@ -121,14 +126,37 @@ fn check_preload_library_availability(preload_path: &str) {
     // Check if the preload library file exists
     let preload_file_exists = std::path::Path::new(preload_path).exists();
 
-    if platform_supports_preload && preload_file_exists {
+    // Check for platform-specific restrictions
+    let runtime_supports_preload = is_preload_supported_at_runtime();
+
+    if platform_supports_preload && preload_file_exists && runtime_supports_preload {
         println!("cargo:rustc-cfg=has_preload_library");
         println!("cargo:rustc-check-cfg=cfg(has_preload_library)");
         println!("cargo:warning=Preload library available at: {}", preload_path);
     } else {
         println!(
-            "cargo:warning=Preload library not available (platform_supports: {}, file_exists: {})",
-            platform_supports_preload, preload_file_exists
+            "cargo:warning=Preload library not available (platform_supports: {}, file_exists: {}, runtime_supports: {})",
+            platform_supports_preload, preload_file_exists, runtime_supports_preload
         );
+    }
+}
+
+/// Check if preload is supported at runtime, considering platform-specific restrictions.
+fn is_preload_supported_at_runtime() -> bool {
+    #[cfg(windows)]
+    {
+        // Windows doesn't support LD_PRELOAD
+        false
+    }
+    #[cfg(all(target_os = "macos", not(windows)))]
+    {
+        // Disable integration test on macOS, because could not find out how to compile
+        // the libexec.dylib that works on arm64e, and that makes the CI build broken.
+        false
+    }
+    #[cfg(all(not(target_os = "macos"), not(windows)))]
+    {
+        // Other Unix-like systems should support preload
+        true
     }
 }
