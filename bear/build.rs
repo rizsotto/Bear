@@ -25,11 +25,16 @@
 
 /// Default wrapper executable path
 /// Package creators: modify this entire path to change wrapper location
+/// Note for Windows: a single backslash in rust strings starts an escape
+///                   sequence ("C:\Users\..." breaks); use forward slashes
+///                   ("C:/Users/..."), escaped backslashes ("C:\\Users\\..."),
+///                   or a raw string literal (r"C:\Users\...")
 const DEFAULT_WRAPPER_PATH: &str = "/usr/local/libexec/bear";
 
 /// Default preload library path
 /// Package creators: modify this entire path to change preload library location
 /// Note: $LIB will be expanded at runtime to the appropriate architecture subdirectory
+/// Note for Windows: preload isn't supported; feel free to ignore this path
 const DEFAULT_PRELOAD_PATH: &str = "/usr/local/libexec/bear/$LIB";
 
 // =============================================================================
