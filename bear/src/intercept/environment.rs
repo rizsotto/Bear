@@ -57,13 +57,13 @@ impl BuildEnvironment {
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
         match intercept {
-            config::Intercept::Wrapper { path, directory } => {
+            config::Intercept::Wrapper { path, .. } => {
                 let executables: Vec<std::path::PathBuf> = compilers
                     .iter()
                     .filter(|compiler| !compiler.ignore)
                     .map(|compiler| compiler.path.clone())
                     .collect();
-                Self::create_as_wrapper(context, path, directory, &executables, address)
+                Self::create_as_wrapper(context, path, &executables, address)
             }
             config::Intercept::Preload { path } => Self::create_as_preload(context, path, address),
         }
@@ -71,12 +71,12 @@ impl BuildEnvironment {
 
     /// Creates a `BuildEnvironment` configured for wrapper mode interception.
     ///
-    /// The wrapper mode is more complicated than preload mode. We create a temporary directory
-    /// and insert copies of the wrapper executable. To decide how to name the executables
-    /// in the directory, we consider the config file, but also the current environment
-    /// variables. Once these are set up, we alter the `PATH` environment variable to ensure the
-    /// wrappers are executed instead of the real compilers. To instruct the wrappers which
-    /// executables to call, we also create a JSON file.
+    /// The wrapper mode is more complicated than preload mode. We create a `.bear/` directory
+    /// in the current working directory and insert copies of the wrapper executable. To decide
+    /// how to name the executables in the directory, we consider the config file, but also
+    /// the current environment variables. Once these are set up, we alter the `PATH` environment
+    /// variable to ensure the wrappers are executed instead of the real compilers. To instruct
+    /// the wrappers which executables to call, we also create a JSON file.
     ///
     /// The wrapper mode reads the current environment and looks for variables that might
     /// instruct the build process about the compiler locations. Good candidates for such
@@ -93,10 +93,14 @@ impl BuildEnvironment {
     /// some of the environment variables mentioned above (`CC`, `CXX`, `LD`, `CPP`, etc.),
     /// allowing the user to use these variables in the build invocations.
     ///
+    /// The use of a deterministic `.bear/` directory (instead of a random temp directory)
+    /// is essential for autotools-style builds where `./configure` caches compiler paths.
+    /// With a random directory, subsequent `make` invocations would fail because the
+    /// cached paths would no longer exist.
+    ///
     /// # Arguments
     ///
     /// * `path` - Path to the wrapper executable
-    /// * `directory` - Directory where wrapper copies will be created
     /// * `executables` - List of executables to create wrappers for
     /// * `address` - Socket address for interceptor communication
     ///
@@ -107,12 +111,11 @@ impl BuildEnvironment {
     fn create_as_wrapper(
         context: &context::Context,
         path: &std::path::Path,
-        directory: &std::path::Path,
         executables: &[std::path::PathBuf],
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
-        // Create wrapper directory builder
-        let mut wrapper_dir_builder = WrapperDirectoryBuilder::create(path, directory)?;
+        // Create wrapper directory builder (creates .bear/ in context's working directory)
+        let mut wrapper_dir_builder = WrapperDirectoryBuilder::create(path, &context.current_directory)?;
 
         // Register executables from config
         for executable in executables {
@@ -367,6 +370,26 @@ mod test {
     use std::collections::HashMap;
     use std::net::{IpAddr, Ipv4Addr};
     use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    /// Creates a test context with the specified working directory.
+    fn create_test_context_with_dir(working_dir: PathBuf) -> crate::context::Context {
+        let mut environment = HashMap::new();
+        environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
+        #[cfg(not(target_os = "macos"))]
+        environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
+        #[cfg(target_os = "macos")]
+        environment.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), "".to_string());
+        environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
+        environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+
+        crate::context::Context {
+            current_executable: PathBuf::from("/usr/bin/bear"),
+            current_directory: working_dir,
+            environment,
+            preload_supported: true,
+        }
+    }
 
     fn create_test_context() -> crate::context::Context {
         let mut environment = HashMap::new();
@@ -490,33 +513,30 @@ mod test {
 
     #[test]
     fn test_build_environment_create_wrapper() {
-        use tempfile::TempDir;
-
-        // Create a temporary directory for the test
+        // Create a temp directory for this test
         let temp_dir = TempDir::new().unwrap();
-        let temp_path = temp_dir.path();
 
-        // Create a dummy wrapper executable
-        let wrapper_path = temp_path.join("wrapper");
+        // Create a dummy wrapper executable in the test directory
+        let wrapper_path = temp_dir.path().join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        let intercept =
-            config::Intercept::Wrapper { path: wrapper_path.clone(), directory: temp_path.to_path_buf() };
+        let intercept = config::Intercept::Wrapper { path: wrapper_path.clone() };
         let compilers = vec![
             config::Compiler { path: PathBuf::from("/usr/bin/gcc"), as_: None, ignore: false },
             config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
         ];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let context = create_test_context();
+        // Pass temp_dir as the working directory through context
+        let context = create_test_context_with_dir(temp_dir.path().to_path_buf());
         let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Check that destination is set
         assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
 
-        // Check that PATH is updated (should contain our temp directory at the beginning)
+        // Check that PATH is updated (should contain .bear directory at the beginning)
         let path = env.environment_overrides.get("PATH").unwrap();
-        assert!(path.contains(&"bear-".to_string()), "PATH should contain bear temp directory: {path}");
+        assert!(path.contains(".bear"), "PATH should contain .bear directory: {path}");
 
         // Verify wrapper directory is kept alive
         assert!(env._wrapper_directory.is_some());
@@ -524,34 +544,20 @@ mod test {
 
     #[test]
     fn test_build_environment_create_wrapper_with_env_vars() {
-        use tempfile::TempDir;
-
-        // Clean up any existing environment variables first
-        unsafe {
-            std::env::remove_var("CC");
-            std::env::remove_var("CXX");
-        }
-
-        // Create a temporary directory for the test
+        // Create a temp directory for this test
         let temp_dir = TempDir::new().unwrap();
-        let temp_path = temp_dir.path();
 
-        // Create a dummy wrapper executable
-        let wrapper_path = temp_path.join("wrapper");
+        // Create a dummy wrapper executable in the test directory
+        let wrapper_path = temp_dir.path().join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        // Set up environment variables that should be detected
-        unsafe {
-            std::env::set_var("CC", "/usr/bin/gcc");
-            std::env::set_var("CXX", "/usr/bin/g++");
-        }
-
-        let intercept = config::Intercept::Wrapper { path: wrapper_path, directory: temp_path.to_path_buf() };
+        let intercept = config::Intercept::Wrapper { path: wrapper_path };
         let compilers =
             vec![config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false }];
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-        let context = create_test_context();
+        // Pass temp_dir as the working directory through context
+        let context = create_test_context_with_dir(temp_dir.path().to_path_buf());
         let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
 
         // Get the wrapper directory from the BuildEnvironment
@@ -571,23 +577,18 @@ mod test {
         // Check that environment variables were redirected to wrapper executables
         let cc_value = env.environment_overrides.get("CC").unwrap();
         let cxx_value = env.environment_overrides.get("CXX").unwrap();
-        assert!(cc_value.contains("bear-"), "CC should point to wrapper: {}", cc_value);
-        assert!(cxx_value.contains("bear-"), "CXX should point to wrapper: {}", cxx_value);
-
-        // Clean up environment variables
-        unsafe {
-            std::env::remove_var("CC");
-            std::env::remove_var("CXX");
-        }
+        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+        assert!(cxx_value.contains(".bear"), "CXX should point to wrapper: {}", cxx_value);
     }
 
     #[test]
     fn test_path_discovery_with_empty_executables() {
         use std::fs;
-        use tempfile::TempDir;
 
-        // Create a temporary directory with mock compilers
+        // Create a temp directory for this test
         let temp_dir = TempDir::new().unwrap();
+
+        // Create a directory with mock compilers
         let bin_dir = temp_dir.path().join("bin");
         fs::create_dir(&bin_dir).unwrap();
 
@@ -603,20 +604,19 @@ mod test {
             }
         }
 
-        // Create test context with custom PATH
+        // Create test context with custom PATH and temp_dir as working directory
         let mut env = std::collections::HashMap::new();
         env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
 
         let context = crate::context::Context {
             current_executable: std::path::PathBuf::from("/usr/bin/bear"),
-            current_directory: std::path::PathBuf::from("/tmp"),
+            current_directory: temp_dir.path().to_path_buf(),
             environment: env,
             preload_supported: true,
         };
 
-        // Test with empty executables - should trigger PATH discovery
-        let wrapper_dir = TempDir::new().unwrap();
-        let wrapper_exe = wrapper_dir.path().join("bear-wrapper");
+        // Create wrapper executable in test directory
+        let wrapper_exe = temp_dir.path().join("bear-wrapper");
         fs::write(&wrapper_exe, "wrapper").unwrap();
 
         let address = "127.0.0.1:12345".parse().unwrap();
@@ -624,7 +624,6 @@ mod test {
         let result = BuildEnvironment::create_as_wrapper(
             &context,
             &wrapper_exe,
-            wrapper_dir.path(),
             &[], // Empty executables - should trigger PATH discovery
             address,
         );
@@ -634,16 +633,17 @@ mod test {
         // Verify that the PATH was updated to include the wrapper directory
         let build_env = result.unwrap();
         let updated_path = build_env.environment_overrides.get("PATH").unwrap();
-        assert!(updated_path.contains("bear-"), "PATH should contain wrapper directory");
+        assert!(updated_path.contains(".bear"), "PATH should contain .bear directory");
     }
 
     #[test]
     fn test_path_discovery_skipped_with_executables() {
         use std::fs;
-        use tempfile::TempDir;
 
-        // Create test context with PATH containing compilers
+        // Create a temp directory for this test
         let temp_dir = TempDir::new().unwrap();
+
+        // Create a directory with a compiler
         let bin_dir = temp_dir.path().join("bin");
         fs::create_dir(&bin_dir).unwrap();
 
@@ -653,16 +653,16 @@ mod test {
         let mut env = std::collections::HashMap::new();
         env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
 
+        // Use temp_dir as working directory through context
         let context = crate::context::Context {
             current_executable: std::path::PathBuf::from("/usr/bin/bear"),
-            current_directory: std::path::PathBuf::from("/tmp"),
+            current_directory: temp_dir.path().to_path_buf(),
             environment: env,
             preload_supported: true,
         };
 
-        // Test with non-empty executables - should skip PATH discovery
-        let wrapper_dir = TempDir::new().unwrap();
-        let wrapper_exe = wrapper_dir.path().join("bear-wrapper");
+        // Create wrapper executable in test directory
+        let wrapper_exe = temp_dir.path().join("bear-wrapper");
         fs::write(&wrapper_exe, "wrapper").unwrap();
 
         let address = "127.0.0.1:12345".parse().unwrap();
@@ -671,7 +671,6 @@ mod test {
         let result = BuildEnvironment::create_as_wrapper(
             &context,
             &wrapper_exe,
-            wrapper_dir.path(),
             &[custom_compiler], // Non-empty executables - should skip PATH discovery
             address,
         );

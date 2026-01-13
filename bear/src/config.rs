@@ -21,7 +21,6 @@
 //!
 //! intercept:
 //!   mode: wrapper
-//!   directory: /tmp
 //!
 //! compilers:
 //!   - path: /usr/local/bin/cc
@@ -122,7 +121,7 @@ mod types {
         }
     }
 
-    /// Simplified intercept configuration with mode and directory.
+    /// Simplified intercept configuration with mode.
     #[derive(Debug, PartialEq, serde::Deserialize, serde::Serialize)]
     #[serde(tag = "mode")]
     pub enum Intercept {
@@ -130,8 +129,6 @@ mod types {
         Wrapper {
             #[serde(default = "default_wrapper_executable")]
             path: PathBuf,
-            #[serde(default = "default_wrapper_directory")]
-            directory: PathBuf,
         },
         #[serde(rename = "preload")]
         Preload {
@@ -155,7 +152,7 @@ mod types {
 
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
         fn default() -> Self {
-            Intercept::Wrapper { path: default_wrapper_executable(), directory: default_wrapper_directory() }
+            Intercept::Wrapper { path: default_wrapper_executable() }
         }
     }
 
@@ -332,11 +329,6 @@ mod types {
     const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
     const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
 
-    /// The default directory where the wrapper executables will be stored.
-    pub(super) fn default_wrapper_directory() -> PathBuf {
-        std::env::temp_dir()
-    }
-
     /// The default path to the wrapper executable.
     pub(super) fn default_wrapper_executable() -> PathBuf {
         PathBuf::from(WRAPPER_EXECUTABLE_PATH)
@@ -472,19 +464,12 @@ pub mod validation {
 
         fn validate(config: &Intercept) -> Result<(), Self::Error> {
             match config {
-                Intercept::Wrapper { path, directory } => {
-                    let mut collector = ValidationCollector::new();
-
+                Intercept::Wrapper { path } => {
                     if !path.exists() {
-                        collector.add(ValidationError::PathNotFound { path: path.display().to_string() });
+                        Err(ValidationError::PathNotFound { path: path.display().to_string() })
+                    } else {
+                        Ok(())
                     }
-
-                    if !directory.exists() {
-                        collector
-                            .add(ValidationError::PathNotFound { path: directory.display().to_string() });
-                    }
-
-                    collector.finish()
                 }
                 Intercept::Preload { path } => {
                     if !path.exists() {
@@ -589,26 +574,21 @@ pub mod validation {
             let temp_file = temp_dir.path().join("test_file");
             std::fs::write(&temp_file, "test").unwrap();
 
-            let config = Intercept::Wrapper { path: temp_file, directory: temp_dir.path().to_path_buf() };
+            let config = Intercept::Wrapper { path: temp_file };
 
             assert!(Intercept::validate(&config).is_ok());
         }
 
         #[test]
         fn test_validate_intercept_wrapper_invalid_paths() {
-            let config = Intercept::Wrapper {
-                path: PathBuf::from("/nonexistent/path"),
-                directory: PathBuf::from("/nonexistent/directory"),
-            };
+            let config = Intercept::Wrapper { path: PathBuf::from("/nonexistent/path") };
 
             let result = Intercept::validate(&config);
             assert!(result.is_err());
 
             match result.unwrap_err() {
-                ValidationError::Multiple { errors } => {
-                    assert_eq!(errors.len(), 2);
-                }
-                _ => panic!("Expected multiple validation errors"),
+                ValidationError::PathNotFound { .. } => {}
+                _ => panic!("Expected PathNotFound validation error"),
             }
         }
 
@@ -946,7 +926,6 @@ pub mod loader {
             intercept:
                 mode: wrapper
                 path: /usr/local/libexec/bear/wrapper
-                directory: /tmp
 
             compilers:
               - path: /usr/local/bin/cc
@@ -982,10 +961,7 @@ pub mod loader {
 
             let expected = Main {
                 schema: String::from("4.0"),
-                intercept: Intercept::Wrapper {
-                    path: PathBuf::from("/usr/local/libexec/bear/wrapper"),
-                    directory: PathBuf::from("/tmp"),
-                },
+                intercept: Intercept::Wrapper { path: PathBuf::from("/usr/local/libexec/bear/wrapper") },
                 compilers: vec![
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/cc"),
@@ -1036,10 +1012,7 @@ pub mod loader {
 
             let expected = Main {
                 schema: String::from("4.0"),
-                intercept: Intercept::Wrapper {
-                    path: default_wrapper_executable(),
-                    directory: default_wrapper_directory(),
-                },
+                intercept: Intercept::Wrapper { path: default_wrapper_executable() },
                 compilers: vec![],
                 sources: SourceFilter { only_existing_files: true, directories: vec![] },
                 duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Arguments] },

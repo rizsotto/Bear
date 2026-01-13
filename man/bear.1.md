@@ -110,7 +110,6 @@ Bear uses a YAML configuration file to control its behavior. The configuration f
 schema: "4.0"
 intercept:
   mode: wrapper
-  directory: /tmp
 compilers:
   - path: /usr/bin/cc
     as: gcc
@@ -155,7 +154,6 @@ Controls the command interception method:
 
 - **mode**: `preload` (Unix) or `wrapper` (cross-platform)
 - **path**: Path to the preload library or wrapper executable (depending on the mode)
-- **directory**: Directory to create temporary wrapper executables (wrapper mode only)
 
 ### compilers
 

@@ -8,12 +8,62 @@
 /// The filename used for wrapper configuration files.
 pub const CONFIG_FILENAME: &str = "wrappers.cfg";
 
+/// The directory name used for wrapper executables in the current working directory.
+pub const WRAPPER_DIR_NAME: &str = ".bear";
+
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use tempfile::TempDir;
 use thiserror::Error;
+
+/// A managed directory that is created in the current working directory
+/// and cleaned up when dropped.
+///
+/// Unlike `TempDir`, this uses a deterministic path (`.bear/` in cwd) which
+/// is essential for autotools-style builds where `configure` caches compiler
+/// paths that must remain valid across multiple Bear invocations.
+pub struct ManagedDirectory {
+    path: PathBuf,
+}
+
+impl ManagedDirectory {
+    /// Creates a new managed directory at `.bear/` in the specified working directory.
+    ///
+    /// If the directory already exists, it is deleted first to ensure a clean state.
+    /// This is important because we need fresh wrapper executables for each Bear run.
+    ///
+    /// # Arguments
+    ///
+    /// * `working_dir` - The directory where `.bear/` will be created (typically from context)
+    pub fn create(working_dir: &Path) -> Result<Self, std::io::Error> {
+        let path = working_dir.join(WRAPPER_DIR_NAME);
+
+        // Remove existing directory if present (clean slate for each run)
+        if path.exists() {
+            std::fs::remove_dir_all(&path)?;
+        }
+
+        // Create fresh directory
+        std::fs::create_dir_all(&path)?;
+
+        Ok(Self { path })
+    }
+
+    /// Returns the path to the managed directory.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ManagedDirectory {
+    fn drop(&mut self) {
+        // Best-effort cleanup - ignore errors
+        if self.path.exists() {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}
 
 /// Configuration structure for wrapper executables.
 ///
@@ -104,28 +154,31 @@ impl WrapperConfigWriter {
 ///
 /// This type acts as a builder that collects executable mappings and creates
 /// the necessary directory structure, hard links (or file copies on Windows), and configuration file.
-/// It owns and manages the temporary directory for the wrapper setup.
-/// Builder for creating wrapper directories with executable links and configuration.
+/// It owns and manages the wrapper directory (`.bear/` in the current working directory).
 ///
-/// This type acts as a builder that collects executable mappings and creates
-/// the necessary directory structure, hard links (or file copies on Windows), and configuration file.
-/// It owns and manages the temporary directory for the wrapper setup.
+/// The use of a deterministic directory path is essential for autotools-style builds
+/// where `./configure` caches compiler paths. Using a random temporary directory
+/// would break subsequent `make` invocations because the cached paths would no longer exist.
 pub struct WrapperDirectoryBuilder {
     wrapper_executable_path: PathBuf,
-    wrapper_dir: TempDir,
+    wrapper_dir: ManagedDirectory,
     config: WrapperConfig,
 }
 
 impl WrapperDirectoryBuilder {
-    /// Creates a wrapper directory in a temporary location and sets it up.
+    /// Creates a wrapper directory at `.bear/` in the specified working directory.
     ///
-    /// This is a convenience method that combines directory creation with setup.
-    /// The WrapperDirectoryBuilder takes ownership of the temporary directory.
-    pub fn create(wrapper_executable_path: &Path, parent_dir: &Path) -> Result<Self, WrapperDirectoryError> {
-        let wrapper_dir = tempfile::Builder::new()
-            .prefix("bear-")
-            .tempdir_in(parent_dir)
-            .map_err(WrapperDirectoryError::TempDirCreation)?;
+    /// This creates a deterministic directory path that persists across Bear invocations,
+    /// which is essential for autotools-style builds. The directory is cleaned up when
+    /// Bear exits, but the path remains consistent so cached compiler paths remain valid.
+    ///
+    /// # Arguments
+    ///
+    /// * `wrapper_executable_path` - Path to the wrapper executable to link/copy
+    /// * `working_dir` - The directory where `.bear/` will be created (typically `context.current_directory`)
+    pub fn create(wrapper_executable_path: &Path, working_dir: &Path) -> Result<Self, WrapperDirectoryError> {
+        let wrapper_dir =
+            ManagedDirectory::create(working_dir).map_err(WrapperDirectoryError::DirCreation)?;
 
         Ok(Self {
             wrapper_executable_path: wrapper_executable_path.to_path_buf(),
@@ -196,7 +249,7 @@ impl WrapperDirectoryBuilder {
 
 /// Immutable wrapper directory after build.
 pub struct WrapperDirectory {
-    wrapper_dir: TempDir,
+    wrapper_dir: ManagedDirectory,
     _config: WrapperConfig,
 }
 
@@ -237,8 +290,8 @@ pub enum WrapperDirectoryError {
     LinkCreation(#[from] std::io::Error),
     #[error("Failed to write configuration file: {0}")]
     ConfigWrite(#[from] ConfigError),
-    #[error("Failed to create temporary directory: {0}")]
-    TempDirCreation(std::io::Error),
+    #[error("Failed to create wrapper directory: {0}")]
+    DirCreation(std::io::Error),
 }
 
 /// Errors that can occur during wrapper configuration operations.
@@ -337,6 +390,59 @@ mod tests {
     }
 
     #[test]
+    fn test_managed_directory_creation() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let managed_dir = ManagedDirectory::create(temp_dir.path()).unwrap();
+
+        // Verify directory exists
+        assert!(managed_dir.path().exists());
+        assert!(managed_dir.path().ends_with(WRAPPER_DIR_NAME));
+    }
+
+    #[test]
+    fn test_managed_directory_cleanup_on_drop() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let path;
+        {
+            let managed_dir = ManagedDirectory::create(temp_dir.path()).unwrap();
+            path = managed_dir.path().to_path_buf();
+            assert!(path.exists());
+        }
+        // After drop, directory should be cleaned up
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn test_managed_directory_replaces_existing() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create first managed directory and add a file
+        let managed_dir1 = ManagedDirectory::create(temp_dir.path()).unwrap();
+        let test_file = managed_dir1.path().join("test_file.txt");
+        std::fs::write(&test_file, "test content").unwrap();
+        assert!(test_file.exists());
+
+        // Drop the first directory (but pretend we didn't clean up)
+        let path = managed_dir1.path().to_path_buf();
+        std::mem::forget(managed_dir1); // Simulate crash - don't run drop
+
+        // Verify the directory and file still exist (since we skipped drop)
+        assert!(path.exists());
+        assert!(test_file.exists());
+
+        // Create second managed directory in the SAME working directory - should replace existing
+        let managed_dir2 = ManagedDirectory::create(temp_dir.path()).unwrap();
+        assert_eq!(managed_dir2.path(), path);
+
+        // Old file should be gone (directory was replaced with a fresh one)
+        assert!(!test_file.exists());
+        // But the directory itself should exist (freshly created)
+        assert!(managed_dir2.path().exists());
+    }
+
+    #[test]
     fn test_wrapper_directory_builder() {
         let temp_dir = TempDir::new().unwrap();
         let wrapper_path = temp_dir.path().join("wrapper");
@@ -350,15 +456,22 @@ mod tests {
         let gcc_wrapper = builder.register_executable(PathBuf::from("/usr/bin/gcc")).unwrap();
         let gpp_wrapper = builder.register_executable(PathBuf::from("/usr/bin/g++")).unwrap();
 
+        // Save path for later assertions (before build consumes builder)
+        let builder_path = builder.path().to_path_buf();
+
         // Verify links were created
-        assert!(builder.path().join("gcc").exists());
-        assert!(builder.path().join("g++").exists());
-        assert_eq!(gcc_wrapper, builder.path().join("gcc"));
-        assert_eq!(gpp_wrapper, builder.path().join("g++"));
+        assert!(builder_path.join("gcc").exists());
+        assert!(builder_path.join("g++").exists());
+        assert_eq!(gcc_wrapper, builder_path.join("gcc"));
+        assert_eq!(gpp_wrapper, builder_path.join("g++"));
+
+        // Verify wrapper directory is in .bear
+        assert!(builder_path.ends_with(WRAPPER_DIR_NAME));
 
         // Finalize and check config file
         let wrapper_dir = builder.build().unwrap();
-        assert!(wrapper_dir.path().join(CONFIG_FILENAME).exists());
+        let config_path = wrapper_dir.path().join(CONFIG_FILENAME);
+        assert!(config_path.exists(), "Config file should exist at {:?}", config_path);
         assert_eq!(wrapper_dir.config().executables.len(), 2);
         assert!(wrapper_dir.config().get_executable("gcc").is_some());
         assert!(wrapper_dir.config().get_executable("g++").is_some());
@@ -402,16 +515,17 @@ mod tests {
     }
 
     #[test]
-    fn test_wrapper_directory_temp_creation() {
-        let temp_parent = TempDir::new().unwrap();
-        let wrapper_path = temp_parent.path().join("wrapper");
+    fn test_wrapper_directory_uses_bear_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let wrapper_path = temp_dir.path().join("wrapper");
         std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
 
-        let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_parent.path()).unwrap();
+        let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_dir.path()).unwrap();
 
         let clang_wrapper = builder.register_executable(PathBuf::from("/usr/bin/clang")).unwrap();
 
-        // Verify link was created in wrapper directory
+        // Verify wrapper is in .bear directory
+        assert!(builder.path().ends_with(WRAPPER_DIR_NAME));
         assert!(builder.path().join("clang").exists());
         assert_eq!(clang_wrapper, builder.path().join("clang"));
 

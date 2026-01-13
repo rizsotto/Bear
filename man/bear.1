@@ -128,7 +128,6 @@ sections.
 schema\f[B]:\f[R] \[dq]4.0\[dq]
 intercept\f[B]:\f[R]
   mode\f[B]:\f[R] wrapper
-  directory\f[B]:\f[R] /tmp
 compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/bin/cc
     as\f[B]:\f[R] gcc
@@ -175,9 +174,6 @@ Controls the command interception method:
 .IP \[bu] 2
 \f[B]path\f[R]: Path to the preload library or wrapper executable
 (depending on the mode)
-.IP \[bu] 2
-\f[B]directory\f[R]: Directory to create temporary wrapper executables
-(wrapper mode only)
 .SS compilers
 Contains hints about what compiler needs to be recognized and what that
 compiler is.
