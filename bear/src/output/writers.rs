@@ -2,8 +2,11 @@
 
 use super::clang;
 use super::formats::{JsonCompilationDatabase, SerializationError, SerializationFormat};
+use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
 use crate::{config, semantic};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::{fs, io, path};
 
 /// A trait representing a writer for iterator type `T`.
@@ -22,18 +25,32 @@ pub(super) trait IteratorWriter<T> {
 pub(super) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     converter: clang::CommandConverter,
     writer: T,
+    stats: Arc<OutputStatistics>,
 }
 
 impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
-    pub(super) fn new(writer: T, format: &config::Format) -> Self {
-        Self { converter: clang::CommandConverter::new(format.clone()), writer }
+    pub(super) fn new(writer: T, format: &config::Format, stats: Arc<OutputStatistics>) -> Self {
+        Self { converter: clang::CommandConverter::new(format.clone()), writer, stats }
     }
 }
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
     fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
-        let entries = semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
-        self.writer.write(entries)
+        let stats = Arc::clone(&self.stats);
+        let stats_for_entries = Arc::clone(&self.stats);
+
+        // Count semantic commands as they flow in
+        let counted_semantics = semantics.inspect(move |_| {
+            stats.semantic_commands_received.fetch_add(1, Ordering::Relaxed);
+        });
+
+        // Convert and count entries produced
+        let entries = counted_semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
+        let counted_entries = entries.inspect(move |_| {
+            stats_for_entries.compilation_entries_produced.fetch_add(1, Ordering::Relaxed);
+        });
+
+        self.writer.write(counted_entries)
     }
 }
 
@@ -49,10 +66,16 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for Conv
 pub(super) struct AppendClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     path: Option<path::PathBuf>,
+    stats: Arc<OutputStatistics>,
 }
 
 impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
-    pub(super) fn new(writer: T, input_path: &path::Path, append: bool) -> Self {
+    pub(super) fn new(
+        writer: T,
+        input_path: &path::Path,
+        append: bool,
+        stats: Arc<OutputStatistics>,
+    ) -> Self {
         let path = if input_path.exists() && append {
             Some(input_path.to_path_buf())
         } else {
@@ -61,7 +84,7 @@ impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
             }
             None
         };
-        Self { writer, path }
+        Self { writer, path, stats }
     }
 
     /// Reads the compilation database from a file.
@@ -83,9 +106,17 @@ impl<T: IteratorWriter<clang::Entry>> AppendClangOutputWriter<T> {
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AppendClangOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         if let Some(path) = &self.path {
+            let stats = Arc::clone(&self.stats);
+
             let entries_from_db =
                 Self::read_from_compilation_db(path).map_err(|err| WriterError::Io(path.clone(), err))?;
-            let final_entries = entries_from_db.chain(entries);
+
+            // Count entries read from existing database
+            let counted_existing = entries_from_db.inspect(move |_| {
+                stats.entries_read_from_existing.fetch_add(1, Ordering::Relaxed);
+            });
+
+            let final_entries = counted_existing.chain(entries);
             self.writer.write(final_entries)
         } else {
             self.writer.write(entries)
@@ -127,21 +158,34 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AtomicCla
 pub(super) struct UniqueOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     filter: clang::DuplicateEntryFilter,
+    stats: Arc<OutputStatistics>,
 }
 
 impl<T: IteratorWriter<clang::Entry>> UniqueOutputWriter<T> {
-    pub(super) fn create(writer: T, config: config::DuplicateFilter) -> Result<Self, WriterCreationError> {
+    pub(super) fn create(
+        writer: T,
+        config: config::DuplicateFilter,
+        stats: Arc<OutputStatistics>,
+    ) -> Result<Self, WriterCreationError> {
         let filter = clang::DuplicateEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
-        Ok(Self { writer, filter })
+        Ok(Self { writer, filter, stats })
     }
 }
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for UniqueOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
         let mut filter = self.filter;
-        let filtered_entries = entries.filter(move |entry| filter.unique(entry));
+        let stats = Arc::clone(&self.stats);
+
+        let filtered_entries = entries.filter(move |entry| {
+            let is_unique = filter.unique(entry);
+            if !is_unique {
+                stats.duplicates_detected.fetch_add(1, Ordering::Relaxed);
+            }
+            is_unique
+        });
 
         self.writer.write(filtered_entries)
     }
@@ -155,20 +199,35 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for UniqueOut
 pub(super) struct SourceFilterOutputWriter<T: IteratorWriter<clang::Entry>> {
     writer: T,
     filter: clang::SourceEntryFilter,
+    stats: Arc<OutputStatistics>,
 }
 
 impl<T: IteratorWriter<clang::Entry>> SourceFilterOutputWriter<T> {
-    pub(super) fn create(writer: T, config: config::SourceFilter) -> Result<Self, WriterCreationError> {
+    pub(super) fn create(
+        writer: T,
+        config: config::SourceFilter,
+        stats: Arc<OutputStatistics>,
+    ) -> Result<Self, WriterCreationError> {
         let filter = clang::SourceEntryFilter::try_from(config)
             .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
 
-        Ok(Self { writer, filter })
+        Ok(Self { writer, filter, stats })
     }
 }
 
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for SourceFilterOutputWriter<T> {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        let filtered_entries = entries.filter(|entry| self.filter.should_include(entry));
+        let filter = self.filter;
+        let stats = Arc::clone(&self.stats);
+
+        let filtered_entries = entries.filter(move |entry| {
+            let included = filter.should_include(entry);
+            if !included {
+                stats.entries_filtered_by_source.fetch_add(1, Ordering::Relaxed);
+            }
+            included
+        });
+
         self.writer.write(filtered_entries)
     }
 }
@@ -181,21 +240,33 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for SourceFil
 pub(super) struct ClangOutputWriter {
     output: io::BufWriter<fs::File>,
     path: path::PathBuf,
+    stats: Arc<OutputStatistics>,
 }
 
 impl ClangOutputWriter {
-    pub(super) fn create(path: &path::Path) -> Result<Self, WriterCreationError> {
+    pub(super) fn create(
+        path: &path::Path,
+        stats: Arc<OutputStatistics>,
+    ) -> Result<Self, WriterCreationError> {
         let output = fs::File::create(path)
             .map(io::BufWriter::new)
             .map_err(|err| WriterCreationError::Io(path.to_path_buf(), err))?;
 
-        Ok(Self { output, path: path.to_path_buf() })
+        Ok(Self { output, path: path.to_path_buf(), stats })
     }
 }
 
 impl IteratorWriter<clang::Entry> for ClangOutputWriter {
     fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
-        JsonCompilationDatabase::write(self.output, entries).map_err(|err| WriterError::Io(self.path, err))
+        let stats = Arc::clone(&self.stats);
+
+        // Count entries as they are written
+        let counted_entries = entries.inspect(move |_| {
+            stats.entries_written.fetch_add(1, Ordering::Relaxed);
+        });
+
+        JsonCompilationDatabase::write(self.output, counted_entries)
+            .map_err(|err| WriterError::Io(self.path, err))
     }
 }
 
@@ -210,7 +281,9 @@ mod tests {
     struct MockWriter;
 
     impl IteratorWriter<clang::Entry> for MockWriter {
-        fn write(self, _: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
+        fn write(self, entries: impl Iterator<Item = clang::Entry>) -> Result<(), WriterError> {
+            // Consume the iterator to trigger upstream counting
+            entries.for_each(drop);
             Ok(())
         }
     }
@@ -270,14 +343,15 @@ mod tests {
         let dir = tempdir().unwrap();
         let input_path = dir.path().join("file_to_append.json");
         let result_path = dir.path().join("result_file.json");
+        let stats = OutputStatistics::new();
 
         let entries_to_write = vec![
             clang::Entry::from_arguments_str("file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
+        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
         sut.write(entries_to_write.into_iter()).unwrap();
 
         // Verify the result file contains the written entries
@@ -289,6 +363,7 @@ mod tests {
 
     #[test]
     fn test_source_filter_output_writer_includes_matching_entries() {
+        let stats = OutputStatistics::new();
         let config = SourceFilter {
             only_existing_files: true,
             directories: vec![
@@ -297,7 +372,7 @@ mod tests {
             ],
         };
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
+        let sut = SourceFilterOutputWriter::create(MockWriter, config, Arc::clone(&stats)).unwrap();
 
         let entries = vec![
             clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
@@ -307,33 +382,37 @@ mod tests {
 
         // This would normally write, but MockWriter doesn't actually write
         // The test verifies the writer can be created and configured properly
-        assert!(writer.write(entries.into_iter()).is_ok());
+        assert!(sut.write(entries.into_iter()).is_ok());
     }
 
     #[test]
     fn test_source_filter_output_writer_empty_config() {
-        let config = SourceFilter { only_existing_files: true, directories: vec![] };
+        let stats = OutputStatistics::new();
+        let config = SourceFilter::default();
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
+        let sut = SourceFilterOutputWriter::create(MockWriter, config, Arc::clone(&stats)).unwrap();
 
         let entries =
             vec![clang::Entry::from_arguments_str("any/file.c", vec!["gcc", "-c"], "/project", None)];
 
-        assert!(writer.write(entries.into_iter()).is_ok());
+        assert!(sut.write(entries.into_iter()).is_ok());
     }
 
     #[test]
     fn test_source_filter_output_writer_complex_rules() {
+        let stats = OutputStatistics::new();
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
-                DirectoryRule { path: PathBuf::from("."), action: DirectoryAction::Include },
-                DirectoryRule { path: PathBuf::from("build"), action: DirectoryAction::Exclude },
-                DirectoryRule { path: PathBuf::from("build/config"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/home/project"), action: DirectoryAction::Include },
+                DirectoryRule {
+                    path: PathBuf::from("/home/project/build"),
+                    action: DirectoryAction::Exclude,
+                },
             ],
+            ..Default::default()
         };
 
-        let writer = SourceFilterOutputWriter::create(MockWriter, config).unwrap();
+        let sut = SourceFilterOutputWriter::create(MockWriter, config, Arc::clone(&stats)).unwrap();
 
         let entries = vec![
             clang::Entry::from_arguments_str("./src/main.c", vec!["gcc", "-c"], "/project", None),
@@ -341,13 +420,14 @@ mod tests {
             clang::Entry::from_arguments_str("build/config/defs.h", vec!["gcc", "-c"], "/project", None),
         ];
 
-        assert!(writer.write(entries.into_iter()).is_ok());
+        assert!(sut.write(entries.into_iter()).is_ok());
     }
 
     #[test]
     fn test_source_filter_integration_with_writer_pipeline() {
         let dir = tempdir().unwrap();
         let output_path = dir.path().join("compile_commands.json");
+        let stats = OutputStatistics::new();
 
         // Create a source filter configuration
         let source_config = SourceFilter {
@@ -364,9 +444,11 @@ mod tests {
         };
 
         // Build the writer pipeline: base -> unique -> source_filter
-        let base_writer = ClangOutputWriter::create(&output_path).unwrap();
-        let unique_writer = UniqueOutputWriter::create(base_writer, duplicate_config).unwrap();
-        let source_filter_writer = SourceFilterOutputWriter::create(unique_writer, source_config).unwrap();
+        let base_writer = ClangOutputWriter::create(&output_path, Arc::clone(&stats)).unwrap();
+        let unique_writer =
+            UniqueOutputWriter::create(base_writer, duplicate_config, Arc::clone(&stats)).unwrap();
+        let source_filter_writer =
+            SourceFilterOutputWriter::create(unique_writer, source_config, Arc::clone(&stats)).unwrap();
 
         // Test entries: some should be filtered, some should pass through
         let entries = vec![
@@ -395,13 +477,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let input_path = dir.path().join("file_to_append.json");
         let result_path = dir.path().join("result_file.json");
+        let stats = OutputStatistics::new();
 
         // Create the original file with some entries
         let original_entries = vec![
             clang::Entry::from_arguments_str("file3.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("file4.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer = ClangOutputWriter::create(&input_path).unwrap();
+        let writer = ClangOutputWriter::create(&input_path, Arc::clone(&stats)).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -409,8 +492,8 @@ mod tests {
             clang::Entry::from_arguments_str("file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, &input_path, true);
+        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains both original and new entries
@@ -427,13 +510,14 @@ mod tests {
         let dir = tempdir().unwrap();
         let input_path = dir.path().join("file_to_overwrite.json");
         let result_path = dir.path().join("result_file.json");
+        let stats = OutputStatistics::new();
 
         // Create the original file with some entries
         let original_entries = vec![
             clang::Entry::from_arguments_str("old_file1.cpp", vec!["clang", "-c"], "/path/to/dir", None),
             clang::Entry::from_arguments_str("old_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
-        let writer = ClangOutputWriter::create(&input_path).unwrap();
+        let writer = ClangOutputWriter::create(&input_path, Arc::clone(&stats)).unwrap();
         writer.write(original_entries.into_iter()).unwrap();
 
         let new_entries = vec![
@@ -441,8 +525,8 @@ mod tests {
             clang::Entry::from_arguments_str("new_file2.cpp", vec!["clang", "-c"], "/path/to/dir", None),
         ];
 
-        let writer = ClangOutputWriter::create(&result_path).unwrap();
-        let sut = AppendClangOutputWriter::new(writer, &input_path, false);
+        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, false, Arc::clone(&stats));
         sut.write(new_entries.into_iter()).unwrap();
 
         // Verify the result file contains only new entries (no original entries)
