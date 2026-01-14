@@ -5,7 +5,7 @@
 //! This module provides test-only helper functions and types for creating
 //! and comparing semantic analysis structures in unit tests.
 
-use super::{ArgumentKind, Arguments, CompilerCommand};
+use super::{ArgumentKind, Arguments, CompilerCommand, PassEffect};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -175,12 +175,12 @@ mod tests {
         let source_arg = TestArguments::new(vec!["main.c".to_string()], ArgumentKind::Source);
         let output_arg =
             TestArguments::new(vec!["-o".to_string(), "main.o".to_string()], ArgumentKind::Output);
-        let other_arg = TestArguments::new(vec!["-Wall".to_string()], ArgumentKind::Other(None));
+        let other_arg = TestArguments::new(vec!["-Wall".to_string()], ArgumentKind::Other(PassEffect::None));
 
         // Test kind method
         assert_eq!(source_arg.kind(), ArgumentKind::Source);
         assert_eq!(output_arg.kind(), ArgumentKind::Output);
-        assert_eq!(other_arg.kind(), ArgumentKind::Other(None));
+        assert_eq!(other_arg.kind(), ArgumentKind::Other(PassEffect::None));
 
         // Test as_arguments method
         let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);

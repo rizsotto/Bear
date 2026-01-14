@@ -16,7 +16,7 @@ use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
 };
 use crate::semantic::{
-    ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, Execution, Interpreter,
+    ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
 };
 
 /// GCC command-line argument parser that extracts semantic information from compiler invocations.
@@ -96,221 +96,349 @@ impl Interpreter for GccInterpreter {
 pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
     // Generated flag definitions converted from C++ Bear project ToolGcc.cc
     let mut flags = vec![
-        FlagRule::new(FlagPattern::Exactly("-x", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-S", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        // Language and compilation control
+        FlagRule::new(
+            FlagPattern::Exactly("-x", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-c", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-S", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-E", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
-        FlagRule::new(FlagPattern::Exactly("-dumpbase", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
+        // Driver/info options
+        FlagRule::new(FlagPattern::Exactly("-dumpbase", 1), ArgumentKind::Other(PassEffect::DriverOption)),
         FlagRule::new(
             FlagPattern::Exactly("-dumpbase-ext", 1),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
+            ArgumentKind::Other(PassEffect::DriverOption),
         ),
-        FlagRule::new(FlagPattern::Exactly("-dumpdir", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::Exactly("-###", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::Prefix("--help", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(
-            FlagPattern::Exactly("--target-help", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
-        ),
-        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-dumpdir", 1), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-###", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Prefix("--help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+        FlagRule::new(FlagPattern::Exactly("--target-help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
         FlagRule::new(
             FlagPattern::Exactly("-pass-exit-codes", 0),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
+            ArgumentKind::Other(PassEffect::DriverOption),
         ),
-        FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::ExactlyWithEq("-specs"), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::Exactly("-wrapper", 1), ArgumentKind::Other(Some(CompilerPass::Info))),
+        FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::ExactlyWithEq("-specs"), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-wrapper", 1), ArgumentKind::Other(PassEffect::DriverOption)),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-ffile-prefix-map"),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
+        // Plugin options
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-fplugin"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Prefix("-fplugin-arg-", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Prefix("@", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Prefix("@", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        // Preprocessor options
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-A"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-D"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-U"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-include"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-imacros", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-undef", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-pthread", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-M", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MM", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MG", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MP", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MD", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(
+            FlagPattern::Exactly("-M", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MM", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MG", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MP", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MD", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("-MMD", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-MF", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MT", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-MQ", 1), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-C", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-CC", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        FlagRule::new(FlagPattern::Exactly("-P", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(
+            FlagPattern::Exactly("-MF", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MT", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-MQ", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-C", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-CC", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-P", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::Prefix("-traditional", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-trigraphs", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-remap", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-H", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(
+            FlagPattern::Exactly("-H", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("-Xpreprocessor", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::Prefix("-Wp,", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
+        FlagRule::new(
+            FlagPattern::Prefix("-Wp,", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-I"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-iplugindir"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-iquote", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-isystem", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-idirafter", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-iprefix", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-iwithprefix", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-iwithprefixbefore", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-isysroot", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-imultilib", 1),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
+        // Linker options
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-L"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-B"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("--sysroot"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-flinker-output"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEq("-fuse-ld"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-l"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-nostartfiles", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-nodefaultlibs", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-nolibc", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-nostdlib", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-e", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::ExactlyWithEq("-entry"), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-pie", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-no-pie", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(
+            FlagPattern::Exactly("-nolibc", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-nostdlib", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-e", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEq("-entry"),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-pie", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-no-pie", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("-static-pie", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-r", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-rdynamic", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-s", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-symbolic", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Prefix("-static", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Prefix("-shared", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-T", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Prefix("-Wl,", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-u", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-z", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("-Xassembler", 1), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-Wa,", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-aux-info", 1), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-r", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-rdynamic", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-s", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-symbolic", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-static", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-shared", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-T", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-Xlinker", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-Wl,", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-u", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-z", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        // Assembler options
+        FlagRule::new(
+            FlagPattern::Exactly("-Xassembler", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-Wa,", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling)),
+        ),
+        // Other/unclassified options
+        FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-aux-info", 1), ArgumentKind::Other(PassEffect::None)),
+        // Compilation options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-std"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Prefix("-O", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Prefix("-g", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Prefix("-f", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Prefix("-m", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Prefix("-p", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-tno", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-save", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Prefix("-d", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-Q", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-Y", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("--", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Prefix("-O", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-g", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-f", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Prefix("-m", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(FlagPattern::Prefix("-p", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-no", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-tno", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-save", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Prefix("-d", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-Q", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-Y", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("--", 0), ArgumentKind::Other(PassEffect::None)),
     ];
 
     // Sort by flag length descending to ensure longer matches are tried first
@@ -336,22 +464,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 
         let current_arg = &args[i];
 
-        // Check if it's a source file (not a flag)
-        if !current_arg.starts_with('-') {
-            if looks_like_a_source_file(current_arg) {
-                result.push(Box::new(SourceArgument::new(current_arg.clone())));
-            } else {
-                // Non-source, non-flag argument
-                result.push(Box::new(OtherArguments::new(
-                    vec![current_arg.clone()],
-                    ArgumentKind::Other(None),
-                )));
-            }
-            i += 1;
-            continue;
-        }
-
-        // Try to match against flag definitions
+        // Try to match against flag definitions first (handles both -flags and @response files)
         if let Some(match_result) = flag_analyzer.match_flag(remaining_args) {
             let consumed_count = match_result.consumed_args_count();
             let arg: Box<dyn Arguments> = match match_result.rule.kind {
@@ -385,8 +498,22 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
             result.push(arg);
             i += consumed_count;
         } else {
-            // Unknown flag - treat as simple flag
-            result.push(Box::new(OtherArguments::new(vec![current_arg.clone()], ArgumentKind::Other(None))));
+            // No flag match - check if it's a source file or other argument
+            if looks_like_a_source_file(current_arg) {
+                result.push(Box::new(SourceArgument::new(current_arg.clone())));
+            } else if current_arg.starts_with('-') {
+                // Unknown flag - treat as simple flag
+                result.push(Box::new(OtherArguments::new(
+                    vec![current_arg.clone()],
+                    ArgumentKind::Other(PassEffect::None),
+                )));
+            } else {
+                // Non-source, non-flag argument (e.g., object files)
+                result.push(Box::new(OtherArguments::new(
+                    vec![current_arg.clone()],
+                    ArgumentKind::Other(PassEffect::None),
+                )));
+            }
             i += 1;
         }
     }
@@ -412,7 +539,7 @@ fn parse_environment(environment: &std::collections::HashMap<String, String>) ->
                 if !path.as_os_str().is_empty() {
                     args.push(Box::new(OtherArguments::new(
                         vec!["-I".to_string(), path.to_string_lossy().to_string()],
-                        ArgumentKind::Other(None),
+                        ArgumentKind::Other(PassEffect::None),
                     )));
                 }
             }
@@ -426,7 +553,7 @@ fn parse_environment(environment: &std::collections::HashMap<String, String>) ->
             if !path.as_os_str().is_empty() {
                 args.push(Box::new(OtherArguments::new(
                     vec!["-isystem".to_string(), path.to_string_lossy().to_string()],
-                    ArgumentKind::Other(None),
+                    ArgumentKind::Other(PassEffect::None),
                 )));
             }
         }
@@ -461,7 +588,7 @@ pub fn parse_arguments_and_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::ArgumentKind;
+    use crate::semantic::{ArgumentKind, PassEffect};
     use std::borrow::Cow;
     use std::collections::HashMap;
 
@@ -499,7 +626,10 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Check -c flag
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
 
             // Check source file
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
@@ -526,11 +656,17 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 5);
 
             // Check combined include flag
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-I/usr/include"]);
 
             // Check combined define flag
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
             assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["-DDEBUG=1"]);
 
             // Check output
@@ -556,11 +692,17 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 4);
 
             // Check separate include flag
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-I", "/usr/include"]);
 
             // Check separate define flag
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
             assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["-D", "DEBUG=1"]);
 
             // Check source
@@ -581,7 +723,10 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 3);
 
             // Check response file
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["@response.txt"]);
         } else {
             panic!("Expected compiler command");
@@ -600,14 +745,14 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 5);
 
             // Check -Wall (exact match)
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(PassEffect::None));
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-Wall"]);
 
             // Check -Wextra (exact match)
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
 
             // Check -Wno-unused (prefix match with -W)
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(PassEffect::None));
             assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["-Wno-unused"]);
         } else {
             panic!("Expected compiler command");
@@ -622,7 +767,10 @@ mod tests {
         let execution = create_execution("gcc", vec!["gcc", "-std", "c99", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-std", "c99"]);
         }
 
@@ -630,7 +778,10 @@ mod tests {
         let execution = create_execution("gcc", vec!["gcc", "-std=c99", "main.c"], "/project");
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             assert_eq!(cmd.arguments[1].as_arguments(&|p| Cow::Borrowed(p)), vec!["-std=c99"]);
         }
     }
@@ -705,7 +856,10 @@ mod tests {
 
             // Check that arguments are parsed correctly
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
         } else {
@@ -725,7 +879,10 @@ mod tests {
             // All -O* flags should be recognized
             assert!(cmd.arguments.len() >= 5);
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+                );
             }
         }
 
@@ -736,7 +893,10 @@ mod tests {
         if let Command::Compiler(cmd) = result {
             // All -g* flags should be recognized
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+                );
             }
         }
 
@@ -750,7 +910,7 @@ mod tests {
         if let Command::Compiler(cmd) = result {
             // All -W* flags should be recognized
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(None));
+                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(PassEffect::None));
             }
         }
 
@@ -764,7 +924,10 @@ mod tests {
         if let Command::Compiler(cmd) = result {
             // All -f* flags should be recognized
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+                );
             }
         }
 
@@ -778,7 +941,10 @@ mod tests {
         if let Command::Compiler(cmd) = result {
             // All -m* flags should be recognized
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+                );
             }
         }
     }
@@ -805,9 +971,18 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify linker flags are recognized
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
         }
 
         // Test system include and library paths
@@ -827,9 +1002,18 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify system paths are recognized with correct passes
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
         }
     }
 
@@ -853,10 +1037,19 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // All should be recognized as compilation flags
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(None)); // @file
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // plugin
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // plugin-arg
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling))); // save-temps
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            ); // @file
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            ); // plugin
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            ); // plugin-arg
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(PassEffect::DriverOption)); // save-temps
         }
     }
 
@@ -1096,10 +1289,16 @@ mod tests {
         let result = interpreter.recognize(&execution).unwrap();
         if let Command::Compiler(cmd) = result {
             // Verify preprocessor flags are correctly categorized
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))
+            );
             // Most preprocessor control flags should be preprocessing
             for i in 2..13 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+                );
             }
         }
     }
@@ -1182,18 +1381,24 @@ mod tests {
 
             // Check object files - these should be treated as Other arguments since
             // looks_like_a_source_file() doesn't recognize .o extensions
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
             assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["source1.o"]);
 
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(PassEffect::None));
             assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["source2.o"]);
 
             // Check library link flag (-lx)
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                cmd.arguments[4].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
             assert_eq!(cmd.arguments[4].as_arguments(&|p| Cow::Borrowed(p)), vec!["-lx"]);
 
             // Check library path flag (-L/usr/local/lib)
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                cmd.arguments[5].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
             assert_eq!(cmd.arguments[5].as_arguments(&|p| Cow::Borrowed(p)), vec!["-L/usr/local/lib"]);
         } else {
             panic!("Expected compiler command");
@@ -1236,7 +1441,9 @@ mod tests {
             let linking_args: Vec<_> = cmd
                 .arguments
                 .iter()
-                .filter(|arg| matches!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Linking))))
+                .filter(|arg| {
+                    matches!(arg.kind(), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+                })
                 .collect();
 
             // Should have: -L/usr/lib, -L /opt/lib, -lmath, -l pthread, -Wl,--as-needed, -static, -pie
@@ -1279,7 +1486,7 @@ mod tests {
 
             // All should be classified as Other(None) since they're not recognized source extensions
             for obj_file in object_files {
-                assert_eq!(obj_file.kind(), ArgumentKind::Other(None));
+                assert_eq!(obj_file.kind(), ArgumentKind::Other(PassEffect::None));
             }
         }
     }

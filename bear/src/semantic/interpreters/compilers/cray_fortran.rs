@@ -8,7 +8,7 @@
 
 use crate::semantic::interpreters::compilers::gcc::parse_arguments_and_environment;
 use crate::semantic::interpreters::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
-use crate::semantic::{ArgumentKind, Command, CompilerPass, Interpreter};
+use crate::semantic::{ArgumentKind, Command, CompilerPass, Interpreter, PassEffect};
 use std::sync::LazyLock;
 
 /// Flag definitions for Cray Fortran compilers
@@ -19,138 +19,171 @@ static CRAY_FORTRAN_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
     let mut flags = vec![
         FlagRule::new(
             FlagPattern::Exactly("-no-add-rpath-shared", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--no-custom-ld-script", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-no-add-runpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-add-rpath-shared", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--no-as-needed", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-no-gcc-rpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-no-add-rpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-add-runpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-no-as-needed", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--as-needed", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-gcc-rpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-add-rpath", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-as-needed", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-qno-openmp", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-noopenmp", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-Mnoopenmp", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-default64", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-openmp", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-dynamic", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-shared", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-static", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-VVV", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-mp", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-VV", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("-qno-openmp", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-noopenmp", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-Mnoopenmp", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-default64", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-openmp", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-dynamic", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-shared", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-static", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-VVV", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-mp", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Exactly("-VV", 0), ArgumentKind::Other(PassEffect::DriverOption)),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("--custom-ld-script="),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-target-network="), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-target-accel="), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-target-cpu="), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-A"), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-target-network="),
+            ArgumentKind::Other(PassEffect::None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-target-accel="),
+            ArgumentKind::Other(PassEffect::None),
+        ),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-target-cpu="),
+            ArgumentKind::Other(PassEffect::None),
+        ),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-A"), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-b"), ArgumentKind::Output),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-D"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-e"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-f"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-G"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-h"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-e"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-f"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-G"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-h"), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-I"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-J"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-K"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-K"), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-l"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-L"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-m"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-M"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-N"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-O"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-m"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-M"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-N"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(
+            FlagPattern::ExactlyWithGluedOrSep("-O"),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-p"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-Q"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-r"),
-            ArgumentKind::Other(Some(CompilerPass::Info)),
+            ArgumentKind::Other(PassEffect::DriverOption),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-R"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-s"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-R"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-s"), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(
             FlagPattern::ExactlyWithGluedOrSep("-U"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-W"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-x"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-Y"), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("--cray", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Prefix("-cray", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-F", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-g", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-S", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("-T", 0), ArgumentKind::Other(Some(CompilerPass::Info))),
-        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-V", 0), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-W"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-x"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-Y"), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("--cray", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("-cray", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-c", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-E", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-F", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-g", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("-S", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-T", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-V", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     ];
 
     // Sort by flag length descending to ensure longer matches are tried first
@@ -218,7 +251,10 @@ mod tests {
             assert_eq!(parsed.arguments.len(), 3);
 
             // Check -c flag
-            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                parsed.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
         }
     }
 
@@ -233,9 +269,15 @@ mod tests {
 
         if let Some(Command::Compiler(parsed)) = result {
             // Check -D flag (preprocessing)
-            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                parsed.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
             // Check -I flag (preprocessing)
-            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+            assert_eq!(
+                parsed.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))
+            );
         }
     }
 
@@ -250,9 +292,15 @@ mod tests {
 
         if let Some(Command::Compiler(parsed)) = result {
             // Check -add-rpath flag (linking)
-            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                parsed.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
             // Check -l flag (linking)
-            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                parsed.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
         }
     }
 
@@ -271,8 +319,8 @@ mod tests {
         if let Some(Command::Compiler(parsed)) = result {
             assert_eq!(parsed.arguments.len(), 4);
             // Should recognize Cray-specific flags
-            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(None));
-            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(None));
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(PassEffect::None));
+            assert_eq!(parsed.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
         }
     }
 
@@ -287,7 +335,7 @@ mod tests {
         if let Some(Command::Compiler(parsed)) = result {
             assert_eq!(parsed.arguments.len(), 3);
             // Check -openmp flag
-            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(None));
+            assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(PassEffect::None));
         }
     }
 }

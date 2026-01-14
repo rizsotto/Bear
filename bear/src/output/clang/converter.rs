@@ -20,15 +20,15 @@
 //! should be generated:
 //!
 //! ## Cases that generate NO entries:
-//! 1. **Preprocessing-only commands**: Commands classified as `CompilerPass::Preprocessing`
-//! 2. **Info-only commands**: Commands classified as `CompilerPass::Info` (e.g., `--version`, `--help`)
+//! 1. **Preprocessing-only commands**: Commands with `PassEffect::StopsAt(Preprocessing)`
+//! 2. **Info-only commands**: Commands with `PassEffect::InfoAndExit` (e.g., `--version`, `--help`)
 //! 3. **Linking-only commands**: Commands without compilation flags and no compilable source files
 //! 4. **Commands without source files**: Any command that has no source files to process
 //!
 //! ## Cases that generate entries:
-//! 1. **Compilation commands**: Commands classified as `CompilerPass::Compiling` (compile-only or compile-to-assembly)
+//! 1. **Compilation commands**: Commands with `PassEffect::StopsAt(Compiling)` or `PassEffect::StopsAt(Assembling)`
 //! 2. **Compile-and-link commands**: Commands that both compile and link in one step
-//!    - Linking-specific flags (classified as `CompilerPass::Linking`) are filtered out from entries
+//!    - Linking-specific flags (classified as `PassEffect::Configures(Linking)`) are filtered out from entries
 //!    - Only compilation-relevant flags are included in the database
 //!
 //! The converter relies on semantic analysis performed by compiler interpreters to properly
@@ -50,7 +50,7 @@
 use super::Entry;
 use super::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
-use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand};
+use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, PassEffect};
 use log::warn;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -206,7 +206,11 @@ impl CommandConverter {
             }
 
             // Filter out linking-specific arguments for compilation database entries
-            if matches!(arg.kind(), ArgumentKind::Other(Some(crate::semantic::CompilerPass::Linking))) {
+            if matches!(
+                arg.kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+                    | ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Linking))
+            ) {
                 continue;
             }
 
@@ -269,18 +273,18 @@ impl CommandConverter {
     /// Determines if we should skip generating compilation database entries for a command.
     ///
     /// Returns true if the command should not generate entries for any of these reasons:
-    /// 1. Preprocessing-only commands (`CompilerPass::Preprocessing`)
-    /// 2. Info-only commands (`CompilerPass::Info`)
+    /// 1. Preprocessing-only commands (`PassEffect::StopsAt(Preprocessing)`)
+    /// 2. Info-only commands (`PassEffect::InfoAndExit`)
     /// 3. Commands without source files
     /// 4. Linking-only commands (no compilation flags and has source files)
     fn should_skip_entry_generation(&self, cmd: &CompilerCommand) -> bool {
-        // Check if this is a preprocessing-only command
-        if self.is_preprocessing_only(cmd) {
+        // Check if this is an info-only command (e.g., --version, --help)
+        if self.is_info_only(cmd) {
             return true;
         }
 
-        // Check if this is an info-only command
-        if self.is_info_only(cmd) {
+        // Check if this is a preprocessing-only command (e.g., -E)
+        if self.is_preprocessing_only(cmd) {
             return true;
         }
 
@@ -294,42 +298,36 @@ impl CommandConverter {
         }
 
         // Check if this is a linking-only command
-        self.is_linking_only(cmd)
+        if self.is_linking_only(cmd) {
+            return true;
+        }
+
+        false
     }
 
     /// Determines if a compiler command is preprocessing-only.
     ///
-    /// A command is considered preprocessing-only if it contains arguments
-    /// classified as `CompilerPass::Preprocessing` by the semantic analysis.
+    /// A command is considered preprocessing-only if it has a `PassEffect::StopsAt(Preprocessing)` flag.
+    /// This is the `-E` flag which explicitly stops the compiler after preprocessing.
     fn is_preprocessing_only(&self, cmd: &CompilerCommand) -> bool {
-        // A command is preprocessing-only if it has preprocessing flags but NO compilation flags
-        let has_preprocessing = cmd.arguments.iter().any(|arg| {
-            matches!(arg.kind(), ArgumentKind::Other(Some(crate::semantic::CompilerPass::Preprocessing)))
-        });
-
-        let has_compilation = cmd.arguments.iter().any(|arg| {
-            matches!(arg.kind(), ArgumentKind::Other(Some(crate::semantic::CompilerPass::Compiling)))
-        });
-
-        // Only preprocessing-only if it has preprocessing flags but no compilation flags
-        has_preprocessing && !has_compilation
+        cmd.arguments.iter().any(|arg| {
+            matches!(arg.kind(), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)))
+        })
     }
 
     /// Determines if a compiler command is info-only.
     ///
     /// A command is considered info-only if it contains arguments
-    /// classified as `CompilerPass::Info` by the semantic analysis.
+    /// classified as `PassEffect::InfoAndExit` by the semantic analysis.
     /// These commands typically display information and don't perform compilation.
     fn is_info_only(&self, cmd: &CompilerCommand) -> bool {
-        cmd.arguments
-            .iter()
-            .any(|arg| matches!(arg.kind(), ArgumentKind::Other(Some(crate::semantic::CompilerPass::Info))))
+        cmd.arguments.iter().any(|arg| matches!(arg.kind(), ArgumentKind::Other(PassEffect::InfoAndExit)))
     }
 
     /// Determines if a compiler command is linking-only.
     ///
     /// A command is considered linking-only if:
-    /// 1. It does NOT have the `-c` flag (which means compile-only)
+    /// 1. It does NOT have a `PassEffect::StopsAt(Compiling)` or `PassEffect::StopsAt(Assembling)` flag
     /// 2. AND it has no compilable source files (only object files, libraries, etc.)
     ///
     /// This typically happens when linking pre-compiled object files or libraries.
@@ -338,13 +336,17 @@ impl CommandConverter {
     /// `looks_like_a_source_file()` during semantic analysis, but we still need to
     /// exclude object files (.o, .a, etc.) which may be misclassified in tests.
     fn is_linking_only(&self, cmd: &CompilerCommand) -> bool {
-        // Check if the command has compile-only flags
-        let has_compile_flag = cmd.arguments.iter().any(|arg| {
-            matches!(arg.kind(), ArgumentKind::Other(Some(crate::semantic::CompilerPass::Compiling)))
+        // Check if the command has a flag that stops before linking (-c or -S)
+        let stops_before_linking = cmd.arguments.iter().any(|arg| {
+            matches!(
+                arg.kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+                    | ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))
+            )
         });
 
-        // If there's a -c flag, it's not linking-only
-        if has_compile_flag {
+        // If there's a -c or -S flag, it's not linking-only
+        if stops_before_linking {
             return false;
         }
 
@@ -367,17 +369,17 @@ impl CommandConverter {
                 }
             });
 
-        // If no -c flag and no compilable sources, it's linking-only
+        // If no -c/-S flag and no compilable sources, it's linking-only
         !has_compilable_sources
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::clang::format::{FormatError, MockPathFormatter};
+    use super::super::format::{FormatError, MockPathFormatter};
     use super::*;
     use crate::config::{EntryFormat, Format, PathFormat};
-    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass};
+    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
     use std::io;
 
     #[test]
@@ -387,8 +389,8 @@ mod tests {
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Other(None), vec!["-Wall"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::None), vec!["-Wall"]),
                 (ArgumentKind::Source, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
@@ -414,7 +416,7 @@ mod tests {
             "/usr/bin/g++",
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/g++"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["file1.cpp"]),
                 (ArgumentKind::Source, vec!["file2.cpp"]),
             ],
@@ -436,7 +438,7 @@ mod tests {
         let command = Command::Compiler(CompilerCommand::from_strings(
             "/home/user",
             "gcc",
-            vec![(ArgumentKind::Other(Some(CompilerPass::Info)), vec!["--version"])],
+            vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
         ));
 
         let format = Format { paths: PathFormat::default(), entries: EntryFormat::default() };
@@ -454,7 +456,7 @@ mod tests {
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
@@ -478,7 +480,7 @@ mod tests {
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
@@ -512,7 +514,7 @@ mod tests {
             "/home/user",
             "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["test.c"]),
             ],
         );
@@ -658,7 +660,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Other(Some(CompilerPass::Preprocessing)), vec!["-E"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
                 (ArgumentKind::Source, vec!["main.c"]),
             ],
         );
@@ -680,7 +682,7 @@ mod tests {
             vec![
                 (ArgumentKind::Source, vec!["main.o", "lib.o"]),
                 (ArgumentKind::Output, vec!["-o", "program"]),
-                (ArgumentKind::Other(Some(CompilerPass::Linking)), vec!["-L/usr/lib"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -698,7 +700,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
@@ -723,9 +725,9 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Source, vec!["main.c"]),
-                (ArgumentKind::Other(Some(CompilerPass::Linking)), vec!["-L/usr/lib"]),
-                (ArgumentKind::Other(Some(CompilerPass::Linking)), vec!["-lmath"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-Wall"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lmath"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)), vec!["-Wall"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -751,7 +753,7 @@ mod tests {
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
             "gcc",
-            vec![(ArgumentKind::Other(Some(CompilerPass::Info)), vec!["--version"])],
+            vec![(ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"])],
         );
         let command = Command::Compiler(compiler_cmd);
 
@@ -771,7 +773,7 @@ mod tests {
             vec![
                 (ArgumentKind::Source, vec!["main.c"]),    // Real source file
                 (ArgumentKind::Source, vec!["utils.cpp"]), // Real source file
-                (ArgumentKind::Other(Some(CompilerPass::Linking)), vec!["-lm"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -810,7 +812,7 @@ mod tests {
             "gcc",
             vec![
                 (
-                    ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
                     vec!["-E"], // Semantically classified as preprocessing
                 ),
                 (ArgumentKind::Source, vec!["main.c"]),
@@ -826,7 +828,7 @@ mod tests {
             "gcc",
             vec![
                 (
-                    ArgumentKind::Other(Some(CompilerPass::Compiling)),
+                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
                     vec!["-c"], // Semantically classified as compiling
                 ),
                 (ArgumentKind::Source, vec!["main.c"]),
@@ -841,7 +843,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![(
-                ArgumentKind::Other(Some(CompilerPass::Info)),
+                ArgumentKind::Other(PassEffect::InfoAndExit),
                 vec!["--version"], // Semantically classified as info
             )],
         );
@@ -856,11 +858,11 @@ mod tests {
             vec![
                 (ArgumentKind::Source, vec!["main.c"]),
                 (
-                    ArgumentKind::Other(Some(CompilerPass::Linking)),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
                     vec!["-lmath"], // Semantically classified as linking
                 ),
                 (
-                    ArgumentKind::Other(Some(CompilerPass::Compiling)),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
                     vec!["-O2"], // Compilation flag
                 ),
             ],
@@ -889,7 +891,7 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
@@ -930,8 +932,11 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Preprocessing)), vec!["-DWRAPPER_FLAG"]),
-                (ArgumentKind::Other(Some(CompilerPass::Compiling)), vec!["-c"]),
+                (
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+                    vec!["-DWRAPPER_FLAG"],
+                ),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source, vec!["test.c"]),
             ],
         );
@@ -964,8 +969,11 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Compiler, vec!["gcc"]),
-                (ArgumentKind::Other(Some(CompilerPass::Preprocessing)), vec!["-E"]),
-                (ArgumentKind::Other(Some(CompilerPass::Preprocessing)), vec!["-DSOME_DEFINE"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
+                (
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+                    vec!["-DSOME_DEFINE"],
+                ),
                 (ArgumentKind::Source, vec!["test.c"]),
             ],
         );
@@ -973,7 +981,35 @@ mod tests {
 
         let result = converter.to_entries(&command);
 
-        // Should NOT generate entries because it's preprocessing-only (no compilation flags)
+        // Should NOT generate entries because it's preprocessing-only (has -E flag)
         assert_eq!(result.len(), 0);
+    }
+
+    #[test]
+    fn test_driver_option_does_not_affect_entry_generation() {
+        let format = Format::default();
+        let converter = CommandConverter::new(format);
+
+        // Test command with driver options like -pipe (should still generate entries)
+        let compiler_cmd = CompilerCommand::from_strings(
+            "/home/user",
+            "gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["gcc"]),
+                (ArgumentKind::Other(PassEffect::DriverOption), vec!["-pipe"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source, vec!["main.c"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let result = converter.to_entries(&command);
+
+        // Should generate entries - driver options don't stop compilation
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].file, PathBuf::from("main.c"));
+
+        // Verify -pipe is included in the command
+        assert!(result[0].arguments.contains(&"-pipe".to_string()));
     }
 }

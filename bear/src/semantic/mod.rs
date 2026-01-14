@@ -25,6 +25,7 @@
 //! - [`CompilerCommand`] - Represents a structured compiler invocation
 //! - [`Arguments`] - Trait for representing different types of compiler arguments
 //! - [`ArgumentKind`] - Classifies the semantic meaning of arguments
+//! - [`PassEffect`] - Represents how an argument affects the compilation pipeline
 
 pub mod interpreters;
 
@@ -122,19 +123,48 @@ pub trait Arguments: std::fmt::Debug {
 /// - `Source`: A source file to be compiled.
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
 /// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
-///   Can optionally specify which compiler pass the argument affects.
+///   Specifies how the argument affects the compilation pipeline via [`PassEffect`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArgumentKind {
     Compiler,
     Source,
     Output,
-    Other(Option<CompilerPass>),
+    Other(PassEffect),
+}
+
+/// Represents how an argument affects the compilation pipeline.
+///
+/// This enum distinguishes between arguments that merely configure a compiler pass
+/// versus arguments that enforce stopping at a particular pass.
+///
+/// # Variants
+///
+/// - `Configures(CompilerPass)`: The argument configures a pass without changing control flow.
+///   Examples: `-I/path` (configures preprocessing), `-O2` (configures compilation), `-g` (configures compilation)
+///
+/// - `StopsAt(CompilerPass)`: The argument enforces stopping at this pass - no later passes run.
+///   Examples: `-E` (stops at preprocessing), `-c` (stops at compilation), `-S` (stops at assembly)
+///
+/// - `InfoAndExit`: The argument causes the compiler to output info and exit immediately.
+///   Examples: `--version`, `--help`
+///
+/// - `DriverOption`: The argument affects driver behavior but doesn't stop or configure a specific pass.
+///   Examples: `-pipe`, `-v`, `-save-temps`
+///
+/// - `None`: The argument's effect on the pipeline is unknown or unclassified.
+///   Examples: `-Wall`, `-Wextra`
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum PassEffect {
+    Configures(CompilerPass),
+    StopsAt(CompilerPass),
+    InfoAndExit,
+    DriverOption,
+    None,
 }
 
 /// Represents different compiler passes that an argument might affect.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CompilerPass {
-    Info,
     Preprocessing,
     Compiling,
     Assembling,

@@ -118,14 +118,16 @@ impl Arguments for OutputArgument {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::CompilerPass;
+    use crate::semantic::{CompilerPass, PassEffect};
 
     #[test]
     fn test_other_arguments_new_with_simple_flag() {
-        let arg =
-            OtherArguments::new(vec!["-c".to_string()], ArgumentKind::Other(Some(CompilerPass::Compiling)));
+        let arg = OtherArguments::new(
+            vec!["-c".to_string()],
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        );
 
-        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+        assert_eq!(arg.kind(), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-c"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
@@ -134,10 +136,10 @@ mod tests {
     fn test_other_arguments_new_with_flag_and_value() {
         let arg = OtherArguments::new(
             vec!["-I".to_string(), "/usr/include".to_string()],
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.kind(), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-I", "/usr/include"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
@@ -146,10 +148,10 @@ mod tests {
     fn test_other_arguments_new_with_combined_flag() {
         let arg = OtherArguments::new(
             vec!["-I/usr/include".to_string()],
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.kind(), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-I/usr/include"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
@@ -165,9 +167,10 @@ mod tests {
 
     #[test]
     fn test_other_arguments_new_with_response_file() {
-        let arg = OtherArguments::new(vec!["@response.txt".to_string()], ArgumentKind::Other(None));
+        let arg =
+            OtherArguments::new(vec!["@response.txt".to_string()], ArgumentKind::Other(PassEffect::None));
 
-        assert_eq!(arg.kind(), ArgumentKind::Other(None));
+        assert_eq!(arg.kind(), ArgumentKind::Other(PassEffect::None));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["@response.txt"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }
@@ -203,10 +206,10 @@ mod tests {
     fn test_other_arguments_new() {
         let arg = OtherArguments::new(
             vec!["-D".to_string(), "MACRO=value".to_string()],
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         );
 
-        assert_eq!(arg.kind(), ArgumentKind::Other(Some(CompilerPass::Preprocessing)));
+        assert_eq!(arg.kind(), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)));
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["-D", "MACRO=value"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), None);
     }

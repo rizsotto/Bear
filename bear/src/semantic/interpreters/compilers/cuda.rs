@@ -13,7 +13,9 @@
 
 use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
 use super::gcc::{GCC_FLAGS, parse_arguments_and_environment};
-use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter};
+use crate::semantic::{
+    ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
+};
 
 /// CUDA compiler (nvcc) command-line argument parser that extracts semantic information from compiler invocations.
 ///
@@ -74,164 +76,203 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
         // GPU Architecture and Code Generation
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--gpu-architecture"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-arch"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--gpu-code"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-code"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--generate-code"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-gencode"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Compilation Modes
         FlagRule::new(
             FlagPattern::Exactly("--compile", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("-c", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--device-c", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-dc", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("-dc", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--device-w", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-dw", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("-dw", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--device-link", 0),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-dlink", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("--link", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("--lib", 0), ArgumentKind::Other(Some(CompilerPass::Linking))),
-        FlagRule::new(FlagPattern::Exactly("--run", 0), ArgumentKind::Other(None)),
+        FlagRule::new(
+            FlagPattern::Exactly("-dlink", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--link", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--lib", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("--run", 0), ArgumentKind::Other(PassEffect::None)),
         // CUDA Runtime and Toolkit
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--cudart"),
-            ArgumentKind::Other(Some(CompilerPass::Linking)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--cuda-path"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Host Compiler Options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--compiler-bindir"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-ccbin"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Prefix("-Xcompiler", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Prefix("-Xlinker", 1), ArgumentKind::Other(Some(CompilerPass::Linking))),
+        FlagRule::new(
+            FlagPattern::Prefix("-Xlinker", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+        ),
         // Device-Specific Options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--maxrregcount"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-maxrregcount"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--use_fast_math", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-use_fast_math", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("--ftz", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("--ftz", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--prec-div", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--prec-sqrt", 1),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("--fmad", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("--fmad", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         // PTX and SASS Options
-        FlagRule::new(FlagPattern::Exactly("--ptx", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
-        FlagRule::new(FlagPattern::Exactly("--cubin", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("--ptx", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(
+            FlagPattern::Exactly("--cubin", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--fatbin", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Debug and Profiling
         FlagRule::new(
             FlagPattern::Exactly("--device-debug", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-G", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("-G", 0),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         FlagRule::new(
             FlagPattern::Exactly("--generate-line-info", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-lineinfo", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--profile", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Optimization
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--optimize"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-O"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Language Standard
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--std"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Relocatable Device Code
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--relocatable-device-code"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-rdc", 1), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+        FlagRule::new(
+            FlagPattern::Exactly("-rdc", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
         // Extended Lambda
         FlagRule::new(
             FlagPattern::Exactly("--extended-lambda", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("-extended-lambda", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Experimental Features
         FlagRule::new(
             FlagPattern::Exactly("--expt-extended-lambda", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::Exactly("--expt-relaxed-constexpr", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         // Output Options
         FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("--output-file"), ArgumentKind::Output),
@@ -239,36 +280,39 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
         // Preprocessing
         FlagRule::new(
             FlagPattern::Exactly("--preprocess", 0),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
         ),
-        FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(Some(CompilerPass::Preprocessing))),
-        // Verbose and Information
-        FlagRule::new(FlagPattern::Exactly("--verbose", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::Exactly("--help", 0), ArgumentKind::Other(None)),
-        // Warnings
-        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
         FlagRule::new(
-            FlagPattern::Prefix("--disable-warnings", 0),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            FlagPattern::Exactly("-E", 0),
+            ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
         ),
+        // Verbose and Information
+        FlagRule::new(FlagPattern::Exactly("--verbose", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+        FlagRule::new(FlagPattern::Exactly("--help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+        // Warnings
+        FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
+        FlagRule::new(FlagPattern::Prefix("--disable-warnings", 0), ArgumentKind::Other(PassEffect::None)),
         // CUDA-specific include paths
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--include-path"),
-            ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         ),
         // Keep intermediate files
-        FlagRule::new(FlagPattern::Exactly("--keep", 0), ArgumentKind::Other(None)),
-        FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--keep-dir"), ArgumentKind::Other(None)),
+        FlagRule::new(FlagPattern::Exactly("--keep", 0), ArgumentKind::Other(PassEffect::DriverOption)),
+        FlagRule::new(
+            FlagPattern::ExactlyWithEqOrSep("--keep-dir"),
+            ArgumentKind::Other(PassEffect::DriverOption),
+        ),
         // Machine and Target Options
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("--machine"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
         FlagRule::new(
             FlagPattern::ExactlyWithEqOrSep("-m"),
-            ArgumentKind::Other(Some(CompilerPass::Compiling)),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
         ),
     ]);
 
@@ -281,6 +325,7 @@ pub static CUDA_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock:
 mod tests {
     use super::*;
     use crate::intercept::Execution;
+    use crate::semantic::PassEffect;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -309,7 +354,10 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Index 1: -c (compilation flag)
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
 
             // Index 2: kernel.cu (source file)
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
@@ -348,13 +396,25 @@ mod tests {
 
             // Check that GPU architecture flags are recognized as compilation flags
             // Index 1: --gpu-architecture=sm_80
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             // Index 2: -arch=sm_70
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             // Index 3: --gpu-code=sm_80,compute_80
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
             // Index 4: -c
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[4].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
             // Index 5: kernel.cu (source file)
             assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
         } else {
@@ -377,10 +437,16 @@ mod tests {
             assert_eq!(cmd.arguments.len(), 5);
 
             // Index 1: --device-c
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
 
             // Index 2: --relocatable-device-code=true
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[2].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
 
             // Index 3: kernel.cu (source file)
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
@@ -410,16 +476,22 @@ mod tests {
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
 
             // Index 1: -Xcompiler
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
 
             // Index 2: -Wall
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
 
             // Index 3: -Xlinker
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(Some(CompilerPass::Linking)));
+            assert_eq!(
+                cmd.arguments[3].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
+            );
 
             // Index 4: -rpath=/usr/lib
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(None));
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(PassEffect::None));
 
             // Index 5: main.cu (source file)
             assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
@@ -447,7 +519,10 @@ mod tests {
 
             // Index 1-4: All compilation flags
             for i in 1..5 {
-                assert_eq!(cmd.arguments[i].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+                assert_eq!(
+                    cmd.arguments[i].kind(),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+                );
             }
 
             // Index 5: Source file
@@ -466,7 +541,10 @@ mod tests {
         let result = interpreter.recognize(&execution);
         if let Some(Command::Compiler(cmd)) = result {
             assert_eq!(cmd.arguments.len(), 4);
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
         }
 
         // Test separate format
@@ -476,7 +554,10 @@ mod tests {
         if let Some(Command::Compiler(cmd)) = result {
             // Separate format creates one argument that consumes both the flag and value
             assert_eq!(cmd.arguments.len(), 4);
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
         }
     }
 
@@ -493,7 +574,10 @@ mod tests {
         if let Some(Command::Compiler(cmd)) = result {
             assert_eq!(cmd.arguments.len(), 3);
             assert_eq!(cmd.arguments[0].kind(), ArgumentKind::Compiler);
-            assert_eq!(cmd.arguments[1].kind(), ArgumentKind::Other(Some(CompilerPass::Compiling)));
+            assert_eq!(
+                cmd.arguments[1].kind(),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
+            );
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
         } else {
             panic!("Expected compiler command");

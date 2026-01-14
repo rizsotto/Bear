@@ -224,22 +224,25 @@ impl FlagRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::CompilerPass;
+    use crate::semantic::{CompilerPass, PassEffect};
     use std::sync::LazyLock;
 
     // Create test-specific flags (not compiler-specific)
     static TEST_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
         let mut flags = vec![
-            FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+            FlagRule::new(
+                FlagPattern::Exactly("-c", 0),
+                ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+            ),
             FlagRule::new(
                 FlagPattern::ExactlyWithEqOrSep("-std"),
-                ArgumentKind::Other(Some(CompilerPass::Compiling)),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
             ),
             FlagRule::new(
                 FlagPattern::ExactlyWithGluedOrSep("-I"),
-                ArgumentKind::Other(Some(CompilerPass::Preprocessing)),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
             ),
-            FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(Some(CompilerPass::Compiling))),
+            FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
             FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
         ];
 
