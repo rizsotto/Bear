@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Bear executable path - only available when integration tests are enabled
+#[cfg(feature = "allow-integration-tests")]
 #[allow(dead_code)]
-pub const BEAR_BIN: &str = "bear";
+pub const BEAR_EXECUTABLE_PATH: &str = env!("BEAR_EXECUTABLE_PATH");
 
 #[cfg(has_executable_true)]
 #[allow(dead_code)]

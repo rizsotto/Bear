@@ -39,6 +39,7 @@ harness = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(has_preload_library)',
     'cfg(has_executable_true)',
     'cfg(has_executable_false)',
     'cfg(has_executable_echo)',

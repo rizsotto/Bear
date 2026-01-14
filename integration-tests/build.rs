@@ -6,6 +6,12 @@
  * original bear/build.rs.
  */
 
+/// Bear executable name (platform-dependent)
+#[cfg(windows)]
+const BEAR_NAME: &str = "bear.exe";
+#[cfg(not(windows))]
+const BEAR_NAME: &str = "bear";
+
 /// Wrapper executable name (platform-dependent)
 #[cfg(windows)]
 const WRAPPER_NAME: &str = "wrapper.exe";
@@ -19,8 +25,9 @@ const PRELOAD_NAME: &str = "libexec.dylib";
 const PRELOAD_NAME: &str = "libexec.so";
 
 fn main() {
-    // Set up paths for wrapper and preload artifacts
-    let (wrapper_path, preload_path) = find_intercept_artifacts();
+    // Set up paths for bear, wrapper and preload artifacts
+    let (bear_path, wrapper_path, preload_path) = find_intercept_artifacts();
+    println!("cargo:rustc-env=BEAR_EXECUTABLE_PATH={}", bear_path);
     println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH={}", wrapper_path);
     println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path);
 
@@ -61,17 +68,22 @@ fn main() {
     check_preload_library_availability(&preload_path);
 }
 
-fn find_intercept_artifacts() -> (String, String) {
+fn find_intercept_artifacts() -> (String, String, String) {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let target_dir = std::path::Path::new(&out_dir)
         .ancestors()
         .nth(3) // Go up from out_dir to target/debug or target/release
         .unwrap();
 
+    let bear_path = target_dir.join(BEAR_NAME);
     let wrapper_path = target_dir.join(WRAPPER_NAME);
     let preload_path = target_dir.join(PRELOAD_NAME);
 
-    (format!("{}", wrapper_path.display()), format!("{}", preload_path.display()))
+    (
+        format!("{}", bear_path.display()),
+        format!("{}", wrapper_path.display()),
+        format!("{}", preload_path.display()),
+    )
 }
 
 fn check_executable_exists(executable: &str) {

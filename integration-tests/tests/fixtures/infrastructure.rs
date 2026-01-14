@@ -42,7 +42,6 @@
 use super::constants::*;
 use anyhow::{Context, Result};
 use assert_cmd::Command;
-use assert_cmd::cargo::cargo_bin;
 // TempDir and predicates are infrastructure for future tests
 #[allow(unused_imports)]
 use assert_fs::{TempDir, prelude::*};
@@ -231,7 +230,7 @@ impl TestEnvironment {
 
     /// Run bear with the given arguments
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
-        let mut cmd = Command::new(cargo_bin(BEAR_BIN));
+        let mut cmd = Command::new(BEAR_EXECUTABLE_PATH);
         cmd.current_dir(self.temp_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args(args);
 
         let output = cmd.output()?;
