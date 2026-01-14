@@ -42,6 +42,10 @@ jobs:
         toolchain:
           - stable
           - nightly
+        exclude:
+          # Windows stable has LNK1318 PDB linker errors that we can't easily fix
+          - os: windows-latest
+            toolchain: stable
     runs-on: ${{ matrix.os }}
     needs: [compile]
     steps:
