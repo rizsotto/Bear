@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This file implements a shared library. This library can be pre-loaded by
-//! the dynamic linker of the Operating System (OS). It implements a few function
-//! related to process creation. By pre-load this library the executed process
-//! uses these functions instead of those from the standard library.
+//! This file implements the Rust side of the preload library interception.
 //!
-//! The idea here is to inject a logic before calling the real methods. The logic is
-//! to dump the call into a file. To call the real method, this library is doing
-//! the job of the dynamic linker.
+//! All exported functions are prefixed with `rust_` and are called from the C shim
+//! (`src/c/shim.c`). This separation exists because:
 //!
-//! The only input for the log writing is about the destination directory.
-//! This is passed as an environment variable.
+//! 1. Stable Rust cannot handle C variadic arguments (execl family)
+//! 2. On FreeBSD, libc functions may call each other internally. By having all
+//!    exported symbols in C call into Rust (which uses dlsym(RTLD_NEXT, ...)),
+//!    we avoid recursive interception issues.
+//!
+//! Each `rust_*` function:
+//! - Reports the execution to the collector
+//! - Calls the real function via dlsym(RTLD_NEXT, ...)
 
 use std::collections::HashMap;
-use std::ffi::{CStr, CString};
-#[cfg(not(test))]
-use std::io::Write;
+use std::ffi::CStr;
+
 use std::path::PathBuf;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
@@ -26,7 +27,10 @@ use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
+// =============================================================================
 // Function pointer types for the original functions
+// =============================================================================
+
 #[cfg(has_symbol_execve)]
 type ExecveFunc = unsafe extern "C" fn(
     path: *const c_char,
@@ -87,8 +91,15 @@ type PopenFunc = unsafe extern "C" fn(command: *const c_char, mode: *const c_cha
 #[cfg(has_symbol_system)]
 type SystemFunc = unsafe extern "C" fn(command: *const c_char) -> c_int;
 
-// Dynamic loading related constants and types
+// =============================================================================
+// Dynamic loading related constants
+// =============================================================================
+
 const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
+
+// =============================================================================
+// Constructor and initialization
+// =============================================================================
 
 /// Constructor function that is called when the library is loaded
 ///
@@ -98,6 +109,8 @@ const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 unsafe fn on_load() {
     #[cfg(not(test))]
     {
+        use std::io::Write;
+
         let pid = std::process::id();
         env_logger::Builder::from_default_env()
             .format(move |buf, record| {
@@ -109,7 +122,10 @@ unsafe fn on_load() {
     log::debug!("Initializing intercept-preload library");
 }
 
+// =============================================================================
 // Static variables to hold original function pointers
+// =============================================================================
+
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execve".as_ptr() as *const _) };
@@ -135,7 +151,7 @@ static REAL_EXECVP: AtomicPtr<libc::c_void> = {
 };
 
 #[ctor]
-static REAL_EXECVE_OPENBSD: AtomicPtr<libc::c_void> = {
+static REAL_EXECVP_OPENBSD: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvP".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
@@ -158,14 +174,12 @@ static REAL_POSIX_SPAWNP: AtomicPtr<libc::c_void> = {
     AtomicPtr::new(ptr)
 };
 
-#[cfg(has_symbol_popen)]
 #[ctor]
 static REAL_POPEN: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"popen".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
-#[cfg(has_symbol_system)]
 #[ctor]
 static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"system".as_ptr() as *const _) };
@@ -179,11 +193,50 @@ static REPORTER: AtomicPtr<ReporterOnTcp> = {
     ReporterFactory::create_as_ptr()
 };
 
+/// Rust implementation of execv
+///
+/// Called from C shim for: execv, execl
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execv function
+#[cfg(has_symbol_execv)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rust_execv(path: *const c_char, argv: *const *const c_char) -> c_int {
+    unsafe {
+        report(|| {
+            let result = Execution {
+                executable: as_path_buf(path)?,
+                arguments: as_string_vec(argv)?,
+                working_dir: working_dir()?,
+                environment: std::env::vars().collect(),
+            };
+            Ok(result)
+        });
+
+        let func_ptr = REAL_EXECV.load(Ordering::SeqCst);
+        if !func_ptr.is_null() {
+            let real_func_ptr: ExecvFunc = std::mem::transmute(func_ptr);
+            real_func_ptr(path, argv)
+        } else {
+            log::error!("Real execv function not found");
+            libc::ENOSYS
+        }
+    }
+}
+
+/// Rust implementation of execve
+///
+/// Called from C shim for: execve, execle
+///
+/// # Safety
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execve function
 #[cfg(has_symbol_execve)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn execve(
+pub unsafe extern "C" fn rust_execve(
     path: *const c_char,
     argv: *const *const c_char,
     envp: *const *const c_char,
@@ -210,72 +263,17 @@ pub unsafe extern "C" fn execve(
     }
 }
 
+/// Rust implementation of execvp
+///
+/// Called from C shim for: execvp, execlp
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
-#[cfg(has_symbol_execv)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn execv(path: *const c_char, argv: *const *const c_char) -> c_int {
-    // Try to report but don't fail if we can't
-    unsafe {
-        report(|| {
-            let result = Execution {
-                executable: as_path_buf(path)?,
-                arguments: as_string_vec(argv)?,
-                working_dir: working_dir()?,
-                environment: std::env::vars().collect(),
-            };
-            Ok(result)
-        });
-
-        let func_ptr = REAL_EXECV.load(Ordering::SeqCst);
-        if !func_ptr.is_null() {
-            let real_func_ptr: ExecvFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(path, argv)
-        } else {
-            log::error!("Real execv function not found");
-            libc::ENOSYS
-        }
-    }
-}
-
-/// # Safety
-/// This function is unsafe because it modifies global state.
-#[cfg(has_symbol_execvpe)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn execvpe(
-    file: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int {
-    // Try to report but don't fail if we can't
-    unsafe {
-        report(|| {
-            let result = Execution {
-                executable: as_path_buf(file)?,
-                arguments: as_string_vec(argv)?,
-                working_dir: working_dir()?,
-                environment: as_environment(envp)?,
-            };
-            Ok(result)
-        });
-
-        let func_ptr = REAL_EXECVPE.load(Ordering::SeqCst);
-        if !func_ptr.is_null() {
-            let real_func_ptr: ExecvpeFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(file, argv, envp)
-        } else {
-            log::error!("Real execvpe function not found");
-            libc::ENOSYS
-        }
-    }
-}
-
-/// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execvp function
 #[cfg(has_symbol_execvp)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
-    // Try to report but don't fail if we can't
+pub unsafe extern "C" fn rust_execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
     unsafe {
         report(|| {
             let result = Execution {
@@ -298,11 +296,54 @@ pub unsafe extern "C" fn execvp(file: *const c_char, argv: *const *const c_char)
     }
 }
 
+/// Rust implementation of execvpe (GNU extension)
+///
+/// Called from C shim for: execvpe
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execvpe function
+#[cfg(has_symbol_execvpe)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rust_execvpe(
+    file: *const c_char,
+    argv: *const *const c_char,
+    envp: *const *const c_char,
+) -> c_int {
+    unsafe {
+        report(|| {
+            let result = Execution {
+                executable: as_path_buf(file)?,
+                arguments: as_string_vec(argv)?,
+                working_dir: working_dir()?,
+                environment: as_environment(envp)?,
+            };
+            Ok(result)
+        });
+
+        let func_ptr = REAL_EXECVPE.load(Ordering::SeqCst);
+        if !func_ptr.is_null() {
+            let real_func_ptr: ExecvpeFunc = std::mem::transmute(func_ptr);
+            real_func_ptr(file, argv, envp)
+        } else {
+            log::error!("Real execvpe function not found");
+            libc::ENOSYS
+        }
+    }
+}
+
+/// Rust implementation of execvP (BSD extension)
+///
+/// Called from C shim for: execvP
+///
+/// # Safety
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execvP function
 #[cfg(has_symbol_execvP)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn execvP(
+pub unsafe extern "C" fn rust_execvP(
     file: *const c_char,
     search_path: *const c_char,
     argv: *const *const c_char,
@@ -318,7 +359,7 @@ pub unsafe extern "C" fn execvP(
             Ok(result)
         });
 
-        let func_ptr = REAL_EXECVE_OPENBSD.load(Ordering::SeqCst);
+        let func_ptr = REAL_EXECVP_OPENBSD.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: ExecvPFunc = std::mem::transmute(func_ptr);
             real_func_ptr(file, search_path, argv)
@@ -329,11 +370,17 @@ pub unsafe extern "C" fn execvP(
     }
 }
 
+/// Rust implementation of exect (BSD, deprecated)
+///
+/// Called from C shim for: exect
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real exect function
 #[cfg(has_symbol_exect)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn exect(
+pub unsafe extern "C" fn rust_exect(
     path: *const c_char,
     argv: *const *const c_char,
     envp: *const *const c_char,
@@ -360,124 +407,17 @@ pub unsafe extern "C" fn exect(
     }
 }
 
-// Implementations for variable argument functions
-// We need to handle C variadic arguments in Rust
-
+/// Rust implementation of posix_spawn
+///
+/// Called from C shim for: posix_spawn
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
-#[cfg(all(has_symbol_execl, has_symbol_execv))]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn execl(
-    path: *const c_char,
-    arg: *const c_char,
-    args: *const c_char, /* variadic */
-) -> c_int {
-    // In a real implementation, we would need to pass all the variadic arguments
-    // But since we can't access all of them directly in Rust, we'll collect what we can
-    // and use execv instead
-
-    // Create a vector of argument pointers that we can access
-    let mut argv = Vec::new();
-    argv.push(path);
-
-    if !arg.is_null() {
-        argv.push(arg);
-
-        // In C, execl() is often implemented with execv() and just copying the
-        // arguments we have access to
-        let va_arg = args;
-        if !va_arg.is_null() {
-            argv.push(va_arg);
-        }
-    }
-
-    // Null-terminate the argument list
-    argv.push(ptr::null());
-
-    // Use execv to execute the command
-    unsafe { execv(path, argv.as_ptr()) }
-}
-
-/// # Safety
-/// This function is unsafe because it modifies global state.
-#[cfg(all(has_symbol_execlp, has_symbol_execvp))]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn execlp(
-    file: *const c_char,
-    arg: *const c_char,
-    args: *const c_char, /* variadic */
-) -> c_int {
-    // Create a vector of argument pointers that we can access
-    let mut argv = Vec::new();
-    argv.push(file);
-
-    if !arg.is_null() {
-        argv.push(arg);
-
-        // In C, execlp() is often implemented with execvp() and just copying the
-        // arguments we have access to
-        let va_arg = args;
-        if !va_arg.is_null() {
-            argv.push(va_arg);
-        }
-    }
-
-    // Null-terminate the argument list
-    argv.push(ptr::null());
-
-    // Use execvp to execute the command
-    unsafe { execvp(file, argv.as_ptr()) }
-}
-
-/// # Safety
-/// This function is unsafe because it modifies global state.
-#[cfg(all(has_symbol_execle, has_symbol_execve))]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn execle(
-    path: *const c_char,
-    arg: *const c_char,
-    args: *const c_char, /* variadic */
-) -> c_int {
-    // execle is a variadic function in C that takes arguments followed by an environment pointer
-    // In a real implementation, the last argument (after NULL) is the environment pointer
-
-    // Create a vector of argument pointers that we can access
-    let mut argv = Vec::new();
-    argv.push(path);
-
-    if !arg.is_null() {
-        argv.push(arg);
-
-        // We can only grab the next argument directly
-        let va_arg = args;
-        if !va_arg.is_null() {
-            argv.push(va_arg);
-        }
-    }
-
-    // Null-terminate the argument list
-    argv.push(ptr::null());
-
-    // In execle, the envp pointer follows the NULL terminator
-    // Since we can't access variadic args reliably, we'll use the current environment
-    let current_env = std::env::vars()
-        .map(|(k, v)| format!("{k}={v}"))
-        .map(|s| CString::new(s).unwrap())
-        .collect::<Vec<_>>();
-
-    let mut env_ptrs: Vec<*const c_char> = current_env.iter().map(|cs| cs.as_ptr()).collect();
-
-    env_ptrs.push(ptr::null());
-
-    // Use execve to execute the command
-    unsafe { execve(path, argv.as_ptr(), env_ptrs.as_ptr()) }
-}
-
-/// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real posix_spawn function
 #[cfg(has_symbol_posix_spawn)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_spawn(
+pub unsafe extern "C" fn rust_posix_spawn(
     pid: *mut pid_t,
     path: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
@@ -507,11 +447,17 @@ pub unsafe extern "C" fn posix_spawn(
     }
 }
 
+/// Rust implementation of posix_spawnp
+///
+/// Called from C shim for: posix_spawnp
+///
 /// # Safety
-/// This function is unsafe because it modifies global state.
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real posix_spawnp function
 #[cfg(has_symbol_posix_spawnp)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn posix_spawnp(
+pub unsafe extern "C" fn rust_posix_spawnp(
     pid: *mut pid_t,
     file: *const c_char,
     file_actions: *const posix_spawn_file_actions_t,
@@ -541,7 +487,9 @@ pub unsafe extern "C" fn posix_spawnp(
     }
 }
 
-/// Intercept popen function calls
+/// Rust implementation of popen
+///
+/// Called from C shim for: popen
 ///
 /// # Safety
 /// This function is unsafe because it:
@@ -552,7 +500,7 @@ pub unsafe extern "C" fn posix_spawnp(
 /// The caller must ensure that `command` and `mode` are valid null-terminated C strings.
 #[cfg(has_symbol_popen)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
+pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
     // For popen, we need to parse the shell command to extract the executable
     if !command.is_null() {
         let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
@@ -590,7 +538,9 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
     }
 }
 
-/// Intercept system function calls
+/// Rust implementation of system
+///
+/// Called from C shim for: system
 ///
 /// # Safety
 /// This function is unsafe because it:
@@ -601,7 +551,7 @@ pub unsafe extern "C" fn popen(command: *const c_char, mode: *const c_char) -> *
 /// The caller must ensure that `command` is a valid null-terminated C string.
 #[cfg(has_symbol_system)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
+pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
     // For system, we need to parse the shell command to extract the executable
     if !command.is_null() {
         let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
@@ -639,7 +589,11 @@ pub unsafe extern "C" fn system(command: *const c_char) -> c_int {
     }
 }
 
-// Function to report a command execution only if reporter is available
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+/// Report a command execution only if reporter is available
 fn report<F>(f: F)
 where
     F: FnOnce() -> Result<Execution, c_int>,
@@ -662,7 +616,7 @@ where
     }
 }
 
-// Utility functions to convert C arguments to Rust types
+/// Convert a C string to a Rust String
 unsafe fn as_string(s: *const c_char) -> Result<String, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
@@ -673,6 +627,7 @@ unsafe fn as_string(s: *const c_char) -> Result<String, c_int> {
     }
 }
 
+/// Convert a C string to a PathBuf
 unsafe fn as_path_buf(s: *const c_char) -> Result<PathBuf, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
@@ -683,6 +638,7 @@ unsafe fn as_path_buf(s: *const c_char) -> Result<PathBuf, c_int> {
     }
 }
 
+/// Convert a null-terminated array of C strings to a Vec<String>
 unsafe fn as_string_vec(s: *const *const c_char) -> Result<Vec<String>, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
@@ -701,6 +657,7 @@ unsafe fn as_string_vec(s: *const *const c_char) -> Result<Vec<String>, c_int> {
     Ok(vec)
 }
 
+/// Convert a null-terminated array of "KEY=VALUE" C strings to a HashMap
 unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, String>, c_int> {
     if s.is_null() {
         return Err(libc::EINVAL);
@@ -727,6 +684,7 @@ unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, Stri
     Ok(map)
 }
 
+/// Get the current working directory
 fn working_dir() -> Result<PathBuf, c_int> {
     let cwd = std::env::current_dir().map_err(|_| libc::EINVAL)?;
     Ok(cwd)

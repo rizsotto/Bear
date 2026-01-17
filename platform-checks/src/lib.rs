@@ -5,6 +5,7 @@
 //! This crate provides functions for checking system capabilities during build time.
 //! It's designed to be used in build scripts to generate appropriate cfg flags.
 
+use std::collections::HashSet;
 use std::io::Write;
 
 /// Check if a header file is available on the system
@@ -15,7 +16,10 @@ use std::io::Write;
 ///
 /// # Output
 /// Generates `cargo:rustc-cfg=has_header_{define}` if the header is found
-pub fn check_include_file(header: &str, define: &str) {
+///
+/// # Returns
+/// `true` if the header is found, `false` otherwise
+pub fn check_include_file(header: &str, define: &str) -> bool {
     let result = cc::Build::new()
         .cargo_metadata(false)
         .cargo_output(false)
@@ -39,9 +43,11 @@ pub fn check_include_file(header: &str, define: &str) {
             println!("cargo:rustc-cfg=has_header_{define}");
             println!("cargo:rustc-check-cfg=cfg(has_header_{define})");
             println!("cargo:warning=Checking for include file: {header} ... found");
+            true
         }
         Err(_) => {
             println!("cargo:warning=Checking for include file: {header} ... missing");
+            false
         }
     }
 }
@@ -54,7 +60,10 @@ pub fn check_include_file(header: &str, define: &str) {
 ///
 /// # Output
 /// Generates `cargo:rustc-cfg=has_symbol_{symbol}` if the symbol is found
-pub fn check_symbol_exists(symbol: &str, header: &str) {
+///
+/// # Returns
+/// `true` if the symbol is found, `false` otherwise
+pub fn check_symbol_exists(symbol: &str, header: &str) -> bool {
     let check_code = format!(
         r#"
         #include <stddef.h>
@@ -95,9 +104,11 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
             println!("cargo:rustc-cfg=has_symbol_{symbol}");
             println!("cargo:rustc-check-cfg=cfg(has_symbol_{symbol})");
             println!("cargo:warning=Checking for symbol: {symbol} ... found");
+            true
         }
         Err(_) => {
             println!("cargo:warning=Checking for symbol: {symbol} ... missing");
+            false
         }
     }
 }
@@ -106,7 +117,13 @@ pub fn check_symbol_exists(symbol: &str, header: &str) {
 ///
 /// This function runs all the header and symbol checks that are needed
 /// by the Bear project components.
-pub fn perform_system_checks() {
+///
+/// # Returns
+/// A `HashSet<String>` containing the names of all detected symbols.
+/// The names match the `has_symbol_*` cfg flag format (e.g., "execve", "posix_spawn").
+pub fn perform_system_checks() -> HashSet<String> {
+    let mut detected_symbols = HashSet::new();
+
     check_include_file("dlfcn.h", "dlfcn_h");
     check_symbol_exists("dlopen", "dlfcn.h");
     check_symbol_exists("dlsym", "dlfcn.h");
@@ -119,27 +136,41 @@ pub fn perform_system_checks() {
     check_symbol_exists("ENOENT", "errno.h");
 
     check_include_file("unistd.h", "unistd_h");
-    check_symbol_exists("execve", "unistd.h");
-    check_symbol_exists("execv", "unistd.h");
-    check_symbol_exists("execvpe", "unistd.h");
-    check_symbol_exists("execvp", "unistd.h");
-    check_symbol_exists("execvP", "unistd.h");
-    check_symbol_exists("exect", "unistd.h");
-    check_symbol_exists("execl", "unistd.h");
-    check_symbol_exists("execlp", "unistd.h");
-    check_symbol_exists("execle", "unistd.h");
-    check_symbol_exists("execveat", "unistd.h");
-    check_symbol_exists("fexecve", "unistd.h");
+
+    // exec family - track which symbols are available
+    for symbol in &[
+        "execve", "execv", "execvpe", "execvp", "execvP", "exect", "execl", "execlp", "execle", "execveat",
+        "fexecve",
+    ] {
+        if check_symbol_exists(symbol, "unistd.h") {
+            detected_symbols.insert(symbol.to_string());
+        }
+    }
 
     check_include_file("spawn.h", "spawn_h");
-    check_symbol_exists("posix_spawn", "spawn.h");
-    check_symbol_exists("posix_spawnp", "spawn.h");
+
+    // posix_spawn family
+    for symbol in &["posix_spawn", "posix_spawnp"] {
+        if check_symbol_exists(symbol, "spawn.h") {
+            detected_symbols.insert(symbol.to_string());
+        }
+    }
 
     check_include_file("stdio.h", "stdio_h");
-    check_symbol_exists("popen", "stdio.h");
+
+    // popen
+    if check_symbol_exists("popen", "stdio.h") {
+        detected_symbols.insert("popen".to_string());
+    }
 
     check_include_file("stdlib.h", "stdlib_h");
-    check_symbol_exists("system", "stdlib.h");
+
+    // system
+    if check_symbol_exists("system", "stdlib.h") {
+        detected_symbols.insert("system".to_string());
+    }
+
+    detected_symbols
 }
 
 /// Get all the cfg flags that should be added to check-cfg

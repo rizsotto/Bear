@@ -351,7 +351,7 @@ impl TestEnvironment {
 
         let events: Vec<Value> = content
             .lines()
-            .map(|line| serde_json::from_str(line))
+            .map(serde_json::from_str)
             .collect::<Result<Vec<_>, _>>()
             .with_context(|| "Failed to parse events JSON lines")?;
 
@@ -889,10 +889,8 @@ impl EventMatcher {
 
     fn matches(&self, event: &Value) -> bool {
         // Check event type if specified
-        if let Some(ref expected_type) = self.event_type {
-            if !event.get(expected_type).is_some() {
-                return false;
-            }
+        if self.event_type.as_ref().is_some_and(|expected_type| event.get(expected_type).is_none()) {
+            return false;
         }
 
         // Get the execution part of the event (most common case)

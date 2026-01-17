@@ -425,6 +425,7 @@ name = "intercept-preload"
 version = "4.0.2"
 dependencies = [
  "bear",
+ "cc",
  "ctor",
  "env_logger",
  "libc",

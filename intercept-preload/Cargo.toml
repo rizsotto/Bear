@@ -31,6 +31,7 @@ libc.workspace = true
 
 [build-dependencies]
 platform-checks = { path = "../platform-checks" }
+cc.workspace = true
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
