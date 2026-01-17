@@ -81,7 +81,7 @@ things you might want to know:
   the executables, so it is recommended to isolate the two steps as much as
   possible. Consult the CI configuration in `.github/workflows/build_rust.yml`
   for details.
-- The preload mode is only enabled on Linux at the moment. Including
+- The preload mode is only enabled on UNIX at the moment. Including
   `libexec.so` only makes sense on this OS. This might be extended to other
   operating systems in the future. Consult `intercept-preload/build.rs` for
   details.

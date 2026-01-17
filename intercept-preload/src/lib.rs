@@ -4,12 +4,12 @@
 //!
 //! The library captures system calls and reports them to the collector.
 
-// Only include Linux implementation when building for Linux
-#[cfg(target_os = "linux")]
+// Only include implementation when building on unix
+#[cfg(target_family = "unix")]
 mod implementation;
 
-// Re-export Linux implementations when on Linux
-#[cfg(target_os = "linux")]
+// Re-export implementations
+#[cfg(target_family = "unix")]
 pub use implementation::*;
 
 /// Version information for the library
