@@ -4,12 +4,24 @@
 //!
 //! The library captures system calls and reports them to the collector.
 
-// Only include Linux implementation when building for Linux
-#[cfg(target_os = "linux")]
+// Only include Unix implementation when building for Unix
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
 mod implementation;
 
-// Re-export Linux implementations when on Linux
-#[cfg(target_os = "linux")]
+// Re-export Unix implementations when on Unix
+#[cfg(any(
+    target_os = "linux",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "dragonfly"
+))]
 pub use implementation::*;
 
 /// Version information for the library
