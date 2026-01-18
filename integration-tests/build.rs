@@ -160,13 +160,13 @@ fn is_preload_supported_at_runtime() -> bool {
         // Windows doesn't support LD_PRELOAD
         false
     }
-    #[cfg(all(target_os = "macos", not(windows)))]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
         // Disable integration test on macOS, because could not find out how to compile
         // the libexec.dylib that works on arm64e, and that makes the CI build broken.
         false
     }
-    #[cfg(all(not(target_os = "macos"), not(windows)))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", windows)))]
     {
         // Other Unix-like systems should support preload
         true

@@ -139,13 +139,7 @@ mod types {
 
     /// The default intercept mode is varying based on the target operating system.
     impl Default for Intercept {
-        #[cfg(any(
-            target_os = "linux",
-            target_os = "freebsd",
-            target_os = "netbsd",
-            target_os = "openbsd",
-            target_os = "dragonfly"
-        ))]
+        #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
         fn default() -> Self {
             Intercept::Preload { path: default_preload_library() }
         }
