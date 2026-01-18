@@ -138,10 +138,7 @@ pub fn perform_system_checks() -> HashSet<String> {
     check_include_file("unistd.h", "unistd_h");
 
     // exec family - track which symbols are available
-    for symbol in &[
-        "execve", "execv", "execvpe", "execvp", "execvP", "exect", "execl", "execlp", "execle", "execveat",
-        "fexecve",
-    ] {
+    for symbol in &["execve", "execv", "execvpe", "execvp", "execvP", "exect", "execl", "execlp", "execle"] {
         if check_symbol_exists(symbol, "unistd.h") {
             detected_symbols.insert(symbol.to_string());
         }

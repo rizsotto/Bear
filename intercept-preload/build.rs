@@ -9,6 +9,8 @@ fn main() {
     println!("cargo:rerun-if-changed=src/c/shim.c");
 
     if cfg!(target_family = "unix") {
+        let out_dir = std::env::var("OUT_DIR").unwrap();
+
         // Perform system capability checks and get detected symbols
         let detected_symbols = platform_checks::perform_system_checks();
 
@@ -18,8 +20,12 @@ fn main() {
         //
         // We use cargo_metadata(false) to prevent cc from emitting its own
         // cargo:rustc-link-lib directive, which would link without --whole-archive
-        let out_dir = std::env::var("OUT_DIR").unwrap();
-        cc::Build::new()
+        let mut shim = cc::Build::new();
+        for symbol in &detected_symbols {
+            let flag = format!("has_symbol_{}", symbol);
+            shim.define(flag.as_str(), None);
+        }
+        shim
             .file("src/c/shim.c")
             .warnings(true)
             .extra_warnings(true)
@@ -79,7 +85,7 @@ fn generate_linux_exports(path: &str, detected_symbols: &HashSet<String>) {
     writeln!(file, "    global:").unwrap();
 
     // Export symbols that were detected on this platform
-    for symbol in get_exported_symbols(detected_symbols) {
+    for symbol in detected_symbols {
         writeln!(file, "        {};", symbol).unwrap();
     }
 
@@ -97,36 +103,10 @@ fn generate_macos_exports(path: &str, detected_symbols: &HashSet<String>) {
     let mut file = std::fs::File::create(path).expect("Failed to create exports.txt");
 
     // macOS exported_symbols_list format: one symbol per line, prefixed with underscore
-    for symbol in get_exported_symbols(detected_symbols) {
+    for symbol in detected_symbols {
         writeln!(file, "_{}", symbol).unwrap();
     }
 
     // Library version info
     writeln!(file, "_LIBEAR_VERSION").unwrap();
-}
-
-/// Get the list of symbols to export based on detected platform capabilities
-fn get_exported_symbols(detected_symbols: &HashSet<String>) -> Vec<&'static str> {
-    // Define all symbols we want to intercept, in order
-    let all_symbols = [
-        // execl family (variadic)
-        "execl",
-        "execlp",
-        "execle",
-        // exec family (non-variadic)
-        "execv",
-        "execve",
-        "execvp",
-        "execvpe",
-        "execvP",
-        "exect",
-        // posix_spawn family
-        "posix_spawn",
-        "posix_spawnp",
-        // popen and system
-        "popen",
-        "system",
-    ];
-
-    all_symbols.into_iter().filter(|symbol| detected_symbols.contains(*symbol)).collect()
 }

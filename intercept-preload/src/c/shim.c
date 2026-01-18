@@ -41,10 +41,8 @@ extern int rust_execv(const char *path, char *const argv[]);
 extern int rust_execve(const char *path, char *const argv[], char *const envp[]);
 extern int rust_execvp(const char *file, char *const argv[]);
 extern int rust_execvpe(const char *file, char *const argv[], char *const envp[]);
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
 extern int rust_execvP(const char *file, const char *search_path, char *const argv[]);
 extern int rust_exect(const char *path, char *const argv[], char *const envp[]);
-#endif
 extern int rust_posix_spawn(pid_t *pid, const char *path,
                             const posix_spawn_file_actions_t *file_actions,
                             const posix_spawnattr_t *attrp,
@@ -79,6 +77,7 @@ static void va_copy_args(va_list ap, char **argv, size_t n)
 //
 // int execl(const char *path, const char *arg0, ... /*, (char *)0 */);
 //
+#if defined(has_symbol_execl)
 EXPORT int execl(const char *path, const char *arg0, ...)
 {
     va_list ap;
@@ -100,12 +99,14 @@ EXPORT int execl(const char *path, const char *arg0, ...)
 
     return rust_execv(path, argv);
 }
+#endif
 
 //
 // execlp - execute a file, searching PATH
 //
 // int execlp(const char *file, const char *arg0, ... /*, (char *)0 */);
 //
+#if defined(has_symbol_execlp)
 EXPORT int execlp(const char *file, const char *arg0, ...)
 {
     va_list ap;
@@ -126,6 +127,7 @@ EXPORT int execlp(const char *file, const char *arg0, ...)
 
     return rust_execvp(file, argv);
 }
+#endif
 
 //
 // execle - execute a file with environment
@@ -134,6 +136,7 @@ EXPORT int execlp(const char *file, const char *arg0, ...)
 //
 // Note: The environment pointer comes AFTER the NULL terminator in the variadic list
 //
+#if defined(has_symbol_execle)
 EXPORT int execle(const char *path, const char *arg0, ...)
 {
     va_list ap;
@@ -157,51 +160,62 @@ EXPORT int execle(const char *path, const char *arg0, ...)
 
     return rust_execve(path, argv, envp);
 }
+#endif
 
 //
 // execv - execute a file
 //
+#if defined(has_symbol_execv)
 EXPORT int execv(const char *path, char *const argv[])
 {
     return rust_execv(path, argv);
 }
+#endif
 
 //
 // execve - execute a file with environment
 //
+#if defined(has_symbol_execve)
 EXPORT int execve(const char *path, char *const argv[], char *const envp[])
 {
     return rust_execve(path, argv, envp);
 }
+#endif
 
 //
 // execvp - execute a file, searching PATH
 //
+#if defined(has_symbol_execvp)
 EXPORT int execvp(const char *file, char *const argv[])
 {
     return rust_execvp(file, argv);
 }
+#endif
 
 //
 // execvpe - execute a file, searching PATH, with environment (GNU extension)
 //
+#if defined(has_symbol_execvpe)
 EXPORT int execvpe(const char *file, char *const argv[], char *const envp[])
 {
     return rust_execvpe(file, argv, envp);
 }
+#endif
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
 //
 // execvP - execute a file with custom search path (BSD extension)
 //
+#if defined(has_symbol_execvP)
 EXPORT int execvP(const char *file, const char *search_path, char *const argv[])
 {
     return rust_execvP(file, search_path, argv);
 }
+#endif
 
 //
 // exect - execute a file with tracing (BSD, deprecated)
 //
+#if defined(has_symbol_exect)
 EXPORT int exect(const char *path, char *const argv[], char *const envp[])
 {
     return rust_exect(path, argv, envp);
@@ -211,6 +225,7 @@ EXPORT int exect(const char *path, char *const argv[], char *const envp[])
 //
 // posix_spawn - spawn a process
 //
+#if defined(has_symbol_posix_spawn)
 EXPORT int posix_spawn(pid_t *pid, const char *path,
                        const posix_spawn_file_actions_t *file_actions,
                        const posix_spawnattr_t *attrp,
@@ -218,10 +233,12 @@ EXPORT int posix_spawn(pid_t *pid, const char *path,
 {
     return rust_posix_spawn(pid, path, file_actions, attrp, argv, envp);
 }
+#endif
 
 //
 // posix_spawnp - spawn a process, searching PATH
 //
+#if defined(has_symbol_posix_spawnp)
 EXPORT int posix_spawnp(pid_t *pid, const char *file,
                         const posix_spawn_file_actions_t *file_actions,
                         const posix_spawnattr_t *attrp,
@@ -229,19 +246,24 @@ EXPORT int posix_spawnp(pid_t *pid, const char *file,
 {
     return rust_posix_spawnp(pid, file, file_actions, attrp, argv, envp);
 }
+#endif
 
 //
 // popen - open a pipe to a process
 //
+#if defined(has_symbol_popen)
 EXPORT FILE *popen(const char *command, const char *mode)
 {
     return rust_popen(command, mode);
 }
+#endif
 
 //
 // system - execute a shell command
 //
+#if defined(has_symbol_system)
 EXPORT int system(const char *command)
 {
     return rust_system(command);
 }
+#endif

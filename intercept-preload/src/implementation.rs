@@ -27,80 +27,6 @@ use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
-// =============================================================================
-// Function pointer types for the original functions
-// =============================================================================
-
-#[cfg(has_symbol_execve)]
-type ExecveFunc = unsafe extern "C" fn(
-    path: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_execv)]
-type ExecvFunc = unsafe extern "C" fn(path: *const c_char, argv: *const *const c_char) -> c_int;
-
-#[cfg(has_symbol_execvpe)]
-type ExecvpeFunc = unsafe extern "C" fn(
-    file: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_execvp)]
-type ExecvpFunc = unsafe extern "C" fn(file: *const c_char, argv: *const *const c_char) -> c_int;
-
-#[cfg(has_symbol_execvP)]
-type ExecvPFunc = unsafe extern "C" fn(
-    file: *const c_char,
-    search_path: *const c_char,
-    argv: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_exect)]
-type ExectFunc = unsafe extern "C" fn(
-    path: *const c_char,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_posix_spawn)]
-type PosixSpawnFunc = unsafe extern "C" fn(
-    pid: *mut pid_t,
-    path: *const c_char,
-    file_actions: *const posix_spawn_file_actions_t,
-    attrp: *const posix_spawnattr_t,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_posix_spawnp)]
-type PosixSpawnpFunc = unsafe extern "C" fn(
-    pid: *mut pid_t,
-    file: *const c_char,
-    file_actions: *const posix_spawn_file_actions_t,
-    attrp: *const posix_spawnattr_t,
-    argv: *const *const c_char,
-    envp: *const *const c_char,
-) -> c_int;
-
-#[cfg(has_symbol_popen)]
-type PopenFunc = unsafe extern "C" fn(command: *const c_char, mode: *const c_char) -> *mut libc::FILE;
-
-#[cfg(has_symbol_system)]
-type SystemFunc = unsafe extern "C" fn(command: *const c_char) -> c_int;
-
-// =============================================================================
-// Dynamic loading related constants
-// =============================================================================
-
-const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
-
-// =============================================================================
-// Constructor and initialization
-// =============================================================================
-
 /// Constructor function that is called when the library is loaded
 ///
 /// # Safety
@@ -122,9 +48,7 @@ unsafe fn on_load() {
     log::debug!("Initializing intercept-preload library");
 }
 
-// =============================================================================
-// Static variables to hold original function pointers
-// =============================================================================
+const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -204,6 +128,8 @@ static REPORTER: AtomicPtr<ReporterOnTcp> = {
 #[cfg(has_symbol_execv)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_execv(path: *const c_char, argv: *const *const c_char) -> c_int {
+    type ExecvFunc = unsafe extern "C" fn(path: *const c_char, argv: *const *const c_char) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -241,6 +167,12 @@ pub unsafe extern "C" fn rust_execve(
     argv: *const *const c_char,
     envp: *const *const c_char,
 ) -> c_int {
+    type ExecveFunc = unsafe extern "C" fn(
+        path: *const c_char,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -274,6 +206,8 @@ pub unsafe extern "C" fn rust_execve(
 #[cfg(has_symbol_execvp)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
+    type ExecvpFunc = unsafe extern "C" fn(file: *const c_char, argv: *const *const c_char) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -311,6 +245,12 @@ pub unsafe extern "C" fn rust_execvpe(
     argv: *const *const c_char,
     envp: *const *const c_char,
 ) -> c_int {
+    type ExecvpeFunc = unsafe extern "C" fn(
+        file: *const c_char,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -348,6 +288,12 @@ pub unsafe extern "C" fn rust_execvP(
     search_path: *const c_char,
     argv: *const *const c_char,
 ) -> c_int {
+    type ExecvPFunc = unsafe extern "C" fn(
+        file: *const c_char,
+        search_path: *const c_char,
+        argv: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -385,6 +331,12 @@ pub unsafe extern "C" fn rust_exect(
     argv: *const *const c_char,
     envp: *const *const c_char,
 ) -> c_int {
+    type ExectFunc = unsafe extern "C" fn(
+        path: *const c_char,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -425,6 +377,15 @@ pub unsafe extern "C" fn rust_posix_spawn(
     argv: *const *const c_char,
     envp: *const *const c_char,
 ) -> c_int {
+    type PosixSpawnFunc = unsafe extern "C" fn(
+        pid: *mut pid_t,
+        path: *const c_char,
+        file_actions: *const posix_spawn_file_actions_t,
+        attrp: *const posix_spawnattr_t,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -465,6 +426,15 @@ pub unsafe extern "C" fn rust_posix_spawnp(
     argv: *const *const c_char,
     envp: *const *const c_char,
 ) -> c_int {
+    type PosixSpawnpFunc = unsafe extern "C" fn(
+        pid: *mut pid_t,
+        file: *const c_char,
+        file_actions: *const posix_spawn_file_actions_t,
+        attrp: *const posix_spawnattr_t,
+        argv: *const *const c_char,
+        envp: *const *const c_char,
+    ) -> c_int;
+
     unsafe {
         report(|| {
             let result = Execution {
@@ -501,6 +471,8 @@ pub unsafe extern "C" fn rust_posix_spawnp(
 #[cfg(has_symbol_popen)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
+    type PopenFunc = unsafe extern "C" fn(command: *const c_char, mode: *const c_char) -> *mut libc::FILE;
+
     // For popen, we need to parse the shell command to extract the executable
     if !command.is_null() {
         let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
@@ -552,6 +524,8 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
 #[cfg(has_symbol_system)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
+    type SystemFunc = unsafe extern "C" fn(command: *const c_char) -> c_int;
+
     // For system, we need to parse the shell command to extract the executable
     if !command.is_null() {
         let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
