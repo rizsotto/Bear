@@ -65,6 +65,7 @@ fn main() {
             // The version script's "local: *" hides all other symbols
             println!("cargo:rustc-cdylib-link-arg=-Wl,--version-script={}", exports_path);
             // Set rpath to look for dependencies in the same directory as the library
+            println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
             println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         }
 
