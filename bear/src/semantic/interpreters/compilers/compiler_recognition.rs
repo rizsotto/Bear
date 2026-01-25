@@ -17,7 +17,7 @@ use std::sync::LazyLock;
 /// This method provides built-in patterns for recognizing common compiler executables
 /// based on their names. The patterns are designed to handle various scenarios including:
 /// - Cross-compilation prefixes (e.g., `arm-linux-gnueabihf-gcc`)
-/// - Versioned executables (e.g., `gcc-11`, `clang-15`)
+/// - Versioned executables (e.g., `gcc-11`, `clang-15`, `gcc11`, `clang15`)
 /// - Multiple naming conventions for the same compiler family
 ///
 /// # Supported Compiler Patterns
@@ -53,7 +53,7 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
 
         // Add version pattern (with or without capturing group) if requested
         let pattern_with_version = if with_version {
-            format!(r"{}(?:[-_]([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base_pattern)
+            format!(r"{}(?:[-_]?([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base_pattern)
         } else {
             base_pattern.to_string()
         };
@@ -62,8 +62,10 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         Regex::new(&full_pattern).unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
     }
     vec![
+        // simple cc pattern: matches cc
+        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?cc", false)),
         // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
-        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|cc|c\+\+)", true)),
+        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|c\+\+)", true)),
         // GCC internal executables pattern: matches GCC's internal compiler phases
         // These are implementation details of GCC's compilation process that should be
         // routed to GccInterpreter for proper handling (typically to be ignored).
@@ -285,6 +287,8 @@ mod tests {
         assert_eq!(recognizer.recognize(path("gcc-9")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("g++-11")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("gcc-11.2")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc9")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("g++11")), Some(CompilerType::Gcc));
 
         // With full paths
         assert_eq!(recognizer.recognize(path("/usr/bin/gcc")), Some(CompilerType::Gcc));
@@ -306,6 +310,8 @@ mod tests {
         // Versioned variants
         assert_eq!(recognizer.recognize(path("clang-15")), Some(CompilerType::Clang));
         assert_eq!(recognizer.recognize(path("clang++-16")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("clang15")), Some(CompilerType::Clang));
+        assert_eq!(recognizer.recognize(path("clang++16")), Some(CompilerType::Clang));
         assert_eq!(recognizer.recognize(path("clang-15.0")), Some(CompilerType::Clang));
 
         // With full paths
@@ -386,6 +392,7 @@ mod tests {
 
         // Versioned variants
         assert_eq!(recognizer.recognize(path("gfortran-11")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran11")), Some(CompilerType::Flang));
         assert_eq!(recognizer.recognize(path("f90-4.8")), Some(CompilerType::Flang));
     }
 
