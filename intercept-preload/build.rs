@@ -65,8 +65,10 @@ fn main() {
             // The version script's "local: *" hides all other symbols
             println!("cargo:rustc-cdylib-link-arg=-Wl,--version-script={}", exports_path);
             // Set rpath to look for dependencies in the same directory as the library
-            println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
             println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
+            // Force using lld
+            // https://users.rust-lang.org/t/how-to-use-linker-version-scripts-in-rust-1-54
+            println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
         }
 
         // Force building cdylib even in debug mode
