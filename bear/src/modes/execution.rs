@@ -151,7 +151,7 @@ impl Interceptor {
         // Handle the producer thread result
         producer_thread
             .join()
-            .map_err(|_| RuntimeError::Thread("Source thread panicked"))?
+            .map_err(|_| RuntimeError::Thread("Producer thread panicked"))?
             .map_err(RuntimeError::Producer)?;
 
         // Handle the consumer thread result
@@ -177,13 +177,13 @@ impl Interceptor {
 /// - Testing semantic analysis changes
 /// - Generating compilation databases from archived event data
 pub struct Replayer {
-    source: Box<dyn Producer>,
+    producer: Box<dyn Producer>,
     consumer: Box<dyn Consumer>,
 }
 
 impl Replayer {
-    pub fn new(source: Box<dyn Producer>, consumer: Box<dyn Consumer>) -> Self {
-        Self { source, consumer }
+    pub fn new(producer: Box<dyn Producer>, consumer: Box<dyn Consumer>) -> Self {
+        Self { producer, consumer }
     }
 
     /// Replays stored intercept events through the processing pipeline.
@@ -197,9 +197,9 @@ impl Replayer {
         // is not possible with intercept mode, because that would slow the build process.
         let (sender, receiver) = bounded::<intercept::Event>(10);
 
-        let source_thread = {
-            let source = self.source;
-            std::thread::spawn(move || source.produce(sender))
+        let producer_thread = {
+            let producer = self.producer;
+            std::thread::spawn(move || producer.produce(sender))
         };
 
         let consumer_thread = {
@@ -208,9 +208,9 @@ impl Replayer {
         };
 
         // Handle the source thread result
-        source_thread
+        producer_thread
             .join()
-            .map_err(|_| RuntimeError::Thread("Source thread panicked"))?
+            .map_err(|_| RuntimeError::Thread("Producer thread panicked"))?
             .map_err(RuntimeError::Producer)?;
 
         // Handle the consumer thread result
@@ -226,13 +226,13 @@ impl Replayer {
 /// Errors that can occur during event processing or running the build.
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Producer error: {0}")]
+    #[error("Report creation error: {0}")]
     Producer(#[from] ReporterError),
-    #[error("Consumer error: {0}")]
+    #[error("Report creation error: {0}")]
     Consumer(#[from] WriterError),
-    #[error("Executor error: {0}")]
+    #[error("Build execution failed: {0}")]
     Executor(#[from] SuperviseError),
-    #[error("Thread error: {0}")]
+    #[error("Internal error: {0}")]
     Thread(&'static str),
 }
 
@@ -511,10 +511,10 @@ mod tests {
 
         let mut executor_mock = MockExecutor::new();
         executor_mock.expect_run().times(1).returning(|_| {
-            Err(SuperviseError::ProcessSpawn(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "Test executor failure",
-            )))
+            Err(SuperviseError::ProcessSpawn {
+                executable: "test_executable".into(),
+                source: std::io::Error::new(std::io::ErrorKind::NotFound, "Test executor failure"),
+            })
         });
 
         let interceptor = Interceptor::new(producer_mock, Box::new(consumer_mock), Box::new(executor_mock));

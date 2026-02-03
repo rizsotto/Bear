@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use crate::intercept::Execution;
+use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -14,19 +15,25 @@ use thiserror::Error;
 /// signals to the child process. The method returns the exit status of the
 /// child process.
 pub fn supervise(command: &mut std::process::Command) -> Result<ExitStatus, SuperviseError> {
+    let executable = PathBuf::from(command.get_program());
     let signaled = Arc::new(AtomicUsize::new(0));
     for signal in signal_hook::consts::TERM_SIGNALS {
-        signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize)
-            .map_err(SuperviseError::SignalRegistration)?;
+        signal_hook::flag::register_usize(*signal, Arc::clone(&signaled), *signal as usize).map_err(
+            |err| SuperviseError::SignalRegistration { executable: executable.clone(), source: err },
+        )?;
     }
 
-    let mut child = command.spawn().map_err(SuperviseError::ProcessSpawn)?;
+    let mut child = command
+        .spawn()
+        .map_err(|err| SuperviseError::ProcessSpawn { executable: executable.clone(), source: err })?;
 
     loop {
         // Forward signals to the child process, but don't exit the loop while it is running
         if signaled.swap(0usize, Ordering::SeqCst) != 0 {
             log::debug!("Received signal, forwarding to child process");
-            child.kill().map_err(SuperviseError::ProcessKill)?;
+            child
+                .kill()
+                .map_err(|err| SuperviseError::ProcessKill { executable: executable.clone(), source: err })?;
         }
 
         // Check if the child process has exited
@@ -40,7 +47,7 @@ pub fn supervise(command: &mut std::process::Command) -> Result<ExitStatus, Supe
             }
             Err(err) => {
                 log::error!("Error waiting for child process: {err}");
-                return Err(SuperviseError::ProcessWait(err));
+                return Err(SuperviseError::ProcessWait { executable: executable.clone(), source: err });
             }
         }
     }
@@ -73,12 +80,28 @@ impl From<Execution> for std::process::Command {
 /// Errors that can occur during process supervision.
 #[derive(Error, Debug)]
 pub enum SuperviseError {
-    #[error("Failed to register signal handler")]
-    SignalRegistration(#[source] std::io::Error),
-    #[error("Failed to spawn child process")]
-    ProcessSpawn(#[source] std::io::Error),
-    #[error("Failed to kill child process")]
-    ProcessKill(#[source] std::io::Error),
-    #[error("Failed to wait for child process")]
-    ProcessWait(#[source] std::io::Error),
+    #[error("Failed to register signal handler for '{executable}': {source}", executable = executable.display())]
+    SignalRegistration {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Failed to execute '{executable}': {source}", executable = executable.display())]
+    ProcessSpawn {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Failed to kill process '{executable}': {source}", executable = executable.display())]
+    ProcessKill {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Failed to wait for process '{executable}': {source}", executable = executable.display())]
+    ProcessWait {
+        executable: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }

@@ -119,7 +119,7 @@ impl Mode {
             Self::Replay(semantic) => semantic.run(),
         };
         status.unwrap_or_else(|error| {
-            log::error!("Bear: {error}");
+            log::error!("{error}");
             ExitCode::FAILURE
         })
     }

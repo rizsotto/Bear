@@ -64,7 +64,7 @@ fn exit_code_for_non_existing_command() -> Result<()> {
 
     let result = env.run_bear(&["--", "invalid_command"])?;
     result.assert_failure()?;
-    assert!(result.stderr().contains("Bear: Executor error: Failed to spawn child process"));
+    assert!(result.stderr().contains("Build execution failed: Failed to execute"));
     Ok(())
 }
 
