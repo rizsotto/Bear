@@ -249,7 +249,7 @@ mod types {
 
     impl Default for DuplicateFilter {
         fn default() -> Self {
-            Self { match_on: vec![OutputFields::File, OutputFields::Arguments] }
+            Self { match_on: vec![OutputFields::Directory, OutputFields::File, OutputFields::Arguments] }
         }
     }
 
@@ -1009,7 +1009,9 @@ pub mod loader {
                 intercept: Intercept::Wrapper { path: default_wrapper_executable() },
                 compilers: vec![],
                 sources: SourceFilter { only_existing_files: true, directories: vec![] },
-                duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Arguments] },
+                duplicates: DuplicateFilter {
+                    match_on: vec![OutputFields::Directory, OutputFields::File, OutputFields::Arguments],
+                },
                 format: Format {
                     paths: PathFormat { directory: PathResolver::AsIs, file: PathResolver::AsIs },
                     entries: EntryFormat { use_array_format: true, include_output_field: true },
@@ -1041,7 +1043,9 @@ pub mod loader {
                 intercept: Intercept::Preload { path: default_preload_library() },
                 compilers: vec![],
                 sources: SourceFilter { only_existing_files: false, directories: vec![] },
-                duplicates: DuplicateFilter { match_on: vec![OutputFields::File, OutputFields::Arguments] },
+                duplicates: DuplicateFilter {
+                    match_on: vec![OutputFields::Directory, OutputFields::File, OutputFields::Arguments],
+                },
                 format: Format {
                     paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
                     entries: EntryFormat { use_array_format: true, include_output_field: true },
