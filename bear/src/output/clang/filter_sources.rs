@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_empty_directories_includes_all() {
-        let config = SourceFilter { only_existing_files: true, directories: vec![] };
+        let config = SourceFilter { directories: vec![] };
         let filter = SourceEntryFilter::try_from(config).unwrap();
 
         let entry1 = create_test_entry("any/path.c", "/project");
@@ -158,7 +158,6 @@ mod tests {
     #[test]
     fn test_order_based_evaluation() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("src/test"), action: DirectoryAction::Exclude },
@@ -186,7 +185,6 @@ mod tests {
     #[test]
     fn test_no_match_behavior() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
@@ -203,7 +201,6 @@ mod tests {
     #[test]
     fn test_exact_path_matching() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src/main.c"),
                 action: DirectoryAction::Exclude,
@@ -223,7 +220,6 @@ mod tests {
     #[test]
     fn test_prefix_matching() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -243,7 +239,6 @@ mod tests {
     #[test]
     fn test_case_sensitivity_unix() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -259,7 +254,6 @@ mod tests {
     #[test]
     fn test_case_sensitivity_windows() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Exclude }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -275,7 +269,6 @@ mod tests {
     fn test_platform_separators() {
         #[cfg(unix)]
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src/lib"),
                 action: DirectoryAction::Exclude,
@@ -284,7 +277,6 @@ mod tests {
 
         #[cfg(windows)]
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule {
                 path: PathBuf::from("src\\lib"),
                 action: DirectoryAction::Exclude,
@@ -314,7 +306,6 @@ mod tests {
     #[test]
     fn test_complex_scenario() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 // Include everything in project
                 DirectoryRule { path: PathBuf::from("."), action: DirectoryAction::Include },
@@ -352,7 +343,6 @@ mod tests {
     #[test]
     fn test_filter_entries_method() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr"), action: DirectoryAction::Exclude },
@@ -378,7 +368,6 @@ mod tests {
     #[test]
     fn test_should_include_path_method() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
         let filter = SourceEntryFilter::try_from(config).unwrap();
@@ -391,7 +380,6 @@ mod tests {
     #[test]
     fn test_try_from_success() {
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include }],
         };
 
@@ -401,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_try_from_empty_config() {
-        let config = SourceFilter { only_existing_files: false, directories: vec![] };
+        let config = SourceFilter { directories: vec![] };
 
         let result = SourceEntryFilter::try_from(config);
         assert!(result.is_ok());

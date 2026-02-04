@@ -134,7 +134,6 @@ compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/local/bin/gcc
     ignore\f[B]:\f[R] true
 sources\f[B]:\f[R]
-  only_existing_files\f[B]:\f[R] true
   directories\f[B]:\f[R]
     \f[B]\-\f[R] path\f[B]:\f[R] /project/tests
       action\f[B]:\f[R] exclude
@@ -154,8 +153,7 @@ format\f[B]:\f[R]
 This example configuration file: sets the interception mode to
 \f[CR]wrapper\f[R], hints the \f[CR]/usr/bin/cc\f[R] to be the main
 compiler in this project, which is the GNU compiler, hints to ignore the
-\f[CR]/usr/local/bin/gcc\f[R] compilers from the project, disallow to
-include files which are not available on the filesystem, instructs to
+\f[CR]/usr/local/bin/gcc\f[R] compilers from the project, instructs to
 ignore files from \f[CR]/project/tests\f[R], instructs to detect
 duplicates based on the \f[CR]file\f[R] and \f[CR]arguments\f[R] fields
 of the output file, instructs to format the output to use canonical path
@@ -187,8 +185,6 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .SS sources
 Filtering functionality based on the source file location.
-.IP \[bu] 2
-\f[B]only_existing_files\f[R]: Filter out non\-existent source files
 .IP \[bu] 2
 \f[B]directories\f[R]: List of directory\-based inclusion/exclusion
 rules

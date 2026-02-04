@@ -365,7 +365,6 @@ mod tests {
     fn test_source_filter_output_writer_includes_matching_entries() {
         let stats = OutputStatistics::new();
         let config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
@@ -409,7 +408,6 @@ mod tests {
                     action: DirectoryAction::Exclude,
                 },
             ],
-            ..Default::default()
         };
 
         let sut = SourceFilterOutputWriter::create(MockWriter, config, Arc::clone(&stats)).unwrap();
@@ -431,7 +429,6 @@ mod tests {
 
         // Create a source filter configuration
         let source_config = SourceFilter {
-            only_existing_files: true,
             directories: vec![
                 DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
                 DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },

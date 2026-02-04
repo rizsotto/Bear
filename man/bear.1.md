@@ -116,7 +116,6 @@ compilers:
   - path: /usr/local/bin/gcc
     ignore: true
 sources:
-  only_existing_files: true
   directories:
     - path: /project/tests
       action: exclude
@@ -137,7 +136,6 @@ This example configuration file:
  sets the interception mode to `wrapper`,
  hints the `/usr/bin/cc` to be the main compiler in this project, which is the GNU compiler,
  hints to ignore the `/usr/local/bin/gcc` compilers from the project,
- disallow to include files which are not available on the filesystem,
  instructs to ignore files from `/project/tests`,
  instructs to detect duplicates based on the `file` and `arguments` fields of the output file,
  instructs to format the output to use canonical path for the `file` and `directory` fields of the output file,
@@ -167,7 +165,6 @@ Contains hints about what compiler needs to be recognized and what that compiler
 
 Filtering functionality based on the source file location.
 
-- **only_existing_files**: Filter out non-existent source files
 - **directories**: List of directory-based inclusion/exclusion rules
 
 Directory rules are evaluated in order, with the last matching rule determining inclusion/exclusion. Empty directories list means include everything.

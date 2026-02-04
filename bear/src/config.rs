@@ -30,7 +30,6 @@
 //!   - path: /usr/bin/clang++
 //!
 //! sources:
-//!   only_existing_files: true
 //!   directories:
 //!     - path: "/opt/project/sources"
 //!       action: include
@@ -227,18 +226,10 @@ mod types {
     ///
     /// **Important**: For matching to work correctly, rule paths should use the same format as
     /// configured in `format.paths.file`. This consistency is the user's responsibility.
-    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+    #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize, serde::Serialize)]
     pub struct SourceFilter {
-        #[serde(default = "default_enabled")]
-        pub only_existing_files: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         pub directories: Vec<DirectoryRule>,
-    }
-
-    impl Default for SourceFilter {
-        fn default() -> Self {
-            Self { only_existing_files: true, directories: vec![] }
-        }
     }
 
     /// Duplicate filter configuration matching the YAML format.
@@ -608,7 +599,6 @@ pub mod validation {
         #[test]
         fn test_validate_source_filter_empty_paths() {
             let config = SourceFilter {
-                only_existing_files: true,
                 directories: vec![
                     DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Include },
                     DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Exclude },
@@ -629,7 +619,6 @@ pub mod validation {
         #[test]
         fn test_validate_source_filter_multiple_empty_paths() {
             let config = SourceFilter {
-                only_existing_files: true,
                 directories: vec![
                     DirectoryRule { path: PathBuf::from(""), action: DirectoryAction::Include },
                     DirectoryRule { path: PathBuf::from("valid/path"), action: DirectoryAction::Exclude },
@@ -651,7 +640,6 @@ pub mod validation {
         #[test]
         fn test_validate_source_filter_valid_config() {
             let config = SourceFilter {
-                only_existing_files: true,
                 directories: vec![
                     DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
                     DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
@@ -664,7 +652,7 @@ pub mod validation {
 
         #[test]
         fn test_validate_source_filter_empty_directories() {
-            let config = SourceFilter { only_existing_files: false, directories: vec![] };
+            let config = SourceFilter { directories: vec![] };
 
             let result = SourceFilter::validate(&config);
             assert!(result.is_ok());
@@ -932,7 +920,6 @@ pub mod loader {
                     remove: ["-Wall"]
 
             sources:
-                only_existing_files: true
                 directories:
                   - path: "/opt/project/sources"
                     action: include
@@ -966,7 +953,6 @@ pub mod loader {
                     Compiler { path: PathBuf::from("/usr/bin/clang++"), as_: None, ignore: false },
                 ],
                 sources: SourceFilter {
-                    only_existing_files: true,
                     directories: vec![
                         DirectoryRule {
                             path: PathBuf::from("/opt/project/sources"),
@@ -1008,7 +994,7 @@ pub mod loader {
                 schema: String::from("4.0"),
                 intercept: Intercept::Wrapper { path: default_wrapper_executable() },
                 compilers: vec![],
-                sources: SourceFilter { only_existing_files: true, directories: vec![] },
+                sources: SourceFilter { directories: vec![] },
                 duplicates: DuplicateFilter {
                     match_on: vec![OutputFields::Directory, OutputFields::File, OutputFields::Arguments],
                 },
@@ -1028,8 +1014,6 @@ pub mod loader {
 
             intercept:
               mode: preload
-            sources:
-              only_existing_files: false
             format:
               paths:
                 directory: absolute
@@ -1042,7 +1026,7 @@ pub mod loader {
                 schema: String::from("4.0"),
                 intercept: Intercept::Preload { path: default_preload_library() },
                 compilers: vec![],
-                sources: SourceFilter { only_existing_files: false, directories: vec![] },
+                sources: SourceFilter { directories: vec![] },
                 duplicates: DuplicateFilter {
                     match_on: vec![OutputFields::Directory, OutputFields::File, OutputFields::Arguments],
                 },
