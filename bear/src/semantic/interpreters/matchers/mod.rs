@@ -13,7 +13,7 @@ pub(super) mod source;
 
 use crate::semantic::ArgumentKind;
 
-pub use source::looks_like_a_source_file;
+pub use source::{is_binary_file, looks_like_a_source_file};
 
 /// Flag pattern definitions that describe HOW to consume arguments from the command line.
 /// These patterns define the syntactic structure of compiler flags and their arguments.

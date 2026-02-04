@@ -50,6 +50,7 @@
 use super::Entry;
 use super::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
+use crate::semantic::interpreters::is_binary_file;
 use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, PassEffect};
 use log::warn;
 use std::borrow::Cow;
@@ -355,15 +356,8 @@ impl CommandConverter {
             Self::find_arguments_by_kind(cmd, ArgumentKind::Source).any(|source_arg| {
                 let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
                 if let Some(file_path) = source_arg.as_file(path_updater) {
-                    // Check if this is a compilable source file (not an object file)
-                    if let Some(ext) = file_path.extension() {
-                        let ext_str = ext.to_string_lossy().to_lowercase();
-                        // Object files and libraries are not compilable source files
-                        !matches!(ext_str.as_str(), "o" | "a" | "so" | "dylib" | "dll" | "lib")
-                    } else {
-                        // Files without extensions are typically not object files
-                        true
-                    }
+                    // Check if this is a compilable source file (not a binary file)
+                    !is_binary_file(&file_path)
                 } else {
                     false
                 }
