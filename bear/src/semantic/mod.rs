@@ -120,14 +120,15 @@ pub trait Arguments: std::fmt::Debug {
 ///
 /// Variants:
 /// - `Compiler`: The compiler executable itself.
-/// - `Source`: A source file to be compiled.
+/// - `Source`: A source file to be compiled. The `binary` field indicates whether
+///   this is a binary file (object file or library) rather than a compilable source file.
 /// - `Output`: An output file or related argument (e.g., `-o output.o`).
 /// - `Other`: Any other argument not classified above (e.g., compiler switches like `-Wall`).
 ///   Specifies how the argument affects the compilation pipeline via [`PassEffect`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ArgumentKind {
     Compiler,
-    Source,
+    Source { binary: bool },
     Output,
     Other(PassEffect),
 }

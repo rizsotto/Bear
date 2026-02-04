@@ -9,8 +9,6 @@ pub mod compilers;
 mod ignore;
 mod matchers;
 
-pub use matchers::is_binary_file;
-
 use super::Interpreter;
 use crate::config;
 

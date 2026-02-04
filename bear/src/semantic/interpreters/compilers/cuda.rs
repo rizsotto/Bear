@@ -360,7 +360,7 @@ mod tests {
             );
 
             // Index 2: kernel.cu (source file)
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: false });
 
             // Index 3: -o kernel.o (output file)
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
@@ -416,7 +416,7 @@ mod tests {
                 ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
             );
             // Index 5: kernel.cu (source file)
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -449,7 +449,7 @@ mod tests {
             );
 
             // Index 3: kernel.cu (source file)
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
 
             // Index 4: -o kernel.o (output)
             assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Output);
@@ -494,7 +494,7 @@ mod tests {
             assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Other(PassEffect::None));
 
             // Index 5: main.cu (source file)
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -526,7 +526,7 @@ mod tests {
             }
 
             // Index 5: Source file
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -578,7 +578,7 @@ mod tests {
                 cmd.arguments[1].kind(),
                 ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
             );
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }

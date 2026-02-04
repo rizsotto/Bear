@@ -36,7 +36,7 @@ impl Arguments for TestArguments {
 
     fn as_file(&self, _path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Option<PathBuf> {
         match self.kind {
-            ArgumentKind::Source => self.args.first().map(PathBuf::from),
+            ArgumentKind::Source { .. } => self.args.first().map(PathBuf::from),
             ArgumentKind::Output => self.args.get(1).map(PathBuf::from),
             _ => None,
         }
@@ -57,7 +57,7 @@ impl CompilerCommand {
     ///     "/home/user",
     ///     "/usr/bin/gcc",
     ///     vec![
-    ///         (ArgumentKind::Source, vec!["main.c"]),
+    ///         (ArgumentKind::Source { binary: false }, vec!["main.c"]),
     ///         (ArgumentKind::Output, vec!["-o", "main.o"]),
     ///     ],
     /// );
@@ -112,19 +112,28 @@ mod tests {
         let cmd1 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
         );
 
         let cmd2 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
         );
 
         let cmd3 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["other.c"]), (ArgumentKind::Output, vec!["-o", "other.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["other.c"]),
+                (ArgumentKind::Output, vec!["-o", "other.o"]),
+            ],
         );
 
         // Same arguments should be equal
@@ -139,7 +148,7 @@ mod tests {
         let cmd1 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
+            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );
 
         let cmd2 = CompilerCommand::from_strings(
@@ -157,13 +166,16 @@ mod tests {
         let cmd1 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
         );
 
         let cmd2 = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
+            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );
 
         // Different number of arguments should not be equal
@@ -172,13 +184,14 @@ mod tests {
 
     #[test]
     fn test_test_arguments_implementation() {
-        let source_arg = TestArguments::new(vec!["main.c".to_string()], ArgumentKind::Source);
+        let source_arg =
+            TestArguments::new(vec!["main.c".to_string()], ArgumentKind::Source { binary: false });
         let output_arg =
             TestArguments::new(vec!["-o".to_string(), "main.o".to_string()], ArgumentKind::Output);
         let other_arg = TestArguments::new(vec!["-Wall".to_string()], ArgumentKind::Other(PassEffect::None));
 
         // Test kind method
-        assert_eq!(source_arg.kind(), ArgumentKind::Source);
+        assert_eq!(source_arg.kind(), ArgumentKind::Source { binary: false });
         assert_eq!(output_arg.kind(), ArgumentKind::Output);
         assert_eq!(other_arg.kind(), ArgumentKind::Other(PassEffect::None));
 

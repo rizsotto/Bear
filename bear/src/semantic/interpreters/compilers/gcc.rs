@@ -10,7 +10,7 @@
 //! The interpreter assumes compiler recognition has been handled by the compiler_interpreter
 //! and focuses solely on argument parsing and semantic analysis of command-line flags.
 
-use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule, looks_like_a_source_file};
+use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
 use super::arguments::{OtherArguments, OutputArgument, SourceArgument};
 use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
@@ -472,7 +472,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
                     vec![match_result.consumed_args[0].clone()],
                     ArgumentKind::Compiler,
                 )),
-                ArgumentKind::Source => {
+                ArgumentKind::Source { .. } => {
                     // This case should never occur since source files are handled by heuristic above
                     unreachable!("Source files should be detected by heuristic, not flag matching")
                 }
@@ -498,21 +498,15 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
             result.push(arg);
             i += consumed_count;
         } else {
-            // No flag match - check if it's a source file or other argument
-            if looks_like_a_source_file(current_arg) {
-                result.push(Box::new(SourceArgument::new(current_arg.clone())));
-            } else if current_arg.starts_with('-') {
+            if current_arg.starts_with('-') {
                 // Unknown flag - treat as simple flag
                 result.push(Box::new(OtherArguments::new(
                     vec![current_arg.clone()],
                     ArgumentKind::Other(PassEffect::None),
                 )));
             } else {
-                // Non-source, non-flag argument (e.g., object files)
-                result.push(Box::new(OtherArguments::new(
-                    vec![current_arg.clone()],
-                    ArgumentKind::Other(PassEffect::None),
-                )));
+                // non-flag argument (e.g., source files, object files, libraries)
+                result.push(Box::new(SourceArgument::new(current_arg.clone())));
             }
             i += 1;
         }
@@ -632,7 +626,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: false });
 
             // Check output
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
@@ -674,7 +668,7 @@ mod tests {
             assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["-o", "main"]);
 
             // Check source
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -706,7 +700,7 @@ mod tests {
             assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["-D", "DEBUG=1"]);
 
             // Check source
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -826,7 +820,7 @@ mod tests {
 
             for arg in &cmd.arguments {
                 match arg.kind() {
-                    ArgumentKind::Source => source_count += 1,
+                    ArgumentKind::Source { .. } => source_count += 1,
                     ArgumentKind::Output => output_count += 1,
                     _ => {}
                 }
@@ -860,7 +854,7 @@ mod tests {
                 cmd.arguments[1].kind(),
                 ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))
             );
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: false });
             assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Output);
         } else {
             panic!("Expected compiler command");
@@ -1381,10 +1375,10 @@ mod tests {
 
             // Check object files - these should be treated as Other arguments since
             // looks_like_a_source_file() doesn't recognize .o extensions
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: true });
             assert_eq!(cmd.arguments[2].as_arguments(&|p| Cow::Borrowed(p)), vec!["source1.o"]);
 
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Other(PassEffect::None));
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: true });
             assert_eq!(cmd.arguments[3].as_arguments(&|p| Cow::Borrowed(p)), vec!["source2.o"]);
 
             // Check library link flag (-lx)
@@ -1486,7 +1480,7 @@ mod tests {
 
             // All should be classified as Other(None) since they're not recognized source extensions
             for obj_file in object_files {
-                assert_eq!(obj_file.kind(), ArgumentKind::Other(PassEffect::None));
+                assert_eq!(obj_file.kind(), ArgumentKind::Source { binary: true });
             }
         }
     }

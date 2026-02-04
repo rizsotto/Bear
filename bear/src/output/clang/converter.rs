@@ -50,7 +50,6 @@
 use super::Entry;
 use super::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
-use crate::semantic::interpreters::is_binary_file;
 use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, PassEffect};
 use log::warn;
 use std::borrow::Cow;
@@ -101,8 +100,10 @@ impl CommandConverter {
         // Create output file if needed
         let output_file = self.create_output_file(&formatted_directory, &cmd.arguments);
 
-        // Create one entry per source argument
-        Self::find_arguments_by_kind(cmd, ArgumentKind::Source)
+        // Create one entry per source argument (only non-binary source files)
+        cmd.arguments
+            .iter()
+            .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
             .filter_map(|source_arg| {
                 // Get and format source file
                 let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
@@ -202,7 +203,7 @@ impl CommandConverter {
         // Add all non-source arguments, while handling source file placement
         for arg in &cmd.arguments {
             // Skip this specific source argument (using pointer equality)
-            if matches!(arg.kind(), ArgumentKind::Source) && !std::ptr::eq(arg.as_ref(), source_arg) {
+            if matches!(arg.kind(), ArgumentKind::Source { .. }) && !std::ptr::eq(arg.as_ref(), source_arg) {
                 continue;
             }
 
@@ -221,7 +222,7 @@ impl CommandConverter {
 
             // For file-type arguments, we need to format the paths
             match arg.kind() {
-                ArgumentKind::Source | ArgumentKind::Output => {
+                ArgumentKind::Source { .. } | ArgumentKind::Output => {
                     // These might contain file paths that need formatting
                     let formatted_args = original_args
                         .into_iter()
@@ -264,11 +265,19 @@ impl CommandConverter {
     /// Returns arguments of a specific kind from the command.
     ///
     /// This method filters arguments by their kind and returns their values as strings.
+    /// For `ArgumentKind::Source`, this matches any source regardless of the `binary` flag.
     fn find_arguments_by_kind(
         cmd: &CompilerCommand,
         kind: ArgumentKind,
     ) -> impl Iterator<Item = &Box<dyn Arguments>> {
-        cmd.arguments.iter().filter(move |arg| arg.kind() == kind)
+        cmd.arguments.iter().filter(move |arg| {
+            match (arg.kind(), kind) {
+                // For Source, match any source regardless of binary flag
+                (ArgumentKind::Source { .. }, ArgumentKind::Source { .. }) => true,
+                // For other kinds, use exact equality
+                (a, b) => a == b,
+            }
+        })
     }
 
     /// Determines if we should skip generating compilation database entries for a command.
@@ -289,9 +298,9 @@ impl CommandConverter {
             return true;
         }
 
-        // Find all source arguments
-        let source_arguments =
-            Self::find_arguments_by_kind(cmd, ArgumentKind::Source).collect::<Vec<&Box<dyn Arguments>>>();
+        // Find all source arguments (using binary: false as a placeholder, find_arguments_by_kind matches any source)
+        let source_arguments = Self::find_arguments_by_kind(cmd, ArgumentKind::Source { binary: false })
+            .collect::<Vec<&Box<dyn Arguments>>>();
 
         // If no source files found, skip entry generation
         if source_arguments.is_empty() {
@@ -333,9 +342,8 @@ impl CommandConverter {
     ///
     /// This typically happens when linking pre-compiled object files or libraries.
     ///
-    /// Note: Arguments with `ArgumentKind::Source` have already been validated by
-    /// `looks_like_a_source_file()` during semantic analysis, but we still need to
-    /// exclude object files (.o, .a, etc.) which may be misclassified in tests.
+    /// The `binary` flag on `ArgumentKind::Source` is set during semantic analysis
+    /// by the interpreter, so we can simply check it here.
     fn is_linking_only(&self, cmd: &CompilerCommand) -> bool {
         // Check if the command has a flag that stops before linking (-c or -S)
         let stops_before_linking = cmd.arguments.iter().any(|arg| {
@@ -351,17 +359,10 @@ impl CommandConverter {
             return false;
         }
 
-        // Check if there are any compilable source files (not object/library files)
+        // Check if there are any compilable source files (not binary files)
+        // The binary flag is set by the interpreter during semantic analysis
         let has_compilable_sources =
-            Self::find_arguments_by_kind(cmd, ArgumentKind::Source).any(|source_arg| {
-                let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
-                if let Some(file_path) = source_arg.as_file(path_updater) {
-                    // Check if this is a compilable source file (not a binary file)
-                    !is_binary_file(&file_path)
-                } else {
-                    false
-                }
-            });
+            cmd.arguments.iter().any(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }));
 
         // If no -c/-S flag and no compilable sources, it's linking-only
         !has_compilable_sources
@@ -385,7 +386,7 @@ mod tests {
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Other(PassEffect::None), vec!["-Wall"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         ));
@@ -411,8 +412,8 @@ mod tests {
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/g++"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["file1.cpp"]),
-                (ArgumentKind::Source, vec!["file2.cpp"]),
+                (ArgumentKind::Source { binary: false }, vec!["file1.cpp"]),
+                (ArgumentKind::Source { binary: false }, vec!["file2.cpp"]),
             ],
         ));
 
@@ -451,7 +452,7 @@ mod tests {
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         ));
@@ -475,7 +476,7 @@ mod tests {
             vec![
                 (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         ));
@@ -509,7 +510,7 @@ mod tests {
             "/usr/bin/gcc",
             vec![
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["test.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -539,7 +540,10 @@ mod tests {
         let compiler_cmd = CompilerCommand::from_strings(
             "/original/dir",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
         );
         let command = Command::Compiler(compiler_cmd);
 
@@ -564,7 +568,7 @@ mod tests {
         let compiler_cmd = CompilerCommand::from_strings(
             "/nonexistent/dir",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"])],
+            vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );
         let command = Command::Compiler(compiler_cmd);
 
@@ -590,7 +594,7 @@ mod tests {
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["nonexistent.c"])],
+            vec![(ArgumentKind::Source { binary: false }, vec!["nonexistent.c"])],
         );
         let command = Command::Compiler(compiler_cmd);
 
@@ -633,7 +637,10 @@ mod tests {
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
             "/usr/bin/gcc",
-            vec![(ArgumentKind::Source, vec!["main.c"]), (ArgumentKind::Output, vec!["-o", "main.o"])],
+            vec![
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
         );
         let command = Command::Compiler(compiler_cmd);
 
@@ -655,7 +662,7 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -674,7 +681,8 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source, vec!["main.o", "lib.o"]),
+                (ArgumentKind::Source { binary: true }, vec!["main.o"]),
+                (ArgumentKind::Source { binary: true }, vec!["lib.o"]),
                 (ArgumentKind::Output, vec!["-o", "program"]),
                 (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
             ],
@@ -695,7 +703,7 @@ mod tests {
             "gcc",
             vec![
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
@@ -718,7 +726,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-L/usr/lib"]),
                 (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lmath"]),
                 (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)), vec!["-Wall"]),
@@ -765,8 +773,8 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source, vec!["main.c"]),    // Real source file
-                (ArgumentKind::Source, vec!["utils.cpp"]), // Real source file
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]), // Real source file
+                (ArgumentKind::Source { binary: false }, vec!["utils.cpp"]), // Real source file
                 (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
             ],
         );
@@ -780,8 +788,8 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source, vec!["main.o"]),  // Object file
-                (ArgumentKind::Source, vec!["utils.a"]), // Static library
+                (ArgumentKind::Source { binary: true }, vec!["main.o"]), // Object file
+                (ArgumentKind::Source { binary: true }, vec!["utils.a"]), // Static library
                 (ArgumentKind::Output, vec!["-o", "program"]),
             ],
         );
@@ -809,7 +817,7 @@ mod tests {
                     ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)),
                     vec!["-E"], // Semantically classified as preprocessing
                 ),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -825,7 +833,7 @@ mod tests {
                     ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
                     vec!["-c"], // Semantically classified as compiling
                 ),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -850,7 +858,7 @@ mod tests {
             "/home/user",
             "gcc",
             vec![
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (
                     ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
                     vec!["-lmath"], // Semantically classified as linking
@@ -886,7 +894,7 @@ mod tests {
             vec![
                 (ArgumentKind::Compiler, vec!["gcc"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
             ],
         );
@@ -931,7 +939,7 @@ mod tests {
                     vec!["-DWRAPPER_FLAG"],
                 ),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["test.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -968,7 +976,7 @@ mod tests {
                     ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
                     vec!["-DSOME_DEFINE"],
                 ),
-                (ArgumentKind::Source, vec!["test.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["test.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);
@@ -992,7 +1000,7 @@ mod tests {
                 (ArgumentKind::Compiler, vec!["gcc"]),
                 (ArgumentKind::Other(PassEffect::DriverOption), vec!["-pipe"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
-                (ArgumentKind::Source, vec!["main.c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
             ],
         );
         let command = Command::Compiler(compiler_cmd);

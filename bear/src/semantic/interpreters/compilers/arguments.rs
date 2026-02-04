@@ -6,6 +6,7 @@
 //! for various types of compiler arguments, enabling more sophisticated
 //! argument parsing than the basic [`BasicArguments`] implementation.
 
+use crate::semantic::interpreters::matchers::looks_like_a_source_file;
 use crate::semantic::{ArgumentKind, Arguments};
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -54,18 +55,24 @@ impl Arguments for OtherArguments {
 pub struct SourceArgument {
     /// Path to the source file
     path: String,
+    /// Whether this is a binary file (object file or library)
+    binary: bool,
 }
 
 impl SourceArgument {
     /// Creates a new source file argument.
+    ///
+    /// Automatically determines if the file is a binary (object/library) file
+    /// based on its extension.
     pub fn new(path: String) -> Self {
-        Self { path }
+        let source = looks_like_a_source_file(&path);
+        Self { path, binary: !source }
     }
 }
 
 impl Arguments for SourceArgument {
     fn kind(&self) -> ArgumentKind {
-        ArgumentKind::Source
+        ArgumentKind::Source { binary: self.binary }
     }
 
     fn as_arguments(&self, path_updater: &dyn Fn(&Path) -> Cow<Path>) -> Vec<String> {
@@ -179,9 +186,27 @@ mod tests {
     fn test_source_argument() {
         let arg = SourceArgument::new("main.c".to_string());
 
-        assert_eq!(arg.kind(), ArgumentKind::Source);
+        assert_eq!(arg.kind(), ArgumentKind::Source { binary: false });
         assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["main.c"]);
         assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), Some(PathBuf::from("main.c")));
+    }
+
+    #[test]
+    fn test_source_argument_binary_object_file() {
+        let arg = SourceArgument::new("main.o".to_string());
+
+        assert_eq!(arg.kind(), ArgumentKind::Source { binary: true });
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["main.o"]);
+        assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), Some(PathBuf::from("main.o")));
+    }
+
+    #[test]
+    fn test_source_argument_binary_library() {
+        let arg = SourceArgument::new("libfoo.a".to_string());
+
+        assert_eq!(arg.kind(), ArgumentKind::Source { binary: true });
+        assert_eq!(arg.as_arguments(&|p| Cow::Borrowed(p)), vec!["libfoo.a"]);
+        assert_eq!(arg.as_file(&|p| Cow::Borrowed(p)), Some(PathBuf::from("libfoo.a")));
     }
 
     #[test]

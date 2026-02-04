@@ -637,7 +637,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -681,7 +681,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -709,7 +709,7 @@ mod tests {
             }
 
             // Check source file
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -772,7 +772,7 @@ mod tests {
             }
 
             // Check source file
-            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[4].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -808,7 +808,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -844,7 +844,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -869,7 +869,7 @@ mod tests {
                 ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
             );
             assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Other(PassEffect::None));
-            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[3].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -913,7 +913,7 @@ mod tests {
             }
 
             // Check source file
-            assert_eq!(cmd.arguments[12].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[12].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -982,7 +982,7 @@ mod tests {
             }
 
             // Check source file
-            assert_eq!(cmd.arguments[6].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[6].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -1032,7 +1032,7 @@ mod tests {
             }
 
             // Source file
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -1080,7 +1080,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[5].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
@@ -1107,7 +1107,7 @@ mod tests {
             );
 
             // Check source file
-            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source);
+            assert_eq!(cmd.arguments[2].kind(), ArgumentKind::Source { binary: false });
         } else {
             panic!("Expected compiler command");
         }
