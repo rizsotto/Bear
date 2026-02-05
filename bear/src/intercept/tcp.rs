@@ -56,7 +56,8 @@ impl CollectorOnTcp {
     /// The address of the collector can be obtained by the `address` method.
     pub fn new() -> Result<(Self, SocketAddr), std::io::Error> {
         let shutdown = Arc::new(AtomicBool::new(false));
-        let listener = TcpListener::bind("127.0.0.1:0")?;
+        // Try IPv4 loopback first, fall back to IPv6 loopback if IPv4 is unavailable.
+        let listener = TcpListener::bind("127.0.0.1:0").or_else(|_| TcpListener::bind("[::1]:0"))?;
         let address = listener.local_addr()?;
 
         Ok((Self { shutdown, listener }, address))
