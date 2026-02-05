@@ -128,9 +128,10 @@ impl Reporter for ReporterOnTcp {
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), ReporterError> {
+        log::debug!("Execution report: {event:?}");
+
         let mut socket = TcpStream::connect(self.destination).map_err(ReporterError::Network)?;
-        log::info!("Execution reported: {event:?}");
-        EventWireSerializer::write(&mut socket, event.trim())?;
+        EventWireSerializer::write(&mut socket, event)?;
 
         Ok(())
     }
@@ -247,17 +248,5 @@ mod tests {
                 ),
             ]
         });
-
-        #[test]
-        fn events_are_not_changed_when_trimmed() {
-            for event in EVENTS.iter() {
-                let original_event = event.clone();
-                let trimmed_event = event.clone().trim();
-                assert_eq!(
-                    trimmed_event, original_event,
-                    "Trimmed event should be equal to the original event"
-                );
-            }
-        }
     }
 }

@@ -118,14 +118,7 @@ impl Event {
     /// Creates a new event that is originated from the current process.
     pub fn new(execution: Execution) -> Self {
         let pid = std::process::id();
-        Event { pid, execution }
-    }
-
-    /// Create a new event from the current, where the new event execution
-    /// is trimmed to only contain relevant environment variables.
-    pub fn trim(self) -> Self {
-        let execution = self.execution.trim();
-        Self { execution, ..self }
+        Event { pid, execution: execution.trim() }
     }
 
     #[cfg(test)]
@@ -206,5 +199,65 @@ mod tests {
         assert_eq!(event.pid, 0);
         assert_eq!(event.execution.executable, PathBuf::from("make"));
         assert_eq!(event.execution.arguments, vec!["make"]);
+    }
+
+    #[test]
+    fn test_execution_trim() {
+        // Create an execution with both relevant and irrelevant environment variables
+        let environment = {
+            let mut builder = HashMap::new();
+            builder.insert("PATH".to_string(), "/usr/bin:/bin".to_string());
+            builder.insert("CC".to_string(), "gcc".to_string());
+            builder.insert("IRRELEVANT_VAR".to_string(), "value".to_string());
+            builder.insert("HOME".to_string(), "/home/user".to_string());
+            builder
+        };
+
+        let execution = Execution {
+            executable: PathBuf::from("/usr/bin/gcc"),
+            arguments: vec!["/usr/bin/gcc".to_string(), "-c".to_string(), "test.c".to_string()],
+            working_dir: PathBuf::from("/tmp"),
+            environment,
+        };
+
+        let trimmed = execution.trim();
+
+        // All environment variables in the trimmed execution should be relevant
+        for key in trimmed.environment.keys() {
+            assert!(relevant_env(key), "Non-relevant env var found after trim: {}", key);
+        }
+
+        // Other fields should remain unchanged
+        assert_eq!(trimmed.executable, PathBuf::from("/usr/bin/gcc"));
+        assert_eq!(trimmed.arguments, vec!["/usr/bin/gcc", "-c", "test.c"]);
+        assert_eq!(trimmed.working_dir, PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn test_event_new_calls_trim() {
+        // Create an execution with both relevant and irrelevant environment variables
+        let environment = {
+            let mut builder = HashMap::new();
+            builder.insert("PATH".to_string(), "/usr/bin:/bin".to_string());
+            builder.insert("CC".to_string(), "gcc".to_string());
+            builder.insert("IRRELEVANT_VAR".to_string(), "value".to_string());
+            builder.insert("HOME".to_string(), "/home/user".to_string());
+            builder
+        };
+
+        let execution = Execution {
+            executable: PathBuf::from("/usr/bin/gcc"),
+            arguments: vec!["/usr/bin/gcc".to_string(), "-c".to_string(), "test.c".to_string()],
+            working_dir: PathBuf::from("/tmp"),
+            environment,
+        };
+
+        let event = Event::new(execution.clone());
+
+        // Verify that the event has a valid PID
+        assert_eq!(event.pid, std::process::id());
+
+        // Verify that trim was called - all environment variables should be relevant
+        assert_eq!(event.execution, execution.trim());
     }
 }
