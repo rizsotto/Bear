@@ -14,4 +14,4 @@ pub use implementation::*;
 
 /// Version information for the library
 #[unsafe(no_mangle)]
-pub static LIBEAR_VERSION: &[u8; 6] = b"4.0.0\0";
+pub static LIBEAR_VERSION: &[u8; 6] = b"4.0.3\0";

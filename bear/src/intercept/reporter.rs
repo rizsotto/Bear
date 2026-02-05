@@ -13,11 +13,10 @@
 //!
 //! # Usage
 //!
-//! Use `ReporterFactory::create()` to instantiate a reporter, or `ReporterFactory::create_as_ptr()`
-//! to obtain a raw pointer suitable for static/global usage. The reporter sends events to a remote
-//! collector, with the destination specified by the `KEY_DESTINATION` environment variable.
+//! Use `ReporterFactory::create()` to instantiate a reporter with a socket address, or
+//! `ReporterFactory::create_as_ptr()` to obtain a raw pointer suitable for static/global usage.
+//! The reporter sends events to a remote collector at the specified address.
 
-use crate::environment::KEY_DESTINATION;
 use crate::intercept::{Event, tcp};
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicPtr;
@@ -48,17 +47,8 @@ impl ReporterFactory {
     /// Creates a new TCP-based reporter using the destination from the environment.
     ///
     /// The created reporter is not connected yet; it only stores the destination address.
-    /// It is safe to presume that the existence of the instance does not imply it is
-    /// consuming resources until the `report` method is called.
-    pub fn create() -> Result<tcp::ReporterOnTcp, ReporterCreationError> {
-        let address_str = std::env::var(KEY_DESTINATION)
-            .map_err(|_| ReporterCreationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
-        let address = address_str
-            .parse::<SocketAddr>()
-            .map_err(|_| ReporterCreationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
-
-        let reporter = tcp::ReporterOnTcp::new(address);
-        Ok(reporter)
+    pub fn create(address: SocketAddr) -> impl Reporter {
+        tcp::ReporterOnTcp::new(address)
     }
 
     /// Creates a new reporter and returns it as an atomic pointer.
@@ -74,11 +64,11 @@ impl ReporterFactory {
     ///
     /// Returns a null pointer if reporter creation fails. Caller must check for null
     /// before dereferencing.
-    pub fn create_as_ptr() -> AtomicPtr<tcp::ReporterOnTcp> {
-        match Self::create() {
-            Ok(reporter) => {
+    pub fn create_as_ptr(address_str: &str) -> AtomicPtr<tcp::ReporterOnTcp> {
+        match address_str.parse::<SocketAddr>() {
+            Ok(address) => {
                 // Leak the reporter to get a stable pointer for the lifetime of the program
-                let boxed_reporter = Box::new(reporter);
+                let boxed_reporter = Box::new(tcp::ReporterOnTcp::new(address));
                 let ptr = Box::into_raw(boxed_reporter);
 
                 AtomicPtr::new(ptr)
@@ -89,13 +79,4 @@ impl ReporterFactory {
             }
         }
     }
-}
-
-/// Errors that can occur during reporter initialization.
-#[derive(Error, Debug)]
-pub enum ReporterCreationError {
-    #[error("Environment variable '{0}' is missing")]
-    MissingEnvironmentVariable(&'static str),
-    #[error("Network error: {0}")]
-    Network(#[from] std::io::Error),
 }

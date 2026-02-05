@@ -19,9 +19,8 @@ extern crate core;
 
 use anyhow::{Context, Result};
 use bear::environment::KEY_DESTINATION;
-use bear::intercept::reporter::Reporter;
+use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise_execution;
-use bear::intercept::tcp;
 use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 use bear::intercept::{Event, Execution};
 use std::io::Write;
@@ -70,7 +69,7 @@ fn report(real_execution: &Execution) -> Result<()> {
             .parse::<SocketAddr>()
             .with_context(|| format!("Failed to parse interceptor address: {}", address_str))?;
 
-        tcp::ReporterOnTcp::new(address)
+        ReporterFactory::create(address)
     };
     // Report the execution event to collector.
     reporter.report(Event::new(real_execution.clone()))?;

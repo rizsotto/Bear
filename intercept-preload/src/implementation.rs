@@ -21,11 +21,12 @@ use std::path::PathBuf;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
+use bear::environment::KEY_DESTINATION;
 use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::tcp::ReporterOnTcp;
 use bear::intercept::{Event, Execution};
 use ctor::ctor;
-use libc::{c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
+use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
 /// Constructor function that is called when the library is loaded
 ///
@@ -47,8 +48,6 @@ unsafe fn on_load() {
     }
     log::debug!("Initializing intercept-preload library");
 }
-
-const RTLD_NEXT: *mut libc::c_void = -1isize as *mut libc::c_void;
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -112,9 +111,10 @@ static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
 
 #[ctor]
 static REPORTER: AtomicPtr<ReporterOnTcp> = {
-    // This will capture the reporter address for later use, before any environment variable
-    // might be changed.
-    ReporterFactory::create_as_ptr()
+    match std::env::var(KEY_DESTINATION) {
+        Ok(address_str) => ReporterFactory::create_as_ptr(&address_str),
+        Err(_) => AtomicPtr::new(std::ptr::null_mut()),
+    }
 };
 
 /// Rust implementation of execv
