@@ -109,7 +109,7 @@ impl CollectorOnTcp {
 
 /// Represents a TCP event reporter.
 pub struct ReporterOnTcp {
-    destination: String,
+    destination: SocketAddr,
 }
 
 impl ReporterOnTcp {
@@ -117,7 +117,7 @@ impl ReporterOnTcp {
     ///
     /// It does not open the TCP connection yet. Stores the destination
     /// address and creates a unique reporter id.
-    pub fn new(destination: String) -> Self {
+    pub fn new(destination: SocketAddr) -> Self {
         Self { destination }
     }
 }
@@ -128,7 +128,8 @@ impl Reporter for ReporterOnTcp {
     /// The event is wrapped in an envelope and sent to the remote collector.
     /// The TCP connection is opened and closed for each event.
     fn report(&self, event: Event) -> Result<(), ReporterError> {
-        let mut socket = TcpStream::connect(self.destination.clone()).map_err(ReporterError::Network)?;
+        let mut socket = TcpStream::connect(self.destination).map_err(ReporterError::Network)?;
+        log::info!("Execution reported: {event:?}");
         EventWireSerializer::write(&mut socket, event.trim())?;
 
         Ok(())
@@ -170,7 +171,7 @@ mod tests {
     fn tcp_reporter_and_collectors_work() {
         let (collector, address) = CollectorOnTcp::new().unwrap();
         let collector_arc = Arc::new(collector);
-        let reporter = ReporterOnTcp::new(address.to_string());
+        let reporter = ReporterOnTcp::new(address);
 
         // Start the collector in a separate thread using the events iterator
         let collector_thread = {

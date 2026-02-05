@@ -19,6 +19,7 @@
 
 use crate::environment::KEY_DESTINATION;
 use crate::intercept::{Event, tcp};
+use std::net::SocketAddr;
 use std::sync::atomic::AtomicPtr;
 use thiserror::Error;
 
@@ -50,7 +51,10 @@ impl ReporterFactory {
     /// It is safe to presume that the existence of the instance does not imply it is
     /// consuming resources until the `report` method is called.
     pub fn create() -> Result<tcp::ReporterOnTcp, ReporterCreationError> {
-        let address = std::env::var(KEY_DESTINATION)
+        let address_str = std::env::var(KEY_DESTINATION)
+            .map_err(|_| ReporterCreationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
+        let address = address_str
+            .parse::<SocketAddr>()
             .map_err(|_| ReporterCreationError::MissingEnvironmentVariable(KEY_DESTINATION))?;
 
         let reporter = tcp::ReporterOnTcp::new(address);

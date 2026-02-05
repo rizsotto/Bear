@@ -18,11 +18,14 @@
 extern crate core;
 
 use anyhow::{Context, Result};
-use bear::intercept::reporter::{Reporter, ReporterFactory};
+use bear::environment::KEY_DESTINATION;
+use bear::intercept::reporter::Reporter;
 use bear::intercept::supervise::supervise_execution;
+use bear::intercept::tcp;
 use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 use bear::intercept::{Event, Execution};
 use std::io::Write;
+use std::net::SocketAddr;
 
 /// Implementation of the wrapper process.
 ///
@@ -59,11 +62,18 @@ fn main() -> Result<()> {
 
 /// Report the execution to the remote collector.
 fn report(real_execution: &Execution) -> Result<()> {
-    let reporter = ReporterFactory::create().with_context(|| "Failed to create the reporter")?;
-    // Trim environment variables when reporting to collector
-    let event = Event::new(real_execution.clone()).trim();
-    log::info!("Execution reported: {event:?}");
-    reporter.report(event)?;
+    let reporter = {
+        // Get address of the interceptor
+        let address_str =
+            std::env::var(KEY_DESTINATION).with_context(|| "Failed to get interceptor address")?;
+        let address = address_str
+            .parse::<SocketAddr>()
+            .with_context(|| format!("Failed to parse interceptor address: {}", address_str))?;
+
+        tcp::ReporterOnTcp::new(address)
+    };
+    // Report the execution event to collector.
+    reporter.report(Event::new(real_execution.clone()))?;
 
     Ok(())
 }
