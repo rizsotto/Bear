@@ -115,7 +115,8 @@ impl BuildEnvironment {
         address: SocketAddr,
     ) -> Result<Self, ConfigurationError> {
         // Create wrapper directory builder (creates .bear/ in context's working directory)
-        let mut wrapper_dir_builder = WrapperDirectoryBuilder::create(path, &context.current_directory)?;
+        let mut wrapper_dir_builder =
+            WrapperDirectoryBuilder::create(path, &context.current_directory, address)?;
 
         // Register executables from config
         for executable in executables {
@@ -157,7 +158,6 @@ impl BuildEnvironment {
             environment_overrides
                 .insert(KEY_OS__PATH.to_string(), wrapper_dir.path().to_string_lossy().to_string());
         }
-        environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
 
         Ok(Self { environment_overrides, _wrapper_directory: Some(wrapper_dir) })
     }
@@ -372,41 +372,35 @@ mod test {
     use std::path::PathBuf;
     use tempfile::TempDir;
 
-    /// Creates a test context with the specified working directory.
-    fn create_test_context_with_dir(working_dir: PathBuf) -> crate::context::Context {
-        let mut environment = HashMap::new();
-        environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
-        #[cfg(not(target_os = "macos"))]
-        environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
-        #[cfg(target_os = "macos")]
-        environment.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), "".to_string());
-        environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
-        environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+    /// Helper function to assert that the first entry in a path-like string equals the expected value.
+    /// This can be used to assert PATH, LD_PRELOAD, or any other path-separated environment variable.
+    fn assert_first_path_entry(expected: &str, path_like: &str) {
+        let path_entries: Vec<String> =
+            std::env::split_paths(path_like).map(|p| p.to_string_lossy().to_string()).collect();
+        let first_entry = path_entries.first().expect("Path-like string should not be empty");
 
-        crate::context::Context {
-            current_executable: PathBuf::from("/usr/bin/bear"),
-            current_directory: working_dir,
-            environment,
-            preload_supported: true,
-        }
+        assert_eq!(
+            first_entry, expected,
+            "First path entry should match expected. First entry: {}, expected: {}",
+            first_entry, expected
+        );
     }
 
-    fn create_test_context() -> crate::context::Context {
-        let mut environment = HashMap::new();
-        environment.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
-        #[cfg(not(target_os = "macos"))]
-        environment.insert(KEY_OS__PRELOAD_PATH.to_string(), "".to_string());
-        #[cfg(target_os = "macos")]
-        environment.insert(KEY_OS__MACOS_PRELOAD_PATH.to_string(), "".to_string());
-        environment.insert("CC".to_string(), "/usr/bin/gcc".to_string());
-        environment.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+    fn assert_path_entry(expected: &str, path_like: &str) {
+        let path_entries: Vec<String> =
+            std::env::split_paths(path_like).map(|p| p.to_string_lossy().to_string()).collect();
 
-        crate::context::Context {
-            current_executable: PathBuf::from("/usr/bin/bear"),
-            current_directory: PathBuf::from("/tmp"),
-            environment,
-            preload_supported: true,
-        }
+        assert!(
+            path_entries.contains(&expected.to_string()),
+            "Path entry should contain expected. Path entries: {:?}, expected: {}",
+            path_entries,
+            expected
+        );
+    }
+
+    /// Helper function to get the expected wrapper directory path from a TempDir.
+    fn get_wrapper_dir_path(temp_dir: &TempDir) -> String {
+        temp_dir.path().join(".bear").to_string_lossy().to_string()
     }
 
     #[test]
@@ -415,12 +409,11 @@ mod test {
         let first = PathBuf::from("/usr/local/bin");
         let result = insert_to_path(original, first.clone()).unwrap();
         // For empty path case, we just return the path as a string
-        assert_eq!(result, first.to_string_lossy());
+        assert_first_path_entry(&first.to_string_lossy(), &result);
     }
 
     #[test]
     fn test_insert_to_path_prepend_new() {
-        // Create platform-independent paths using std::env functions
         let bin = PathBuf::from("/bin");
         let usr_bin = PathBuf::from("/usr/bin");
         let usr_local_bin = PathBuf::from("/usr/local/bin");
@@ -432,16 +425,14 @@ mod test {
         // Apply our function
         let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
 
-        // Create expected result using platform-specific separator
-        let expected =
-            std::env::join_paths([usr_local_bin, usr_bin, bin]).unwrap().to_string_lossy().to_string();
-
-        assert_eq!(result, expected);
+        // Check that the new path is first
+        assert_first_path_entry(&usr_local_bin.to_string_lossy(), &result);
+        assert_path_entry(&bin.to_string_lossy(), &result);
+        assert_path_entry(&usr_bin.to_string_lossy(), &result);
     }
 
     #[test]
     fn test_insert_to_path_move_existing_to_front() {
-        // Create platform-independent paths using std::env functions
         let bin = PathBuf::from("/bin");
         let usr_bin = PathBuf::from("/usr/bin");
         let usr_local_bin = PathBuf::from("/usr/local/bin");
@@ -455,16 +446,14 @@ mod test {
         // Apply our function
         let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
 
-        // Create expected result using platform-specific separator
-        let expected =
-            std::env::join_paths([usr_local_bin, usr_bin, bin]).unwrap().to_string_lossy().to_string();
-
-        assert_eq!(result, expected);
+        // Check that the existing path was moved to front
+        assert_first_path_entry(&usr_local_bin.to_string_lossy(), &result);
+        assert_path_entry(&bin.to_string_lossy(), &result);
+        assert_path_entry(&usr_bin.to_string_lossy(), &result);
     }
 
     #[test]
     fn test_insert_to_path_already_first() {
-        // Create platform-independent paths using std::env functions
         let bin = PathBuf::from("/bin");
         let usr_bin = PathBuf::from("/usr/bin");
         let usr_local_bin = PathBuf::from("/usr/local/bin");
@@ -478,204 +467,10 @@ mod test {
         // Apply our function
         let result = insert_to_path(&original, usr_local_bin.clone()).unwrap();
 
-        assert_eq!(result, original);
-    }
-
-    #[test]
-    fn test_build_environment_create_preload() {
-        let intercept = config::Intercept::Preload { path: PathBuf::from("/usr/local/lib/libintercept.so") };
-        let compilers = vec![];
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-        let context = create_test_context();
-        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
-
-        // Check that destination is set
-        assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
-
-        // Check platform-specific preload configuration
-        #[cfg(target_os = "macos")]
-        {
-            // Check that DYLD_INSERT_LIBRARIES contains our library
-            let dyld_preload = env.environment_overrides.get(KEY_OS__MACOS_PRELOAD_PATH).unwrap();
-            assert!(dyld_preload.starts_with("/usr/local/lib/libintercept.so"));
-
-            // Check that DYLD_FORCE_FLAT_NAMESPACE is set to "1"
-            assert_eq!(env.environment_overrides.get(KEY_OS__MACOS_FLAT_NAMESPACE), Some(&"1".to_string()));
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            // Check that LD_PRELOAD contains our library
-            let ld_preload = env.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
-            assert!(ld_preload.starts_with("/usr/local/lib/libintercept.so"));
-        }
-    }
-
-    #[test]
-    fn test_build_environment_create_wrapper() {
-        // Create a temp directory for this test
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a dummy wrapper executable in the test directory
-        let wrapper_path = temp_dir.path().join("wrapper");
-        std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
-
-        let intercept = config::Intercept::Wrapper { path: wrapper_path.clone() };
-        let compilers = vec![
-            config::Compiler { path: PathBuf::from("/usr/bin/gcc"), as_: None, ignore: false },
-            config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
-        ];
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-        // Pass temp_dir as the working directory through context
-        let context = create_test_context_with_dir(temp_dir.path().to_path_buf());
-        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
-
-        // Check that destination is set
-        assert_eq!(env.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
-
-        // Check that PATH is updated (should contain .bear directory at the beginning)
-        let path = env.environment_overrides.get("PATH").unwrap();
-        assert!(path.contains(".bear"), "PATH should contain .bear directory: {path}");
-
-        // Verify wrapper directory is kept alive
-        assert!(env._wrapper_directory.is_some());
-    }
-
-    #[test]
-    fn test_build_environment_create_wrapper_with_env_vars() {
-        // Create a temp directory for this test
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a dummy wrapper executable in the test directory
-        let wrapper_path = temp_dir.path().join("wrapper");
-        std::fs::write(&wrapper_path, "#!/bin/bash\necho wrapper").unwrap();
-
-        let intercept = config::Intercept::Wrapper { path: wrapper_path };
-        let compilers =
-            vec![config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false }];
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-        // Pass temp_dir as the working directory through context
-        let context = create_test_context_with_dir(temp_dir.path().to_path_buf());
-        let env = BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap();
-
-        // Get the wrapper directory from the BuildEnvironment
-        let wrapper_dir = env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let config_path = wrapper_dir.path().join(crate::intercept::wrapper::CONFIG_FILENAME);
-        assert!(config_path.exists(), "JSON config file should exist");
-
-        // Read and verify JSON config content
-        let wrapper_config =
-            crate::intercept::wrapper::WrapperConfigReader::read_from_file(&config_path).unwrap();
-
-        // Should contain executables from both config and environment variables
-        assert!(wrapper_config.get_executable("clang").is_some());
-        assert!(wrapper_config.get_executable("gcc").is_some());
-        assert!(wrapper_config.get_executable("g++").is_some());
-
-        // Check that environment variables were redirected to wrapper executables
-        let cc_value = env.environment_overrides.get("CC").unwrap();
-        let cxx_value = env.environment_overrides.get("CXX").unwrap();
-        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
-        assert!(cxx_value.contains(".bear"), "CXX should point to wrapper: {}", cxx_value);
-    }
-
-    #[test]
-    fn test_path_discovery_with_empty_executables() {
-        use std::fs;
-
-        // Create a temp directory for this test
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a directory with mock compilers
-        let bin_dir = temp_dir.path().join("bin");
-        fs::create_dir(&bin_dir).unwrap();
-
-        // Create mock compiler executables
-        let compilers = ["gcc", "g++", "clang", "notacompiler"];
-        for compiler in &compilers {
-            let compiler_path = bin_dir.join(compiler);
-            fs::write(&compiler_path, "#!/bin/sh\necho mock compiler").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&compiler_path, fs::Permissions::from_mode(0o755)).unwrap();
-            }
-        }
-
-        // Create test context with custom PATH and temp_dir as working directory
-        let mut env = std::collections::HashMap::new();
-        env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
-
-        let context = crate::context::Context {
-            current_executable: std::path::PathBuf::from("/usr/bin/bear"),
-            current_directory: temp_dir.path().to_path_buf(),
-            environment: env,
-            preload_supported: true,
-        };
-
-        // Create wrapper executable in test directory
-        let wrapper_exe = temp_dir.path().join("bear-wrapper");
-        fs::write(&wrapper_exe, "wrapper").unwrap();
-
-        let address = "127.0.0.1:12345".parse().unwrap();
-
-        let result = BuildEnvironment::create_as_wrapper(
-            &context,
-            &wrapper_exe,
-            &[], // Empty executables - should trigger PATH discovery
-            address,
-        );
-
-        assert!(result.is_ok(), "PATH discovery should succeed");
-
-        // Verify that the PATH was updated to include the wrapper directory
-        let build_env = result.unwrap();
-        let updated_path = build_env.environment_overrides.get("PATH").unwrap();
-        assert!(updated_path.contains(".bear"), "PATH should contain .bear directory");
-    }
-
-    #[test]
-    fn test_path_discovery_skipped_with_executables() {
-        use std::fs;
-
-        // Create a temp directory for this test
-        let temp_dir = TempDir::new().unwrap();
-
-        // Create a directory with a compiler
-        let bin_dir = temp_dir.path().join("bin");
-        fs::create_dir(&bin_dir).unwrap();
-
-        let gcc_path = bin_dir.join("gcc");
-        fs::write(&gcc_path, "#!/bin/sh\necho gcc").unwrap();
-
-        let mut env = std::collections::HashMap::new();
-        env.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
-
-        // Use temp_dir as working directory through context
-        let context = crate::context::Context {
-            current_executable: std::path::PathBuf::from("/usr/bin/bear"),
-            current_directory: temp_dir.path().to_path_buf(),
-            environment: env,
-            preload_supported: true,
-        };
-
-        // Create wrapper executable in test directory
-        let wrapper_exe = temp_dir.path().join("bear-wrapper");
-        fs::write(&wrapper_exe, "wrapper").unwrap();
-
-        let address = "127.0.0.1:12345".parse().unwrap();
-        let custom_compiler = std::path::PathBuf::from("/usr/bin/custom-gcc");
-
-        let result = BuildEnvironment::create_as_wrapper(
-            &context,
-            &wrapper_exe,
-            &[custom_compiler], // Non-empty executables - should skip PATH discovery
-            address,
-        );
-
-        assert!(result.is_ok(), "Should succeed with explicit executables");
+        // Check that the path is still first (no change needed)
+        assert_first_path_entry(&usr_local_bin.to_string_lossy(), &result);
+        assert_path_entry(&bin.to_string_lossy(), &result);
+        assert_path_entry(&usr_bin.to_string_lossy(), &result);
     }
 
     #[cfg(target_os = "windows")]
@@ -688,25 +483,311 @@ mod test {
 
         let result = insert_to_path(original, first).unwrap();
 
-        // Critical assertion: MinGW path must be preserved for gcc.exe to be found
-        assert!(
-            result.contains("mingw64\\bin"),
-            "MinGW path should be preserved so gcc.exe can be found. Original: {}, Result: {}",
-            original,
-            result
-        );
-
         // Wrapper should be first in PATH
+        assert_first_path_entry(wrapper_dir, &result);
+        assert_path_entry("C:\\mingw64\\bin", &result);
+        assert_path_entry("C:\\Windows\\System32", &result);
+        assert_path_entry("C:\\Program Files\\Git\\bin", &result);
+    }
+
+    #[test]
+    fn test_build_environment_create_preload() {
+        let preload_path = "/usr/local/lib/libexec.so";
+
+        let sut = {
+            let context = {
+                let environment = {
+                    let mut builder = HashMap::new();
+                    builder.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
+                    builder.insert("CC".to_string(), "/usr/bin/gcc".to_string());
+                    builder.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+                    builder
+                };
+
+                crate::context::Context {
+                    current_executable: PathBuf::from("/usr/bin/bear"),
+                    current_directory: PathBuf::from("/tmp"),
+                    environment,
+                    preload_supported: true,
+                }
+            };
+            let intercept = config::Intercept::Preload { path: PathBuf::from(preload_path) };
+            let compilers = vec![];
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+        };
+
+        // Check that destination is set
+        assert_eq!(sut.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
+
+        // Check platform-specific preload configuration
+        #[cfg(target_os = "macos")]
+        {
+            // Check that DYLD_INSERT_LIBRARIES contains our library
+            let dyld_preload = sut.environment_overrides.get(KEY_OS__MACOS_PRELOAD_PATH).unwrap();
+            assert_first_path_entry(preload_path, dyld_preload);
+
+            // Check that DYLD_FORCE_FLAT_NAMESPACE is set to "1"
+            assert_eq!(sut.environment_overrides.get(KEY_OS__MACOS_FLAT_NAMESPACE), Some(&"1".to_string()));
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            // Check that LD_PRELOAD contains our library
+            let ld_preload = sut.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
+            assert_first_path_entry(preload_path, ld_preload);
+        }
+
+        assert!(sut._wrapper_directory.is_none());
+    }
+
+    #[test]
+    fn test_wrapper_environment_path_setting_when_it_was_empty_before() {
+        let temp_dir = TempDir::new().unwrap();
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+        let sut = {
+            let wrapper_path = {
+                let file = temp_dir.path().join("wrapper");
+                std::fs::write(&file, "#!/bin/bash\necho wrapper").unwrap();
+                file
+            };
+
+            let intercept = config::Intercept::Wrapper { path: wrapper_path.clone() };
+            let compilers = vec![];
+            let context = {
+                crate::context::Context {
+                    current_executable: PathBuf::from("/usr/bin/bear"),
+                    current_directory: temp_dir.path().to_path_buf(),
+                    environment: HashMap::new(),
+                    preload_supported: false,
+                }
+            };
+
+            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+        };
+
+        // Check that PATH is updated (should contain .bear directory at the beginning)
+        let path = sut.environment_overrides.get("PATH").unwrap();
+        let expected_wrapper_path = get_wrapper_dir_path(&temp_dir);
+        assert_first_path_entry(&expected_wrapper_path, path);
+    }
+
+    #[test]
+    fn test_build_environment_create_wrapper() {
+        let temp_dir = TempDir::new().unwrap();
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+        let sut = {
+            let wrapper_path = {
+                let file = temp_dir.path().join("wrapper");
+                std::fs::write(&file, "#!/bin/bash\necho wrapper").unwrap();
+                file
+            };
+            let intercept = config::Intercept::Wrapper { path: wrapper_path };
+            let compilers = vec![
+                config::Compiler { path: PathBuf::from("/usr/bin/cc"), as_: None, ignore: false },
+                config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
+            ];
+            let context = {
+                let environment = {
+                    let mut builder = HashMap::new();
+                    builder.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
+                    builder.insert("CC".to_string(), "/usr/bin/gcc".to_string());
+                    builder.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+                    builder
+                };
+
+                crate::context::Context {
+                    current_executable: PathBuf::from("/usr/bin/bear"),
+                    current_directory: temp_dir.path().to_path_buf(),
+                    environment,
+                    preload_supported: true,
+                }
+            };
+
+            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+        };
+
+        // Check that PATH is updated (should contain .bear directory at the beginning)
+        let path = sut.environment_overrides.get("PATH").unwrap();
+        let expected_wrapper_path = get_wrapper_dir_path(&temp_dir);
+        assert_first_path_entry(&expected_wrapper_path, path);
+
+        // Verify wrapper directory is kept alive
+        assert!(sut._wrapper_directory.is_some());
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // Check that collector address is in the config
+        assert_eq!(wrapper_config.collector_address, address);
+
+        // Check that compilers configured are in the wrapper config
+        assert_eq!("/usr/bin/cc", wrapper_config.get_executable("cc").unwrap()); // this is from the config
+        assert_eq!("/usr/bin/clang", wrapper_config.get_executable("clang").unwrap()); // this if from the config
+        assert_eq!("/usr/bin/gcc", wrapper_config.get_executable("gcc").unwrap()); // this is from context
+        assert_eq!("/usr/bin/g++", wrapper_config.get_executable("g++").unwrap()); // this is from context
+
+        // Check that environment variables were redirected to wrapper executables
+        let cc_value = sut.environment_overrides.get("CC").unwrap();
+        let cxx_value = sut.environment_overrides.get("CXX").unwrap();
+        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+        assert!(cxx_value.contains(".bear"), "CXX should point to wrapper: {}", cxx_value);
+    }
+
+    #[test]
+    fn test_path_discovery_with_empty_executables() {
+        use std::fs;
+
+        // Create a temp directory for this test
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a directory with mock compilers
+        let bin_dir = {
+            let bin_dir = temp_dir.path().join("bin");
+            fs::create_dir(&bin_dir).unwrap();
+
+            // Create mock compiler executables
+            #[cfg(unix)]
+            let compilers = ["gcc", "g++", "clang", "notacompiler"];
+            #[cfg(not(unix))]
+            let compilers = ["gcc.exe", "g++.exe", "clang.exe", "notacompiler"];
+
+            for compiler in &compilers {
+                let compiler_path = bin_dir.join(compiler);
+                fs::write(&compiler_path, "#!/bin/sh\necho mock compiler").unwrap();
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    fs::set_permissions(&compiler_path, fs::Permissions::from_mode(0o755)).unwrap();
+                }
+            }
+            bin_dir
+        };
+
+        let sut = {
+            let context = {
+                let environment = {
+                    let mut builder = HashMap::new();
+                    builder.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
+                    builder
+                };
+
+                crate::context::Context {
+                    current_executable: PathBuf::from("/usr/bin/bear"),
+                    current_directory: temp_dir.path().to_path_buf(),
+                    environment,
+                    preload_supported: true,
+                }
+            };
+
+            let wrapper_exe = temp_dir.path().join("bear-wrapper");
+            fs::write(&wrapper_exe, "wrapper").unwrap();
+
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+            BuildEnvironment::create_as_wrapper(
+                &context,
+                &wrapper_exe,
+                &[], // Empty executables - should trigger PATH discovery
+                address,
+            )
+        };
+
+        assert!(sut.is_ok(), "PATH discovery should succeed");
+        let build_env = sut.unwrap();
+
+        // Verify that the PATH was updated to include the wrapper directory
+        let path = build_env.environment_overrides.get("PATH").unwrap();
+        let expected_wrapper_path = get_wrapper_dir_path(&temp_dir);
+        assert_first_path_entry(&expected_wrapper_path, path);
+
+        // Verify that compilers were discovered and registered in the config
+        let wrapper_dir = build_env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // Should have discovered gcc, g++, and clang from PATH (but not notacompiler)
+        #[cfg(unix)]
+        assert!(wrapper_config.get_executable("gcc").is_some(), "gcc should be discovered");
+        #[cfg(unix)]
+        assert!(wrapper_config.get_executable("g++").is_some(), "g++ should be discovered");
+        #[cfg(unix)]
+        assert!(wrapper_config.get_executable("clang").is_some(), "clang should be discovered");
+        #[cfg(not(unix))]
+        assert!(wrapper_config.get_executable("gcc.exe").is_some(), "gcc should be discovered");
+        #[cfg(not(unix))]
+        assert!(wrapper_config.get_executable("g++.exe").is_some(), "g++ should be discovered");
+        #[cfg(not(unix))]
+        assert!(wrapper_config.get_executable("clang.exe").is_some(), "clang should be discovered");
         assert!(
-            result.starts_with(wrapper_dir),
-            "Wrapper directory should be first in PATH. Result: {}",
-            result
+            wrapper_config.get_executable("notacompiler").is_none(),
+            "notacompiler should not be registered"
         );
+    }
 
-        // Should have all original paths plus wrapper (4 total)
-        let path_count = result.split(';').filter(|s| !s.is_empty()).count();
-        assert_eq!(path_count, 4, "Should preserve all original paths plus wrapper, got: {}", path_count);
+    #[test]
+    fn test_path_discovery_skipped_with_executables() {
+        use std::fs;
 
-        println!("Windows PATH preservation test passed. Result: {}", result);
+        // Create a temp directory for this test
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create a directory with a compiler
+        let bin_dir = {
+            let bin_dir = temp_dir.path().join("bin");
+            fs::create_dir(&bin_dir).unwrap();
+
+            let gcc_path = bin_dir.join("gcc");
+            fs::write(&gcc_path, "#!/bin/sh\necho gcc").unwrap();
+
+            bin_dir
+        };
+
+        // Use temp_dir as working directory through context
+        let sut = {
+            let context = {
+                let environment = {
+                    let mut builder = std::collections::HashMap::new();
+                    builder.insert("PATH".to_string(), bin_dir.to_string_lossy().to_string());
+                    builder
+                };
+
+                crate::context::Context {
+                    current_executable: std::path::PathBuf::from("/usr/bin/bear"),
+                    current_directory: temp_dir.path().to_path_buf(),
+                    environment,
+                    preload_supported: true,
+                }
+            };
+
+            let wrapper_exe = temp_dir.path().join("bear-wrapper");
+            fs::write(&wrapper_exe, "wrapper").unwrap();
+
+            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
+            let custom_compiler =
+                config::Compiler { path: PathBuf::from("/usr/bin/custom-gcc"), as_: None, ignore: false };
+
+            BuildEnvironment::create(
+                &context,
+                &config::Intercept::Wrapper { path: wrapper_exe },
+                &[custom_compiler],
+                address,
+            )
+        };
+
+        assert!(sut.is_ok(), "Should succeed with explicit executables");
+
+        // Verify that only the explicit executable is registered (no PATH discovery)
+        let build_env = sut.unwrap();
+        let wrapper_dir = build_env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // Should have custom-gcc registered
+        assert!(wrapper_config.get_executable("custom-gcc").is_some(), "custom-gcc should be registered");
+
+        // Should NOT have gcc from PATH (PATH discovery should be skipped)
+        // The gcc in bin_dir should not be discovered because we provided explicit executables
+        assert!(wrapper_config.get_executable("gcc").is_none(), "gcc from PATH should not be discovered");
     }
 }

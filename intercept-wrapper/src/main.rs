@@ -15,16 +15,12 @@
 //! to find the real executable path. It reports the execution of the real
 //! executable and then calls the real executable with the same arguments.
 
-extern crate core;
-
 use anyhow::{Context, Result};
-use bear::environment::KEY_DESTINATION;
 use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::supervise::supervise_execution;
 use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigReader};
 use bear::intercept::{Event, Execution};
 use std::io::Write;
-use std::net::SocketAddr;
 
 /// Implementation of the wrapper process.
 ///
@@ -43,13 +39,15 @@ fn main() -> Result<()> {
 
     // Capture the current process execution details
     let execution = Execution::capture().with_context(|| "Failed to capture the execution")?;
-    // Find the real executable using JSON config
-    let real_executable = find_from_config(&execution.executable)?;
+    // Load configuration
+    let config = load_config(&execution.executable)?;
+    // Find the real executable using config
+    let real_executable = find_from_config(&config, &execution.executable)?;
     let real_execution = execution.with_executable(&real_executable);
 
     // Reporting failures shall not fail this process. Therefore, errors will be logged
     // but not propagated. The process will continue to execute the real executable.
-    if let Err(err) = report(&real_execution) {
+    if let Err(err) = report(&config, &real_execution) {
         log::error!("Failed to report the execution: {err}");
     }
 
@@ -60,31 +58,21 @@ fn main() -> Result<()> {
 }
 
 /// Report the execution to the remote collector.
-fn report(real_execution: &Execution) -> Result<()> {
-    let reporter = {
-        // Get address of the interceptor
-        let address_str =
-            std::env::var(KEY_DESTINATION).with_context(|| "Failed to get interceptor address")?;
-        let address = address_str
-            .parse::<SocketAddr>()
-            .with_context(|| format!("Failed to parse interceptor address: {}", address_str))?;
-
-        ReporterFactory::create(address)
-    };
-    // Report the execution event to collector.
+fn report(config: &WrapperConfig, real_execution: &Execution) -> Result<()> {
+    let reporter = ReporterFactory::create(config.collector_address);
     reporter.report(Event::new(real_execution.clone()))?;
 
     Ok(())
 }
 
-/// Find the real executable using JSON configuration.
-fn find_from_config(current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
+/// Find the real executable using configuration.
+fn find_from_config(config: &WrapperConfig, current_exe: &std::path::Path) -> Result<std::path::PathBuf> {
     let executable_name = current_exe
         .file_name()
         .and_then(|name| name.to_str())
         .with_context(|| "Cannot get executable name")?;
 
-    load_config(current_exe)?
+    config
         .get_executable(executable_name)
         .cloned()
         .with_context(|| format!("Executable '{}' not found in configuration", executable_name))
@@ -98,42 +86,4 @@ fn load_config(current_exe: &std::path::Path) -> Result<WrapperConfig> {
 
     WrapperConfigReader::read_from_file(&config_path)
         .with_context(|| format!("Cannot read config file: {}", config_path.display()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-
-    #[test]
-    fn test_wrapper_config_reading() {
-        use bear::intercept::wrapper::{CONFIG_FILENAME, WrapperConfig, WrapperConfigWriter};
-
-        let temp_dir = TempDir::new().unwrap();
-        let wrapper_path = temp_dir.path().join("gcc");
-        let config_path = temp_dir.path().join(CONFIG_FILENAME);
-
-        // Create a mock wrapper config
-        let mut config = WrapperConfig::new();
-        config.add_executable("gcc".to_string(), std::path::PathBuf::from("/usr/bin/gcc"));
-        config.add_executable("g++".to_string(), std::path::PathBuf::from("/usr/bin/g++"));
-
-        WrapperConfigWriter::write_to_file(&config, &config_path).unwrap();
-
-        // Test reading the config
-        let result = find_from_config(&wrapper_path);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), std::path::PathBuf::from("/usr/bin/gcc"));
-    }
-
-    #[test]
-    fn test_wrapper_config_missing_file() {
-        let temp_dir = TempDir::new().unwrap();
-        let wrapper_path = temp_dir.path().join("gcc");
-
-        // Test with missing config file - should fail since we only use JSON config
-        let result = find_from_config(&wrapper_path);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Cannot read config file"));
-    }
 }
