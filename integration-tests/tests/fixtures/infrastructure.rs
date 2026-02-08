@@ -198,6 +198,7 @@ impl TestEnvironment {
     }
 
     /// Verify that a file is encoded with the specified encoding
+    #[allow(dead_code)]
     pub fn verify_file_encoding(
         &self,
         file_path: &Path,

@@ -6,14 +6,18 @@
 //! and verify if the interception get these calls recorded. This only works with
 //! the preload mode, since it does not involve any compiler.
 
+#[allow(unused_imports)]
 use crate::fixtures::constants::*;
+#[allow(unused_imports)]
 use crate::fixtures::infrastructure::*;
+#[allow(unused_imports)]
 use anyhow::Result;
 
 /// Create a minimal config to enforce the preload mode.
 ///
 /// This might be the default mode on many platform, but that's not always the case.
 /// The preload might work on MacOS, but not set to default. Here we can enforce it.
+#[allow(dead_code)]
 const CONFIG: &str = concat!(
     r#"schema: '4.0'
 
