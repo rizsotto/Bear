@@ -94,7 +94,7 @@ fn generate_linux_exports(path: &str, detected_symbols: &HashSet<String>) {
 
     writeln!(file).unwrap();
     writeln!(file, "        /* Library version info */").unwrap();
-    writeln!(file, "        LIBEAR_VERSION;").unwrap();
+    writeln!(file, "        LIBEXEC_VERSION;").unwrap();
     writeln!(file).unwrap();
     writeln!(file, "    local:").unwrap();
     writeln!(file, "        *;").unwrap();
@@ -111,5 +111,5 @@ fn generate_macos_exports(path: &str, detected_symbols: &HashSet<String>) {
     }
 
     // Library version info
-    writeln!(file, "_LIBEAR_VERSION").unwrap();
+    writeln!(file, "_LIBEXEC_VERSION").unwrap();
 }
