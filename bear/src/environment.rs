@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-pub const KEY_DESTINATION: &str = "INTERCEPT_COLLECTOR_ADDRESS";
+pub const KEY_INTERCEPT_STATE: &str = "BEAR_INTERCEPT";
 
 // man page for `ld.so` (Linux dynamic linker/loader)
 pub const KEY_OS__PRELOAD_PATH: &str = "LD_PRELOAD";
@@ -105,7 +105,7 @@ static GCC_INCLUDE_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync:
 });
 
 pub fn relevant_env(key: &str) -> bool {
-    matches!(key, KEY_DESTINATION | KEY_OS__PRELOAD_PATH | KEY_OS__MACOS_PRELOAD_PATH | KEY_OS__MACOS_FLAT_NAMESPACE)
+    matches!(key, KEY_INTERCEPT_STATE | KEY_OS__PRELOAD_PATH | KEY_OS__MACOS_PRELOAD_PATH | KEY_OS__MACOS_FLAT_NAMESPACE)
         || MAKE_PROGRAM_KEYS.contains(key)
         || MAKE_FLAGS_KEYS.contains(key)
         || CARGO_PROGRAM_KEYS.contains(key)

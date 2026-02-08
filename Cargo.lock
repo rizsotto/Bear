@@ -431,6 +431,7 @@ dependencies = [
  "libc",
  "log",
  "platform-checks",
+ "serde_json",
  "thiserror",
 ]
 

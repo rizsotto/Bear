@@ -2,7 +2,7 @@
 
 #[cfg(not(target_os = "macos"))]
 use crate::environment::KEY_OS__PRELOAD_PATH;
-use crate::environment::{KEY_DESTINATION, KEY_OS__PATH};
+use crate::environment::{KEY_INTERCEPT_STATE, KEY_OS__PATH};
 #[cfg(target_os = "macos")]
 use crate::environment::{KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH};
 use crate::intercept::supervise;
@@ -19,6 +19,42 @@ use std::process::ExitStatus;
 use thiserror::Error;
 
 use crate::intercept::wrapper::{WrapperDirectory, WrapperDirectoryBuilder, WrapperDirectoryError};
+
+/// Represents the state information needed for preload-based interception.
+///
+/// This struct is serialized to JSON and passed to the preloaded library via
+/// an environment variable. It contains all the information the library needs
+/// to report execution events back to the Bear process.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct PreloadState {
+    /// The socket address where execution events should be reported
+    pub destination: SocketAddr,
+    /// The path to the preload library itself
+    pub library: PathBuf,
+}
+
+impl TryInto<String> for PreloadState {
+    type Error = serde_json::Error;
+
+    fn try_into(self) -> Result<String, Self::Error> {
+        serde_json::to_string(&self)
+    }
+}
+impl TryFrom<&str> for PreloadState {
+    type Error = serde_json::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        serde_json::from_str(value)
+    }
+}
+
+impl TryFrom<String> for PreloadState {
+    type Error = serde_json::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&value)
+    }
+}
 
 /// Manages the environment setup for intercepting build commands during compilation.
 ///
@@ -248,7 +284,11 @@ impl BuildEnvironment {
             environment_overrides.insert(KEY_OS__PRELOAD_PATH.to_string(), preload_updated);
         }
 
-        environment_overrides.insert(KEY_DESTINATION.to_string(), address.to_string());
+        // Make the current state available as a single environment variable
+        let state: String = PreloadState { destination: address, library: path.to_path_buf() }
+            .try_into()
+            .map_err(|_| ConfigurationError::PathNotFound)?;
+        environment_overrides.insert(KEY_INTERCEPT_STATE.to_string(), state);
 
         Ok(Self { environment_overrides, _wrapper_directory: None })
     }
@@ -331,7 +371,7 @@ pub enum ConfigurationError {
 /// - If `first` already exists in `original`, it's moved to the front
 /// - If `first` doesn't exist, it's prepended to the existing paths
 /// - Uses platform-appropriate path separators and handles path encoding
-fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, JoinPathsError> {
+pub fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String, JoinPathsError> {
     let first_path = first.as_ref();
 
     if original.is_empty() {
@@ -519,7 +559,10 @@ mod test {
         };
 
         // Check that destination is set
-        assert_eq!(sut.environment_overrides.get(KEY_DESTINATION), Some(&"127.0.0.1:8080".to_string()));
+        assert_eq!(
+            sut.environment_overrides.get(KEY_INTERCEPT_STATE),
+            Some(&r#"{"destination":"127.0.0.1:8080","library":"/usr/local/lib/libexec.so"}"#.to_string())
+        );
 
         // Check platform-specific preload configuration
         #[cfg(target_os = "macos")]

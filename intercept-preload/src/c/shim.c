@@ -31,15 +31,32 @@
 // Ensure symbols are exported from the shared library
 #define EXPORT __attribute__((visibility("default")))
 
+// Platform-specific environment access
+//
+// When the dynamic linker loads the library, the `environ` variable might not
+// be available yet. This is the case on macOS where we need to use
+// `_NSGetEnviron()` to reliably access the environment during library
+// initialization.
+
+#if defined(__APPLE__)
+#include <crt_externs.h>
+#define get_environ() (*_NSGetEnviron())
+#else
+extern char **environ;
+#define get_environ() environ
+#endif
+
 // Rust implementation functions
 //
 // These are defined in implementation.rs with #[no_mangle] and handle:
 // - Reporting the execution to the collector
 // - Calling the real function via dlsym(RTLD_NEXT, ...)
 
-extern int rust_execv(const char *path, char *const argv[]);
+// Session initialization - called from constructor to capture environment
+extern void rust_session_init(char *const *envp);
+
+// Exec family functions
 extern int rust_execve(const char *path, char *const argv[], char *const envp[]);
-extern int rust_execvp(const char *file, char *const argv[]);
 extern int rust_execvpe(const char *file, char *const argv[], char *const envp[]);
 extern int rust_execvP(const char *file, const char *search_path, char *const argv[]);
 extern int rust_exect(const char *path, char *const argv[], char *const envp[]);
@@ -53,6 +70,27 @@ extern int rust_posix_spawnp(pid_t *pid, const char *file,
                              char *const argv[], char *const envp[]);
 extern FILE *rust_popen(const char *command, const char *mode);
 extern int rust_system(const char *command);
+
+// Library constructor
+//
+// This function is called when the library is loaded into memory. It captures
+// the current environment and passes it to Rust for session initialization.
+// This is critical because:
+//
+// 1. On macOS, `environ` is not available during early library initialization,
+//    so we use `_NSGetEnviron()` instead.
+// 2. Build systems may clear or modify environment variables like LD_PRELOAD
+//    and INTERCEPT_COLLECTOR_ADDRESS. By capturing them early, we can restore
+//    them when executing child processes.
+
+__attribute__((constructor))
+static void on_load(void)
+{
+    char *const *envp = get_environ();
+    if (envp != NULL) {
+        rust_session_init(envp);
+    }
+}
 
 // Count variadic arguments until NULL terminator
 // The va_list is consumed by this function
@@ -97,7 +135,7 @@ EXPORT int execl(const char *path, const char *arg0, ...)
 
     va_end(ap);
 
-    return rust_execv(path, argv);
+    return rust_execve(path, argv, get_environ());
 }
 #endif
 
@@ -125,7 +163,7 @@ EXPORT int execlp(const char *file, const char *arg0, ...)
 
     va_end(ap);
 
-    return rust_execvp(file, argv);
+    return rust_execvpe(file, argv, get_environ());
 }
 #endif
 
@@ -168,7 +206,7 @@ EXPORT int execle(const char *path, const char *arg0, ...)
 #if defined(has_symbol_execv)
 EXPORT int execv(const char *path, char *const argv[])
 {
-    return rust_execv(path, argv);
+    return rust_execve(path, argv, get_environ());
 }
 #endif
 
@@ -188,7 +226,7 @@ EXPORT int execve(const char *path, char *const argv[], char *const envp[])
 #if defined(has_symbol_execvp)
 EXPORT int execvp(const char *file, char *const argv[])
 {
-    return rust_execvp(file, argv);
+    return rust_execvpe(file, argv, get_environ());
 }
 #endif
 

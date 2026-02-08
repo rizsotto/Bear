@@ -12,42 +12,29 @@
 //!
 //! Each `rust_*` function:
 //! - Reports the execution to the collector
+//! - Optionally "doctors" the environment to ensure child processes continue interception
 //! - Calls the real function via dlsym(RTLD_NEXT, ...)
+//!
+//! ## Environment Doctoring
+//!
+//! When SESSION is set (meaning we're in an interception session), we check if the
+//! environment passed to exec functions still has the correct preload settings.
+//! If not, we "doctor" the environment to restore them, ensuring child processes
+//! continue to be intercepted even if the build system cleared the variables.
 
 use std::collections::HashMap;
 use std::ffi::CStr;
-
 use std::path::PathBuf;
 use std::ptr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
-use bear::environment::KEY_DESTINATION;
 use bear::intercept::reporter::{Reporter, ReporterFactory};
 use bear::intercept::tcp::ReporterOnTcp;
 use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
-/// Constructor function that is called when the library is loaded
-///
-/// # Safety
-/// This function is unsafe because it modifies global state.
-#[ctor]
-unsafe fn on_load() {
-    #[cfg(not(test))]
-    {
-        use std::io::Write;
-
-        let pid = std::process::id();
-        env_logger::Builder::from_default_env()
-            .format(move |buf, record| {
-                let timestamp = buf.timestamp();
-                writeln!(buf, "[{timestamp} preload/{pid}] {}", record.args())
-            })
-            .init();
-    }
-    log::debug!("Initializing intercept-preload library");
-}
+use crate::session::{DoctoredEnvironment, SESSION, in_session, init_session_from_envp};
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -56,20 +43,8 @@ static REAL_EXECVE: AtomicPtr<libc::c_void> = {
 };
 
 #[ctor]
-static REAL_EXECV: AtomicPtr<libc::c_void> = {
-    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execv".as_ptr() as *const _) };
-    AtomicPtr::new(ptr)
-};
-
-#[ctor]
 static REAL_EXECVPE: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvpe".as_ptr() as *const _) };
-    AtomicPtr::new(ptr)
-};
-
-#[ctor]
-static REAL_EXECVP: AtomicPtr<libc::c_void> = {
-    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvp".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
 
@@ -109,52 +84,49 @@ static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
     AtomicPtr::new(ptr)
 };
 
-#[ctor]
-static REPORTER: AtomicPtr<ReporterOnTcp> = {
-    match std::env::var(KEY_DESTINATION) {
-        Ok(address_str) => ReporterFactory::create_as_ptr(&address_str),
-        Err(_) => AtomicPtr::new(std::ptr::null_mut()),
-    }
-};
+/// Reporter for sending execution events to the collector.
+/// Initialized by `rust_session_init` when called from the C shim constructor.
+static REPORTER: AtomicPtr<ReporterOnTcp> = AtomicPtr::new(std::ptr::null_mut());
 
-/// Rust implementation of execv
+/// Initialize the session from the environment.
 ///
-/// Called from C shim for: execv, execl
+/// Called from the C shim's `on_load()` constructor. This captures the
+/// environment variables before the build system has a chance to clear them.
 ///
 /// # Safety
-/// This function is unsafe because it:
-/// - Dereferences raw pointers
-/// - Calls the real execv function
-#[cfg(has_symbol_execv)]
+/// This function is unsafe because it dereferences raw pointers from C.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rust_execv(path: *const c_char, argv: *const *const c_char) -> c_int {
-    type ExecvFunc = unsafe extern "C" fn(path: *const c_char, argv: *const *const c_char) -> c_int;
+pub unsafe extern "C" fn rust_session_init(envp: *const *const c_char) {
+    // Initialize logging first
+    #[cfg(not(test))]
+    {
+        use std::io::Write;
 
-    unsafe {
-        report(|| {
-            let result = Execution {
-                executable: as_path_buf(path)?,
-                arguments: as_string_vec(argv)?,
-                working_dir: working_dir()?,
-                environment: std::env::vars().collect(),
-            };
-            Ok(result)
-        });
+        let pid = std::process::id();
+        let _ = env_logger::Builder::from_default_env()
+            .format(move |buf, record| {
+                let timestamp = buf.timestamp();
+                writeln!(buf, "[{timestamp} preload/{pid}] {}", record.args())
+            })
+            .try_init();
+    }
 
-        let func_ptr = REAL_EXECV.load(Ordering::SeqCst);
-        if !func_ptr.is_null() {
-            let real_func_ptr: ExecvFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(path, argv)
-        } else {
-            log::error!("Real execv function not found");
-            libc::ENOSYS
-        }
+    // Initialize the session and get the destination for reporter setup
+    let destination = unsafe { init_session_from_envp(envp) };
+
+    // Initialize the reporter from the captured destination
+    if let Some(address) = destination {
+        let boxed_reporter = Box::new(ReporterFactory::create(address));
+        let ptr = Box::into_raw(boxed_reporter);
+        REPORTER.store(ptr, Ordering::SeqCst);
+    } else {
+        log::debug!("No destination found, reporter not initialized");
     }
 }
 
 /// Rust implementation of execve
 ///
-/// Called from C shim for: execve, execle
+/// Called from C shim for: execv, execve, execl, execle
 ///
 /// # Safety
 /// This function is unsafe because it:
@@ -184,10 +156,14 @@ pub unsafe extern "C" fn rust_execve(
             Ok(result)
         });
 
+        // Resolve the environment: use original if in session or no session, doctor otherwise
+        let resolved_env = resolve_environment(envp);
+        let envp_to_use = resolved_env.as_ptr();
+
         let func_ptr = REAL_EXECVE.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: ExecveFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(path, argv, envp)
+            real_func_ptr(path, argv, envp_to_use)
         } else {
             log::error!("Real execve function not found");
             libc::ENOSYS
@@ -195,44 +171,9 @@ pub unsafe extern "C" fn rust_execve(
     }
 }
 
-/// Rust implementation of execvp
-///
-/// Called from C shim for: execvp, execlp
-///
-/// # Safety
-/// This function is unsafe because it:
-/// - Dereferences raw pointers
-/// - Calls the real execvp function
-#[cfg(has_symbol_execvp)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn rust_execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
-    type ExecvpFunc = unsafe extern "C" fn(file: *const c_char, argv: *const *const c_char) -> c_int;
-
-    unsafe {
-        report(|| {
-            let result = Execution {
-                executable: as_path_buf(file)?,
-                arguments: as_string_vec(argv)?,
-                working_dir: working_dir()?,
-                environment: std::env::vars().collect(),
-            };
-            Ok(result)
-        });
-
-        let func_ptr = REAL_EXECVP.load(Ordering::SeqCst);
-        if !func_ptr.is_null() {
-            let real_func_ptr: ExecvpFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(file, argv)
-        } else {
-            log::error!("Real execvp function not found");
-            libc::ENOSYS
-        }
-    }
-}
-
 /// Rust implementation of execvpe (GNU extension)
 ///
-/// Called from C shim for: execvpe
+/// Called from C shim for: execvpe, execvp, execlp
 ///
 /// # Safety
 /// This function is unsafe because it:
@@ -262,10 +203,14 @@ pub unsafe extern "C" fn rust_execvpe(
             Ok(result)
         });
 
+        // Resolve the environment: use original if in session or no session, doctor otherwise
+        let resolved_env = resolve_environment(envp);
+        let envp_to_use = resolved_env.as_ptr();
+
         let func_ptr = REAL_EXECVPE.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: ExecvpeFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(file, argv, envp)
+            real_func_ptr(file, argv, envp_to_use)
         } else {
             log::error!("Real execvpe function not found");
             libc::ENOSYS
@@ -348,10 +293,14 @@ pub unsafe extern "C" fn rust_exect(
             Ok(result)
         });
 
+        // Resolve the environment: use original if in session or no session, doctor otherwise
+        let resolved_env = resolve_environment(envp);
+        let envp_to_use = resolved_env.as_ptr();
+
         let func_ptr = REAL_EXECT.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: ExectFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(path, argv, envp)
+            real_func_ptr(path, argv, envp_to_use)
         } else {
             log::error!("Real exect function not found");
             libc::ENOSYS
@@ -397,10 +346,14 @@ pub unsafe extern "C" fn rust_posix_spawn(
             Ok(result)
         });
 
+        // Resolve the environment: use original if in session or no session, doctor otherwise
+        let resolved_env = resolve_environment(envp);
+        let envp_to_use = resolved_env.as_ptr();
+
         let func_ptr = REAL_POSIX_SPAWN.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: PosixSpawnFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(pid, path, file_actions, attrp, argv, envp)
+            real_func_ptr(pid, path, file_actions, attrp, argv, envp_to_use)
         } else {
             log::error!("Real posix_spawn function not found");
             libc::ENOSYS
@@ -446,10 +399,14 @@ pub unsafe extern "C" fn rust_posix_spawnp(
             Ok(result)
         });
 
+        // Resolve the environment: use original if in session or no session, doctor otherwise
+        let resolved_env = resolve_environment(envp);
+        let envp_to_use = resolved_env.as_ptr();
+
         let func_ptr = REAL_POSIX_SPAWNP.load(Ordering::SeqCst);
         if !func_ptr.is_null() {
             let real_func_ptr: PosixSpawnpFunc = std::mem::transmute(func_ptr);
-            real_func_ptr(pid, file, file_actions, attrp, argv, envp)
+            real_func_ptr(pid, file, file_actions, attrp, argv, envp_to_use)
         } else {
             log::error!("Real posix_spawnp function not found");
             libc::ENOSYS
@@ -567,6 +524,58 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
 // Helper functions
 // =============================================================================
 
+/// Represents either the original environment pointer or a doctored environment.
+///
+/// This enum allows us to either pass through the original `envp` unchanged,
+/// or use a doctored environment that ensures preload settings are preserved.
+enum ResolvedEnvironment {
+    /// Use the original environment pointer as-is
+    Original(*const *const c_char),
+    /// Use a doctored environment (owns the data)
+    Doctored(DoctoredEnvironment),
+}
+
+impl ResolvedEnvironment {
+    /// Get a pointer to the environment array suitable for passing to exec functions.
+    fn as_ptr(&self) -> *const *const c_char {
+        match self {
+            Self::Original(ptr) => *ptr,
+            Self::Doctored(doc) => doc.as_ptr(),
+        }
+    }
+}
+
+/// Determine whether to use the original environment or create a doctored one.
+///
+/// Logic:
+/// - If SESSION is not set: use original envp (we're not in an interception session)
+/// - If SESSION is set and `in_session` returns true: use original envp (environment is correct)
+/// - If SESSION is set and `in_session` returns false: create doctored environment
+///
+/// # Safety
+/// The `envp` pointer must be a valid null-terminated array of null-terminated
+/// C strings in "KEY=VALUE" format, or null.
+unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment {
+    match SESSION.get() {
+        None => {
+            // No session, pass through original environment
+            ResolvedEnvironment::Original(envp)
+        }
+        Some(state) => {
+            if unsafe { in_session(state.clone(), envp) } {
+                // Environment is still aligned with session, pass through
+                ResolvedEnvironment::Original(envp)
+            } else {
+                // Environment was modified, doctor it
+                match DoctoredEnvironment::from_envp(state.clone(), envp) {
+                    Ok(doctored) => ResolvedEnvironment::Doctored(doctored),
+                    Err(_) => ResolvedEnvironment::Original(envp),
+                }
+            }
+        }
+    }
+}
+
 /// Report a command execution only if reporter is available
 fn report<F>(f: F)
 where
@@ -648,7 +657,7 @@ unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, Stri
 
                     map.insert(key, value);
                 }
-                // FIXME: is the `=` always there? Or can be without?
+                // Note: entries without '=' are technically valid but unusual
             }
             Err(e) => return Err(e),
         }

@@ -8,6 +8,9 @@
 #[cfg(target_family = "unix")]
 mod implementation;
 
+#[cfg(target_family = "unix")]
+mod session;
+
 // Re-export implementations
 #[cfg(target_family = "unix")]
 pub use implementation::*;

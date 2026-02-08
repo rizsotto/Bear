@@ -33,6 +33,9 @@ libc.workspace = true
 platform-checks = { path = "../platform-checks" }
 cc.workspace = true
 
+[dev-dependencies]
+serde_json.workspace = true
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(has_header_dlfcn_h)',
