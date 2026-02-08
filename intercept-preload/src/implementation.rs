@@ -166,7 +166,8 @@ pub unsafe extern "C" fn rust_execve(
             real_func_ptr(path, argv, envp_to_use)
         } else {
             log::error!("Real execve function not found");
-            libc::ENOSYS
+            set_errno(libc::ENOSYS);
+            -1
         }
     }
 }
@@ -213,7 +214,8 @@ pub unsafe extern "C" fn rust_execvpe(
             real_func_ptr(file, argv, envp_to_use)
         } else {
             log::error!("Real execvpe function not found");
-            libc::ENOSYS
+            set_errno(libc::ENOSYS);
+            -1
         }
     }
 }
@@ -256,7 +258,8 @@ pub unsafe extern "C" fn rust_execvP(
             real_func_ptr(file, search_path, argv)
         } else {
             log::error!("Real execvP function not found");
-            libc::ENOSYS
+            set_errno(libc::ENOSYS);
+            -1
         }
     }
 }
@@ -303,7 +306,8 @@ pub unsafe extern "C" fn rust_exect(
             real_func_ptr(path, argv, envp_to_use)
         } else {
             log::error!("Real exect function not found");
-            libc::ENOSYS
+            set_errno(libc::ENOSYS);
+            -1
         }
     }
 }
@@ -671,4 +675,32 @@ unsafe fn as_environment(s: *const *const c_char) -> Result<HashMap<String, Stri
 fn working_dir() -> Result<PathBuf, c_int> {
     let cwd = std::env::current_dir().map_err(|_| libc::EINVAL)?;
     Ok(cwd)
+}
+
+/// Set errno to the given value.
+///
+/// Exec-family functions (execve, execvpe, etc.) return -1 on failure and communicate
+/// the error code through errno, not through their return value. This helper provides
+/// portable errno-setting across supported Unix platforms.
+///
+/// # Safety
+/// This directly writes to the thread-local errno location via platform-specific libc functions.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+unsafe fn set_errno(value: c_int) {
+    unsafe {
+        *libc::__errno_location() = value;
+    }
+}
+
+/// Set errno to the given value (macOS / FreeBSD / DragonFly variant).
+#[cfg(any(
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "dragonfly"
+))]
+unsafe fn set_errno(value: c_int) {
+    unsafe {
+        *libc::__error() = value;
+    }
 }
