@@ -162,7 +162,7 @@ pub unsafe extern "C" fn rust_execve(
             Ok(result)
         });
 
-        // Resolve the environment: use original if in session or no session, doctor otherwise
+        // Doctor the environment if session is active but the build system stripped preload vars
         let resolved_env = resolve_environment(envp);
         let envp_to_use = resolved_env.as_ptr();
 
@@ -210,7 +210,7 @@ pub unsafe extern "C" fn rust_execvpe(
             Ok(result)
         });
 
-        // Resolve the environment: use original if in session or no session, doctor otherwise
+        // Doctor the environment if session is active but the build system stripped preload vars
         let resolved_env = resolve_environment(envp);
         let envp_to_use = resolved_env.as_ptr();
 
@@ -302,7 +302,7 @@ pub unsafe extern "C" fn rust_exect(
             Ok(result)
         });
 
-        // Resolve the environment: use original if in session or no session, doctor otherwise
+        // Doctor the environment if session is active but the build system stripped preload vars
         let resolved_env = resolve_environment(envp);
         let envp_to_use = resolved_env.as_ptr();
 
@@ -356,7 +356,7 @@ pub unsafe extern "C" fn rust_posix_spawn(
             Ok(result)
         });
 
-        // Resolve the environment: use original if in session or no session, doctor otherwise
+        // Doctor the environment if session is active but the build system stripped preload vars
         let resolved_env = resolve_environment(envp);
         let envp_to_use = resolved_env.as_ptr();
 
@@ -409,7 +409,7 @@ pub unsafe extern "C" fn rust_posix_spawnp(
             Ok(result)
         });
 
-        // Resolve the environment: use original if in session or no session, doctor otherwise
+        // Doctor the environment if session is active but the build system stripped preload vars
         let resolved_env = resolve_environment(envp);
         let envp_to_use = resolved_env.as_ptr();
 
