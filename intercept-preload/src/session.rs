@@ -15,7 +15,9 @@ use std::ffi::{CStr, CString};
 use std::net::SocketAddr;
 use std::sync::OnceLock;
 
-use bear::environment::{KEY_INTERCEPT_STATE, KEY_OS__PRELOAD_PATH};
+use bear::environment::KEY_INTERCEPT_STATE;
+#[cfg(not(target_os = "macos"))]
+use bear::environment::KEY_OS__PRELOAD_PATH;
 #[cfg(target_os = "macos")]
 use bear::environment::{KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH};
 use bear::intercept::environment::{PreloadState, insert_to_path};

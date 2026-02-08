@@ -50,6 +50,12 @@ static REAL_EXECVPE: AtomicPtr<libc::c_void> = {
 };
 
 #[ctor]
+static REAL_EXECVP: AtomicPtr<libc::c_void> = {
+    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvp".as_ptr() as *const _) };
+    AtomicPtr::new(ptr)
+};
+
+#[ctor]
 static REAL_EXECVP_OPENBSD: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"execvP".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
@@ -180,7 +186,8 @@ pub unsafe extern "C" fn rust_execve(
 
 /// Rust implementation of execvpe (GNU extension)
 ///
-/// Called from C shim for: execvpe, execvp, execlp
+/// Called from C shim for: execvpe
+/// On platforms where execvpe is available, execlp and execvp are also routed here.
 ///
 /// # Safety
 /// This function is unsafe because it:
@@ -220,6 +227,46 @@ pub unsafe extern "C" fn rust_execvpe(
             real_func_ptr(file, argv, envp_to_use)
         } else {
             log::error!("Real execvpe function not found");
+            set_errno(libc::ENOSYS);
+            -1
+        }
+    }
+}
+
+/// Rust implementation of execvp
+///
+/// Called from C shim for: execvp, execlp (on platforms where execvpe is not available)
+///
+/// Unlike `rust_execvpe`, this function does not take an explicit `envp` argument.
+/// The real `execvp` uses the process's `environ`, so no environment doctoring is
+/// performed here (same approach as `popen` and `system`).
+///
+/// # Safety
+/// This function is unsafe because it:
+/// - Dereferences raw pointers
+/// - Calls the real execvp function
+#[cfg(has_symbol_execvp)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rust_execvp(file: *const c_char, argv: *const *const c_char) -> c_int {
+    type ExecvpFunc = unsafe extern "C" fn(file: *const c_char, argv: *const *const c_char) -> c_int;
+
+    unsafe {
+        report(|| {
+            let result = Execution {
+                executable: as_path_buf(file)?,
+                arguments: as_string_vec(argv)?,
+                working_dir: working_dir()?,
+                environment: std::env::vars().collect(),
+            };
+            Ok(result)
+        });
+
+        let func_ptr = REAL_EXECVP.load(Ordering::SeqCst);
+        if !func_ptr.is_null() {
+            let real_func_ptr: ExecvpFunc = std::mem::transmute(func_ptr);
+            real_func_ptr(file, argv)
+        } else {
+            log::error!("Real execvp function not found");
             set_errno(libc::ENOSYS);
             -1
         }
@@ -698,12 +745,7 @@ unsafe fn set_errno(value: c_int) {
 }
 
 /// Set errno to the given value (macOS / FreeBSD / DragonFly variant).
-#[cfg(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "freebsd",
-    target_os = "dragonfly"
-))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
 unsafe fn set_errno(value: c_int) {
     unsafe {
         *libc::__error() = value;

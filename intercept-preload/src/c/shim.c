@@ -58,6 +58,7 @@ extern void rust_session_init(char *const *envp);
 // Exec family functions
 extern int rust_execve(const char *path, char *const argv[], char *const envp[]);
 extern int rust_execvpe(const char *file, char *const argv[], char *const envp[]);
+extern int rust_execvp(const char *file, char *const argv[]);
 extern int rust_execvP(const char *file, const char *search_path, char *const argv[]);
 extern int rust_exect(const char *path, char *const argv[], char *const envp[]);
 extern int rust_posix_spawn(pid_t *pid, const char *path,
@@ -163,7 +164,11 @@ EXPORT int execlp(const char *file, const char *arg0, ...)
 
     va_end(ap);
 
+#if defined(has_symbol_execvpe)
     return rust_execvpe(file, argv, get_environ());
+#else
+    return rust_execvp(file, argv);
+#endif
 }
 #endif
 
@@ -226,7 +231,11 @@ EXPORT int execve(const char *path, char *const argv[], char *const envp[])
 #if defined(has_symbol_execvp)
 EXPORT int execvp(const char *file, char *const argv[])
 {
+#if defined(has_symbol_execvpe)
     return rust_execvpe(file, argv, get_environ());
+#else
+    return rust_execvp(file, argv);
+#endif
 }
 #endif
 
