@@ -29,7 +29,6 @@ intercept:
 ///
 /// execl(path, arg0, arg1, ..., NULL) - variadic, no PATH search, inherited env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execl)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execl_interception() -> Result<()> {
@@ -75,7 +74,6 @@ int main() {{
 ///
 /// execlp(file, arg0, arg1, ..., NULL) - variadic, PATH search, inherited env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execlp)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execlp_interception() -> Result<()> {
@@ -118,7 +116,6 @@ int main() {
 ///
 /// execle(path, arg0, arg1, ..., NULL, envp) - variadic, no PATH search, explicit env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execle)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execle_interception() -> Result<()> {
@@ -164,7 +161,6 @@ int main() {{
 ///
 /// execv(path, argv) - array, no PATH search, inherited env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execv)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execv_interception() -> Result<()> {
@@ -208,7 +204,6 @@ int main() {{
 ///
 /// execve(path, argv, envp) - array, no PATH search, explicit env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execve)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execve_interception() -> Result<()> {
@@ -253,7 +248,6 @@ int main() {{
 ///
 /// execvp(file, argv) - array, PATH search, inherited env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execvp)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execvp_interception() -> Result<()> {
@@ -295,7 +289,6 @@ int main() {
 ///
 /// execvpe(file, argv, envp) - array, PATH search, explicit env
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execvpe)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn execvpe_interception() -> Result<()> {
@@ -338,7 +331,6 @@ int main() {
 
 /// Test posix_spawn interception
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_posix_spawn)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn posix_spawn_interception() -> Result<()> {
@@ -392,7 +384,6 @@ int main() {{
 
 /// Test posix_spawnp interception (searches PATH)
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_posix_spawnp)]
 #[cfg(has_executable_compiler_c)]
 fn posix_spawnp_interception() -> Result<()> {
@@ -443,7 +434,6 @@ int main() {
 
 /// Test popen system call interception
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_popen)]
 #[cfg(all(has_executable_compiler_c, has_executable_cat))]
 fn popen_interception() -> Result<()> {
@@ -503,7 +493,6 @@ int main(void) {{
 
 /// Test system() call interception
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_system)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
 fn system_interception() -> Result<()> {
@@ -545,7 +534,6 @@ int main() {{
 
 /// Test errno handling with failed exec calls
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_symbol_execve)]
 #[cfg(has_executable_compiler_c)]
 fn test_failed_exec_errno_handling() -> Result<()> {
@@ -594,7 +582,6 @@ int main() {
 
 /// Test that programs with no exec calls don't generate spurious events
 #[test]
-#[cfg(has_preload_library)]
 #[cfg(has_executable_compiler_c)]
 fn test_no_exec_calls() -> Result<()> {
     let env = TestEnvironment::new("no_exec")?;
