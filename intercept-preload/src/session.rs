@@ -65,7 +65,7 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
 /// The method does check the passed environment if still aligned with the expected
 /// preload mode environment settings.
 ///
-/// This walks through the C pointers direcly and check if the `KEY_INTERCEPT_STATE`
+/// This walks through the C pointers directly and check if the `KEY_INTERCEPT_STATE`
 /// and `LD_PRELOAD` variables are all set as expected. Returns true if the variables
 /// are not changed.
 pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> bool {
