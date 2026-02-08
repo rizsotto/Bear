@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::path::PathBuf;
 use std::ptr;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use bear::intercept::reporter::{Reporter, ReporterFactory};
@@ -85,8 +86,12 @@ static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
 };
 
 /// Reporter for sending execution events to the collector.
-/// Initialized by `rust_session_init` when called from the C shim constructor.
-static REPORTER: AtomicPtr<ReporterOnTcp> = AtomicPtr::new(std::ptr::null_mut());
+/// Initialized once by `rust_session_init` when called from the C shim constructor.
+/// Using `OnceLock` ensures safe single-initialization without raw pointers and
+/// provides `&ReporterOnTcp` references that are sound across threads (since
+/// `ReporterOnTcp` is `Sync` — it only holds a `SocketAddr` and creates a fresh
+/// `TcpStream` per report call).
+static REPORTER: OnceLock<ReporterOnTcp> = OnceLock::new();
 
 /// Initialize the session from the environment.
 ///
@@ -116,9 +121,10 @@ pub unsafe extern "C" fn rust_session_init(envp: *const *const c_char) {
 
     // Initialize the reporter from the captured destination
     if let Some(address) = destination {
-        let boxed_reporter = Box::new(ReporterFactory::create(address));
-        let ptr = Box::into_raw(boxed_reporter);
-        REPORTER.store(ptr, Ordering::SeqCst);
+        let reporter = ReporterFactory::create(address);
+        if REPORTER.set(reporter).is_err() {
+            log::warn!("Reporter already initialized, ignoring duplicate init");
+        }
     } else {
         log::debug!("No destination found, reporter not initialized");
     }
@@ -585,10 +591,9 @@ fn report<F>(f: F)
 where
     F: FnOnce() -> Result<Execution, c_int>,
 {
-    let reporter = REPORTER.load(Ordering::SeqCst);
-    if reporter.is_null() {
+    let Some(reporter) = REPORTER.get() else {
         return;
-    }
+    };
 
     let event = match f() {
         Ok(execution) => Event::new(execution),
@@ -598,8 +603,8 @@ where
         }
     };
 
-    if let Err(err) = unsafe { (*reporter).report(event) } {
-        log::debug!("Failed to report execution: {err}",);
+    if let Err(err) = reporter.report(event) {
+        log::debug!("Failed to report execution: {err}");
     }
 }
 
