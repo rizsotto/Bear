@@ -48,24 +48,50 @@ int main() {{
     env.run_c_compiler("test_execl", &["test_execl.c"])?;
 
     // Run intercept on the compiled program
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execl",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execl",
+        ])?;
 
-    // Verify intercepted events - check BOTH executable AND arguments
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        // Verify intercepted events - check BOTH executable AND arguments
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    if cfg!(has_symbol_execve) {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execl",
+        ])?;
+
+        // Verify intercepted events - check BOTH executable AND arguments
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -90,24 +116,50 @@ int main() {
     env.create_source_files(&[("test_execlp.c", c_program)])?;
     env.run_c_compiler("test_execlp", &["test_execlp.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execlp",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execlp",
+        ])?;
 
-    // For execlp, we verify the arguments but not the full path since it's resolved via PATH
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        "echo".to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        // For execlp, we verify the arguments but not the full path since it's resolved via PATH
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    if cfg!(has_symbol_execvpe) {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execlp",
+        ])?;
+
+        // For execlp, we verify the arguments but not the full path since it's resolved via PATH
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -135,24 +187,50 @@ int main() {{
     env.create_source_files(&[("test_execle.c", &c_program)])?;
     env.run_c_compiler("test_execle", &["test_execle.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execle",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execle",
+        ])?;
 
-    // Verify arguments were captured correctly
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        // Verify arguments were captured correctly
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    if cfg!(has_symbol_execve) {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execle",
+        ])?;
+
+        // Verify arguments were captured correctly
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -179,23 +257,48 @@ int main() {{
     env.create_source_files(&[("test_execv.c", &c_program)])?;
     env.run_c_compiler("test_execv", &["test_execv.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execv",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execv",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    if cfg!(has_symbol_execve) {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execv",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -223,23 +326,47 @@ int main() {{
     env.create_source_files(&[("test_execve.c", &c_program)])?;
     env.run_c_compiler("test_execve", &["test_execve.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execve",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execve",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+    // Run intercept on the compiled program in empty environment
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execve",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -264,23 +391,48 @@ int main() {
     env.create_source_files(&[("test_execvp.c", c_program)])?;
     env.run_c_compiler("test_execvp", &["test_execvp.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execvp",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execvp",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        "echo".to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    if cfg!(has_symbol_execvpe) {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execvp",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -308,23 +460,48 @@ int main() {
     env.create_source_files(&[("test_execvpe.c", c_program)])?;
     env.run_c_compiler("test_execvpe", &["test_execvpe.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_execvpe",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_execvpe",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        "echo".to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_execvpe",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -361,23 +538,48 @@ int main() {{
     env.create_source_files(&[("test_posix_spawn.c", &c_program)])?;
     env.run_c_compiler("test_posix_spawn", &["test_posix_spawn.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_posix_spawn",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_posix_spawn",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        ECHO_PATH.to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_posix_spawn",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            ECHO_PATH.to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -411,23 +613,48 @@ int main() {
     env.create_source_files(&[("test_posix_spawnp.c", c_program)])?;
     env.run_c_compiler("test_posix_spawnp", &["test_posix_spawnp.c"])?;
 
-    env.run_bear_success(&[
-        "--config",
-        "config.yml",
-        "intercept",
-        "--output",
-        "events.json",
-        "--",
-        "./test_posix_spawnp",
-    ])?;
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            "./test_posix_spawnp",
+        ])?;
 
-    let events = env.load_events_file("events.json")?;
-    events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
-        "echo".to_string(),
-        "arg1".to_string(),
-        "arg2".to_string(),
-        "arg3".to_string(),
-    ]))?;
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
+
+    // Run intercept on the compiled program in empty environment
+    {
+        env.run_bear_success(&[
+            "--config",
+            "config.yml",
+            "intercept",
+            "--output",
+            "events.json",
+            "--",
+            ENV_PATH,
+            "-",
+            "./test_posix_spawnp",
+        ])?;
+
+        let events = env.load_events_file("events.json")?;
+        events.assert_contains(&EventMatcher::new().executable_name("echo").arguments(vec![
+            "echo".to_string(),
+            "arg1".to_string(),
+            "arg2".to_string(),
+            "arg3".to_string(),
+        ]))?;
+    }
 
     Ok(())
 }
@@ -572,6 +799,9 @@ int main() {
 
     // The program should fail (non-zero exit) but intercept should still work
     intercept_output.assert_failure()?;
+
+    let output = intercept_output.stdout();
+    assert!(output.contains("execve failed: No such file or directory"));
 
     // Should still be able to load events file
     let events = env.load_events_file("events.json")?;
