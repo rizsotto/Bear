@@ -186,6 +186,19 @@ impl CommandConverter {
         }
     }
 
+    /// Formats an executable file path
+    ///
+    /// Returns the formatted path, falling back to the original path on error.
+    fn format_executable(&self, formatted_directory: &Path, executable: &Path) -> PathBuf {
+        match self.path_formatter.format_executable(formatted_directory, executable) {
+            Ok(formatted_path) => formatted_path,
+            Err(e) => {
+                warn!("Failed to format executable path {}: {}", executable.display(), e);
+                executable.to_path_buf()
+            }
+        }
+    }
+
     /// Builds command arguments for a specific source file.
     ///
     /// This method constructs the command arguments list that includes the executable,
@@ -242,12 +255,9 @@ impl CommandConverter {
                     command_args.extend(formatted_args);
                 }
                 ArgumentKind::Compiler => {
-                    if let Some(executable_name) = cmd.executable.file_name() {
-                        if let Some(name_str) = executable_name.to_str() {
-                            command_args.push(name_str.to_string());
-                        } else {
-                            command_args.extend(original_args);
-                        }
+                    let executable = self.format_executable(&formatted_directory, &cmd.executable);
+                    if let Some(executable_str) = executable.to_str() {
+                        command_args.push(executable_str.to_string());
                     } else {
                         command_args.extend(original_args);
                     }
