@@ -275,6 +275,8 @@ mod types {
         pub directory: PathResolver,
         #[serde(default)]
         pub file: PathResolver,
+        #[serde(default)]
+        pub executable: PathResolver,
     }
 
     /// Path resolver options matching the YAML format.
