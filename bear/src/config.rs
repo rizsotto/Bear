@@ -369,7 +369,7 @@ pub mod validation {
         #[error("Duplicate {field} entry at: {idx}")]
         DuplicateEntry { field: &'static str, idx: usize },
         #[error("Path format error: {message}")]
-        PathFormatError { message: &'static str },
+        PathFormatError { message: String },
         #[error("Multiple validation errors: {errors:?}")]
         Multiple { errors: Vec<ValidationError> },
     }
@@ -521,6 +521,29 @@ pub mod validation {
         }
     }
 
+    fn validate_path_dependency(
+        base: &PathResolver,
+        dependent: &PathResolver,
+        dependent_name: &str,
+    ) -> Result<(), ValidationError> {
+        use PathResolver::*;
+
+        let conflict = match (base, dependent) {
+            (Relative, Absolute | Canonical) => Some("must be relative too"),
+            (Canonical, Absolute) => Some("can't be absolute"),
+            (Absolute, Canonical) => Some("can't be canonical"),
+            (AsIs, Absolute | Relative | Canonical) => Some("must also be AsIs"),
+            _ => None,
+        };
+
+        match conflict {
+            Some(reason) => Err(ValidationError::PathFormatError {
+                message: format!("When directory is {base:?}, {dependent_name} {reason}"),
+            }),
+            None => Ok(()),
+        }
+    }
+
     impl Validator<PathFormat> for PathFormat {
         type Error = ValidationError;
 
@@ -529,23 +552,9 @@ pub mod validation {
         /// - When directory is canonical, file can't be absolute
         /// - When directory is absolute, file can't be canonical
         fn validate(config: &PathFormat) -> Result<(), Self::Error> {
-            use PathResolver::*;
-
-            match (&config.directory, &config.file) {
-                (Relative, Absolute | Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory is relative, file must be relative too",
-                }),
-                (Canonical, Absolute) => Err(ValidationError::PathFormatError {
-                    message: "When directory is canonical, file can't be absolute",
-                }),
-                (Absolute, Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory is absolute, file can't be canonical",
-                }),
-                (AsIs, Absolute | Relative | Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory as-is, file should be the same",
-                }),
-                _ => Ok(()),
-            }
+            validate_path_dependency(&config.directory, &config.file, "file")?;
+            validate_path_dependency(&config.directory, &config.executable, "executable")?;
+            Ok(())
         }
     }
 
