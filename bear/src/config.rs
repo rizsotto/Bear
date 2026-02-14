@@ -525,25 +525,29 @@ pub mod validation {
         type Error = ValidationError;
 
         /// Validates the path format configuration according to the rules:
-        /// - When directory is relative, file must be relative too
-        /// - When directory is canonical, file can't be absolute
-        /// - When directory is absolute, file can't be canonical
+        /// - When directory is relative, file and executable must be relative too
+        /// - When directory is canonical, file and executable can't be absolute
+        /// - When directory is absolute, file and executable can't be canonical
         fn validate(config: &PathFormat) -> Result<(), Self::Error> {
             use PathResolver::*;
 
-            match (&config.directory, &config.file) {
-                (Relative, Absolute | Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory is relative, file must be relative too",
+            match (&config.directory, &config.file, &config.executable) {
+                (Relative, Absolute | Canonical, Absolute | Canonical) => {
+                    Err(ValidationError::PathFormatError {
+                        message: "When directory is relative, file and executable must be relative too",
+                    })
+                }
+                (Canonical, Absolute, Absolute) => Err(ValidationError::PathFormatError {
+                    message: "When directory is canonical, file and executable can't be absolute",
                 }),
-                (Canonical, Absolute) => Err(ValidationError::PathFormatError {
-                    message: "When directory is canonical, file can't be absolute",
+                (Absolute, Canonical, Canonical) => Err(ValidationError::PathFormatError {
+                    message: "When directory is absolute, file and executable can't be canonical",
                 }),
-                (Absolute, Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory is absolute, file can't be canonical",
-                }),
-                (AsIs, Absolute | Relative | Canonical) => Err(ValidationError::PathFormatError {
-                    message: "When directory as-is, file should be the same",
-                }),
+                (AsIs, Absolute | Relative | Canonical, Absolute | Relative | Canonical) => {
+                    Err(ValidationError::PathFormatError {
+                        message: "When directory as-is, file and executable should be the same",
+                    })
+                }
                 _ => Ok(()),
             }
         }
