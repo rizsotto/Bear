@@ -545,7 +545,7 @@ pub mod validation {
                 }),
                 (AsIs, Absolute | Relative | Canonical, Absolute | Relative | Canonical) => {
                     Err(ValidationError::PathFormatError {
-                        message: "When directory as-is, file and executable should be the same",
+                        message: "When directory as-is, file and executable must also be as-is",
                     })
                 }
                 _ => Ok(()),
