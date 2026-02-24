@@ -406,6 +406,11 @@ pub static GCC_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::
             ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling)),
         ),
         // Other/unclassified options
+        FlagRule::new(
+            FlagPattern::Exactly("-arch", 1),
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        ),
+        FlagRule::new(FlagPattern::Exactly("-arch_only", 1), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(PassEffect::None)),
         FlagRule::new(FlagPattern::Exactly("-aux-info", 1), ArgumentKind::Other(PassEffect::None)),
         // Compilation options
@@ -1482,6 +1487,40 @@ mod tests {
             for obj_file in object_files {
                 assert_eq!(obj_file.kind(), ArgumentKind::Source { binary: true });
             }
+        }
+    }
+
+    #[test]
+    fn test_arch_flag_preserves_argument() {
+        let interpreter = GccInterpreter::new();
+
+        // On macOS, cc/gcc are Apple Clang and pass -arch arm64.
+        // The -arch flag takes one argument; both must be preserved.
+        let execution =
+            create_execution("cc", vec!["cc", "-arch", "arm64", "-Wall", "-O2", "-c", "hello.c"], "/project");
+
+        let result = interpreter.recognize(&execution).unwrap();
+
+        if let Command::Compiler(cmd) = result {
+            // -arch arm64 must be recognised as a single two-token flag
+            let arch_arg = cmd.arguments.iter().find(|a| {
+                let tokens = a.as_arguments(&|p| Cow::Borrowed(p));
+                tokens.len() == 2 && tokens[0] == "-arch" && tokens[1] == "arm64"
+            });
+            assert!(arch_arg.is_some(), "-arch arm64 should be captured as a single argument pair");
+            assert_eq!(
+                arch_arg.unwrap().kind(),
+                ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))
+            );
+
+            // arm64 must NOT appear as a source file
+            let bad_source = cmd.arguments.iter().any(|a| {
+                let tokens = a.as_arguments(&|p| Cow::Borrowed(p));
+                tokens.len() == 1 && tokens[0] == "arm64"
+            });
+            assert!(!bad_source, "arm64 must not be misclassified as a source file");
+        } else {
+            panic!("Expected compiler command");
         }
     }
 }
