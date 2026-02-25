@@ -62,22 +62,16 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
         Regex::new(&full_pattern).unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
     }
     vec![
-        // simple cc pattern: matches cc
-        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?cc", false)),
-        // GCC pattern: matches cc, c++ and gcc cross compilation variants and versioned variants
-        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|c\+\+)", true)),
+        // simple cc and c++ (no version support)
+        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:cc|c\+\+)", false)),
+        // GCC pattern
+        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|gfortran|egfortran|f95)", true)),
         // GCC internal executables pattern: matches GCC's internal compiler phases
-        // These are implementation details of GCC's compilation process that should be
-        // routed to GccInterpreter for proper handling (typically to be ignored).
-        // Examples: cc1, cc1plus, cc1obj, cc1objplus, collect2, lto1
-        (CompilerType::Gcc, create_compiler_regex(r"(?:cc1(?:plus|obj|objplus)?|collect2|lto1)", false)),
+        (CompilerType::Gcc, create_compiler_regex(r"(?:cc1(?:plus|obj|objplus)?|f951|collect2|lto1)", false)),
         // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
         (CompilerType::Clang, create_compiler_regex(r"(?:[^/]*-)?clang(?:\+\+)?", true)),
-        // Fortran pattern: matches gfortran, flang, f77, f90, f95, f03, f08, cross-compilation variants, and versioned variants
-        (
-            CompilerType::Flang,
-            create_compiler_regex(r"(?:[^/]*-)?(?:gfortran|flang|f77|f90|f95|f03|f08)", true),
-        ),
+        // Fortran pattern: matches flang, cross-compilation variants, and versioned variants
+        (CompilerType::Flang, create_compiler_regex(r"(?:[^/]*-)?(?:flang|flang-new)", true)),
         // Intel Fortran pattern: matches ifort, ifx, and versioned variants
         (CompilerType::IntelFortran, create_compiler_regex(r"(?:ifort|ifx)", true)),
         // Cray Fortran pattern: matches crayftn, ftn
@@ -343,10 +337,9 @@ mod tests {
         assert_eq!(recognizer.recognize(path("clang-15.exe")), Some(CompilerType::Clang));
 
         // Fortran with .exe extensions
-        assert_eq!(recognizer.recognize(path("gfortran.exe")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran.exe")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("flang.exe")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f77.exe")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f90.exe")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("f95.exe")), Some(CompilerType::Gcc));
 
         // Intel Fortran with .exe extensions
         assert_eq!(recognizer.recognize(path("ifort.exe")), Some(CompilerType::IntelFortran));
@@ -379,21 +372,18 @@ mod tests {
         let recognizer = CompilerRecognizer::new();
 
         // Basic Fortran names
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("f95")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("flang")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f77")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f90")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f95")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f03")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f08")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("flang-new")), Some(CompilerType::Flang));
 
         // Cross-compilation variants
-        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-gfortran")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-gfortran")), Some(CompilerType::Gcc));
 
         // Versioned variants
-        assert_eq!(recognizer.recognize(path("gfortran-11")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("gfortran11")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("f90-4.8")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran-11")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gfortran11")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("f95-4.8")), Some(CompilerType::Gcc));
     }
 
     #[test]
@@ -512,6 +502,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("cc1obj")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("cc1objplus")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("collect2")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("f951")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("lto1")), Some(CompilerType::Gcc));
 
         // Test with full paths
@@ -566,7 +557,7 @@ mod tests {
         );
 
         // Test Fortran pattern matching when 'as' is None
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
     }
 
     #[test]
@@ -618,7 +609,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("g++-9.3.0")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("clang-15")), Some(CompilerType::Clang));
         assert_eq!(recognizer.recognize(path("clang-12.1")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("gfortran-12")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran-12")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("ifort-2023")), Some(CompilerType::IntelFortran));
         assert_eq!(recognizer.recognize(path("nvcc-11.8")), Some(CompilerType::Cuda));
 
@@ -629,7 +620,7 @@ mod tests {
         // Test that non-versioned compilers still work
         assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Flang));
+        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
 
         // Test that wrapper executables don't have version patterns (as expected)
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));

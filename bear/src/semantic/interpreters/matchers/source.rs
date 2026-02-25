@@ -27,8 +27,8 @@ static SOURCE_EXTENSIONS: std::sync::LazyLock<HashSet<&'static str>> = std::sync
         // Assembly
         "s", "S", "sx", "asm",
         // Fortran
-        "f", "for", "ftn",
-        "F", "FOR", "fpp", "FPP", "FTN",
+        "f", "for", "fpp", "ftn",
+        "F", "FOR", "FPP", "FTN",
         "f90", "f95", "f03", "f08",
         "F90", "F95", "F03", "F08",
         // go

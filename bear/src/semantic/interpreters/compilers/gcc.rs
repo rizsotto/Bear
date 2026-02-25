@@ -63,11 +63,12 @@ impl GccInterpreter {
 
 /// GCC internal executables that should be ignored
 /// These are implementation details of GCC's compilation process
-const GCC_INTERNAL_EXECUTABLES: [&str; 6] = [
+const GCC_INTERNAL_EXECUTABLES: [&str; 7] = [
     "cc1",        // C compiler proper
     "cc1plus",    // C++ compiler proper
     "cc1obj",     // Objective-C compiler proper
     "cc1objplus", // Objective-C++ compiler proper
+    "f951",       // Fortran compiler proper
     "collect2",   // Linker wrapper
     "lto1",       // Link-time optimization pass
 ];
@@ -1340,6 +1341,19 @@ mod tests {
         );
 
         if let Some(Command::Ignored(reason)) = interpreter.recognize(&collect2_execution) {
+            assert_eq!(reason, "GCC internal executable");
+        } else {
+            panic!("Expected ignored command for collect2");
+        }
+
+        // Test internal fortran executable
+        let fortran_execution = create_execution(
+            "/usr/libexec/gcc/x86_64-redhat-linux/15/f951",
+            vec!["f951", "fortran.f90", "-mtune=generic", "-march=x86-64", "-o", "/tmp/cc6kwJ3Y.s"],
+            "/home/user",
+        );
+
+        if let Some(Command::Ignored(reason)) = interpreter.recognize(&fortran_execution) {
             assert_eq!(reason, "GCC internal executable");
         } else {
             panic!("Expected ignored command for collect2");
