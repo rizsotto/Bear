@@ -165,14 +165,16 @@ mod tests {
     // We create a TCP collector and a TCP reporter, then we send events
     // to the reporter and check if the collector receives them.
     //
-    // We use a bounded channel to send the events from the reporter to the
-    // collector. The collector reads the events from the channel and checks
-    // if they are the same as the original events.
+    // A channel is used so the collector thread can signal that all events
+    // have been received, and a timeout prevents the test from hanging
+    // indefinitely if event delivery is broken.
     #[test]
     fn tcp_reporter_and_collectors_work() {
         let (collector, address) = CollectorOnTcp::new().unwrap();
         let collector_arc = Arc::new(collector);
-        let reporter = ReporterOnTcp::new(address);
+
+        // Channel for the collector to signal "I've received everything"
+        let (done_tx, done_rx) = std::sync::mpsc::sync_channel::<()>(0);
 
         // Start the collector in a separate thread using the events iterator
         let collector_thread = {
@@ -184,6 +186,7 @@ mod tests {
                         Ok(event) => {
                             received_events.push(event);
                             if received_events.len() == fixtures::EVENTS.len() {
+                                let _ = done_tx.send(());
                                 break;
                             }
                         }
@@ -199,30 +202,43 @@ mod tests {
 
         // Send events to the reporter.
         for event in fixtures::EVENTS.iter() {
+            let reporter = ReporterOnTcp::new(address);
             let result = reporter.report(event.clone());
             assert!(result.is_ok());
         }
 
-        // Give some time for events to be processed before shutdown
-        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Wait with a timeout — if delivery is broken, fail instead of hang.
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("timed out waiting for collector to receive all events");
 
-        // Call the stop method to stop the collector.
-        {
-            let tcp_collector = Arc::clone(&collector_arc);
-            tcp_collector.shutdown().unwrap();
-        }
-
-        // Wait for all events to be consumed
+        // Now safe to shutdown and join.
+        collector_arc.shutdown().unwrap();
         let received_events = collector_thread.join().unwrap();
 
         // Assert that we received all the events.
-        assert_eq!(received_events.len(), fixtures::EVENTS.len());
+        assert_eq!(fixtures::EVENTS.len(), received_events.len());
         for event in received_events {
             assert!(fixtures::EVENTS.contains(&event));
         }
+    }
 
-        // shutdown the receiver thread
-        // Note: collector_thread is already joined above
+    // Test that calling shutdown on the collector stops the events iterator.
+    // No events are sent — this purely tests the shutdown mechanism.
+    #[test]
+    fn tcp_collector_shutdown_stops_iterator() {
+        let (collector, _address) = CollectorOnTcp::new().unwrap();
+        let collector_arc = Arc::new(collector);
+
+        let collector_thread = {
+            let tcp_collector = Arc::clone(&collector_arc);
+            std::thread::spawn(move || tcp_collector.events().count())
+        };
+
+        collector_arc.shutdown().unwrap();
+
+        let count = collector_thread.join().unwrap();
+        assert_eq!(count, 0);
     }
 
     mod fixtures {
