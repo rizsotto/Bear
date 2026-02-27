@@ -9,3 +9,4 @@ target/
 .vs
 settings.json
 *~
+*.profraw

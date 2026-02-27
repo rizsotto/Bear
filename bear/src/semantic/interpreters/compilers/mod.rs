@@ -51,7 +51,7 @@ impl CompilerInterpreter {
         let recognizer = Arc::new(CompilerRecognizer::new_with_config(compilers));
 
         // Create the final interpreter and register all non-wrapper interpreters
-        let mut result = CompilerInterpreter::new(Arc::clone(&recognizer));
+        let mut result = Self::new(Arc::clone(&recognizer));
 
         // Register all interpreter types using the centralized method
         result.register(CompilerType::Gcc, GccInterpreter::default());
@@ -76,6 +76,7 @@ impl CompilerInterpreter {
             result
         })
     }
+
     /// Creates a new compiler interpreter with empty interpreter map.
     ///
     /// This is the basic constructor. Use `new_with_config` for a fully
@@ -122,15 +123,27 @@ impl Interpreter for Arc<CompilerInterpreter> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::{borrow::Cow, path::Path, path::PathBuf};
 
     fn create_execution(executable: &str, arguments: Vec<&str>) -> Execution {
+        let arguments = {
+            let mut builder = vec![executable.to_string()];
+            for argument in arguments {
+                builder.push(argument.to_string());
+            }
+            builder
+        };
+
         Execution {
             executable: PathBuf::from(executable),
-            arguments: arguments.into_iter().map(String::from).collect(),
+            arguments,
             working_dir: PathBuf::from("/tmp"),
             environment: std::collections::HashMap::new(),
         }
+    }
+
+    fn noop(path: &Path) -> Cow<'_, Path> {
+        Cow::from(path)
     }
 
     #[test]
@@ -234,18 +247,15 @@ mod tests {
         let ccache_execution = create_execution("ccache", vec!["gcc", "-c", "test.c"]);
         let result = sut.recognize(&ccache_execution);
 
-        // Wrapper support might not be fully functional yet, so we just check it doesn't crash
-        // In a complete implementation, this should delegate to gcc and return a compiler command
-        match result {
-            Some(Command::Compiler(_)) => {
-                // Great! Wrapper delegation worked
-            }
-            Some(Command::Ignored(_)) => {
-                // Wrapper was recognized but ignored for some reason
-            }
-            None => {
-                // Wrapper support not yet complete, which is acceptable
-            }
+        if let Some(Command::Compiler(cmd)) = result {
+            // Assert the compiler
+            assert_eq!(*cmd.executable, *"gcc");
+            // Assert the arguments
+            let arguments: Vec<String> =
+                cmd.arguments.into_iter().flat_map(|arg| arg.as_arguments(&noop)).collect();
+            assert_eq!(vec!["gcc".to_string(), "-c".to_string(), "test.c".to_string()], arguments);
+        } else {
+            panic!("Expected compiler command");
         }
     }
 
@@ -254,15 +264,8 @@ mod tests {
         let sut = CompilerInterpreter::new_with_config(&[]);
 
         // Test that all compiler types are handled uniformly through the map
-        let test_cases = vec![
-            ("gcc", CompilerType::Gcc),
-            ("clang", CompilerType::Clang),
-            ("nvcc", CompilerType::Cuda),
-            ("gfortran", CompilerType::Flang),
-            ("ifort", CompilerType::IntelFortran),
-        ];
-
-        for (executable, _expected_type) in test_cases {
+        let executables = vec!["gcc", "clang", "nvcc", "gfortran", "ifort"];
+        for executable in executables {
             let execution = create_execution(executable, vec!["-c", "test.c"]);
 
             // Test that the recognizer identifies the correct type
