@@ -37,6 +37,9 @@ pub trait PathFormatter: Send + Sync {
 
     /// Format a file path according to the configured strategy.
     fn format_file(&self, directory: &Path, file: &Path) -> Result<PathBuf, FormatError>;
+
+    /// Format an executable path according to the configured strategy.
+    fn format_executable(&self, directory: &Path, file: &Path) -> Result<PathBuf, FormatError>;
 }
 
 /// Implementation of PathFormatter that uses the configuration to determine
@@ -61,6 +64,10 @@ impl PathFormatter for ConfigurablePathFormatter {
 
     fn format_file(&self, directory: &Path, file: &Path) -> Result<PathBuf, FormatError> {
         self.config.file.resolve(directory, file)
+    }
+
+    fn format_executable(&self, directory: &Path, executable: &Path) -> Result<PathBuf, FormatError> {
+        self.config.executable.resolve(directory, executable)
     }
 }
 
