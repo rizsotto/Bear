@@ -66,7 +66,7 @@ fn main() {
             println!("cargo:rustc-cdylib-link-arg=-Wl,--version-script={}", exports_path);
             // Set rpath to look for dependencies in the same directory as the library
             println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
-            // Force using lld
+            // Force using lld, because GNU ld does not support multiple version tag
             // https://users.rust-lang.org/t/how-to-use-linker-version-scripts-in-rust-1-54
             println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
         }
