@@ -54,6 +54,7 @@ use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, Compile
 use log::warn;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
+use which::which;
 
 /// Converts commands into compilation database entries.
 ///
@@ -242,14 +243,15 @@ impl CommandConverter {
                     command_args.extend(formatted_args);
                 }
                 ArgumentKind::Compiler => {
-                    if let Some(executable_name) = cmd.executable.file_name() {
-                        if let Some(name_str) = executable_name.to_str() {
-                            command_args.push(name_str.to_string());
-                        } else {
+                    let absolute_executable_name =
+                        which(&cmd.executable).ok().and_then(|n| n.to_str().map(|s| s.to_string()));
+                    match absolute_executable_name {
+                        Some(name_str) => {
+                            command_args.push(name_str);
+                        }
+                        None => {
                             command_args.extend(original_args);
                         }
-                    } else {
-                        command_args.extend(original_args);
                     }
                 }
                 _ => {
