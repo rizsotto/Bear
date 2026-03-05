@@ -78,6 +78,7 @@ dependencies = [
  "signal-hook",
  "tempfile",
  "thiserror",
+ "which",
 ]
 
 [[package]]
