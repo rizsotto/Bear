@@ -399,7 +399,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
+            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
             "/home/user",
             Some("main.o"),
         )];
@@ -424,8 +424,18 @@ mod tests {
         let result = converter.to_entries(&command);
 
         let expected = vec![
-            Entry::from_arguments_str("file1.cpp", vec!["g++", "-c", "file1.cpp"], "/home/user", None),
-            Entry::from_arguments_str("file2.cpp", vec!["g++", "-c", "file2.cpp"], "/home/user", None),
+            Entry::from_arguments_str(
+                "file1.cpp",
+                vec!["/usr/bin/g++", "-c", "file1.cpp"],
+                "/home/user",
+                None,
+            ),
+            Entry::from_arguments_str(
+                "file2.cpp",
+                vec!["/usr/bin/g++", "-c", "file2.cpp"],
+                "/home/user",
+                None,
+            ),
         ];
         assert_eq!(result, expected);
     }
@@ -465,8 +475,12 @@ mod tests {
         let converter = CommandConverter::new(format);
         let entries = converter.to_entries(&command);
 
-        let expected =
-            vec![Entry::from_command_str("main.c", "gcc -c main.c -o main.o", "/home/user", Some("main.o"))];
+        let expected = vec![Entry::from_command_str(
+            "main.c",
+            "/usr/bin/gcc -c main.c -o main.o",
+            "/home/user",
+            Some("main.o"),
+        )];
         assert_eq!(entries, expected);
     }
 
@@ -491,7 +505,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
+            vec!["/usr/bin/gcc", "-c", "main.c", "-o", "main.o"],
             "/home/user",
             None,
         )];
@@ -892,9 +906,9 @@ mod tests {
         // Test that all three formatting methods work consistently
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
-            "gcc",
+            "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source { binary: false }, vec!["main.c"]),
                 (ArgumentKind::Output, vec!["-o", "main.o"]),
@@ -918,7 +932,7 @@ mod tests {
         assert_eq!(entry.output, Some(PathBuf::from("main.o")));
 
         // Verify the command includes the formatted paths
-        assert!(entry.arguments.contains(&"gcc".to_string()));
+        assert!(entry.arguments.contains(&"/usr/bin/gcc".to_string()));
         assert!(entry.arguments.contains(&"-c".to_string()));
         assert!(entry.arguments.contains(&"main.c".to_string()));
         assert!(entry.arguments.contains(&"-o".to_string()));
@@ -933,9 +947,9 @@ mod tests {
         // Test command with both preprocessing flags (-D) and compilation flags (-c)
         let compiler_cmd = CompilerCommand::from_strings(
             "/home/user",
-            "gcc",
+            "/usr/bin/gcc",
             vec![
-                (ArgumentKind::Compiler, vec!["gcc"]),
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
                 (
                     ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
                     vec!["-DWRAPPER_FLAG"],
@@ -956,7 +970,7 @@ mod tests {
         assert_eq!(entry.directory, PathBuf::from("/home/user"));
 
         // Verify the arguments include both preprocessing and compilation flags
-        assert!(entry.arguments.contains(&"gcc".to_string()));
+        assert!(entry.arguments.contains(&"/usr/bin/gcc".to_string()));
         assert!(entry.arguments.contains(&"-DWRAPPER_FLAG".to_string()));
         assert!(entry.arguments.contains(&"-c".to_string()));
         assert!(entry.arguments.contains(&"test.c".to_string()));
