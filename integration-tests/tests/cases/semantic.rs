@@ -8,7 +8,7 @@ use serde_json::json;
 fn basic_semantic_conversion() -> Result<()> {
     let env = TestEnvironment::new("basic_semantic")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create sample events file with compilation events using new format
     // Use proper JSON serialization to handle Windows paths with backslashes
@@ -60,7 +60,7 @@ fn basic_semantic_conversion() -> Result<()> {
 fn semantic_multiple_entries() -> Result<()> {
     let env = TestEnvironment::new("semantic_multiple")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events file with multiple compilation events using new format
     let event1 = json!({
@@ -135,7 +135,7 @@ fn semantic_multiple_entries() -> Result<()> {
 fn semantic_format_conversion() -> Result<()> {
     let env = TestEnvironment::new("semantic_format")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with compiler flags
     let event1 = json!({
@@ -181,7 +181,7 @@ fn semantic_format_conversion() -> Result<()> {
 fn semantic_relative_paths() -> Result<()> {
     let env = TestEnvironment::new("semantic_relative_paths")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with relative paths
     let event1 = json!({
@@ -223,7 +223,7 @@ fn semantic_relative_paths() -> Result<()> {
 fn semantic_wrapper_flags() -> Result<()> {
     let env = TestEnvironment::new("semantic_wrapper")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with wrapper that adds flags
     let event1 = json!({
@@ -269,7 +269,7 @@ fn semantic_wrapper_flags() -> Result<()> {
 fn semantic_clang_plugins() -> Result<()> {
     let env = TestEnvironment::new("semantic_clang_plugins")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with clang plugin flags
     let event1 = json!({
@@ -312,7 +312,7 @@ fn semantic_clang_plugins() -> Result<()> {
 fn semantic_with_filtering() -> Result<()> {
     let env = TestEnvironment::new("semantic_filtering")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with both compilation and non-compilation commands
     let event1 = json!({
@@ -417,7 +417,7 @@ fn semantic_malformed_events() -> Result<()> {
 fn semantic_non_compilation_events() -> Result<()> {
     let env = TestEnvironment::new("semantic_non_compilation")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     // Create events with only non-compilation commands
     let event1 = json!({
@@ -469,7 +469,7 @@ fn semantic_non_compilation_events() -> Result<()> {
 fn semantic_output_format() -> Result<()> {
     let env = TestEnvironment::new("semantic_output_format")?;
 
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     let event1 = json!({
         "pid": 12345,

@@ -8,14 +8,9 @@ license.workspace = true
 edition.workspace = true
 publish = false
 
-[features]
-# Feature to enable integration testing with locally built binaries from target directory
-allow-integration-tests = ["bear/allow-integration-tests", "intercept-preload/allow-integration-tests"]
-
 [dev-dependencies]
 bear = { path = "../bear" }
 intercept-preload = { path = "../intercept-preload" }
-intercept-wrapper = { path = "../intercept-wrapper" }
 tempfile.workspace = true
 anyhow.workspace = true
 assert_cmd.workspace = true
@@ -34,7 +29,6 @@ which.workspace = true
 [[test]]
 name = "integration"
 path = "tests/integration.rs"
-required-features = ["allow-integration-tests"]
 harness = true
 
 [lints.rust]

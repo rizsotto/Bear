@@ -51,7 +51,7 @@ fn simple_single_file_compilation() -> Result<()> {
     // Verify the entry contains expected information
     db.assert_contains(&compilation_entry!(
         file: "simple.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),
@@ -104,7 +104,7 @@ fn successful_build_multiple_sources() -> Result<()> {
     db.assert_count(4)?;
 
     // Verify entries for each source file
-    let temp_dir = env.temp_dir().to_str().unwrap();
+    let temp_dir = env.test_dir().to_str().unwrap();
 
     db.assert_contains(&compilation_entry!(
         file: "test1.c".to_string(),
@@ -301,7 +301,7 @@ fn broken_build_partial_success() -> Result<()> {
     // Should contain entry for valid compilation
     db.assert_contains(&compilation_entry!(
         file: "valid.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),
@@ -314,7 +314,7 @@ fn broken_build_partial_success() -> Result<()> {
     // Should also contain entry for failed compilation attempt
     db.assert_contains(&compilation_entry!(
         file: "invalid.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),
@@ -392,7 +392,7 @@ fn multiple_sources_single_command() -> Result<()> {
 
     db.assert_contains(&compilation_entry!(
         file: "src1.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),
@@ -401,7 +401,7 @@ fn multiple_sources_single_command() -> Result<()> {
     ))?;
     db.assert_contains(&compilation_entry!(
         file: "src2.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),
@@ -410,7 +410,7 @@ fn multiple_sources_single_command() -> Result<()> {
     ))?;
     db.assert_contains(&compilation_entry!(
         file: "src3.c".to_string(),
-        directory: env.temp_dir().to_str().unwrap().to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
             filename_of(COMPILER_C_PATH),
             "-c".to_string(),

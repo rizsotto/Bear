@@ -24,22 +24,21 @@ integration-tests/
 ## Running Integration Tests
 
 ### Prerequisites
-1. **Enable Feature Flag**: Integration tests require the `allow-integration-tests` feature
-2. **Build Dependencies**: Bear, intercept-preload, and intercept-wrapper must be built
+1. **Build Dependencies**: Bear, intercept-preload, and intercept-wrapper must be built
 
 ### Basic Test Execution
 ```bash
 # Build all dependencies first
-cargo build --features allow-integration-tests 
+cargo build
 
 # Run all integration tests
-cargo test --features allow-integration-tests
+cargo test
 
 # Run specific test file
-cargo test --features allow-integration-tests compilation_output
+cargo test compilation_output
 
 # Run specific test function
-cargo test --features allow-integration-tests test_basic_c_compilation
+cargo test test_basic_c_compilation
 ```
 
 ### Verbose Debugging
@@ -47,13 +46,13 @@ For debugging failing tests, use the verbose output system:
 
 ```bash
 # Automatic verbose output on test failure
-BEAR_TEST_VERBOSE=1 cargo test --features allow-integration-tests
+BEAR_TEST_VERBOSE=1 cargo test
 
 # Preserve test directories for manual inspection
-BEAR_TEST_PRESERVE_FAILURES=1 cargo test --features allow-integration-tests
+BEAR_TEST_PRESERVE_FAILURES=1 cargo test
 
 # Combine both for thorough debugging
-BEAR_TEST_VERBOSE=1 BEAR_TEST_PRESERVE_FAILURES=1 cargo test --features allow-integration-tests
+BEAR_TEST_VERBOSE=1 BEAR_TEST_PRESERVE_FAILURES=1 cargo test
 ```
 
 ## Writing New Tests
@@ -183,7 +182,6 @@ If your test requires external tools (compilers, build systems), check for avail
 
 The integration tests are designed to run in CI environments:
 
-- **Feature Flag**: Tests only run when explicitly enabled with `allow-integration-tests`
 - **Platform Detection**: Build script detects available tools and sets appropriate cfg flags
 - **Parallel Execution**: Tests use isolated temporary directories for safe parallel execution
 - **Error Reporting**: Verbose output provides detailed debugging information for CI failures

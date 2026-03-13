@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Bear executable path - only available when integration tests are enabled
-#[cfg(feature = "allow-integration-tests")]
 #[allow(dead_code)]
-pub const BEAR_EXECUTABLE_PATH: &str = env!("BEAR_EXECUTABLE_PATH");
+pub const DRIVER_EXECUTABLE_PATH: &str = env!("DRIVER_EXECUTABLE_PATH");
+#[allow(dead_code)]
+pub const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
+#[allow(dead_code)]
+pub const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
+
+#[allow(dead_code)]
+pub const DRIVER_EXECUTABLE: &str = env!("DRIVER_EXECUTABLE");
+#[allow(dead_code)]
+pub const WRAPPER_EXECUTABLE: &str = env!("WRAPPER_EXECUTABLE");
+#[allow(dead_code)]
+pub const PRELOAD_LIBRARY: &str = env!("PRELOAD_LIBRARY");
 
 #[cfg(has_executable_true)]
 #[allow(dead_code)]
@@ -62,11 +72,3 @@ pub const MKDIR_PATH: &str = env!("MKDIR_PATH");
 #[cfg(has_executable_rm)]
 #[allow(dead_code)]
 pub const RM_PATH: &str = env!("RM_PATH");
-
-// Intercept artifact paths - only available when integration tests are enabled
-#[cfg(feature = "allow-integration-tests")]
-#[allow(dead_code)]
-pub const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
-#[cfg(feature = "allow-integration-tests")]
-#[allow(dead_code)]
-pub const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");

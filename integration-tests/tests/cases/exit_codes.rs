@@ -4,7 +4,7 @@ use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::TestEnvironment;
 use anyhow::Result;
 #[cfg(has_executable_sleep)]
-use std::process::{Command as StdCommand, Stdio};
+use std::process::Stdio;
 #[cfg(has_executable_sleep)]
 use std::time::Instant;
 
@@ -97,8 +97,8 @@ fn exit_code_when_signaled() -> Result<()> {
     // And should terminate the child process and return immediately.
     let env = TestEnvironment::new("exit_code_when_signaled")?;
 
-    let mut cmd = StdCommand::new(BEAR_EXECUTABLE_PATH);
-    cmd.current_dir(env.temp_dir())
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
         .arg("--")
         .arg(SLEEP_PATH)
         .arg("10")

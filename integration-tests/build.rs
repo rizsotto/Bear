@@ -6,17 +6,17 @@
  * original bear/build.rs.
  */
 
-/// Bear executable name (platform-dependent)
+/// Driver executable name (platform-dependent)
 #[cfg(windows)]
-const BEAR_NAME: &str = "bear.exe";
+const DRIVER_NAME: &str = "bear-driver.exe";
 #[cfg(not(windows))]
-const BEAR_NAME: &str = "bear";
+const DRIVER_NAME: &str = "bear-driver";
 
 /// Wrapper executable name (platform-dependent)
 #[cfg(windows)]
-const WRAPPER_NAME: &str = "wrapper.exe";
+const WRAPPER_NAME: &str = "bear-wrapper.exe";
 #[cfg(not(windows))]
-const WRAPPER_NAME: &str = "wrapper";
+const WRAPPER_NAME: &str = "bear-wrapper";
 
 /// Preload library name (platform-dependent)
 #[cfg(target_os = "macos")]
@@ -25,12 +25,6 @@ const PRELOAD_NAME: &str = "libexec.dylib";
 const PRELOAD_NAME: &str = "libexec.so";
 
 fn main() {
-    // Set up paths for bear, wrapper and preload artifacts
-    let (bear_path, wrapper_path, preload_path) = find_intercept_artifacts();
-    println!("cargo:rustc-env=BEAR_EXECUTABLE_PATH={}", bear_path);
-    println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH={}", wrapper_path);
-    println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path);
-
     // Re-run build script if env changes
     println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
@@ -39,6 +33,15 @@ fn main() {
     // Re-run if bear or intercept-preload artifacts change
     println!("cargo:rerun-if-changed=../bear/src");
     println!("cargo:rerun-if-changed=../intercept-preload/src");
+
+    // Set up paths for driver, wrapper and preload artifacts
+    let (driver_path, wrapper_path, preload_path) = find_intercept_artifacts();
+    println!("cargo:rustc-env=DRIVER_EXECUTABLE={}", DRIVER_NAME);
+    println!("cargo:rustc-env=DRIVER_EXECUTABLE_PATH={}", driver_path);
+    println!("cargo:rustc-env=WRAPPER_EXECUTABLE={}", WRAPPER_NAME);
+    println!("cargo:rustc-env=WRAPPER_EXECUTABLE_PATH={}", wrapper_path);
+    println!("cargo:rustc-env=PRELOAD_LIBRARY={}", PRELOAD_NAME);
+    println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path);
 
     // Perform system checks for headers and symbols
     platform_checks::perform_system_checks();
@@ -75,12 +78,12 @@ fn find_intercept_artifacts() -> (String, String, String) {
         .nth(3) // Go up from out_dir to target/debug or target/release
         .unwrap();
 
-    let bear_path = target_dir.join(BEAR_NAME);
+    let driver_path = target_dir.join(DRIVER_NAME);
     let wrapper_path = target_dir.join(WRAPPER_NAME);
     let preload_path = target_dir.join(PRELOAD_NAME);
 
     (
-        format!("{}", bear_path.display()),
+        format!("{}", driver_path.display()),
         format!("{}", wrapper_path.display()),
         format!("{}", preload_path.display()),
     )

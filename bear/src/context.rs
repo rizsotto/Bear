@@ -62,6 +62,26 @@ impl Context {
     }
 }
 
+impl fmt::Display for Context {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Application Context:")?;
+        writeln!(f, "  Current Executable: {}", self.current_executable.display())?;
+        writeln!(f, "  Current Directory: {}", self.current_directory.display())?;
+        writeln!(f, "  Preload Supported: {}", self.preload_supported)?;
+        writeln!(f, "  Total Environment Variables: {} entries", self.environment.len())?;
+
+        // Display relevant environment variables by iterating directly
+        writeln!(f, "  Relevant Environment Variables:")?;
+        for (key, value) in &self.environment {
+            if environment::relevant_env(key) {
+                writeln!(f, "    {}={}", key, value)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Check if preload-based interception is supported on the current platform.
 ///
 /// Returns false if:
@@ -107,26 +127,6 @@ fn is_sip_enabled() -> bool {
             // than to unnecessarily force wrapper mode
             false
         }
-    }
-}
-
-impl fmt::Display for Context {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Application Context:")?;
-        writeln!(f, "Current Executable: {}", self.current_executable.display())?;
-        writeln!(f, "Current Directory: {}", self.current_directory.display())?;
-        writeln!(f, "Preload Supported: {}", self.preload_supported)?;
-        writeln!(f, "Total Environment Variables: {} entries", self.environment.len())?;
-
-        // Display relevant environment variables by iterating directly
-        writeln!(f, "Relevant Environment Variables:")?;
-        for (key, value) in &self.environment {
-            if environment::relevant_env(key) {
-                writeln!(f, "  {}={}", key, value)?;
-            }
-        }
-
-        Ok(())
     }
 }
 

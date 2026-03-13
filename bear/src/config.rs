@@ -17,7 +17,7 @@
 //! 5. The configuration directory of the application
 //!
 //! ```yaml
-//! schema: 4.0
+//! schema: 4.1
 //!
 //! intercept:
 //!   mode: wrapper
@@ -49,7 +49,7 @@
 //! ```
 //!
 //! ```yaml
-//! schema: 4.0
+//! schema: 4.1
 //!
 //! intercept:
 //!   mode: preload
@@ -125,27 +125,21 @@ mod types {
     #[serde(tag = "mode")]
     pub enum Intercept {
         #[serde(rename = "wrapper")]
-        Wrapper {
-            #[serde(default = "default_wrapper_executable")]
-            path: PathBuf,
-        },
+        Wrapper,
         #[serde(rename = "preload")]
-        Preload {
-            #[serde(default = "default_preload_library")]
-            path: PathBuf,
-        },
+        Preload,
     }
 
     /// The default intercept mode is varying based on the target operating system.
     impl Default for Intercept {
-        #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
-        fn default() -> Self {
-            Intercept::Preload { path: default_preload_library() }
-        }
-
         #[cfg(any(target_os = "macos", target_os = "ios", target_os = "windows"))]
         fn default() -> Self {
-            Intercept::Wrapper { path: default_wrapper_executable() }
+            Intercept::Wrapper
+        }
+
+        #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "windows")))]
+        fn default() -> Self {
+            Intercept::Preload
         }
     }
 
@@ -310,19 +304,7 @@ mod types {
         }
     }
 
-    const SUPPORTED_SCHEMA_VERSION: &str = "4.0";
-    const PRELOAD_LIBRARY_PATH: &str = env!("PRELOAD_LIBRARY_PATH");
-    const WRAPPER_EXECUTABLE_PATH: &str = env!("WRAPPER_EXECUTABLE_PATH");
-
-    /// The default path to the wrapper executable.
-    pub(super) fn default_wrapper_executable() -> PathBuf {
-        PathBuf::from(WRAPPER_EXECUTABLE_PATH)
-    }
-
-    /// The default path to the shared library that will be preloaded.
-    pub(super) fn default_preload_library() -> PathBuf {
-        PathBuf::from(PRELOAD_LIBRARY_PATH)
-    }
+    const SUPPORTED_SCHEMA_VERSION: &str = "4.1";
 
     fn default_enabled() -> bool {
         true
@@ -415,9 +397,6 @@ pub mod validation {
         fn validate(config: &Main) -> Result<(), Self::Error> {
             let mut collector = ValidationCollector::new();
 
-            // Validate intercept configuration
-            collector.add_result(Intercept::validate(&config.intercept));
-
             // Validate each compiler configuration
             for compiler in config.compilers.iter() {
                 collector.add_result(Compiler::validate(compiler));
@@ -441,29 +420,6 @@ pub mod validation {
             collector.add_result(PathFormat::validate(&config.format.paths));
 
             collector.finish()
-        }
-    }
-
-    impl Validator<Intercept> for Intercept {
-        type Error = ValidationError;
-
-        fn validate(config: &Intercept) -> Result<(), Self::Error> {
-            match config {
-                Intercept::Wrapper { path } => {
-                    if !path.exists() {
-                        Err(ValidationError::PathNotFound { path: path.display().to_string() })
-                    } else {
-                        Ok(())
-                    }
-                }
-                Intercept::Preload { path } => {
-                    if !path.exists() {
-                        Err(ValidationError::PathNotFound { path: path.display().to_string() })
-                    } else {
-                        Ok(())
-                    }
-                }
-            }
         }
     }
 
@@ -551,31 +507,6 @@ pub mod validation {
     mod tests {
         use super::*;
         use std::path::PathBuf;
-        use tempfile::TempDir;
-
-        #[test]
-        fn test_validate_intercept_wrapper_valid_paths() {
-            let temp_dir = TempDir::new().unwrap();
-            let temp_file = temp_dir.path().join("test_file");
-            std::fs::write(&temp_file, "test").unwrap();
-
-            let config = Intercept::Wrapper { path: temp_file };
-
-            assert!(Intercept::validate(&config).is_ok());
-        }
-
-        #[test]
-        fn test_validate_intercept_wrapper_invalid_paths() {
-            let config = Intercept::Wrapper { path: PathBuf::from("/nonexistent/path") };
-
-            let result = Intercept::validate(&config);
-            assert!(result.is_err());
-
-            match result.unwrap_err() {
-                ValidationError::PathNotFound { .. } => {}
-                _ => panic!("Expected PathNotFound validation error"),
-            }
-        }
 
         #[test]
         fn test_validate_compiler_invalid_path() {
@@ -903,11 +834,10 @@ pub mod loader {
         #[test]
         fn test_wrapper_config() {
             let content: &[u8] = br#"
-            schema: 4.0
+            schema: 4.1
 
             intercept:
                 mode: wrapper
-                path: /usr/local/libexec/bear/wrapper
 
             compilers:
               - path: /usr/local/bin/cc
@@ -941,8 +871,8 @@ pub mod loader {
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
-                schema: String::from("4.0"),
-                intercept: Intercept::Wrapper { path: PathBuf::from("/usr/local/libexec/bear/wrapper") },
+                schema: String::from("4.1"),
+                intercept: Intercept::Wrapper,
                 compilers: vec![
                     Compiler {
                         path: PathBuf::from("/usr/local/bin/cc"),
@@ -977,7 +907,7 @@ pub mod loader {
         #[test]
         fn test_incomplete_wrapper_config() {
             let content: &[u8] = br#"
-            schema: 4.0
+            schema: 4.1
 
             intercept:
               mode: wrapper
@@ -991,8 +921,8 @@ pub mod loader {
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
-                schema: String::from("4.0"),
-                intercept: Intercept::Wrapper { path: default_wrapper_executable() },
+                schema: String::from("4.1"),
+                intercept: Intercept::Wrapper,
                 compilers: vec![],
                 sources: SourceFilter { directories: vec![] },
                 duplicates: DuplicateFilter {
@@ -1010,7 +940,7 @@ pub mod loader {
         #[test]
         fn test_incomplete_preload_config() {
             let content: &[u8] = br#"
-            schema: 4.0
+            schema: 4.1
 
             intercept:
               mode: preload
@@ -1023,8 +953,8 @@ pub mod loader {
             let result = Loader::from_reader(content).unwrap();
 
             let expected = Main {
-                schema: String::from("4.0"),
-                intercept: Intercept::Preload { path: default_preload_library() },
+                schema: String::from("4.1"),
+                intercept: Intercept::Preload,
                 compilers: vec![],
                 sources: SourceFilter { directories: vec![] },
                 duplicates: DuplicateFilter {
@@ -1044,7 +974,7 @@ pub mod loader {
             let result = Main::default();
 
             let expected = Main {
-                schema: String::from("4.0"),
+                schema: String::from("4.1"),
                 intercept: Intercept::default(),
                 compilers: vec![],
                 sources: SourceFilter::default(),
@@ -1070,7 +1000,7 @@ pub mod loader {
             assert!(result.is_err());
 
             let message = result.unwrap_err().to_string();
-            assert_eq!("Unsupported schema version: 3.0. Expected: 4.0 at line 2 column 13", message);
+            assert_eq!("Unsupported schema version: 3.0. Expected: 4.1 at line 2 column 13", message);
         }
 
         #[test]
@@ -1099,7 +1029,7 @@ pub mod loader {
             let config_file = temp_dir.path().join("bear.yml");
 
             let invalid_config = r#"
-            schema: "4.0"
+            schema: "4.1"
 
             intercept:
                 mode: wrapper
@@ -1193,7 +1123,7 @@ pub mod loader {
 
             let config_with_hints = format!(
                 r#"
-                schema: "4.0"
+                schema: "4.1"
 
                 intercept:
                     mode: wrapper

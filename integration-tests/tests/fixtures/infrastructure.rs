@@ -55,13 +55,83 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 use tempfile;
 
+/// Install environment for Bear
+pub struct InstallEnvironment {
+    #[allow(dead_code)]
+    install_dir: tempfile::TempDir,
+    #[allow(dead_code)]
+    bin_dir: tempfile::TempDir,
+    bear: PathBuf,
+}
+
+impl InstallEnvironment {
+    pub fn new() -> Result<Self> {
+        let install_dir = tempfile::TempDir::new().with_context(|| "install dir tempdir failed")?;
+        let bin_dir = tempfile::TempDir::new().with_context(|| "bin dir tempdir failed")?;
+
+        let driver = Self::prepare_install_dir(install_dir.path())?;
+        let bear = Self::prepare_entry_script(bin_dir.path(), &driver)?;
+
+        Ok(Self { install_dir, bin_dir, bear })
+    }
+
+    fn prepare_install_dir(path: &Path) -> Result<PathBuf> {
+        let bin_dir = path.join("bin");
+        std::fs::create_dir(&bin_dir).with_context(|| format!("create dir={:?}", &bin_dir))?;
+
+        let driver = &bin_dir.join(DRIVER_EXECUTABLE);
+        std::fs::copy(DRIVER_EXECUTABLE_PATH, driver)
+            .with_context(|| format!("copy from={}, to={:?}", DRIVER_EXECUTABLE_PATH, &driver))?;
+
+        let wrapper = &bin_dir.join(WRAPPER_EXECUTABLE);
+        std::fs::copy(WRAPPER_EXECUTABLE_PATH, wrapper)
+            .with_context(|| format!("copy from={}, to={:?}", WRAPPER_EXECUTABLE_PATH, &wrapper))?;
+
+        let lib_dir = path.join("lib64");
+        std::fs::create_dir(&lib_dir).with_context(|| format!("create dir={:?}", &lib_dir))?;
+
+        let library = &lib_dir.join(PRELOAD_LIBRARY);
+        std::fs::copy(PRELOAD_LIBRARY_PATH, library)
+            .with_context(|| format!("copy from={}, to={:?}", PRELOAD_LIBRARY_PATH, &library))?;
+
+        Ok(bin_dir.join(env!("DRIVER_EXECUTABLE")))
+    }
+
+    #[cfg(unix)]
+    fn prepare_entry_script(path: &Path, driver: &Path) -> Result<PathBuf> {
+        let file = path.join("bear");
+        let script = format!("#!/usr/bin/sh\n{driver:?} $@\n");
+
+        std::fs::write(&file, script).with_context(|| format!("writing file={:?}", &file))?;
+
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        Ok(file)
+    }
+
+    #[cfg(not(unix))]
+    fn prepare_entry_script(path: &Path, driver: &Path) -> Result<PathBuf> {
+        let file = path.join("bear.bat");
+        let script = format!("@echo off\r\n{driver:?} %*\r\n");
+
+        std::fs::write(&file, script).with_context(|| "writing the script failed")?;
+
+        Ok(file)
+    }
+
+    pub fn path(&self) -> &Path {
+        self.bear.as_path()
+    }
+}
+
 /// Test environment for Bear integration tests
 ///
 /// Manages temporary directories, file setup, and cleanup with
 /// debugging preservation on test failure.
-#[derive(Debug)]
 pub struct TestEnvironment {
-    temp_dir: tempfile::TempDir,
+    install: InstallEnvironment,
+    test_dir: tempfile::TempDir,
     test_name: String,
     preserve_on_failure: bool,
     verbose: bool,
@@ -71,7 +141,9 @@ pub struct TestEnvironment {
 impl TestEnvironment {
     /// Create a new test environment
     pub fn new(test_name: &str) -> Result<Self> {
-        let temp_dir = tempfile::TempDir::new()
+        let install = InstallEnvironment::new()?;
+
+        let test_dir = tempfile::TempDir::new()
             .with_context(|| format!("Failed to create temp dir for test: {}", test_name))?;
 
         let preserve_on_failure = std::env::var("BEAR_TEST_PRESERVE_FAILURES")
@@ -83,7 +155,8 @@ impl TestEnvironment {
             .unwrap_or(false);
 
         Ok(Self {
-            temp_dir,
+            install,
+            test_dir,
             test_name: test_name.to_string(),
             preserve_on_failure,
             verbose,
@@ -94,7 +167,9 @@ impl TestEnvironment {
     /// Create a new test environment with explicit verbose setting
     #[allow(dead_code)]
     pub fn new_with_verbose(test_name: &str) -> Result<Self> {
-        let temp_dir = tempfile::TempDir::new()
+        let install = InstallEnvironment::new()?;
+
+        let test_dir = tempfile::TempDir::new()
             .with_context(|| format!("Failed to create temp dir for test: {}", test_name))?;
 
         let preserve_on_failure = std::env::var("BEAR_TEST_PRESERVE_FAILURES")
@@ -102,7 +177,8 @@ impl TestEnvironment {
             .unwrap_or(false);
 
         Ok(Self {
-            temp_dir,
+            install,
+            test_dir,
             test_name: test_name.to_string(),
             preserve_on_failure,
             verbose: true,
@@ -111,14 +187,14 @@ impl TestEnvironment {
     }
 
     /// Get the temporary directory path
-    pub fn temp_dir(&self) -> &Path {
-        self.temp_dir.path()
+    pub fn test_dir(&self) -> &Path {
+        self.test_dir.path()
     }
 
     /// Create source files in the test directory
     pub fn create_source_files(&self, files: &[(&str, &str)]) -> Result<()> {
         for (path, content) in files {
-            let file_path = self.temp_dir().join(path);
+            let file_path = self.test_dir().join(path);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent)
                     .with_context(|| format!("Failed to create directory: {:?}", parent))?;
@@ -131,7 +207,7 @@ impl TestEnvironment {
     /// Create a build script in the test directory
     #[allow(dead_code)]
     pub fn create_build_script(&self, script_name: &str, content: &str) -> Result<PathBuf> {
-        let script_path = self.temp_dir().join(script_name);
+        let script_path = self.test_dir().join(script_name);
         fs::write(&script_path, content)?;
 
         // Make executable on Unix systems
@@ -174,7 +250,7 @@ impl TestEnvironment {
         content: &str,
         encoding: &'static encoding_rs::Encoding,
     ) -> Result<PathBuf> {
-        let script_path = self.temp_dir().join(script_name);
+        let script_path = self.test_dir().join(script_name);
 
         // Encode content using the specified encoding
         let (encoded_bytes, _, had_errors) = encoding.encode(content);
@@ -216,7 +292,7 @@ impl TestEnvironment {
     /// Create a Makefile in the test directory
     #[allow(dead_code)]
     pub fn create_makefile(&self, makefile_name: &str, content: &str) -> Result<PathBuf> {
-        let makefile_path = self.temp_dir().join(makefile_name);
+        let makefile_path = self.test_dir().join(makefile_name);
         fs::write(&makefile_path, content)?;
         Ok(makefile_path)
     }
@@ -224,20 +300,25 @@ impl TestEnvironment {
     /// Create a configuration file (YAML format)
     #[allow(dead_code)]
     pub fn create_config(&self, config_yaml: &str) -> Result<PathBuf> {
-        let config_path = self.temp_dir().join("config.yml");
+        let config_path = self.test_dir().join("config.yml");
         fs::write(&config_path, config_yaml)?;
         Ok(config_path)
     }
 
+    #[allow(dead_code)]
+    pub fn command_bear(&self) -> std::process::Command {
+        std::process::Command::new(self.install.path())
+    }
+
     /// Run bear with the given arguments
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
-        let mut cmd = Command::new(BEAR_EXECUTABLE_PATH);
-        cmd.current_dir(self.temp_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args(args);
+        let mut cmd = Command::new(self.install.path());
+        cmd.current_dir(self.test_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args(args);
 
         let output = cmd.output()?;
 
         let bear_output =
-            BearOutput { output, temp_dir: self.temp_dir().to_path_buf(), verbose: self.verbose };
+            BearOutput { output, temp_dir: self.test_dir().to_path_buf(), verbose: self.verbose };
 
         // Store the output for potential later display
         *self.last_bear_output.borrow_mut() = Some(bear_output.clone());
@@ -281,7 +362,7 @@ impl TestEnvironment {
     #[cfg(has_executable_compiler_c)]
     pub fn run_c_compiler(&self, output_name: &str, source_files: &[&str]) -> Result<PathBuf> {
         let mut cmd = std::process::Command::new(COMPILER_C_PATH);
-        cmd.current_dir(self.temp_dir());
+        cmd.current_dir(self.test_dir());
 
         // Add output flag
         cmd.arg("-o").arg(output_name);
@@ -309,27 +390,27 @@ impl TestEnvironment {
         let executable_name =
             if cfg!(windows) { format!("{}.exe", output_name) } else { output_name.to_string() };
 
-        let executable_path = self.temp_dir().join(executable_name);
+        let executable_path = self.test_dir().join(executable_name);
         Ok(executable_path)
     }
 
     /// Check if a file exists in the test directory
     #[allow(dead_code)]
     pub fn file_exists(&self, path: &str) -> bool {
-        self.temp_dir().join(path).exists()
+        self.test_dir().join(path).exists()
     }
 
     /// Read file content from test directory
     #[allow(dead_code)]
     pub fn read_file(&self, path: &str) -> Result<String> {
-        let file_path = self.temp_dir().join(path);
+        let file_path = self.test_dir().join(path);
         fs::read_to_string(&file_path).with_context(|| format!("Failed to read file: {}", path))
     }
 
     /// Load compilation database from file
     #[allow(dead_code)]
     pub fn load_compilation_database(&self, path: &str) -> Result<CompilationDatabase> {
-        let db_path = self.temp_dir().join(path);
+        let db_path = self.test_dir().join(path);
         let content = fs::read_to_string(&db_path)
             .with_context(|| format!("Failed to read compilation database: {:?}", db_path))?;
 
@@ -346,7 +427,7 @@ impl TestEnvironment {
     /// Load intercept events file
     #[allow(dead_code)]
     pub fn load_events_file(&self, path: &str) -> Result<InterceptEvents> {
-        let events_path = self.temp_dir().join(path);
+        let events_path = self.test_dir().join(path);
         let content = fs::read_to_string(&events_path)
             .with_context(|| format!("Failed to read events file: {:?}", events_path))?;
 
@@ -383,7 +464,7 @@ impl TestEnvironment {
         if self.preserve_on_failure && std::thread::panicking() {
             let preserve_dir = format!("/tmp/bear-test-{}-{}", self.test_name, std::process::id());
 
-            if let Err(e) = fs::rename(self.temp_dir(), &preserve_dir) {
+            if let Err(e) = fs::rename(self.test_dir(), &preserve_dir) {
                 eprintln!("Failed to preserve test directory: {}", e);
             } else {
                 eprintln!("Test failed. Directory preserved at: {}", preserve_dir);
@@ -1043,7 +1124,7 @@ mod tests {
     #[test]
     fn environment_creation() -> Result<()> {
         let env = TestEnvironment::new("test_creation")?;
-        assert!(env.temp_dir().exists());
+        assert!(env.test_dir().exists());
         Ok(())
     }
 
@@ -1055,8 +1136,8 @@ mod tests {
             ("subdir/test.h", "#pragma once"),
         ])?;
 
-        assert!(env.temp_dir().join("test.c").exists());
-        assert!(env.temp_dir().join("subdir/test.h").exists());
+        assert!(env.test_dir().join("test.c").exists());
+        assert!(env.test_dir().join("subdir/test.h").exists());
         Ok(())
     }
 
@@ -1187,7 +1268,7 @@ int main() {
 
         // Verify the executable actually works by running it
         let output = std::process::Command::new(&executable_path)
-            .current_dir(env.temp_dir())
+            .current_dir(env.test_dir())
             .output()
             .expect("Failed to run compiled executable");
 

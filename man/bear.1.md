@@ -107,7 +107,7 @@ Bear uses a YAML configuration file to control its behavior. The configuration f
 ## Configuration Schema
 
 ```yaml
-schema: "4.0"
+schema: "4.1"
 intercept:
   mode: wrapper
 compilers:
@@ -151,7 +151,6 @@ The configuration file uses schema version `4.0` and has the following structure
 Controls the command interception method:
 
 - **mode**: `preload` (Unix) or `wrapper` (cross-platform)
-- **path**: Path to the preload library or wrapper executable (depending on the mode)
 
 ### compilers
 

@@ -51,8 +51,8 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
       - name: Run integration tests
         run: |
-          cargo build --verbose --features allow-integration-tests
-          cargo test --verbose --features allow-integration-tests
+          cargo build --verbose
+          cargo test --verbose
         env:
           BEAR_TEST_VERBOSE: 1
 

@@ -26,7 +26,7 @@ fn basic_config_loading() -> Result<()> {
     // Create basic valid config
     let config = format!(
         r#"
-schema: "4.0"
+schema: "4.1"
 
 intercept:
   mode: preload
@@ -43,7 +43,7 @@ format:
         PRELOAD_LIBRARY_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     // Run bear with config
@@ -66,7 +66,7 @@ format:
 
     let matcher = CompilationEntryMatcher::new()
         .file("test.c")
-        .directory(env.temp_dir().to_str().unwrap())
+        .directory(env.test_dir().to_str().unwrap())
         .arguments(expected_args);
 
     db.assert_contains(&matcher)?;
@@ -94,7 +94,7 @@ fn compiler_ignore_config() -> Result<()> {
     // Create config that ignores the C++ compiler
     let config = format!(
         r#"
-schema: "4.0"
+schema: "4.1"
 
 intercept:
   mode: preload
@@ -111,7 +111,7 @@ sources:
         cxx = COMPILER_CXX_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     // Run bear with config
@@ -134,7 +134,7 @@ sources:
 
     let matcher = CompilationEntryMatcher::new()
         .file("source.c")
-        .directory(env.temp_dir().to_str().unwrap())
+        .directory(env.test_dir().to_str().unwrap())
         .arguments(expected_args);
 
     db.assert_contains(&matcher)?;
@@ -162,7 +162,7 @@ fn source_file_filtering() -> Result<()> {
     // Config to include only existing source files
     let config = format!(
         r#"
-schema: "4.0"
+schema: "4.1"
 
 intercept:
   mode: preload
@@ -174,7 +174,7 @@ sources:
         PRELOAD_LIBRARY_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     let _output = env.run_bear_success(&[
@@ -195,7 +195,7 @@ sources:
 
     let matcher = CompilationEntryMatcher::new()
         .file("existing.c")
-        .directory(env.temp_dir().to_str().unwrap())
+        .directory(env.test_dir().to_str().unwrap())
         .arguments(expected_args);
 
     db.assert_contains(&matcher)?;
@@ -219,7 +219,7 @@ fn path_format_config() -> Result<()> {
     // Test absolute path format
     let config = format!(
         r#"
-schema: "4.0"
+schema: "4.1"
 
 intercept:
   mode: preload
@@ -236,7 +236,7 @@ sources:
         PRELOAD_LIBRARY_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     let _output = env.run_bear_success(&[
@@ -255,7 +255,7 @@ sources:
 
     // Verify the entry contains the expected compilation command
     // When absolute path format is used, the source file argument is also absolute
-    let src_dir = env.temp_dir().join("src");
+    let src_dir = env.test_dir().join("src");
     let absolute_src_dir = src_dir.canonicalize().unwrap_or_else(|_| src_dir.clone());
     let absolute_file_path = absolute_src_dir.join("main.c");
 
@@ -288,7 +288,7 @@ fn invalid_config_handling() -> Result<()> {
 
     // Create invalid YAML config
     let invalid_config = "{ invalid yaml content }";
-    let config_path = env.temp_dir().join("invalid_config.yaml");
+    let config_path = env.test_dir().join("invalid_config.yaml");
     std::fs::write(&config_path, invalid_config)?;
 
     let build_commands = format!("{} -c test.c", COMPILER_C_PATH);
@@ -334,7 +334,7 @@ sources:
         PRELOAD_LIBRARY_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     let build_commands = format!("{} -c test.c", COMPILER_C_PATH);
@@ -375,7 +375,7 @@ fn duplicate_filter_config() -> Result<()> {
     // Config with duplicate filtering
     let config = format!(
         r#"
-schema: "4.0"
+schema: "4.1"
 
 intercept:
   mode: preload
@@ -390,7 +390,7 @@ sources:
         PRELOAD_LIBRARY_PATH
     );
 
-    let config_path = env.temp_dir().join("config.yaml");
+    let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     let _output = env.run_bear_success(&[

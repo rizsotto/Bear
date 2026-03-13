@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use bear::{args, config, context, modes};
+use bear::{args, config, context, installation, modes};
 use std::env;
 use std::process::ExitCode;
 
@@ -20,6 +20,9 @@ fn main() -> anyhow::Result<ExitCode> {
     // Capture application context.
     let context = context::Context::capture()?;
     log::info!("{context}");
+    // Log the installation layout derived from the current executable.
+    let layout = installation::InstallationLayout::try_from(context.current_executable.as_path())?;
+    log::info!("{layout}");
     // Parse the command line arguments.
     let matches = args::cli().get_matches();
     let arguments = args::Arguments::try_from(matches)?;

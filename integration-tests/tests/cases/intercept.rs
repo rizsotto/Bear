@@ -138,7 +138,7 @@ fn parallel_command_interception() -> Result<()> {
         format!("{} -c test_2.c &", filename_of(COMPILER_C_PATH)),
         format!("{} -c test_3.c &", filename_of(COMPILER_C_PATH)),
         format!("{} -c test_4.c &", filename_of(COMPILER_C_PATH)),
-        format!("wait"),
+        "wait".to_string(),
     ]
     .join("\n");
     let script_path = env.create_shell_script("parallel_build.sh", &build_commands)?;

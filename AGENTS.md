@@ -10,9 +10,8 @@ It is intended for developers who need to integrate clang-based tools with their
 - Run linter to ensure the code passes all linter checks.
 
 ### Development Workflow
-- Build the project: `cargo build --verbose --features allow-integration-tests`
-- Run unit tests: `cargo test`
-- Run integration tests: `cargo test --features allow-integration-tests`
+- Build the project: `cargo build --verbose`
+- Run unit and integration tests: `cargo test`
 - Run the linter: `cargo clippy --all-targets -- -D warnings`
 
 ## Repository Structure
