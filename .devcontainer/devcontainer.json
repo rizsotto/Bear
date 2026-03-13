@@ -1,0 +1,41 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/rust
+{
+  "name": "BearDevEnv",
+  "build": {
+    "dockerfile": "Dockerfile",
+  },
+
+  // Override the automatic workspace mount to add the :z SELinux relabel option.
+  // This is required on Fedora/RHEL hosts where SELinux is enforcing, otherwise
+  // the bind-mounted directory is inaccessible inside the container.
+  "workspaceFolder": "/workspaces/Bear",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/Bear,type=bind,z=true",
+
+  "mounts": [
+    // Make the cargo registry persistent across container rebuilds.
+    "source=devcontainer-cargo-cache-${devcontainerId},target=/usr/local/cargo,type=volume",
+    // Forward the SSH agent socket from the host so SSH keys are available
+    // inside the container for commit signing and remote operations.
+    // Requires the SSH agent to be running on the host: eval $(ssh-agent) && ssh-add
+    "source=${localEnv:SSH_AUTH_SOCK},target=/ssh-agent,type=bind",
+    "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,readonly=true,z=true",
+    // Mount the host gitconfig (read-only) so git user identity, signing key,
+    // and gpg/ssh signing settings are inherited inside the container.
+    "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,readonly=true,z=true",
+  ],
+
+  // Point git at the forwarded SSH agent socket.
+  "remoteEnv": {
+    "SSH_AUTH_SOCK": "/ssh-agent",
+  },
+
+  // In rootless Docker on Fedora/RHEL, container uid=0 (root) maps to the host
+  // user's uid (laca, uid=1000). Running as root inside the container is therefore
+  // safe and ensures the mounted project files are writable.
+  "remoteUser": "root",
+  "containerUser": "root",
+
+  // Verify the Rust toolchain is available after the container is created.
+  "postCreateCommand": "rustc --version && cargo --version",
+}
