@@ -32,7 +32,7 @@ fi
 # Resolve to absolute path
 DESTDIR="$(cd "$DESTDIR" 2>/dev/null && pwd || echo "$DESTDIR")"
 
-INTERCEPT_LIBDIR="${INTERCEPT_LIBDIR:-lib}"
+INTERCEPT_LIBDIR="${INTERCEPT_LIBDIR-lib}"
 
 MANIFEST="$DESTDIR/share/bear/install-manifest.txt"
 
@@ -43,6 +43,21 @@ refuse_root_destdir() {
         echo "error: refusing to operate with DESTDIR=/ (would clobber the root filesystem)" >&2
         exit 1
     fi
+}
+
+validate_intercept_libdir() {
+    # Reject empty or whitespace-only values
+    if [ -z "$(echo "$INTERCEPT_LIBDIR" | tr -d '[:space:]')" ]; then
+        echo "error: INTERCEPT_LIBDIR must not be empty or whitespace-only" >&2
+        exit 1
+    fi
+    # Reject absolute paths
+    case "$INTERCEPT_LIBDIR" in
+        /*)
+            echo "error: INTERCEPT_LIBDIR must be a relative path, got: $INTERCEPT_LIBDIR" >&2
+            exit 1
+            ;;
+    esac
 }
 
 # --- artifact discovery -------------------------------------------------------
@@ -91,6 +106,7 @@ detect_platform() {
 
 do_install() {
     refuse_root_destdir
+    validate_intercept_libdir
     detect_platform
 
     SOURCE_DIR="$(find_source_dir)"
@@ -151,6 +167,7 @@ ENTRY_SCRIPT
 
 do_uninstall() {
     refuse_root_destdir
+    validate_intercept_libdir
 
     if [ ! -f "$MANIFEST" ]; then
         echo "error: no install manifest found at $MANIFEST" >&2
