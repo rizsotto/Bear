@@ -29,6 +29,11 @@ fn main() {
     println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=CARGO_TARGET_DIR");
     println!("cargo:rerun-if-env-changed=PROFILE");
+    println!("cargo:rerun-if-env-changed=INTERCEPT_LIBDIR");
+
+    // Forward INTERCEPT_LIBDIR so integration tests use the same value as bear-driver
+    let intercept_libdir = std::env::var("INTERCEPT_LIBDIR").unwrap_or_else(|_| "lib".to_string());
+    println!("cargo:rustc-env=INTERCEPT_LIBDIR={}", intercept_libdir);
 
     // Re-run if bear or intercept-preload artifacts change
     println!("cargo:rerun-if-changed=../bear/src");

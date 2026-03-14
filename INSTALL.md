@@ -56,18 +56,19 @@ To build and install Bear, run the following commands:
    sudo install -m 755 target/release/bear $TARGET_DIR/bin
    ```
 
-To install the preload library, you need to determine the directory the dynamic
-linker uses to resolve the `$LIB` symbol. You can find more information about
-this in the `ld.so` man page (`man ld.so`).
+To install the preload library, you need to determine the library directory name
+for your system. Set `INTERCEPT_LIBDIR` to the appropriate value. On glibc-based
+Linux, the special value `$LIB` can be used (the dynamic linker expands it at
+runtime — see `man ld.so`). On other platforms, use a concrete directory name.
 
    ```bash
    # For RedHat, Fedora, Arch based systems
-   export LIBRARY_DIR=lib64
+   export INTERCEPT_LIBDIR=lib64
    # For Debian, Ubuntu based systems
-   export LIBRARY_DIR=lib/x86_64-linux-gnu
+   export INTERCEPT_LIBDIR=lib/x86_64-linux-gnu
 
-   sudo mkdir -p $SHARE_DIR/bear/$LIBRARY_DIR
-   sudo install -m 755 target/release/libexec.so $SHARE_DIR/bear/$LIBRARY_DIR
+   sudo mkdir -p $SHARE_DIR/bear/$INTERCEPT_LIBDIR
+   sudo install -m 755 target/release/libexec.so $SHARE_DIR/bear/$INTERCEPT_LIBDIR
    ```
 
 # How to package
@@ -85,8 +86,9 @@ things you might want to know:
 - The final install should look like this. Where `bear` is a shell script,
   and the only program that uses absolute path to call `bear-driver`. The
   `bear-driver` is referencing `bear-wrapper` or `libexec.so` with relative
-  path. (Using `./bear-wrapper` and `../$LIB/libexec.so` to reach these files.)
-  This allows the installation process to choose the destination directory.
+  path. (Using `./bear-wrapper` and `../$INTERCEPT_LIBDIR/libexec.so` to reach
+  these files.) This allows the installation process to choose the destination
+  directory.
 
    ```bash
    $ tree /usr/local
@@ -105,6 +107,7 @@ things you might want to know:
                └── bear-wrapper
    ```
 
-- The preload library path contains a `$LIB` string, which the dynamic linker
-  understands and resolves. This is useful in a multilib context. Consult the
-  `ld.so` man page (`man ld.so`) for details.
+- The preload library path contains the value of `INTERCEPT_LIBDIR` (set at
+  build time, defaults to `lib`). On glibc-based Linux, packagers can set this
+  to `$LIB` so the dynamic linker resolves it at runtime — useful in a multilib
+  context. Consult the `ld.so` man page (`man ld.so`) for details.

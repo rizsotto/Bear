@@ -87,7 +87,7 @@ impl InstallEnvironment {
         std::fs::copy(WRAPPER_EXECUTABLE_PATH, wrapper)
             .with_context(|| format!("copy from={}, to={:?}", WRAPPER_EXECUTABLE_PATH, &wrapper))?;
 
-        let lib_dir = path.join("lib64");
+        let lib_dir = path.join(env!("INTERCEPT_LIBDIR"));
         std::fs::create_dir(&lib_dir).with_context(|| format!("create dir={:?}", &lib_dir))?;
 
         let library = &lib_dir.join(PRELOAD_LIBRARY);

@@ -568,31 +568,25 @@ mod test {
             BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
         };
 
+        let libdir = env!("INTERCEPT_LIBDIR");
+        let preload_name = env!("PRELOAD_NAME");
+        let expected_library = format!("/usr/{libdir}/{preload_name}");
+        let expected_state = format!(r#"{{"destination":"127.0.0.1:8080","library":"{expected_library}"}}"#);
+
         // Check platform-specific preload configuration
         #[cfg(target_os = "macos")]
         {
-            // Check that destination is set
-            assert_eq!(
-                sut.environment_overrides.get(KEY_INTERCEPT_STATE),
-                Some(&r#"{"destination":"127.0.0.1:8080","library":"/usr/$LIB/libexec.dylib"}"#.to_string())
-            );
-            // Check that DYLD_INSERT_LIBRARIES contains our library
+            assert_eq!(sut.environment_overrides.get(KEY_INTERCEPT_STATE), Some(&expected_state));
             let dyld_preload = sut.environment_overrides.get(KEY_OS__MACOS_PRELOAD_PATH).unwrap();
-            assert_first_path_entry("/usr/$LIB/libexec.dylib", dyld_preload);
+            assert_first_path_entry(&expected_library, dyld_preload);
 
-            // Check that DYLD_FORCE_FLAT_NAMESPACE is set to "1"
             assert_eq!(sut.environment_overrides.get(KEY_OS__MACOS_FLAT_NAMESPACE), Some(&"1".to_string()));
         }
         #[cfg(not(target_os = "macos"))]
         {
-            // Check that destination is set
-            assert_eq!(
-                sut.environment_overrides.get(KEY_INTERCEPT_STATE),
-                Some(&r#"{"destination":"127.0.0.1:8080","library":"/usr/$LIB/libexec.so"}"#.to_string())
-            );
-            // Check that LD_PRELOAD contains our library
+            assert_eq!(sut.environment_overrides.get(KEY_INTERCEPT_STATE), Some(&expected_state));
             let ld_preload = sut.environment_overrides.get(KEY_OS__PRELOAD_PATH).unwrap();
-            assert_first_path_entry("/usr/$LIB/libexec.so", ld_preload);
+            assert_first_path_entry(&expected_library, ld_preload);
         }
 
         assert!(sut._wrapper_directory.is_none());

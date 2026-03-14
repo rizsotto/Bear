@@ -16,16 +16,16 @@
 //!     ├── bin/
 //!     │   ├── bear-driver     ← current_executable
 //!     │   └── bear-wrapper    ← sibling of bear-driver
-//!     └── $LIB/
-//!         └── libexec.so      ← one level up from bin/, then into $LIB/
+//!     └── <INTERCEPT_LIBDIR>/
+//!         └── libexec.so      ← one level up from bin/, then into INTERCEPT_LIBDIR/
 //! ```
 //!
 //! `bear-driver` locates its siblings using **relative paths only**:
 //! - `bear-wrapper` is a sibling in the same `bin/` directory.
-//! - `libexec.so` is reached via `../$LIB/libexec.so` relative to `bin/`.
+//! - `libexec.so` is reached via `../<INTERCEPT_LIBDIR>/libexec.so` relative to `bin/`.
 //!
-//! The `$LIB` token is left as a literal string in the path so that the OS
-//! dynamic linker can expand it at load time (see `man ld.so`).
+//! The `INTERCEPT_LIBDIR` value is set at build time (defaults to `lib`). On glibc-based
+//! Linux, packagers can set it to `$LIB` so the dynamic linker expands it at runtime.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -33,6 +33,7 @@ use thiserror::Error;
 
 const WRAPPER_NAME: &str = env!("WRAPPER_NAME");
 const PRELOAD_NAME: &str = env!("PRELOAD_NAME");
+const INTERCEPT_LIBDIR: &str = env!("INTERCEPT_LIBDIR");
 
 /// Errors that can occur when constructing an [`InstallationLayout`].
 #[derive(Debug, Error)]
@@ -67,9 +68,8 @@ impl InstallationLayout {
 
     /// Returns the path to the preload shared library (`libexec.so` / `libexec.dylib`).
     ///
-    /// The library lives one directory level above `bin/`, inside a `$LIB` subdirectory.
-    /// The `$LIB` token is kept as a literal string so that the OS dynamic linker
-    /// can resolve it at runtime (see `man ld.so`).
+    /// The library lives one directory level above `bin/`, inside the `INTERCEPT_LIBDIR`
+    /// subdirectory (set at build time, defaults to `lib`).
     pub fn preload_path(&self) -> PathBuf {
         self.lib_dir.join(PRELOAD_NAME)
     }
@@ -106,7 +106,7 @@ impl TryFrom<&Path> for InstallationLayout {
         let parent_dir =
             bin_dir.parent().ok_or_else(|| LayoutError::NoParent(executable.to_path_buf()))?.to_path_buf();
 
-        Ok(Self { bin_dir, lib_dir: parent_dir.join("$LIB") })
+        Ok(Self { bin_dir, lib_dir: parent_dir.join(INTERCEPT_LIBDIR) })
     }
 }
 
@@ -133,7 +133,10 @@ mod tests {
         let layout = InstallationLayout::try_from(exe.as_path()).unwrap();
 
         assert_eq!(layout.wrapper_path(), abs_path(&["usr", "local", "share", "bear", "bin", WRAPPER_NAME]));
-        assert_eq!(layout.preload_path(), abs_path(&["usr", "local", "share", "bear", "$LIB", PRELOAD_NAME]));
+        assert_eq!(
+            layout.preload_path(),
+            abs_path(&["usr", "local", "share", "bear", INTERCEPT_LIBDIR, PRELOAD_NAME])
+        );
     }
 
     #[test]
@@ -143,7 +146,7 @@ mod tests {
         let layout = InstallationLayout::try_from(exe.as_path()).unwrap();
 
         assert_eq!(layout.wrapper_path(), abs_path(&["bin", WRAPPER_NAME]));
-        assert_eq!(layout.preload_path(), abs_path(&["$LIB", PRELOAD_NAME]));
+        assert_eq!(layout.preload_path(), abs_path(&[INTERCEPT_LIBDIR, PRELOAD_NAME]));
     }
 
     #[test]
@@ -187,7 +190,7 @@ mod tests {
         let output = format!("{layout}");
 
         let expected_wrapper = abs_path(&["usr", "local", "share", "bear", "bin", WRAPPER_NAME]);
-        let expected_preload = abs_path(&["usr", "local", "share", "bear", "$LIB", PRELOAD_NAME]);
+        let expected_preload = abs_path(&["usr", "local", "share", "bear", INTERCEPT_LIBDIR, PRELOAD_NAME]);
 
         assert!(output.contains(&expected_wrapper.display().to_string()));
         assert!(output.contains(&expected_preload.display().to_string()));
