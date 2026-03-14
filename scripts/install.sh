@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Install script for Bear.
@@ -6,6 +6,7 @@
 # Environment variables:
 #   DESTDIR          — installation prefix (default: /usr/local if root, $HOME/.local otherwise)
 #   INTERCEPT_LIBDIR — library directory name (default: lib)
+#   SOURCE_DIR       — directory containing build artifacts (default: target/release)
 #
 # Usage:
 #   ./scripts/install.sh              # install with defaults
@@ -48,8 +49,11 @@ refuse_root_destdir() {
 
 # When run from the source repo, artifacts are in target/release/.
 # When run from a release archive, artifacts are next to the script.
+# Override with SOURCE_DIR to use a custom artifact directory (e.g. target/debug/).
 find_source_dir() {
-    if [ -d "$REPO_ROOT/target/release" ]; then
+    if [ -n "${SOURCE_DIR:-}" ]; then
+        echo "$SOURCE_DIR"
+    elif [ -d "$REPO_ROOT/target/release" ]; then
         echo "$REPO_ROOT/target/release"
     elif [ -f "$REPO_ROOT/bin/bear-driver" ] || [ -f "$REPO_ROOT/bin/bear-driver.exe" ]; then
         echo "$REPO_ROOT"

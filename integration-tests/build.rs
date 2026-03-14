@@ -39,6 +39,14 @@ fn main() {
     println!("cargo:rerun-if-changed=../bear/src");
     println!("cargo:rerun-if-changed=../intercept-preload/src");
 
+    // Locate install script and repo root for integration tests
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+    let repo_root = std::path::Path::new(&manifest_dir).parent().unwrap();
+    let install_script = repo_root.join("scripts").join("install.sh");
+    println!("cargo:rerun-if-changed={}", install_script.display());
+    println!("cargo:rustc-env=REPO_ROOT={}", repo_root.display());
+    println!("cargo:rustc-env=INSTALL_SCRIPT_PATH={}", install_script.display());
+
     // Set up paths for driver, wrapper and preload artifacts
     let (driver_path, wrapper_path, preload_path) = find_intercept_artifacts();
     println!("cargo:rustc-env=DRIVER_EXECUTABLE={}", DRIVER_NAME);

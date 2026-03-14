@@ -56,68 +56,58 @@ use std::process::Output;
 use tempfile;
 
 /// Install environment for Bear
+///
+/// On Unix, uses `scripts/install.sh` to create a proper installation layout
+/// in a temp directory — this exercises the install script on every test run.
+///
+/// On Windows, runs `bear-driver.exe` directly (no preload library, no shell
+/// entry script).
 pub struct InstallEnvironment {
     #[allow(dead_code)]
     install_dir: tempfile::TempDir,
-    #[allow(dead_code)]
-    bin_dir: tempfile::TempDir,
     bear: PathBuf,
 }
 
 impl InstallEnvironment {
     pub fn new() -> Result<Self> {
         let install_dir = tempfile::TempDir::new().with_context(|| "install dir tempdir failed")?;
-        let bin_dir = tempfile::TempDir::new().with_context(|| "bin dir tempdir failed")?;
 
-        let driver = Self::prepare_install_dir(install_dir.path())?;
-        let bear = Self::prepare_entry_script(bin_dir.path(), &driver)?;
-
-        Ok(Self { install_dir, bin_dir, bear })
+        if cfg!(unix) {
+            Self::install_via_script(install_dir.path())?;
+            let bear = install_dir.path().join("bin").join("bear");
+            Ok(Self { install_dir, bear })
+        } else {
+            // Windows: run bear-driver.exe directly from the build output
+            let bear = PathBuf::from(DRIVER_EXECUTABLE_PATH);
+            Ok(Self { install_dir, bear })
+        }
     }
 
-    fn prepare_install_dir(path: &Path) -> Result<PathBuf> {
-        let bin_dir = path.join("bin");
-        std::fs::create_dir(&bin_dir).with_context(|| format!("create dir={:?}", &bin_dir))?;
+    fn install_via_script(destdir: &Path) -> Result<()> {
+        let source_dir = Path::new(DRIVER_EXECUTABLE_PATH)
+            .parent()
+            .with_context(|| "cannot determine artifact directory from DRIVER_EXECUTABLE_PATH")?;
 
-        let driver = &bin_dir.join(DRIVER_EXECUTABLE);
-        std::fs::copy(DRIVER_EXECUTABLE_PATH, driver)
-            .with_context(|| format!("copy from={}, to={:?}", DRIVER_EXECUTABLE_PATH, &driver))?;
+        let output = std::process::Command::new("bash")
+            .arg(INSTALL_SCRIPT_PATH)
+            .env("DESTDIR", destdir)
+            .env("INTERCEPT_LIBDIR", INTERCEPT_LIBDIR)
+            .env("SOURCE_DIR", source_dir)
+            .output()
+            .with_context(|| "failed to run install.sh")?;
 
-        let wrapper = &bin_dir.join(WRAPPER_EXECUTABLE);
-        std::fs::copy(WRAPPER_EXECUTABLE_PATH, wrapper)
-            .with_context(|| format!("copy from={}, to={:?}", WRAPPER_EXECUTABLE_PATH, &wrapper))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            anyhow::bail!(
+                "install.sh failed with exit code {:?}\nstdout: {}\nstderr: {}",
+                output.status.code(),
+                stdout,
+                stderr
+            );
+        }
 
-        let lib_dir = path.join(env!("INTERCEPT_LIBDIR"));
-        std::fs::create_dir(&lib_dir).with_context(|| format!("create dir={:?}", &lib_dir))?;
-
-        let library = &lib_dir.join(PRELOAD_LIBRARY);
-        std::fs::copy(PRELOAD_LIBRARY_PATH, library)
-            .with_context(|| format!("copy from={}, to={:?}", PRELOAD_LIBRARY_PATH, &library))?;
-
-        Ok(bin_dir.join(env!("DRIVER_EXECUTABLE")))
-    }
-
-    #[cfg(unix)]
-    fn prepare_entry_script(path: &Path, driver: &Path) -> Result<PathBuf> {
-        let file = path.join("bear");
-        let script = format!("#!/usr/bin/sh\n{driver:?} $@\n");
-
-        std::fs::write(&file, script).with_context(|| format!("writing file={:?}", &file))?;
-
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
-
-        Ok(file)
-    }
-
-    #[cfg(not(unix))]
-    fn prepare_entry_script(path: &Path, driver: &Path) -> Result<PathBuf> {
-        let file = path.join("bear.bat");
-        let script = format!("@echo off\r\n{driver:?} %*\r\n");
-
-        std::fs::write(&file, script).with_context(|| "writing the script failed")?;
-
-        Ok(file)
+        Ok(())
     }
 
     pub fn path(&self) -> &Path {

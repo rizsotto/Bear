@@ -72,3 +72,12 @@ pub const MKDIR_PATH: &str = env!("MKDIR_PATH");
 #[cfg(has_executable_rm)]
 #[allow(dead_code)]
 pub const RM_PATH: &str = env!("RM_PATH");
+
+#[allow(dead_code)]
+pub const INSTALL_SCRIPT_PATH: &str = env!("INSTALL_SCRIPT_PATH");
+
+#[allow(dead_code)]
+pub const INTERCEPT_LIBDIR: &str = env!("INTERCEPT_LIBDIR");
+
+#[allow(dead_code)]
+pub const REPO_ROOT: &str = env!("REPO_ROOT");
