@@ -33,6 +33,7 @@ fn main() {
 
     // Forward INTERCEPT_LIBDIR so integration tests use the same value as bear-driver
     let intercept_libdir = std::env::var("INTERCEPT_LIBDIR").unwrap_or_else(|_| "lib".to_string());
+    validate_intercept_libdir(&intercept_libdir);
     println!("cargo:rustc-env=INTERCEPT_LIBDIR={}", intercept_libdir);
 
     // Re-run if bear or intercept-preload artifacts change
@@ -186,5 +187,15 @@ fn is_preload_supported_at_runtime() -> bool {
     {
         // Other Unix-like systems should support preload
         true
+    }
+}
+
+fn validate_intercept_libdir(value: &str) {
+    if value.trim().is_empty() {
+        panic!("INTERCEPT_LIBDIR must not be empty or whitespace-only");
+    }
+    let path = std::path::Path::new(value);
+    if path.is_absolute() {
+        panic!("INTERCEPT_LIBDIR must be a relative path, got: {}", value);
     }
 }
