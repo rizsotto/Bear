@@ -92,7 +92,7 @@ impl InstallEnvironment {
             .arg(INSTALL_SCRIPT_PATH)
             .env("DESTDIR", destdir)
             .env("INTERCEPT_LIBDIR", INTERCEPT_LIBDIR)
-            .env("SOURCE_DIR", source_dir)
+            .env("SRCDIR", source_dir)
             .output()
             .with_context(|| "failed to run install.sh")?;
 

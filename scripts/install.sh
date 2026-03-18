@@ -6,7 +6,7 @@
 # Environment variables:
 #   DESTDIR          — installation prefix (default: /usr/local if root, $HOME/.local otherwise)
 #   INTERCEPT_LIBDIR — library directory name (default: lib)
-#   SOURCE_DIR       — directory containing build artifacts (default: target/release)
+#   SRCDIR           — directory containing build artifacts (default: target/release)
 #
 # Usage:
 #   ./scripts/install.sh              # install with defaults
@@ -34,7 +34,7 @@ DESTDIR="$(cd "$DESTDIR" 2>/dev/null && pwd || echo "$DESTDIR")"
 
 INTERCEPT_LIBDIR="${INTERCEPT_LIBDIR-lib}"
 
-MANIFEST="$DESTDIR/share/bear/install-manifest.txt"
+UNINSTALL_SCRIPT="$DESTDIR/share/bear/uninstall.sh"
 
 # --- safety guards ------------------------------------------------------------
 
@@ -63,15 +63,12 @@ validate_intercept_libdir() {
 # --- artifact discovery -------------------------------------------------------
 
 # When run from the source repo, artifacts are in target/release/.
-# When run from a release archive, artifacts are next to the script.
-# Override with SOURCE_DIR to use a custom artifact directory (e.g. target/debug/).
+# Override with SRCDIR to use a custom artifact directory (e.g. target/debug/).
 find_source_dir() {
-    if [ -n "${SOURCE_DIR:-}" ]; then
-        echo "$SOURCE_DIR"
+    if [ -n "${SRCDIR:-}" ]; then
+        echo "$SRCDIR"
     elif [ -d "$REPO_ROOT/target/release" ]; then
         echo "$REPO_ROOT/target/release"
-    elif [ -f "$REPO_ROOT/bin/bear-driver" ] || [ -f "$REPO_ROOT/bin/bear-driver.exe" ]; then
-        echo "$REPO_ROOT"
     else
         echo "error: cannot find build artifacts in target/release/ or next to the script" >&2
         exit 1
@@ -91,13 +88,9 @@ detect_platform() {
             PRELOAD_NAME="libexec.dylib"
             HAS_PRELOAD=true
             ;;
-        MINGW*|MSYS*|CYGWIN*)
+        *)
             PRELOAD_NAME=""
             HAS_PRELOAD=false
-            ;;
-        *)
-            PRELOAD_NAME="libexec.so"
-            HAS_PRELOAD=true
             ;;
     esac
 }
@@ -109,96 +102,128 @@ do_install() {
     validate_intercept_libdir
     detect_platform
 
-    SOURCE_DIR="$(find_source_dir)"
+    SRCDIR="$(find_source_dir)"
 
-    # Start fresh manifest
+    # Start generating uninstall script (create directory first)
     mkdir -p "$DESTDIR/share/bear"
-    : > "$MANIFEST"
+    cat > "$UNINSTALL_SCRIPT" <<'UNINSTALL_HEADER'
+#!/bin/sh
+# Bear uninstall script
+# This script was generated during installation and removes all installed files.
+# Usage: sh uninstall.sh
+
+set -e
+
+UNINSTALL_HEADER
+
+    # Helper to emit directory removal (only if not a protected system directory)
+    emit_rmdir() {
+        local dir="$1"
+        local boundary="$2"
+        local current="$dir"
+
+        while [ "$current" != "$boundary" ] && [ -n "$current" ] && [ "$current" != "/" ]; do
+            # Don't emit rmdir for common system directories
+            case "$current" in
+                /usr|/usr/local|/opt|/etc)
+                    # Protected - don't try to remove
+                    ;;
+                *)
+                    echo "rmdir '$current' 2>/dev/null || true" >> "$UNINSTALL_SCRIPT"
+                    ;;
+            esac
+            current="$(dirname "$current")"
+        done
+    }
 
     # bear-driver and bear-wrapper
+    echo "# Remove bear binaries" >> "$UNINSTALL_SCRIPT"
     mkdir -p "$DESTDIR/share/bear/bin"
-    install -m 755 "$SOURCE_DIR/bear-driver" "$DESTDIR/share/bear/bin/bear-driver"
-    echo "$DESTDIR/share/bear/bin/bear-driver" >> "$MANIFEST"
-    install -m 755 "$SOURCE_DIR/bear-wrapper" "$DESTDIR/share/bear/bin/bear-wrapper"
-    echo "$DESTDIR/share/bear/bin/bear-wrapper" >> "$MANIFEST"
+    install -m 755 "$SRCDIR/bear-driver" "$DESTDIR/share/bear/bin/bear-driver"
+    echo "rm -f '$DESTDIR/share/bear/bin/bear-driver'" >> "$UNINSTALL_SCRIPT"
+    install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR/share/bear/bin/bear-wrapper"
+    echo "rm -f '$DESTDIR/share/bear/bin/bear-wrapper'" >> "$UNINSTALL_SCRIPT"
+    emit_rmdir "$DESTDIR/share/bear/bin" "$DESTDIR"
 
     # preload library (Unix only)
-    if [ "$HAS_PRELOAD" = true ] && [ -f "$SOURCE_DIR/$PRELOAD_NAME" ]; then
+    if [ "$HAS_PRELOAD" = true ] && [ -f "$SRCDIR/$PRELOAD_NAME" ]; then
+        echo "" >> "$UNINSTALL_SCRIPT"
+        echo "# Remove preload library" >> "$UNINSTALL_SCRIPT"
         mkdir -p "$DESTDIR/share/bear/$INTERCEPT_LIBDIR"
-        install -m 644 "$SOURCE_DIR/$PRELOAD_NAME" "$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
-        echo "$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME" >> "$MANIFEST"
+        install -m 644 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
+        echo "rm -f '$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME'" >> "$UNINSTALL_SCRIPT"
+        emit_rmdir "$DESTDIR/share/bear/$INTERCEPT_LIBDIR" "$DESTDIR"
     fi
 
     # bear entry script
+    echo "" >> "$UNINSTALL_SCRIPT"
+    echo "# Remove bear entry script" >> "$UNINSTALL_SCRIPT"
     mkdir -p "$DESTDIR/bin"
-    cat > "$DESTDIR/bin/bear" <<ENTRY_SCRIPT
+    tmp_bear_sh="$(mktemp)"
+    trap 'rm -f "$tmp_bear_sh"' EXIT
+    cat > "$tmp_bear_sh" <<ENTRY_SCRIPT
 #!/bin/sh
 $DESTDIR/share/bear/bin/bear-driver "\$@"
 ENTRY_SCRIPT
-    chmod 755 "$DESTDIR/bin/bear"
-    echo "$DESTDIR/bin/bear" >> "$MANIFEST"
+    install -m 755 "$tmp_bear_sh" "$DESTDIR/bin/bear"
+    rm -f "$tmp_bear_sh"
+    trap - EXIT
+    echo "rm -f '$DESTDIR/bin/bear'" >> "$UNINSTALL_SCRIPT"
+    emit_rmdir "$DESTDIR/bin" "$DESTDIR"
 
     # man page
     if [ -f "$REPO_ROOT/man/bear.1" ]; then
+        echo "" >> "$UNINSTALL_SCRIPT"
+        echo "# Remove man page" >> "$UNINSTALL_SCRIPT"
         mkdir -p "$DESTDIR/share/man/man1"
         install -m 644 "$REPO_ROOT/man/bear.1" "$DESTDIR/share/man/man1/bear.1"
-        echo "$DESTDIR/share/man/man1/bear.1" >> "$MANIFEST"
+        echo "rm -f '$DESTDIR/share/man/man1/bear.1'" >> "$UNINSTALL_SCRIPT"
+        emit_rmdir "$DESTDIR/share/man/man1" "$DESTDIR"
     fi
 
     # documentation
+    echo "" >> "$UNINSTALL_SCRIPT"
+    echo "# Remove documentation" >> "$UNINSTALL_SCRIPT"
     mkdir -p "$DESTDIR/share/doc/bear"
     if [ -f "$REPO_ROOT/README.md" ]; then
         install -m 644 "$REPO_ROOT/README.md" "$DESTDIR/share/doc/bear/README.md"
-        echo "$DESTDIR/share/doc/bear/README.md" >> "$MANIFEST"
+        echo "rm -f '$DESTDIR/share/doc/bear/README.md'" >> "$UNINSTALL_SCRIPT"
     fi
     if [ -f "$REPO_ROOT/COPYING" ]; then
         install -m 644 "$REPO_ROOT/COPYING" "$DESTDIR/share/doc/bear/COPYING"
-        echo "$DESTDIR/share/doc/bear/COPYING" >> "$MANIFEST"
+        echo "rm -f '$DESTDIR/share/doc/bear/COPYING'" >> "$UNINSTALL_SCRIPT"
     fi
+    emit_rmdir "$DESTDIR/share/doc/bear" "$DESTDIR"
 
-    # record the manifest itself
-    echo "$MANIFEST" >> "$MANIFEST"
+    # Remove the uninstall script itself
+    echo "" >> "$UNINSTALL_SCRIPT"
+    echo "# Remove uninstall script" >> "$UNINSTALL_SCRIPT"
+    echo "rm -f '$UNINSTALL_SCRIPT'" >> "$UNINSTALL_SCRIPT"
+    emit_rmdir "$DESTDIR/share/bear" "$DESTDIR"
+
+    echo "" >> "$UNINSTALL_SCRIPT"
+    echo "echo 'Bear uninstalled from $DESTDIR'" >> "$UNINSTALL_SCRIPT"
+
+    # Make uninstall script non-executable (must be invoked explicitly)
+    chmod 644 "$UNINSTALL_SCRIPT"
 
     echo "Bear installed to $DESTDIR"
-    echo "Manifest written to $MANIFEST"
+    echo "Uninstall script written to $UNINSTALL_SCRIPT"
 }
 
 # --- uninstall ----------------------------------------------------------------
 
 do_uninstall() {
     refuse_root_destdir
-    validate_intercept_libdir
 
-    if [ ! -f "$MANIFEST" ]; then
-        echo "error: no install manifest found at $MANIFEST" >&2
-        echo "Cannot uninstall without a manifest." >&2
+    if [ ! -f "$UNINSTALL_SCRIPT" ]; then
+        echo "error: no uninstall script found at $UNINSTALL_SCRIPT" >&2
+        echo "Cannot uninstall without the uninstall script." >&2
         exit 1
     fi
 
-    # Remove each file listed in the manifest
-    while IFS= read -r file; do
-        if [ -f "$file" ]; then
-            rm -f "$file"
-            echo "removed: $file"
-        fi
-    done < "$MANIFEST"
-
-    # Remove empty directories (deepest first)
-    for dir in \
-        "$DESTDIR/share/bear/bin" \
-        "$DESTDIR/share/bear/$INTERCEPT_LIBDIR" \
-        "$DESTDIR/share/bear" \
-        "$DESTDIR/share/doc/bear" \
-        "$DESTDIR/share/man/man1" \
-        "$DESTDIR/share/man" \
-        "$DESTDIR/share/doc" \
-        "$DESTDIR/share" \
-        "$DESTDIR/bin" \
-    ; do
-        rmdir "$dir" 2>/dev/null || true
-    done
-
-    echo "Bear uninstalled from $DESTDIR"
+    # Execute the generated uninstall script
+    sh "$UNINSTALL_SCRIPT"
 }
 
 # --- main ---------------------------------------------------------------------
