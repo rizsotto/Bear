@@ -195,6 +195,38 @@ ENTRY_SCRIPT
     fi
     emit_rmdir "$PREFIX/share/doc/bear" "$PREFIX"
 
+    # shell completions (optional — only installed when generated files are present)
+    COMPLETIONS_DIR="$SRCDIR/completions"
+    if [ -d "$COMPLETIONS_DIR" ]; then
+        echo "" >> "$UNINSTALL_SCRIPT"
+        echo "# Remove shell completions" >> "$UNINSTALL_SCRIPT"
+
+        if [ -f "$COMPLETIONS_DIR/bear.bash" ]; then
+            mkdir -p "$PREFIX/share/bash-completion/completions"
+            install -m 644 "$COMPLETIONS_DIR/bear.bash" "$PREFIX/share/bash-completion/completions/bear"
+            echo "rm -f '$PREFIX/share/bash-completion/completions/bear'" >> "$UNINSTALL_SCRIPT"
+            emit_rmdir "$PREFIX/share/bash-completion/completions" "$PREFIX"
+        fi
+        if [ -f "$COMPLETIONS_DIR/_bear" ]; then
+            mkdir -p "$PREFIX/share/zsh/site-functions"
+            install -m 644 "$COMPLETIONS_DIR/_bear" "$PREFIX/share/zsh/site-functions/_bear"
+            echo "rm -f '$PREFIX/share/zsh/site-functions/_bear'" >> "$UNINSTALL_SCRIPT"
+            emit_rmdir "$PREFIX/share/zsh/site-functions" "$PREFIX"
+        fi
+        if [ -f "$COMPLETIONS_DIR/bear.fish" ]; then
+            mkdir -p "$PREFIX/share/fish/vendor_completions.d"
+            install -m 644 "$COMPLETIONS_DIR/bear.fish" "$PREFIX/share/fish/vendor_completions.d/bear.fish"
+            echo "rm -f '$PREFIX/share/fish/vendor_completions.d/bear.fish'" >> "$UNINSTALL_SCRIPT"
+            emit_rmdir "$PREFIX/share/fish/vendor_completions.d" "$PREFIX"
+        fi
+        if [ -f "$COMPLETIONS_DIR/bear.elv" ]; then
+            mkdir -p "$PREFIX/share/elvish/lib"
+            install -m 644 "$COMPLETIONS_DIR/bear.elv" "$PREFIX/share/elvish/lib/bear.elv"
+            echo "rm -f '$PREFIX/share/elvish/lib/bear.elv'" >> "$UNINSTALL_SCRIPT"
+            emit_rmdir "$PREFIX/share/elvish/lib" "$PREFIX"
+        fi
+    fi
+
     # Remove the uninstall script itself
     echo "" >> "$UNINSTALL_SCRIPT"
     echo "# Remove uninstall script" >> "$UNINSTALL_SCRIPT"

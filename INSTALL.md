@@ -67,12 +67,21 @@ ensure `gcc` or `clang` is installed.
    cargo build --release
    ```
 
-3. Install:
+3. (Optional) Generate shell completions:
+   ```bash
+   target/release/generate-completions target/release/completions
+   ```
+
+4. Install:
    ```bash
    ./scripts/install.sh
    ```
 
-4. Verify the installation:
+   If the completions directory exists under the build artifacts, the install
+   script will automatically install completions for bash, zsh, fish, and
+   elvish to standard locations.
+
+5. Verify the installation:
    ```bash
    bear --version
    bear -- true   # quick smoke test — should produce an empty compile_commands.json
@@ -126,14 +135,37 @@ On glibc-based Linux, the special value `$LIB` can be used — the dynamic
 linker expands it at runtime (see `man ld.so`). On other platforms (macOS,
 musl, FreeBSD), use a concrete directory name.
 
+### Shell completions with a user-local install
+
+When Bear is installed to a system prefix like `/usr` or `/usr/local`, shells
+typically find completions automatically. For a user-local install
+(`$HOME/.local`), you need to tell your shell where to look:
+
+**Bash** — add to `~/.bashrc`:
+   ```bash
+   source "$HOME/.local/share/bash-completion/completions/bear"
+   ```
+
+**Zsh** — add to `~/.zshrc` (before `compinit`):
+   ```zsh
+   fpath=("$HOME/.local/share/zsh/site-functions" $fpath)
+   ```
+
+**Fish** — add to `~/.config/fish/config.fish`:
+   ```fish
+   set -p fish_complete_path $HOME/.local/share/fish/vendor_completions.d
+   ```
+
 
 # How to package
 
 If you are a package maintainer for a distribution:
 
-- Build and install with explicit values for `PREFIX` and `INTERCEPT_LIBDIR`:
+- Build, generate completions, and install with explicit values for `PREFIX`
+  and `INTERCEPT_LIBDIR`:
   ```bash
   INTERCEPT_LIBDIR=lib64 cargo build --release
+  target/release/generate-completions target/release/completions
   INTERCEPT_LIBDIR=lib64 PREFIX=$pkgdir/usr ./scripts/install.sh
   ```
 
@@ -149,8 +181,20 @@ If you are a package maintainer for a distribution:
   ```
   $PREFIX/
   ├── bin/
-  │   └── bear                        (shell script)
+  │   └── bear                              (shell script)
   └── share/
+      ├── bash-completion/
+      │   └── completions/
+      │       └── bear                      (optional)
+      ├── zsh/
+      │   └── site-functions/
+      │       └── _bear                     (optional)
+      ├── fish/
+      │   └── vendor_completions.d/
+      │       └── bear.fish                 (optional)
+      ├── elvish/
+      │   └── lib/
+      │       └── bear.elv                  (optional)
       ├── doc/
       │   └── bear/
       │       ├── README.md

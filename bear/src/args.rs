@@ -188,7 +188,11 @@ pub enum ParseError {
 /// The application can be run in intercept mode, semantic mode, or the
 /// default mode where both intercept and semantic are executed.
 pub fn cli() -> Command {
+    // The binary is `bear-driver` but users invoke it as `bear` via a
+    // shell wrapper, so we hardcode the user-facing name instead of
+    // letting `command!()` pick up CARGO_BIN_NAME.
     command!()
+        .name("bear")
         .subcommand_required(false)
         .subcommand_negates_reqs(true)
         .subcommand_precedence_over_arg(true)
