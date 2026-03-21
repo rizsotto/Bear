@@ -6,7 +6,7 @@
 //! for various build scenarios, ported from the Python/lit test suite.
 
 use crate::fixtures::constants::*;
-use crate::fixtures::infrastructure::{TestEnvironment, compilation_entry, filename_of};
+use crate::fixtures::infrastructure::{TestEnvironment, compilation_entry};
 use anyhow::Result;
 
 /// Test compilation with build script that calls compiler
@@ -20,7 +20,7 @@ fn simple_single_file_compilation() -> Result<()> {
     env.create_source_files(&[("simple.c", "int main() { return 0; }")])?;
 
     // Create a shell script that calls the compiler
-    let build_commands = format!("\"{}\" -c simple.c -o simple.o", filename_of(COMPILER_C_PATH));
+    let build_commands = format!("\"{}\" -c simple.c -o simple.o", COMPILER_C_PATH);
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Step 1: Run intercept command to capture events from the build script
@@ -53,7 +53,7 @@ fn simple_single_file_compilation() -> Result<()> {
         file: "simple.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "simple.c".to_string(),
             "-o".to_string(),
@@ -81,10 +81,10 @@ fn successful_build_multiple_sources() -> Result<()> {
 
     // Create build script that compiles all files
     let build_commands = [
-        format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH)),
-        format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH)),
-        format!("\"{}\" -c -o test3.o test3.cpp", filename_of(COMPILER_CXX_PATH)),
-        format!("\"{}\" -c -o test4.o test4.cpp", filename_of(COMPILER_CXX_PATH)),
+        format!("\"{}\" -c -o test1.o test1.c", COMPILER_C_PATH),
+        format!("\"{}\" -c -o test2.o test2.c", COMPILER_C_PATH),
+        format!("\"{}\" -c -o test3.o test3.cpp", COMPILER_CXX_PATH),
+        format!("\"{}\" -c -o test4.o test4.cpp", COMPILER_CXX_PATH),
     ]
     .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
@@ -110,7 +110,7 @@ fn successful_build_multiple_sources() -> Result<()> {
         file: "test1.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "test1.o".to_string(),
@@ -122,7 +122,7 @@ fn successful_build_multiple_sources() -> Result<()> {
         file: "test2.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "test2.o".to_string(),
@@ -134,7 +134,7 @@ fn successful_build_multiple_sources() -> Result<()> {
         file: "test3.cpp".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_CXX_PATH),
+            COMPILER_CXX_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "test3.o".to_string(),
@@ -146,7 +146,7 @@ fn successful_build_multiple_sources() -> Result<()> {
         file: "test4.cpp".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_CXX_PATH),
+            COMPILER_CXX_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "test4.o".to_string(),
@@ -170,10 +170,10 @@ fn without_append_output_is_overwritten() -> Result<()> {
     ])?;
 
     // Create build script that compiles all files
-    let build_command1 = format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH));
+    let build_command1 = format!("\"{}\" -c -o test1.o test1.c", COMPILER_C_PATH);
     let build_script1_path = env.create_shell_script("build1.sh", &build_command1)?;
 
-    let build_command2 = format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH));
+    let build_command2 = format!("\"{}\" -c -o test2.o test2.c", COMPILER_C_PATH);
     let build_script2_path = env.create_shell_script("build2.sh", &build_command2)?;
 
     // Run bear once
@@ -220,10 +220,10 @@ fn append_works_as_expected() -> Result<()> {
     ])?;
 
     // Create build script that compiles all files
-    let build_command1 = format!("\"{}\" -c -o test1.o test1.c", filename_of(COMPILER_C_PATH));
+    let build_command1 = format!("\"{}\" -c -o test1.o test1.c", COMPILER_C_PATH);
     let build_script1_path = env.create_shell_script("build1.sh", &build_command1)?;
 
-    let build_command2 = format!("\"{}\" -c -o test2.o test2.c", filename_of(COMPILER_C_PATH));
+    let build_command2 = format!("\"{}\" -c -o test2.o test2.c", COMPILER_C_PATH);
     let build_script2_path = env.create_shell_script("build2.sh", &build_command2)?;
 
     // Run bear once
@@ -273,8 +273,8 @@ fn broken_build_partial_success() -> Result<()> {
 
     // Create build script that tries to compile both (one will fail)
     let build_commands = [
-        format!("\"{}\" -c -o valid.o valid.c", filename_of(COMPILER_C_PATH)),
-        format!("\"{}\" -c -o invalid.o invalid.c", filename_of(COMPILER_C_PATH)),
+        format!("\"{}\" -c -o valid.o valid.c", COMPILER_C_PATH),
+        format!("\"{}\" -c -o invalid.o invalid.c", COMPILER_C_PATH),
     ]
     .join("\n");
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
@@ -303,7 +303,7 @@ fn broken_build_partial_success() -> Result<()> {
         file: "valid.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "valid.o".to_string(),
@@ -316,7 +316,7 @@ fn broken_build_partial_success() -> Result<()> {
         file: "invalid.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "-o".to_string(),
             "invalid.o".to_string(),
@@ -370,7 +370,7 @@ fn multiple_sources_single_command() -> Result<()> {
     ])?;
 
     // Create build script with single command compiling multiple files
-    let build_commands = format!("\"{}\" -c src1.c src2.c src3.c", filename_of(COMPILER_C_PATH));
+    let build_commands = format!("\"{}\" -c src1.c src2.c src3.c", COMPILER_C_PATH);
     let build_script_path = env.create_shell_script("build.sh", &build_commands)?;
 
     // Run bear with build script
@@ -394,7 +394,7 @@ fn multiple_sources_single_command() -> Result<()> {
         file: "src1.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "src1.c".to_string(),
         ]
@@ -403,7 +403,7 @@ fn multiple_sources_single_command() -> Result<()> {
         file: "src2.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "src2.c".to_string(),
         ]
@@ -412,7 +412,7 @@ fn multiple_sources_single_command() -> Result<()> {
         file: "src3.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "src3.c".to_string(),
         ]

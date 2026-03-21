@@ -242,12 +242,8 @@ impl CommandConverter {
                     command_args.extend(formatted_args);
                 }
                 ArgumentKind::Compiler => {
-                    if let Some(executable_name) = cmd.executable.file_name() {
-                        if let Some(name_str) = executable_name.to_str() {
-                            command_args.push(name_str.to_string());
-                        } else {
-                            command_args.extend(original_args);
-                        }
+                    if let Some(exe_str) = cmd.executable.to_str() {
+                        command_args.push(exe_str.to_string());
                     } else {
                         command_args.extend(original_args);
                     }
@@ -397,7 +393,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
+            vec!["/usr/bin/gcc", "-c", "-Wall", "main.c", "-o", "main.o"],
             "/home/user",
             Some("main.o"),
         )];
@@ -422,8 +418,8 @@ mod tests {
         let result = converter.to_entries(&command);
 
         let expected = vec![
-            Entry::from_arguments_str("file1.cpp", vec!["g++", "-c", "file1.cpp"], "/home/user", None),
-            Entry::from_arguments_str("file2.cpp", vec!["g++", "-c", "file2.cpp"], "/home/user", None),
+            Entry::from_arguments_str("file1.cpp", vec!["/usr/bin/g++", "-c", "file1.cpp"], "/home/user", None),
+            Entry::from_arguments_str("file2.cpp", vec!["/usr/bin/g++", "-c", "file2.cpp"], "/home/user", None),
         ];
         assert_eq!(result, expected);
     }
@@ -464,7 +460,7 @@ mod tests {
         let entries = converter.to_entries(&command);
 
         let expected =
-            vec![Entry::from_command_str("main.c", "gcc -c main.c -o main.o", "/home/user", Some("main.o"))];
+            vec![Entry::from_command_str("main.c", "/usr/bin/gcc -c main.c -o main.o", "/home/user", Some("main.o"))];
         assert_eq!(entries, expected);
     }
 
@@ -489,7 +485,7 @@ mod tests {
 
         let expected = vec![Entry::from_arguments_str(
             "main.c",
-            vec!["gcc", "-c", "main.c", "-o", "main.o"],
+            vec!["/usr/bin/gcc", "-c", "main.c", "-o", "main.o"],
             "/home/user",
             None,
         )];

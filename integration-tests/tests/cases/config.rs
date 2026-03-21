@@ -62,7 +62,7 @@ format:
     db.assert_count(1)?;
 
     // Verify the entry contains the expected compilation command
-    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test.c".to_string()];
+    let expected_args = vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test.c".to_string()];
 
     let matcher = CompilationEntryMatcher::new()
         .file("test.c")
@@ -130,7 +130,7 @@ sources:
     db.assert_count(1)?;
 
     // Verify the entry contains the expected C compilation command
-    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "source.c".to_string()];
+    let expected_args = vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "source.c".to_string()];
 
     let matcher = CompilationEntryMatcher::new()
         .file("source.c")
@@ -191,7 +191,7 @@ sources:
     let db = env.load_compilation_database("compile_commands.json")?;
 
     // Verify that we have entries and at least one is for existing.c
-    let expected_args = vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "existing.c".to_string()];
+    let expected_args = vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "existing.c".to_string()];
 
     let matcher = CompilationEntryMatcher::new()
         .file("existing.c")
@@ -260,7 +260,7 @@ sources:
     let absolute_file_path = absolute_src_dir.join("main.c");
 
     let expected_args = vec![
-        filename_of(COMPILER_C_PATH),
+        COMPILER_C_PATH.to_string(),
         "-c".to_string(),
         absolute_file_path.to_str().unwrap().to_string(),
     ];

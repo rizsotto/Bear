@@ -1,4 +1,4 @@
-use crate::fixtures::infrastructure::{compilation_entry, filename_of};
+use crate::fixtures::infrastructure::compilation_entry;
 use crate::fixtures::*;
 use anyhow::Result;
 use serde_json::json;
@@ -49,7 +49,7 @@ fn basic_semantic_conversion() -> Result<()> {
     db.assert_contains(&compilation_entry!(
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test.c".to_string()]
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test.c".to_string()]
     ))?;
 
     Ok(())
@@ -112,19 +112,19 @@ fn semantic_multiple_entries() -> Result<()> {
     db.assert_contains(&compilation_entry!(
         file: "test1.c".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test1.c".to_string()]
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test1.c".to_string()]
     ))?;
 
     db.assert_contains(&compilation_entry!(
         file: "test2.cpp".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_CXX_PATH), "-c".to_string(), "test2.cpp".to_string()]
+        arguments: vec![COMPILER_CXX_PATH.to_string(), "-c".to_string(), "test2.cpp".to_string()]
     ))?;
 
     db.assert_contains(&compilation_entry!(
         file: "test3.c".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test3.c".to_string(), "-o".to_string(), "test3.o".to_string()]
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test3.c".to_string(), "-o".to_string(), "test3.o".to_string()]
     ))?;
 
     Ok(())
@@ -166,7 +166,7 @@ fn semantic_format_conversion() -> Result<()> {
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "-Wall".to_string(),
             "test.c".to_string()
@@ -209,7 +209,7 @@ fn semantic_relative_paths() -> Result<()> {
         file: "./src/main.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "./src/main.c".to_string()
         ]
@@ -254,7 +254,7 @@ fn semantic_wrapper_flags() -> Result<()> {
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-DWRAPPER_FLAG".to_string(),
             "-c".to_string(),
             "test.c".to_string()
@@ -297,7 +297,7 @@ fn semantic_clang_plugins() -> Result<()> {
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-fplugin=libexample.so".to_string(),
             "-c".to_string(),
             "test.c".to_string()
@@ -364,13 +364,13 @@ fn semantic_with_filtering() -> Result<()> {
     db.assert_contains(&compilation_entry!(
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test.c".to_string()]
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test.c".to_string()]
     ))?;
 
     db.assert_contains(&compilation_entry!(
         file: "test2.c".to_string(),
         directory: temp_dir.to_string(),
-        arguments: vec![filename_of(COMPILER_C_PATH), "-c".to_string(), "test2.c".to_string()]
+        arguments: vec![COMPILER_C_PATH.to_string(), "-c".to_string(), "test2.c".to_string()]
     ))?;
 
     Ok(())
@@ -496,7 +496,7 @@ fn semantic_output_format() -> Result<()> {
         file: "test.c".to_string(),
         directory: temp_dir.to_string(),
         arguments: vec![
-            filename_of(COMPILER_C_PATH),
+            COMPILER_C_PATH.to_string(),
             "-c".to_string(),
             "test.c".to_string()
         ]
