@@ -127,8 +127,8 @@ mod tests {
     use super::*;
     use crate::config::{DirectoryAction, DirectoryRule, SourceFilter};
     use crate::output::clang;
-    use crate::output::writers::MockWriter;
     use crate::output::writers::file::ClangOutputWriter;
+    use crate::output::writers::fixtures::CollectingWriter;
     use crate::output::writers::unique::UniqueOutputWriter;
     use std::path::PathBuf;
 
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_source_filter_with_collecting_writer_verifies_entries() {
-        use crate::output::writers::CollectingWriter;
+        use crate::output::writers::fixtures::CollectingWriter;
         use std::sync::atomic::Ordering;
 
         let stats = OutputStatistics::new();
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_source_filter_with_collecting_writer_empty_config_passes_all() {
-        use crate::output::writers::CollectingWriter;
+        use crate::output::writers::fixtures::CollectingWriter;
         use std::sync::atomic::Ordering;
 
         let stats = OutputStatistics::new();
@@ -420,7 +420,7 @@ mod tests {
             ],
         };
 
-        let sut = SourceFilterOutputWriter::new(MockWriter, config, Arc::clone(&stats));
+        let sut = SourceFilterOutputWriter::new(CollectingWriter::new().0, config, Arc::clone(&stats));
 
         let entries = vec![
             clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
@@ -436,7 +436,7 @@ mod tests {
         let stats = OutputStatistics::new();
         let config = SourceFilter::default();
 
-        let sut = SourceFilterOutputWriter::new(MockWriter, config, Arc::clone(&stats));
+        let sut = SourceFilterOutputWriter::new(CollectingWriter::new().0, config, Arc::clone(&stats));
 
         let entries =
             vec![clang::Entry::from_arguments_str("any/file.c", vec!["gcc", "-c"], "/project", None)];
@@ -457,7 +457,7 @@ mod tests {
             ],
         };
 
-        let sut = SourceFilterOutputWriter::new(MockWriter, config, Arc::clone(&stats));
+        let sut = SourceFilterOutputWriter::new(CollectingWriter::new().0, config, Arc::clone(&stats));
 
         let entries = vec![
             clang::Entry::from_arguments_str("./src/main.c", vec!["gcc", "-c"], "/project", None),

@@ -94,40 +94,34 @@ pub(crate) fn create_pipeline(
 }
 
 #[cfg(test)]
-pub(crate) struct MockWriter;
+mod fixtures {
+    use super::{IteratorWriter, WriterError};
 
-#[cfg(test)]
-impl IteratorWriter<crate::output::clang::Entry> for MockWriter {
-    fn write(self, entries: impl Iterator<Item = crate::output::clang::Entry>) -> Result<(), WriterError> {
-        // Consume the iterator to trigger upstream counting
-        entries.for_each(drop);
-        Ok(())
+    /// A test writer that collects all entries into a shared vector.
+    ///
+    /// This allows tests to verify exactly which entries pass through a writer
+    /// pipeline, including their contents and ordering. When inspection is not
+    /// needed, simply ignore the collected vector.
+    pub(crate) struct CollectingWriter {
+        pub collected: std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>,
     }
-}
 
-/// A test-only writer that collects all entries into a shared vector.
-///
-/// This allows tests to verify exactly which entries pass through a writer
-/// pipeline, including their contents and ordering.
-#[cfg(test)]
-pub(crate) struct CollectingWriter {
-    pub collected: std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>,
-}
-
-#[cfg(test)]
-impl CollectingWriter {
-    pub fn new() -> (Self, std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>) {
-        let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
-        (Self { collected: std::sync::Arc::clone(&collected) }, collected)
+    impl CollectingWriter {
+        pub fn new() -> (Self, std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>) {
+            let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+            (Self { collected: std::sync::Arc::clone(&collected) }, collected)
+        }
     }
-}
 
-#[cfg(test)]
-impl IteratorWriter<crate::output::clang::Entry> for CollectingWriter {
-    fn write(self, entries: impl Iterator<Item = crate::output::clang::Entry>) -> Result<(), WriterError> {
-        let mut collected = self.collected.lock().unwrap();
-        collected.extend(entries);
-        Ok(())
+    impl IteratorWriter<crate::output::clang::Entry> for CollectingWriter {
+        fn write(
+            self,
+            entries: impl Iterator<Item = crate::output::clang::Entry>,
+        ) -> Result<(), WriterError> {
+            let mut collected = self.collected.lock().unwrap();
+            collected.extend(entries);
+            Ok(())
+        }
     }
 }
 

@@ -45,7 +45,7 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for Conv
 mod tests {
     use super::*;
     use crate::output::statistics::OutputStatistics;
-    use crate::output::writers::CollectingWriter;
+    use crate::output::writers::fixtures::CollectingWriter;
     use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;

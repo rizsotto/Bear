@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn test_unique_writer_filters_duplicates_with_collecting_writer() {
         use crate::output::statistics::OutputStatistics;
-        use crate::output::writers::CollectingWriter;
+        use crate::output::writers::fixtures::CollectingWriter;
         use std::sync::atomic::Ordering;
 
         let stats = OutputStatistics::new();
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_unique_writer_preserves_order() {
         use crate::output::statistics::OutputStatistics;
-        use crate::output::writers::CollectingWriter;
+        use crate::output::writers::fixtures::CollectingWriter;
 
         let stats = OutputStatistics::new();
         let (writer, collected) = CollectingWriter::new();

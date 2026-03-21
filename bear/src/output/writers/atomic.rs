@@ -36,7 +36,7 @@ impl<T: IteratorWriter<clang::Entry>> IteratorWriter<clang::Entry> for AtomicCla
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::output::writers::MockWriter;
+    use crate::output::writers::fixtures::CollectingWriter;
 
     #[test]
     fn test_atomic_clang_output_writer_success() {
@@ -47,7 +47,7 @@ mod tests {
         // Create the temp file
         fs::File::create(&temp_path).unwrap();
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
+        let sut = AtomicClangOutputWriter::new(CollectingWriter::new().0, &temp_path, &final_path);
         sut.write(std::iter::empty()).unwrap();
 
         // Verify the final file exists
@@ -61,7 +61,7 @@ mod tests {
         let temp_path = dir.path().join("temp_file.json");
         let final_path = dir.path().join("final_file.json");
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
+        let sut = AtomicClangOutputWriter::new(CollectingWriter::new().0, &temp_path, &final_path);
         let result = sut.write(std::iter::empty());
 
         // Verify the operation fails
@@ -93,7 +93,7 @@ mod tests {
         // Make target directory read-only
         fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o444)).unwrap();
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
+        let sut = AtomicClangOutputWriter::new(CollectingWriter::new().0, &temp_path, &final_path);
         let result = sut.write(std::iter::empty());
 
         // Restore permissions before asserting (so tempdir cleanup works)
@@ -117,7 +117,7 @@ mod tests {
         fs::File::create(&temp_path).unwrap();
         fs::File::create(&final_path).unwrap();
 
-        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
+        let sut = AtomicClangOutputWriter::new(CollectingWriter::new().0, &temp_path, &final_path);
         let result = sut.write(std::iter::empty());
 
         // Verify the operation fails
