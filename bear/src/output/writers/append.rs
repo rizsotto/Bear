@@ -142,6 +142,67 @@ mod tests {
     }
 
     #[test]
+    fn test_append_with_corrupted_database_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("corrupted.json");
+        let result_path = dir.path().join("result_file.json");
+        let stats = OutputStatistics::new();
+
+        // Write invalid JSON to the input file
+        fs::write(&input_path, "this is not valid json at all!!!").unwrap();
+
+        let new_entries =
+            vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
+
+        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
+
+        // Should fail because read_from_compilation_db returns an error for non-JSON
+        // (the file opens fine, but deserialization fails during iteration —
+        //  however read_and_ignore swallows errors, so the iterator just yields nothing)
+        // Actually: read_from_compilation_db calls read_and_ignore which filters errors.
+        // So it should succeed with zero entries from existing DB.
+        sut.write(new_entries.into_iter()).unwrap();
+
+        let content = fs::read_to_string(&result_path).unwrap();
+        assert!(content.contains("new_file.cpp"));
+        assert_eq!(stats.entries_read_from_existing.load(std::sync::atomic::Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_append_with_partially_valid_database_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let input_path = dir.path().join("partial.json");
+        let result_path = dir.path().join("result_file.json");
+        let stats = OutputStatistics::new();
+
+        // Write a JSON array with one valid and one invalid entry
+        // The valid entry has both command and arguments (which is invalid per validation)
+        let partial_content = r#"[
+            {"directory": "/path/to/dir", "file": "valid.cpp", "arguments": ["clang", "-c"]},
+            {"directory": "", "file": "invalid.cpp", "arguments": ["clang", "-c"]}
+        ]"#;
+        fs::write(&input_path, partial_content).unwrap();
+
+        let new_entries =
+            vec![clang::Entry::from_arguments_str("new_file.cpp", vec!["clang", "-c"], "/path/to/dir", None)];
+
+        let writer = ClangOutputWriter::create(&result_path, Arc::clone(&stats)).unwrap();
+        let sut = AppendClangOutputWriter::new(writer, &input_path, true, Arc::clone(&stats));
+        sut.write(new_entries.into_iter()).unwrap();
+
+        let content = fs::read_to_string(&result_path).unwrap();
+        // Valid existing entry should be included
+        assert!(content.contains("valid.cpp"));
+        // New entry should be included
+        assert!(content.contains("new_file.cpp"));
+        // Invalid entry should be skipped (read_and_ignore filters it out)
+        assert!(!content.contains("invalid.cpp"));
+        // Only the valid existing entry was counted
+        assert_eq!(stats.entries_read_from_existing.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
+
+    #[test]
     fn test_append_clang_output_writer_overwrite_existing_file() {
         let dir = tempfile::tempdir().unwrap();
         let input_path = dir.path().join("file_to_overwrite.json");

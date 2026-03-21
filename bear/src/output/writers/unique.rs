@@ -240,6 +240,64 @@ mod tests {
         assert!(sut.unique(&entry2));
     }
 
+    // --- Pipeline writer tests with CollectingWriter ---
+
+    #[test]
+    fn test_unique_writer_filters_duplicates_with_collecting_writer() {
+        use crate::output::statistics::OutputStatistics;
+        use crate::output::writers::CollectingWriter;
+        use std::sync::atomic::Ordering;
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let config = config::DuplicateFilter {
+            match_on: vec![config::OutputFields::File, config::OutputFields::Directory],
+        };
+
+        let sut = UniqueOutputWriter::create(writer, config, Arc::clone(&stats)).unwrap();
+
+        let entries = vec![
+            Entry::from_arguments_str("file1.c", vec!["gcc", "-c"], "/project", None),
+            Entry::from_arguments_str("file1.c", vec!["gcc", "-c", "-Wall"], "/project", None), // dup
+            Entry::from_arguments_str("file2.c", vec!["gcc", "-c"], "/project", None),
+            Entry::from_arguments_str("file1.c", vec!["gcc", "-c", "-O2"], "/project", None), // dup
+        ];
+
+        sut.write(entries.into_iter()).unwrap();
+
+        let result = collected.lock().unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].file, std::path::PathBuf::from("file1.c"));
+        assert_eq!(result[1].file, std::path::PathBuf::from("file2.c"));
+        assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn test_unique_writer_preserves_order() {
+        use crate::output::statistics::OutputStatistics;
+        use crate::output::writers::CollectingWriter;
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::File] };
+
+        let sut = UniqueOutputWriter::create(writer, config, Arc::clone(&stats)).unwrap();
+
+        let entries = vec![
+            Entry::from_arguments_str("c.c", vec!["gcc", "-c"], "/project", None),
+            Entry::from_arguments_str("a.c", vec!["gcc", "-c"], "/project", None),
+            Entry::from_arguments_str("b.c", vec!["gcc", "-c"], "/project", None),
+        ];
+
+        sut.write(entries.into_iter()).unwrap();
+
+        let result = collected.lock().unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].file, std::path::PathBuf::from("c.c"));
+        assert_eq!(result[1].file, std::path::PathBuf::from("a.c"));
+        assert_eq!(result[2].file, std::path::PathBuf::from("b.c"));
+    }
+
     #[test]
     fn test_is_unique() {
         let config = config::DuplicateFilter { match_on: vec![config::OutputFields::File] };
