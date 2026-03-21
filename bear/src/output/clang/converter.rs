@@ -48,7 +48,7 @@
 //! ```
 
 use super::Entry;
-use super::{ConfigurablePathFormatter, PathFormatter};
+use super::path_format::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
 use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, PassEffect};
 use log::warn;

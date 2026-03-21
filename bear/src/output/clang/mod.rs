@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! This module provides support for reading and writing JSON compilation database files.
+//! Clang JSON compilation database data model and conversion.
 //!
-//! A compilation database is a set of records which describe the compilation of the
-//! source files in a given project. It describes the compiler invocation command to
-//! compile a source module to an object file.
-//!
-//! This database can have many forms. One well known and supported format is the JSON
-//! compilation database, which is a simple JSON file having the list of compilation
-//! as an array. The definition of the JSON compilation database files is done in the
-//! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
+//! This module defines the [`Entry`] type representing a single record in the
+//! [JSON compilation database](https://clang.llvm.org/docs/JSONCompilationDatabase.html),
+//! along with the [`CommandConverter`] for creating entries from semantic commands.
 
 pub mod converter;
 mod path_format;
@@ -21,7 +16,6 @@ use thiserror::Error;
 
 // Re-export types for easier access
 pub use converter::CommandConverter;
-pub use path_format::{ConfigurablePathFormatter, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
