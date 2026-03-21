@@ -12,7 +12,6 @@
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
 pub mod converter;
-mod filter_duplicates;
 mod filter_sources;
 mod format;
 pub(crate) mod serialization;
@@ -23,7 +22,6 @@ use thiserror::Error;
 
 // Re-export types for easier access
 pub use converter::CommandConverter;
-pub use filter_duplicates::DuplicateEntryFilter;
 pub use filter_sources::{SourceEntryFilter, SourceFilterError};
 pub use format::{ConfigurablePathFormatter, FormatError, PathFormatter};
 
@@ -34,13 +32,13 @@ pub struct Entry {
     /// This is used by tools as the key into the compilation database.
     /// There can be multiple command objects for the same file, for example if the same
     /// source file is compiled with different configurations.
-    file: path::PathBuf,
+    pub(crate) file: path::PathBuf,
     /// The compile command argv as list of strings. This should run the compilation step
     /// for the translation unit file. `arguments[0]` should be the executable name, such
     /// as `clang++`. Arguments should not be escaped, but ready to pass to `execvp()`.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
-    arguments: Vec<String>,
+    pub(crate) arguments: Vec<String>,
     /// The compile command as a single shell-escaped string. Arguments may be shell quoted
     /// and escaped following platform conventions, with ‘"’ and ‘\’ being the only special
     /// characters. Shell expansion is not supported.
@@ -49,15 +47,15 @@ pub struct Entry {
     /// (un)escaping is a possible source of errors.
     #[serde(skip_serializing_if = "String::is_empty")]
     #[serde(default)]
-    command: String,
+    pub(crate) command: String,
     /// The working directory of the compilation. All paths specified in the `command` or
     /// `file` fields must be either absolute or relative to this directory.
-    directory: path::PathBuf,
+    pub(crate) directory: path::PathBuf,
     /// The name of the output created by this compilation step. This field is optional.
     /// It can be used to distinguish different processing modes of the same input file.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
-    output: Option<path::PathBuf>,
+    pub(crate) output: Option<path::PathBuf>,
 }
 
 impl Entry {
