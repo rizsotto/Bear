@@ -32,6 +32,15 @@ pub const PRELOAD_KEY: &str = KEY_OS__PRELOAD_PATH;
 /// Global session storage, initialized once from the C constructor.
 pub static SESSION: OnceLock<PreloadState> = OnceLock::new();
 
+/// The full LD_PRELOAD value captured at library load time.
+///
+/// When doctoring an envp that has no LD_PRELOAD at all (e.g. after `env -i`),
+/// we use this to restore the complete preload chain — not just our library,
+/// but also any other LD_PRELOAD libraries (like Gentoo's `libsandbox.so`)
+/// that were present when the process started. Without this, doctoring would
+/// only restore Bear's library, breaking co-resident LD_PRELOAD libraries.
+static INITIAL_PRELOAD: OnceLock<String> = OnceLock::new();
+
 /// Create a PreloadState by extracting the intercept state from a C-style envp array.
 ///
 /// This walks through the C pointers directly to find the `KEY_INTERCEPT_STATE`
@@ -57,6 +66,31 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
             && key == KEY_INTERCEPT_STATE
         {
             return value.try_into().ok();
+        }
+        ptr = unsafe { ptr.add(1) };
+    }
+
+    None
+}
+
+/// Read a single environment variable value from a C-style envp array.
+///
+/// # Safety
+/// The `envp` pointer must be a valid null-terminated array of null-terminated
+/// C strings in "KEY=VALUE" format, or null.
+unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String> {
+    if envp.is_null() {
+        return None;
+    }
+
+    let mut ptr = envp;
+    while !unsafe { (*ptr).is_null() } {
+        let cstr = unsafe { CStr::from_ptr(*ptr) };
+        if let Ok(key_and_value) = cstr.to_str()
+            && let Some((k, v)) = key_and_value.split_once('=')
+            && k == key
+        {
+            return Some(v.to_string());
         }
         ptr = unsafe { ptr.add(1) };
     }
@@ -174,9 +208,16 @@ impl DoctoredEnvironment {
         let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
         strings.push(CString::new(intercept_entry).map_err(|_| libc::EINVAL)?);
 
-        // Add PRELOAD_KEY with the library path inserted at front
-        let preload_value =
-            insert_to_path(&original_preload_value, &state.library).map_err(|_| libc::EINVAL)?;
+        // Add PRELOAD_KEY with the library path inserted at front.
+        // If the envp had no LD_PRELOAD at all (e.g. `env -i`), fall back to the
+        // initial value captured at library load time. This preserves co-resident
+        // LD_PRELOAD libraries like Gentoo's libsandbox.so (issue #675).
+        let preload_base = if original_preload_value.is_empty() {
+            INITIAL_PRELOAD.get().cloned().unwrap_or_default()
+        } else {
+            original_preload_value
+        };
+        let preload_value = insert_to_path(&preload_base, &state.library).map_err(|_| libc::EINVAL)?;
         let preload_entry = format!("{}={}", PRELOAD_KEY, preload_value);
         strings.push(CString::new(preload_entry).map_err(|_| libc::EINVAL)?);
 
@@ -216,6 +257,11 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
         }
         Some(session) => {
             let destination = session.destination;
+
+            // Capture the full LD_PRELOAD value before anything modifies it.
+            // This preserves co-resident libraries (e.g. libsandbox.so).
+            let _ = INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }.unwrap_or_default());
+
             let _ = SESSION.set(session);
 
             Some(destination)

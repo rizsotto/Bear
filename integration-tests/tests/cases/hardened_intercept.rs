@@ -491,6 +491,8 @@ int main() {{
 /// - On i686 (32-bit), chained variadic function overrides (`execle`) can
 ///   corrupt the stack — likely the cause of the SIGSEGV reported in #675.
 ///   This test covers the basic "chain of RTLD_NEXT" scenario only.
+///
+/// See also HI-9 which tests the harder case: competing library + `env -i`.
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -556,6 +558,153 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: env.test_dir().to_str().unwrap().to_string(),
+        arguments: vec![
+            COMPILER_C_PATH.to_string(),
+            "-c".to_string(),
+            "test.c".to_string(),
+            "-o".to_string(),
+            "test.o".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+/// HI-9: Competing LD_PRELOAD library survives exec with empty envp.
+///
+/// Simulates the core #675 failure: a competing LD_PRELOAD library (like
+/// Gentoo's `libsandbox.so`) coexists with Bear's, and a program calls
+/// `execve` with a completely empty envp. When Bear's doctoring restores
+/// `LD_PRELOAD`, it must include the competing library — not just its own.
+///
+/// The competing library here **enforces** its presence: its `execve`
+/// override checks that its path appears in the envp's `LD_PRELOAD` and
+/// rejects the exec with `EPERM` if missing. This simulates sandbox's
+/// self-protection.
+///
+/// We use a C program that calls `execve` directly (not `env -i`) because
+/// `env` uses `execvp` → `execvpe` which bypasses the competing library's
+/// `execve` override entirely.
+///
+/// Without the fix (preserving the initial full LD_PRELOAD in INITIAL_PRELOAD),
+/// doctoring after an empty-envp exec would set `LD_PRELOAD=libexec.so` only,
+/// and the competing library's check would reject the exec.
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn hardened_competing_ld_preload_survives_env_clear() -> Result<()> {
+    let env = TestEnvironment::new("hardened_competing_env_clear")?;
+    env.create_config(CONFIG)?;
+
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    // Build a competing library that enforces its own presence in LD_PRELOAD.
+    // If a child exec's envp does NOT contain this library in LD_PRELOAD,
+    // the library rejects the exec with EPERM. This simulates sandbox
+    // self-protection behavior.
+    let lib_path = env.test_dir().join("libcompeting.so");
+    let competing_lib_source = format!(
+        r#"
+#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MY_PATH "{lib_path}"
+
+typedef int (*execve_func_t)(const char *, char *const[], char *const[]);
+
+int execve(const char *path, char *const argv[], char *const envp[]) {{
+    execve_func_t real_execve = (execve_func_t)dlsym(RTLD_NEXT, "execve");
+    if (!real_execve) return -1;
+
+    /* Check that our library is still in LD_PRELOAD.
+       If not, reject the exec — simulating sandbox self-protection. */
+    int found = 0;
+    for (char *const *e = envp; *e; e++) {{
+        if (strstr(*e, "LD_PRELOAD=") == *e) {{
+            if (strstr(*e, MY_PATH)) {{
+                found = 1;
+            }}
+            break;
+        }}
+    }}
+    if (!found) {{
+        errno = EPERM;
+        return -1;
+    }}
+
+    return real_execve(path, argv, envp);
+}}
+"#,
+        lib_path = lib_path.to_str().unwrap(),
+    );
+
+    env.create_source_files(&[("competing_lib.c", &competing_lib_source)])?;
+
+    let compile_result = {
+        let mut cmd = std::process::Command::new(COMPILER_C_PATH);
+        cmd.current_dir(env.test_dir()).args([
+            "-shared",
+            "-fPIC",
+            "-o",
+            "libcompeting.so",
+            "competing_lib.c",
+            "-ldl",
+        ]);
+        cmd.output()?
+    };
+    if !compile_result.status.success() {
+        anyhow::bail!(
+            "Failed to compile competing library: {}",
+            String::from_utf8_lossy(&compile_result.stderr)
+        );
+    }
+
+    // Build a C program that calls execve with an empty envp.
+    // This forces the call through execve (not execvp/execvpe), so the
+    // competing library's execve override is in the RTLD_NEXT chain.
+    let launcher_source = format!(
+        r#"#include <unistd.h>
+#include <stdio.h>
+
+int main() {{
+    char *const argv[] = {{ "{compiler}", "-c", "test.c", "-o", "test.o", 0 }};
+    char *const envp[] = {{ "PATH=/usr/bin:/bin", 0 }};
+    execve("{compiler}", argv, envp);
+    perror("execve failed");
+    return 1;
+}}"#,
+        compiler = COMPILER_C_PATH,
+    );
+
+    env.create_source_files(&[("launcher.c", &launcher_source)])?;
+    env.run_c_compiler("launcher", &["launcher.c"])?;
+
+    // Run bear with the competing library added to LD_PRELOAD.
+    // Bear will prepend libexec.so, giving: libexec.so:libcompeting.so
+    // The launcher then calls execve with an empty envp. Bear's doctoring
+    // must restore LD_PRELOAD with BOTH libraries for the competing
+    // library's self-check to pass.
+    let build_commands =
+        format!("export LD_PRELOAD=\"$LD_PRELOAD:{}\" && ./launcher", lib_path.to_str().unwrap(),);
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    env.run_bear_success(&[
+        "--config",
+        "config.yml",
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_contains(&compilation_entry!(
         file: "test.c".to_string(),
         directory: env.test_dir().to_str().unwrap().to_string(),
