@@ -60,7 +60,7 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
         let unique_writer =
             UniqueOutputWriter::create(base_writer, config.duplicates.clone(), Arc::clone(&stats))?;
         let source_filter_writer =
-            SourceFilterOutputWriter::create(unique_writer, config.sources.clone(), Arc::clone(&stats))?;
+            SourceFilterOutputWriter::new(unique_writer, config.sources.clone(), Arc::clone(&stats));
         let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
         let append_writer =
             AppendClangOutputWriter::new(atomic_writer, final_path, args.append, Arc::clone(&stats));
