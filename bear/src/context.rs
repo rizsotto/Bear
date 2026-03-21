@@ -2,11 +2,19 @@
 
 use crate::environment;
 use crate::environment::KEY_OS__PATH;
-use anyhow::{Context as AnyhowContext, Result};
 use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::path::PathBuf;
+
+/// Errors that can occur when capturing the application context.
+#[derive(Debug, thiserror::Error)]
+pub enum ContextError {
+    #[error("Failed to get current executable path: {0}")]
+    CurrentExecutable(std::io::Error),
+    #[error("Failed to get current working directory: {0}")]
+    CurrentDirectory(std::io::Error),
+}
 
 /// Application context containing runtime environment information.
 ///
@@ -34,12 +42,10 @@ impl Context {
     ///
     /// This function performs I/O operations to gather system state and should
     /// be called early in the application lifecycle, before any validation phase.
-    pub fn capture() -> Result<Self> {
-        let current_executable =
-            env::current_exe().with_context(|| "Failed to get current executable path")?;
+    pub fn capture() -> Result<Self, ContextError> {
+        let current_executable = env::current_exe().map_err(ContextError::CurrentExecutable)?;
 
-        let current_directory =
-            env::current_dir().with_context(|| "Failed to get current working directory")?;
+        let current_directory = env::current_dir().map_err(ContextError::CurrentDirectory)?;
 
         let environment = env::vars().collect::<HashMap<String, String>>();
 
@@ -263,6 +269,26 @@ mod tests {
             // Just verify the field exists and has a boolean value
             let _ = context.preload_supported;
         }
+    }
+
+    #[test]
+    fn test_context_error_current_executable() {
+        let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
+        let error = ContextError::CurrentExecutable(io_error);
+
+        assert!(matches!(error, ContextError::CurrentExecutable(_)));
+        assert!(error.to_string().contains("Failed to get current executable path"));
+        assert!(error.to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_context_error_current_directory() {
+        let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+        let error = ContextError::CurrentDirectory(io_error);
+
+        assert!(matches!(error, ContextError::CurrentDirectory(_)));
+        assert!(error.to_string().contains("Failed to get current working directory"));
+        assert!(error.to_string().contains("permission denied"));
     }
 
     #[cfg(target_os = "macos")]
