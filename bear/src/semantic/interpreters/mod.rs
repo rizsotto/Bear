@@ -8,6 +8,7 @@ mod combinators;
 pub mod compilers;
 mod ignore;
 mod matchers;
+pub mod resolve;
 
 use super::Interpreter;
 use crate::config;
@@ -15,6 +16,7 @@ use crate::config;
 use combinators::{Any, InputLogger, OutputLogger};
 use compilers::CompilerInterpreter;
 use ignore::IgnoreByPath;
+use resolve::ResolveExecutable;
 use std::path::PathBuf;
 use thiserror::Error;
 
@@ -31,7 +33,10 @@ pub enum InterpreterConfigError {
 /// 1. Generic programs to exclude
 /// 2. Compilers specified to exclude
 /// 3. All other compilers to include
-pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, InterpreterConfigError> {
+pub fn create<'a>(
+    config: &config::Main,
+    confstr_path: String,
+) -> Result<impl Interpreter + 'a, InterpreterConfigError> {
     // Build the base interpreter chain
     let mut interpreters: Vec<Box<dyn Interpreter>> = vec![
         // ignore executables which are not compilers,
@@ -48,7 +53,9 @@ pub fn create<'a>(config: &config::Main) -> Result<impl Interpreter + 'a, Interp
     let tool = CompilerInterpreter::new_with_config(&config.compilers);
     interpreters.push(Box::new(tool));
 
-    Ok(InputLogger::new(Any::new(interpreters)))
+    // Wrap the chain with executable path resolution so bare filenames
+    // from preload p-variant interceptions are resolved to absolute paths.
+    Ok(ResolveExecutable::new(InputLogger::new(Any::new(interpreters)), confstr_path))
 }
 
 fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
@@ -67,7 +74,7 @@ mod test {
     #[test]
     fn test_create_interpreter_with_default_config() {
         let config = config::Main::default();
-        let interpreter = create(&config);
+        let interpreter = create(&config, "/usr/bin:/bin".to_string());
 
         // Test that the interpreter can be created without errors
         assert!(interpreter.is_ok());
@@ -76,7 +83,7 @@ mod test {
     #[test]
     fn test_create_interpreter_recognizes_compiler() {
         let config = config::Main::default();
-        let interpreter = create(&config).unwrap();
+        let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -96,7 +103,7 @@ mod test {
     #[test]
     fn test_create_interpreter_ignores_coreutils() {
         let config = config::Main::default();
-        let interpreter = create(&config).unwrap();
+        let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
         let execution =
             Execution::from_strings("/usr/bin/ls", vec!["ls", "-la"], "/home/user", HashMap::new());
@@ -120,7 +127,7 @@ mod test {
             ..Default::default()
         };
 
-        let interpreter = create(&config).unwrap();
+        let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
         let execution = Execution::from_strings(
             "/usr/bin/gcc",
@@ -156,7 +163,7 @@ mod test {
     fn test_windows_gcc_exe_regression() {
         // Regression test for Windows CI failure where gcc.exe was not recognized
         let config = config::Main::default();
-        let interpreter = create(&config).unwrap();
+        let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
         // Test with .exe extension - this simulates Windows executables
         let execution = Execution::from_strings(
@@ -183,7 +190,7 @@ mod test {
     #[test]
     fn test_various_windows_exe_compilers() {
         let config = config::Main::default();
-        let interpreter = create(&config).unwrap();
+        let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
         let test_cases = vec!["gcc.exe", "g++.exe", "clang.exe", "clang++.exe", "gfortran.exe", "nvcc.exe"];
 

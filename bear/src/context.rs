@@ -24,6 +24,9 @@ pub struct Context {
     pub environment: HashMap<String, String>,
     /// Whether preload-based interception is supported on this system
     pub preload_supported: bool,
+    /// Default executable search path from `confstr(_CS_PATH)`.
+    /// Used as a fallback when a process's environment lacks `PATH`.
+    pub confstr_path: String,
 }
 
 impl Context {
@@ -41,8 +44,9 @@ impl Context {
         let environment = env::vars().collect::<HashMap<String, String>>();
 
         let preload_supported = is_preload_supported();
+        let confstr_path = get_confstr_cs_path();
 
-        Ok(Context { current_executable, current_directory, environment, preload_supported })
+        Ok(Context { current_executable, current_directory, environment, preload_supported, confstr_path })
     }
 
     /// Returns the PATH environment variable key and value.
@@ -130,6 +134,35 @@ fn is_sip_enabled() -> bool {
     }
 }
 
+/// Returns the default search path from `confstr(_CS_PATH)`.
+///
+/// On Unix systems, this queries the system configuration for the standard
+/// utility search path. Falls back to `/usr/bin:/bin` if unavailable.
+#[cfg(unix)]
+fn get_confstr_cs_path() -> String {
+    use std::ffi::CStr;
+
+    let len = unsafe { libc::confstr(libc::_CS_PATH, std::ptr::null_mut(), 0) };
+    if len == 0 {
+        return "/usr/bin:/bin".to_string();
+    }
+
+    let mut buf = vec![0u8; len];
+    let result = unsafe { libc::confstr(libc::_CS_PATH, buf.as_mut_ptr() as *mut libc::c_char, len) };
+    if result == 0 {
+        return "/usr/bin:/bin".to_string();
+    }
+
+    CStr::from_bytes_until_nul(&buf)
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| "/usr/bin:/bin".to_string())
+}
+
+#[cfg(not(unix))]
+fn get_confstr_cs_path() -> String {
+    "/usr/bin:/bin".to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,6 +207,7 @@ mod tests {
             current_directory: std::env::current_dir().unwrap(),
             environment: test_env,
             preload_supported: is_preload_supported(),
+            confstr_path: get_confstr_cs_path(),
         };
 
         let display_output = format!("{}", context);
@@ -205,6 +239,7 @@ mod tests {
             current_directory: std::env::current_dir().unwrap(),
             environment: test_env,
             preload_supported: is_preload_supported(),
+            confstr_path: get_confstr_cs_path(),
         };
 
         let display_output = format!("{}", context);

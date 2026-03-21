@@ -69,6 +69,7 @@ dependencies = [
  "crossbeam-channel",
  "directories",
  "env_logger",
+ "libc",
  "log",
  "mockall",
  "regex",
@@ -79,6 +80,7 @@ dependencies = [
  "signal-hook",
  "tempfile",
  "thiserror",
+ "which",
 ]
 
 [[package]]

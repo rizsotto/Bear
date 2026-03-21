@@ -120,28 +120,10 @@ fn check_executable_exists(executable: &str) {
 fn check_one_executable_exists(define: &str, executables: &[&str]) {
     for executable in executables {
         if let Ok(path) = which::which(executable) {
-            // For integration tests, prefer real compiler paths over ccache wrappers
-            let final_path = if path.to_string_lossy().contains("ccache") {
-                // Try to find the real compiler in /usr/bin
-                let real_path = std::path::Path::new("/usr/bin").join(executable);
-                if real_path.exists() {
-                    println!(
-                        "cargo:warning=Preferring real compiler {} over ccache wrapper {}",
-                        real_path.display(),
-                        path.display()
-                    );
-                    real_path
-                } else {
-                    path
-                }
-            } else {
-                path
-            };
-
             println!("cargo:rustc-cfg=has_executable_{}", define);
             println!("cargo:rustc-check-cfg=cfg(has_executable_{})", define);
-            println!("cargo:rustc-env={}_PATH={}", define.to_uppercase(), final_path.display());
-            println!("cargo:warning=Checking for executable: {} ... {}", define, final_path.display());
+            println!("cargo:rustc-env={}_PATH={}", define.to_uppercase(), path.display());
+            println!("cargo:warning=Checking for executable: {} ... {}", define, path.display());
             return;
         }
     }

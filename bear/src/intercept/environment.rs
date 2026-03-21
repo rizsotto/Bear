@@ -559,6 +559,7 @@ mod test {
                     current_directory: PathBuf::from("/tmp"),
                     environment,
                     preload_supported: true,
+                    confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
             let intercept = config::Intercept::Preload;
@@ -619,6 +620,7 @@ mod test {
                     current_directory: current_dir.path().to_path_buf(),
                     environment: HashMap::new(),
                     preload_supported: false,
+                    confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
 
@@ -669,6 +671,7 @@ mod test {
                     current_directory: current_dir.path().to_path_buf(),
                     environment,
                     preload_supported: true,
+                    confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
 
@@ -752,6 +755,7 @@ mod test {
                     current_directory: current_dir.path().to_path_buf(),
                     environment,
                     preload_supported: true,
+                    confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
 
@@ -844,6 +848,7 @@ mod test {
                     current_directory: current_dir.path().to_path_buf(),
                     environment,
                     preload_supported: true,
+                    confstr_path: String::from("/usr/bin:/bin"),
                 }
             };
 

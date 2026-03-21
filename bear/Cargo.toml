@@ -43,6 +43,8 @@ tempfile.workspace = true
 signal-hook.workspace = true
 crossbeam-channel.workspace = true
 regex.workspace = true
+which.workspace = true
+libc.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

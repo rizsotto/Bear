@@ -259,11 +259,8 @@ sources:
     let absolute_src_dir = src_dir.canonicalize().unwrap_or_else(|_| src_dir.clone());
     let absolute_file_path = absolute_src_dir.join("main.c");
 
-    let expected_args = vec![
-        COMPILER_C_PATH.to_string(),
-        "-c".to_string(),
-        absolute_file_path.to_str().unwrap().to_string(),
-    ];
+    let expected_args =
+        vec![COMPILER_C_PATH.to_string(), "-c".to_string(), absolute_file_path.to_str().unwrap().to_string()];
 
     // For absolute path format, we expect the file and directory to be absolute paths
 

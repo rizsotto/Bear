@@ -8,6 +8,43 @@
 //!
 //! The module provides abstractions for the reporter and the collector. And it also defines
 //! the data structures that are used to represent the events.
+//!
+//! # How the executable path is captured
+//!
+//! The `Execution.executable` field contains the path to the intercepted executable.
+//! Its value depends on the interception mechanism and the exec-family function used:
+//!
+//! ## Wrapper mode
+//!
+//! The wrapper binary discovers the real compiler path at build start (via `which`) and
+//! stores it in a config file. When invoked, it replaces its own path with the real
+//! compiler's absolute path before reporting. **Result:** always an absolute path.
+//!
+//! ## Preload mode (libexec.so)
+//!
+//! The preload library intercepts exec-family calls and reports the path argument as-is:
+//!
+//! | Function    | Parameter | Typical value   | Searches PATH? |
+//! |-------------|-----------|-----------------|----------------|
+//! | `execve`    | `path`    | `/usr/bin/gcc`  | No             |
+//! | `execv`     | `path`    | `/usr/bin/gcc`  | No             |
+//! | `execvpe`   | `file`    | `gcc`           | Yes            |
+//! | `execvp`    | `file`    | `gcc`           | Yes            |
+//! | `execlp`    | `file`    | `gcc`           | Yes            |
+//! | `posix_spawn` | `path`  | `/usr/bin/gcc`  | No             |
+//! | `posix_spawnp` | `file` | `gcc`           | Yes            |
+//!
+//! The `p`-variant functions accept bare filenames; the preload shim reports them
+//! as-is (not resolved). **Result:** absolute path or bare filename.
+//!
+//! ## Normalization
+//!
+//! Bare executable filenames from `p`-variant interceptions are resolved to
+//! absolute paths by the [`ResolveExecutable`] interpreter decorator in the
+//! semantic analysis layer. It uses the execution's own `PATH` environment
+//! variable, falling back to the system default from `confstr(_CS_PATH)`.
+//!
+//! [`ResolveExecutable`]: crate::semantic::interpreters::resolve::ResolveExecutable
 
 pub mod environment;
 pub mod reporter;

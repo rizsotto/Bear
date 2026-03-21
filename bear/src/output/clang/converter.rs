@@ -418,8 +418,18 @@ mod tests {
         let result = converter.to_entries(&command);
 
         let expected = vec![
-            Entry::from_arguments_str("file1.cpp", vec!["/usr/bin/g++", "-c", "file1.cpp"], "/home/user", None),
-            Entry::from_arguments_str("file2.cpp", vec!["/usr/bin/g++", "-c", "file2.cpp"], "/home/user", None),
+            Entry::from_arguments_str(
+                "file1.cpp",
+                vec!["/usr/bin/g++", "-c", "file1.cpp"],
+                "/home/user",
+                None,
+            ),
+            Entry::from_arguments_str(
+                "file2.cpp",
+                vec!["/usr/bin/g++", "-c", "file2.cpp"],
+                "/home/user",
+                None,
+            ),
         ];
         assert_eq!(result, expected);
     }
@@ -459,8 +469,12 @@ mod tests {
         let converter = CommandConverter::new(format);
         let entries = converter.to_entries(&command);
 
-        let expected =
-            vec![Entry::from_command_str("main.c", "/usr/bin/gcc -c main.c -o main.o", "/home/user", Some("main.o"))];
+        let expected = vec![Entry::from_command_str(
+            "main.c",
+            "/usr/bin/gcc -c main.c -o main.o",
+            "/home/user",
+            Some("main.o"),
+        )];
         assert_eq!(entries, expected);
     }
 
