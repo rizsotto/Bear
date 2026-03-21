@@ -46,6 +46,49 @@ that case, please omit the extra `--` or consult your local documentation.
 For more information, read the man pages or the project [wiki][WIKI], which
 talks about limitations, known issues, and platform-specific usage.
 
+When to use Bear
+-----------------
+
+Use Bear when your build system does not natively support generating a
+[JSON compilation database][JSONCDB]. If your project already uses CMake,
+Meson, or Bazel, prefer the built-in compilation database export those tools
+provide — it will be faster and more reliable.
+
+Supported platforms
+-------------------
+
+Bear works on:
+
+- **Linux** (glibc and musl) — interception via `LD_PRELOAD`
+- **macOS** — interception via `DYLD_INSERT_LIBRARIES`
+- **FreeBSD, NetBSD, OpenBSD, DragonFly BSD** — interception via `LD_PRELOAD`
+- **Windows** — wrapper-based interception only (no preload library)
+
+Limitations
+-----------
+
+- **macOS System Integrity Protection (SIP)** can prevent library preloading
+  for system-protected executables. See the [wiki][WIKI] for workarounds.
+- Builds that use **sandboxing** (e.g., Nix, Flatpak) may block interception.
+- When using **distcc** or **ccache**, Bear may need extra configuration to
+  intercept the actual compiler invocation. Consult the [wiki][WIKI].
+- Bear intercepts process creation — builds that do not spawn a compiler
+  process (e.g., some IDE-internal builds) will not produce output.
+
+Version note
+------------
+
+Bear 3.x and later require a `--` separator between Bear flags and the build
+command:
+
+    bear -- make
+
+Bear 2.4.x does not use the separator:
+
+    bear make
+
+Check your installed version with `bear --version`.
+
 Problem reports
 ---------------
 
