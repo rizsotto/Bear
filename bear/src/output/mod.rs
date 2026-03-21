@@ -83,3 +83,62 @@ pub enum WriterError {
     #[error("Serialization error {0}: {1}")]
     Io(std::path::PathBuf, SerializationError),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
+    use std::sync::atomic::Ordering;
+
+    fn make_compile_command(file: &str) -> Command {
+        Command::Compiler(CompilerCommand::from_strings(
+            "/home/user",
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec![file]),
+            ],
+        ))
+    }
+
+    #[test]
+    fn test_output_writer_try_from_and_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("compile_commands.json");
+        let args = args::BuildSemantic { path: output_path.clone(), append: false };
+        let config = config::Main::default();
+
+        let writer = OutputWriter::try_from((&args, &config)).unwrap();
+
+        // Statistics should be accessible before write
+        let stats = writer.statistics().clone();
+        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 0);
+
+        let commands = vec![make_compile_command("main.c"), make_compile_command("util.c")];
+
+        writer.write(commands.into_iter()).unwrap();
+
+        // Verify output file
+        assert!(output_path.exists());
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        assert!(content.contains("main.c"));
+        assert!(content.contains("util.c"));
+
+        // Verify statistics were populated
+        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn test_output_writer_creation_failure() {
+        let args = args::BuildSemantic {
+            path: std::path::PathBuf::from("/nonexistent/dir/output.json"),
+            append: false,
+        };
+        let config = config::Main::default();
+
+        let result = OutputWriter::try_from((&args, &config));
+        assert!(result.is_err());
+    }
+}

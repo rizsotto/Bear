@@ -69,6 +69,44 @@ mod tests {
         assert!(!final_path.exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_atomic_clang_output_writer_permission_denied() {
+        use std::os::unix::fs::PermissionsExt;
+
+        // Skip this test when running as root (root bypasses permission checks)
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let temp_path = dir.path().join("temp_file.json");
+
+        // Create a read-only target directory
+        let readonly_dir = dir.path().join("readonly");
+        fs::create_dir(&readonly_dir).unwrap();
+        let final_path = readonly_dir.join("final_file.json");
+
+        // Create the temp file
+        fs::File::create(&temp_path).unwrap();
+
+        // Make target directory read-only
+        fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o444)).unwrap();
+
+        let sut = AtomicClangOutputWriter::new(MockWriter, &temp_path, &final_path);
+        let result = sut.write(std::iter::empty());
+
+        // Restore permissions before asserting (so tempdir cleanup works)
+        fs::set_permissions(&readonly_dir, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            WriterError::Io(path, _) => {
+                assert_eq!(path, final_path);
+            }
+        }
+    }
+
     #[test]
     fn test_atomic_clang_output_writer_final_file_exists() {
         let dir = tempfile::tempdir().unwrap();

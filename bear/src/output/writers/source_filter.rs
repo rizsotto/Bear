@@ -350,6 +350,64 @@ mod tests {
         assert!(filter.should_include_path(Path::new("other/file.c")));
     }
 
+    // --- Pipeline writer tests with CollectingWriter ---
+
+    #[test]
+    fn test_source_filter_with_collecting_writer_verifies_entries() {
+        use crate::output::writers::CollectingWriter;
+        use std::sync::atomic::Ordering;
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let config = SourceFilter {
+            directories: vec![
+                DirectoryRule { path: PathBuf::from("src"), action: DirectoryAction::Include },
+                DirectoryRule { path: PathBuf::from("/usr/include"), action: DirectoryAction::Exclude },
+            ],
+        };
+
+        let sut = SourceFilterOutputWriter::new(writer, config, Arc::clone(&stats));
+
+        let entries = vec![
+            clang::Entry::from_arguments_str("src/main.c", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("/usr/include/stdio.h", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("lib/utils.c", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("src/helper.c", vec!["gcc", "-c"], "/project", None),
+        ];
+
+        sut.write(entries.into_iter()).unwrap();
+
+        let result = collected.lock().unwrap();
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].file, PathBuf::from("src/main.c"));
+        assert_eq!(result[1].file, PathBuf::from("lib/utils.c"));
+        assert_eq!(result[2].file, PathBuf::from("src/helper.c"));
+        assert_eq!(stats.entries_filtered_by_source.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn test_source_filter_with_collecting_writer_empty_config_passes_all() {
+        use crate::output::writers::CollectingWriter;
+        use std::sync::atomic::Ordering;
+
+        let stats = OutputStatistics::new();
+        let (writer, collected) = CollectingWriter::new();
+        let config = SourceFilter::default();
+
+        let sut = SourceFilterOutputWriter::new(writer, config, Arc::clone(&stats));
+
+        let entries = vec![
+            clang::Entry::from_arguments_str("any/file.c", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("/usr/include/stdio.h", vec!["gcc", "-c"], "/project", None),
+        ];
+
+        sut.write(entries.into_iter()).unwrap();
+
+        let result = collected.lock().unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(stats.entries_filtered_by_source.load(Ordering::Relaxed), 0);
+    }
+
     // --- Pipeline writer tests ---
 
     #[test]
