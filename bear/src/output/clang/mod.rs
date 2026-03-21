@@ -12,7 +12,7 @@
 //! LLVM project [documentation](https://clang.llvm.org/docs/JSONCompilationDatabase.html).
 
 pub mod converter;
-mod format;
+mod path_format;
 pub(crate) mod serialization;
 
 use shell_words;
@@ -21,7 +21,7 @@ use thiserror::Error;
 
 // Re-export types for easier access
 pub use converter::CommandConverter;
-pub use format::{ConfigurablePathFormatter, FormatError, PathFormatter};
+pub use path_format::{ConfigurablePathFormatter, FormatError, PathFormatter};
 
 /// Represents an entry of the compilation database.
 #[derive(Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]

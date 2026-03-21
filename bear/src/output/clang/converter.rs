@@ -367,7 +367,7 @@ impl CommandConverter {
 
 #[cfg(test)]
 mod tests {
-    use super::super::format::{FormatError, MockPathFormatter};
+    use super::super::path_format::{FormatError, MockPathFormatter};
     use super::*;
     use crate::config::{EntryFormat, Format, PathFormat};
     use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
