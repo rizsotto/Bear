@@ -4,7 +4,7 @@
 # Install script for Bear.
 #
 # Environment variables:
-#   DESTDIR          — installation prefix (default: /usr/local if root, $HOME/.local otherwise)
+#   PREFIX           — installation prefix (default: /usr/local if root, $HOME/.local otherwise)
 #   INTERCEPT_LIBDIR — library directory name (default: lib)
 #   SRCDIR           — directory containing build artifacts (default: target/release)
 #
@@ -12,7 +12,7 @@
 #   ./scripts/install.sh              # install with defaults
 #   ./scripts/install.sh --uninstall  # remove previously installed files
 #
-#   DESTDIR=/usr INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
+#   PREFIX=/usr INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
 
 set -euxo pipefail
 
@@ -20,27 +20,27 @@ set -euxo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-DESTDIR="${DESTDIR:-}"
-if [ -z "$DESTDIR" ]; then
+PREFIX="${PREFIX:-}"
+if [ -z "$PREFIX" ]; then
     if [ "$(id -u)" -eq 0 ]; then
-        DESTDIR="/usr/local"
+        PREFIX="/usr/local"
     else
-        DESTDIR="$HOME/.local"
+        PREFIX="$HOME/.local"
     fi
 fi
 
 # Resolve to absolute path
-DESTDIR="$(cd "$DESTDIR" 2>/dev/null && pwd || echo "$DESTDIR")"
+PREFIX="$(cd "$PREFIX" 2>/dev/null && pwd || echo "$PREFIX")"
 
 INTERCEPT_LIBDIR="${INTERCEPT_LIBDIR-lib}"
 
-UNINSTALL_SCRIPT="$DESTDIR/share/bear/uninstall.sh"
+UNINSTALL_SCRIPT="$PREFIX/share/bear/uninstall.sh"
 
 # --- safety guards ------------------------------------------------------------
 
-refuse_root_destdir() {
-    if [ "$DESTDIR" = "/" ]; then
-        echo "error: refusing to operate with DESTDIR=/ (would clobber the root filesystem)" >&2
+refuse_root_prefix() {
+    if [ "$PREFIX" = "/" ]; then
+        echo "error: refusing to operate with PREFIX=/ (would clobber the root filesystem)" >&2
         exit 1
     fi
 }
@@ -98,14 +98,14 @@ detect_platform() {
 # --- install ------------------------------------------------------------------
 
 do_install() {
-    refuse_root_destdir
+    refuse_root_prefix
     validate_intercept_libdir
     detect_platform
 
     SRCDIR="$(find_source_dir)"
 
     # Start generating uninstall script (create directory first)
-    mkdir -p "$DESTDIR/share/bear"
+    mkdir -p "$PREFIX/share/bear"
     cat > "$UNINSTALL_SCRIPT" <<'UNINSTALL_HEADER'
 #!/bin/sh
 # Bear uninstall script
@@ -138,83 +138,83 @@ UNINSTALL_HEADER
 
     # bear-driver and bear-wrapper
     echo "# Remove bear binaries" >> "$UNINSTALL_SCRIPT"
-    mkdir -p "$DESTDIR/share/bear/bin"
-    install -m 755 "$SRCDIR/bear-driver" "$DESTDIR/share/bear/bin/bear-driver"
-    echo "rm -f '$DESTDIR/share/bear/bin/bear-driver'" >> "$UNINSTALL_SCRIPT"
-    install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR/share/bear/bin/bear-wrapper"
-    echo "rm -f '$DESTDIR/share/bear/bin/bear-wrapper'" >> "$UNINSTALL_SCRIPT"
-    emit_rmdir "$DESTDIR/share/bear/bin" "$DESTDIR"
+    mkdir -p "$PREFIX/share/bear/bin"
+    install -m 755 "$SRCDIR/bear-driver" "$PREFIX/share/bear/bin/bear-driver"
+    echo "rm -f '$PREFIX/share/bear/bin/bear-driver'" >> "$UNINSTALL_SCRIPT"
+    install -m 755 "$SRCDIR/bear-wrapper" "$PREFIX/share/bear/bin/bear-wrapper"
+    echo "rm -f '$PREFIX/share/bear/bin/bear-wrapper'" >> "$UNINSTALL_SCRIPT"
+    emit_rmdir "$PREFIX/share/bear/bin" "$PREFIX"
 
     # preload library (Unix only)
     if [ "$HAS_PRELOAD" = true ] && [ -f "$SRCDIR/$PRELOAD_NAME" ]; then
         echo "" >> "$UNINSTALL_SCRIPT"
         echo "# Remove preload library" >> "$UNINSTALL_SCRIPT"
-        mkdir -p "$DESTDIR/share/bear/$INTERCEPT_LIBDIR"
-        install -m 644 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
-        echo "rm -f '$DESTDIR/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME'" >> "$UNINSTALL_SCRIPT"
-        emit_rmdir "$DESTDIR/share/bear/$INTERCEPT_LIBDIR" "$DESTDIR"
+        mkdir -p "$PREFIX/share/bear/$INTERCEPT_LIBDIR"
+        install -m 644 "$SRCDIR/$PRELOAD_NAME" "$PREFIX/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
+        echo "rm -f '$PREFIX/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME'" >> "$UNINSTALL_SCRIPT"
+        emit_rmdir "$PREFIX/share/bear/$INTERCEPT_LIBDIR" "$PREFIX"
     fi
 
     # bear entry script
     echo "" >> "$UNINSTALL_SCRIPT"
     echo "# Remove bear entry script" >> "$UNINSTALL_SCRIPT"
-    mkdir -p "$DESTDIR/bin"
+    mkdir -p "$PREFIX/bin"
     tmp_bear_sh="$(mktemp)"
     trap 'rm -f "$tmp_bear_sh"' EXIT
     cat > "$tmp_bear_sh" <<ENTRY_SCRIPT
 #!/bin/sh
-$DESTDIR/share/bear/bin/bear-driver "\$@"
+$PREFIX/share/bear/bin/bear-driver "\$@"
 ENTRY_SCRIPT
-    install -m 755 "$tmp_bear_sh" "$DESTDIR/bin/bear"
+    install -m 755 "$tmp_bear_sh" "$PREFIX/bin/bear"
     rm -f "$tmp_bear_sh"
     trap - EXIT
-    echo "rm -f '$DESTDIR/bin/bear'" >> "$UNINSTALL_SCRIPT"
-    emit_rmdir "$DESTDIR/bin" "$DESTDIR"
+    echo "rm -f '$PREFIX/bin/bear'" >> "$UNINSTALL_SCRIPT"
+    emit_rmdir "$PREFIX/bin" "$PREFIX"
 
     # man page
     if [ -f "$REPO_ROOT/man/bear.1" ]; then
         echo "" >> "$UNINSTALL_SCRIPT"
         echo "# Remove man page" >> "$UNINSTALL_SCRIPT"
-        mkdir -p "$DESTDIR/share/man/man1"
-        install -m 644 "$REPO_ROOT/man/bear.1" "$DESTDIR/share/man/man1/bear.1"
-        echo "rm -f '$DESTDIR/share/man/man1/bear.1'" >> "$UNINSTALL_SCRIPT"
-        emit_rmdir "$DESTDIR/share/man/man1" "$DESTDIR"
+        mkdir -p "$PREFIX/share/man/man1"
+        install -m 644 "$REPO_ROOT/man/bear.1" "$PREFIX/share/man/man1/bear.1"
+        echo "rm -f '$PREFIX/share/man/man1/bear.1'" >> "$UNINSTALL_SCRIPT"
+        emit_rmdir "$PREFIX/share/man/man1" "$PREFIX"
     fi
 
     # documentation
     echo "" >> "$UNINSTALL_SCRIPT"
     echo "# Remove documentation" >> "$UNINSTALL_SCRIPT"
-    mkdir -p "$DESTDIR/share/doc/bear"
+    mkdir -p "$PREFIX/share/doc/bear"
     if [ -f "$REPO_ROOT/README.md" ]; then
-        install -m 644 "$REPO_ROOT/README.md" "$DESTDIR/share/doc/bear/README.md"
-        echo "rm -f '$DESTDIR/share/doc/bear/README.md'" >> "$UNINSTALL_SCRIPT"
+        install -m 644 "$REPO_ROOT/README.md" "$PREFIX/share/doc/bear/README.md"
+        echo "rm -f '$PREFIX/share/doc/bear/README.md'" >> "$UNINSTALL_SCRIPT"
     fi
     if [ -f "$REPO_ROOT/COPYING" ]; then
-        install -m 644 "$REPO_ROOT/COPYING" "$DESTDIR/share/doc/bear/COPYING"
-        echo "rm -f '$DESTDIR/share/doc/bear/COPYING'" >> "$UNINSTALL_SCRIPT"
+        install -m 644 "$REPO_ROOT/COPYING" "$PREFIX/share/doc/bear/COPYING"
+        echo "rm -f '$PREFIX/share/doc/bear/COPYING'" >> "$UNINSTALL_SCRIPT"
     fi
-    emit_rmdir "$DESTDIR/share/doc/bear" "$DESTDIR"
+    emit_rmdir "$PREFIX/share/doc/bear" "$PREFIX"
 
     # Remove the uninstall script itself
     echo "" >> "$UNINSTALL_SCRIPT"
     echo "# Remove uninstall script" >> "$UNINSTALL_SCRIPT"
     echo "rm -f '$UNINSTALL_SCRIPT'" >> "$UNINSTALL_SCRIPT"
-    emit_rmdir "$DESTDIR/share/bear" "$DESTDIR"
+    emit_rmdir "$PREFIX/share/bear" "$PREFIX"
 
     echo "" >> "$UNINSTALL_SCRIPT"
-    echo "echo 'Bear uninstalled from $DESTDIR'" >> "$UNINSTALL_SCRIPT"
+    echo "echo 'Bear uninstalled from $PREFIX'" >> "$UNINSTALL_SCRIPT"
 
     # Make uninstall script non-executable (must be invoked explicitly)
     chmod 644 "$UNINSTALL_SCRIPT"
 
-    echo "Bear installed to $DESTDIR"
+    echo "Bear installed to $PREFIX"
     echo "Uninstall script written to $UNINSTALL_SCRIPT"
 }
 
 # --- uninstall ----------------------------------------------------------------
 
 do_uninstall() {
-    refuse_root_destdir
+    refuse_root_prefix
 
     if [ ! -f "$UNINSTALL_SCRIPT" ]; then
         echo "error: no uninstall script found at $UNINSTALL_SCRIPT" >&2

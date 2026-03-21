@@ -65,10 +65,10 @@ customization, the uninstall script may be located elsewhere.
 ## Custom installation
 
 By default, Bear is installed to `/usr/local` (when run as root) or
-`$HOME/.local` (otherwise). You can override this with `DESTDIR`:
+`$HOME/.local` (otherwise). You can override this with `PREFIX`:
 
    ```bash
-   sudo DESTDIR=/usr ./scripts/install.sh
+   sudo PREFIX=/usr ./scripts/install.sh
    ```
 
 The preload library directory name defaults to `lib`. On systems where a
@@ -92,10 +92,10 @@ musl, FreeBSD), use a concrete directory name.
 
 If you are a package maintainer for a distribution:
 
-- Build and install with explicit values for `DESTDIR` and `INTERCEPT_LIBDIR`:
+- Build and install with explicit values for `PREFIX` and `INTERCEPT_LIBDIR`:
   ```bash
   INTERCEPT_LIBDIR=lib64 cargo build --release
-  INTERCEPT_LIBDIR=lib64 DESTDIR=$pkgdir/usr ./scripts/install.sh
+  INTERCEPT_LIBDIR=lib64 PREFIX=$pkgdir/usr ./scripts/install.sh
   ```
 
 - The preload library (`libexec.so`) is only built on Unix. Windows builds
@@ -104,11 +104,11 @@ If you are a package maintainer for a distribution:
 
 - `bear-driver` locates its siblings using relative paths:
   `./bear-wrapper` and `../$INTERCEPT_LIBDIR/libexec.so`. The `bear` entry
-  script in `$DESTDIR/bin/` is the only artifact that uses an absolute path.
+  script in `$PREFIX/bin/` is the only artifact that uses an absolute path.
 
 - The expected installation layout:
   ```
-  $DESTDIR/
+  $PREFIX/
   ├── bin/
   │   └── bear                        (shell script)
   └── share/

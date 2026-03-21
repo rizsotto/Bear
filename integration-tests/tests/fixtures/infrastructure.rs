@@ -90,7 +90,7 @@ impl InstallEnvironment {
 
         let output = std::process::Command::new("bash")
             .arg(INSTALL_SCRIPT_PATH)
-            .env("DESTDIR", destdir)
+            .env("PREFIX", destdir)
             .env("INTERCEPT_LIBDIR", INTERCEPT_LIBDIR)
             .env("SRCDIR", source_dir)
             .output()
