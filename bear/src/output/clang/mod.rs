@@ -7,6 +7,7 @@
 //! along with the [`CommandConverter`] for creating entries from semantic commands.
 
 pub mod converter;
+mod json;
 mod path_format;
 pub(crate) mod serialization;
 

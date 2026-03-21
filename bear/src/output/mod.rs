@@ -12,7 +12,6 @@
 pub mod clang;
 mod formats;
 mod intercept;
-mod json;
 mod statistics;
 mod writers;
 

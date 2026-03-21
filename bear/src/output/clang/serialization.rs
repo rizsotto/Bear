@@ -9,7 +9,7 @@
 //! https://clang.llvm.org/docs/JSONCompilationDatabase.html
 
 use super::Entry;
-use crate::output::json;
+use super::json;
 use crate::output::{SerializationError, SerializationFormat};
 
 /// The type represents a JSON compilation database format.
