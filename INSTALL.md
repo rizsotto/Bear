@@ -1,30 +1,32 @@
-# How to install
+# Install from distribution package
 
 Bear has been around for a while, and packages are available in many
-distributions. For an easy installation, check your machine's package manager
-for available packages. These packages are well-tested and should be your first
-choice for installation.
+distributions. For an easy installation, consult your distribution's package
+manager. These packages are well-tested and should be the first choice for
+installation.
 
-# How to build
+# Install from source
 
-Bear is now implemented in Rust and can be built and installed using the Rust
-toolchain.
+If the latest version is not available in your distribution, install Bear from
+source. Follow the steps below.
 
 ## Prerequisites
+
+Bear is now implemented in Rust, so the Rust toolchain is required.
 
 **Rust toolchain**: Install Rust using [rustup](https://rustup.rs/).
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-Ensure `cargo` and `rustc` are available in your PATH:
+Ensure that `cargo` and `rustc` are available in your `PATH`:
 
    ```bash
    rustc --version
    cargo --version
    ```
 
-## Build and Install
+## Simple installation
 
 1. Clone the repository:
    ```bash
@@ -42,11 +44,31 @@ Ensure `cargo` and `rustc` are available in your PATH:
    ./scripts/install.sh
    ```
 
+## Uninstall
+
+Once installed, the easiest way to remove all files is to run the original
+install script with the uninstall option:
+
+   ```bash
+   ./scripts/install.sh --uninstall
+   ```
+
+If the source tree is no longer available, run the `uninstall.sh` script:
+
+   ```bash
+   sh $HOME/.local/share/bear/uninstall.sh
+   ```
+
+The path above assumes Bear was installed under `$HOME/.local`. Depending on
+customization, the uninstall script may be located elsewhere.
+
+## Custom installation
+
 By default, Bear is installed to `/usr/local` (when run as root) or
 `$HOME/.local` (otherwise). You can override this with `DESTDIR`:
 
    ```bash
-   sudo DESTDIR=/usr/local ./scripts/install.sh
+   sudo DESTDIR=/usr ./scripts/install.sh
    ```
 
 The preload library directory name defaults to `lib`. On systems where a
@@ -65,15 +87,6 @@ On glibc-based Linux, the special value `$LIB` can be used — the dynamic
 linker expands it at runtime (see `man ld.so`). On other platforms (macOS,
 musl, FreeBSD), use a concrete directory name.
 
-## Uninstall
-
-   ```bash
-   ./scripts/install.sh --uninstall
-   ```
-
-The install script writes a manifest at `$DESTDIR/share/bear/install-manifest.txt`.
-The `--uninstall` flag reads this manifest and removes only the files that were
-previously installed.
 
 # How to package
 
