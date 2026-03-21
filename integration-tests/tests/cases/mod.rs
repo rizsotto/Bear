@@ -30,6 +30,8 @@
 pub mod compilation_output;
 pub mod config;
 pub mod exit_codes;
+#[cfg(has_preload_library)]
+pub mod hardened_intercept;
 pub mod intercept;
 #[cfg(has_preload_library)]
 pub mod intercept_posix;
