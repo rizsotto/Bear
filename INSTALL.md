@@ -5,6 +5,28 @@ distributions. For an easy installation, consult your distribution's package
 manager. These packages are well-tested and should be the first choice for
 installation.
 
+Common package manager commands:
+
+   ```bash
+   # Debian / Ubuntu
+   sudo apt install bear
+
+   # Fedora
+   sudo dnf install bear
+
+   # Arch Linux
+   sudo pacman -S bear
+
+   # macOS (Homebrew)
+   brew install bear
+
+   # FreeBSD
+   pkg install bear
+   ```
+
+For a full list of available packages, see the
+[Repology page](https://repology.org/project/bear-clang/versions).
+
 # Install from source
 
 If the latest version is not available in your distribution, install Bear from
@@ -14,7 +36,9 @@ source. Follow the steps below.
 
 Bear is now implemented in Rust, so the Rust toolchain is required.
 
-**Rust toolchain**: Install Rust using [rustup](https://rustup.rs/).
+**Rust toolchain** (1.85 or later): Bear uses the Rust 2024 edition, which
+requires Rust 1.85+. Install Rust using [rustup](https://rustup.rs/):
+
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
@@ -22,9 +46,13 @@ Bear is now implemented in Rust, so the Rust toolchain is required.
 Ensure that `cargo` and `rustc` are available in your `PATH`:
 
    ```bash
-   rustc --version
+   rustc --version   # must be >= 1.85
    cargo --version
    ```
+
+**C compiler**: A C compiler is required to build the preload library
+(`intercept-preload`). The `cc` crate will typically find one automatically;
+ensure `gcc` or `clang` is installed.
 
 ## Simple installation
 
@@ -42,6 +70,12 @@ Ensure that `cargo` and `rustc` are available in your `PATH`:
 3. Install:
    ```bash
    ./scripts/install.sh
+   ```
+
+4. Verify the installation:
+   ```bash
+   bear --version
+   bear -- true   # quick smoke test — should produce an empty compile_commands.json
    ```
 
 ## Uninstall
@@ -65,11 +99,16 @@ customization, the uninstall script may be located elsewhere.
 ## Custom installation
 
 By default, Bear is installed to `/usr/local` (when run as root) or
-`$HOME/.local` (otherwise). You can override this with `PREFIX`:
+`$HOME/.local` (otherwise). You can override the installation prefix with
+`PREFIX`:
 
    ```bash
    sudo PREFIX=/usr ./scripts/install.sh
    ```
+
+`PREFIX` is the final install location (e.g., `/usr`, `/usr/local`,
+`$HOME/.local`). Binaries go into `$PREFIX/bin/`, libraries into
+`$PREFIX/share/bear/`, and so on.
 
 The preload library directory name defaults to `lib`. On systems where a
 different directory is needed, set `INTERCEPT_LIBDIR` at both build and
