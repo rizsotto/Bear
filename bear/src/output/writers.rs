@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use super::clang;
-use super::formats::{JsonCompilationDatabase, SerializationError, SerializationFormat};
+use super::clang::serialization::JsonCompilationDatabase;
+use super::formats::{SerializationError, SerializationFormat};
 use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
 use crate::{config, semantic};

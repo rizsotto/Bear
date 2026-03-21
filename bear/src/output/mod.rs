@@ -11,6 +11,7 @@
 
 pub mod clang;
 mod formats;
+mod intercept;
 mod json;
 mod statistics;
 mod writers;
@@ -24,7 +25,8 @@ use writers::{
 };
 
 // Re-export types for convenience.
-pub use formats::{ExecutionEventDatabase, SerializationError, SerializationFormat};
+pub use formats::{SerializationError, SerializationFormat};
+pub use intercept::ExecutionEventDatabase;
 pub use statistics::OutputStatistics;
 
 /// A stack of output writers for Clang compilation databases.

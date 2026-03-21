@@ -15,6 +15,7 @@ pub mod converter;
 mod filter_duplicates;
 mod filter_sources;
 mod format;
+pub(crate) mod serialization;
 
 use shell_words;
 use std::path;
