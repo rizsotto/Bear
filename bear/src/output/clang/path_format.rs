@@ -31,7 +31,7 @@ pub enum FormatError {
 /// This trait allows for easy mocking in tests and provides a clean abstraction
 /// for path transformation logic.
 #[cfg_attr(test, mockall::automock)]
-pub trait PathFormatter: Send + Sync {
+pub trait PathFormatter: Send {
     /// Format a directory path according to the configured strategy.
     fn format_directory(&self, working_dir: &Path, directory: &Path) -> Result<PathBuf, FormatError>;
 
