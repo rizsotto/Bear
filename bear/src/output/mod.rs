@@ -19,30 +19,18 @@ mod writers;
 use crate::{args, config, semantic};
 use std::sync::Arc;
 use thiserror::Error;
-use writers::{
-    AppendClangOutputWriter, AtomicClangOutputWriter, ClangOutputWriter, ConverterClangOutputWriter,
-    IteratorWriter, SourceFilterOutputWriter, UniqueOutputWriter,
-};
 
 // Re-export types for convenience.
 pub use formats::{SerializationError, SerializationFormat};
 pub use intercept::ExecutionEventDatabase;
 pub use statistics::OutputStatistics;
 
-/// A stack of output writers for Clang compilation databases.
-type ClangWriterStack = ConverterClangOutputWriter<
-    AppendClangOutputWriter<
-        AtomicClangOutputWriter<SourceFilterOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
-    >,
->;
-
 /// Represents the output writer for JSON compilation databases.
 ///
 /// The writer handles writing semantic analysis results as JSON compilation databases,
 /// with support for deduplication, atomic writes, and appending to existing files.
 pub struct OutputWriter {
-    #[allow(private_interfaces)]
-    writer: ClangWriterStack,
+    writer: writers::SemanticCommandWriter,
     stats: Arc<OutputStatistics>,
 }
 
@@ -52,22 +40,9 @@ impl TryFrom<(&args::BuildSemantic, &config::Main)> for OutputWriter {
     fn try_from(value: (&args::BuildSemantic, &config::Main)) -> Result<Self, Self::Error> {
         let (args, config) = value;
         let stats = OutputStatistics::new();
+        let writer = writers::create_pipeline(args, config, Arc::clone(&stats))?;
 
-        let final_path = &args.path;
-        let temp_path = &args.path.with_extension("tmp");
-
-        let base_writer = ClangOutputWriter::create(temp_path, Arc::clone(&stats))?;
-        let unique_writer =
-            UniqueOutputWriter::create(base_writer, config.duplicates.clone(), Arc::clone(&stats))?;
-        let source_filter_writer =
-            SourceFilterOutputWriter::new(unique_writer, config.sources.clone(), Arc::clone(&stats));
-        let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
-        let append_writer =
-            AppendClangOutputWriter::new(atomic_writer, final_path, args.append, Arc::clone(&stats));
-        let formatted_writer =
-            ConverterClangOutputWriter::new(append_writer, &config.format, Arc::clone(&stats));
-
-        Ok(Self { writer: formatted_writer, stats })
+        Ok(Self { writer, stats })
     }
 }
 
