@@ -35,7 +35,7 @@ use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
-use crate::session::{DoctoredEnvironment, SESSION, in_session, init_session_from_envp};
+use crate::session::{DoctoredEnvironment, PRELOAD_KEY, SESSION, in_session, init_session_from_envp};
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -514,6 +514,10 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         });
     }
 
+    // Restore session variables in environ before calling real popen.
+    // See ensure_environ_has_session_vars docs for why this is needed.
+    unsafe { ensure_environ_has_session_vars() };
+
     let func_ptr = REAL_POPEN.load(Ordering::SeqCst);
     if !func_ptr.is_null() {
         let real_func_ptr: PopenFunc = unsafe { std::mem::transmute(func_ptr) };
@@ -566,6 +570,10 @@ pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
             Ok(result)
         });
     }
+
+    // Restore session variables in environ before calling real system.
+    // See ensure_environ_has_session_vars docs for why this is needed.
+    unsafe { ensure_environ_has_session_vars() };
 
     let func_ptr = REAL_SYSTEM.load(Ordering::SeqCst);
     if !func_ptr.is_null() {
@@ -630,6 +638,61 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
                 }
             }
         }
+    }
+}
+
+/// Ensure the process's `environ` contains the session variables.
+///
+/// `system()` and `popen()` use the process's `environ` to set up the child
+/// environment. On glibc < 2.34 their internal `fork + __execve` bypasses the
+/// PLT, so our LD_PRELOAD override of `execve` never fires and we cannot
+/// doctor the envp. The only option is to patch `environ` directly before
+/// the real function call.
+///
+/// This is a no-op when the variables are already present and correct.
+///
+/// # Safety
+///
+/// Calls `libc::setenv` which is not async-signal-safe and races with
+/// concurrent `getenv`/`setenv` from other threads. In practice this is
+/// acceptable because `system()` and `popen()` themselves are not safe to
+/// call concurrently with environment mutations, so callers already operate
+/// under that constraint.
+unsafe fn ensure_environ_has_session_vars() {
+    use std::ffi::CString;
+
+    let Some(state) = SESSION.get() else {
+        return;
+    };
+
+    // Fast path: check if BEAR_INTERCEPT is present and correct.
+    let needs_fix = match std::env::var(bear::environment::KEY_INTERCEPT_STATE) {
+        Ok(val) => {
+            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref() != Some(state)
+        }
+        Err(_) => true,
+    };
+
+    if !needs_fix {
+        return;
+    }
+
+    log::debug!("ensure_environ_has_session_vars: restoring session variables in process environ");
+
+    // Restore BEAR_INTERCEPT
+    if let Ok(state_json) = TryInto::<String>::try_into(state.clone())
+        && let (Ok(k), Ok(v)) =
+            (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
+    {
+        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+    }
+
+    // Restore LD_PRELOAD (or DYLD_INSERT_LIBRARIES on macOS)
+    let current_preload = std::env::var(PRELOAD_KEY).unwrap_or_default();
+    if let Ok(updated) = bear::intercept::environment::insert_to_path(&current_preload, &state.library)
+        && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
+    {
+        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
     }
 }
 

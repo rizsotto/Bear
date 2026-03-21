@@ -490,7 +490,7 @@ int main() {{
 /// - `libsandbox.so` may modify the environment or refuse certain exec calls.
 /// - On i686 (32-bit), chained variadic function overrides (`execle`) can
 ///   corrupt the stack — likely the cause of the SIGSEGV reported in #675.
-/// This test covers the basic "chain of RTLD_NEXT" scenario only.
+///   This test covers the basic "chain of RTLD_NEXT" scenario only.
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
