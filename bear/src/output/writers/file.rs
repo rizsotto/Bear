@@ -47,3 +47,68 @@ impl IteratorWriter<clang::Entry> for ClangOutputWriter {
             .map_err(|err| WriterError::Io(self.path, err))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::output::statistics::OutputStatistics;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn test_create_and_write_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("output.json");
+        let stats = OutputStatistics::new();
+
+        let entries = vec![
+            clang::Entry::from_arguments_str("file1.c", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("file2.c", vec!["gcc", "-c"], "/project", None),
+            clang::Entry::from_arguments_str("file3.c", vec!["gcc", "-c"], "/project", Some("file3.o")),
+        ];
+
+        let writer = ClangOutputWriter::create(&path, Arc::clone(&stats)).unwrap();
+        writer.write(entries.into_iter()).unwrap();
+
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 3);
+
+        // Read back and verify
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("file1.c"));
+        assert!(content.contains("file2.c"));
+        assert!(content.contains("file3.c"));
+        assert!(content.contains("file3.o"));
+    }
+
+    #[test]
+    fn test_create_failure_invalid_path() {
+        let stats = OutputStatistics::new();
+        let result = ClangOutputWriter::create(
+            path::Path::new("/nonexistent/directory/output.json"),
+            Arc::clone(&stats),
+        );
+
+        assert!(result.is_err());
+        match result {
+            Err(WriterCreationError::Io(p, _)) => {
+                assert_eq!(p, path::PathBuf::from("/nonexistent/directory/output.json"));
+            }
+            _ => panic!("Expected WriterCreationError::Io"),
+        }
+    }
+
+    #[test]
+    fn test_entries_written_counter_matches_actual() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("output.json");
+        let stats = OutputStatistics::new();
+
+        let writer = ClangOutputWriter::create(&path, Arc::clone(&stats)).unwrap();
+        writer.write(std::iter::empty()).unwrap();
+
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 0);
+
+        let content = fs::read_to_string(&path).unwrap();
+        // Should be an empty JSON array
+        assert!(content.contains("[]") || content.trim() == "[\n]" || content.trim().starts_with('['));
+    }
+}

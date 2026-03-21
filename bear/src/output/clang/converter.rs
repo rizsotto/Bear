@@ -369,7 +369,7 @@ impl CommandConverter {
 mod tests {
     use super::super::path_format::{FormatError, MockPathFormatter};
     use super::*;
-    use crate::config::{EntryFormat, Format, PathFormat};
+    use crate::config::{EntryFormat, Format, PathFormat, PathResolver};
     use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
     use std::io;
 
@@ -995,6 +995,160 @@ mod tests {
 
         // Should NOT generate entries because it's preprocessing-only (has -E flag)
         assert_eq!(result.len(), 0);
+    }
+
+    // --- Tests for non-trivial PathFormat configurations (end-to-end through CommandConverter::new) ---
+
+    #[test]
+    fn test_absolute_path_format_makes_paths_absolute() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+        let working_dir = temp_path.to_str().unwrap();
+
+        // Create actual source file so canonicalize can work if needed
+        std::fs::write(temp_path.join("main.c"), "").unwrap();
+
+        let format = Format {
+            paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Absolute },
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format);
+
+        let compiler_cmd = CompilerCommand::from_strings(
+            working_dir,
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+                (ArgumentKind::Output, vec!["-o", "main.o"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let entries = converter.to_entries(&command);
+        assert_eq!(entries.len(), 1);
+
+        let entry = &entries[0];
+        // Directory should be absolute
+        assert!(entry.directory.is_absolute(), "directory should be absolute: {:?}", entry.directory);
+        // File should be absolute
+        assert!(entry.file.is_absolute(), "file should be absolute: {:?}", entry.file);
+    }
+
+    #[test]
+    fn test_relative_path_format_makes_paths_relative() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+        let working_dir = temp_path.to_str().unwrap();
+
+        let source_file = temp_path.join("main.c");
+        std::fs::write(&source_file, "").unwrap();
+
+        let format = Format {
+            paths: PathFormat { directory: PathResolver::Relative, file: PathResolver::Relative },
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format);
+
+        // Use a relative source file (relative to working dir)
+        let compiler_cmd = CompilerCommand::from_strings(
+            working_dir,
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let entries = converter.to_entries(&command);
+        assert_eq!(entries.len(), 1);
+
+        let entry = &entries[0];
+        // Directory should be relative (the working dir resolved relative to itself is ".")
+        assert!(!entry.directory.is_absolute(), "directory should be relative: {:?}", entry.directory);
+        // File should be relative
+        assert!(!entry.file.is_absolute(), "file should be relative: {:?}", entry.file);
+    }
+
+    #[test]
+    fn test_canonical_path_format_resolves_dotdot() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        // Create subdirectory and file
+        let sub_dir = temp_path.join("src");
+        std::fs::create_dir(&sub_dir).unwrap();
+        let source_file = sub_dir.join("main.c");
+        std::fs::write(&source_file, "").unwrap();
+
+        // Use a path with .. components
+        let working_dir_with_dotdot = sub_dir.join("..").join("src");
+        let working_dir_str = working_dir_with_dotdot.to_str().unwrap();
+
+        let format = Format {
+            paths: PathFormat { directory: PathResolver::Canonical, file: PathResolver::Canonical },
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format);
+
+        let compiler_cmd = CompilerCommand::from_strings(
+            working_dir_str,
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec![source_file.to_str().unwrap()]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let entries = converter.to_entries(&command);
+        assert_eq!(entries.len(), 1);
+
+        let entry = &entries[0];
+        // Canonical paths should not contain ".."
+        let dir_str = entry.directory.to_string_lossy();
+        assert!(!dir_str.contains(".."), "canonical directory should not contain '..': {}", dir_str);
+        let file_str = entry.file.to_string_lossy();
+        assert!(!file_str.contains(".."), "canonical file should not contain '..': {}", file_str);
+    }
+
+    #[test]
+    fn test_mixed_path_format_absolute_directory_relative_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+        let working_dir = temp_path.to_str().unwrap();
+
+        std::fs::write(temp_path.join("main.c"), "").unwrap();
+
+        let format = Format {
+            paths: PathFormat { directory: PathResolver::Absolute, file: PathResolver::Relative },
+            entries: EntryFormat::default(),
+        };
+        let converter = CommandConverter::new(format);
+
+        let compiler_cmd = CompilerCommand::from_strings(
+            working_dir,
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec!["main.c"]),
+            ],
+        );
+        let command = Command::Compiler(compiler_cmd);
+
+        let entries = converter.to_entries(&command);
+        assert_eq!(entries.len(), 1);
+
+        let entry = &entries[0];
+        // Directory should be absolute
+        assert!(entry.directory.is_absolute(), "directory should be absolute: {:?}", entry.directory);
+        // File should be relative
+        assert!(!entry.file.is_absolute(), "file should be relative: {:?}", entry.file);
     }
 
     #[test]

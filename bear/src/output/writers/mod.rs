@@ -104,3 +104,148 @@ impl IteratorWriter<crate::output::clang::Entry> for MockWriter {
         Ok(())
     }
 }
+
+/// A test-only writer that collects all entries into a shared vector.
+///
+/// This allows tests to verify exactly which entries pass through a writer
+/// pipeline, including their contents and ordering.
+#[cfg(test)]
+pub(crate) struct CollectingWriter {
+    pub collected: std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>,
+}
+
+#[cfg(test)]
+impl CollectingWriter {
+    pub fn new() -> (Self, std::sync::Arc<std::sync::Mutex<Vec<crate::output::clang::Entry>>>) {
+        let collected = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        (Self { collected: std::sync::Arc::clone(&collected) }, collected)
+    }
+}
+
+#[cfg(test)]
+impl IteratorWriter<crate::output::clang::Entry> for CollectingWriter {
+    fn write(self, entries: impl Iterator<Item = crate::output::clang::Entry>) -> Result<(), WriterError> {
+        let mut collected = self.collected.lock().unwrap();
+        collected.extend(entries);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config;
+    use crate::semantic::{ArgumentKind, CompilerCommand, CompilerPass, PassEffect};
+    use std::sync::atomic::Ordering;
+
+    fn make_compile_command(file: &str) -> semantic::Command {
+        semantic::Command::Compiler(CompilerCommand::from_strings(
+            "/home/user",
+            "/usr/bin/gcc",
+            vec![
+                (ArgumentKind::Compiler, vec!["/usr/bin/gcc"]),
+                (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
+                (ArgumentKind::Source { binary: false }, vec![file]),
+            ],
+        ))
+    }
+
+    #[test]
+    fn test_create_pipeline_writes_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("compile_commands.json");
+        let config = config::Main::default();
+        let args = args::BuildSemantic { path: output_path.clone(), append: false };
+        let stats = OutputStatistics::new();
+
+        let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
+
+        let commands = vec![make_compile_command("file1.c"), make_compile_command("file2.c")];
+
+        pipeline.write(commands.into_iter()).unwrap();
+
+        // Verify output file exists and contains expected entries
+        assert!(output_path.exists());
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        assert!(content.contains("file1.c"));
+        assert!(content.contains("file2.c"));
+
+        // Verify statistics are populated across all stages
+        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
+        assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 2);
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
+        assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 0);
+        assert_eq!(stats.entries_filtered_by_source.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn test_create_pipeline_deduplicates_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("compile_commands.json");
+        let config = config::Main::default();
+        let args = args::BuildSemantic { path: output_path.clone(), append: false };
+        let stats = OutputStatistics::new();
+
+        let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
+
+        // Send duplicate commands
+        let commands = vec![
+            make_compile_command("file1.c"),
+            make_compile_command("file1.c"),
+            make_compile_command("file2.c"),
+        ];
+
+        pipeline.write(commands.into_iter()).unwrap();
+
+        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 3);
+        assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 3);
+        assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    fn test_create_pipeline_filters_by_source() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("compile_commands.json");
+        let config = config::Main {
+            sources: config::SourceFilter {
+                directories: vec![config::DirectoryRule {
+                    path: std::path::PathBuf::from("/usr/include"),
+                    action: config::DirectoryAction::Exclude,
+                }],
+            },
+            ..config::Main::default()
+        };
+        let args = args::BuildSemantic { path: output_path.clone(), append: false };
+        let stats = OutputStatistics::new();
+
+        let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
+
+        let commands = vec![make_compile_command("src/main.c"), make_compile_command("/usr/include/stdio.h")];
+
+        pipeline.write(commands.into_iter()).unwrap();
+
+        assert_eq!(stats.entries_filtered_by_source.load(Ordering::Relaxed), 1);
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 1);
+
+        let content = std::fs::read_to_string(&output_path).unwrap();
+        assert!(content.contains("src/main.c"));
+        assert!(!content.contains("stdio.h"));
+    }
+
+    #[test]
+    fn test_create_pipeline_empty_input() {
+        let dir = tempfile::tempdir().unwrap();
+        let output_path = dir.path().join("compile_commands.json");
+        let config = config::Main::default();
+        let args = args::BuildSemantic { path: output_path.clone(), append: false };
+        let stats = OutputStatistics::new();
+
+        let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
+        pipeline.write(std::iter::empty()).unwrap();
+
+        assert!(output_path.exists());
+        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 0);
+        assert_eq!(stats.entries_written.load(Ordering::Relaxed), 0);
+    }
+}
