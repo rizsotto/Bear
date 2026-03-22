@@ -62,10 +62,43 @@ pub static SESSION: OnceLock<PreloadState> = OnceLock::new();
 /// only restore Bear's library, breaking co-resident LD_PRELOAD libraries.
 static INITIAL_PRELOAD: OnceLock<String> = OnceLock::new();
 
+/// Iterate over key-value pairs in a C-style envp array.
+///
+/// Yields `(&str, &str)` for well-formed `"KEY=VALUE"` entries.
+/// Skips entries that are not valid UTF-8 or that lack `'='`.
+///
+/// The returned `&str` references borrow directly from the C strings pointed
+/// to by `envp`. The caller must ensure those strings remain valid for `'a`.
+///
+/// # Safety
+/// The `envp` pointer must be a valid, non-null, null-terminated array of
+/// null-terminated C strings that remain valid for lifetime `'a`.
+unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a str, &'a str)> {
+    let mut ptr = envp;
+    std::iter::from_fn(move || {
+        loop {
+            if unsafe { (*ptr).is_null() } {
+                return None;
+            }
+            // SAFETY: CStr::from_ptr returns &CStr with an unbounded lifetime.
+            // We re-borrow it as &'a CStr, which is sound because the caller
+            // guarantees the C strings remain valid for 'a.
+            let cstr: &'a CStr = unsafe { CStr::from_ptr(*ptr) };
+            ptr = unsafe { ptr.add(1) };
+
+            if let Ok(entry) = cstr.to_str()
+                && let Some(pair) = entry.split_once('=')
+            {
+                return Some(pair);
+            }
+        }
+    })
+}
+
 /// Create a PreloadState by extracting the intercept state from a C-style envp array.
 ///
-/// This walks through the C pointers directly to find the `KEY_INTERCEPT_STATE`
-/// environment variable and attempts to parse it into a `PreloadState`.
+/// Walks the envp to find `BEAR_INTERCEPT` and attempts to parse it into a
+/// `PreloadState`.
 ///
 /// # Safety
 /// The `envp` pointer must be a valid null-terminated array of null-terminated
@@ -79,19 +112,9 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
         return None;
     }
 
-    let mut ptr = envp;
-    while !unsafe { (*ptr).is_null() } {
-        let cstr = unsafe { CStr::from_ptr(*ptr) };
-        if let Ok(key_and_value) = cstr.to_str()
-            && let Some((key, value)) = key_and_value.split_once('=')
-            && key == KEY_INTERCEPT_STATE
-        {
-            return value.try_into().ok();
-        }
-        ptr = unsafe { ptr.add(1) };
-    }
-
-    None
+    unsafe { envp_iter(envp) }
+        .find(|(key, _)| *key == KEY_INTERCEPT_STATE)
+        .and_then(|(_, value)| value.try_into().ok())
 }
 
 /// Read a single environment variable value from a C-style envp array.
@@ -104,19 +127,7 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
         return None;
     }
 
-    let mut ptr = envp;
-    while !unsafe { (*ptr).is_null() } {
-        let cstr = unsafe { CStr::from_ptr(*ptr) };
-        if let Ok(key_and_value) = cstr.to_str()
-            && let Some((k, v)) = key_and_value.split_once('=')
-            && k == key
-        {
-            return Some(v.to_string());
-        }
-        ptr = unsafe { ptr.add(1) };
-    }
-
-    None
+    unsafe { envp_iter(envp) }.find(|(k, _)| *k == key).map(|(_, v)| v.to_string())
 }
 
 /// Check whether the given envp is already aligned with the expected session state.
@@ -138,26 +149,14 @@ pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> boo
     let mut intercept_state_matches = false;
     let mut preload_matches = false;
 
-    let mut ptr = envp;
-    while !unsafe { (*ptr).is_null() } {
-        let cstr = unsafe { CStr::from_ptr(*ptr) };
-        if let Ok(key_and_value) = cstr.to_str()
-            && let Some((key, value)) = key_and_value.split_once('=')
-        {
-            if key == KEY_INTERCEPT_STATE {
-                if let Ok(parsed_state) = PreloadState::try_from(value) {
-                    // expect full match on this
-                    intercept_state_matches = parsed_state == state;
-                }
-            } else if key == PRELOAD_KEY {
-                preload_matches = {
-                    // we check if our library is at the first position
-                    let paths = std::env::split_paths(value);
-                    paths.into_iter().next() == Some(state.library.clone())
-                };
+    for (key, value) in unsafe { envp_iter(envp) } {
+        if key == KEY_INTERCEPT_STATE {
+            if let Ok(parsed_state) = PreloadState::try_from(value) {
+                intercept_state_matches = parsed_state == state;
             }
+        } else if key == PRELOAD_KEY {
+            preload_matches = std::env::split_paths(value).next() == Some(state.library.clone());
         }
-        ptr = unsafe { ptr.add(1) };
     }
 
     intercept_state_matches && preload_matches
