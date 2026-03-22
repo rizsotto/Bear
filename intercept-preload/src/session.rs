@@ -86,11 +86,15 @@ unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a
             let cstr: &'a CStr = unsafe { CStr::from_ptr(*ptr) };
             ptr = unsafe { ptr.add(1) };
 
-            if let Ok(entry) = cstr.to_str()
-                && let Some(pair) = entry.split_once('=')
-            {
-                return Some(pair);
-            }
+            let Ok(entry) = cstr.to_str() else {
+                log::debug!("envp entry is not valid UTF-8, skipping");
+                continue;
+            };
+            let Some(pair) = entry.split_once('=') else {
+                log::debug!("envp entry has no '=' delimiter, skipping: {entry}");
+                continue;
+            };
+            return Some(pair);
         }
     })
 }
@@ -112,9 +116,15 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
         return None;
     }
 
-    unsafe { envp_iter(envp) }
-        .find(|(key, _)| *key == KEY_INTERCEPT_STATE)
-        .and_then(|(_, value)| value.try_into().ok())
+    unsafe { envp_iter(envp) }.find(|(key, _)| *key == KEY_INTERCEPT_STATE).and_then(|(_, value)| match value
+        .try_into()
+    {
+        Ok(state) => Some(state),
+        Err(_) => {
+            log::debug!("BEAR_INTERCEPT found but failed to parse");
+            None
+        }
+    })
 }
 
 /// Read a single environment variable value from a C-style envp array.
@@ -298,9 +308,14 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
 
             // Capture the full LD_PRELOAD value before anything modifies it.
             // This preserves co-resident libraries (e.g. libsandbox.so).
-            let _ = INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }.unwrap_or_default());
+            if INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }.unwrap_or_default()).is_err()
+            {
+                log::debug!("INITIAL_PRELOAD already set, ignoring duplicate init");
+            }
 
-            let _ = SESSION.set(session);
+            if SESSION.set(session).is_err() {
+                log::debug!("SESSION already set, ignoring duplicate init");
+            }
 
             Some(destination)
         }
