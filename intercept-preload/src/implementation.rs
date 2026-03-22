@@ -679,10 +679,11 @@ unsafe fn ensure_environ_has_session_vars() {
     };
 
     // Check if LD_PRELOAD is present and has our library first.
-    let current_preload = std::env::var(PRELOAD_KEY).unwrap_or_default();
-    let preload_ok = {
-        let paths = std::env::split_paths(&current_preload);
-        paths.into_iter().next() == Some(state.library.clone())
+    // None means the variable is absent from environ.
+    let current_preload = std::env::var(PRELOAD_KEY).ok();
+    let preload_ok = match &current_preload {
+        Some(val) => std::env::split_paths(val).next() == Some(state.library.clone()),
+        None => false,
     };
 
     if intercept_ok && preload_ok {
@@ -701,9 +702,9 @@ unsafe fn ensure_environ_has_session_vars() {
     }
 
     // Restore LD_PRELOAD using the same policy as exec-family doctoring:
-    // fall back to the startup snapshot when the current value is empty.
+    // fall back to the startup snapshot when the current value is absent or empty.
     if !preload_ok
-        && let Ok(updated) = desired_preload_value(state, &current_preload)
+        && let Ok(updated) = desired_preload_value(state, current_preload.as_deref())
         && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
     {
         unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };

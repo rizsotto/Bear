@@ -60,7 +60,10 @@ pub static SESSION: OnceLock<PreloadState> = OnceLock::new();
 /// but also any other LD_PRELOAD libraries (like Gentoo's `libsandbox.so`)
 /// that were present when the process started. Without this, doctoring would
 /// only restore Bear's library, breaking co-resident LD_PRELOAD libraries.
-static INITIAL_PRELOAD: OnceLock<String> = OnceLock::new();
+/// `None` means the preload variable was absent at startup.
+/// `Some("")` means it was present but empty.
+/// `Some("libexec.so:libsandbox.so")` is the normal case.
+static INITIAL_PRELOAD: OnceLock<Option<String>> = OnceLock::new();
 
 /// Iterate over key-value pairs in a C-style envp array.
 ///
@@ -172,22 +175,21 @@ pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> boo
     intercept_state_matches && preload_matches
 }
 
-/// Compute the desired LD_PRELOAD value for a child process.
+/// Compute the desired preload variable value for a child process.
 ///
 /// This is the single source of truth for preload restoration, used by both
 /// `DoctoredEnvironment::from_envp` (for exec-family calls) and
 /// `ensure_environ_has_session_vars` (for system/popen calls).
 ///
 /// Policy:
-/// - If the caller provides a non-empty current value, prepend Bear's library to it.
-/// - If the current value is empty (environment was cleared), fall back to the
+/// - `Some(value)` with a non-empty value: prepend Bear's library to it.
+/// - `Some("")` (present but empty) or `None` (absent): fall back to the
 ///   startup snapshot (`INITIAL_PRELOAD`) so co-resident libraries survive.
 /// - If no snapshot exists either, use just Bear's library.
-pub fn desired_preload_value(state: &PreloadState, current: &str) -> Result<String, c_int> {
-    let base = if current.is_empty() {
-        INITIAL_PRELOAD.get().cloned().unwrap_or_default()
-    } else {
-        current.to_string()
+pub fn desired_preload_value(state: &PreloadState, current: Option<&str>) -> Result<String, c_int> {
+    let base = match current {
+        Some(v) if !v.is_empty() => v.to_string(),
+        _ => INITIAL_PRELOAD.get().and_then(|opt| opt.clone()).unwrap_or_default(),
     };
     insert_to_path(&base, &state.library).map_err(|_| libc::EINVAL)
 }
@@ -227,7 +229,7 @@ impl DoctoredEnvironment {
         use std::ffi::CString;
 
         let mut strings = Vec::new();
-        let mut original_preload_value = String::new();
+        let mut original_preload_value: Option<String> = None;
 
         // First, copy existing environment variables, skipping ones we'll set ourselves
         if !envp.is_null() {
@@ -246,7 +248,7 @@ impl DoctoredEnvironment {
 
                     if key == PRELOAD_KEY {
                         // Save the original preload value for later doctoring
-                        original_preload_value = value.to_string();
+                        original_preload_value = Some(value.to_string());
                     }
 
                     if !dominated_by_bear {
@@ -264,8 +266,8 @@ impl DoctoredEnvironment {
         strings.push(CString::new(intercept_entry).map_err(|_| libc::EINVAL)?);
 
         // Add PRELOAD_KEY with the library path inserted at front.
-        // Uses the shared policy: fall back to startup snapshot when envp had no LD_PRELOAD.
-        let preload_value = desired_preload_value(&state, &original_preload_value)?;
+        // Uses the shared policy: fall back to startup snapshot when envp had no preload key.
+        let preload_value = desired_preload_value(&state, original_preload_value.as_deref())?;
         let preload_entry = format!("{}={}", PRELOAD_KEY, preload_value);
         strings.push(CString::new(preload_entry).map_err(|_| libc::EINVAL)?);
 
@@ -308,8 +310,8 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
 
             // Capture the full LD_PRELOAD value before anything modifies it.
             // This preserves co-resident libraries (e.g. libsandbox.so).
-            if INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }.unwrap_or_default()).is_err()
-            {
+            // None means the preload key was absent from envp.
+            if INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }).is_err() {
                 log::debug!("INITIAL_PRELOAD already set, ignoring duplicate init");
             }
 
