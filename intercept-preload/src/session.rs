@@ -137,6 +137,26 @@ pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> boo
     intercept_state_matches && preload_matches
 }
 
+/// Compute the desired LD_PRELOAD value for a child process.
+///
+/// This is the single source of truth for preload restoration, used by both
+/// `DoctoredEnvironment::from_envp` (for exec-family calls) and
+/// `ensure_environ_has_session_vars` (for system/popen calls).
+///
+/// Policy:
+/// - If the caller provides a non-empty current value, prepend Bear's library to it.
+/// - If the current value is empty (environment was cleared), fall back to the
+///   startup snapshot (`INITIAL_PRELOAD`) so co-resident libraries survive.
+/// - If no snapshot exists either, use just Bear's library.
+pub fn desired_preload_value(state: &PreloadState, current: &str) -> Result<String, c_int> {
+    let base = if current.is_empty() {
+        INITIAL_PRELOAD.get().cloned().unwrap_or_default()
+    } else {
+        current.to_string()
+    };
+    insert_to_path(&base, &state.library).map_err(|_| libc::EINVAL)
+}
+
 /// A doctored environment that owns its strings and can provide a C-style envp.
 ///
 /// This struct manages the memory for environment strings and provides a
@@ -209,15 +229,8 @@ impl DoctoredEnvironment {
         strings.push(CString::new(intercept_entry).map_err(|_| libc::EINVAL)?);
 
         // Add PRELOAD_KEY with the library path inserted at front.
-        // If the envp had no LD_PRELOAD at all (e.g. `env -i`), fall back to the
-        // initial value captured at library load time. This preserves co-resident
-        // LD_PRELOAD libraries like Gentoo's libsandbox.so (issue #675).
-        let preload_base = if original_preload_value.is_empty() {
-            INITIAL_PRELOAD.get().cloned().unwrap_or_default()
-        } else {
-            original_preload_value
-        };
-        let preload_value = insert_to_path(&preload_base, &state.library).map_err(|_| libc::EINVAL)?;
+        // Uses the shared policy: fall back to startup snapshot when envp had no LD_PRELOAD.
+        let preload_value = desired_preload_value(&state, &original_preload_value)?;
         let preload_entry = format!("{}={}", PRELOAD_KEY, preload_value);
         strings.push(CString::new(preload_entry).map_err(|_| libc::EINVAL)?);
 

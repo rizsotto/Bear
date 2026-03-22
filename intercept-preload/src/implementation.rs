@@ -35,7 +35,9 @@ use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
-use crate::session::{DoctoredEnvironment, PRELOAD_KEY, SESSION, in_session, init_session_from_envp};
+use crate::session::{
+    DoctoredEnvironment, PRELOAD_KEY, SESSION, desired_preload_value, in_session, init_session_from_envp,
+};
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -644,12 +646,15 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
 /// Ensure the process's `environ` contains the session variables.
 ///
 /// `system()` and `popen()` use the process's `environ` to set up the child
-/// environment. On glibc < 2.34 their internal `fork + __execve` bypasses the
-/// PLT, so our LD_PRELOAD override of `execve` never fires and we cannot
-/// doctor the envp. The only option is to patch `environ` directly before
-/// the real function call.
+/// environment. On some glibc versions their internal exec bypasses the PLT,
+/// so our LD_PRELOAD override never fires and we cannot doctor the envp.
+/// The only option is to patch `environ` directly before the real function call.
 ///
-/// This is a no-op when the variables are already present and correct.
+/// Uses `desired_preload_value` (the same policy as exec-family doctoring) to
+/// compute the LD_PRELOAD value, ensuring co-resident libraries like Gentoo's
+/// `libsandbox.so` are preserved.
+///
+/// This is a no-op when both variables are already present and correct.
 ///
 /// # Safety
 ///
@@ -665,34 +670,45 @@ unsafe fn ensure_environ_has_session_vars() {
         return;
     };
 
-    // Fast path: check if BEAR_INTERCEPT is present and correct.
-    let needs_fix = match std::env::var(bear::environment::KEY_INTERCEPT_STATE) {
+    // Check if BEAR_INTERCEPT is present and correct.
+    let intercept_ok = match std::env::var(bear::environment::KEY_INTERCEPT_STATE) {
         Ok(val) => {
-            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref() != Some(state)
+            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref() == Some(state)
         }
-        Err(_) => true,
+        Err(_) => false,
     };
 
-    if !needs_fix {
+    // Check if LD_PRELOAD is present and has our library first.
+    let current_preload = std::env::var(PRELOAD_KEY).unwrap_or_default();
+    let preload_ok = {
+        let paths = std::env::split_paths(&current_preload);
+        paths.into_iter().next() == Some(state.library.clone())
+    };
+
+    if intercept_ok && preload_ok {
         return;
     }
 
     log::debug!("ensure_environ_has_session_vars: restoring session variables in process environ");
 
     // Restore BEAR_INTERCEPT
-    if let Ok(state_json) = TryInto::<String>::try_into(state.clone())
-        && let (Ok(k), Ok(v)) =
-            (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
-    {
-        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+    if !intercept_ok {
+        if let Ok(state_json) = TryInto::<String>::try_into(state.clone())
+            && let (Ok(k), Ok(v)) =
+                (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
+        {
+            unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+        }
     }
 
-    // Restore LD_PRELOAD (or DYLD_INSERT_LIBRARIES on macOS)
-    let current_preload = std::env::var(PRELOAD_KEY).unwrap_or_default();
-    if let Ok(updated) = bear::intercept::environment::insert_to_path(&current_preload, &state.library)
-        && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
-    {
-        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+    // Restore LD_PRELOAD using the same policy as exec-family doctoring:
+    // fall back to the startup snapshot when the current value is empty.
+    if !preload_ok {
+        if let Ok(updated) = desired_preload_value(state, &current_preload)
+            && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
+        {
+            unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+        }
     }
 }
 
