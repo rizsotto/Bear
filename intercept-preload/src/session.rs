@@ -181,7 +181,8 @@ pub unsafe fn in_session(ctx: &SessionContext, envp: *const *const c_char) -> bo
                 intercept_state_matches = parsed_state == ctx.state;
             }
         } else if key == PRELOAD_KEY {
-            preload_matches = std::env::split_paths(value).next() == Some(ctx.state.library.clone());
+            preload_matches =
+                std::env::split_paths(value).next().as_deref() == Some(ctx.state.library.as_path());
         }
     }
 

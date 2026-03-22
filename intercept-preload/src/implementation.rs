@@ -683,7 +683,7 @@ unsafe fn ensure_environ_has_session_vars() {
     // None means the variable is absent from environ.
     let current_preload = std::env::var(PRELOAD_KEY).ok();
     let preload_ok = match &current_preload {
-        Some(val) => std::env::split_paths(val).next() == Some(ctx.state.library.clone()),
+        Some(val) => std::env::split_paths(val).next().as_deref() == Some(ctx.state.library.as_path()),
         None => false,
     };
 
