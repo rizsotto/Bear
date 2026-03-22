@@ -524,8 +524,9 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         }
     };
 
-    // Determine pipe direction: 'r' means we read child's stdout, 'w' means we write to child's stdin
+    // Parse mode: 'r' or 'w' for direction, optional 'e' for O_CLOEXEC (glibc extension)
     let reading = mode_str.starts_with('r');
+    let cloexec = mode_str.contains('e');
 
     report(|| {
         Ok(Execution {
@@ -536,9 +537,14 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
         })
     });
 
-    // Create the pipe
+    // Create the pipe, with O_CLOEXEC if requested via 'e' in mode.
     let mut pipe_fds: [c_int; 2] = [0; 2];
-    if unsafe { libc::pipe(pipe_fds.as_mut_ptr()) } != 0 {
+    let pipe_result = if cloexec {
+        create_pipe_cloexec(pipe_fds.as_mut_ptr())
+    } else {
+        unsafe { libc::pipe(pipe_fds.as_mut_ptr()) }
+    };
+    if pipe_result != 0 {
         return ptr::null_mut();
     }
 
@@ -549,6 +555,12 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     } else {
         (pipe_fds[1], pipe_fds[0], libc::STDIN_FILENO)
     };
+
+    // Set FD_CLOEXEC on the parent fd to prevent leaking it into unrelated
+    // children if the caller later fork+execs without going through our override.
+    // This matches libc popen behavior. (When 'e' was requested and pipe2 was used,
+    // both fds already have CLOEXEC, but setting it again is harmless.)
+    unsafe { libc::fcntl(parent_fd, libc::F_SETFD, libc::FD_CLOEXEC) };
 
     // Set up file actions: redirect child's stdin/stdout to the pipe
     let mut file_actions: libc::posix_spawn_file_actions_t = unsafe { std::mem::zeroed() };
@@ -914,6 +926,29 @@ fn get_environ() -> *const *const c_char {
             static environ: *const *const c_char;
         }
         unsafe { environ }
+    }
+}
+
+/// Create a pipe with `O_CLOEXEC` set on both fds.
+///
+/// Uses `pipe2(O_CLOEXEC)` on platforms that support it (Linux, FreeBSD),
+/// falls back to `pipe()` + `fcntl(FD_CLOEXEC)` on macOS.
+fn create_pipe_cloexec(fds: *mut c_int) -> c_int {
+    #[cfg(not(target_os = "macos"))]
+    {
+        unsafe { libc::pipe2(fds, libc::O_CLOEXEC) }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let ret = unsafe { libc::pipe(fds) };
+        if ret != 0 {
+            return ret;
+        }
+        unsafe {
+            libc::fcntl(*fds, libc::F_SETFD, libc::FD_CLOEXEC);
+            libc::fcntl(*fds.add(1), libc::F_SETFD, libc::FD_CLOEXEC);
+        }
+        0
     }
 }
 

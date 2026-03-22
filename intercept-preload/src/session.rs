@@ -69,7 +69,9 @@ pub struct SessionContext {
 
 /// Iterate over key-value pairs in a C-style envp array.
 ///
-/// Yields `(&str, &str)` for well-formed `"KEY=VALUE"` entries.
+/// Yields `(key, value, full_entry)` for well-formed `"KEY=VALUE"` entries.
+/// The `full_entry` includes the `=` separator, useful when callers need
+/// to copy the entry verbatim (e.g. `DoctoredEnvironment::from_envp`).
 /// Skips entries that are not valid UTF-8 or that lack `'='`.
 ///
 /// The returned `&str` references borrow directly from the C strings pointed
@@ -78,7 +80,7 @@ pub struct SessionContext {
 /// # Safety
 /// The `envp` pointer must be a valid, non-null, null-terminated array of
 /// null-terminated C strings that remain valid for lifetime `'a`.
-unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a str, &'a str)> {
+unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a str, &'a str, &'a str)> {
     let mut ptr = envp;
     std::iter::from_fn(move || {
         loop {
@@ -95,11 +97,11 @@ unsafe fn envp_iter<'a>(envp: *const *const c_char) -> impl Iterator<Item = (&'a
                 log::debug!("envp entry is not valid UTF-8, skipping");
                 continue;
             };
-            let Some(pair) = entry.split_once('=') else {
+            let Some((key, value)) = entry.split_once('=') else {
                 log::debug!("envp entry has no '=' delimiter, skipping: {entry}");
                 continue;
             };
-            return Some(pair);
+            return Some((key, value, entry));
         }
     })
 }
@@ -121,13 +123,13 @@ unsafe fn from_envp(envp: *const *const c_char) -> Option<PreloadState> {
         return None;
     }
 
-    unsafe { envp_iter(envp) }.find(|(key, _)| *key == KEY_INTERCEPT_STATE).and_then(|(_, value)| match value
-        .try_into()
-    {
-        Ok(state) => Some(state),
-        Err(_) => {
-            log::debug!("BEAR_INTERCEPT found but failed to parse");
-            None
+    unsafe { envp_iter(envp) }.find(|(key, _, _)| *key == KEY_INTERCEPT_STATE).and_then(|(_, value, _)| {
+        match value.try_into() {
+            Ok(state) => Some(state),
+            Err(_) => {
+                log::debug!("BEAR_INTERCEPT found but failed to parse");
+                None
+            }
         }
     })
 }
@@ -142,7 +144,7 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
         return None;
     }
 
-    unsafe { envp_iter(envp) }.find(|(k, _)| *k == key).map(|(_, v)| v.to_string())
+    unsafe { envp_iter(envp) }.find(|(k, _, _)| *k == key).map(|(_, v, _)| v.to_string())
 }
 
 /// Normalize a preload value string into a deduplicated list of paths.
@@ -175,7 +177,7 @@ pub unsafe fn in_session(ctx: &SessionContext, envp: *const *const c_char) -> bo
     let mut intercept_state_matches = false;
     let mut preload_matches = false;
 
-    for (key, value) in unsafe { envp_iter(envp) } {
+    for (key, value, _) in unsafe { envp_iter(envp) } {
         if key == KEY_INTERCEPT_STATE {
             if let Ok(parsed_state) = PreloadState::try_from(value) {
                 intercept_state_matches = parsed_state == ctx.state;
@@ -249,37 +251,26 @@ impl DoctoredEnvironment {
     /// environment is not aligned with the preload mode settings. The result environment
     /// will be aligned with the preload mode settings based on the context.
     pub fn from_envp(ctx: &SessionContext, envp: *const *const c_char) -> Result<Self, c_int> {
-        use std::ffi::CString;
-
         let mut strings = Vec::new();
         let mut original_preload_value: Option<String> = None;
 
-        // First, copy existing environment variables, skipping ones we'll set ourselves
+        // Copy existing environment variables, skipping ones we'll set ourselves.
+        // Uses envp_iter for consistent parsing and malformed-entry logging.
         if !envp.is_null() {
-            let mut ptr = envp;
-            while !unsafe { (*ptr).is_null() } {
-                let cstr = unsafe { CStr::from_ptr(*ptr) };
-                if let Ok(key_and_value) = cstr.to_str()
-                    && let Some((key, value)) = key_and_value.split_once('=')
-                {
-                    #[cfg(target_os = "macos")]
-                    let dominated_by_bear = key == KEY_INTERCEPT_STATE
-                        || key == PRELOAD_KEY
-                        || key == KEY_OS__MACOS_FLAT_NAMESPACE;
-                    #[cfg(not(target_os = "macos"))]
-                    let dominated_by_bear = key == KEY_INTERCEPT_STATE || key == PRELOAD_KEY;
+            for (key, value, full_entry) in unsafe { envp_iter(envp) } {
+                #[cfg(target_os = "macos")]
+                let dominated_by_bear =
+                    key == KEY_INTERCEPT_STATE || key == PRELOAD_KEY || key == KEY_OS__MACOS_FLAT_NAMESPACE;
+                #[cfg(not(target_os = "macos"))]
+                let dominated_by_bear = key == KEY_INTERCEPT_STATE || key == PRELOAD_KEY;
 
-                    if key == PRELOAD_KEY {
-                        // Save the original preload value for later doctoring
-                        original_preload_value = Some(value.to_string());
-                    }
-
-                    if !dominated_by_bear {
-                        // Keep other variables as-is
-                        strings.push(CString::new(key_and_value).map_err(|_| libc::EINVAL)?);
-                    }
+                if key == PRELOAD_KEY {
+                    original_preload_value = Some(value.to_string());
                 }
-                ptr = unsafe { ptr.add(1) };
+
+                if !dominated_by_bear {
+                    strings.push(CString::new(full_entry).map_err(|_| libc::EINVAL)?);
+                }
             }
         }
 
