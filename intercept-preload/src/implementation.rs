@@ -692,23 +692,21 @@ unsafe fn ensure_environ_has_session_vars() {
     log::debug!("ensure_environ_has_session_vars: restoring session variables in process environ");
 
     // Restore BEAR_INTERCEPT
-    if !intercept_ok {
-        if let Ok(state_json) = TryInto::<String>::try_into(state.clone())
-            && let (Ok(k), Ok(v)) =
-                (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
-        {
-            unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
-        }
+    if !intercept_ok
+        && let Ok(state_json) = TryInto::<String>::try_into(state.clone())
+        && let (Ok(k), Ok(v)) =
+            (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
+    {
+        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
     }
 
     // Restore LD_PRELOAD using the same policy as exec-family doctoring:
     // fall back to the startup snapshot when the current value is empty.
-    if !preload_ok {
-        if let Ok(updated) = desired_preload_value(state, &current_preload)
-            && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
-        {
-            unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
-        }
+    if !preload_ok
+        && let Ok(updated) = desired_preload_value(state, &current_preload)
+        && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
+    {
+        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
     }
 }
 

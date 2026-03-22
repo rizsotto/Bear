@@ -7,9 +7,30 @@
 //! - Storing session state (preload path, destination address)
 //! - "Doctoring" environments to ensure child processes continue interception
 //!
-//! The environment doctoring ensures that `LD_PRELOAD` (or `DYLD_INSERT_LIBRARIES`
-//! on macOS) and `INTERCEPT_COLLECTOR_ADDRESS` are preserved across exec calls,
-//! even if the build system attempts to clear them.
+//! ## Restoration policy
+//!
+//! Bear's interception variables are always restored in child process environments.
+//! The two key variables are:
+//!
+//! - The preload variable (`LD_PRELOAD` on Linux, `DYLD_INSERT_LIBRARIES` on macOS):
+//!   Bear's library must be the **first** entry to ensure our exec overrides have
+//!   priority over competing preload libraries. If another library's `execve` runs
+//!   before ours and strips the preload variable, our doctoring never fires.
+//!
+//! - `BEAR_INTERCEPT`: encodes the session state (destination address + library path).
+//!   Must exactly match the captured session state.
+//!
+//! When either condition fails, the environment is doctored to restore both.
+//!
+//! ## Co-resident library preservation
+//!
+//! When an envp has no preload variable at all (e.g. after `env -i`), the startup
+//! snapshot is used as the base to preserve co-resident libraries (like Gentoo's
+//! `libsandbox.so`). This is a compatibility-first policy.
+//!
+//! The startup snapshot is best-effort: it is captured from `environ` at constructor
+//! time, which may already reflect modifications by earlier constructors in other
+//! preload libraries.
 
 use std::ffi::{CStr, CString};
 use std::net::SocketAddr;
@@ -98,12 +119,17 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
     None
 }
 
-/// The method does check the passed environment if still aligned with the expected
-/// preload mode environment settings.
+/// Check whether the given envp is already aligned with the expected session state.
 ///
-/// This walks through the C pointers directly and check if the `KEY_INTERCEPT_STATE`
-/// and `LD_PRELOAD` variables are all set as expected. Returns true if the variables
-/// are not changed.
+/// Returns `true` when both conditions hold:
+/// 1. `BEAR_INTERCEPT` is present and parses to a value equal to `state`.
+/// 2. Bear's library is the **first** entry in the preload variable (`PRELOAD_KEY`).
+///
+/// The first-position requirement exists because preload libraries are loaded in
+/// order. Bear must be first so that our exec overrides take priority: if a
+/// competing library's `execve` runs before ours and strips the preload variable,
+/// our doctoring never fires. When Bear is not first, this function returns `false`
+/// so that the caller re-doctors the environment to restore the correct ordering.
 pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> bool {
     if envp.is_null() {
         return false;
