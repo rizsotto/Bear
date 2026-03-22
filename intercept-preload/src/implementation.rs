@@ -35,9 +35,7 @@ use bear::intercept::{Event, Execution};
 use ctor::ctor;
 use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
-use crate::session::{
-    DoctoredEnvironment, PRELOAD_KEY, SESSION_CTX, desired_preload_value, in_session, init_session_from_envp,
-};
+use crate::session::{DoctoredEnvironment, SESSION_CTX, in_session, init_session_from_envp};
 
 #[ctor]
 static REAL_EXECVE: AtomicPtr<libc::c_void> = {
@@ -92,6 +90,18 @@ static REAL_SYSTEM: AtomicPtr<libc::c_void> = {
     let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"system".as_ptr() as *const _) };
     AtomicPtr::new(ptr)
 };
+
+#[ctor]
+static REAL_PCLOSE: AtomicPtr<libc::c_void> = {
+    let ptr = unsafe { libc::dlsym(RTLD_NEXT, c"pclose".as_ptr() as *const _) };
+    AtomicPtr::new(ptr)
+};
+
+/// Map from FILE* address to child pid for our popen implementation.
+/// When our `rust_popen` spawns a child, it stores the pid here so
+/// `rust_pclose` can later `waitpid` it.
+static POPEN_CHILDREN: std::sync::LazyLock<std::sync::Mutex<HashMap<usize, pid_t>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
 
 /// Reporter for sending execution events to the collector.
 /// Initialized once by `rust_session_init` when called from the C shim constructor.
@@ -477,114 +487,357 @@ pub unsafe extern "C" fn rust_posix_spawnp(
 ///
 /// Called from C shim for: popen
 ///
+/// Instead of calling the real `popen` (which uses `environ` internally and
+/// may bypass our LD_PRELOAD on older glibc), we reimplement it using
+/// `posix_spawnp` with a doctored envp — the same path as exec-family calls.
+/// This eliminates the need for `ensure_environ_has_session_vars` / `setenv`.
+///
 /// # Safety
 /// This function is unsafe because it:
 /// - Dereferences raw pointers (`command` and `mode`) which could be null or invalid
-/// - Calls the original popen function through a function pointer
+/// - Creates pipes and spawns child processes
 /// - Returns a raw pointer to a FILE structure
 ///
 /// The caller must ensure that `command` and `mode` are valid null-terminated C strings.
 #[cfg(has_symbol_popen)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char) -> *mut libc::FILE {
-    type PopenFunc = unsafe extern "C" fn(command: *const c_char, mode: *const c_char) -> *mut libc::FILE;
-
-    // For popen, we need to parse the shell command to extract the executable
-    if !command.is_null() {
-        let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                log::warn!("Failed to parse popen command as UTF-8");
-                let func_ptr = REAL_POPEN.load(Ordering::SeqCst);
-                if !func_ptr.is_null() {
-                    let real_func_ptr: PopenFunc = unsafe { std::mem::transmute(func_ptr) };
-                    return unsafe { real_func_ptr(command, mode) };
-                }
-                return ptr::null_mut();
-            }
-        };
-
-        // Parse the shell command - for simplicity, we'll report it as a shell execution
-        report(|| {
-            let result = Execution {
-                executable: PathBuf::from("/bin/sh"),
-                arguments: vec!["/bin/sh".to_string(), "-c".to_string(), command_str.to_string()],
-                working_dir: working_dir()?,
-                environment: std::env::vars().collect(),
-            };
-            Ok(result)
-        });
+    if command.is_null() || mode.is_null() {
+        set_errno(libc::EINVAL);
+        return ptr::null_mut();
     }
 
-    // Restore session variables in environ before calling real popen.
-    // See ensure_environ_has_session_vars docs for why this is needed.
-    unsafe { ensure_environ_has_session_vars() };
+    let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            log::warn!("Failed to parse popen command as UTF-8");
+            set_errno(libc::EINVAL);
+            return ptr::null_mut();
+        }
+    };
 
-    let func_ptr = REAL_POPEN.load(Ordering::SeqCst);
-    if !func_ptr.is_null() {
-        let real_func_ptr: PopenFunc = unsafe { std::mem::transmute(func_ptr) };
-        unsafe { real_func_ptr(command, mode) }
+    let mode_str = match unsafe { CStr::from_ptr(mode) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            set_errno(libc::EINVAL);
+            return ptr::null_mut();
+        }
+    };
+
+    // Determine pipe direction: 'r' means we read child's stdout, 'w' means we write to child's stdin
+    let reading = mode_str.starts_with('r');
+
+    report(|| {
+        Ok(Execution {
+            executable: PathBuf::from("/bin/sh"),
+            arguments: vec!["/bin/sh".to_string(), "-c".to_string(), command_str.to_string()],
+            working_dir: working_dir()?,
+            environment: std::env::vars().collect(),
+        })
+    });
+
+    // Create the pipe
+    let mut pipe_fds: [c_int; 2] = [0; 2];
+    if unsafe { libc::pipe(pipe_fds.as_mut_ptr()) } != 0 {
+        return ptr::null_mut();
+    }
+
+    // Parent reads from pipe_fds[0], child writes to pipe_fds[1] (reading mode)
+    // Parent writes to pipe_fds[1], child reads from pipe_fds[0] (writing mode)
+    let (parent_fd, child_fd, child_target_fd) = if reading {
+        (pipe_fds[0], pipe_fds[1], libc::STDOUT_FILENO)
     } else {
-        log::error!("Real popen function not found");
-        ptr::null_mut()
+        (pipe_fds[1], pipe_fds[0], libc::STDIN_FILENO)
+    };
+
+    // Set up file actions: redirect child's stdin/stdout to the pipe
+    let mut file_actions: libc::posix_spawn_file_actions_t = unsafe { std::mem::zeroed() };
+    if unsafe { libc::posix_spawn_file_actions_init(&mut file_actions) } != 0 {
+        unsafe {
+            libc::close(pipe_fds[0]);
+            libc::close(pipe_fds[1]);
+        }
+        return ptr::null_mut();
     }
+    // Close the parent's end in the child
+    unsafe { libc::posix_spawn_file_actions_addclose(&mut file_actions, parent_fd) };
+    // Redirect child's target fd (stdin or stdout) to the child's end of the pipe
+    unsafe { libc::posix_spawn_file_actions_adddup2(&mut file_actions, child_fd, child_target_fd) };
+    // Close the child's original pipe fd (now duplicated to target)
+    unsafe { libc::posix_spawn_file_actions_addclose(&mut file_actions, child_fd) };
+
+    // Build argv for /bin/sh -c <command>
+    let sh = c"/bin/sh";
+    let dash_c = c"-c";
+    let cmd_cstr = match std::ffi::CString::new(command_str) {
+        Ok(c) => c,
+        Err(_) => {
+            unsafe {
+                libc::posix_spawn_file_actions_destroy(&mut file_actions);
+                libc::close(pipe_fds[0]);
+                libc::close(pipe_fds[1]);
+            }
+            return ptr::null_mut();
+        }
+    };
+    let argv: [*const c_char; 4] = [sh.as_ptr(), dash_c.as_ptr(), cmd_cstr.as_ptr(), ptr::null()];
+
+    // Doctor the environment via the same path as exec-family calls
+    let envp = get_environ();
+    let resolved_env = unsafe { resolve_environment(envp) };
+    let envp_to_use = resolved_env.as_ptr();
+
+    // Spawn the child
+    let mut child_pid: pid_t = 0;
+    let spawn_result = unsafe {
+        let func_ptr = REAL_POSIX_SPAWNP.load(Ordering::SeqCst);
+        if func_ptr.is_null() {
+            log::error!("Real posix_spawnp function not found");
+            libc::posix_spawn_file_actions_destroy(&mut file_actions);
+            libc::close(pipe_fds[0]);
+            libc::close(pipe_fds[1]);
+            return ptr::null_mut();
+        }
+        type PosixSpawnpFunc = unsafe extern "C" fn(
+            pid: *mut pid_t,
+            file: *const c_char,
+            file_actions: *const posix_spawn_file_actions_t,
+            attrp: *const posix_spawnattr_t,
+            argv: *const *const c_char,
+            envp: *const *const c_char,
+        ) -> c_int;
+        let real_func: PosixSpawnpFunc = std::mem::transmute(func_ptr);
+        real_func(&mut child_pid, sh.as_ptr(), &file_actions, ptr::null(), argv.as_ptr(), envp_to_use)
+    };
+
+    unsafe { libc::posix_spawn_file_actions_destroy(&mut file_actions) };
+
+    if spawn_result != 0 {
+        unsafe {
+            libc::close(pipe_fds[0]);
+            libc::close(pipe_fds[1]);
+            set_errno(spawn_result);
+        }
+        return ptr::null_mut();
+    }
+
+    // Close the child's end in the parent
+    unsafe { libc::close(child_fd) };
+
+    // Wrap the parent's fd in a FILE*
+    let file_ptr = unsafe { libc::fdopen(parent_fd, mode) };
+    if file_ptr.is_null() {
+        unsafe {
+            libc::close(parent_fd);
+            libc::kill(child_pid, libc::SIGKILL);
+            libc::waitpid(child_pid, ptr::null_mut(), 0);
+        }
+        return ptr::null_mut();
+    }
+
+    // Track the child pid so pclose can waitpid it
+    POPEN_CHILDREN.lock().unwrap().insert(file_ptr as usize, child_pid);
+
+    file_ptr
+}
+
+/// Rust implementation of pclose
+///
+/// Called from C shim for: pclose
+///
+/// Retrieves the child pid associated with the FILE* (stored by our popen),
+/// closes the stream, and waits for the child to exit.
+///
+/// # Safety
+/// This function is unsafe because it dereferences a raw FILE pointer.
+#[cfg(has_symbol_popen)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
+    if stream.is_null() {
+        set_errno(libc::EINVAL);
+        return -1;
+    }
+
+    // Look up the child pid
+    let child_pid = POPEN_CHILDREN.lock().unwrap().remove(&(stream as usize));
+
+    // If we don't have a tracked pid, this FILE* wasn't opened by our popen.
+    // Fall back to the real pclose.
+    let Some(pid) = child_pid else {
+        let func_ptr = REAL_PCLOSE.load(Ordering::SeqCst);
+        if !func_ptr.is_null() {
+            type PcloseFunc = unsafe extern "C" fn(stream: *mut libc::FILE) -> c_int;
+            let real_func: PcloseFunc = unsafe { std::mem::transmute(func_ptr) };
+            return unsafe { real_func(stream) };
+        }
+        set_errno(libc::EINVAL);
+        return -1;
+    };
+
+    // Close the stream (this closes the underlying fd)
+    unsafe { libc::fclose(stream) };
+
+    // Wait for the child
+    let mut status: c_int = 0;
+    loop {
+        let ret = unsafe { libc::waitpid(pid, &mut status, 0) };
+        if ret != -1 || get_errno() != libc::EINTR {
+            break;
+        }
+    }
+
+    status
 }
 
 /// Rust implementation of system
 ///
 /// Called from C shim for: system
 ///
+/// Instead of calling the real `system` (which uses `environ` internally and
+/// may bypass our LD_PRELOAD on older glibc), we reimplement it using
+/// `posix_spawnp` with a doctored envp — the same path as exec-family calls.
+/// This eliminates the need for `ensure_environ_has_session_vars` / `setenv`.
+///
+/// Follows POSIX system() semantics: blocks SIGCHLD, ignores SIGINT/SIGQUIT
+/// during the child's execution, then waitpid's and returns the status.
+/// `system(NULL)` returns non-zero to indicate a shell is available.
+///
 /// # Safety
 /// This function is unsafe because it:
 /// - Dereferences a raw pointer (`command`) which could be null or invalid
-/// - Calls the original system function through a function pointer
-/// - Executes arbitrary shell commands which can have system-wide effects
+/// - Spawns child processes and manipulates signal masks
 ///
 /// The caller must ensure that `command` is a valid null-terminated C string.
 #[cfg(has_symbol_system)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn rust_system(command: *const c_char) -> c_int {
-    type SystemFunc = unsafe extern "C" fn(command: *const c_char) -> c_int;
-
-    // For system, we need to parse the shell command to extract the executable
-    if !command.is_null() {
-        let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                log::warn!("Failed to parse system command as UTF-8");
-                let func_ptr = REAL_SYSTEM.load(Ordering::SeqCst);
-                if !func_ptr.is_null() {
-                    let real_func_ptr: SystemFunc = unsafe { std::mem::transmute(func_ptr) };
-                    return unsafe { real_func_ptr(command) };
-                }
-                return -1;
-            }
-        };
-
-        // Parse the shell command - for simplicity, we'll report it as a shell execution
-        report(|| {
-            let result = Execution {
-                executable: PathBuf::from("/bin/sh"),
-                arguments: vec!["/bin/sh".to_string(), "-c".to_string(), command_str.to_string()],
-                working_dir: working_dir()?,
-                environment: std::env::vars().collect(),
-            };
-            Ok(result)
-        });
+    // system(NULL) returns non-zero to indicate a command processor is available
+    if command.is_null() {
+        return 1;
     }
 
-    // Restore session variables in environ before calling real system.
-    // See ensure_environ_has_session_vars docs for why this is needed.
-    unsafe { ensure_environ_has_session_vars() };
+    let command_str = match unsafe { CStr::from_ptr(command) }.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            log::warn!("Failed to parse system command as UTF-8");
+            set_errno(libc::EINVAL);
+            return -1;
+        }
+    };
 
-    let func_ptr = REAL_SYSTEM.load(Ordering::SeqCst);
-    if !func_ptr.is_null() {
-        let real_func_ptr: SystemFunc = unsafe { std::mem::transmute(func_ptr) };
-        unsafe { real_func_ptr(command) }
-    } else {
-        log::error!("Real system function not found");
+    report(|| {
+        Ok(Execution {
+            executable: PathBuf::from("/bin/sh"),
+            arguments: vec!["/bin/sh".to_string(), "-c".to_string(), command_str.to_string()],
+            working_dir: working_dir()?,
+            environment: std::env::vars().collect(),
+        })
+    });
+
+    // Build argv for /bin/sh -c <command>
+    let sh = c"/bin/sh";
+    let dash_c = c"-c";
+    let cmd_cstr = match std::ffi::CString::new(command_str) {
+        Ok(c) => c,
+        Err(_) => {
+            set_errno(libc::EINVAL);
+            return -1;
+        }
+    };
+    let argv: [*const c_char; 4] = [sh.as_ptr(), dash_c.as_ptr(), cmd_cstr.as_ptr(), ptr::null()];
+
+    // Block SIGCHLD, ignore SIGINT and SIGQUIT (POSIX system() semantics)
+    let mut block_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+    let mut old_mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+    unsafe {
+        libc::sigemptyset(&mut block_mask);
+        libc::sigaddset(&mut block_mask, libc::SIGCHLD);
+        libc::sigprocmask(libc::SIG_BLOCK, &block_mask, &mut old_mask);
+    }
+
+    let old_sigint = unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
+    let old_sigquit = unsafe { libc::signal(libc::SIGQUIT, libc::SIG_IGN) };
+
+    // Set up spawn attributes to restore default signal handling in the child
+    let mut attr: libc::posix_spawnattr_t = unsafe { std::mem::zeroed() };
+    unsafe {
+        libc::posix_spawnattr_init(&mut attr);
+        libc::posix_spawnattr_setflags(
+            &mut attr,
+            libc::POSIX_SPAWN_SETSIGDEF as libc::c_short | libc::POSIX_SPAWN_SETSIGMASK as libc::c_short,
+        );
+        // Restore default handlers for SIGINT, SIGQUIT in the child
+        let mut default_sigs: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut default_sigs);
+        libc::sigaddset(&mut default_sigs, libc::SIGINT);
+        libc::sigaddset(&mut default_sigs, libc::SIGQUIT);
+        libc::posix_spawnattr_setsigdefault(&mut attr, &default_sigs);
+        // Restore the original signal mask in the child
+        libc::posix_spawnattr_setsigmask(&mut attr, &old_mask);
+    }
+
+    // Doctor the environment via the same path as exec-family calls
+    let envp = get_environ();
+    let resolved_env = unsafe { resolve_environment(envp) };
+    let envp_to_use = resolved_env.as_ptr();
+
+    // Spawn the child
+    let mut child_pid: pid_t = 0;
+    let spawn_result = unsafe {
+        let func_ptr = REAL_POSIX_SPAWNP.load(Ordering::SeqCst);
+        if func_ptr.is_null() {
+            log::error!("Real posix_spawnp function not found");
+            libc::posix_spawnattr_destroy(&mut attr);
+            libc::signal(libc::SIGINT, old_sigint);
+            libc::signal(libc::SIGQUIT, old_sigquit);
+            libc::sigprocmask(libc::SIG_SETMASK, &old_mask, ptr::null_mut());
+            return -1;
+        }
+        type PosixSpawnpFunc = unsafe extern "C" fn(
+            pid: *mut pid_t,
+            file: *const c_char,
+            file_actions: *const posix_spawn_file_actions_t,
+            attrp: *const posix_spawnattr_t,
+            argv: *const *const c_char,
+            envp: *const *const c_char,
+        ) -> c_int;
+        let real_func: PosixSpawnpFunc = std::mem::transmute(func_ptr);
+        real_func(
+            &mut child_pid,
+            sh.as_ptr(),
+            ptr::null(), // no file actions
+            &attr,
+            argv.as_ptr(),
+            envp_to_use,
+        )
+    };
+
+    unsafe { libc::posix_spawnattr_destroy(&mut attr) };
+
+    let status = if spawn_result != 0 {
+        // Spawn failed — return as if the shell exited with 127
+        set_errno(spawn_result);
         -1
+    } else {
+        // Wait for the child
+        let mut wstatus: c_int = 0;
+        loop {
+            let ret = unsafe { libc::waitpid(child_pid, &mut wstatus, 0) };
+            if ret != -1 || get_errno() != libc::EINTR {
+                break;
+            }
+        }
+        wstatus
+    };
+
+    // Restore signal handling
+    unsafe {
+        libc::signal(libc::SIGINT, old_sigint);
+        libc::signal(libc::SIGQUIT, old_sigquit);
+        libc::sigprocmask(libc::SIG_SETMASK, &old_mask, ptr::null_mut());
     }
+
+    status
 }
 
 // =============================================================================
@@ -643,72 +896,24 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
     }
 }
 
-/// Ensure the process's `environ` contains the session variables.
+/// Get the process's current `environ` pointer.
 ///
-/// `system()` and `popen()` use the process's `environ` to set up the child
-/// environment. On some glibc versions their internal exec bypasses the PLT,
-/// so our LD_PRELOAD override never fires and we cannot doctor the envp.
-/// The only option is to patch `environ` directly before the real function call.
-///
-/// Uses `desired_preload_value` (the same policy as exec-family doctoring) to
-/// compute the LD_PRELOAD value, ensuring co-resident libraries like Gentoo's
-/// `libsandbox.so` are preserved.
-///
-/// This is a no-op when both variables are already present and correct.
-///
-/// # Safety
-///
-/// Calls `libc::setenv` which is not async-signal-safe and races with
-/// concurrent `getenv`/`setenv` from other threads. In practice this is
-/// acceptable because `system()` and `popen()` themselves are not safe to
-/// call concurrently with environment mutations, so callers already operate
-/// under that constraint.
-unsafe fn ensure_environ_has_session_vars() {
-    use std::ffi::CString;
-
-    let Some(ctx) = SESSION_CTX.get() else {
-        return;
-    };
-
-    // Check if BEAR_INTERCEPT is present and correct.
-    let intercept_ok = match std::env::var(bear::environment::KEY_INTERCEPT_STATE) {
-        Ok(val) => {
-            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref()
-                == Some(&ctx.state)
+/// On Linux/BSD, this is the `extern char **environ` variable.
+/// On macOS, we use `_NSGetEnviron()` for reliable access.
+fn get_environ() -> *const *const c_char {
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn _NSGetEnviron() -> *mut *mut *mut c_char;
         }
-        Err(_) => false,
-    };
-
-    // Check if LD_PRELOAD is present and has our library first.
-    // None means the variable is absent from environ.
-    let current_preload = std::env::var(PRELOAD_KEY).ok();
-    let preload_ok = match &current_preload {
-        Some(val) => std::env::split_paths(val).next().as_deref() == Some(ctx.state.library.as_path()),
-        None => false,
-    };
-
-    if intercept_ok && preload_ok {
-        return;
+        unsafe { *_NSGetEnviron() as *const *const c_char }
     }
-
-    log::debug!("ensure_environ_has_session_vars: restoring session variables in process environ");
-
-    // Restore BEAR_INTERCEPT
-    if !intercept_ok
-        && let Ok(state_json) = TryInto::<String>::try_into(ctx.state.clone())
-        && let (Ok(k), Ok(v)) =
-            (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
+    #[cfg(not(target_os = "macos"))]
     {
-        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
-    }
-
-    // Restore LD_PRELOAD using the same policy as exec-family doctoring:
-    // fall back to the startup snapshot when the current value is absent or empty.
-    if !preload_ok
-        && let Ok(updated) = desired_preload_value(ctx, current_preload.as_deref())
-        && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
-    {
-        unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };
+        unsafe extern "C" {
+            static environ: *const *const c_char;
+        }
+        unsafe { environ }
     }
 }
 
@@ -808,25 +1013,12 @@ fn working_dir() -> Result<PathBuf, c_int> {
     Ok(cwd)
 }
 
-/// Set errno to the given value.
-///
-/// Exec-family functions (execve, execvpe, etc.) return -1 on failure and communicate
-/// the error code through errno, not through their return value. This helper provides
-/// portable errno-setting across supported Unix platforms.
-///
-/// # Safety
-/// This directly writes to the thread-local errno location via platform-specific libc functions.
-#[cfg(any(target_os = "linux", target_os = "android"))]
-unsafe fn set_errno(value: c_int) {
-    unsafe {
-        *libc::__errno_location() = value;
-    }
+/// Set the thread-local errno value.
+fn set_errno(value: c_int) {
+    errno::set_errno(errno::Errno(value));
 }
 
-/// Set errno to the given value (macOS / FreeBSD / DragonFly variant).
-#[cfg(any(target_os = "macos", target_os = "ios", target_os = "freebsd", target_os = "dragonfly"))]
-unsafe fn set_errno(value: c_int) {
-    unsafe {
-        *libc::__error() = value;
-    }
+/// Read the thread-local errno value.
+fn get_errno() -> c_int {
+    errno::errno().0
 }

@@ -70,6 +70,7 @@ extern int rust_posix_spawnp(pid_t *pid, const char *file,
                              const posix_spawnattr_t *attrp,
                              char *const argv[], char *const envp[]);
 extern FILE *rust_popen(const char *command, const char *mode);
+extern int rust_pclose(FILE *stream);
 extern int rust_system(const char *command);
 
 // Library constructor
@@ -302,6 +303,11 @@ EXPORT int posix_spawnp(pid_t *pid, const char *file,
 EXPORT FILE *popen(const char *command, const char *mode)
 {
     return rust_popen(command, mode);
+}
+
+EXPORT int pclose(FILE *stream)
+{
+    return rust_pclose(stream);
 }
 #endif
 

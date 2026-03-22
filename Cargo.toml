@@ -34,6 +34,8 @@ tempfile = { version = "3.19", default-features = false }
 signal-hook = { version = "0.3", default-features = false }
 regex = "1.0"
 libc = "0.2"
+errno = "0.3"
+ctor = "0.4"
 which = "8.0"
 cc = "1.2"
 assert_cmd = "2.0"

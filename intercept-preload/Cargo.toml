@@ -20,10 +20,11 @@ bear = { path = "../bear" }
 thiserror.workspace = true
 log.workspace = true
 env_logger.workspace = true
-ctor = { version = "0.4" }
+ctor.workspace = true
 
 [target.'cfg(target_family = "unix")'.dependencies]
 libc.workspace = true
+errno.workspace = true
 
 [build-dependencies]
 platform-checks = { path = "../platform-checks" }
