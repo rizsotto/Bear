@@ -36,7 +36,7 @@ use ctor::ctor;
 use libc::{RTLD_NEXT, c_char, c_int, pid_t, posix_spawn_file_actions_t, posix_spawnattr_t};
 
 use crate::session::{
-    DoctoredEnvironment, PRELOAD_KEY, SESSION, desired_preload_value, in_session, init_session_from_envp,
+    DoctoredEnvironment, PRELOAD_KEY, SESSION_CTX, desired_preload_value, in_session, init_session_from_envp,
 };
 
 #[ctor]
@@ -623,18 +623,18 @@ impl ResolvedEnvironment {
 /// The `envp` pointer must be a valid null-terminated array of null-terminated
 /// C strings in "KEY=VALUE" format, or null.
 unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment {
-    match SESSION.get() {
+    match SESSION_CTX.get() {
         None => {
             // No session, pass through original environment
             ResolvedEnvironment::Original(envp)
         }
-        Some(state) => {
-            if unsafe { in_session(state.clone(), envp) } {
+        Some(ctx) => {
+            if unsafe { in_session(ctx, envp) } {
                 // Environment is still aligned with session, pass through
                 ResolvedEnvironment::Original(envp)
             } else {
                 // Environment was modified, doctor it
-                match DoctoredEnvironment::from_envp(state.clone(), envp) {
+                match DoctoredEnvironment::from_envp(ctx, envp) {
                     Ok(doctored) => ResolvedEnvironment::Doctored(doctored),
                     Err(_) => ResolvedEnvironment::Original(envp),
                 }
@@ -666,14 +666,15 @@ unsafe fn resolve_environment(envp: *const *const c_char) -> ResolvedEnvironment
 unsafe fn ensure_environ_has_session_vars() {
     use std::ffi::CString;
 
-    let Some(state) = SESSION.get() else {
+    let Some(ctx) = SESSION_CTX.get() else {
         return;
     };
 
     // Check if BEAR_INTERCEPT is present and correct.
     let intercept_ok = match std::env::var(bear::environment::KEY_INTERCEPT_STATE) {
         Ok(val) => {
-            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref() == Some(state)
+            bear::intercept::environment::PreloadState::try_from(val.as_str()).ok().as_ref()
+                == Some(&ctx.state)
         }
         Err(_) => false,
     };
@@ -682,7 +683,7 @@ unsafe fn ensure_environ_has_session_vars() {
     // None means the variable is absent from environ.
     let current_preload = std::env::var(PRELOAD_KEY).ok();
     let preload_ok = match &current_preload {
-        Some(val) => std::env::split_paths(val).next() == Some(state.library.clone()),
+        Some(val) => std::env::split_paths(val).next() == Some(ctx.state.library.clone()),
         None => false,
     };
 
@@ -694,7 +695,7 @@ unsafe fn ensure_environ_has_session_vars() {
 
     // Restore BEAR_INTERCEPT
     if !intercept_ok
-        && let Ok(state_json) = TryInto::<String>::try_into(state.clone())
+        && let Ok(state_json) = TryInto::<String>::try_into(ctx.state.clone())
         && let (Ok(k), Ok(v)) =
             (CString::new(bear::environment::KEY_INTERCEPT_STATE), CString::new(state_json))
     {
@@ -704,7 +705,7 @@ unsafe fn ensure_environ_has_session_vars() {
     // Restore LD_PRELOAD using the same policy as exec-family doctoring:
     // fall back to the startup snapshot when the current value is absent or empty.
     if !preload_ok
-        && let Ok(updated) = desired_preload_value(state, current_preload.as_deref())
+        && let Ok(updated) = desired_preload_value(ctx, current_preload.as_deref())
         && let (Ok(k), Ok(v)) = (CString::new(PRELOAD_KEY), CString::new(updated))
     {
         unsafe { libc::setenv(k.as_ptr(), v.as_ptr(), 1) };

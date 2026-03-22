@@ -34,6 +34,7 @@
 
 use std::ffi::{CStr, CString};
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use bear::environment::KEY_INTERCEPT_STATE;
@@ -41,7 +42,7 @@ use bear::environment::KEY_INTERCEPT_STATE;
 use bear::environment::KEY_OS__PRELOAD_PATH;
 #[cfg(target_os = "macos")]
 use bear::environment::{KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH};
-use bear::intercept::environment::{PreloadState, insert_to_path};
+use bear::intercept::environment::PreloadState;
 use libc::{c_char, c_int};
 
 /// The preload environment variable key for the current platform.
@@ -50,20 +51,21 @@ pub const PRELOAD_KEY: &str = KEY_OS__MACOS_PRELOAD_PATH;
 #[cfg(not(target_os = "macos"))]
 pub const PRELOAD_KEY: &str = KEY_OS__PRELOAD_PATH;
 
-/// Global session storage, initialized once from the C constructor.
-pub static SESSION: OnceLock<PreloadState> = OnceLock::new();
-
-/// The full LD_PRELOAD value captured at library load time.
+/// Combined session state, initialized atomically from the C constructor.
 ///
-/// When doctoring an envp that has no LD_PRELOAD at all (e.g. after `env -i`),
-/// we use this to restore the complete preload chain — not just our library,
-/// but also any other LD_PRELOAD libraries (like Gentoo's `libsandbox.so`)
-/// that were present when the process started. Without this, doctoring would
-/// only restore Bear's library, breaking co-resident LD_PRELOAD libraries.
-/// `None` means the preload variable was absent at startup.
-/// `Some("")` means it was present but empty.
-/// `Some("libexec.so:libsandbox.so")` is the normal case.
-static INITIAL_PRELOAD: OnceLock<Option<String>> = OnceLock::new();
+/// Replaces the previous separate `SESSION` and `INITIAL_PRELOAD` globals,
+/// ensuring both are always initialized together.
+pub static SESSION_CTX: OnceLock<SessionContext> = OnceLock::new();
+
+/// Holds the parsed session state and the normalized startup preload snapshot.
+pub struct SessionContext {
+    /// Bear's session state (destination + library path).
+    pub state: PreloadState,
+    /// Best-effort startup snapshot of the preload variable, parsed and normalized.
+    /// `None` if the preload variable was absent at startup.
+    /// Stored as `Vec<PathBuf>` so we avoid re-parsing every time we doctor.
+    pub startup_preload: Option<Vec<PathBuf>>,
+}
 
 /// Iterate over key-value pairs in a C-style envp array.
 ///
@@ -143,6 +145,17 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
     unsafe { envp_iter(envp) }.find(|(k, _)| *k == key).map(|(_, v)| v.to_string())
 }
 
+/// Normalize a preload value string into a deduplicated list of paths.
+///
+/// Removes empty segments and deduplicates while preserving order.
+fn normalize_preload(value: &str) -> Vec<PathBuf> {
+    let mut seen = std::collections::HashSet::new();
+    std::env::split_paths(value)
+        .filter(|p| !p.as_os_str().is_empty())
+        .filter(|p| seen.insert(p.clone()))
+        .collect()
+}
+
 /// Check whether the given envp is already aligned with the expected session state.
 ///
 /// Returns `true` when both conditions hold:
@@ -154,7 +167,7 @@ unsafe fn read_env_value(envp: *const *const c_char, key: &str) -> Option<String
 /// competing library's `execve` runs before ours and strips the preload variable,
 /// our doctoring never fires. When Bear is not first, this function returns `false`
 /// so that the caller re-doctors the environment to restore the correct ordering.
-pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> bool {
+pub unsafe fn in_session(ctx: &SessionContext, envp: *const *const c_char) -> bool {
     if envp.is_null() {
         return false;
     }
@@ -165,10 +178,10 @@ pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> boo
     for (key, value) in unsafe { envp_iter(envp) } {
         if key == KEY_INTERCEPT_STATE {
             if let Ok(parsed_state) = PreloadState::try_from(value) {
-                intercept_state_matches = parsed_state == state;
+                intercept_state_matches = parsed_state == ctx.state;
             }
         } else if key == PRELOAD_KEY {
-            preload_matches = std::env::split_paths(value).next() == Some(state.library.clone());
+            preload_matches = std::env::split_paths(value).next() == Some(ctx.state.library.clone());
         }
     }
 
@@ -184,14 +197,23 @@ pub unsafe fn in_session(state: PreloadState, envp: *const *const c_char) -> boo
 /// Policy:
 /// - `Some(value)` with a non-empty value: prepend Bear's library to it.
 /// - `Some("")` (present but empty) or `None` (absent): fall back to the
-///   startup snapshot (`INITIAL_PRELOAD`) so co-resident libraries survive.
+///   startup snapshot so co-resident libraries survive.
 /// - If no snapshot exists either, use just Bear's library.
-pub fn desired_preload_value(state: &PreloadState, current: Option<&str>) -> Result<String, c_int> {
+pub fn desired_preload_value(ctx: &SessionContext, current: Option<&str>) -> Result<String, c_int> {
     let base = match current {
         Some(v) if !v.is_empty() => v.to_string(),
-        _ => INITIAL_PRELOAD.get().and_then(|opt| opt.clone()).unwrap_or_default(),
+        _ => {
+            // Fall back to the startup snapshot.
+            match &ctx.startup_preload {
+                Some(paths) if !paths.is_empty() => std::env::join_paths(paths)
+                    .map_err(|_| libc::EINVAL)?
+                    .into_string()
+                    .map_err(|_| libc::EINVAL)?,
+                _ => String::new(),
+            }
+        }
     };
-    insert_to_path(&base, &state.library).map_err(|_| libc::EINVAL)
+    bear::intercept::environment::insert_to_path(&base, &ctx.state.library).map_err(|_| libc::EINVAL)
 }
 
 /// A doctored environment that owns its strings and can provide a C-style envp.
@@ -218,14 +240,14 @@ impl DoctoredEnvironment {
         DoctoredEnvironment { strings, ptrs }
     }
 
-    /// Create a doctored environment from a preload state and the received environment.
+    /// Create a doctored environment from a session context and the received environment.
     ///
     /// Returns an error if any key or value contains a null byte.
     ///
-    /// The method is called when the `in_session` was returning false, therefore the
+    /// The method is called when `in_session` returned false, therefore the
     /// environment is not aligned with the preload mode settings. The result environment
-    /// will be aligned with the preload mode settings based on the state.
-    pub fn from_envp(state: PreloadState, envp: *const *const c_char) -> Result<Self, c_int> {
+    /// will be aligned with the preload mode settings based on the context.
+    pub fn from_envp(ctx: &SessionContext, envp: *const *const c_char) -> Result<Self, c_int> {
         use std::ffi::CString;
 
         let mut strings = Vec::new();
@@ -261,13 +283,13 @@ impl DoctoredEnvironment {
         }
 
         // Add KEY_INTERCEPT_STATE with serialized state (JSON)
-        let state_json: String = state.clone().try_into().map_err(|_| libc::EINVAL)?;
+        let state_json: String = ctx.state.clone().try_into().map_err(|_| libc::EINVAL)?;
         let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
         strings.push(CString::new(intercept_entry).map_err(|_| libc::EINVAL)?);
 
         // Add PRELOAD_KEY with the library path inserted at front.
         // Uses the shared policy: fall back to startup snapshot when envp had no preload key.
-        let preload_value = desired_preload_value(&state, original_preload_value.as_deref())?;
+        let preload_value = desired_preload_value(ctx, original_preload_value.as_deref())?;
         let preload_entry = format!("{}={}", PRELOAD_KEY, preload_value);
         strings.push(CString::new(preload_entry).map_err(|_| libc::EINVAL)?);
 
@@ -308,15 +330,14 @@ pub unsafe fn init_session_from_envp(envp: *const *const c_char) -> Option<Socke
         Some(session) => {
             let destination = session.destination;
 
-            // Capture the full LD_PRELOAD value before anything modifies it.
+            // Capture and normalize the preload variable before anything modifies it.
             // This preserves co-resident libraries (e.g. libsandbox.so).
-            // None means the preload key was absent from envp.
-            if INITIAL_PRELOAD.set(unsafe { read_env_value(envp, PRELOAD_KEY) }).is_err() {
-                log::debug!("INITIAL_PRELOAD already set, ignoring duplicate init");
-            }
+            let startup_preload = unsafe { read_env_value(envp, PRELOAD_KEY) }.map(|v| normalize_preload(&v));
 
-            if SESSION.set(session).is_err() {
-                log::debug!("SESSION already set, ignoring duplicate init");
+            let ctx = SessionContext { state: session, startup_preload };
+
+            if SESSION_CTX.set(ctx).is_err() {
+                log::debug!("SESSION_CTX already set, ignoring duplicate init");
             }
 
             Some(destination)
@@ -365,6 +386,11 @@ mod tests {
     /// Helper function to create a test PreloadState with default destination and library.
     fn create_test_state() -> PreloadState {
         PreloadState { destination: TEST_DESTINATION, library: PathBuf::from(TEST_LIBRARY_PATH) }
+    }
+
+    /// Helper function to create a test SessionContext with no startup preload.
+    fn create_test_ctx() -> SessionContext {
+        SessionContext { state: create_test_state(), startup_preload: None }
     }
 
     /// Helper function to serialize a PreloadState to JSON for environment variable.
@@ -448,37 +474,37 @@ mod tests {
 
     #[test]
     fn test_in_session_returns_false_for_null_pointer() {
-        let state = create_test_state();
-        let result = unsafe { in_session(state, std::ptr::null()) };
+        let ctx = create_test_ctx();
+        let result = unsafe { in_session(&ctx, std::ptr::null()) };
         assert!(!result);
     }
 
     #[test]
     fn test_in_session_returns_false_when_intercept_state_missing() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let preload_entry = format!("{}={}", PRELOAD_KEY, TEST_LIBRARY_PATH);
 
         let envp = TestEnvp::new(&["PATH=/usr/bin", &preload_entry]);
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
 
     #[test]
     fn test_in_session_returns_false_when_preload_missing() {
-        let state = create_test_state();
-        let state_json = state_to_json(&state);
+        let ctx = create_test_ctx();
+        let state_json = state_to_json(&ctx.state);
         let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
 
         let envp = TestEnvp::new(&["PATH=/usr/bin", &intercept_entry]);
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
 
     #[test]
     fn test_in_session_returns_false_when_state_differs() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
             let different_destination = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 54321);
             let different_state = PreloadState {
@@ -492,15 +518,15 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
 
     #[test]
     fn test_in_session_returns_false_when_library_not_first_in_preload() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
-            let state_json = state_to_json(&state);
+            let state_json = state_to_json(&ctx.state);
             let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
             // Library is second in the preload path
             let preload_entry = format!("{}=/other/lib.so:{}", PRELOAD_KEY, TEST_LIBRARY_PATH);
@@ -508,30 +534,30 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
 
     #[test]
     fn test_in_session_returns_true_when_all_matches() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
-            let state_json = state_to_json(&state);
+            let state_json = state_to_json(&ctx.state);
             let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
             let preload_entry = format!("{}={}", PRELOAD_KEY, TEST_LIBRARY_PATH);
 
             TestEnvp::new(&["PATH=/usr/bin", &intercept_entry, &preload_entry])
         };
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
 
     #[test]
     fn test_in_session_returns_true_with_library_first_among_multiple() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
-            let state_json = state_to_json(&state);
+            let state_json = state_to_json(&ctx.state);
             let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
             // Library is first but there are other libraries too
             let preload_entry =
@@ -540,24 +566,24 @@ mod tests {
             TestEnvp::new(&[&intercept_entry, &preload_entry])
         };
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
 
     #[test]
     fn test_in_session_returns_false_for_empty_environment() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&[]);
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(!result);
     }
 
     #[test]
     fn test_doctored_environment_from_null_envp() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
 
-        let result = DoctoredEnvironment::from_envp(state, std::ptr::null());
+        let result = DoctoredEnvironment::from_envp(&ctx, std::ptr::null());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -569,10 +595,10 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_preserves_other_variables() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user", "SHELL=/bin/bash"]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -587,10 +613,10 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_adds_intercept_state() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(state.clone(), envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -604,10 +630,10 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_adds_preload_key() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -621,13 +647,13 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_library_first_in_preload() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
             let existing_preload = format!("{}=/other/lib.so:/another/lib.so", PRELOAD_KEY);
             TestEnvp::new(&["PATH=/usr/bin", &existing_preload])
         };
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -652,10 +678,10 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_as_ptr_returns_valid_pointer() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -678,10 +704,10 @@ mod tests {
 
     #[test]
     fn test_doctored_environment_null_terminated() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&["PATH=/usr/bin", "HOME=/home/user"]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -692,7 +718,7 @@ mod tests {
 
     #[test]
     fn test_init_session_from_envp_returns_none_for_null() {
-        // Note: We can't easily test SESSION initialization multiple times
+        // Note: We can't easily test SESSION_CTX initialization multiple times
         // since it's a OnceLock. We test the return value behavior.
         let result = unsafe { init_session_from_envp(std::ptr::null()) };
         assert!(result.is_none());
@@ -725,26 +751,26 @@ mod tests {
 
     #[test]
     fn test_in_session_handles_malformed_entry_without_equals() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = {
-            let state_json = state_to_json(&state);
+            let state_json = state_to_json(&ctx.state);
             let intercept_entry = format!("{}={}", KEY_INTERCEPT_STATE, state_json);
             let preload_entry = format!("{}={}", PRELOAD_KEY, TEST_LIBRARY_PATH);
 
             TestEnvp::new(&["MALFORMED", &intercept_entry, &preload_entry])
         };
 
-        let result = unsafe { in_session(state, envp.as_ptr()) };
+        let result = unsafe { in_session(&ctx, envp.as_ptr()) };
         assert!(result);
     }
 
     #[test]
     fn test_doctored_environment_handles_entry_with_multiple_equals() {
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         // Entry with value containing equals signs
         let envp = TestEnvp::new(&["MY_VAR=value=with=equals", "PATH=/usr/bin"]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
@@ -778,14 +804,68 @@ mod tests {
     #[test]
     fn test_doctored_environment_from_strings() {
         // Test the private from_strings method indirectly through from_envp
-        let state = create_test_state();
+        let ctx = create_test_ctx();
         let envp = TestEnvp::new(&[]);
 
-        let result = DoctoredEnvironment::from_envp(state, envp.as_ptr());
+        let result = DoctoredEnvironment::from_envp(&ctx, envp.as_ptr());
         assert!(result.is_ok());
 
         let doctored = result.unwrap();
         // Verify strings and ptrs are consistent
         assert_eq!(doctored.ptrs.len(), doctored.strings.len() + 1); // +1 for null terminator
+    }
+
+    #[test]
+    fn test_normalize_preload_deduplicates() {
+        let result = normalize_preload("/a.so:/b.so:/a.so");
+        assert_eq!(result, vec![PathBuf::from("/a.so"), PathBuf::from("/b.so")]);
+    }
+
+    #[test]
+    fn test_normalize_preload_removes_empty_segments() {
+        let result = normalize_preload("/a.so::/b.so:");
+        assert_eq!(result, vec![PathBuf::from("/a.so"), PathBuf::from("/b.so")]);
+    }
+
+    #[test]
+    fn test_normalize_preload_preserves_order() {
+        let result = normalize_preload("/c.so:/a.so:/b.so");
+        assert_eq!(result, vec![PathBuf::from("/c.so"), PathBuf::from("/a.so"), PathBuf::from("/b.so")]);
+    }
+
+    #[test]
+    fn test_desired_preload_value_with_startup_snapshot() {
+        let ctx = SessionContext {
+            state: create_test_state(),
+            startup_preload: Some(vec![PathBuf::from("/other/lib.so")]),
+        };
+        // When current is absent, should fall back to startup snapshot
+        let result = desired_preload_value(&ctx, None).unwrap();
+        let paths: Vec<PathBuf> = std::env::split_paths(&result).collect();
+        assert_eq!(paths[0], PathBuf::from(TEST_LIBRARY_PATH));
+        assert!(paths.contains(&PathBuf::from("/other/lib.so")));
+    }
+
+    #[test]
+    fn test_desired_preload_value_with_current() {
+        let ctx = create_test_ctx();
+        // When current has a value, should prepend Bear's library
+        let result = desired_preload_value(&ctx, Some("/existing/lib.so")).unwrap();
+        let paths: Vec<PathBuf> = std::env::split_paths(&result).collect();
+        assert_eq!(paths[0], PathBuf::from(TEST_LIBRARY_PATH));
+        assert!(paths.contains(&PathBuf::from("/existing/lib.so")));
+    }
+
+    #[test]
+    fn test_desired_preload_value_empty_current_falls_back() {
+        let ctx = SessionContext {
+            state: create_test_state(),
+            startup_preload: Some(vec![PathBuf::from("/snapshot/lib.so")]),
+        };
+        // Empty current should fall back to startup snapshot
+        let result = desired_preload_value(&ctx, Some("")).unwrap();
+        let paths: Vec<PathBuf> = std::env::split_paths(&result).collect();
+        assert_eq!(paths[0], PathBuf::from(TEST_LIBRARY_PATH));
+        assert!(paths.contains(&PathBuf::from("/snapshot/lib.so")));
     }
 }
