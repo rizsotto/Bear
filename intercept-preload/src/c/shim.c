@@ -94,8 +94,8 @@ static void on_load(void)
     }
 }
 
-// Count variadic arguments until NULL terminator
-// The va_list is consumed by this function
+// Count variadic arguments until NULL terminator.
+// Uses its own va_copy, so the caller's va_list is not affected.
 static size_t va_count_args(va_list ap)
 {
     size_t count = 0;
@@ -104,13 +104,24 @@ static size_t va_count_args(va_list ap)
     return count;
 }
 
-// Copy n arguments from va_list to argv array
-// Copies exactly n elements (should include the NULL terminator)
-static void va_copy_args(va_list ap, char **argv, size_t n)
-{
-    for (size_t i = 0; i < n; ++i)
-        argv[i] = va_arg(ap, char *);
-}
+//
+// Variadic exec helpers — why we inline va_arg extraction
+//
+// The C standard says that after a va_list is passed to a function that calls
+// va_arg on it, the va_list's value in the caller is indeterminate. On x86_64
+// va_list is an array type (effectively passed by reference), so the caller's
+// copy happens to be advanced — but on i686 (32-bit) va_list is a plain char*
+// passed by value, so the caller's copy is NOT advanced. To avoid undefined
+// behavior on any platform, all va_arg extraction is done directly in the
+// calling function rather than delegated to a helper.
+//
+// static void va_copy_args(va_list ap, char **argv, size_t n)
+// {
+//     for (size_t i = 0; i < n; ++i)
+//         argv[i] = va_arg(ap, char *);
+// }
+// 
+
 
 //
 // execl - execute a file
@@ -129,11 +140,12 @@ EXPORT int execl(const char *path, const char *arg0, ...)
     const size_t argc = va_count_args(ap_count);
     va_end(ap_count);
 
-    // Second pass: copy arguments to stack-allocated VLA
+    // Second pass: extract arguments into stack-allocated VLA
     // Layout: [arg0, arg1, ..., argN, NULL] = 1 + argc + 1 elements
     char *argv[argc + 2];
     argv[0] = (char *)arg0;
-    va_copy_args(ap, &argv[1], argc + 1);  // argc args + NULL terminator
+    for (size_t i = 1; i <= argc + 1; ++i)
+        argv[i] = va_arg(ap, char *);
 
     va_end(ap);
 
@@ -158,10 +170,11 @@ EXPORT int execlp(const char *file, const char *arg0, ...)
     const size_t argc = va_count_args(ap_count);
     va_end(ap_count);
 
-    // Second pass: copy arguments to stack-allocated VLA
+    // Second pass: extract arguments into stack-allocated VLA
     char *argv[argc + 2];
     argv[0] = (char *)arg0;
-    va_copy_args(ap, &argv[1], argc + 1);
+    for (size_t i = 1; i <= argc + 1; ++i)
+        argv[i] = va_arg(ap, char *);
 
     va_end(ap);
 
@@ -192,10 +205,11 @@ EXPORT int execle(const char *path, const char *arg0, ...)
     const size_t argc = va_count_args(ap_count);
     va_end(ap_count);
 
-    // Second pass: copy arguments to stack-allocated VLA
+    // Second pass: extract arguments into stack-allocated VLA
     char *argv[argc + 2];
     argv[0] = (char *)arg0;
-    va_copy_args(ap, &argv[1], argc + 1);  // argc args + NULL terminator
+    for (size_t i = 1; i <= argc + 1; ++i)
+        argv[i] = va_arg(ap, char *);
 
     // The next argument after NULL is the environment pointer
     char *const *envp = va_arg(ap, char *const *);
