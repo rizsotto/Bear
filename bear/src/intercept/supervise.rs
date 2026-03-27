@@ -55,14 +55,16 @@ pub fn supervise(command: &mut std::process::Command) -> Result<ExitStatus, Supe
 
 /// This function supervises the execution of a command represented by the `Execution` struct.
 pub fn supervise_execution(execution: Execution) -> Result<ExitStatus, SuperviseError> {
-    let mut child = Into::<std::process::Command>::into(execution);
+    let mut child = std::process::Command::try_from(execution)?;
     supervise(&mut child)
 }
 
-impl From<Execution> for std::process::Command {
-    fn from(val: Execution) -> Self {
+impl TryFrom<Execution> for std::process::Command {
+    type Error = SuperviseError;
+
+    fn try_from(val: Execution) -> Result<Self, Self::Error> {
         let mut command = match val.arguments.as_slice() {
-            [] => panic!("Execution arguments cannot be empty"),
+            [] => return Err(SuperviseError::EmptyArguments),
             [_] => std::process::Command::new(val.executable),
             [_, arguments @ ..] => {
                 let mut cmd = std::process::Command::new(val.executable);
@@ -73,7 +75,7 @@ impl From<Execution> for std::process::Command {
 
         command.envs(val.environment);
         command.current_dir(val.working_dir);
-        command
+        Ok(command)
     }
 }
 
@@ -104,4 +106,6 @@ pub enum SuperviseError {
         #[source]
         source: std::io::Error,
     },
+    #[error("Execution arguments cannot be empty")]
+    EmptyArguments,
 }
