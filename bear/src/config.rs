@@ -113,9 +113,7 @@ mod types {
                     }
                     Ok(())
                 }
-                Err(_) => {
-                    panic!("configuration can't be serialized")
-                }
+                Err(_) => Err(fmt::Error),
             }
         }
     }
