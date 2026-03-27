@@ -648,7 +648,7 @@ pub unsafe extern "C" fn rust_popen(command: *const c_char, mode: *const c_char)
     }
 
     // Track the child pid so pclose can waitpid it
-    POPEN_CHILDREN.lock().unwrap().insert(file_ptr as usize, child_pid);
+    POPEN_CHILDREN.lock().unwrap_or_else(|e| e.into_inner()).insert(file_ptr as usize, child_pid);
 
     file_ptr
 }
@@ -671,7 +671,7 @@ pub unsafe extern "C" fn rust_pclose(stream: *mut libc::FILE) -> c_int {
     }
 
     // Look up the child pid
-    let child_pid = POPEN_CHILDREN.lock().unwrap().remove(&(stream as usize));
+    let child_pid = POPEN_CHILDREN.lock().unwrap_or_else(|e| e.into_inner()).remove(&(stream as usize));
 
     // If we don't have a tracked pid, this FILE* wasn't opened by our popen.
     // Fall back to the real pclose.
