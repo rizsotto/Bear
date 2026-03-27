@@ -106,7 +106,7 @@ mod types {
     impl fmt::Display for Main {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             writeln!(f, "Configuration:")?;
-            match serde_yml::to_string(self) {
+            match serde_saphyr::to_string(self) {
                 Ok(yaml_string) => {
                     for line in yaml_string.lines() {
                         writeln!(f, "{}", line)?;
@@ -715,6 +715,7 @@ pub mod loader {
         /// If the configuration file is specified, it will be used. Otherwise, the default locations
         /// will be searched for the configuration file. If the configuration file is not found, the
         /// default configuration will be returned.
+        #[allow(clippy::result_large_err)] // Config loading runs once at startup.
         pub fn load(
             context: &crate::context::Context,
             filename: &Option<String>,
@@ -765,6 +766,7 @@ pub mod loader {
         }
 
         /// Loads the configuration from the specified file.
+        #[allow(clippy::result_large_err)] // Config loading runs once at startup.
         pub fn from_file(path: &Path) -> Result<Main, ConfigError> {
             info!("Loading configuration file: {}", path.display());
 
@@ -784,12 +786,12 @@ pub mod loader {
         }
 
         /// Define the deserialization format of the config file.
-        fn from_reader<R, T>(rdr: R) -> serde_yml::Result<T>
+        fn from_reader<R, T>(rdr: R) -> Result<T, serde_saphyr::Error>
         where
             R: std::io::Read,
             T: serde::de::DeserializeOwned,
         {
-            serde_yml::from_reader(rdr)
+            serde_saphyr::from_reader(rdr)
         }
     }
 
@@ -808,7 +810,7 @@ pub mod loader {
         ParseError {
             path: PathBuf,
             #[source]
-            source: serde_yml::Error,
+            source: serde_saphyr::Error,
         },
         /// Error when the schema version is not supported.
         #[error("Unsupported schema version: {found}. Expected: {expected}")]
@@ -993,12 +995,15 @@ pub mod loader {
               directory: /tmp
             "#;
 
-            let result: serde_yml::Result<Main> = Loader::from_reader(content);
+            let result: Result<Main, serde_saphyr::Error> = Loader::from_reader(content);
 
             assert!(result.is_err());
 
             let message = result.unwrap_err().to_string();
-            assert_eq!("Unsupported schema version: 3.0. Expected: 4.1 at line 2 column 13", message);
+            assert!(
+                message.contains("Unsupported schema version: 3.0. Expected: 4.1"),
+                "unexpected error message: {message}"
+            );
         }
 
         #[test]
@@ -1014,7 +1019,7 @@ pub mod loader {
                 }
             }"#;
 
-            let result: serde_yml::Result<Main> = Loader::from_reader(content);
+            let result: Result<Main, serde_saphyr::Error> = Loader::from_reader(content);
 
             assert!(result.is_err());
         }
