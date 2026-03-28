@@ -18,7 +18,6 @@ pub use source::looks_like_a_source_file;
 /// Flag pattern definitions that describe HOW to consume arguments from the command line.
 /// These patterns define the syntactic structure of compiler flags and their arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // Comprehensive matching system - not all variants used yet
 pub enum FlagPattern {
     /// Match the flag exactly with specified number of required separate arguments: "-c", "-o file"
     /// The u32 represents how many additional arguments are required (0 for no additional args)
