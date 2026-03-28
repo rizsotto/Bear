@@ -24,9 +24,9 @@ static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(||
     let mut patterns = Vec::new();
 
     // Build patterns from generated YAML data
-    for &(type_str, names, cross_compilation, versioned) in RECOGNITION_PATTERNS {
+    for &(type_str, executables, cross_compilation, versioned) in RECOGNITION_PATTERNS {
         let compiler_type = parse_compiler_type(type_str);
-        let regex = create_compiler_regex(names, cross_compilation, versioned);
+        let regex = create_compiler_regex(executables, cross_compilation, versioned);
         patterns.push((compiler_type, regex));
     }
 
@@ -50,11 +50,11 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
     }
 }
 
-/// Build a regex that matches any of the given executable `names`, with optional
+/// Build a regex that matches any of the given `executables`, with optional
 /// cross-compilation prefix and version suffix support, plus `.exe` extension.
-fn create_compiler_regex(names: &[&str], cross_compilation: bool, versioned: bool) -> Regex {
-    // Escape names for regex (handles '+' in names like "c++", "clang++")
-    let escaped: Vec<String> = names.iter().map(|n| regex::escape(n)).collect();
+fn create_compiler_regex(executables: &[&str], cross_compilation: bool, versioned: bool) -> Regex {
+    // Escape for regex (handles '+' in names like "c++", "clang++")
+    let escaped: Vec<String> = executables.iter().map(|n| regex::escape(n)).collect();
     let alternation = escaped.join("|");
 
     let base = if cross_compilation {

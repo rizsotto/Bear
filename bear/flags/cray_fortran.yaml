@@ -2,7 +2,7 @@
 # https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html
 type: cray_fortran
 recognize:
-  - names: ["crayftn", "ftn"]
+  - executables: ["crayftn", "ftn"]
     cross_compilation: false
     versioned: true
 flags:

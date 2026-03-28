@@ -2,7 +2,7 @@
 # https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html
 type: intel_fortran
 recognize:
-  - names: ["ifort", "ifx"]
+  - executables: ["ifort", "ifx"]
     cross_compilation: false
     versioned: true
 flags:

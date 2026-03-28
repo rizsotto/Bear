@@ -3,7 +3,7 @@
 extends: gcc
 type: clang
 recognize:
-  - names: ["clang", "clang++"]
+  - executables: ["clang", "clang++"]
     cross_compilation: true
     versioned: true
 ignore_when:

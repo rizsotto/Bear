@@ -78,7 +78,7 @@ mod flags {
 
     #[derive(Deserialize, Clone)]
     struct RecognizeEntry {
-        names: Vec<String>,
+        executables: Vec<String>,
         #[serde(default)]
         cross_compilation: bool,
         #[serde(default)]
@@ -273,13 +273,15 @@ mod flags {
     /// Generate a static array of recognition pattern data from all YAML files.
     ///
     /// Produces `recognition.rs` containing `RECOGNITION_PATTERNS`, a static array of
-    /// `(&str, &[&str], bool, bool)` tuples: (compiler_type, names, cross_compilation, versioned).
+    /// `(&str, &[&str], bool, bool)` tuples: (compiler_type, executables, cross_compilation, versioned).
+    ///
+    /// Executables listed in `ignore_when.executables` are automatically added as
+    /// recognition entries with `(false, false)` so the recognizer can route them
+    /// to the right compiler type (where the interpreter will then ignore them).
     fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
         let mut out = String::new();
         out.push_str("// Generated from flags/*.yaml -- DO NOT EDIT\n");
-        out.push_str(
-            "pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n",
-        );
+        out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n");
 
         // Collect entries in a deterministic order (by TABLES order)
         for config in TABLES {
@@ -289,19 +291,33 @@ mod flags {
             let Some(ref type_name) = table.type_ else {
                 continue;
             };
-            let Some(ref recognize_entries) = table.recognize else {
-                continue;
-            };
 
-            for entry in recognize_entries {
-                let names_str: Vec<String> =
-                    entry.names.iter().map(|n| format!("\"{}\"", n)).collect();
+            // Emit explicit recognize entries
+            if let Some(ref recognize_entries) = table.recognize {
+                for entry in recognize_entries {
+                    let names_str: Vec<String> =
+                        entry.executables.iter().map(|n| format!("\"{}\"", n)).collect();
+                    out.push_str(&format!(
+                        "    (\"{}\", &[{}], {}, {}),\n",
+                        type_name,
+                        names_str.join(", "),
+                        entry.cross_compilation,
+                        entry.versioned,
+                    ));
+                }
+            }
+
+            // Auto-add own ignore_when.executables as recognition entries (no cross-compilation, no version).
+            // Only use the table's own list, not inherited — inherited executables are already
+            // recognized under the base compiler type.
+            let own_ignore = table.ignore_when.as_ref();
+            if own_ignore.is_some_and(|iw| !iw.executables.is_empty()) {
+                let exes = &own_ignore.unwrap().executables;
+                let names_str: Vec<String> = exes.iter().map(|n| format!("\"{}\"", n)).collect();
                 out.push_str(&format!(
-                    "    (\"{}\", &[{}], {}, {}),\n",
+                    "    (\"{}\", &[{}], false, false),\n",
                     type_name,
                     names_str.join(", "),
-                    entry.cross_compilation,
-                    entry.versioned,
                 ));
             }
         }
@@ -309,8 +325,7 @@ mod flags {
         out.push_str("];\n");
 
         let out_path = out_dir.join("recognition.rs");
-        fs::write(&out_path, out)
-            .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+        fs::write(&out_path, out).unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
     }
 
     /// Compute the flag name length as `FlagPattern::flag()` would return it.

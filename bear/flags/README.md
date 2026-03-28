@@ -19,10 +19,10 @@ type: gcc
 
 # Executable names this compiler is known by
 recognize:
-  - names: ["gcc", "g++", "gfortran"]
+  - executables: ["gcc", "g++", "gfortran"]
     cross_compilation: true    # match with cross-compilation prefix (e.g., arm-linux-gnu-gcc)
     versioned: true            # match with version suffix (e.g., gcc-11, gcc11)
-  - names: ["cc", "c++"]
+  - executables: ["cc", "c++"]
     cross_compilation: true
     versioned: false
 
@@ -109,13 +109,18 @@ base flags of the same length.
 The `recognize` section defines which executable names this compiler is known by.
 Each entry specifies:
 
-- `names` -- list of base executable names (e.g., `["gcc", "g++"]`)
+- `executables` -- list of base executable names (e.g., `["gcc", "g++"]`)
 - `cross_compilation` -- if `true`, also matches names with a cross-compilation
   prefix (e.g., `arm-linux-gnueabihf-gcc`)
 - `versioned` -- if `true`, also matches names with a version suffix
   (e.g., `gcc-11`, `gcc11`, `gcc-11.2`)
 
 All patterns automatically handle `.exe` extensions on Windows.
+
+Executables listed in `ignore_when.executables` are automatically added as
+recognition entries with `cross_compilation: false, versioned: false`. This
+ensures the recognizer routes them to the right compiler type, where the
+interpreter then ignores them. You do not need to list them under `recognize`.
 
 ## Adding a new compiler
 

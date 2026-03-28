@@ -3,7 +3,7 @@
 extends: gcc
 type: flang
 recognize:
-  - names: ["flang", "flang-new"]
+  - executables: ["flang", "flang-new"]
     cross_compilation: true
     versioned: true
 flags:

@@ -3,7 +3,7 @@
 extends: gcc
 type: cuda
 recognize:
-  - names: ["nvcc"]
+  - executables: ["nvcc"]
     cross_compilation: true
     versioned: true
 flags:
