@@ -1,5 +1,16 @@
 # GCC compiler flag definitions
 # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
+type: gcc
+recognize:
+  - names: ["gcc", "g++", "gfortran", "egfortran", "f95"]
+    cross_compilation: true
+    versioned: true
+  - names: ["cc", "c++"]
+    cross_compilation: true
+    versioned: false
+  - names: ["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"]
+    cross_compilation: false
+    versioned: false
 ignore_when:
   executables: ["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"]
 flags:

@@ -1,6 +1,11 @@
 # Flang (LLVM Fortran) compiler flag definitions
 # https://flang.llvm.org/docs/FlangDriver.html
 extends: gcc
+type: flang
+recognize:
+  - names: ["flang", "flang-new"]
+    cross_compilation: true
+    versioned: true
 flags:
   - match: {pattern: "-J{ }*"}
     result: configures_compiling

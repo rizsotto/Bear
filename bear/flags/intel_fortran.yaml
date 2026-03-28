@@ -1,5 +1,10 @@
 # Intel Fortran compiler (ifort, ifx) flag definitions
 # https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html
+type: intel_fortran
+recognize:
+  - names: ["ifort", "ifx"]
+    cross_compilation: false
+    versioned: true
 flags:
   - match: {pattern: "-preprocess-only"}
     result: stops_at_preprocessing

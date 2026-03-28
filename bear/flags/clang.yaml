@@ -1,6 +1,11 @@
 # Clang compiler flag definitions
 # https://clang.llvm.org/docs/ClangCommandLineReference.html
 extends: gcc
+type: clang
+recognize:
+  - names: ["clang", "clang++"]
+    cross_compilation: true
+    versioned: true
 ignore_when:
   flags: ["-cc1"]
 flags:

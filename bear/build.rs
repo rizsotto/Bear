@@ -69,8 +69,20 @@ mod flags {
     #[derive(Deserialize)]
     struct FlagTable {
         extends: Option<String>,
+        #[serde(rename = "type")]
+        type_: Option<String>,
+        recognize: Option<Vec<RecognizeEntry>>,
         ignore_when: Option<IgnoreWhen>,
         flags: Vec<FlagEntry>,
+    }
+
+    #[derive(Deserialize, Clone)]
+    struct RecognizeEntry {
+        names: Vec<String>,
+        #[serde(default)]
+        cross_compilation: bool,
+        #[serde(default)]
+        versioned: bool,
     }
 
     #[derive(Deserialize, Clone, Default)]
@@ -175,6 +187,9 @@ mod flags {
             raw_tables.insert(key, table);
         }
 
+        // Generate recognition patterns from all tables
+        generate_recognition_patterns(&raw_tables, &out_dir);
+
         // Generate each table
         for config in TABLES {
             let key = config.yaml_file.strip_suffix(".yaml").unwrap();
@@ -253,6 +268,49 @@ mod flags {
         out.push_str("];\n");
 
         out
+    }
+
+    /// Generate a static array of recognition pattern data from all YAML files.
+    ///
+    /// Produces `recognition.rs` containing `RECOGNITION_PATTERNS`, a static array of
+    /// `(&str, &[&str], bool, bool)` tuples: (compiler_type, names, cross_compilation, versioned).
+    fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
+        let mut out = String::new();
+        out.push_str("// Generated from flags/*.yaml -- DO NOT EDIT\n");
+        out.push_str(
+            "pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n",
+        );
+
+        // Collect entries in a deterministic order (by TABLES order)
+        for config in TABLES {
+            let key = config.yaml_file.strip_suffix(".yaml").unwrap();
+            let table = &raw_tables[key];
+
+            let Some(ref type_name) = table.type_ else {
+                continue;
+            };
+            let Some(ref recognize_entries) = table.recognize else {
+                continue;
+            };
+
+            for entry in recognize_entries {
+                let names_str: Vec<String> =
+                    entry.names.iter().map(|n| format!("\"{}\"", n)).collect();
+                out.push_str(&format!(
+                    "    (\"{}\", &[{}], {}, {}),\n",
+                    type_name,
+                    names_str.join(", "),
+                    entry.cross_compilation,
+                    entry.versioned,
+                ));
+            }
+        }
+
+        out.push_str("];\n");
+
+        let out_path = out_dir.join("recognition.rs");
+        fs::write(&out_path, out)
+            .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
     }
 
     /// Compute the flag name length as `FlagPattern::flag()` would return it.

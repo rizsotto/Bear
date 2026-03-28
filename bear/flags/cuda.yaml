@@ -1,6 +1,11 @@
 # NVIDIA CUDA compiler (nvcc) flag definitions
 # https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/
 extends: gcc
+type: cuda
+recognize:
+  - names: ["nvcc"]
+    cross_compilation: true
+    versioned: true
 flags:
   - match: {pattern: "--gpu-architecture{=}*"}
     result: configures_compiling
