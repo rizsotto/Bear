@@ -57,7 +57,7 @@ fn validate_intercept_libdir(value: &str) {
 
 /// Build-time code generation for compiler flag tables.
 ///
-/// Reads YAML flag definition files from `flags/` and generates Rust source files
+/// Reads YAML flag definition files from `interpreters/` and generates Rust source files
 /// containing static `[FlagRule; N]` arrays that are included via `include!()` in
 /// the compiler interpreter modules.
 mod flags {
@@ -168,7 +168,7 @@ mod flags {
     ];
 
     pub fn generate_flag_tables() {
-        let flags_dir = Path::new("flags");
+        let flags_dir = Path::new("interpreters");
         let out_dir: PathBuf = std::env::var("OUT_DIR").unwrap().into();
 
         // Read all YAML files first so we can resolve `extends`
@@ -280,7 +280,7 @@ mod flags {
     /// to the right compiler type (where the interpreter will then ignore them).
     fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
         let mut out = String::new();
-        out.push_str("// Generated from flags/*.yaml -- DO NOT EDIT\n");
+        out.push_str("// Generated from interpreters/*.yaml -- DO NOT EDIT\n");
         out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n");
 
         // Collect entries in a deterministic order (by TABLES order)
@@ -395,7 +395,7 @@ mod flags {
     /// Generate a Rust source file containing a static array of FlagRule.
     fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
         let mut out = String::new();
-        out.push_str(&format!("// Generated from flags/{} -- DO NOT EDIT\n", config.yaml_file));
+        out.push_str(&format!("// Generated from interpreters/{} -- DO NOT EDIT\n", config.yaml_file));
         out.push_str(&format!(
             "{}static {}: [FlagRule; {}] = [\n",
             config.visibility,
