@@ -386,4 +386,38 @@ mod tests {
             assert_eq!(parsed.arguments[1].kind(), ArgumentKind::Other(PassEffect::InfoAndExit));
         }
     }
+
+    #[test]
+    fn test_no_flag_rule_uses_source_kind() {
+        for rule in INTEL_FORTRAN_FLAGS.iter() {
+            assert!(
+                !matches!(rule.kind, ArgumentKind::Source { .. }),
+                "Flag rule {:?} must not use ArgumentKind::Source",
+                rule.pattern.flag()
+            );
+        }
+    }
+
+    #[test]
+    fn test_output_rules_consume_one_or_two_args() {
+        for rule in INTEL_FORTRAN_FLAGS.iter() {
+            if matches!(rule.kind, ArgumentKind::Output) {
+                match rule.pattern {
+                    FlagPattern::Exactly(_, n) => assert!(
+                        n <= 1,
+                        "Output rule {:?} with Exactly must take 0 or 1 extra args",
+                        rule.pattern.flag()
+                    ),
+                    FlagPattern::ExactlyWithEq(_)
+                    | FlagPattern::ExactlyWithEqOrSep(_)
+                    | FlagPattern::ExactlyWithGluedOrSep(_) => {}
+                    FlagPattern::Prefix(_, n) => assert!(
+                        n <= 1,
+                        "Output rule {:?} with Prefix must take 0 or 1 extra args",
+                        rule.pattern.flag()
+                    ),
+                }
+            }
+        }
+    }
 }
