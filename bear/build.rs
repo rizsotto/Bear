@@ -69,7 +69,16 @@ mod flags {
     #[derive(Deserialize)]
     struct FlagTable {
         extends: Option<String>,
+        ignore_when: Option<IgnoreWhen>,
         flags: Vec<FlagEntry>,
+    }
+
+    #[derive(Deserialize, Clone, Default)]
+    struct IgnoreWhen {
+        #[serde(default)]
+        executables: Vec<String>,
+        #[serde(default)]
+        flags: Vec<String>,
     }
 
     #[derive(Deserialize, Clone)]
@@ -89,6 +98,8 @@ mod flags {
     struct TableConfig {
         yaml_file: &'static str,
         static_name: &'static str,
+        ignore_executables_name: &'static str,
+        ignore_flags_name: &'static str,
         visibility: &'static str, // "pub " or ""
         output_file: &'static str,
     }
@@ -97,37 +108,49 @@ mod flags {
         TableConfig {
             yaml_file: "gcc.yaml",
             static_name: "GCC_FLAGS",
+            ignore_executables_name: "GCC_IGNORE_EXECUTABLES",
+            ignore_flags_name: "GCC_IGNORE_FLAGS",
             visibility: "pub ",
             output_file: "flags_gcc.rs",
         },
         TableConfig {
             yaml_file: "clang.yaml",
             static_name: "CLANG_FLAGS",
-            visibility: "",
+            ignore_executables_name: "CLANG_IGNORE_EXECUTABLES",
+            ignore_flags_name: "CLANG_IGNORE_FLAGS",
+            visibility: "pub ",
             output_file: "flags_clang.rs",
         },
         TableConfig {
             yaml_file: "flang.yaml",
             static_name: "FLANG_FLAGS",
-            visibility: "",
+            ignore_executables_name: "FLANG_IGNORE_EXECUTABLES",
+            ignore_flags_name: "FLANG_IGNORE_FLAGS",
+            visibility: "pub ",
             output_file: "flags_flang.rs",
         },
         TableConfig {
             yaml_file: "cuda.yaml",
             static_name: "CUDA_FLAGS",
+            ignore_executables_name: "CUDA_IGNORE_EXECUTABLES",
+            ignore_flags_name: "CUDA_IGNORE_FLAGS",
             visibility: "pub ",
             output_file: "flags_cuda.rs",
         },
         TableConfig {
             yaml_file: "intel_fortran.yaml",
             static_name: "INTEL_FORTRAN_FLAGS",
-            visibility: "",
+            ignore_executables_name: "INTEL_FORTRAN_IGNORE_EXECUTABLES",
+            ignore_flags_name: "INTEL_FORTRAN_IGNORE_FLAGS",
+            visibility: "pub ",
             output_file: "flags_intel_fortran.rs",
         },
         TableConfig {
             yaml_file: "cray_fortran.yaml",
             static_name: "CRAY_FORTRAN_FLAGS",
-            visibility: "",
+            ignore_executables_name: "CRAY_FORTRAN_IGNORE_EXECUTABLES",
+            ignore_flags_name: "CRAY_FORTRAN_IGNORE_FLAGS",
+            visibility: "pub ",
             output_file: "flags_cray_fortran.rs",
         },
     ];
@@ -173,12 +196,63 @@ mod flags {
                 b_len.cmp(&a_len)
             });
 
+            // Resolve ignore_when (own + base)
+            let ignore_when = resolve_ignore_when(table, &raw_tables);
+
             // Generate Rust source
-            let rust_code = generate_static_array(config, &entries);
+            let mut rust_code = generate_static_array(config, &entries);
+            rust_code.push_str(&generate_ignore_arrays(config, &ignore_when));
             let out_path = out_dir.join(config.output_file);
             fs::write(&out_path, rust_code)
                 .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
         }
+    }
+
+    /// Resolve `ignore_when` for a table, inheriting from base if extending.
+    fn resolve_ignore_when(table: &FlagTable, raw_tables: &HashMap<String, FlagTable>) -> IgnoreWhen {
+        let own = table.ignore_when.clone().unwrap_or_default();
+        if let Some(ref base_name) = table.extends {
+            if let Some(base_table) = raw_tables.get(base_name.as_str()) {
+                let base = base_table.ignore_when.clone().unwrap_or_default();
+                // Own values take precedence; only inherit if own list is empty
+                return IgnoreWhen {
+                    executables: if own.executables.is_empty() { base.executables } else { own.executables },
+                    flags: if own.flags.is_empty() { base.flags } else { own.flags },
+                };
+            }
+        }
+        own
+    }
+
+    /// Generate static arrays for ignore_when executables and flags.
+    fn generate_ignore_arrays(config: &TableConfig, ignore_when: &IgnoreWhen) -> String {
+        let mut out = String::new();
+
+        // Generate ignore executables array
+        out.push_str(&format!(
+            "{}static {}: [&str; {}] = [",
+            config.visibility,
+            config.ignore_executables_name,
+            ignore_when.executables.len()
+        ));
+        for exe in &ignore_when.executables {
+            out.push_str(&format!("\"{}\", ", exe));
+        }
+        out.push_str("];\n");
+
+        // Generate ignore flags array
+        out.push_str(&format!(
+            "{}static {}: [&str; {}] = [",
+            config.visibility,
+            config.ignore_flags_name,
+            ignore_when.flags.len()
+        ));
+        for flag in &ignore_when.flags {
+            out.push_str(&format!("\"{}\", ", flag));
+        }
+        out.push_str("];\n");
+
+        out
     }
 
     /// Compute the flag name length as `FlagPattern::flag()` would return it.

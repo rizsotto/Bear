@@ -1,5 +1,7 @@
 # GCC compiler flag definitions
 # https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
+ignore_when:
+  executables: ["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"]
 flags:
   - match: {pattern: "-x", count: 1}
     result: configures_compiling
