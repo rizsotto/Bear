@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! GCC command-line argument parser for compilation database generation.
+//! Generic flag-based compiler interpreter.
 //!
-//! This module provides a specialized interpreter for parsing GCC and GCC-compatible
-//! compiler command lines. It recognizes various compiler flags and categorizes them
-//! into semantic groups (source files, output files, compilation options, etc.) to
-//! generate accurate compilation database entries.
-//!
-//! The interpreter assumes compiler recognition has been handled by the compiler_interpreter
-//! and focuses solely on argument parsing and semantic analysis of command-line flags.
+//! This module provides a single interpreter type that handles all flag-table-driven
+//! compilers (GCC, Clang, Flang, CUDA, Intel Fortran, Cray Fortran). Each compiler
+//! is parameterized by its generated flag table and optional ignore filters, eliminating
+//! the need for per-compiler structs and trait implementations.
 
 use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
 use super::arguments::{OtherArguments, OutputArgument, SourceArgument};
@@ -19,69 +16,54 @@ use crate::semantic::{
     ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
 };
 
-/// GCC command-line argument parser that extracts semantic information from compiler invocations.
+/// A generic compiler interpreter parameterized by a flag table and ignore filters.
 ///
-/// This interpreter processes GCC and GCC-compatible compiler command lines to identify:
-/// - Source files being compiled
-/// - Output files and directories
-/// - Compiler flags that affect compilation
-/// - Include directories and preprocessor definitions
-///
-/// It assumes the executable has already been recognized as GCC-compatible by the
-/// compiler recognition system and focuses purely on argument parsing.
-pub struct GccInterpreter {
-    /// Flag analyzer that recognizes and categorizes GCC command-line flags
-    matcher: FlagAnalyzer,
+/// This replaces the individual per-compiler interpreter structs (GccInterpreter,
+/// ClangInterpreter, etc.) with a single type driven by build-time-generated data.
+pub struct FlagBasedInterpreter {
+    analyzer: FlagAnalyzer,
+    ignore_executables: &'static [&'static str],
+    ignore_flags: &'static [&'static str],
 }
 
-impl Default for GccInterpreter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl GccInterpreter {
-    /// Creates a new GCC interpreter with comprehensive GCC flag definitions.
-    ///
-    /// The interpreter is configured with patterns to recognize standard GCC flags
-    /// including optimization flags, warning flags, include directories, preprocessor
-    /// definitions, and various compilation options.
-    pub fn new() -> Self {
-        Self { matcher: FlagAnalyzer::new(&GCC_FLAGS) }
+impl FlagBasedInterpreter {
+    /// Creates a new flag-based interpreter with the given flag table and ignore filters.
+    pub fn new(
+        flags: &'static [FlagRule],
+        ignore_executables: &'static [&'static str],
+        ignore_flags: &'static [&'static str],
+    ) -> Self {
+        Self { analyzer: FlagAnalyzer::new(flags), ignore_executables, ignore_flags }
     }
 
-    /// Check if the execution represents a GCC internal executable that should be ignored.
-    fn is_gcc_internal_executable(execution: &Execution) -> bool {
-        if let Some(filename) = execution.executable.file_name()
+    fn should_ignore(&self, execution: &Execution) -> Option<&'static str> {
+        // Check executable name against ignore list
+        if !self.ignore_executables.is_empty()
+            && let Some(filename) = execution.executable.file_name()
             && let Some(filename_str) = filename.to_str()
+            && self.ignore_executables.contains(&filename_str)
         {
-            return GCC_INTERNAL_EXECUTABLES.contains(&filename_str);
+            return Some("internal executable");
         }
-        false
+
+        // Check arguments against ignore flags
+        if !self.ignore_flags.is_empty()
+            && self.ignore_flags.iter().any(|flag| execution.arguments.iter().any(|arg| arg == flag))
+        {
+            return Some("internal invocation");
+        }
+
+        None
     }
 }
 
-/// GCC internal executables that should be ignored
-/// These are implementation details of GCC's compilation process
-const GCC_INTERNAL_EXECUTABLES: [&str; 7] = [
-    "cc1",        // C compiler proper
-    "cc1plus",    // C++ compiler proper
-    "cc1obj",     // Objective-C compiler proper
-    "cc1objplus", // Objective-C++ compiler proper
-    "f951",       // Fortran compiler proper
-    "collect2",   // Linker wrapper
-    "lto1",       // Link-time optimization pass
-];
-
-impl Interpreter for GccInterpreter {
+impl Interpreter for FlagBasedInterpreter {
     fn recognize(&self, execution: &Execution) -> Option<Command> {
-        // Check if this is a GCC internal executable that should be ignored
-        if Self::is_gcc_internal_executable(execution) {
-            return Some(Command::Ignored("GCC internal executable"));
+        if let Some(reason) = self.should_ignore(execution) {
+            return Some(Command::Ignored(reason));
         }
 
-        // Parse both command-line arguments and environment variables
-        let annotated_args = parse_arguments_and_environment(&self.matcher, execution);
+        let annotated_args = parse_arguments_and_environment(&self.analyzer, execution);
 
         Some(Command::Compiler(CompilerCommand::new(
             execution.working_dir.clone(),
@@ -91,8 +73,16 @@ impl Interpreter for GccInterpreter {
     }
 }
 
-// GCC flag definitions. Generated at build time from flags/gcc.yaml.
-include!(concat!(env!("OUT_DIR"), "/flags_gcc.rs"));
+/// Parse both command-line arguments and environment variables to generate complete argument list.
+pub fn parse_arguments_and_environment(
+    flag_analyzer: &FlagAnalyzer,
+    execution: &Execution,
+) -> Vec<Box<dyn Arguments>> {
+    let mut args = parse_arguments(flag_analyzer, &execution.arguments);
+    let env_args = parse_environment(&execution.environment);
+    args.extend(env_args);
+    args
+}
 
 /// Parse command line arguments using the provided flag analyzer.
 fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn Arguments>> {
@@ -120,7 +110,6 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
                     ArgumentKind::Compiler,
                 )),
                 ArgumentKind::Source { .. } => {
-                    // This case should never occur since source files are handled by heuristic above
                     unreachable!("Source files should be detected by heuristic, not flag matching")
                 }
                 ArgumentKind::Output => match match_result.consumed_args_count() {
@@ -165,17 +154,12 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 /// Parse include directories from GCC-compatible environment variables.
 ///
 /// https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
-///
-/// Returns a vector of Arguments representing the environment-based include directories.
-/// This vector can be concatenated with the result of `parse_arguments` to create
-/// a complete argument list.
 fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Box<dyn Arguments>> {
     let mut args: Vec<Box<dyn Arguments>> = Vec::new();
 
     // Process the three GCC include environment variables that use -I
     for env_key in [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3] {
         if let Some(env_value) = environment.get(env_key) {
-            // Use std::env::split_paths for platform-correct path splitting
             for path in std::env::split_paths(env_value) {
                 if !path.as_os_str().is_empty() {
                     args.push(Box::new(OtherArguments::new(
@@ -189,7 +173,6 @@ fn parse_environment(environment: &std::collections::HashMap<String, String>) ->
 
     // Process OBJC_INCLUDE_PATH which uses -isystem
     if let Some(env_value) = environment.get(KEY_GCC__OBJC_INCLUDE) {
-        // Use std::env::split_paths for platform-correct path splitting
         for path in std::env::split_paths(env_value) {
             if !path.as_os_str().is_empty() {
                 args.push(Box::new(OtherArguments::new(
@@ -203,33 +186,19 @@ fn parse_environment(environment: &std::collections::HashMap<String, String>) ->
     args
 }
 
-/// Parse both command-line arguments and environment variables to generate complete argument list.
-///
-/// This is a convenience function that combines the results of `parse_arguments` and
-/// `parse_environment`, providing a unified interface for both GCC and Clang interpreters.
-///
-/// # Arguments
-///
-/// * `flag_analyzer` - The flag analyzer to use for parsing command-line arguments
-/// * `execution` - The execution context containing both arguments and environment variables
-///
-/// # Returns
-///
-/// A complete vector of Arguments containing both command-line and environment-based arguments.
-pub fn parse_arguments_and_environment(
-    flag_analyzer: &FlagAnalyzer,
-    execution: &Execution,
-) -> Vec<Box<dyn Arguments>> {
-    let mut args = parse_arguments(flag_analyzer, &execution.arguments);
-    let env_args = parse_environment(&execution.environment);
-    args.extend(env_args);
-    args
-}
+// Flag tables and ignore arrays. Generated at build time from flags/*.yaml.
+include!(concat!(env!("OUT_DIR"), "/flags_gcc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_clang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_flang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cuda.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_intel_fortran.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
 
 /// Validate semantic invariants that all flag tables must satisfy.
-/// Used by tests in this module and other compiler modules.
 #[cfg(test)]
 pub fn assert_flag_table_invariants(flags: &[FlagRule]) {
+    use super::super::matchers::FlagPattern;
+
     assert!(!flags.is_empty(), "Flag table must not be empty");
 
     // Sorted by flag length descending
@@ -270,15 +239,5 @@ pub fn assert_flag_table_invariants(flags: &[FlagRule]) {
                 }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_flag_table_invariants() {
-        assert_flag_table_invariants(&GCC_FLAGS);
     }
 }

@@ -7,24 +7,15 @@
 //! wrappers like ccache, distcc, and sccache.
 
 pub mod arguments;
-pub mod clang;
 pub mod compiler_recognition;
-pub mod cray_fortran;
-pub mod cuda;
-pub mod gcc;
-pub mod intel_fortran;
+pub mod flag_based;
 pub mod wrapper;
 
 use super::super::{Command, Interpreter};
 use super::combinators::OutputLogger;
 use crate::config::CompilerType;
 use crate::intercept::Execution;
-use clang::{ClangInterpreter, FlangInterpreter};
 use compiler_recognition::CompilerRecognizer;
-use cray_fortran::CrayFortranInterpreter;
-use cuda::CudaInterpreter;
-use gcc::GccInterpreter;
-use intel_fortran::IntelFortranInterpreter;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use wrapper::WrapperInterpreter;
@@ -53,13 +44,41 @@ impl CompilerInterpreter {
         // Create the final interpreter and register all non-wrapper interpreters
         let mut result = Self::new(Arc::clone(&recognizer));
 
-        // Register all interpreter types using the centralized method
-        result.register(CompilerType::Gcc, GccInterpreter::default());
-        result.register(CompilerType::Clang, ClangInterpreter::default());
-        result.register(CompilerType::Flang, FlangInterpreter::default());
-        result.register(CompilerType::IntelFortran, IntelFortranInterpreter::default());
-        result.register(CompilerType::CrayFortran, CrayFortranInterpreter::default());
-        result.register(CompilerType::Cuda, CudaInterpreter::default());
+        use flag_based::*;
+
+        // Register all interpreter types using generated flag tables and ignore filters
+        result.register(
+            CompilerType::Gcc,
+            FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS),
+        );
+        result.register(
+            CompilerType::Clang,
+            FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS),
+        );
+        result.register(
+            CompilerType::Flang,
+            FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS),
+        );
+        result.register(
+            CompilerType::IntelFortran,
+            FlagBasedInterpreter::new(
+                &INTEL_FORTRAN_FLAGS,
+                &INTEL_FORTRAN_IGNORE_EXECUTABLES,
+                &INTEL_FORTRAN_IGNORE_FLAGS,
+            ),
+        );
+        result.register(
+            CompilerType::CrayFortran,
+            FlagBasedInterpreter::new(
+                &CRAY_FORTRAN_FLAGS,
+                &CRAY_FORTRAN_IGNORE_EXECUTABLES,
+                &CRAY_FORTRAN_IGNORE_FLAGS,
+            ),
+        );
+        result.register(
+            CompilerType::Cuda,
+            FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS),
+        );
 
         Arc::new_cyclic(|weak_self| {
             // Create wrapper interpreter with weak references
@@ -157,15 +176,10 @@ mod tests {
         let Some(Command::Compiler(cmd)) = result else {
             panic!("Expected Command::Compiler, got {:?}", result);
         };
-        let actual: Vec<(ArgumentKind, Vec<String>)> = cmd
-            .arguments
-            .iter()
-            .map(|a| (a.kind(), a.as_arguments(&|p| Cow::Borrowed(p))))
-            .collect();
-        let expected: Vec<(ArgumentKind, Vec<String>)> = expected
-            .into_iter()
-            .map(|(k, args)| (k, args.into_iter().map(String::from).collect()))
-            .collect();
+        let actual: Vec<(ArgumentKind, Vec<String>)> =
+            cmd.arguments.iter().map(|a| (a.kind(), a.as_arguments(&|p| Cow::Borrowed(p)))).collect();
+        let expected: Vec<(ArgumentKind, Vec<String>)> =
+            expected.into_iter().map(|(k, args)| (k, args.into_iter().map(String::from).collect())).collect();
         assert_eq!(actual, expected);
     }
 
@@ -233,7 +247,8 @@ mod tests {
         #[test]
         fn unrecognized_compiler() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution = create_execution("unknown_compiler", vec!["unknown_compiler", "-c", "test.c"], "/tmp");
+            let execution =
+                create_execution("unknown_compiler", vec!["unknown_compiler", "-c", "test.c"], "/tmp");
             assert!(sut.recognize(&execution).is_none(), "Unknown compiler should not be recognized");
         }
 
@@ -263,13 +278,28 @@ mod tests {
             use crate::config::{Compiler, CompilerType};
             let config = vec![
                 Compiler { path: "/custom/path/my-gcc".into(), as_: Some(CompilerType::Gcc), ignore: false },
-                Compiler { path: "/opt/clang/bin/clang++".into(), as_: Some(CompilerType::Clang), ignore: false },
+                Compiler {
+                    path: "/opt/clang/bin/clang++".into(),
+                    as_: Some(CompilerType::Clang),
+                    ignore: false,
+                },
             ];
             let sut = CompilerInterpreter::new_with_config(&config);
-            let custom_gcc = create_execution("/custom/path/my-gcc", vec!["/custom/path/my-gcc", "-c", "test.c"], "/tmp");
-            assert!(sut.recognize(&custom_gcc).is_some(), "Custom GCC path should be recognized via config hint");
-            let custom_clang = create_execution("/opt/clang/bin/clang++", vec!["/opt/clang/bin/clang++", "-c", "main.cpp"], "/tmp");
-            assert!(sut.recognize(&custom_clang).is_some(), "Custom Clang path should be recognized via config hint");
+            let custom_gcc =
+                create_execution("/custom/path/my-gcc", vec!["/custom/path/my-gcc", "-c", "test.c"], "/tmp");
+            assert!(
+                sut.recognize(&custom_gcc).is_some(),
+                "Custom GCC path should be recognized via config hint"
+            );
+            let custom_clang = create_execution(
+                "/opt/clang/bin/clang++",
+                vec!["/opt/clang/bin/clang++", "-c", "main.cpp"],
+                "/tmp",
+            );
+            assert!(
+                sut.recognize(&custom_clang).is_some(),
+                "Custom Clang path should be recognized via config hint"
+            );
             let normal_gcc = create_execution("gcc", vec!["gcc", "-c", "normal.c"], "/tmp");
             assert!(sut.recognize(&normal_gcc).is_some(), "Standard GCC should still be recognized");
         }
@@ -311,12 +341,15 @@ mod tests {
         fn simple_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (stops_at(CompilerPass::Compiling), vec!["-c"]),
-                (Source { binary: false }, vec!["main.c"]),
-                (Output, vec!["-o", "main.o"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                    (Output, vec!["-o", "main.o"]),
+                ],
+            );
         }
 
         #[test]
@@ -327,37 +360,49 @@ mod tests {
                 vec!["gcc", "-I/usr/include", "-DDEBUG=1", "-o", "main", "main.c"],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (configures(CompilerPass::Preprocessing), vec!["-I/usr/include"]),
-                (configures(CompilerPass::Preprocessing), vec!["-DDEBUG=1"]),
-                (Output, vec!["-o", "main"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-I/usr/include"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-DDEBUG=1"]),
+                    (Output, vec!["-o", "main"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
         fn separate_flags() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution =
-                create_execution("gcc", vec!["gcc", "-I", "/usr/include", "-D", "DEBUG=1", "main.c"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (configures(CompilerPass::Preprocessing), vec!["-I", "/usr/include"]),
-                (configures(CompilerPass::Preprocessing), vec!["-D", "DEBUG=1"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            let execution = create_execution(
+                "gcc",
+                vec!["gcc", "-I", "/usr/include", "-D", "DEBUG=1", "main.c"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-I", "/usr/include"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-D", "DEBUG=1"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
         fn response_file() {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution("gcc", vec!["gcc", "@response.txt", "main.c"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (configures(CompilerPass::Compiling), vec!["@response.txt"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (configures(CompilerPass::Compiling), vec!["@response.txt"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -365,13 +410,16 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution =
                 create_execution("gcc", vec!["gcc", "-Wall", "-Wextra", "-Wno-unused", "main.c"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (none(), vec!["-Wall"]),
-                (none(), vec!["-Wextra"]),
-                (none(), vec!["-Wno-unused"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (none(), vec!["-Wall"]),
+                    (none(), vec!["-Wextra"]),
+                    (none(), vec!["-Wno-unused"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -397,8 +445,24 @@ mod tests {
             let execution = create_execution(
                 "gcc",
                 vec![
-                    "gcc", "-Wall", "-Werror", "-O2", "-g", "-I/usr/local/include", "-I", "/opt/include",
-                    "-DVERSION=1.0", "-D", "DEBUG", "-fPIC", "-m64", "-c", "main.c", "utils.c", "-o", "program",
+                    "gcc",
+                    "-Wall",
+                    "-Werror",
+                    "-O2",
+                    "-g",
+                    "-I/usr/local/include",
+                    "-I",
+                    "/opt/include",
+                    "-DVERSION=1.0",
+                    "-D",
+                    "DEBUG",
+                    "-fPIC",
+                    "-m64",
+                    "-c",
+                    "main.c",
+                    "utils.c",
+                    "-o",
+                    "program",
                 ],
                 "/project",
             );
@@ -423,8 +487,14 @@ mod tests {
                 (vec!["-O2", "-Os", "-Ofast", "-Og"], configures(CompilerPass::Compiling)),
                 (vec!["-g", "-g3", "-gdwarf-4", "-ggdb"], configures(CompilerPass::Compiling)),
                 (vec!["-Wall", "-Wextra", "-Wno-unused", "-Werror=format"], none()),
-                (vec!["-fPIC", "-fstack-protector", "-fno-omit-frame-pointer", "-flto"], configures(CompilerPass::Compiling)),
-                (vec!["-m64", "-march=native", "-mtune=generic", "-msse4.2"], configures(CompilerPass::Compiling)),
+                (
+                    vec!["-fPIC", "-fstack-protector", "-fno-omit-frame-pointer", "-flto"],
+                    configures(CompilerPass::Compiling),
+                ),
+                (
+                    vec!["-m64", "-march=native", "-mtune=generic", "-msse4.2"],
+                    configures(CompilerPass::Compiling),
+                ),
             ];
 
             for (flags, expected_kind) in cases {
@@ -449,7 +519,16 @@ mod tests {
             // Test linker flags
             let execution = create_execution(
                 "gcc",
-                vec!["gcc", "-Wl,--gc-sections", "-Wl,-rpath,/usr/local/lib", "-static", "-shared", "-pie", "-pthread", "main.c"],
+                vec![
+                    "gcc",
+                    "-Wl,--gc-sections",
+                    "-Wl,-rpath,/usr/local/lib",
+                    "-static",
+                    "-shared",
+                    "-pie",
+                    "-pthread",
+                    "main.c",
+                ],
                 "/project",
             );
             let result = sut.recognize(&execution).unwrap();
@@ -462,7 +541,15 @@ mod tests {
             // Test system include and library paths
             let execution = create_execution(
                 "gcc",
-                vec!["gcc", "-isystem", "/usr/local/include", "-L/usr/local/lib", "-lmath", "--sysroot=/opt/sysroot", "main.c"],
+                vec![
+                    "gcc",
+                    "-isystem",
+                    "/usr/local/include",
+                    "-L/usr/local/lib",
+                    "-lmath",
+                    "--sysroot=/opt/sysroot",
+                    "main.c",
+                ],
                 "/project",
             );
             let result = sut.recognize(&execution).unwrap();
@@ -478,7 +565,14 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "gcc",
-                vec!["gcc", "@compile_flags.txt", "-fplugin=myplugin.so", "-fplugin-arg-myplugin-option=value", "-save-temps=obj", "main.c"],
+                vec![
+                    "gcc",
+                    "@compile_flags.txt",
+                    "-fplugin=myplugin.so",
+                    "-fplugin-arg-myplugin-option=value",
+                    "-save-temps=obj",
+                    "main.c",
+                ],
                 "/project",
             );
             let result = sut.recognize(&execution).unwrap();
@@ -498,11 +592,17 @@ mod tests {
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 6);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/opt/include".to_string()));
@@ -518,11 +618,17 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let mut env = HashMap::new();
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 5);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
             } else {
@@ -537,11 +643,17 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let mut env = HashMap::new();
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
-            let execution = create_execution_with_env("g++", vec!["g++", "-c", "main.cpp", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "g++",
+                vec!["g++", "-c", "main.cpp", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 5);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
             } else {
@@ -559,11 +671,17 @@ mod tests {
             env.insert("CPATH", cpath.as_str());
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 8);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/opt/include".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
@@ -581,11 +699,17 @@ mod tests {
             let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
             let mut env = HashMap::new();
             env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.m", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.m", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 6);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/System/Library/Frameworks".to_string()));
                 assert!(args.contains(&"/usr/local/objc".to_string()));
@@ -604,11 +728,17 @@ mod tests {
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
             env.insert("OBJC_INCLUDE_PATH", "/System/Library/Frameworks");
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 8);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
@@ -627,7 +757,12 @@ mod tests {
             let mut env = HashMap::new();
             env.insert("CPATH", "");
             env.insert("C_INCLUDE_PATH", c_include_path.as_str());
-            let execution = create_execution_with_env("gcc", vec!["gcc", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "gcc",
+                vec!["gcc", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 4);
@@ -641,7 +776,22 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "gcc",
-                vec!["gcc", "-E", "-C", "-CC", "-P", "-traditional", "-trigraphs", "-undef", "-Wp,-MD,deps.d", "-M", "-MM", "-MG", "-MP", "main.c"],
+                vec![
+                    "gcc",
+                    "-E",
+                    "-C",
+                    "-CC",
+                    "-P",
+                    "-traditional",
+                    "-trigraphs",
+                    "-undef",
+                    "-Wp,-MD,deps.d",
+                    "-M",
+                    "-MM",
+                    "-MG",
+                    "-MP",
+                    "main.c",
+                ],
                 "/project",
             );
             let result = sut.recognize(&execution).unwrap();
@@ -660,16 +810,23 @@ mod tests {
             let internal_cases = [
                 ("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1", vec!["cc1", "-quiet", "test.c"]),
                 ("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus", vec!["cc1plus", "-quiet", "test.cpp"]),
-                ("/usr/libexec/gcc/x86_64-linux-gnu/11/collect2", vec!["collect2", "-o", "program", "main.o"]),
-                ("/usr/libexec/gcc/x86_64-redhat-linux/15/f951", vec!["f951", "fortran.f90", "-mtune=generic", "-march=x86-64", "-o", "/tmp/cc6kwJ3Y.s"]),
+                (
+                    "/usr/libexec/gcc/x86_64-linux-gnu/11/collect2",
+                    vec!["collect2", "-o", "program", "main.o"],
+                ),
+                (
+                    "/usr/libexec/gcc/x86_64-redhat-linux/15/f951",
+                    vec!["f951", "fortran.f90", "-mtune=generic", "-march=x86-64", "-o", "/tmp/cc6kwJ3Y.s"],
+                ),
             ];
             for (exe, args) in &internal_cases {
                 let execution = create_execution(exe, args.clone(), "/home/user");
-                assert_ignored(sut.recognize(&execution), "GCC internal executable");
+                assert_ignored(sut.recognize(&execution), "internal executable");
             }
 
             // Regular gcc should still be recognized as a compiler
-            let gcc_execution = create_execution("/usr/bin/gcc", vec!["gcc", "-c", "-O2", "main.c"], "/home/user");
+            let gcc_execution =
+                create_execution("/usr/bin/gcc", vec!["gcc", "-c", "-O2", "main.c"], "/home/user");
             assert!(matches!(sut.recognize(&gcc_execution), Some(Command::Compiler(_))));
         }
 
@@ -681,14 +838,17 @@ mod tests {
                 vec!["gcc", "-o", "a.out", "source1.o", "source2.o", "-lx", "-L/usr/local/lib"],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["gcc"]),
-                (Output, vec!["-o", "a.out"]),
-                (Source { binary: true }, vec!["source1.o"]),
-                (Source { binary: true }, vec!["source2.o"]),
-                (configures(CompilerPass::Linking), vec!["-lx"]),
-                (configures(CompilerPass::Linking), vec!["-L/usr/local/lib"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["gcc"]),
+                    (Output, vec!["-o", "a.out"]),
+                    (Source { binary: true }, vec!["source1.o"]),
+                    (Source { binary: true }, vec!["source2.o"]),
+                    (configures(CompilerPass::Linking), vec!["-lx"]),
+                    (configures(CompilerPass::Linking), vec!["-L/usr/local/lib"]),
+                ],
+            );
         }
 
         #[test]
@@ -699,15 +859,30 @@ mod tests {
             let execution = create_execution(
                 "gcc",
                 vec![
-                    "gcc", "-o", "myprogram", "main.o", "utils.o", "lib.a", "-L/usr/lib", "-L", "/opt/lib",
-                    "-lmath", "-l", "pthread", "-Wl,--as-needed", "-static", "-pie",
+                    "gcc",
+                    "-o",
+                    "myprogram",
+                    "main.o",
+                    "utils.o",
+                    "lib.a",
+                    "-L/usr/lib",
+                    "-L",
+                    "/opt/lib",
+                    "-lmath",
+                    "-l",
+                    "pthread",
+                    "-Wl,--as-needed",
+                    "-static",
+                    "-pie",
                 ],
                 "/project",
             );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert!(cmd.arguments.len() >= 10);
-                let linking_count = cmd.arguments.iter()
+                let linking_count = cmd
+                    .arguments
+                    .iter()
                     .filter(|a| matches!(a.kind(), Other(PassEffect::Configures(CompilerPass::Linking))))
                     .count();
                 assert_eq!(linking_count, 7);
@@ -717,17 +892,30 @@ mod tests {
             let pure_linking = create_execution(
                 "gcc",
                 vec![
-                    "gcc", "-o", "final_program", "obj1.o", "obj2.o", "obj3.o", "libstatic.a",
-                    "-lssl", "-lcrypto", "-L/usr/local/ssl/lib", "-Wl,-rpath,/usr/local/ssl/lib",
+                    "gcc",
+                    "-o",
+                    "final_program",
+                    "obj1.o",
+                    "obj2.o",
+                    "obj3.o",
+                    "libstatic.a",
+                    "-lssl",
+                    "-lcrypto",
+                    "-L/usr/local/ssl/lib",
+                    "-Wl,-rpath,/usr/local/ssl/lib",
                 ],
                 "/build",
             );
             let result = sut.recognize(&pure_linking).unwrap();
             if let Command::Compiler(cmd) = result {
-                let object_files: Vec<_> = cmd.arguments.iter().filter(|a| {
-                    let args = a.as_arguments(&|p| Cow::Borrowed(p));
-                    args.len() == 1 && (args[0].ends_with(".o") || args[0].ends_with(".a"))
-                }).collect();
+                let object_files: Vec<_> = cmd
+                    .arguments
+                    .iter()
+                    .filter(|a| {
+                        let args = a.as_arguments(&|p| Cow::Borrowed(p));
+                        args.len() == 1 && (args[0].ends_with(".o") || args[0].ends_with(".a"))
+                    })
+                    .collect();
                 assert_eq!(object_files.len(), 4);
                 for obj_file in object_files {
                     assert_eq!(obj_file.kind(), Source { binary: true });
@@ -738,8 +926,11 @@ mod tests {
         #[test]
         fn arch_flag_preserves_argument() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution =
-                create_execution("gcc", vec!["gcc", "-arch", "arm64", "-Wall", "-O2", "-c", "hello.c"], "/project");
+            let execution = create_execution(
+                "gcc",
+                vec!["gcc", "-arch", "arm64", "-Wall", "-O2", "-c", "hello.c"],
+                "/project",
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 let arch_arg = cmd.arguments.iter().find(|a| {
@@ -766,12 +957,15 @@ mod tests {
         fn simple_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution("clang", vec!["clang", "-c", "-O2", "main.c"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (stops_at(CompilerPass::Compiling), vec!["-c"]),
-                (configures(CompilerPass::Compiling), vec!["-O2"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (configures(CompilerPass::Compiling), vec!["-O2"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -779,17 +973,28 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "clang++",
-                vec!["clang++", "-Weverything", "--target", "x86_64-apple-darwin", "-fsanitize=address", "-std=c++20", "main.cpp"],
+                vec![
+                    "clang++",
+                    "-Weverything",
+                    "--target",
+                    "x86_64-apple-darwin",
+                    "-fsanitize=address",
+                    "-std=c++20",
+                    "main.cpp",
+                ],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang++"]),
-                (none(), vec!["-Weverything"]),
-                (configures(CompilerPass::Compiling), vec!["--target", "x86_64-apple-darwin"]),
-                (configures(CompilerPass::Compiling), vec!["-fsanitize=address"]),
-                (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
-                (Source { binary: false }, vec!["main.cpp"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang++"]),
+                    (none(), vec!["-Weverything"]),
+                    (configures(CompilerPass::Compiling), vec!["--target", "x86_64-apple-darwin"]),
+                    (configures(CompilerPass::Compiling), vec!["-fsanitize=address"]),
+                    (configures(CompilerPass::Compiling), vec!["-std=c++20"]),
+                    (Source { binary: false }, vec!["main.cpp"]),
+                ],
+            );
         }
 
         #[test]
@@ -800,13 +1005,16 @@ mod tests {
                 vec!["clang", "-O3", "-flto", "-fsave-optimization-record", "main.c"],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["-O3"]),
-                (configures(CompilerPass::Compiling), vec!["-flto"]),
-                (configures(CompilerPass::Compiling), vec!["-fsave-optimization-record"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["-O3"]),
+                    (configures(CompilerPass::Compiling), vec!["-flto"]),
+                    (configures(CompilerPass::Compiling), vec!["-fsave-optimization-record"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -814,8 +1022,14 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
 
             for (args, expected_flag_args) in [
-                (vec!["clang", "--target", "arm64-apple-macos", "main.c"], vec!["--target", "arm64-apple-macos"]),
-                (vec!["clang", "-target", "arm64-apple-macos", "main.c"], vec!["-target", "arm64-apple-macos"]),
+                (
+                    vec!["clang", "--target", "arm64-apple-macos", "main.c"],
+                    vec!["--target", "arm64-apple-macos"],
+                ),
+                (
+                    vec!["clang", "-target", "arm64-apple-macos", "main.c"],
+                    vec!["-target", "arm64-apple-macos"],
+                ),
             ] {
                 let execution = create_execution("clang", args, "/project");
                 let result = sut.recognize(&execution).unwrap();
@@ -831,16 +1045,28 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "clang",
-                vec!["clang", "-fsanitize=address,undefined", "-fsanitize-recover=unsigned-integer-overflow", "-fsanitize-ignorelist=mylist.txt", "main.c"],
+                vec![
+                    "clang",
+                    "-fsanitize=address,undefined",
+                    "-fsanitize-recover=unsigned-integer-overflow",
+                    "-fsanitize-ignorelist=mylist.txt",
+                    "main.c",
+                ],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["-fsanitize=address,undefined"]),
-                (configures(CompilerPass::Compiling), vec!["-fsanitize-recover=unsigned-integer-overflow"]),
-                (configures(CompilerPass::Compiling), vec!["-fsanitize-ignorelist=mylist.txt"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["-fsanitize=address,undefined"]),
+                    (
+                        configures(CompilerPass::Compiling),
+                        vec!["-fsanitize-recover=unsigned-integer-overflow"],
+                    ),
+                    (configures(CompilerPass::Compiling), vec!["-fsanitize-ignorelist=mylist.txt"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -851,12 +1077,15 @@ mod tests {
                 vec!["clang", "-O2", "-mllvm", "-inline-threshold=100", "myfile.c"],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["-O2"]),
-                (configures(CompilerPass::Compiling), vec!["-mllvm", "-inline-threshold=100"]),
-                (Source { binary: false }, vec!["myfile.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["-O2"]),
+                    (configures(CompilerPass::Compiling), vec!["-mllvm", "-inline-threshold=100"]),
+                    (Source { binary: false }, vec!["myfile.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -867,12 +1096,15 @@ mod tests {
                 vec!["clang", "-O2", "-mllvm=-inline-threshold=100", "myfile.c"],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["-O2"]),
-                (configures(CompilerPass::Compiling), vec!["-mllvm=-inline-threshold=100"]),
-                (Source { binary: false }, vec!["myfile.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["-O2"]),
+                    (configures(CompilerPass::Compiling), vec!["-mllvm=-inline-threshold=100"]),
+                    (Source { binary: false }, vec!["myfile.c"]),
+                ],
+            );
         }
 
         #[test]
@@ -881,8 +1113,19 @@ mod tests {
             let execution = create_execution(
                 "clang",
                 vec![
-                    "clang", "-c", "-Wall", "-Weverything", "-O2", "-g", "-fmodules", "-fcolor-diagnostics",
-                    "-I/usr/include", "-D_GNU_SOURCE", "--target=x86_64-linux-gnu", "-fsanitize=address", "main.c",
+                    "clang",
+                    "-c",
+                    "-Wall",
+                    "-Weverything",
+                    "-O2",
+                    "-g",
+                    "-fmodules",
+                    "-fcolor-diagnostics",
+                    "-I/usr/include",
+                    "-D_GNU_SOURCE",
+                    "--target=x86_64-linux-gnu",
+                    "-fsanitize=address",
+                    "main.c",
                 ],
                 "/project",
             );
@@ -890,7 +1133,9 @@ mod tests {
                 assert_eq!(cmd.arguments.len(), 13);
                 for i in 1..12 {
                     match cmd.arguments[i].kind() {
-                        Other(PassEffect::Configures(_)) | Other(PassEffect::StopsAt(_)) | Other(PassEffect::None) => {}
+                        Other(PassEffect::Configures(_))
+                        | Other(PassEffect::StopsAt(_))
+                        | Other(PassEffect::None) => {}
                         other => panic!("Unexpected argument kind at index {}: {:?}", i, other),
                     }
                 }
@@ -906,8 +1151,13 @@ mod tests {
             let execution = create_execution(
                 "clang",
                 vec![
-                    "clang", "--target=aarch64-linux-gnu", "--gcc-toolchain=/opt/gcc-cross",
-                    "--gcc-install-dir=/opt/gcc", "-triple", "arm64-apple-ios", "main.c",
+                    "clang",
+                    "--target=aarch64-linux-gnu",
+                    "--gcc-toolchain=/opt/gcc-cross",
+                    "--gcc-install-dir=/opt/gcc",
+                    "-triple",
+                    "arm64-apple-ios",
+                    "main.c",
                 ],
                 "/project",
             );
@@ -927,8 +1177,13 @@ mod tests {
             let execution = create_execution(
                 "clang",
                 vec![
-                    "clang", "--cuda-path=/usr/local/cuda", "--cuda-gpu-arch=sm_70", "-fcuda-rdc",
-                    "-fopenmp", "-fopenmp-targets=nvptx64", "main.cu",
+                    "clang",
+                    "--cuda-path=/usr/local/cuda",
+                    "--cuda-gpu-arch=sm_70",
+                    "-fcuda-rdc",
+                    "-fopenmp",
+                    "-fopenmp-targets=nvptx64",
+                    "main.cu",
                 ],
                 "/project",
             );
@@ -949,19 +1204,29 @@ mod tests {
             let execution = create_execution(
                 "clang",
                 vec![
-                    "clang", "-F/System/Library/Frameworks", "-framework", "Foundation",
-                    "-load", "/path/to/plugin.so", "-plugin", "my-plugin", "main.m",
+                    "clang",
+                    "-F/System/Library/Frameworks",
+                    "-framework",
+                    "Foundation",
+                    "-load",
+                    "/path/to/plugin.so",
+                    "-plugin",
+                    "my-plugin",
+                    "main.m",
                 ],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["-F/System/Library/Frameworks"]),
-                (configures(CompilerPass::Linking), vec!["-framework", "Foundation"]),
-                (configures(CompilerPass::Compiling), vec!["-load", "/path/to/plugin.so"]),
-                (configures(CompilerPass::Compiling), vec!["-plugin", "my-plugin"]),
-                (Source { binary: false }, vec!["main.m"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["-F/System/Library/Frameworks"]),
+                    (configures(CompilerPass::Linking), vec!["-framework", "Foundation"]),
+                    (configures(CompilerPass::Compiling), vec!["-load", "/path/to/plugin.so"]),
+                    (configures(CompilerPass::Compiling), vec!["-plugin", "my-plugin"]),
+                    (Source { binary: false }, vec!["main.m"]),
+                ],
+            );
         }
 
         #[test]
@@ -969,29 +1234,46 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "clang",
-                vec!["clang", "--analyze", "-Xanalyzer", "-analyzer-output=text", "-emit-llvm", "-fprofile-instr-generate", "main.c"],
+                vec![
+                    "clang",
+                    "--analyze",
+                    "-Xanalyzer",
+                    "-analyzer-output=text",
+                    "-emit-llvm",
+                    "-fprofile-instr-generate",
+                    "main.c",
+                ],
                 "/project",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Compiling), vec!["--analyze"]),
-                (configures(CompilerPass::Compiling), vec!["-Xanalyzer", "-analyzer-output=text"]),
-                (configures(CompilerPass::Compiling), vec!["-emit-llvm"]),
-                (configures(CompilerPass::Compiling), vec!["-fprofile-instr-generate"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Compiling), vec!["--analyze"]),
+                    (configures(CompilerPass::Compiling), vec!["-Xanalyzer", "-analyzer-output=text"]),
+                    (configures(CompilerPass::Compiling), vec!["-emit-llvm"]),
+                    (configures(CompilerPass::Compiling), vec!["-fprofile-instr-generate"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         #[test]
         fn compilation_database_flag() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution =
-                create_execution("clang", vec!["clang", "-MJ", "compile_commands.json", "main.c"], "/project");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["clang"]),
-                (configures(CompilerPass::Preprocessing), vec!["-MJ", "compile_commands.json"]),
-                (Source { binary: false }, vec!["main.c"]),
-            ]);
+            let execution = create_execution(
+                "clang",
+                vec!["clang", "-MJ", "compile_commands.json", "main.c"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["clang"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-MJ", "compile_commands.json"]),
+                    (Source { binary: false }, vec!["main.c"]),
+                ],
+            );
         }
 
         /// Uses contains-checks instead of assert_command because environment
@@ -1002,11 +1284,17 @@ mod tests {
             let cpath = create_path_string(&["/usr/include", "/opt/include"]);
             let mut env = HashMap::new();
             env.insert("CPATH", cpath.as_str());
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 6);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/opt/include".to_string()));
@@ -1022,11 +1310,17 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let mut env = HashMap::new();
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 5);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
             } else {
@@ -1041,11 +1335,17 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let mut env = HashMap::new();
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
-            let execution = create_execution_with_env("clang++", vec!["clang++", "-c", "main.cpp", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang++",
+                vec!["clang++", "-c", "main.cpp", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 5);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-I".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
             } else {
@@ -1063,11 +1363,17 @@ mod tests {
             env.insert("CPATH", cpath.as_str());
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 8);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/opt/include".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
@@ -1084,7 +1390,12 @@ mod tests {
             let mut env = HashMap::new();
             env.insert("CPATH", "");
             env.insert("C_INCLUDE_PATH", c_include_path.as_str());
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 4);
@@ -1101,11 +1412,17 @@ mod tests {
             let objc_include_path = create_path_string(&["/System/Library/Frameworks", "/usr/local/objc"]);
             let mut env = HashMap::new();
             env.insert("OBJC_INCLUDE_PATH", objc_include_path.as_str());
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.m", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.m", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 6);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/System/Library/Frameworks".to_string()));
                 assert!(args.contains(&"/usr/local/objc".to_string()));
@@ -1124,11 +1441,17 @@ mod tests {
             env.insert("C_INCLUDE_PATH", "/usr/local/include");
             env.insert("CPLUS_INCLUDE_PATH", "/usr/include/c++/11");
             env.insert("OBJC_INCLUDE_PATH", "/System/Library/Frameworks");
-            let execution = create_execution_with_env("clang", vec!["clang", "-c", "main.c", "-o", "main.o"], "/project", env);
+            let execution = create_execution_with_env(
+                "clang",
+                vec!["clang", "-c", "main.c", "-o", "main.o"],
+                "/project",
+                env,
+            );
             let result = sut.recognize(&execution).unwrap();
             if let Command::Compiler(cmd) = result {
                 assert_eq!(cmd.arguments.len(), 8);
-                let args: Vec<String> = cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
+                let args: Vec<String> =
+                    cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
                 assert!(args.contains(&"/usr/include".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
@@ -1161,21 +1484,62 @@ mod tests {
             let cc1_execution = create_execution(
                 "clang++",
                 vec![
-                    "clang++", "-cc1", "-triple", "x86_64-pc-linux-gnu", "-emit-obj", "-dumpdir",
-                    "hello-world-", "-disable-free", "-clear-ast-before-backend", "-disable-llvm-verifier",
-                    "-discard-value-names", "-main-file-name", "hello-world.cpp", "-mrelocation-model", "pic",
-                    "-pic-level", "2", "-pic-is-pie", "-mframe-pointer=all", "-fmath-errno", "-ffp-contract=on",
-                    "-fno-rounding-math", "-mconstructor-aliases", "-funwind-tables=2", "-target-cpu", "x86-64",
-                    "-tune-cpu", "generic", "-debugger-tuning=gdb", "-fdebug-compilation-dir=/home/user/project",
-                    "-fcoverage-compilation-dir=/home/user/project", "-resource-dir", "/usr/lib/clang/20",
-                    "-std=c++23", "-fdeprecated-macro", "-ferror-limit", "19", "-stack-protector", "2",
-                    "-fgnuc-version=4.2.1", "-fno-implicit-modules", "-fskip-odr-check-in-gmf", "-fcxx-exceptions",
-                    "-fexceptions", "-fcolor-diagnostics", "-faddrsig", "-D__GCC_HAVE_DWARF2_CFI_ASM=1",
-                    "-x", "c++", "-o", "/tmp/hello-world-bd186e.o", "hello-world.cpp",
+                    "clang++",
+                    "-cc1",
+                    "-triple",
+                    "x86_64-pc-linux-gnu",
+                    "-emit-obj",
+                    "-dumpdir",
+                    "hello-world-",
+                    "-disable-free",
+                    "-clear-ast-before-backend",
+                    "-disable-llvm-verifier",
+                    "-discard-value-names",
+                    "-main-file-name",
+                    "hello-world.cpp",
+                    "-mrelocation-model",
+                    "pic",
+                    "-pic-level",
+                    "2",
+                    "-pic-is-pie",
+                    "-mframe-pointer=all",
+                    "-fmath-errno",
+                    "-ffp-contract=on",
+                    "-fno-rounding-math",
+                    "-mconstructor-aliases",
+                    "-funwind-tables=2",
+                    "-target-cpu",
+                    "x86-64",
+                    "-tune-cpu",
+                    "generic",
+                    "-debugger-tuning=gdb",
+                    "-fdebug-compilation-dir=/home/user/project",
+                    "-fcoverage-compilation-dir=/home/user/project",
+                    "-resource-dir",
+                    "/usr/lib/clang/20",
+                    "-std=c++23",
+                    "-fdeprecated-macro",
+                    "-ferror-limit",
+                    "19",
+                    "-stack-protector",
+                    "2",
+                    "-fgnuc-version=4.2.1",
+                    "-fno-implicit-modules",
+                    "-fskip-odr-check-in-gmf",
+                    "-fcxx-exceptions",
+                    "-fexceptions",
+                    "-fcolor-diagnostics",
+                    "-faddrsig",
+                    "-D__GCC_HAVE_DWARF2_CFI_ASM=1",
+                    "-x",
+                    "c++",
+                    "-o",
+                    "/tmp/hello-world-bd186e.o",
+                    "hello-world.cpp",
                 ],
                 "/home/user/project",
             );
-            assert_ignored(sut.recognize(&cc1_execution), "clang internal invocation");
+            assert_ignored(sut.recognize(&cc1_execution), "internal invocation");
         }
     }
 
@@ -1208,13 +1572,17 @@ mod tests {
         #[test]
         fn basic_compilation() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution = create_execution("nvcc", vec!["nvcc", "-c", "kernel.cu", "-o", "kernel.o"], "/test");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (stops_at(CompilerPass::Compiling), vec!["-c"]),
-                (Source { binary: false }, vec!["kernel.cu"]),
-                (Output, vec!["-o", "kernel.o"]),
-            ]);
+            let execution =
+                create_execution("nvcc", vec!["nvcc", "-c", "kernel.cu", "-o", "kernel.o"], "/test");
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (Source { binary: false }, vec!["kernel.cu"]),
+                    (Output, vec!["-o", "kernel.o"]),
+                ],
+            );
         }
 
         #[test]
@@ -1222,17 +1590,27 @@ mod tests {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution(
                 "nvcc",
-                vec!["nvcc", "--gpu-architecture=sm_80", "-arch=sm_70", "--gpu-code=sm_80,compute_80", "-c", "kernel.cu"],
+                vec![
+                    "nvcc",
+                    "--gpu-architecture=sm_80",
+                    "-arch=sm_70",
+                    "--gpu-code=sm_80,compute_80",
+                    "-c",
+                    "kernel.cu",
+                ],
                 "/test",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (configures(CompilerPass::Compiling), vec!["--gpu-architecture=sm_80"]),
-                (configures(CompilerPass::Compiling), vec!["-arch=sm_70"]),
-                (configures(CompilerPass::Compiling), vec!["--gpu-code=sm_80,compute_80"]),
-                (stops_at(CompilerPass::Compiling), vec!["-c"]),
-                (Source { binary: false }, vec!["kernel.cu"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (configures(CompilerPass::Compiling), vec!["--gpu-architecture=sm_80"]),
+                    (configures(CompilerPass::Compiling), vec!["-arch=sm_70"]),
+                    (configures(CompilerPass::Compiling), vec!["--gpu-code=sm_80,compute_80"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-c"]),
+                    (Source { binary: false }, vec!["kernel.cu"]),
+                ],
+            );
         }
 
         #[test]
@@ -1243,13 +1621,16 @@ mod tests {
                 vec!["nvcc", "--device-c", "--relocatable-device-code=true", "kernel.cu", "-o", "kernel.o"],
                 "/test",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (stops_at(CompilerPass::Compiling), vec!["--device-c"]),
-                (configures(CompilerPass::Compiling), vec!["--relocatable-device-code=true"]),
-                (Source { binary: false }, vec!["kernel.cu"]),
-                (Output, vec!["-o", "kernel.o"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (stops_at(CompilerPass::Compiling), vec!["--device-c"]),
+                    (configures(CompilerPass::Compiling), vec!["--relocatable-device-code=true"]),
+                    (Source { binary: false }, vec!["kernel.cu"]),
+                    (Output, vec!["-o", "kernel.o"]),
+                ],
+            );
         }
 
         #[test]
@@ -1260,14 +1641,17 @@ mod tests {
                 vec!["nvcc", "-Xcompiler", "-Wall", "-Xlinker", "-rpath=/usr/lib", "main.cu"],
                 "/test",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (configures(CompilerPass::Compiling), vec!["-Xcompiler"]),
-                (none(), vec!["-Wall"]),
-                (configures(CompilerPass::Linking), vec!["-Xlinker"]),
-                (none(), vec!["-rpath=/usr/lib"]),
-                (Source { binary: false }, vec!["main.cu"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (configures(CompilerPass::Compiling), vec!["-Xcompiler"]),
+                    (none(), vec!["-Wall"]),
+                    (configures(CompilerPass::Linking), vec!["-Xlinker"]),
+                    (none(), vec!["-rpath=/usr/lib"]),
+                    (Source { binary: false }, vec!["main.cu"]),
+                ],
+            );
         }
 
         #[test]
@@ -1278,14 +1662,17 @@ mod tests {
                 vec!["nvcc", "-G", "--generate-line-info", "-O2", "--use_fast_math", "kernel.cu"],
                 "/test",
             );
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (configures(CompilerPass::Compiling), vec!["-G"]),
-                (configures(CompilerPass::Compiling), vec!["--generate-line-info"]),
-                (configures(CompilerPass::Compiling), vec!["-O2"]),
-                (configures(CompilerPass::Compiling), vec!["--use_fast_math"]),
-                (Source { binary: false }, vec!["kernel.cu"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (configures(CompilerPass::Compiling), vec!["-G"]),
+                    (configures(CompilerPass::Compiling), vec!["--generate-line-info"]),
+                    (configures(CompilerPass::Compiling), vec!["-O2"]),
+                    (configures(CompilerPass::Compiling), vec!["--use_fast_math"]),
+                    (Source { binary: false }, vec!["kernel.cu"]),
+                ],
+            );
         }
 
         #[test]
@@ -1309,11 +1696,14 @@ mod tests {
         fn specific_flags() {
             let sut = CompilerInterpreter::new_with_config(&[]);
             let execution = create_execution("nvcc", vec!["nvcc", "--compile", "kernel.cu"], "/test");
-            assert_command(sut.recognize(&execution), vec![
-                (Compiler, vec!["nvcc"]),
-                (stops_at(CompilerPass::Compiling), vec!["--compile"]),
-                (Source { binary: false }, vec!["kernel.cu"]),
-            ]);
+            assert_command(
+                sut.recognize(&execution),
+                vec![
+                    (Compiler, vec!["nvcc"]),
+                    (stops_at(CompilerPass::Compiling), vec!["--compile"]),
+                    (Source { binary: false }, vec!["kernel.cu"]),
+                ],
+            );
         }
     }
 
@@ -1351,7 +1741,8 @@ mod tests {
         #[test]
         fn linking_flags() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution = create_execution("ifort", vec!["ifort", "-shared-intel", "-lm", "test.o"], "/project");
+            let execution =
+                create_execution("ifort", vec!["ifort", "-shared-intel", "-lm", "test.o"], "/project");
             let result = sut.recognize(&execution);
             assert!(result.is_some());
             if let Some(Command::Compiler(parsed)) = result {
@@ -1390,8 +1781,11 @@ mod tests {
         #[test]
         fn preprocessing_flags() {
             let sut = CompilerInterpreter::new_with_config(&[]);
-            let execution =
-                create_execution("crayftn", vec!["crayftn", "-DDEBUG", "-I/usr/include", "test.f90"], "/project");
+            let execution = create_execution(
+                "crayftn",
+                vec!["crayftn", "-DDEBUG", "-I/usr/include", "test.f90"],
+                "/project",
+            );
             let result = sut.recognize(&execution);
             assert!(result.is_some());
             if let Some(Command::Compiler(parsed)) = result {
@@ -1440,6 +1834,60 @@ mod tests {
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), none());
             }
+        }
+    }
+
+    mod flag_table_invariants {
+        use super::*;
+        use crate::semantic::interpreters::compilers::flag_based::*;
+
+        #[test]
+        fn gcc() {
+            flag_based::assert_flag_table_invariants(&GCC_FLAGS);
+        }
+
+        #[test]
+        fn clang() {
+            flag_based::assert_flag_table_invariants(&CLANG_FLAGS);
+        }
+
+        #[test]
+        fn flang() {
+            flag_based::assert_flag_table_invariants(&FLANG_FLAGS);
+        }
+
+        #[test]
+        fn cuda() {
+            flag_based::assert_flag_table_invariants(&CUDA_FLAGS);
+        }
+
+        #[test]
+        fn intel_fortran() {
+            flag_based::assert_flag_table_invariants(&INTEL_FORTRAN_FLAGS);
+        }
+
+        #[test]
+        fn cray_fortran() {
+            flag_based::assert_flag_table_invariants(&CRAY_FORTRAN_FLAGS);
+        }
+
+        #[test]
+        fn clang_inherits_all_gcc_flags() {
+            let gcc_flag_strings: std::collections::HashSet<&str> =
+                GCC_FLAGS.iter().map(|f| f.pattern.flag()).collect();
+            let clang_flag_strings: std::collections::HashSet<&str> =
+                CLANG_FLAGS.iter().map(|f| f.pattern.flag()).collect();
+
+            assert!(
+                CLANG_FLAGS.len() > GCC_FLAGS.len(),
+                "Clang should have more flags than GCC, got gcc: {}, clang: {}",
+                GCC_FLAGS.len(),
+                CLANG_FLAGS.len()
+            );
+
+            let missing_flags: Vec<&str> =
+                gcc_flag_strings.difference(&clang_flag_strings).cloned().collect();
+            assert!(missing_flags.is_empty(), "These GCC flags are missing from Clang: {:?}", missing_flags);
         }
     }
 }

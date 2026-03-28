@@ -211,15 +211,15 @@ mod flags {
     /// Resolve `ignore_when` for a table, inheriting from base if extending.
     fn resolve_ignore_when(table: &FlagTable, raw_tables: &HashMap<String, FlagTable>) -> IgnoreWhen {
         let own = table.ignore_when.clone().unwrap_or_default();
-        if let Some(ref base_name) = table.extends {
-            if let Some(base_table) = raw_tables.get(base_name.as_str()) {
-                let base = base_table.ignore_when.clone().unwrap_or_default();
-                // Own values take precedence; only inherit if own list is empty
-                return IgnoreWhen {
-                    executables: if own.executables.is_empty() { base.executables } else { own.executables },
-                    flags: if own.flags.is_empty() { base.flags } else { own.flags },
-                };
-            }
+        if let Some(ref base_name) = table.extends
+            && let Some(base_table) = raw_tables.get(base_name.as_str())
+        {
+            let base = base_table.ignore_when.clone().unwrap_or_default();
+            // Own values take precedence; only inherit if own list is empty
+            return IgnoreWhen {
+                executables: if own.executables.is_empty() { base.executables } else { own.executables },
+                flags: if own.flags.is_empty() { base.flags } else { own.flags },
+            };
         }
         own
     }
