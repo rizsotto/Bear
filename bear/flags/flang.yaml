@@ -1,0 +1,54 @@
+# Flang (LLVM Fortran) compiler flag definitions
+# https://flang.llvm.org/docs/FlangDriver.html
+extends: gcc
+flags:
+  - match: {pattern: "-J{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-Xflang", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-cpp"}
+    result: configures_preprocessing
+  - match: {pattern: "-nocpp"}
+    result: configures_preprocessing
+  - match: {pattern: "-fbackslash"}
+    result: configures_compiling
+  - match: {pattern: "-fno-backslash"}
+    result: configures_compiling
+  - match: {pattern: "-fconvert=*"}
+    result: configures_compiling
+  - match: {pattern: "-fdefault-real-8"}
+    result: configures_compiling
+  - match: {pattern: "-fdisable-real-10"}
+    result: configures_compiling
+  - match: {pattern: "-fdisable-real-3"}
+    result: configures_compiling
+  - match: {pattern: "-ffixed-form"}
+    result: configures_compiling
+  - match: {pattern: "-ffree-form"}
+    result: configures_compiling
+  - match: {pattern: "-fimplicit-none"}
+    result: configures_compiling
+  - match: {pattern: "-flarge-sizes"}
+    result: configures_compiling
+  - match: {pattern: "-fno-automatic"}
+    result: configures_compiling
+  - match: {pattern: "-frealloc-lhs"}
+    result: configures_compiling
+  - match: {pattern: "-fno-realloc-lhs"}
+    result: configures_compiling
+  - match: {pattern: "-funderscoring"}
+    result: configures_compiling
+  - match: {pattern: "-fno-underscoring"}
+    result: configures_compiling
+  - match: {pattern: "-funsigned"}
+    result: configures_compiling
+  - match: {pattern: "-fno-unsigned"}
+    result: configures_compiling
+  - match: {pattern: "-fxor-operator"}
+    result: configures_compiling
+  - match: {pattern: "-fno-xor-operator"}
+    result: configures_compiling
+  - match: {pattern: "-module-dir{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--romc-path=*"}
+    result: configures_linking

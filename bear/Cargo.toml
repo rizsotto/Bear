@@ -46,6 +46,10 @@ regex.workspace = true
 which.workspace = true
 libc.workspace = true
 
+[build-dependencies]
+serde = { workspace = true }
+serde-saphyr.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 mockall = "0.14"

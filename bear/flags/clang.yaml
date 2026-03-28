@@ -1,0 +1,202 @@
+# Clang compiler flag definitions
+# https://clang.llvm.org/docs/ClangCommandLineReference.html
+extends: gcc
+flags:
+  - match: {pattern: "--prefix=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-F*"}
+    result: configures_compiling
+  - match: {pattern: "-ObjC"}
+    result: none
+  - match: {pattern: "-ObjC++"}
+    result: none
+  - match: {pattern: "-Xarch*", count: 1}
+    result: none
+  - match: {pattern: "-Xcuda*", count: 1}
+    result: none
+  - match: {pattern: "-Xopenmp-target", count: 1}
+    result: none
+  - match: {pattern: "-Xopenmp-target=*", count: 1}
+    result: none
+  - match: {pattern: "-Z", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-a*"}
+    result: configures_compiling
+  - match: {pattern: "--profile-blocks"}
+    result: configures_compiling
+  - match: {pattern: "-all_load"}
+    result: configures_linking
+  - match: {pattern: "-allowable_client", count: 1}
+    result: configures_linking
+  - match: {pattern: "--analyze"}
+    result: configures_compiling
+  - match: {pattern: "--analyzer-output{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-Xanalyzer", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-arch", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-arch_only", count: 1}
+    result: none
+  - match: {pattern: "--autocomplete=*"}
+    result: none
+  - match: {pattern: "-bind_at_load"}
+    result: configures_linking
+  - match: {pattern: "-bundle"}
+    result: configures_linking
+  - match: {pattern: "-bundle_loader", count: 1}
+    result: configures_linking
+  - match: {pattern: "-client_name*"}
+    result: none
+  - match: {pattern: "--config", count: 1}
+    result: driver_option
+  - match: {pattern: "--cuda-host-only"}
+    result: configures_compiling
+  - match: {pattern: "-cuid=*"}
+    result: none
+  - match: {pattern: "-current_version{ }*"}
+    result: configures_linking
+  - match: {pattern: "-dead_strip"}
+    result: configures_linking
+  - match: {pattern: "-dependency-dot", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-dependency-file", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-dsym-dir{ }*"}
+    result: none
+  - match: {pattern: "-dumpmachine"}
+    result: info_and_exit
+  - match: {pattern: "-dumpversion"}
+    result: info_and_exit
+  - match: {pattern: "--dyld-prefix{=}*"}
+    result: none
+  - match: {pattern: "-dylib_file", count: 1}
+    result: configures_linking
+  - match: {pattern: "-dylinker"}
+    result: configures_linking
+  - match: {pattern: "-dynamic"}
+    result: configures_linking
+  - match: {pattern: "-dynamiclib"}
+    result: configures_linking
+  - match: {pattern: "-emit-ast"}
+    result: configures_compiling
+  - match: {pattern: "-faligned-new=*"}
+    result: configures_compiling
+  - match: {pattern: "-force_load", count: 1}
+    result: configures_linking
+  - match: {pattern: "-framework", count: 1}
+    result: configures_linking
+  - match: {pattern: "--gcc-toolchain=*"}
+    result: configures_compiling
+  - match: {pattern: "-gcodeview"}
+    result: configures_compiling
+  - match: {pattern: "-gcodeview-ghash"}
+    result: configures_compiling
+  - match: {pattern: "--hip-link"}
+    result: configures_linking
+  - match: {pattern: "--hip-version=*"}
+    result: configures_compiling
+  - match: {pattern: "-ibuiltininc"}
+    result: configures_preprocessing
+  - match: {pattern: "-image_base", count: 1}
+    result: configures_linking
+  - match: {pattern: "-index-header-map"}
+    result: configures_preprocessing
+  - match: {pattern: "-init", count: 1}
+    result: configures_linking
+  - match: {pattern: "-install_name", count: 1}
+    result: configures_linking
+  - match: {pattern: "-lazy*", count: 1}
+    result: configures_linking
+  - match: {pattern: "-EB"}
+    result: none
+  - match: {pattern: "--migrate"}
+    result: configures_compiling
+  - match: {pattern: "-mllvm{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-multiply_defined*", count: 1}
+    result: configures_linking
+  - match: {pattern: "--output{=}*"}
+    result: output
+  - match: {pattern: "-objcmt*"}
+    result: configures_compiling
+  - match: {pattern: "-object"}
+    result: none
+  - match: {pattern: "--profile"}
+    result: configures_compiling
+  - match: {pattern: "--pipe"}
+    result: driver_option
+  - match: {pattern: "-r*"}
+    result: configures_linking
+  - match: {pattern: "--save*"}
+    result: driver_option
+  - match: {pattern: "-sect*", count: 3}
+    result: configures_linking
+  - match: {pattern: "-seg1addr{ }*"}
+    result: configures_linking
+  - match: {pattern: "-seg_*", count: 1}
+    result: configures_linking
+  - match: {pattern: "-segaddr", count: 2}
+    result: configures_linking
+  - match: {pattern: "-segcreate", count: 3}
+    result: configures_linking
+  - match: {pattern: "-seglinkedit"}
+    result: configures_linking
+  - match: {pattern: "-segprot", count: 3}
+    result: configures_linking
+  - match: {pattern: "-single_module"}
+    result: configures_linking
+  - match: {pattern: "-sub_*"}
+    result: configures_linking
+  - match: {pattern: "--sysroot{=}*"}
+    result: configures_preprocessing
+  - match: {pattern: "--target{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-target", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-time"}
+    result: driver_option
+  - match: {pattern: "--traditional*"}
+    result: configures_preprocessing
+  - match: {pattern: "-traditional*"}
+    result: configures_preprocessing
+  - match: {pattern: "-twolevel*"}
+    result: configures_linking
+  - match: {pattern: "-umbrella", count: 1}
+    result: configures_linking
+  - match: {pattern: "-unwindlib=*"}
+    result: configures_linking
+  - match: {pattern: "--unwindlib=*"}
+    result: configures_linking
+  - match: {pattern: "--language{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Xassembler", count: 1}
+    result: configures_assembling
+  - match: {pattern: "-Xclang", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-Xpreprocessor", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-triple", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-analyzer-config", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-emit-llvm"}
+    result: configures_compiling
+  - match: {pattern: "-resource-dir", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-MJ", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "--cuda-path{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--cuda-gpu-arch{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--hip-path{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--gcc-install-dir{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-load", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-plugin", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-plugin-arg-*"}
+    result: configures_compiling

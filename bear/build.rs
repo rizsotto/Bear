@@ -27,6 +27,8 @@ fn main() {
     println!("cargo:rustc-env=PRELOAD_NAME={}", PRELOAD_NAME);
     println!("cargo:rustc-env=INTERCEPT_LIBDIR={}", intercept_libdir);
     println!("cargo:rerun-if-env-changed=INTERCEPT_LIBDIR");
+
+    flags::generate_flag_tables();
 }
 
 /// Validate the `INTERCEPT_LIBDIR` environment variable.
@@ -50,5 +52,211 @@ fn validate_intercept_libdir(value: &str) {
     let path = std::path::Path::new(value);
     if path.is_absolute() {
         panic!("INTERCEPT_LIBDIR must be a relative path, got: {}", value);
+    }
+}
+
+/// Build-time code generation for compiler flag tables.
+///
+/// Reads YAML flag definition files from `flags/` and generates Rust source files
+/// containing static `[FlagRule; N]` arrays that are included via `include!()` in
+/// the compiler interpreter modules.
+mod flags {
+    use serde::Deserialize;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    #[derive(Deserialize)]
+    struct FlagTable {
+        extends: Option<String>,
+        flags: Vec<FlagEntry>,
+    }
+
+    #[derive(Deserialize, Clone)]
+    struct FlagEntry {
+        #[serde(rename = "match")]
+        match_: FlagMatch,
+        result: String,
+    }
+
+    #[derive(Deserialize, Clone)]
+    struct FlagMatch {
+        pattern: String,
+        count: Option<u32>,
+    }
+
+    /// Table metadata: name of the static, visibility, which file to generate.
+    struct TableConfig {
+        yaml_file: &'static str,
+        static_name: &'static str,
+        visibility: &'static str, // "pub " or ""
+        output_file: &'static str,
+    }
+
+    const TABLES: &[TableConfig] = &[
+        TableConfig {
+            yaml_file: "gcc.yaml",
+            static_name: "GCC_FLAGS",
+            visibility: "pub ",
+            output_file: "flags_gcc.rs",
+        },
+        TableConfig {
+            yaml_file: "clang.yaml",
+            static_name: "CLANG_FLAGS",
+            visibility: "",
+            output_file: "flags_clang.rs",
+        },
+        TableConfig {
+            yaml_file: "flang.yaml",
+            static_name: "FLANG_FLAGS",
+            visibility: "",
+            output_file: "flags_flang.rs",
+        },
+        TableConfig {
+            yaml_file: "cuda.yaml",
+            static_name: "CUDA_FLAGS",
+            visibility: "pub ",
+            output_file: "flags_cuda.rs",
+        },
+        TableConfig {
+            yaml_file: "intel_fortran.yaml",
+            static_name: "INTEL_FORTRAN_FLAGS",
+            visibility: "",
+            output_file: "flags_intel_fortran.rs",
+        },
+        TableConfig {
+            yaml_file: "cray_fortran.yaml",
+            static_name: "CRAY_FORTRAN_FLAGS",
+            visibility: "",
+            output_file: "flags_cray_fortran.rs",
+        },
+    ];
+
+    pub fn generate_flag_tables() {
+        let flags_dir = Path::new("flags");
+        let out_dir: PathBuf = std::env::var("OUT_DIR").unwrap().into();
+
+        // Read all YAML files first so we can resolve `extends`
+        let mut raw_tables: HashMap<String, FlagTable> = HashMap::new();
+        for config in TABLES {
+            let yaml_path = flags_dir.join(config.yaml_file);
+            println!("cargo:rerun-if-changed={}", yaml_path.display());
+
+            let content = fs::read_to_string(&yaml_path)
+                .unwrap_or_else(|e| panic!("Failed to read {}: {}", yaml_path.display(), e));
+            let table: FlagTable = serde_saphyr::from_str(&content)
+                .unwrap_or_else(|e| panic!("Failed to parse {}: {}", yaml_path.display(), e));
+
+            // Key by yaml filename stem (e.g., "gcc", "clang")
+            let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
+            raw_tables.insert(key, table);
+        }
+
+        // Generate each table
+        for config in TABLES {
+            let key = config.yaml_file.strip_suffix(".yaml").unwrap();
+            let table = &raw_tables[key];
+
+            // Collect own flags + base flags (if extending)
+            let mut entries: Vec<FlagEntry> = table.flags.clone();
+            if let Some(ref base_name) = table.extends {
+                let base = raw_tables
+                    .get(base_name.as_str())
+                    .unwrap_or_else(|| panic!("{} extends unknown table '{}'", config.yaml_file, base_name));
+                entries.extend(base.flags.iter().cloned());
+            }
+
+            // Sort by flag length descending (stable sort preserves own-before-base order)
+            entries.sort_by(|a, b| {
+                let a_len = extract_flag_name(&a.match_.pattern).len();
+                let b_len = extract_flag_name(&b.match_.pattern).len();
+                b_len.cmp(&a_len)
+            });
+
+            // Generate Rust source
+            let rust_code = generate_static_array(config, &entries);
+            let out_path = out_dir.join(config.output_file);
+            fs::write(&out_path, rust_code)
+                .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+        }
+    }
+
+    /// Extract the flag name from a pattern string (strip trailing syntax markers).
+    ///
+    /// Examples:
+    ///   "-c" -> "-c"
+    ///   "-f*" -> "-f"
+    ///   "-D{ }*" -> "-D"
+    ///   "-specs=*" -> "-specs"
+    ///   "--std{=}*" -> "--std"
+    fn extract_flag_name(pattern: &str) -> &str {
+        // Find the earliest syntax marker position
+        let candidates = [
+            pattern.find('*'),
+            pattern.find('{'),
+            pattern.find('=').filter(|&i| pattern.get(i + 1..i + 2) == Some("*")),
+        ];
+        let end = candidates.iter().filter_map(|&x| x).min().unwrap_or(pattern.len());
+        &pattern[..end]
+    }
+
+    /// Parse a pattern string into a FlagPattern Rust expression.
+    fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
+        if let Some(flag) = pattern.strip_suffix("{ }*") {
+            format!("FlagPattern::ExactlyWithGluedOrSep(\"{}\")", flag)
+        } else if let Some(flag) = pattern.strip_suffix("{=}*") {
+            format!("FlagPattern::ExactlyWithEqOrSep(\"{}\")", flag)
+        } else if let Some(flag) = pattern.strip_suffix("=*") {
+            format!("FlagPattern::ExactlyWithEq(\"{}\")", flag)
+        } else if let Some(flag) = pattern.strip_suffix('*') {
+            format!("FlagPattern::Prefix(\"{}\", {})", flag, count.unwrap_or(0))
+        } else {
+            format!("FlagPattern::Exactly(\"{}\", {})", pattern, count.unwrap_or(0))
+        }
+    }
+
+    /// Map a result string to its Rust ArgumentKind expression.
+    fn result_to_rust(result: &str) -> &'static str {
+        match result {
+            "output" => "ArgumentKind::Output",
+            "configures_preprocessing" => {
+                "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))"
+            }
+            "configures_compiling" => "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))",
+            "configures_assembling" => {
+                "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))"
+            }
+            "configures_linking" => "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))",
+            "stops_at_preprocessing" => {
+                "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))"
+            }
+            "stops_at_compiling" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))",
+            "stops_at_assembling" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))",
+            "info_and_exit" => "ArgumentKind::Other(PassEffect::InfoAndExit)",
+            "driver_option" => "ArgumentKind::Other(PassEffect::DriverOption)",
+            "none" => "ArgumentKind::Other(PassEffect::None)",
+            other => panic!("Unknown result value: '{}'", other),
+        }
+    }
+
+    /// Generate a Rust source file containing a static array of FlagRule.
+    fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("// Generated from flags/{} -- DO NOT EDIT\n", config.yaml_file));
+        out.push_str(&format!(
+            "{}static {}: [FlagRule; {}] = [\n",
+            config.visibility,
+            config.static_name,
+            entries.len()
+        ));
+
+        for entry in entries {
+            let pattern_rust = pattern_to_rust(&entry.match_.pattern, entry.match_.count);
+            let result_rust = result_to_rust(&entry.result);
+            out.push_str(&format!("    FlagRule::new({}, {}),\n", pattern_rust, result_rust));
+        }
+
+        out.push_str("];\n");
+        out
     }
 }

@@ -1,0 +1,145 @@
+# Intel Fortran compiler (ifort, ifx) flag definitions
+# https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html
+flags:
+  - match: {pattern: "-preprocess-only"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-debug-parameters", count: 1}
+    result: info_and_exit
+  - match: {pattern: "-shared-intel"}
+    result: configures_linking
+  - match: {pattern: "-static-intel"}
+    result: configures_linking
+  - match: {pattern: "-static-libgcc"}
+    result: configures_linking
+  - match: {pattern: "-nogen-interfaces"}
+    result: none
+  - match: {pattern: "-shared-libgcc"}
+    result: configures_linking
+  - match: {pattern: "-gen-interfaces", count: 1}
+    result: none
+  - match: {pattern: "-nostartfiles"}
+    result: configures_linking
+  - match: {pattern: "-nodefaultlibs"}
+    result: configures_linking
+  - match: {pattern: "-gen-dep", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-dumpmachine"}
+    result: info_and_exit
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  - match: {pattern: "-nostdlib"}
+    result: configures_linking
+  - match: {pattern: "-pthread"}
+    result: configures_preprocessing
+  - match: {pattern: "-dryrun"}
+    result: info_and_exit
+  - match: {pattern: "-shared"}
+    result: configures_linking
+  - match: {pattern: "-static"}
+    result: configures_linking
+  - match: {pattern: "-isystem", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-isysroot", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-include", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-iquote", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-Xlinker", count: 1}
+    result: configures_linking
+  - match: {pattern: "-debug", count: 1}
+    result: info_and_exit
+  - match: {pattern: "-nofpp"}
+    result: configures_preprocessing
+  - match: {pattern: "-undef"}
+    result: configures_preprocessing
+  - match: {pattern: "--help"}
+    result: info_and_exit
+  - match: {pattern: "-MMD"}
+    result: configures_preprocessing
+  - match: {pattern: "-fpp"}
+    result: configures_preprocessing
+  - match: {pattern: "-Ep"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-MF", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-MD"}
+    result: configures_preprocessing
+  - match: {pattern: "-T", count: 1}
+    result: configures_linking
+  - match: {pattern: "-C"}
+    result: configures_preprocessing
+  - match: {pattern: "-u", count: 1}
+    result: configures_linking
+  - match: {pattern: "-V"}
+    result: info_and_exit
+  - match: {pattern: "-X"}
+    result: configures_preprocessing
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-o", count: 1}
+    result: output
+  - match: {pattern: "-P"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-r"}
+    result: configures_linking
+  - match: {pattern: "-S"}
+    result: stops_at_assembling
+  - match: {pattern: "-s"}
+    result: configures_linking
+  - match: {pattern: "-Xoption,link*"}
+    result: configures_linking
+  - match: {pattern: "-Xoption,fpp*"}
+    result: configures_preprocessing
+  - match: {pattern: "-Xoption,cpp*"}
+    result: configures_preprocessing
+  - match: {pattern: "-Xoption,asm*"}
+    result: none
+  - match: {pattern: "--sysroot=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-include{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-L{ }*"}
+    result: configures_linking
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-std=*"}
+    result: configures_compiling
+  - match: {pattern: "-diag-*"}
+    result: none
+  - match: {pattern: "--help*"}
+    result: info_and_exit
+  - match: {pattern: "-FA*"}
+    result: info_and_exit
+  - match: {pattern: "-Fa*"}
+    result: info_and_exit
+  - match: {pattern: "-Wl*"}
+    result: configures_linking
+  - match: {pattern: "-Wp*"}
+    result: configures_preprocessing
+  - match: {pattern: "--*"}
+    result: none
+  - match: {pattern: "-f*"}
+    result: configures_compiling
+  - match: {pattern: "-g*"}
+    result: configures_compiling
+  - match: {pattern: "-m*"}
+    result: configures_compiling
+  - match: {pattern: "-no*"}
+    result: none
+  - match: {pattern: "-O*"}
+    result: configures_compiling
+  - match: {pattern: "-v*"}
+    result: driver_option
+  - match: {pattern: "-x*"}
+    result: configures_compiling
+  - match: {pattern: "@*"}
+    result: configures_compiling

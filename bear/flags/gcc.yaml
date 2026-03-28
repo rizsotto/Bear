@@ -1,0 +1,209 @@
+# GCC compiler flag definitions
+# https://gcc.gnu.org/onlinedocs/gcc/Option-Summary.html
+flags:
+  - match: {pattern: "-x", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "-S"}
+    result: stops_at_assembling
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-o{ }*"}
+    result: output
+  - match: {pattern: "-dumpbase", count: 1}
+    result: driver_option
+  - match: {pattern: "-dumpbase-ext", count: 1}
+    result: driver_option
+  - match: {pattern: "-dumpdir", count: 1}
+    result: driver_option
+  - match: {pattern: "-v"}
+    result: driver_option
+  - match: {pattern: "-###"}
+    result: driver_option
+  - match: {pattern: "--help*"}
+    result: info_and_exit
+  - match: {pattern: "--target-help"}
+    result: info_and_exit
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  - match: {pattern: "-pass-exit-codes"}
+    result: driver_option
+  - match: {pattern: "-pipe"}
+    result: driver_option
+  - match: {pattern: "-specs=*"}
+    result: driver_option
+  - match: {pattern: "-wrapper", count: 1}
+    result: driver_option
+  - match: {pattern: "-ffile-prefix-map=*"}
+    result: configures_compiling
+  - match: {pattern: "-fplugin=*"}
+    result: configures_compiling
+  - match: {pattern: "-fplugin-arg-*"}
+    result: configures_compiling
+  - match: {pattern: "@*"}
+    result: configures_compiling
+  - match: {pattern: "-A{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-include{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-imacros", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-undef"}
+    result: configures_preprocessing
+  - match: {pattern: "-pthread"}
+    result: configures_preprocessing
+  - match: {pattern: "-M"}
+    result: configures_preprocessing
+  - match: {pattern: "-MM"}
+    result: configures_preprocessing
+  - match: {pattern: "-MG"}
+    result: configures_preprocessing
+  - match: {pattern: "-MP"}
+    result: configures_preprocessing
+  - match: {pattern: "-MD"}
+    result: configures_preprocessing
+  - match: {pattern: "-MMD"}
+    result: configures_preprocessing
+  - match: {pattern: "-MF", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-MT", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-MQ", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-C"}
+    result: configures_preprocessing
+  - match: {pattern: "-CC"}
+    result: configures_preprocessing
+  - match: {pattern: "-P"}
+    result: configures_preprocessing
+  - match: {pattern: "-traditional*"}
+    result: configures_preprocessing
+  - match: {pattern: "-trigraphs"}
+    result: configures_preprocessing
+  - match: {pattern: "-remap"}
+    result: configures_preprocessing
+  - match: {pattern: "-H"}
+    result: configures_preprocessing
+  - match: {pattern: "-Xpreprocessor", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-Wp,*"}
+    result: configures_preprocessing
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-iplugindir=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-iquote", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-isystem", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-idirafter", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-iprefix", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-iwithprefix", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-iwithprefixbefore", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-isysroot", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-imultilib", count: 1}
+    result: configures_preprocessing
+  - match: {pattern: "-L{ }*"}
+    result: configures_linking
+  - match: {pattern: "-B{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "--sysroot=*"}
+    result: configures_preprocessing
+  - match: {pattern: "-flinker-output=*"}
+    result: configures_linking
+  - match: {pattern: "-fuse-ld=*"}
+    result: configures_linking
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+  - match: {pattern: "-nostartfiles"}
+    result: configures_linking
+  - match: {pattern: "-nodefaultlibs"}
+    result: configures_linking
+  - match: {pattern: "-nolibc"}
+    result: configures_linking
+  - match: {pattern: "-nostdlib"}
+    result: configures_linking
+  - match: {pattern: "-e", count: 1}
+    result: configures_linking
+  - match: {pattern: "-entry=*"}
+    result: configures_linking
+  - match: {pattern: "-pie"}
+    result: configures_linking
+  - match: {pattern: "-no-pie"}
+    result: configures_linking
+  - match: {pattern: "-static-pie"}
+    result: configures_linking
+  - match: {pattern: "-r"}
+    result: configures_linking
+  - match: {pattern: "-rdynamic"}
+    result: configures_linking
+  - match: {pattern: "-s"}
+    result: configures_linking
+  - match: {pattern: "-symbolic"}
+    result: configures_linking
+  - match: {pattern: "-static*"}
+    result: configures_linking
+  - match: {pattern: "-shared*"}
+    result: configures_linking
+  - match: {pattern: "-T", count: 1}
+    result: configures_linking
+  - match: {pattern: "-Xlinker", count: 1}
+    result: configures_linking
+  - match: {pattern: "-Wl,*"}
+    result: configures_linking
+  - match: {pattern: "-u", count: 1}
+    result: configures_linking
+  - match: {pattern: "-z", count: 1}
+    result: configures_linking
+  - match: {pattern: "-Xassembler", count: 1}
+    result: configures_assembling
+  - match: {pattern: "-Wa,*"}
+    result: configures_assembling
+  - match: {pattern: "-arch", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-arch_only", count: 1}
+    result: none
+  - match: {pattern: "-ansi"}
+    result: none
+  - match: {pattern: "-aux-info", count: 1}
+    result: none
+  - match: {pattern: "-std{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-O*"}
+    result: configures_compiling
+  - match: {pattern: "-g*"}
+    result: configures_compiling
+  - match: {pattern: "-f*"}
+    result: configures_compiling
+  - match: {pattern: "-m*"}
+    result: configures_compiling
+  - match: {pattern: "-p*"}
+    result: none
+  - match: {pattern: "-W*"}
+    result: none
+  - match: {pattern: "-no*"}
+    result: none
+  - match: {pattern: "-tno*"}
+    result: none
+  - match: {pattern: "-save*"}
+    result: driver_option
+  - match: {pattern: "-d*"}
+    result: none
+  - match: {pattern: "-Q*"}
+    result: none
+  - match: {pattern: "-X*"}
+    result: none
+  - match: {pattern: "-Y*"}
+    result: none
+  - match: {pattern: "--*"}
+    result: none

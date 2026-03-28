@@ -1,0 +1,130 @@
+# NVIDIA CUDA compiler (nvcc) flag definitions
+# https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/
+extends: gcc
+flags:
+  - match: {pattern: "--gpu-architecture{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-arch{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--gpu-code{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-code{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--generate-code{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-gencode{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--compile"}
+    result: stops_at_compiling
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "--device-c"}
+    result: stops_at_compiling
+  - match: {pattern: "-dc"}
+    result: stops_at_compiling
+  - match: {pattern: "--device-w"}
+    result: stops_at_compiling
+  - match: {pattern: "-dw"}
+    result: stops_at_compiling
+  - match: {pattern: "--device-link"}
+    result: configures_linking
+  - match: {pattern: "-dlink"}
+    result: configures_linking
+  - match: {pattern: "--link"}
+    result: configures_linking
+  - match: {pattern: "--lib"}
+    result: configures_linking
+  - match: {pattern: "--run"}
+    result: none
+  - match: {pattern: "--cudart{=}*"}
+    result: configures_linking
+  - match: {pattern: "--cuda-path{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--compiler-bindir{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-ccbin{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Xcompiler*", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-Xlinker*", count: 1}
+    result: configures_linking
+  - match: {pattern: "--maxrregcount{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-maxrregcount{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--use_fast_math"}
+    result: configures_compiling
+  - match: {pattern: "-use_fast_math"}
+    result: configures_compiling
+  - match: {pattern: "--ftz", count: 1}
+    result: configures_compiling
+  - match: {pattern: "--prec-div", count: 1}
+    result: configures_compiling
+  - match: {pattern: "--prec-sqrt", count: 1}
+    result: configures_compiling
+  - match: {pattern: "--fmad", count: 1}
+    result: configures_compiling
+  - match: {pattern: "--ptx"}
+    result: configures_compiling
+  - match: {pattern: "--cubin"}
+    result: configures_compiling
+  - match: {pattern: "--fatbin"}
+    result: configures_compiling
+  - match: {pattern: "--device-debug"}
+    result: configures_compiling
+  - match: {pattern: "-G"}
+    result: configures_compiling
+  - match: {pattern: "--generate-line-info"}
+    result: configures_compiling
+  - match: {pattern: "-lineinfo"}
+    result: configures_compiling
+  - match: {pattern: "--profile"}
+    result: configures_compiling
+  - match: {pattern: "--optimize{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-O{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--std{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--relocatable-device-code{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-rdc", count: 1}
+    result: configures_compiling
+  - match: {pattern: "--extended-lambda"}
+    result: configures_compiling
+  - match: {pattern: "-extended-lambda"}
+    result: configures_compiling
+  - match: {pattern: "--expt-extended-lambda"}
+    result: configures_compiling
+  - match: {pattern: "--expt-relaxed-constexpr"}
+    result: configures_compiling
+  - match: {pattern: "--output-file{ }*"}
+    result: output
+  - match: {pattern: "-o{ }*"}
+    result: output
+  - match: {pattern: "--preprocess"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "--verbose"}
+    result: driver_option
+  - match: {pattern: "-v"}
+    result: driver_option
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  - match: {pattern: "--help"}
+    result: info_and_exit
+  - match: {pattern: "-W*"}
+    result: none
+  - match: {pattern: "--disable-warnings*"}
+    result: none
+  - match: {pattern: "--include-path{=}*"}
+    result: configures_preprocessing
+  - match: {pattern: "--keep"}
+    result: driver_option
+  - match: {pattern: "--keep-dir{=}*"}
+    result: driver_option
+  - match: {pattern: "--machine{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-m{=}*"}
+    result: configures_compiling

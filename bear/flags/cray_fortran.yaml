@@ -1,0 +1,133 @@
+# Cray Fortran compiler (crayftn) flag definitions
+# https://support.hpe.com/hpesc/public/docDisplay?docId=a00115296en_us&page=Fortran_Command-line_Options.html
+flags:
+  - match: {pattern: "-no-add-rpath-shared"}
+    result: configures_linking
+  - match: {pattern: "--no-custom-ld-script"}
+    result: configures_linking
+  - match: {pattern: "-no-add-runpath"}
+    result: configures_linking
+  - match: {pattern: "-add-rpath-shared"}
+    result: configures_linking
+  - match: {pattern: "--no-as-needed"}
+    result: configures_linking
+  - match: {pattern: "-no-gcc-rpath"}
+    result: configures_linking
+  - match: {pattern: "-no-add-rpath"}
+    result: configures_linking
+  - match: {pattern: "-add-runpath"}
+    result: configures_linking
+  - match: {pattern: "-no-as-needed"}
+    result: configures_linking
+  - match: {pattern: "--as-needed"}
+    result: configures_linking
+  - match: {pattern: "-gcc-rpath"}
+    result: configures_linking
+  - match: {pattern: "-add-rpath"}
+    result: configures_linking
+  - match: {pattern: "-as-needed"}
+    result: configures_linking
+  - match: {pattern: "-qno-openmp"}
+    result: none
+  - match: {pattern: "-noopenmp"}
+    result: none
+  - match: {pattern: "-Mnoopenmp"}
+    result: none
+  - match: {pattern: "-default64"}
+    result: none
+  - match: {pattern: "-openmp"}
+    result: none
+  - match: {pattern: "-dynamic"}
+    result: configures_linking
+  - match: {pattern: "-shared"}
+    result: configures_linking
+  - match: {pattern: "-static"}
+    result: configures_linking
+  - match: {pattern: "-VVV"}
+    result: driver_option
+  - match: {pattern: "-mp"}
+    result: none
+  - match: {pattern: "-VV"}
+    result: driver_option
+  - match: {pattern: "--custom-ld-script={ }*"}
+    result: configures_linking
+  - match: {pattern: "-target-network={ }*"}
+    result: none
+  - match: {pattern: "-target-accel={ }*"}
+    result: none
+  - match: {pattern: "-target-cpu={ }*"}
+    result: none
+  - match: {pattern: "-A{ }*"}
+    result: none
+  - match: {pattern: "-b{ }*"}
+    result: output
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-d{ }*"}
+    result: none
+  - match: {pattern: "-e{ }*"}
+    result: none
+  - match: {pattern: "-f{ }*"}
+    result: none
+  - match: {pattern: "-G{ }*"}
+    result: none
+  - match: {pattern: "-h{ }*"}
+    result: none
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-J{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-K{ }*"}
+    result: none
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+  - match: {pattern: "-L{ }*"}
+    result: configures_linking
+  - match: {pattern: "-m{ }*"}
+    result: none
+  - match: {pattern: "-M{ }*"}
+    result: none
+  - match: {pattern: "-N{ }*"}
+    result: none
+  - match: {pattern: "-O{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-o{ }*"}
+    result: output
+  - match: {pattern: "-p{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-Q{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-r{ }*"}
+    result: driver_option
+  - match: {pattern: "-R{ }*"}
+    result: none
+  - match: {pattern: "-s{ }*"}
+    result: none
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-W{ }*"}
+    result: none
+  - match: {pattern: "-x{ }*"}
+    result: none
+  - match: {pattern: "-Y{ }*"}
+    result: none
+  - match: {pattern: "--cray*"}
+    result: none
+  - match: {pattern: "-cray*"}
+    result: none
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-F"}
+    result: none
+  - match: {pattern: "-g"}
+    result: configures_compiling
+  - match: {pattern: "-S"}
+    result: stops_at_assembling
+  - match: {pattern: "-T"}
+    result: driver_option
+  - match: {pattern: "-v"}
+    result: driver_option
+  - match: {pattern: "-V"}
+    result: info_and_exit
