@@ -168,8 +168,8 @@ mod flags {
 
             // Sort by flag length descending (stable sort preserves own-before-base order)
             entries.sort_by(|a, b| {
-                let a_len = extract_flag_name(&a.match_.pattern).len();
-                let b_len = extract_flag_name(&b.match_.pattern).len();
+                let a_len = flag_name_len(&a.match_);
+                let b_len = flag_name_len(&b.match_);
                 b_len.cmp(&a_len)
             });
 
@@ -181,23 +181,24 @@ mod flags {
         }
     }
 
-    /// Extract the flag name from a pattern string (strip trailing syntax markers).
-    ///
-    /// Examples:
-    ///   "-c" -> "-c"
-    ///   "-f*" -> "-f"
-    ///   "-D{ }*" -> "-D"
-    ///   "-specs=*" -> "-specs"
-    ///   "--std{=}*" -> "--std"
-    fn extract_flag_name(pattern: &str) -> &str {
-        // Find the earliest syntax marker position
-        let candidates = [
-            pattern.find('*'),
-            pattern.find('{'),
-            pattern.find('=').filter(|&i| pattern.get(i + 1..i + 2) == Some("*")),
-        ];
-        let end = candidates.iter().filter_map(|&x| x).min().unwrap_or(pattern.len());
-        &pattern[..end]
+    /// Compute the flag name length as `FlagPattern::flag()` would return it.
+    fn flag_name_len(m: &FlagMatch) -> usize {
+        let pattern = &m.pattern;
+        if let Some(flag) = pattern.strip_suffix("{ }*") {
+            flag.len()
+        } else if let Some(flag) = pattern.strip_suffix("{=}*") {
+            flag.len()
+        } else if let Some(flag) = pattern.strip_suffix("=*") {
+            if m.count.is_some() {
+                flag.len() + 1 // "=" is part of the flag name
+            } else {
+                flag.len()
+            }
+        } else if let Some(flag) = pattern.strip_suffix('*') {
+            flag.len()
+        } else {
+            pattern.len()
+        }
     }
 
     /// Parse a pattern string into a FlagPattern Rust expression.
@@ -207,7 +208,12 @@ mod flags {
         } else if let Some(flag) = pattern.strip_suffix("{=}*") {
             format!("FlagPattern::ExactlyWithEqOrSep(\"{}\")", flag)
         } else if let Some(flag) = pattern.strip_suffix("=*") {
-            format!("FlagPattern::ExactlyWithEq(\"{}\")", flag)
+            if let Some(n) = count {
+                // "=*" with count means Prefix where "=" is part of the flag name
+                format!("FlagPattern::Prefix(\"{}=\", {})", flag, n)
+            } else {
+                format!("FlagPattern::ExactlyWithEq(\"{}\")", flag)
+            }
         } else if let Some(flag) = pattern.strip_suffix('*') {
             format!("FlagPattern::Prefix(\"{}\", {})", flag, count.unwrap_or(0))
         } else {
