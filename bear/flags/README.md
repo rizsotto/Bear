@@ -1,17 +1,30 @@
-# Compiler Flag Definitions
+# Compiler Definitions
 
-This directory contains YAML files that define how Bear recognizes and categorizes
-compiler command-line flags. Each file corresponds to one compiler (or compiler family).
+This directory contains YAML files that define how Bear recognizes compiler
+executables, categorizes their command-line flags, and filters internal
+invocations. Each file corresponds to one compiler (or compiler family).
 
-At build time, `bear/build.rs` reads these files and generates static Rust arrays
-of `FlagRule` values and ignore filter arrays. The generated code is included in
-the `flag_based` interpreter module via `include!()`.
+At build time, `bear/build.rs` reads these files and generates static Rust
+arrays for flag tables, ignore filters, and recognition patterns. The generated
+code is included in the interpreter and recognition modules via `include!()`.
 
 ## File structure
 
 ```yaml
 # Optional: inherit all flags from another file (by filename stem)
 extends: gcc
+
+# Required: maps to a CompilerType variant (gcc, clang, flang, cuda, intel_fortran, cray_fortran)
+type: gcc
+
+# Executable names this compiler is known by
+recognize:
+  - names: ["gcc", "g++", "gfortran"]
+    cross_compilation: true    # match with cross-compilation prefix (e.g., arm-linux-gnu-gcc)
+    versioned: true            # match with version suffix (e.g., gcc-11, gcc11)
+  - names: ["cc", "c++"]
+    cross_compilation: true
+    versioned: false
 
 # Optional: conditions under which a recognized invocation should be ignored
 ignore_when:
@@ -91,15 +104,28 @@ all entries by flag name length (longest first) so more specific flags match
 before shorter prefixes. The sort is stable, so own flags take priority over
 base flags of the same length.
 
+## Recognition patterns
+
+The `recognize` section defines which executable names this compiler is known by.
+Each entry specifies:
+
+- `names` -- list of base executable names (e.g., `["gcc", "g++"]`)
+- `cross_compilation` -- if `true`, also matches names with a cross-compilation
+  prefix (e.g., `arm-linux-gnueabihf-gcc`)
+- `versioned` -- if `true`, also matches names with a version suffix
+  (e.g., `gcc-11`, `gcc11`, `gcc-11.2`)
+
+All patterns automatically handle `.exe` extensions on Windows.
+
 ## Adding a new compiler
 
 1. Create a new YAML file in this directory (e.g., `mycompiler.yaml`)
-2. Add `flags:` entries and optionally `extends:`, `ignore_when:`
+2. Add `type:`, `recognize:`, `flags:` entries and optionally `extends:`, `ignore_when:`
 3. Add a `TableConfig` entry in `bear/build.rs`
-4. Add a `CompilerType` variant in `config.rs`
+4. Add a `CompilerType` variant in `config.rs` and a mapping in
+   `compiler_recognition.rs::parse_compiler_type`
 5. Register the `FlagBasedInterpreter` in `CompilerInterpreter::new_with_config`
-6. Add recognition patterns in `compiler_recognition.rs`
-7. Run `cargo build && cargo test`
+6. Run `cargo build && cargo test`
 
 ## Adding a new flag
 

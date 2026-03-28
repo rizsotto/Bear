@@ -12,76 +12,63 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-/// Compile-time initialized default regex patterns for compiler recognition
+// Generated recognition pattern data from flags/*.yaml.
+include!(concat!(env!("OUT_DIR"), "/recognition.rs"));
+
+/// Compile-time initialized default regex patterns for compiler recognition.
 ///
-/// This method provides built-in patterns for recognizing common compiler executables
-/// based on their names. The patterns are designed to handle various scenarios including:
-/// - Cross-compilation prefixes (e.g., `arm-linux-gnueabihf-gcc`)
-/// - Versioned executables (e.g., `gcc-11`, `clang-15`, `gcc11`, `clang15`)
-/// - Multiple naming conventions for the same compiler family
-///
-/// # Supported Compiler Patterns
-///
-/// - **GCC**: Matches `gcc`, `g++`, `cc`, `c++` with optional cross-compilation prefixes and version suffixes
-/// - **Clang**: Matches `clang`, `clang++` with optional cross-compilation prefixes and version suffixes
-/// - **Fortran**: Matches `gfortran`, `f77`, `f90`, `f95`, `f03`, `f08` with optional prefixes and versions
-/// - **Intel Fortran**: Matches `ifort`, `ifx` with optional version suffixes
-/// - **Cray Fortran**: Matches `crayftn`, `ftn` with optional version suffixes
-///
-/// # Returns
-///
-/// A vector of tuples where each tuple contains:
-/// - `CompilerType`: The type of compiler the pattern identifies
-/// - `Regex`: The compiled regular expression pattern for matching executable names
-///
-/// # Examples
-///
-/// The returned patterns will match executables like:
-/// - `gcc`, `arm-linux-gnueabihf-gcc`, `gcc-11`
-/// - `clang++`, `x86_64-pc-linux-gnu-clang`, `clang-15`
-/// - `gfortran`, `aarch64-linux-gnu-gfortran-9`
-/// - `ifort`, `ifx-2023`
-/// - `crayftn`, `ftn`
+/// Built from YAML-defined `recognize` entries plus a hand-written Wrapper pattern.
+/// Each entry maps a `CompilerType` to a regex that matches executable filenames,
+/// supporting cross-compilation prefixes, version suffixes, and `.exe` extensions.
 static DEFAULT_PATTERNS: LazyLock<Vec<(CompilerType, Regex)>> = LazyLock::new(|| {
-    /// Helper function for creating compiler regex patterns with platform-specific .exe handling
-    ///
-    /// # Parameters
-    /// - `base_pattern`: The core regex pattern without anchors or .exe suffix
-    /// - `with_version_capture`: If true, creates capturing groups for version extraction
-    fn create_compiler_regex(base_pattern: &str, with_version: bool) -> Regex {
-        let exe_suffix = r"(?:\.exe)?";
+    let mut patterns = Vec::new();
 
-        // Add version pattern (with or without capturing group) if requested
-        let pattern_with_version = if with_version {
-            format!(r"{}(?:[-_]?([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base_pattern)
-        } else {
-            base_pattern.to_string()
-        };
-
-        let full_pattern = format!("^{}{}$", pattern_with_version, exe_suffix);
-        Regex::new(&full_pattern).unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
+    // Build patterns from generated YAML data
+    for &(type_str, names, cross_compilation, versioned) in RECOGNITION_PATTERNS {
+        let compiler_type = parse_compiler_type(type_str);
+        let regex = create_compiler_regex(names, cross_compilation, versioned);
+        patterns.push((compiler_type, regex));
     }
-    vec![
-        // simple cc and c++ (no version support)
-        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:cc|c\+\+)", false)),
-        // GCC pattern
-        (CompilerType::Gcc, create_compiler_regex(r"(?:[^/]*-)?(?:gcc|g\+\+|gfortran|egfortran|f95)", true)),
-        // GCC internal executables pattern: matches GCC's internal compiler phases
-        (CompilerType::Gcc, create_compiler_regex(r"(?:cc1(?:plus|obj|objplus)?|f951|collect2|lto1)", false)),
-        // Clang pattern: matches clang, clang++, cross-compilation variants, and versioned variants
-        (CompilerType::Clang, create_compiler_regex(r"(?:[^/]*-)?clang(?:\+\+)?", true)),
-        // Fortran pattern: matches flang, cross-compilation variants, and versioned variants
-        (CompilerType::Flang, create_compiler_regex(r"(?:[^/]*-)?(?:flang|flang-new)", true)),
-        // Intel Fortran pattern: matches ifort, ifx, and versioned variants
-        (CompilerType::IntelFortran, create_compiler_regex(r"(?:ifort|ifx)", true)),
-        // Cray Fortran pattern: matches crayftn, ftn
-        (CompilerType::CrayFortran, create_compiler_regex(r"(?:crayftn|ftn)", true)),
-        // CUDA pattern: matches nvcc (NVIDIA CUDA Compiler) with optional cross-compilation prefixes and version suffixes
-        (CompilerType::Cuda, create_compiler_regex(r"(?:[^/]*-)?nvcc", true)),
-        // Wrapper pattern: matches common compiler wrappers (no version support)
-        (CompilerType::Wrapper, create_compiler_regex(r"(?:ccache|distcc|sccache)", false)),
-    ]
+
+    // Wrapper pattern stays hand-written (not YAML-driven)
+    patterns
+        .push((CompilerType::Wrapper, create_compiler_regex(&["ccache", "distcc", "sccache"], false, false)));
+
+    patterns
 });
+
+/// Map a YAML `type` string to a `CompilerType` variant.
+fn parse_compiler_type(type_str: &str) -> CompilerType {
+    match type_str {
+        "gcc" => CompilerType::Gcc,
+        "clang" => CompilerType::Clang,
+        "flang" => CompilerType::Flang,
+        "intel_fortran" => CompilerType::IntelFortran,
+        "cray_fortran" => CompilerType::CrayFortran,
+        "cuda" => CompilerType::Cuda,
+        other => panic!("Unknown compiler type in YAML: '{}'", other),
+    }
+}
+
+/// Build a regex that matches any of the given executable `names`, with optional
+/// cross-compilation prefix and version suffix support, plus `.exe` extension.
+fn create_compiler_regex(names: &[&str], cross_compilation: bool, versioned: bool) -> Regex {
+    // Escape names for regex (handles '+' in names like "c++", "clang++")
+    let escaped: Vec<String> = names.iter().map(|n| regex::escape(n)).collect();
+    let alternation = escaped.join("|");
+
+    let base = if cross_compilation {
+        format!(r"(?:[^/]*-)?(?:{})", alternation)
+    } else {
+        format!(r"(?:{})", alternation)
+    };
+
+    let with_version =
+        if versioned { format!(r"{}(?:[-_]?([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base) } else { base };
+
+    let full_pattern = format!(r"^{}(?:\.exe)?$", with_version);
+    Regex::new(&full_pattern).unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
+}
 
 /// A unified compiler recognizer that uses regex patterns
 pub struct CompilerRecognizer {
