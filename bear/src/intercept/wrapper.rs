@@ -24,7 +24,7 @@ use thiserror::Error;
 /// Unlike `TempDir`, this uses a deterministic path (`.bear/` in cwd) which
 /// is essential for autotools-style builds where `configure` caches compiler
 /// paths that must remain valid across multiple Bear invocations.
-pub struct ManagedDirectory {
+struct ManagedDirectory {
     path: PathBuf,
 }
 
@@ -132,7 +132,7 @@ impl WrapperConfigReader {
 /// Writer for wrapper configurations.
 ///
 /// Handles serialization of wrapper configurations to various output destinations.
-pub struct WrapperConfigWriter;
+struct WrapperConfigWriter;
 
 impl WrapperConfigWriter {
     /// Writes wrapper configuration to any destination implementing `Write`.

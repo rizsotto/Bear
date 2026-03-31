@@ -23,12 +23,12 @@ use std::path::{Path, PathBuf};
 ///
 /// Uses the execution's own `PATH` to search, falling back to a system
 /// default path (from `confstr(_CS_PATH)`) when `PATH` is not set.
-pub struct ExecutableResolver {
+struct ExecutableResolver {
     fallback_path: String,
 }
 
 impl ExecutableResolver {
-    pub fn new(fallback_path: String) -> Self {
+    fn new(fallback_path: String) -> Self {
         Self { fallback_path }
     }
 
@@ -38,7 +38,7 @@ impl ExecutableResolver {
     /// - Otherwise, searches the execution's `PATH` (or the fallback path)
     ///   using `which_in`.
     /// - If resolution fails, returns the original path unchanged.
-    pub fn resolve(&self, execution: &Execution) -> PathBuf {
+    fn resolve(&self, execution: &Execution) -> PathBuf {
         if execution.executable.is_absolute() {
             return execution.executable.clone();
         }
