@@ -57,7 +57,7 @@ impl ExecutableResolver {
 
 /// Interpreter decorator that resolves bare executable filenames to absolute
 /// paths before delegating to the inner interpreter.
-pub struct ResolveExecutable<T: Interpreter> {
+pub(super) struct ResolveExecutable<T: Interpreter> {
     inner: T,
     resolver: ExecutableResolver,
 }

@@ -73,7 +73,7 @@ impl CommandConverter {
 
     /// Creates a new CommandConverter with a custom path formatter for testing.
     #[cfg(test)]
-    pub fn with_formatter(format: config::EntryFormat, path_formatter: Box<dyn PathFormatter>) -> Self {
+    fn with_formatter(format: config::EntryFormat, path_formatter: Box<dyn PathFormatter>) -> Self {
         Self { format, path_formatter }
     }
 

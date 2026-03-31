@@ -4,7 +4,7 @@ use super::types::*;
 use thiserror::Error;
 
 /// Trait for validating configuration objects
-pub trait Validator<T> {
+pub(super) trait Validator<T> {
     type Error: std::error::Error;
 
     fn validate(config: &T) -> Result<(), Self::Error>;

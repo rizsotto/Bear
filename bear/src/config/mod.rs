@@ -66,8 +66,6 @@
 // Re-Export the types and the loader module content.
 pub use loader::{ConfigError, Loader};
 pub use types::*;
-pub use validation::Validator;
-
 pub mod loader;
 mod types;
-pub mod validation;
+mod validation;

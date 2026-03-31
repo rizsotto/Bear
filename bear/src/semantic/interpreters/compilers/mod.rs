@@ -8,7 +8,7 @@
 
 pub mod arguments;
 pub mod compiler_recognition;
-pub mod flag_based;
+mod flag_based;
 pub mod wrapper;
 
 use super::super::{Command, Interpreter};
@@ -44,41 +44,13 @@ impl CompilerInterpreter {
         // Create the final interpreter and register all non-wrapper interpreters
         let mut result = Self::new(Arc::clone(&recognizer));
 
-        use flag_based::*;
-
-        // Register all interpreter types using generated flag tables and ignore filters
-        result.register(
-            CompilerType::Gcc,
-            FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS),
-        );
-        result.register(
-            CompilerType::Clang,
-            FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS),
-        );
-        result.register(
-            CompilerType::Flang,
-            FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS),
-        );
-        result.register(
-            CompilerType::IntelFortran,
-            FlagBasedInterpreter::new(
-                &INTEL_FORTRAN_FLAGS,
-                &INTEL_FORTRAN_IGNORE_EXECUTABLES,
-                &INTEL_FORTRAN_IGNORE_FLAGS,
-            ),
-        );
-        result.register(
-            CompilerType::CrayFortran,
-            FlagBasedInterpreter::new(
-                &CRAY_FORTRAN_FLAGS,
-                &CRAY_FORTRAN_IGNORE_EXECUTABLES,
-                &CRAY_FORTRAN_IGNORE_FLAGS,
-            ),
-        );
-        result.register(
-            CompilerType::Cuda,
-            FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS),
-        );
+        // Register all interpreter types using factory functions
+        result.register(CompilerType::Gcc, flag_based::gcc());
+        result.register(CompilerType::Clang, flag_based::clang());
+        result.register(CompilerType::Flang, flag_based::flang());
+        result.register(CompilerType::IntelFortran, flag_based::intel_fortran());
+        result.register(CompilerType::CrayFortran, flag_based::cray_fortran());
+        result.register(CompilerType::Cuda, flag_based::cuda());
 
         Arc::new_cyclic(|weak_self| {
             // Create wrapper interpreter with weak references
@@ -1834,60 +1806,6 @@ mod tests {
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), none());
             }
-        }
-    }
-
-    mod flag_table_invariants {
-        use super::*;
-        use crate::semantic::interpreters::compilers::flag_based::*;
-
-        #[test]
-        fn gcc() {
-            flag_based::assert_flag_table_invariants(&GCC_FLAGS);
-        }
-
-        #[test]
-        fn clang() {
-            flag_based::assert_flag_table_invariants(&CLANG_FLAGS);
-        }
-
-        #[test]
-        fn flang() {
-            flag_based::assert_flag_table_invariants(&FLANG_FLAGS);
-        }
-
-        #[test]
-        fn cuda() {
-            flag_based::assert_flag_table_invariants(&CUDA_FLAGS);
-        }
-
-        #[test]
-        fn intel_fortran() {
-            flag_based::assert_flag_table_invariants(&INTEL_FORTRAN_FLAGS);
-        }
-
-        #[test]
-        fn cray_fortran() {
-            flag_based::assert_flag_table_invariants(&CRAY_FORTRAN_FLAGS);
-        }
-
-        #[test]
-        fn clang_inherits_all_gcc_flags() {
-            let gcc_flag_strings: std::collections::HashSet<&str> =
-                GCC_FLAGS.iter().map(|f| f.pattern.flag()).collect();
-            let clang_flag_strings: std::collections::HashSet<&str> =
-                CLANG_FLAGS.iter().map(|f| f.pattern.flag()).collect();
-
-            assert!(
-                CLANG_FLAGS.len() > GCC_FLAGS.len(),
-                "Clang should have more flags than GCC, got gcc: {}, clang: {}",
-                GCC_FLAGS.len(),
-                CLANG_FLAGS.len()
-            );
-
-            let missing_flags: Vec<&str> =
-                gcc_flag_strings.difference(&clang_flag_strings).cloned().collect();
-            assert!(missing_flags.is_empty(), "These GCC flags are missing from Clang: {:?}", missing_flags);
         }
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Main, Validator};
+use super::Main;
+use super::validation::Validator;
 use directories::{BaseDirs, ProjectDirs};
 use log::{debug, info};
 use std::fs::OpenOptions;

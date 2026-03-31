@@ -18,7 +18,7 @@ pub use source::looks_like_a_source_file;
 /// Flag pattern definitions that describe HOW to consume arguments from the command line.
 /// These patterns define the syntactic structure of compiler flags and their arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlagPattern {
+pub(super) enum FlagPattern {
     /// Match the flag exactly with specified number of required separate arguments: "-c", "-o file"
     /// The u32 represents how many additional arguments are required (0 for no additional args)
     Exactly(&'static str, u32),
@@ -53,7 +53,7 @@ impl FlagPattern {
 /// A flag definition combining the flag pattern and argument kind.
 /// This combines syntactic pattern matching with semantic meaning for compiler flags.
 #[derive(Debug, Clone)]
-pub struct FlagRule {
+pub(super) struct FlagRule {
     /// The flag pattern including name and matching instruction
     pub pattern: FlagPattern,
 
@@ -63,7 +63,7 @@ pub struct FlagRule {
 
 /// Result of matching a flag against command line arguments
 #[derive(Debug, Clone)]
-pub struct FlagMatch {
+pub(super) struct FlagMatch {
     /// The flag definition that matched
     pub rule: FlagRule,
 
@@ -79,7 +79,7 @@ impl FlagMatch {
 }
 
 /// A flag matcher that contains flag definitions for a specific compiler
-pub struct FlagAnalyzer {
+pub(super) struct FlagAnalyzer {
     /// All flag definitions, sorted by priority (longer flags first for better matching)
     rules: &'static [FlagRule],
 }

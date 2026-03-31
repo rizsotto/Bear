@@ -106,13 +106,12 @@ mod flags {
         count: Option<u32>,
     }
 
-    /// Table metadata: name of the static, visibility, which file to generate.
+    /// Table metadata: name of the static, which file to generate.
     struct TableConfig {
         yaml_file: &'static str,
         static_name: &'static str,
         ignore_executables_name: &'static str,
         ignore_flags_name: &'static str,
-        visibility: &'static str, // "pub " or ""
         output_file: &'static str,
     }
 
@@ -122,7 +121,6 @@ mod flags {
             static_name: "GCC_FLAGS",
             ignore_executables_name: "GCC_IGNORE_EXECUTABLES",
             ignore_flags_name: "GCC_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_gcc.rs",
         },
         TableConfig {
@@ -130,7 +128,6 @@ mod flags {
             static_name: "CLANG_FLAGS",
             ignore_executables_name: "CLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "CLANG_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_clang.rs",
         },
         TableConfig {
@@ -138,7 +135,6 @@ mod flags {
             static_name: "FLANG_FLAGS",
             ignore_executables_name: "FLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "FLANG_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_flang.rs",
         },
         TableConfig {
@@ -146,7 +142,6 @@ mod flags {
             static_name: "CUDA_FLAGS",
             ignore_executables_name: "CUDA_IGNORE_EXECUTABLES",
             ignore_flags_name: "CUDA_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_cuda.rs",
         },
         TableConfig {
@@ -154,7 +149,6 @@ mod flags {
             static_name: "INTEL_FORTRAN_FLAGS",
             ignore_executables_name: "INTEL_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "INTEL_FORTRAN_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_intel_fortran.rs",
         },
         TableConfig {
@@ -162,7 +156,6 @@ mod flags {
             static_name: "CRAY_FORTRAN_FLAGS",
             ignore_executables_name: "CRAY_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "CRAY_FORTRAN_IGNORE_FLAGS",
-            visibility: "pub ",
             output_file: "flags_cray_fortran.rs",
         },
     ];
@@ -245,8 +238,7 @@ mod flags {
 
         // Generate ignore executables array
         out.push_str(&format!(
-            "{}static {}: [&str; {}] = [",
-            config.visibility,
+            "static {}: [&str; {}] = [",
             config.ignore_executables_name,
             ignore_when.executables.len()
         ));
@@ -257,8 +249,7 @@ mod flags {
 
         // Generate ignore flags array
         out.push_str(&format!(
-            "{}static {}: [&str; {}] = [",
-            config.visibility,
+            "static {}: [&str; {}] = [",
             config.ignore_flags_name,
             ignore_when.flags.len()
         ));
@@ -396,12 +387,7 @@ mod flags {
     fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
         let mut out = String::new();
         out.push_str(&format!("// Generated from interpreters/{} -- DO NOT EDIT\n", config.yaml_file));
-        out.push_str(&format!(
-            "{}static {}: [FlagRule; {}] = [\n",
-            config.visibility,
-            config.static_name,
-            entries.len()
-        ));
+        out.push_str(&format!("static {}: [FlagRule; {}] = [\n", config.static_name, entries.len()));
 
         for entry in entries {
             let pattern_rust = pattern_to_rust(&entry.match_.pattern, entry.match_.count);

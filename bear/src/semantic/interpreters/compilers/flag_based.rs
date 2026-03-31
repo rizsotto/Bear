@@ -20,7 +20,7 @@ use crate::semantic::{
 ///
 /// This replaces the individual per-compiler interpreter structs (GccInterpreter,
 /// ClangInterpreter, etc.) with a single type driven by build-time-generated data.
-pub struct FlagBasedInterpreter {
+struct FlagBasedInterpreter {
     analyzer: FlagAnalyzer,
     ignore_executables: &'static [&'static str],
     ignore_flags: &'static [&'static str],
@@ -28,7 +28,7 @@ pub struct FlagBasedInterpreter {
 
 impl FlagBasedInterpreter {
     /// Creates a new flag-based interpreter with the given flag table and ignore filters.
-    pub fn new(
+    fn new(
         flags: &'static [FlagRule],
         ignore_executables: &'static [&'static str],
         ignore_flags: &'static [&'static str],
@@ -74,7 +74,7 @@ impl Interpreter for FlagBasedInterpreter {
 }
 
 /// Parse both command-line arguments and environment variables to generate complete argument list.
-pub fn parse_arguments_and_environment(
+fn parse_arguments_and_environment(
     flag_analyzer: &FlagAnalyzer,
     execution: &Execution,
 ) -> Vec<Box<dyn Arguments>> {
@@ -194,50 +194,133 @@ include!(concat!(env!("OUT_DIR"), "/flags_cuda.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_intel_fortran.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
 
-/// Validate semantic invariants that all flag tables must satisfy.
+/// Factory functions returning opaque interpreters so callers never see concrete types.
+pub(super) fn gcc() -> impl Interpreter {
+    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS)
+}
+
+pub(super) fn clang() -> impl Interpreter {
+    FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS)
+}
+
+pub(super) fn flang() -> impl Interpreter {
+    FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS)
+}
+
+pub(super) fn cuda() -> impl Interpreter {
+    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS)
+}
+
+pub(super) fn intel_fortran() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &INTEL_FORTRAN_FLAGS,
+        &INTEL_FORTRAN_IGNORE_EXECUTABLES,
+        &INTEL_FORTRAN_IGNORE_FLAGS,
+    )
+}
+
+pub(super) fn cray_fortran() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &CRAY_FORTRAN_FLAGS,
+        &CRAY_FORTRAN_IGNORE_EXECUTABLES,
+        &CRAY_FORTRAN_IGNORE_FLAGS,
+    )
+}
+
 #[cfg(test)]
-pub fn assert_flag_table_invariants(flags: &[FlagRule]) {
-    use super::super::matchers::FlagPattern;
+mod flag_table_invariants {
+    use super::*;
 
-    assert!(!flags.is_empty(), "Flag table must not be empty");
+    fn assert_invariants(flags: &[FlagRule]) {
+        assert!(!flags.is_empty(), "Flag table must not be empty");
 
-    // Sorted by flag length descending
-    for window in flags.windows(2) {
-        assert!(
-            window[0].pattern.flag().len() >= window[1].pattern.flag().len(),
-            "Flags not sorted by length: {:?} (len {}) before {:?} (len {})",
-            window[0].pattern.flag(),
-            window[0].pattern.flag().len(),
-            window[1].pattern.flag(),
-            window[1].pattern.flag().len(),
-        );
-    }
+        // Sorted by flag length descending
+        for window in flags.windows(2) {
+            assert!(
+                window[0].pattern.flag().len() >= window[1].pattern.flag().len(),
+                "Flags not sorted by length: {:?} (len {}) before {:?} (len {})",
+                window[0].pattern.flag(),
+                window[0].pattern.flag().len(),
+                window[1].pattern.flag(),
+                window[1].pattern.flag().len(),
+            );
+        }
 
-    for rule in flags {
-        // No flag rule uses ArgumentKind::Source (source files detected by heuristic)
-        assert!(
-            !matches!(rule.kind, ArgumentKind::Source { .. }),
-            "Flag rule {:?} must not use ArgumentKind::Source",
-            rule.pattern.flag()
-        );
+        for rule in flags {
+            assert!(
+                !matches!(rule.kind, ArgumentKind::Source { .. }),
+                "Flag rule {:?} must not use ArgumentKind::Source",
+                rule.pattern.flag()
+            );
 
-        // All flags start with '-', '--', or '@'
-        let flag = rule.pattern.flag();
-        assert!(flag.starts_with('-') || flag.starts_with('@'), "Flag {:?} must start with '-' or '@'", flag);
+            let flag = rule.pattern.flag();
+            assert!(
+                flag.starts_with('-') || flag.starts_with('@'),
+                "Flag {:?} must start with '-' or '@'",
+                flag
+            );
 
-        // Output rules can only produce 1 or 2 consumed args
-        if matches!(rule.kind, ArgumentKind::Output) {
-            match rule.pattern {
-                FlagPattern::Exactly(_, n) => {
-                    assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
-                }
-                FlagPattern::ExactlyWithEq(_)
-                | FlagPattern::ExactlyWithEqOrSep(_)
-                | FlagPattern::ExactlyWithGluedOrSep(_) => {} // always 1 or 2
-                FlagPattern::Prefix(_, n) => {
-                    assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
+            if matches!(rule.kind, ArgumentKind::Output) {
+                match rule.pattern {
+                    FlagPattern::Exactly(_, n) => {
+                        assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
+                    }
+                    FlagPattern::ExactlyWithEq(_)
+                    | FlagPattern::ExactlyWithEqOrSep(_)
+                    | FlagPattern::ExactlyWithGluedOrSep(_) => {}
+                    FlagPattern::Prefix(_, n) => {
+                        assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
+                    }
                 }
             }
         }
+    }
+
+    #[test]
+    fn gcc() {
+        assert_invariants(&GCC_FLAGS);
+    }
+
+    #[test]
+    fn clang() {
+        assert_invariants(&CLANG_FLAGS);
+    }
+
+    #[test]
+    fn flang() {
+        assert_invariants(&FLANG_FLAGS);
+    }
+
+    #[test]
+    fn cuda() {
+        assert_invariants(&CUDA_FLAGS);
+    }
+
+    #[test]
+    fn intel_fortran() {
+        assert_invariants(&INTEL_FORTRAN_FLAGS);
+    }
+
+    #[test]
+    fn cray_fortran() {
+        assert_invariants(&CRAY_FORTRAN_FLAGS);
+    }
+
+    #[test]
+    fn clang_inherits_all_gcc_flags() {
+        let gcc_flag_strings: std::collections::HashSet<&str> =
+            GCC_FLAGS.iter().map(|f| f.pattern.flag()).collect();
+        let clang_flag_strings: std::collections::HashSet<&str> =
+            CLANG_FLAGS.iter().map(|f| f.pattern.flag()).collect();
+
+        assert!(
+            CLANG_FLAGS.len() > GCC_FLAGS.len(),
+            "Clang should have more flags than GCC, got gcc: {}, clang: {}",
+            GCC_FLAGS.len(),
+            CLANG_FLAGS.len()
+        );
+
+        let missing_flags: Vec<&str> = gcc_flag_strings.difference(&clang_flag_strings).cloned().collect();
+        assert!(missing_flags.is_empty(), "These GCC flags are missing from Clang: {:?}", missing_flags);
     }
 }

@@ -157,7 +157,7 @@ impl WrapperConfigWriter {
 /// The use of a deterministic directory path is essential for autotools-style builds
 /// where `./configure` caches compiler paths. Using a random temporary directory
 /// would break subsequent `make` invocations because the cached paths would no longer exist.
-pub struct WrapperDirectoryBuilder {
+pub(super) struct WrapperDirectoryBuilder {
     wrapper_executable_path: PathBuf,
     wrapper_dir: ManagedDirectory,
     config: WrapperConfig,
@@ -242,11 +242,6 @@ impl WrapperDirectoryBuilder {
         log::info!("{}", wrapper_directory);
 
         Ok(wrapper_directory)
-    }
-
-    /// Gets the path to the wrapper directory.
-    pub fn path(&self) -> &Path {
-        self.wrapper_dir.path()
     }
 }
 
