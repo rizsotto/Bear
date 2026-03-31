@@ -8,15 +8,15 @@
 ʕ·ᴥ·ʔ Build EAR
 ===============
 
-Bear is a tool that generates a compilation database for clang tooling.
+Bear generates a compilation database for Clang tooling.
 
-The [JSON compilation database][JSONCDB] is used in the clang project to
-provide information on how a single compilation unit is processed. With this,
-it is easy to re-run the compilation with alternate programs.
+The [JSON compilation database][JSONCDB] describes how each translation unit
+is compiled. Clang-based tools use it to understand compiler flags, include
+paths, and other build settings.
 
-Some build systems natively support the generation of a JSON compilation
-database. For projects that do not use such build tools, Bear generates the
-JSON file during the build process.
+Some build systems can generate a JSON compilation database directly. For
+build systems that cannot, Bear captures compiler invocations during the
+build and writes the database for you.
 
   [JSONCDB]: http://clang.llvm.org/docs/JSONCompilationDatabase.html
 
@@ -24,21 +24,20 @@ How to install
 --------------
 
 Bear is [packaged](https://repology.org/project/bear-clang/versions) for many
-distributions. Check your distribution's package manager. Alternatively, you
-can [build it](INSTALL.md) from source.
+distributions. Check your distribution's package manager first. Alternatively,
+you can [build it](INSTALL.md) from source.
 
 How to use
 ----------
 
-After installation, use it like this:
+After installation, run:
 
     bear -- <your-build-command>
 
-The output file, `compile_commands.json`, is saved in the current directory.
+Bear writes `compile_commands.json` to the current working directory.
 
-For more options, you can check the man page or pass the `--help` parameter.
-Note that if you want to pass parameters to Bear, pass them _before_ the `--`;
-everything after that is considered part of the build command.
+For more options, see the man page or run `bear --help`. Pass Bear’s own
+options before `--`; everything after that is treated as part of the build command.
 
 Please be aware that some package managers still ship the 2.4.x release. In
 that case, please omit the extra `--` or consult your local documentation.
@@ -50,44 +49,23 @@ When to use Bear
 -----------------
 
 Use Bear when your build system does not natively support generating a
-[JSON compilation database][JSONCDB]. If your project already uses CMake,
-Meson, or Bazel, prefer the built-in compilation database export those tools
-provide — it will be faster and more reliable.
+[JSON compilation database][JSONCDB]. If your project already uses CMake, Meson,
+or Bazel, prefer the built-in compilation database export those tools provide;
+it is usually faster and more reliable.
 
 Supported platforms
 -------------------
 
-Bear works on:
-
-- **Linux** (glibc and musl) — interception via `LD_PRELOAD`
-- **macOS** — interception via `DYLD_INSERT_LIBRARIES`
-- **FreeBSD, NetBSD, OpenBSD, DragonFly BSD** — interception via `LD_PRELOAD`
-- **Windows** — wrapper-based interception only (no preload library)
+Bear works on Linux, macOS, FreeBSD, OpenBSD, NetBSD, DragonFly BSD,
+and Windows.
 
 Limitations
 -----------
 
-- **macOS System Integrity Protection (SIP)** can prevent library preloading
-  for system-protected executables. See the [wiki][WIKI] for workarounds.
-- Builds that use **sandboxing** (e.g., Nix, Flatpak) may block interception.
-- When using **distcc** or **ccache**, Bear may need extra configuration to
-  intercept the actual compiler invocation. Consult the [wiki][WIKI].
-- Bear intercepts process creation — builds that do not spawn a compiler
-  process (e.g., some IDE-internal builds) will not produce output.
-
-Version note
-------------
-
-Bear 3.x and later require a `--` separator between Bear flags and the build
-command:
-
-    bear -- make
-
-Bear 2.4.x does not use the separator:
-
-    bear make
-
-Check your installed version with `bear --version`.
+Bear works by intercepting compiler calls during a build. This means certain
+environments may need extra configuration — for example, macOS System
+Integrity Protection (SIP) or sandboxed builds (Nix, Flatpak). See the
+[wiki][WIKI] for details and workarounds.
 
 Problem reports
 ---------------
