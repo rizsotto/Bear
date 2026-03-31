@@ -14,8 +14,7 @@ mod append;
 mod atomic;
 mod converter;
 mod file;
-mod source_filter;
-mod unique;
+mod filtering;
 
 use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
@@ -26,8 +25,7 @@ use append::AppendClangOutputWriter;
 use atomic::AtomicClangOutputWriter;
 use converter::ConverterClangOutputWriter;
 use file::ClangOutputWriter;
-use source_filter::SourceFilterOutputWriter;
-use unique::UniqueOutputWriter;
+use filtering::{DuplicateEntryFilter, FilteredOutputWriter, SourceEntryFilter};
 
 /// A trait representing a writer for iterator type `T`.
 ///
@@ -44,7 +42,12 @@ pub(crate) trait IteratorWriter<T> {
 /// The assembled writer pipeline type for Clang compilation databases.
 type ClangWriterStack = ConverterClangOutputWriter<
     AppendClangOutputWriter<
-        AtomicClangOutputWriter<SourceFilterOutputWriter<UniqueOutputWriter<ClangOutputWriter>>>,
+        AtomicClangOutputWriter<
+            FilteredOutputWriter<
+                FilteredOutputWriter<ClangOutputWriter, DuplicateEntryFilter>,
+                SourceEntryFilter,
+            >,
+        >,
     >,
 >;
 
@@ -81,10 +84,17 @@ pub(crate) fn create_pipeline(
     let temp_path = &args.path.with_extension("tmp");
 
     let base_writer = ClangOutputWriter::create(temp_path, Arc::clone(&stats))?;
-    let unique_writer =
-        UniqueOutputWriter::create(base_writer, config.duplicates.clone(), Arc::clone(&stats))?;
-    let source_filter_writer =
-        SourceFilterOutputWriter::new(unique_writer, config.sources.clone(), Arc::clone(&stats));
+    let duplicate_filter = DuplicateEntryFilter::try_from(config.duplicates.clone())
+        .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
+    let unique_writer = FilteredOutputWriter::new(base_writer, duplicate_filter, Arc::clone(&stats), |s| {
+        &s.duplicates_detected
+    });
+    let source_filter_writer = FilteredOutputWriter::new(
+        unique_writer,
+        SourceEntryFilter::from(config.sources.clone()),
+        Arc::clone(&stats),
+        |s| &s.entries_filtered_by_source,
+    );
     let atomic_writer = AtomicClangOutputWriter::new(source_filter_writer, temp_path, final_path);
     let append_writer =
         AppendClangOutputWriter::new(atomic_writer, final_path, args.append, Arc::clone(&stats));
@@ -158,13 +168,11 @@ mod tests {
 
         pipeline.write(commands.into_iter()).unwrap();
 
-        // Verify output file exists and contains expected entries
         assert!(output_path.exists());
         let content = std::fs::read_to_string(&output_path).unwrap();
         assert!(content.contains("file1.c"));
         assert!(content.contains("file2.c"));
 
-        // Verify statistics are populated across all stages
         assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 2);
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
@@ -182,7 +190,6 @@ mod tests {
 
         let pipeline = create_pipeline(&args, &config, Arc::clone(&stats)).unwrap();
 
-        // Send duplicate commands
         let commands = vec![
             make_compile_command("file1.c"),
             make_compile_command("file1.c"),

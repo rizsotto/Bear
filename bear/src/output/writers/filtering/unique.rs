@@ -6,16 +6,10 @@
 //! that uses it. The filter can be configured to use different fields of the
 //! compilation database entries to determine if they are duplicates.
 
-use super::IteratorWriter;
 use crate::config;
-use crate::output::WriterCreationError;
-use crate::output::WriterError;
 use crate::output::clang::Entry;
-use crate::output::statistics::OutputStatistics;
 use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use thiserror::Error;
 
 // --- Duplicate entry filter ---
@@ -31,7 +25,7 @@ pub(crate) struct DuplicateEntryFilter {
 unsafe impl Send for DuplicateEntryFilter {}
 
 impl DuplicateEntryFilter {
-    pub(crate) fn unique(&mut self, entry: &Entry) -> bool {
+    fn unique(&mut self, entry: &Entry) -> bool {
         let hash = self.hash_function(entry);
         if self.hash_values.contains(&hash) {
             return false;
@@ -52,6 +46,12 @@ impl DuplicateEntryFilter {
             }
         }
         hasher.finish()
+    }
+}
+
+impl super::EntryFilter for DuplicateEntryFilter {
+    fn accept(&mut self, entry: &Entry) -> bool {
+        self.unique(entry)
     }
 }
 
@@ -89,51 +89,10 @@ impl TryFrom<config::DuplicateFilter> for DuplicateEntryFilter {
     }
 }
 
-// --- Pipeline writer ---
-
-/// The type represents a writer that filters duplicate compilation database entries.
-///
-/// # Features
-/// - Filters duplicates based on the provided configuration.
-pub(crate) struct UniqueOutputWriter<T: IteratorWriter<Entry>> {
-    writer: T,
-    filter: DuplicateEntryFilter,
-    stats: Arc<OutputStatistics>,
-}
-
-impl<T: IteratorWriter<Entry>> UniqueOutputWriter<T> {
-    pub(crate) fn create(
-        writer: T,
-        config: config::DuplicateFilter,
-        stats: Arc<OutputStatistics>,
-    ) -> Result<Self, WriterCreationError> {
-        let filter = DuplicateEntryFilter::try_from(config)
-            .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
-
-        Ok(Self { writer, filter, stats })
-    }
-}
-
-impl<T: IteratorWriter<Entry>> IteratorWriter<Entry> for UniqueOutputWriter<T> {
-    fn write(self, entries: impl Iterator<Item = Entry>) -> Result<(), WriterError> {
-        let mut filter = self.filter;
-        let stats = Arc::clone(&self.stats);
-
-        let filtered_entries = entries.filter(move |entry| {
-            let is_unique = filter.unique(entry);
-            if !is_unique {
-                stats.duplicates_detected.fetch_add(1, Ordering::Relaxed);
-            }
-            is_unique
-        });
-
-        self.writer.write(filtered_entries)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::output::writers::filtering::EntryFilter;
 
     #[test]
     fn test_try_from_success() {
@@ -173,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_duplicate_with_file_and_directory_fields() {
+    fn test_accept_rejects_duplicates_by_file_and_directory() {
         let config = config::DuplicateFilter {
             match_on: vec![config::OutputFields::File, config::OutputFields::Directory],
         };
@@ -192,12 +151,12 @@ mod tests {
             Some("/home/user/project/source.o"),
         );
 
-        assert!(sut.unique(&entry1));
-        assert!(!sut.unique(&entry2));
+        assert!(sut.accept(&entry1));
+        assert!(!sut.accept(&entry2));
     }
 
     #[test]
-    fn test_is_duplicate_with_output_field() {
+    fn test_accept_distinguishes_by_output() {
         let config = config::DuplicateFilter { match_on: vec![config::OutputFields::Output] };
         let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
@@ -214,12 +173,12 @@ mod tests {
             Some("/home/user/project/test.o"),
         );
 
-        assert!(sut.unique(&entry1));
-        assert!(sut.unique(&entry2));
+        assert!(sut.accept(&entry1));
+        assert!(sut.accept(&entry2));
     }
 
     #[test]
-    fn test_is_duplicate_with_arguments_field() {
+    fn test_accept_distinguishes_by_arguments() {
         let config = config::DuplicateFilter { match_on: vec![config::OutputFields::Arguments] };
         let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
 
@@ -236,87 +195,7 @@ mod tests {
             Some("/home/user/project/source.o"),
         );
 
-        assert!(sut.unique(&entry1));
-        assert!(sut.unique(&entry2));
-    }
-
-    // --- Pipeline writer tests with CollectingWriter ---
-
-    #[test]
-    fn test_unique_writer_filters_duplicates_with_collecting_writer() {
-        use crate::output::statistics::OutputStatistics;
-        use crate::output::writers::fixtures::CollectingWriter;
-        use std::sync::atomic::Ordering;
-
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let config = config::DuplicateFilter {
-            match_on: vec![config::OutputFields::File, config::OutputFields::Directory],
-        };
-
-        let sut = UniqueOutputWriter::create(writer, config, Arc::clone(&stats)).unwrap();
-
-        let entries = vec![
-            Entry::from_arguments_str("file1.c", vec!["gcc", "-c"], "/project", None),
-            Entry::from_arguments_str("file1.c", vec!["gcc", "-c", "-Wall"], "/project", None), // dup
-            Entry::from_arguments_str("file2.c", vec!["gcc", "-c"], "/project", None),
-            Entry::from_arguments_str("file1.c", vec!["gcc", "-c", "-O2"], "/project", None), // dup
-        ];
-
-        sut.write(entries.into_iter()).unwrap();
-
-        let result = collected.lock().unwrap();
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].file, std::path::PathBuf::from("file1.c"));
-        assert_eq!(result[1].file, std::path::PathBuf::from("file2.c"));
-        assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 2);
-    }
-
-    #[test]
-    fn test_unique_writer_preserves_order() {
-        use crate::output::statistics::OutputStatistics;
-        use crate::output::writers::fixtures::CollectingWriter;
-
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::File] };
-
-        let sut = UniqueOutputWriter::create(writer, config, Arc::clone(&stats)).unwrap();
-
-        let entries = vec![
-            Entry::from_arguments_str("c.c", vec!["gcc", "-c"], "/project", None),
-            Entry::from_arguments_str("a.c", vec!["gcc", "-c"], "/project", None),
-            Entry::from_arguments_str("b.c", vec!["gcc", "-c"], "/project", None),
-        ];
-
-        sut.write(entries.into_iter()).unwrap();
-
-        let result = collected.lock().unwrap();
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0].file, std::path::PathBuf::from("c.c"));
-        assert_eq!(result[1].file, std::path::PathBuf::from("a.c"));
-        assert_eq!(result[2].file, std::path::PathBuf::from("b.c"));
-    }
-
-    #[test]
-    fn test_is_unique() {
-        let config = config::DuplicateFilter { match_on: vec![config::OutputFields::File] };
-        let mut sut = DuplicateEntryFilter::try_from(config).unwrap();
-
-        let entry1 = Entry::from_arguments_str(
-            "/home/user/project/source.c",
-            vec!["cc", "-c", "source.c"],
-            "/home/user/project",
-            Some("/home/user/project/source.o"),
-        );
-        let entry2 = Entry::from_arguments_str(
-            "/home/user/project/source.c",
-            vec!["cc", "-c", "-Wall", "source.c"],
-            "/home/user/project",
-            Some("/home/user/project/source.o"),
-        );
-
-        assert!(sut.unique(&entry1));
-        assert!(!sut.unique(&entry2));
+        assert!(sut.accept(&entry1));
+        assert!(sut.accept(&entry2));
     }
 }
