@@ -7,7 +7,6 @@ use crate::environment::{KEY_INTERCEPT_STATE, KEY_OS__PATH};
 use crate::environment::{KEY_OS__MACOS_FLAT_NAMESPACE, KEY_OS__MACOS_PRELOAD_PATH};
 use crate::installation::InstallationLayout;
 use crate::intercept::supervise;
-use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, context};
 use std::collections::HashMap;
 use std::env::JoinPathsError;
@@ -92,6 +91,7 @@ impl BuildEnvironment {
         intercept: &config::Intercept,
         compilers: &[config::Compiler],
         address: SocketAddr,
+        is_compiler: impl Fn(&Path) -> bool,
     ) -> Result<Self, ConfigurationError> {
         match intercept {
             config::Intercept::Wrapper => {
@@ -100,7 +100,7 @@ impl BuildEnvironment {
                     .filter(|compiler| !compiler.ignore)
                     .map(|compiler| compiler.path.clone())
                     .collect();
-                Self::create_as_wrapper(context, &executables, address)
+                Self::create_as_wrapper(context, &executables, address, is_compiler)
             }
             config::Intercept::Preload => Self::create_as_preload(context, address),
         }
@@ -149,6 +149,7 @@ impl BuildEnvironment {
         context: &context::Context,
         executables: &[std::path::PathBuf],
         address: SocketAddr,
+        is_compiler: impl Fn(&Path) -> bool,
     ) -> Result<Self, ConfigurationError> {
         let layout = InstallationLayout::try_from(context.current_executable.as_path())
             .map_err(ConfigurationError::InstallationLayout)?;
@@ -179,10 +180,7 @@ impl BuildEnvironment {
 
         // PATH-based discovery (only if no config executables)
         if executables.is_empty() {
-            let compiler_recognizer = CompilerRecognizer::new();
-            let predicate = |path: &Path| -> bool { compiler_recognizer.recognize(path).is_some() };
-
-            for candidate in Self::compiler_candidates(context, predicate) {
+            for candidate in Self::compiler_candidates(context, is_compiler) {
                 wrapper_dir_builder.register_executable(candidate)?;
             }
         }
@@ -566,7 +564,7 @@ mod test {
             let compilers = vec![];
             let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
-            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+            BuildEnvironment::create(&context, &intercept, &compilers, address, |_| true).unwrap()
         };
 
         let libdir = env!("INTERCEPT_LIBDIR");
@@ -624,7 +622,7 @@ mod test {
                 }
             };
 
-            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+            BuildEnvironment::create(&context, &intercept, &compilers, address, |_| true).unwrap()
         };
 
         // Check that PATH is updated (should contain .bear directory at the beginning)
@@ -675,7 +673,7 @@ mod test {
                 }
             };
 
-            BuildEnvironment::create(&context, &intercept, &compilers, address).unwrap()
+            BuildEnvironment::create(&context, &intercept, &compilers, address, |_| true).unwrap()
         };
 
         // Check that PATH is updated (should contain .bear directory at the beginning)
@@ -761,10 +759,17 @@ mod test {
 
             let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
+            let known_compilers = ["gcc", "g++", "clang", "gcc.exe", "g++.exe", "clang.exe"];
             BuildEnvironment::create_as_wrapper(
                 &context,
                 &[], // Empty executables - should trigger PATH discovery
                 address,
+                |path| {
+                    path.file_name()
+                        .and_then(|n| n.to_str())
+                        .map(|n| known_compilers.contains(&n))
+                        .unwrap_or(false)
+                },
             )
         };
 
@@ -857,7 +862,13 @@ mod test {
             let custom_compiler =
                 config::Compiler { path: PathBuf::from("/usr/bin/custom-gcc"), as_: None, ignore: false };
 
-            BuildEnvironment::create(&context, &config::Intercept::Wrapper, &[custom_compiler], address)
+            BuildEnvironment::create(
+                &context,
+                &config::Intercept::Wrapper,
+                &[custom_compiler],
+                address,
+                |_| true,
+            )
         };
 
         assert!(sut.is_ok(), "Should succeed with explicit executables");

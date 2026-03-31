@@ -10,6 +10,7 @@ mod execution;
 
 use crate::intercept::environment;
 use crate::intercept::tcp::CollectorOnTcp;
+use crate::semantic::interpreters::compilers::compiler_recognition::CompilerRecognizer;
 use crate::{args, config, context, output};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -50,11 +51,13 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
+                let recognizer = CompilerRecognizer::new();
                 let build = environment::BuildEnvironment::create(
                     &context,
                     &config.intercept,
                     &config.compilers,
                     address,
+                    |path| recognizer.recognize(path).is_some(),
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
@@ -87,11 +90,13 @@ impl Mode {
                 let (producer, address) =
                     CollectorOnTcp::new().map_err(ConfigurationError::CollectorCreation)?;
 
+                let recognizer = CompilerRecognizer::new();
                 let build = environment::BuildEnvironment::create(
                     &context,
                     &config.intercept,
                     &config.compilers,
                     address,
+                    |path| recognizer.recognize(path).is_some(),
                 )
                 .map_err(ConfigurationError::ExecutorCreation)?;
 
