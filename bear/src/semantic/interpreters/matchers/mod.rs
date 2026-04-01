@@ -78,6 +78,12 @@ impl FlagMatch {
     }
 }
 
+/// Check if `arg` starts with `prefix` followed by '='.
+/// Zero-allocation alternative to `arg.starts_with(&format!("{}=", prefix))`.
+fn starts_with_eq(arg: &str, prefix: &str) -> bool {
+    arg.len() > prefix.len() && arg.as_bytes()[prefix.len()] == b'=' && arg.starts_with(prefix)
+}
+
 /// A flag matcher that contains flag definitions for a specific compiler
 pub(super) struct FlagAnalyzer {
     /// All flag definitions, sorted by priority (longer flags first for better matching)
@@ -134,7 +140,7 @@ impl FlagAnalyzer {
             }
 
             FlagPattern::ExactlyWithEq(_) => {
-                if current_arg.starts_with(&format!("{}=", flag)) {
+                if starts_with_eq(current_arg, flag) {
                     // Flag with value glued with = (required)
                     Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                 } else {
@@ -149,7 +155,7 @@ impl FlagAnalyzer {
                         rule: definition.clone(),
                         consumed_args: vec![current_arg.clone(), args[1].clone()],
                     })
-                } else if current_arg.starts_with(&format!("{}=", flag)) {
+                } else if starts_with_eq(current_arg, flag) {
                     // Flag with value glued with = (required)
                     Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
                 } else {
