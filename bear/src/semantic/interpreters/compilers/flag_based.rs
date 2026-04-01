@@ -103,32 +103,25 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 
         // Try to match against flag definitions first (handles both -flags and @response files)
         if let Some(match_result) = flag_analyzer.match_flag(remaining_args) {
-            let consumed_count = match_result.consumed_args_count();
+            let consumed_count = match_result.consumed_count;
+            let consumed_slice = &args[i..i + consumed_count];
             let arg: Box<dyn Arguments> = match match_result.rule.kind {
-                ArgumentKind::Compiler => Box::new(OtherArguments::new(
-                    vec![match_result.consumed_args[0].clone()],
-                    ArgumentKind::Compiler,
-                )),
+                ArgumentKind::Compiler => {
+                    Box::new(OtherArguments::new(vec![consumed_slice[0].clone()], ArgumentKind::Compiler))
+                }
                 ArgumentKind::Source { .. } => {
                     unreachable!("Source files should be detected by heuristic, not flag matching")
                 }
-                ArgumentKind::Output => match match_result.consumed_args_count() {
-                    1 => Box::new(OutputArgument::new(
-                        "-o".to_string(),
-                        match_result.consumed_args[0][2..].to_string(),
-                    )),
-                    2 => Box::new(OutputArgument::new(
-                        match_result.consumed_args[0].clone(),
-                        match_result.consumed_args[1].clone(),
-                    )),
+                ArgumentKind::Output => match consumed_count {
+                    1 => Box::new(OutputArgument::new("-o".to_string(), consumed_slice[0][2..].to_string())),
+                    2 => Box::new(OutputArgument::new(consumed_slice[0].clone(), consumed_slice[1].clone())),
                     _ => {
                         unreachable!("Output file should be specified either `-o file` or `-ofile`")
                     }
                 },
-                ArgumentKind::Other(compiler_pass) => Box::new(OtherArguments::new(
-                    match_result.consumed_args,
-                    ArgumentKind::Other(compiler_pass),
-                )),
+                ArgumentKind::Other(compiler_pass) => {
+                    Box::new(OtherArguments::new(consumed_slice.to_vec(), ArgumentKind::Other(compiler_pass)))
+                }
             };
 
             result.push(arg);

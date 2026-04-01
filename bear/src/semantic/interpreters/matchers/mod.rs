@@ -61,21 +61,16 @@ pub(super) struct FlagRule {
     pub kind: ArgumentKind,
 }
 
-/// Result of matching a flag against command line arguments
+/// Result of matching a flag against command line arguments.
+/// Contains only metadata (which rule matched and how many args it consumed),
+/// avoiding string clones in the matching phase.
 #[derive(Debug, Clone)]
 pub(super) struct FlagMatch {
     /// The flag definition that matched
     pub rule: FlagRule,
 
-    /// The arguments consumed from the command line
-    pub consumed_args: Vec<String>,
-}
-
-impl FlagMatch {
-    /// Get the number of arguments consumed (derived from consumed_args.len())
-    pub fn consumed_args_count(&self) -> usize {
-        self.consumed_args.len()
-    }
+    /// Number of arguments consumed from the command line (including the flag itself)
+    pub consumed_count: usize,
 }
 
 /// Check if `arg` starts with `prefix` followed by '='.
@@ -124,13 +119,9 @@ impl FlagAnalyzer {
                 let required_args = *required_count as usize;
                 if current_arg == flag {
                     if required_args == 0 {
-                        // No additional arguments required
-                        Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
+                        Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                     } else if args.len() > required_args {
-                        // Has required separate arguments
-                        let mut consumed = vec![current_arg.clone()];
-                        consumed.extend(args.iter().take(required_args + 1).skip(1).cloned());
-                        Some(FlagMatch { rule: definition.clone(), consumed_args: consumed })
+                        Some(FlagMatch { rule: definition.clone(), consumed_count: 1 + required_args })
                     } else {
                         None
                     }
@@ -141,8 +132,7 @@ impl FlagAnalyzer {
 
             FlagPattern::ExactlyWithEq(_) => {
                 if starts_with_eq(current_arg, flag) {
-                    // Flag with value glued with = (required)
-                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                 } else {
                     None
                 }
@@ -150,14 +140,9 @@ impl FlagAnalyzer {
 
             FlagPattern::ExactlyWithEqOrSep(_) => {
                 if current_arg == flag && args.len() > 1 {
-                    // Has separate argument (required)
-                    Some(FlagMatch {
-                        rule: definition.clone(),
-                        consumed_args: vec![current_arg.clone(), args[1].clone()],
-                    })
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 2 })
                 } else if starts_with_eq(current_arg, flag) {
-                    // Flag with value glued with = (required)
-                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                 } else {
                     None
                 }
@@ -165,14 +150,9 @@ impl FlagAnalyzer {
 
             FlagPattern::ExactlyWithGluedOrSep(_) => {
                 if current_arg == flag && args.len() > 1 {
-                    // Has separate argument (required)
-                    Some(FlagMatch {
-                        rule: definition.clone(),
-                        consumed_args: vec![current_arg.clone(), args[1].clone()],
-                    })
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 2 })
                 } else if current_arg.starts_with(flag) && current_arg.len() > flag.len() {
-                    // Flag with value glued (no separator, required)
-                    Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                 } else {
                     None
                 }
@@ -183,32 +163,17 @@ impl FlagAnalyzer {
                     let required_args = *required_count as usize;
 
                     if required_args == 0 {
-                        // No additional arguments required
-                        Some(FlagMatch { rule: definition.clone(), consumed_args: vec![current_arg.clone()] })
+                        Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                     } else if args.len() > required_args {
-                        // Check if we have enough additional arguments and they don't start with '-'
-                        let mut all_args_valid = true;
-                        for arg in args.iter().take(required_args + 1).skip(1) {
-                            if arg.starts_with('-') {
-                                all_args_valid = false;
-                                break;
-                            }
-                        }
+                        let all_args_valid =
+                            args.iter().take(required_args + 1).skip(1).all(|arg| !arg.starts_with('-'));
 
                         if all_args_valid {
-                            // Consume the flag plus required additional arguments
-                            let mut consumed = vec![current_arg.clone()];
-                            consumed.extend(args.iter().take(required_args + 1).skip(1).cloned());
-                            Some(FlagMatch { rule: definition.clone(), consumed_args: consumed })
+                            Some(FlagMatch { rule: definition.clone(), consumed_count: 1 + required_args })
                         } else {
-                            // Fall back to consuming just the flag if additional args start with '-'
-                            Some(FlagMatch {
-                                rule: definition.clone(),
-                                consumed_args: vec![current_arg.clone()],
-                            })
+                            Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                         }
                     } else {
-                        // Not enough arguments for patterns requiring 2+ additional args
                         None
                     }
                 } else {
@@ -268,8 +233,7 @@ mod tests {
         let args = vec!["-c".to_string()];
         let result = matcher.match_flag(&args).unwrap();
 
-        assert_eq!(result.consumed_args_count(), 1);
-        assert_eq!(result.consumed_args, vec!["-c"]);
+        assert_eq!(result.consumed_count, 1);
     }
 
     #[test]
@@ -279,14 +243,12 @@ mod tests {
         // Test glued with =
         let args = vec!["-std=c99".to_string()];
         let result = matcher.match_flag(&args).unwrap();
-        assert_eq!(result.consumed_args_count(), 1);
-        assert_eq!(result.consumed_args, vec!["-std=c99"]);
+        assert_eq!(result.consumed_count, 1);
 
         // Test separate form
         let args = vec!["-std".to_string(), "c99".to_string()];
         let result = matcher.match_flag(&args).unwrap();
-        assert_eq!(result.consumed_args_count(), 2);
-        assert_eq!(result.consumed_args, vec!["-std", "c99"]);
+        assert_eq!(result.consumed_count, 2);
     }
 
     #[test]
@@ -296,14 +258,12 @@ mod tests {
         // Test glued form
         let args = vec!["-I/usr/include".to_string()];
         let result = matcher.match_flag(&args).unwrap();
-        assert_eq!(result.consumed_args_count(), 1);
-        assert_eq!(result.consumed_args, vec!["-I/usr/include"]);
+        assert_eq!(result.consumed_count, 1);
 
         // Test separate form
         let args = vec!["-I".to_string(), "/usr/include".to_string()];
         let result = matcher.match_flag(&args).unwrap();
-        assert_eq!(result.consumed_args_count(), 2);
-        assert_eq!(result.consumed_args, vec!["-I", "/usr/include"]);
+        assert_eq!(result.consumed_count, 2);
 
         // Test flag only (should not match since -I requires an argument)
         let args = vec!["-I".to_string()];
@@ -317,8 +277,7 @@ mod tests {
 
         let args = vec!["-Wall".to_string()];
         let result = matcher.match_flag(&args).unwrap();
-        assert_eq!(result.consumed_args_count(), 1);
-        assert_eq!(result.consumed_args, vec!["-Wall"]);
+        assert_eq!(result.consumed_count, 1);
     }
 
     #[test]
