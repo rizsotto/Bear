@@ -86,7 +86,7 @@ fn parse_arguments_and_environment(
 
 /// Parse command line arguments using the provided flag analyzer.
 fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn Arguments>> {
-    let mut result: Vec<Box<dyn Arguments>> = Vec::new();
+    let mut result: Vec<Box<dyn Arguments>> = Vec::with_capacity(args.len());
     let mut i = 0;
 
     while i < args.len() {
@@ -155,7 +155,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 ///
 /// https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
 fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Box<dyn Arguments>> {
-    let mut args: Vec<Box<dyn Arguments>> = Vec::new();
+    let mut args: Vec<Box<dyn Arguments>> = Vec::with_capacity(4);
 
     // Process the three GCC include environment variables that use -I
     for env_key in [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3] {
