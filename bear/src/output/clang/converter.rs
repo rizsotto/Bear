@@ -50,7 +50,7 @@
 use super::Entry;
 use super::path_format::{ConfigurablePathFormatter, PathFormatter};
 use crate::config;
-use crate::semantic::{ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, PassEffect};
+use crate::semantic::{Argument, ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
 use log::warn;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -103,15 +103,15 @@ impl CommandConverter {
         // Create one entry per source argument (only non-binary source files)
         cmd.arguments
             .iter()
-            .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
-            .filter_map(|source_arg| {
+            .enumerate()
+            .filter(|(_, arg)| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
+            .filter_map(|(source_idx, source_arg)| {
                 // Get and format source file
                 let path_updater: &dyn Fn(&Path) -> Cow<Path> = &|path: &Path| Cow::Borrowed(path);
                 let source_file_path = source_arg.as_file(path_updater)?;
                 let formatted_source_file = self.format_source_file(&formatted_directory, &source_file_path);
 
-                let command_args =
-                    self.build_command_args_for_source(cmd, source_arg.as_ref(), &formatted_directory);
+                let command_args = self.build_command_args_for_source(cmd, source_idx, &formatted_directory);
 
                 if self.format.use_array_format {
                     Some(Entry::with_arguments(
@@ -148,11 +148,7 @@ impl CommandConverter {
     /// Creates the output file path if the format includes output fields.
     ///
     /// Returns `Some(output_path)` if output should be included and found, `None` otherwise.
-    fn create_output_file(
-        &self,
-        formatted_directory: &Path,
-        arguments: &[Box<dyn Arguments>],
-    ) -> Option<PathBuf> {
+    fn create_output_file(&self, formatted_directory: &Path, arguments: &[Argument]) -> Option<PathBuf> {
         if !self.format.include_output_field {
             return None;
         }
@@ -194,16 +190,14 @@ impl CommandConverter {
     fn build_command_args_for_source(
         &self,
         cmd: &CompilerCommand,
-        source_arg: &dyn Arguments,
+        source_arg_idx: usize,
         formatted_directory: &Path,
     ) -> Vec<String> {
-        // Start with the executable
         let mut command_args = vec![];
 
-        // Add all non-source arguments, while handling source file placement
-        for arg in &cmd.arguments {
-            // Skip this specific source argument (using pointer equality)
-            if matches!(arg.kind(), ArgumentKind::Source { .. }) && !std::ptr::eq(arg.as_ref(), source_arg) {
+        for (idx, arg) in cmd.arguments.iter().enumerate() {
+            // Skip other source arguments (not the one we're building for)
+            if matches!(arg.kind(), ArgumentKind::Source { .. }) && idx != source_arg_idx {
                 continue;
             }
 
@@ -262,10 +256,7 @@ impl CommandConverter {
     ///
     /// This method filters arguments by their kind and returns their values as strings.
     /// For `ArgumentKind::Source`, this matches any source regardless of the `binary` flag.
-    fn find_arguments_by_kind(
-        cmd: &CompilerCommand,
-        kind: ArgumentKind,
-    ) -> impl Iterator<Item = &Box<dyn Arguments>> {
+    fn find_arguments_by_kind(cmd: &CompilerCommand, kind: ArgumentKind) -> impl Iterator<Item = &Argument> {
         cmd.arguments.iter().filter(move |arg| {
             match (arg.kind(), kind) {
                 // For Source, match any source regardless of binary flag
@@ -296,7 +287,7 @@ impl CommandConverter {
 
         // Find all source arguments (using binary: false as a placeholder, find_arguments_by_kind matches any source)
         let source_arguments = Self::find_arguments_by_kind(cmd, ArgumentKind::Source { binary: false })
-            .collect::<Vec<&Box<dyn Arguments>>>();
+            .collect::<Vec<&Argument>>();
 
         // If no source files found, skip entry generation
         if source_arguments.is_empty() {
@@ -370,7 +361,7 @@ mod tests {
     use super::super::path_format::{FormatError, MockPathFormatter};
     use super::*;
     use crate::config::{EntryFormat, Format, PathFormat, PathResolver};
-    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
+    use crate::semantic::{ArgumentKind, CompilerCommand, CompilerPass, PassEffect};
     use std::io;
 
     #[test]

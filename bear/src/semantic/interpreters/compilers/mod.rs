@@ -6,7 +6,6 @@
 //! GCC, Clang, CUDA, and Fortran compilers, as well as support for compiler
 //! wrappers like ccache, distcc, and sccache.
 
-pub mod arguments;
 pub mod compiler_recognition;
 mod flag_based;
 pub mod wrapper;

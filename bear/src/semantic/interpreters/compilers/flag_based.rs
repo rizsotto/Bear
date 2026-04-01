@@ -8,12 +8,11 @@
 //! the need for per-compiler structs and trait implementations.
 
 use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
-use super::arguments::{OtherArguments, OutputArgument, SourceArgument};
 use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
 };
 use crate::semantic::{
-    ArgumentKind, Arguments, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
+    Argument, ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -74,10 +73,7 @@ impl Interpreter for FlagBasedInterpreter {
 }
 
 /// Parse both command-line arguments and environment variables to generate complete argument list.
-fn parse_arguments_and_environment(
-    flag_analyzer: &FlagAnalyzer,
-    execution: &Execution,
-) -> Vec<Box<dyn Arguments>> {
+fn parse_arguments_and_environment(flag_analyzer: &FlagAnalyzer, execution: &Execution) -> Vec<Argument> {
     let mut args = parse_arguments(flag_analyzer, &execution.arguments);
     let env_args = parse_environment(&execution.environment);
     args.extend(env_args);
@@ -85,8 +81,8 @@ fn parse_arguments_and_environment(
 }
 
 /// Parse command line arguments using the provided flag analyzer.
-fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn Arguments>> {
-    let mut result: Vec<Box<dyn Arguments>> = Vec::with_capacity(args.len());
+fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Argument> {
+    let mut result: Vec<Argument> = Vec::with_capacity(args.len());
     let mut i = 0;
 
     while i < args.len() {
@@ -94,7 +90,7 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 
         // Handle the first argument (compiler name)
         if i == 0 {
-            result.push(Box::new(OtherArguments::new(vec![args[0].clone()], ArgumentKind::Compiler)));
+            result.push(Argument::Other { arguments: vec![args[0].clone()], kind: ArgumentKind::Compiler });
             i += 1;
             continue;
         }
@@ -105,38 +101,41 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
         if let Some(match_result) = flag_analyzer.match_flag(remaining_args) {
             let consumed_count = match_result.consumed_count;
             let consumed_slice = &args[i..i + consumed_count];
-            let arg: Box<dyn Arguments> = match match_result.rule.kind {
-                ArgumentKind::Compiler => {
-                    Box::new(OtherArguments::new(vec![consumed_slice[0].clone()], ArgumentKind::Compiler))
-                }
+            let arg = match match_result.rule.kind {
+                ArgumentKind::Compiler => Argument::Other {
+                    arguments: vec![consumed_slice[0].clone()],
+                    kind: ArgumentKind::Compiler,
+                },
                 ArgumentKind::Source { .. } => {
                     unreachable!("Source files should be detected by heuristic, not flag matching")
                 }
                 ArgumentKind::Output => match consumed_count {
-                    1 => Box::new(OutputArgument::new("-o".to_string(), consumed_slice[0][2..].to_string())),
-                    2 => Box::new(OutputArgument::new(consumed_slice[0].clone(), consumed_slice[1].clone())),
+                    1 => {
+                        Argument::Output { flag: "-o".to_string(), path: consumed_slice[0][2..].to_string() }
+                    }
+                    2 => {
+                        Argument::Output { flag: consumed_slice[0].clone(), path: consumed_slice[1].clone() }
+                    }
                     _ => {
                         unreachable!("Output file should be specified either `-o file` or `-ofile`")
                     }
                 },
-                ArgumentKind::Other(compiler_pass) => {
-                    Box::new(OtherArguments::new(consumed_slice.to_vec(), ArgumentKind::Other(compiler_pass)))
-                }
+                ArgumentKind::Other(compiler_pass) => Argument::Other {
+                    arguments: consumed_slice.to_vec(),
+                    kind: ArgumentKind::Other(compiler_pass),
+                },
             };
 
             result.push(arg);
             i += consumed_count;
+        } else if current_arg.starts_with('-') {
+            result.push(Argument::Other {
+                arguments: vec![current_arg.clone()],
+                kind: ArgumentKind::Other(PassEffect::None),
+            });
+            i += 1;
         } else {
-            if current_arg.starts_with('-') {
-                // Unknown flag - treat as simple flag
-                result.push(Box::new(OtherArguments::new(
-                    vec![current_arg.clone()],
-                    ArgumentKind::Other(PassEffect::None),
-                )));
-            } else {
-                // non-flag argument (e.g., source files, object files, libraries)
-                result.push(Box::new(SourceArgument::new(current_arg.clone())));
-            }
+            result.push(Argument::new_source(current_arg.clone()));
             i += 1;
         }
     }
@@ -147,31 +146,29 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Box<dyn
 /// Parse include directories from GCC-compatible environment variables.
 ///
 /// https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
-fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Box<dyn Arguments>> {
-    let mut args: Vec<Box<dyn Arguments>> = Vec::with_capacity(4);
+fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Argument> {
+    let mut args: Vec<Argument> = Vec::with_capacity(4);
 
-    // Process the three GCC include environment variables that use -I
     for env_key in [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3] {
         if let Some(env_value) = environment.get(env_key) {
             for path in std::env::split_paths(env_value) {
                 if !path.as_os_str().is_empty() {
-                    args.push(Box::new(OtherArguments::new(
-                        vec!["-I".to_string(), path.to_string_lossy().to_string()],
-                        ArgumentKind::Other(PassEffect::None),
-                    )));
+                    args.push(Argument::Other {
+                        arguments: vec!["-I".to_string(), path.to_string_lossy().to_string()],
+                        kind: ArgumentKind::Other(PassEffect::None),
+                    });
                 }
             }
         }
     }
 
-    // Process OBJC_INCLUDE_PATH which uses -isystem
     if let Some(env_value) = environment.get(KEY_GCC__OBJC_INCLUDE) {
         for path in std::env::split_paths(env_value) {
             if !path.as_os_str().is_empty() {
-                args.push(Box::new(OtherArguments::new(
-                    vec!["-isystem".to_string(), path.to_string_lossy().to_string()],
-                    ArgumentKind::Other(PassEffect::None),
-                )));
+                args.push(Argument::Other {
+                    arguments: vec!["-isystem".to_string(), path.to_string_lossy().to_string()],
+                    kind: ArgumentKind::Other(PassEffect::None),
+                });
             }
         }
     }

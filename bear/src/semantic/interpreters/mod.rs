@@ -7,7 +7,7 @@
 mod combinators;
 pub mod compilers;
 mod ignore;
-mod matchers;
+pub(crate) mod matchers;
 pub mod resolve;
 
 use super::Interpreter;
