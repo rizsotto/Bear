@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, CompilerCommand, PassEffect};
+use super::{Argument, ArgumentKind, Command, PassEffect};
 use std::path::PathBuf;
 
-impl CompilerCommand {
-    /// Create a CompilerCommand from string arguments for testing.
+impl Command {
+    /// Create a Command from string arguments for testing.
     pub fn from_strings(
         working_dir: &str,
         executable: &str,
@@ -31,7 +31,7 @@ impl CompilerCommand {
     }
 
     /// Compare two CompilerCommands by their arguments for testing.
-    pub fn has_same_arguments(&self, other: &CompilerCommand) -> bool {
+    pub fn has_same_arguments(&self, other: &Command) -> bool {
         self.arguments == other.arguments
     }
 }
@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_compiler_command_comparison() {
-        let cmd1 = CompilerCommand::from_strings(
+        let cmd1 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -53,7 +53,7 @@ mod tests {
             ],
         );
 
-        let cmd2 = CompilerCommand::from_strings(
+        let cmd2 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -62,7 +62,7 @@ mod tests {
             ],
         );
 
-        let cmd3 = CompilerCommand::from_strings(
+        let cmd3 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -77,24 +77,21 @@ mod tests {
 
     #[test]
     fn test_arguments_with_different_kinds() {
-        let cmd1 = CompilerCommand::from_strings(
+        let cmd1 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],
         );
 
-        let cmd2 = CompilerCommand::from_strings(
-            "/home/user",
-            "/usr/bin/gcc",
-            vec![(ArgumentKind::Output, vec!["main.c"])],
-        );
+        let cmd2 =
+            Command::from_strings("/home/user", "/usr/bin/gcc", vec![(ArgumentKind::Output, vec!["main.c"])]);
 
         assert!(!cmd1.has_same_arguments(&cmd2));
     }
 
     #[test]
     fn test_arguments_with_different_lengths() {
-        let cmd1 = CompilerCommand::from_strings(
+        let cmd1 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -103,7 +100,7 @@ mod tests {
             ],
         );
 
-        let cmd2 = CompilerCommand::from_strings(
+        let cmd2 = Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![(ArgumentKind::Source { binary: false }, vec!["main.c"])],

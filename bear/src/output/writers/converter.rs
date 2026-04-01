@@ -8,7 +8,8 @@ use crate::{config, semantic};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-/// The type represents a converter that formats `semantic::Command` instances into `Entry` objects.
+/// Converts `semantic::Command` instances into compilation database `Entry` objects,
+/// tracking pipeline statistics.
 pub(crate) struct ConverterClangOutputWriter<T: IteratorWriter<clang::Entry>> {
     converter: clang::CommandConverter,
     writer: T,
@@ -24,17 +25,10 @@ impl<T: IteratorWriter<clang::Entry>> ConverterClangOutputWriter<T> {
 impl<T: IteratorWriter<clang::Entry>> IteratorWriter<semantic::Command> for ConverterClangOutputWriter<T> {
     fn write(self, semantics: impl Iterator<Item = semantic::Command>) -> Result<(), WriterError> {
         let stats = Arc::clone(&self.stats);
-        let stats_for_entries = Arc::clone(&self.stats);
 
-        // Count semantic commands as they flow in
-        let counted_semantics = semantics.inspect(move |_| {
-            stats.semantic_commands_received.fetch_add(1, Ordering::Relaxed);
-        });
-
-        // Convert and count entries produced
-        let entries = counted_semantics.flat_map(|semantic| self.converter.to_entries(&semantic));
+        let entries = semantics.flat_map(|cmd| self.converter.to_entries(&cmd));
         let counted_entries = entries.inspect(move |_| {
-            stats_for_entries.compilation_entries_produced.fetch_add(1, Ordering::Relaxed);
+            stats.compilation_entries_produced.fetch_add(1, Ordering::Relaxed);
         });
 
         self.writer.write(counted_entries)
@@ -46,12 +40,12 @@ mod tests {
     use super::*;
     use crate::output::statistics::OutputStatistics;
     use crate::output::writers::fixtures::CollectingWriter;
-    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
+    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::path::PathBuf;
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> Command {
-        Command::Compiler(CompilerCommand::from_strings(
+        Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -59,33 +53,29 @@ mod tests {
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source { binary: false }, vec![file]),
             ],
-        ))
-    }
-
-    fn make_ignored_command() -> Command {
-        Command::Ignored("/usr/bin/ls")
+        )
     }
 
     fn make_preprocessing_command() -> Command {
-        Command::Compiler(CompilerCommand::from_strings(
+        Command::from_strings(
             "/home/user",
             "gcc",
             vec![
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing)), vec!["-E"]),
                 (ArgumentKind::Source { binary: false }, vec!["main.c"]),
             ],
-        ))
+        )
     }
 
     fn make_link_only_command() -> Command {
-        Command::Compiler(CompilerCommand::from_strings(
+        Command::from_strings(
             "/home/user",
             "gcc",
             vec![
                 (ArgumentKind::Source { binary: true }, vec!["main.o"]),
                 (ArgumentKind::Output, vec!["-o", "program"]),
             ],
-        ))
+        )
     }
 
     #[test]
@@ -103,7 +93,6 @@ mod tests {
 
         sut.write(commands.into_iter()).unwrap();
 
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 3);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 3);
 
         let entries = collected.lock().unwrap();
@@ -111,25 +100,6 @@ mod tests {
         assert_eq!(entries[0].file, PathBuf::from("file1.c"));
         assert_eq!(entries[1].file, PathBuf::from("file2.c"));
         assert_eq!(entries[2].file, PathBuf::from("file3.c"));
-    }
-
-    #[test]
-    fn test_statistics_counting_ignored_commands() {
-        let stats = OutputStatistics::new();
-        let (writer, collected) = CollectingWriter::new();
-        let format = config::Format::default();
-        let sut = ConverterClangOutputWriter::new(writer, &format, Arc::clone(&stats));
-
-        let commands =
-            vec![make_compile_command("file1.c"), make_ignored_command(), make_compile_command("file2.c")];
-
-        sut.write(commands.into_iter()).unwrap();
-
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 3);
-        assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 2);
-
-        let entries = collected.lock().unwrap();
-        assert_eq!(entries.len(), 2);
     }
 
     #[test]
@@ -143,7 +113,6 @@ mod tests {
 
         sut.write(commands.into_iter()).unwrap();
 
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 0);
     }
 
@@ -156,7 +125,6 @@ mod tests {
 
         sut.write(std::iter::empty()).unwrap();
 
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 0);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 0);
     }
 }

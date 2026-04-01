@@ -12,8 +12,7 @@ use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
 };
 use crate::semantic::{
-    Argument, ArgumentKind, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
-    RecognizeResult,
+    Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -70,7 +69,7 @@ impl Interpreter for FlagBasedInterpreter {
         let mut all_args = annotated_args;
         all_args.extend(env_args);
 
-        RecognizeResult::Recognized(CompilerCommand::new(working_dir, executable, all_args))
+        RecognizeResult::Recognized(Command::new(working_dir, executable, all_args))
     }
 }
 

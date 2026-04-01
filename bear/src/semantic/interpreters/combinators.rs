@@ -68,7 +68,7 @@ impl<T: Interpreter> Interpreter for OutputLogger<T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::semantic::CompilerCommand;
+    use crate::semantic::Command;
     use crate::semantic::MockInterpreter;
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -115,7 +115,7 @@ mod test {
     }
 
     fn command_fixture() -> RecognizeResult {
-        RecognizeResult::Recognized(CompilerCommand::new(PathBuf::new(), PathBuf::new(), vec![]))
+        RecognizeResult::Recognized(Command::new(PathBuf::new(), PathBuf::new(), vec![]))
     }
 
     #[test]

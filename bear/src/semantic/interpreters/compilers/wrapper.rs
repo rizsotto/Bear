@@ -115,17 +115,35 @@ impl WrapperInterpreter {
 }
 
 impl Interpreter for WrapperInterpreter {
+    /// Unwraps a compiler wrapper invocation and delegates to the real compiler's interpreter.
+    ///
+    /// Wrapper tools (ccache, distcc, sccache) sit between the build system and the
+    /// real compiler: `ccache gcc -c main.c`. This method:
+    ///
+    /// 1. Detects the wrapper by executable name (ccache, distcc, sccache).
+    /// 2. Extracts the real compiler path and its arguments, stripping wrapper-specific
+    ///    flags (e.g. distcc's `-j 4`).
+    /// 3. Validates the real compiler is a known compiler type (not another wrapper,
+    ///    to prevent infinite recursion in `ccache distcc gcc` chains).
+    /// 4. Builds a new Execution with the real compiler as executable, moving the
+    ///    working directory and environment from the original execution.
+    /// 5. Delegates to the parent CompilerInterpreter (via weak reference) to parse
+    ///    the real compiler's flags with the appropriate flag table.
     fn recognize(&self, execution: Execution) -> RecognizeResult {
+        // 1. Is the executable a known wrapper?
         let Some(wrapper_name) = Self::detect_wrapper_name(&execution.executable) else {
             return RecognizeResult::NotRecognized(execution);
         };
 
+        // 2. Extract the real compiler and its arguments from the wrapper invocation.
         let Some((real_compiler_path, filtered_args)) =
             self.extract_real_compiler(&wrapper_name, &execution.arguments)
         else {
             return RecognizeResult::NotRecognized(execution);
         };
 
+        // 3. Verify the extracted compiler is a real compiler, not another wrapper.
+        //    (Prevents infinite delegation for `ccache distcc gcc ...`.)
         let Some(recognizer) = self.recognizer.upgrade() else {
             return RecognizeResult::NotRecognized(execution);
         };
@@ -136,18 +154,16 @@ impl Interpreter for WrapperInterpreter {
             return RecognizeResult::NotRecognized(execution);
         }
 
+        // 4-5. Rebuild the execution with the real compiler and delegate.
         let Some(delegate) = self.delegate.upgrade() else {
             return RecognizeResult::NotRecognized(execution);
         };
-
-        // Move working_dir and environment from original execution
         let real_execution = Execution {
             executable: real_compiler_path,
             arguments: filtered_args,
             working_dir: execution.working_dir,
             environment: execution.environment,
         };
-
         delegate.recognize(real_execution)
     }
 }
@@ -155,7 +171,7 @@ impl Interpreter for WrapperInterpreter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{CompilerCommand, MockInterpreter, RecognizeResult};
+    use crate::semantic::{Command, MockInterpreter, RecognizeResult};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -224,11 +240,7 @@ mod tests {
         let mock = {
             let mut mock = MockInterpreter::new();
             mock.expect_recognize().returning(|execution| {
-                RecognizeResult::Recognized(CompilerCommand::new(
-                    execution.working_dir,
-                    execution.executable,
-                    vec![],
-                ))
+                RecognizeResult::Recognized(Command::new(execution.working_dir, execution.executable, vec![]))
             });
 
             mock
@@ -258,11 +270,7 @@ mod tests {
         let mock = {
             let mut mock = MockInterpreter::new();
             mock.expect_recognize().returning(|execution| {
-                RecognizeResult::Recognized(CompilerCommand::new(
-                    execution.working_dir,
-                    execution.executable,
-                    vec![],
-                ))
+                RecognizeResult::Recognized(Command::new(execution.working_dir, execution.executable, vec![]))
             });
 
             mock
@@ -299,7 +307,7 @@ mod tests {
                         && execution.environment.get("CC") == Some(&"gcc".to_string())
                 })
                 .returning(|execution| {
-                    RecognizeResult::Recognized(CompilerCommand::new(
+                    RecognizeResult::Recognized(Command::new(
                         execution.working_dir,
                         execution.executable,
                         vec![],
@@ -334,7 +342,7 @@ mod tests {
                         && execution.arguments == vec!["gcc", "-c", "main.c", "-o", "main.o"]
                 })
                 .returning(|execution| {
-                    RecognizeResult::Recognized(CompilerCommand::new(
+                    RecognizeResult::Recognized(Command::new(
                         execution.working_dir,
                         execution.executable,
                         vec![],

@@ -87,11 +87,11 @@ pub enum WriterError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{ArgumentKind, Command, CompilerCommand, CompilerPass, PassEffect};
+    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> Command {
-        Command::Compiler(CompilerCommand::from_strings(
+        Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -99,7 +99,7 @@ mod tests {
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source { binary: false }, vec![file]),
             ],
-        ))
+        )
     }
 
     #[test]
@@ -111,22 +111,17 @@ mod tests {
 
         let writer = OutputWriter::try_from((&args, &config)).unwrap();
 
-        // Statistics should be accessible before write
         let stats = writer.statistics().clone();
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 0);
 
         let commands = vec![make_compile_command("main.c"), make_compile_command("util.c")];
 
         writer.write(commands.into_iter()).unwrap();
 
-        // Verify output file
         assert!(output_path.exists());
         let content = std::fs::read_to_string(&output_path).unwrap();
         assert!(content.contains("main.c"));
         assert!(content.contains("util.c"));
 
-        // Verify statistics were populated
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
     }
 

@@ -22,7 +22,7 @@
 //!
 //! # Core Types
 //!
-//! - [`CompilerCommand`] - Represents a structured compiler invocation
+//! - [`Command`] - Represents a structured compiler invocation
 //! - [`Arguments`] - Trait for representing different types of compiler arguments
 //! - [`ArgumentKind`] - Classifies the semantic meaning of arguments
 //! - [`PassEffect`] - Represents how an argument affects the compilation pipeline
@@ -48,25 +48,16 @@ pub trait Interpreter: Send + Sync {
 #[derive(Debug)]
 pub enum RecognizeResult {
     /// A recognized compiler invocation with parsed, classified arguments.
-    Recognized(CompilerCommand),
+    Recognized(Command),
     /// A command that is intentionally ignored (e.g. coreutils, excluded compilers).
     Ignored(&'static str),
     /// The interpreter did not recognize this execution. Ownership is returned.
     NotRecognized(Execution),
 }
 
-/// Represents a recognized command type after semantic analysis.
-///
-/// Used downstream in the output pipeline (converter, writers).
-#[derive(Debug)]
-pub enum Command {
-    Compiler(CompilerCommand),
-    Ignored(&'static str),
-}
-
 /// Represents a full compiler command invocation.
 #[derive(Debug)]
-pub struct CompilerCommand {
+pub struct Command {
     pub working_dir: PathBuf,
     pub executable: PathBuf,
     pub arguments: Vec<Argument>,
@@ -157,7 +148,7 @@ pub enum CompilerPass {
     Linking,
 }
 
-impl CompilerCommand {
+impl Command {
     pub fn new(working_dir: PathBuf, executable: PathBuf, arguments: Vec<Argument>) -> Self {
         Self { working_dir, executable, arguments }
     }

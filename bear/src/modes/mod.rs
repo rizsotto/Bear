@@ -156,6 +156,7 @@ mod impls {
     use crate::{args, config, intercept, output, semantic};
     use crossbeam_channel::{Receiver, Sender};
     use std::process::ExitStatus;
+    use std::sync::Arc;
     use std::{fs, io};
 
     pub(super) struct TcpEventProducer {
@@ -303,15 +304,21 @@ mod impls {
         /// Consume the intercepted events, and transform them into semantic events,
         /// and write them into the target file (with the right format).
         fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), WriterError> {
-            // Transform and log the events to semantics.
+            let stats = Arc::clone(self.writer.statistics());
+
             let semantics =
                 events.into_iter().filter_map(|event| match self.interpreter.recognize(event.execution) {
-                    semantic::RecognizeResult::Recognized(cmd) => Some(semantic::Command::Compiler(cmd)),
-                    semantic::RecognizeResult::Ignored(reason) => Some(semantic::Command::Ignored(reason)),
+                    semantic::RecognizeResult::Recognized(cmd) => {
+                        stats.semantic_commands_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        Some(cmd)
+                    }
+                    semantic::RecognizeResult::Ignored(_) => {
+                        stats.semantic_commands_received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        None
+                    }
                     semantic::RecognizeResult::NotRecognized(_) => None,
                 });
 
-            // Consume the entries and write them to the output file.
             self.writer.write(semantics)?;
 
             Ok(())

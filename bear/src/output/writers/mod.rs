@@ -139,11 +139,11 @@ mod fixtures {
 mod tests {
     use super::*;
     use crate::config;
-    use crate::semantic::{ArgumentKind, CompilerCommand, CompilerPass, PassEffect};
+    use crate::semantic::{ArgumentKind, Command, CompilerPass, PassEffect};
     use std::sync::atomic::Ordering;
 
     fn make_compile_command(file: &str) -> semantic::Command {
-        semantic::Command::Compiler(CompilerCommand::from_strings(
+        Command::from_strings(
             "/home/user",
             "/usr/bin/gcc",
             vec![
@@ -151,7 +151,7 @@ mod tests {
                 (ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)), vec!["-c"]),
                 (ArgumentKind::Source { binary: false }, vec![file]),
             ],
-        ))
+        )
     }
 
     #[test]
@@ -173,7 +173,6 @@ mod tests {
         assert!(content.contains("file1.c"));
         assert!(content.contains("file2.c"));
 
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 2);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 2);
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
         assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 0);
@@ -198,7 +197,6 @@ mod tests {
 
         pipeline.write(commands.into_iter()).unwrap();
 
-        assert_eq!(stats.semantic_commands_received.load(Ordering::Relaxed), 3);
         assert_eq!(stats.compilation_entries_produced.load(Ordering::Relaxed), 3);
         assert_eq!(stats.duplicates_detected.load(Ordering::Relaxed), 1);
         assert_eq!(stats.entries_written.load(Ordering::Relaxed), 2);
