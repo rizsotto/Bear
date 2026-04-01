@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-use crate::semantic::{Command, Execution, Interpreter};
+use crate::semantic::{Execution, Interpreter, RecognizeResult};
 
 const COREUTILS_MESSAGE: &str = "coreutils executable";
 const COMPILER_MESSAGE: &str = "compiler specified in config to ignore";
@@ -37,9 +37,11 @@ impl Default for IgnoreByPath {
 }
 
 impl Interpreter for IgnoreByPath {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        let filename = execution.executable.file_name()?;
-        if self.filenames.contains(filename) { Some(Command::Ignored(self.reason)) } else { None }
+    fn recognize(&self, execution: Execution) -> RecognizeResult {
+        if execution.executable.file_name().is_some_and(|f| self.filenames.contains(f)) {
+            return RecognizeResult::Ignored(self.reason);
+        }
+        RecognizeResult::NotRecognized(execution)
     }
 }
 
@@ -167,9 +169,7 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
-        let result = sut.recognize(&input);
-
-        assert!(result.is_some());
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
     }
 
     #[test]
@@ -181,9 +181,7 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
-        let result = sut.recognize(&input);
-
-        assert!(result.is_some());
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
     }
 
     #[test]
@@ -195,9 +193,7 @@ mod test {
             HashMap::new(),
         );
         let sut = IgnoreByPath::new();
-        let result = sut.recognize(&input);
-
-        assert!(result.is_none());
+        assert!(matches!(sut.recognize(input), RecognizeResult::NotRecognized(_)));
     }
 
     #[test]
@@ -211,6 +207,6 @@ mod test {
             "/home/user",
             HashMap::new(),
         );
-        assert!(sut.recognize(&input).is_some());
+        assert!(matches!(sut.recognize(input), RecognizeResult::Ignored(_)));
     }
 }

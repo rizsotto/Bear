@@ -41,10 +41,23 @@ use std::path::{Path, PathBuf};
 /// Responsible for recognizing the semantic meaning of an executed command.
 #[cfg_attr(test, mockall::automock)]
 pub trait Interpreter: Send + Sync {
-    fn recognize(&self, execution: &Execution) -> Option<Command>;
+    fn recognize(&self, execution: Execution) -> RecognizeResult;
+}
+
+/// Result of semantic recognition of an executed command.
+#[derive(Debug)]
+pub enum RecognizeResult {
+    /// A recognized compiler invocation with parsed, classified arguments.
+    Recognized(CompilerCommand),
+    /// A command that is intentionally ignored (e.g. coreutils, excluded compilers).
+    Ignored(&'static str),
+    /// The interpreter did not recognize this execution. Ownership is returned.
+    NotRecognized(Execution),
 }
 
 /// Represents a recognized command type after semantic analysis.
+///
+/// Used downstream in the output pipeline (converter, writers).
 #[derive(Debug)]
 pub enum Command {
     Compiler(CompilerCommand),

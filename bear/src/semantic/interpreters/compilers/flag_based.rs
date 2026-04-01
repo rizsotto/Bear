@@ -12,7 +12,8 @@ use crate::environment::{
     KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
 };
 use crate::semantic::{
-    Argument, ArgumentKind, Command, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
+    Argument, ArgumentKind, CompilerCommand, CompilerPass, Execution, Interpreter, PassEffect,
+    RecognizeResult,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -57,53 +58,49 @@ impl FlagBasedInterpreter {
 }
 
 impl Interpreter for FlagBasedInterpreter {
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        if let Some(reason) = self.should_ignore(execution) {
-            return Some(Command::Ignored(reason));
+    fn recognize(&self, execution: Execution) -> RecognizeResult {
+        if let Some(reason) = self.should_ignore(&execution) {
+            return RecognizeResult::Ignored(reason);
         }
 
-        let annotated_args = parse_arguments_and_environment(&self.analyzer, execution);
+        let Execution { executable, mut arguments, working_dir, environment } = execution;
+        let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments);
+        let env_args = parse_environment(&environment);
 
-        Some(Command::Compiler(CompilerCommand::new(
-            execution.working_dir.clone(),
-            execution.executable.clone(),
-            annotated_args,
-        )))
+        let mut all_args = annotated_args;
+        all_args.extend(env_args);
+
+        RecognizeResult::Recognized(CompilerCommand::new(working_dir, executable, all_args))
     }
 }
 
-/// Parse both command-line arguments and environment variables to generate complete argument list.
-fn parse_arguments_and_environment(flag_analyzer: &FlagAnalyzer, execution: &Execution) -> Vec<Argument> {
-    let mut args = parse_arguments(flag_analyzer, &execution.arguments);
-    let env_args = parse_environment(&execution.environment);
-    args.extend(env_args);
-    args
-}
-
-/// Parse command line arguments using the provided flag analyzer.
-fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Argument> {
+/// Parse command line arguments, moving strings out of the owned Vec.
+///
+/// Uses `std::mem::take` to move strings into Argument variants without cloning.
+/// The source Vec elements become empty strings after being taken.
+fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &mut [String]) -> Vec<Argument> {
     let mut result: Vec<Argument> = Vec::with_capacity(args.len());
     let mut i = 0;
 
     while i < args.len() {
-        let remaining_args = &args[i..];
-
         // Handle the first argument (compiler name)
         if i == 0 {
-            result.push(Argument::Other { arguments: vec![args[0].clone()], kind: ArgumentKind::Compiler });
+            result.push(Argument::Other {
+                arguments: vec![std::mem::take(&mut args[0])],
+                kind: ArgumentKind::Compiler,
+            });
             i += 1;
             continue;
         }
 
-        let current_arg = &args[i];
+        // match_flag needs a view of the remaining args; taken slots are behind us
+        let remaining_args = &args[i..];
 
-        // Try to match against flag definitions first (handles both -flags and @response files)
         if let Some(match_result) = flag_analyzer.match_flag(remaining_args) {
             let consumed_count = match_result.consumed_count;
-            let consumed_slice = &args[i..i + consumed_count];
             let arg = match match_result.rule.kind {
                 ArgumentKind::Compiler => Argument::Other {
-                    arguments: vec![consumed_slice[0].clone()],
+                    arguments: vec![std::mem::take(&mut args[i])],
                     kind: ArgumentKind::Compiler,
                 },
                 ArgumentKind::Source { .. } => {
@@ -111,31 +108,34 @@ fn parse_arguments(flag_analyzer: &FlagAnalyzer, args: &[String]) -> Vec<Argumen
                 }
                 ArgumentKind::Output => match consumed_count {
                     1 => {
-                        Argument::Output { flag: "-o".to_string(), path: consumed_slice[0][2..].to_string() }
+                        let val = std::mem::take(&mut args[i]);
+                        Argument::Output { flag: "-o".to_string(), path: val[2..].to_string() }
                     }
-                    2 => {
-                        Argument::Output { flag: consumed_slice[0].clone(), path: consumed_slice[1].clone() }
-                    }
+                    2 => Argument::Output {
+                        flag: std::mem::take(&mut args[i]),
+                        path: std::mem::take(&mut args[i + 1]),
+                    },
                     _ => {
                         unreachable!("Output file should be specified either `-o file` or `-ofile`")
                     }
                 },
-                ArgumentKind::Other(compiler_pass) => Argument::Other {
-                    arguments: consumed_slice.to_vec(),
-                    kind: ArgumentKind::Other(compiler_pass),
-                },
+                ArgumentKind::Other(compiler_pass) => {
+                    let moved: Vec<String> =
+                        (i..i + consumed_count).map(|j| std::mem::take(&mut args[j])).collect();
+                    Argument::Other { arguments: moved, kind: ArgumentKind::Other(compiler_pass) }
+                }
             };
 
             result.push(arg);
             i += consumed_count;
-        } else if current_arg.starts_with('-') {
+        } else if args[i].starts_with('-') {
             result.push(Argument::Other {
-                arguments: vec![current_arg.clone()],
+                arguments: vec![std::mem::take(&mut args[i])],
                 kind: ArgumentKind::Other(PassEffect::None),
             });
             i += 1;
         } else {
-            result.push(Argument::new_source(current_arg.clone()));
+            result.push(Argument::new_source(std::mem::take(&mut args[i])));
             i += 1;
         }
     }

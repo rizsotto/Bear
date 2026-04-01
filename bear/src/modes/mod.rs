@@ -304,7 +304,12 @@ mod impls {
         /// and write them into the target file (with the right format).
         fn consume(self: Box<Self>, events: Receiver<intercept::Event>) -> Result<(), WriterError> {
             // Transform and log the events to semantics.
-            let semantics = events.into_iter().flat_map(|event| self.interpreter.recognize(&event.execution));
+            let semantics =
+                events.into_iter().filter_map(|event| match self.interpreter.recognize(event.execution) {
+                    semantic::RecognizeResult::Recognized(cmd) => Some(semantic::Command::Compiler(cmd)),
+                    semantic::RecognizeResult::Ignored(reason) => Some(semantic::Command::Ignored(reason)),
+                    semantic::RecognizeResult::NotRecognized(_) => None,
+                });
 
             // Consume the entries and write them to the output file.
             self.writer.write(semantics)?;

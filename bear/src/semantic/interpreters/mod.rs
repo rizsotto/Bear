@@ -69,15 +69,12 @@ mod test {
     use super::*;
     use crate::config;
     use crate::intercept::Execution;
-    use crate::semantic::Command;
+    use crate::semantic::RecognizeResult;
 
     #[test]
     fn test_create_interpreter_with_default_config() {
         let config = config::Main::default();
-        let interpreter = create(&config, "/usr/bin:/bin".to_string());
-
-        // Test that the interpreter can be created without errors
-        assert!(interpreter.is_ok());
+        assert!(create(&config, "/usr/bin:/bin".to_string()).is_ok());
     }
 
     #[test]
@@ -92,12 +89,7 @@ mod test {
             HashMap::new(),
         );
 
-        let result = interpreter.recognize(&execution);
-        assert!(result.is_some());
-        match result.unwrap() {
-            Command::Compiler(_) => (), // Expected
-            Command::Ignored(_) => panic!("Expected compiler command, got ignored"),
-        }
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Recognized(_)));
     }
 
     #[test]
@@ -108,12 +100,7 @@ mod test {
         let execution =
             Execution::from_strings("/usr/bin/ls", vec!["ls", "-la"], "/home/user", HashMap::new());
 
-        let result = interpreter.recognize(&execution);
-        assert!(result.is_some());
-        match result.unwrap() {
-            Command::Ignored(_) => (), // Expected
-            Command::Compiler(_) => panic!("Expected ignored command, got compiler"),
-        }
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored(_)));
     }
 
     #[test]
@@ -136,12 +123,7 @@ mod test {
             HashMap::new(),
         );
 
-        let result = interpreter.recognize(&execution);
-        assert!(result.is_some());
-        match result.unwrap() {
-            Command::Ignored(_) => (), // Expected - gcc should be ignored
-            Command::Compiler(_) => panic!("Expected ignored command, got compiler"),
-        }
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Ignored(_)));
     }
 
     #[test]
@@ -161,11 +143,9 @@ mod test {
 
     #[test]
     fn test_windows_gcc_exe_regression() {
-        // Regression test for Windows CI failure where gcc.exe was not recognized
         let config = config::Main::default();
         let interpreter = create(&config, "/usr/bin:/bin".to_string()).unwrap();
 
-        // Test with .exe extension - this simulates Windows executables
         let execution = Execution::from_strings(
             "gcc.exe",
             vec!["gcc.exe", "-fplugin=libexample.so", "-c", "test.c"],
@@ -173,18 +153,7 @@ mod test {
             HashMap::new(),
         );
 
-        // This should recognize gcc.exe as a compiler, not ignore it
-        let result = interpreter.recognize(&execution);
-        assert!(result.is_some(), "gcc.exe should be recognized as a compiler command");
-
-        match result.unwrap() {
-            Command::Compiler(_) => {
-                // This is expected - gcc.exe should be recognized as a compiler
-            }
-            Command::Ignored(_) => {
-                panic!("gcc.exe was incorrectly ignored instead of being recognized as a compiler");
-            }
-        }
+        assert!(matches!(interpreter.recognize(execution), RecognizeResult::Recognized(_)));
     }
 
     #[test]
@@ -202,17 +171,11 @@ mod test {
                 HashMap::new(),
             );
 
-            let result = interpreter.recognize(&execution);
-            assert!(result.is_some(), "{} should be recognized as a compiler", executable_name);
-
-            match result.unwrap() {
-                Command::Compiler(_) => {
-                    // Expected
-                }
-                Command::Ignored(_) => {
-                    panic!("{} was incorrectly ignored", executable_name);
-                }
-            }
+            assert!(
+                matches!(interpreter.recognize(execution), RecognizeResult::Recognized(_)),
+                "{} should be recognized",
+                executable_name
+            );
         }
     }
 }

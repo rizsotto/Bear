@@ -10,7 +10,7 @@
 use super::compiler_recognition::CompilerRecognizer;
 use crate::config::CompilerType;
 use crate::intercept::Execution;
-use crate::semantic::{Command, Interpreter};
+use crate::semantic::{Interpreter, RecognizeResult};
 
 use std::path::{Path, PathBuf};
 use std::sync::Weak;
@@ -115,43 +115,47 @@ impl WrapperInterpreter {
 }
 
 impl Interpreter for WrapperInterpreter {
-    /// Wrapper interpreter recognize the first part of the command,
-    /// then rewrites the execution without the recognized part and
-    /// calls the "delegate" to recognize that. The delegate is the
-    /// interpreter, which was calling the wrapper interpreter.
-    fn recognize(&self, execution: &Execution) -> Option<Command> {
-        // Detect which wrapper we're dealing with
-        let wrapper_name = Self::detect_wrapper_name(&execution.executable)?;
+    fn recognize(&self, execution: Execution) -> RecognizeResult {
+        let Some(wrapper_name) = Self::detect_wrapper_name(&execution.executable) else {
+            return RecognizeResult::NotRecognized(execution);
+        };
 
-        // Extract real compiler path and filtered arguments
-        let (real_compiler_path, filtered_args) =
-            self.extract_real_compiler(&wrapper_name, &execution.arguments)?;
+        let Some((real_compiler_path, filtered_args)) =
+            self.extract_real_compiler(&wrapper_name, &execution.arguments)
+        else {
+            return RecognizeResult::NotRecognized(execution);
+        };
 
-        // Skip if it's another wrapper (avoid infinite recursion)
-        let recognizer = self.recognizer.upgrade()?;
-        let compiler_type = recognizer.recognize(&real_compiler_path)?;
+        let Some(recognizer) = self.recognizer.upgrade() else {
+            return RecognizeResult::NotRecognized(execution);
+        };
+        let Some(compiler_type) = recognizer.recognize(&real_compiler_path) else {
+            return RecognizeResult::NotRecognized(execution);
+        };
         if matches!(compiler_type, CompilerType::Wrapper) {
-            return None;
+            return RecognizeResult::NotRecognized(execution);
         }
 
-        // Create new execution with real compiler
+        let Some(delegate) = self.delegate.upgrade() else {
+            return RecognizeResult::NotRecognized(execution);
+        };
+
+        // Move working_dir and environment from original execution
         let real_execution = Execution {
             executable: real_compiler_path,
             arguments: filtered_args,
-            working_dir: execution.working_dir.clone(),
-            environment: execution.environment.clone(),
+            working_dir: execution.working_dir,
+            environment: execution.environment,
         };
 
-        // Delegate to the main interpreter for re-recognition with the real compiler
-        let delegate = self.delegate.upgrade()?;
-        delegate.recognize(&real_execution)
+        delegate.recognize(real_execution)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semantic::{Command, CompilerCommand, MockInterpreter};
+    use crate::semantic::{CompilerCommand, MockInterpreter, RecognizeResult};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -220,11 +224,11 @@ mod tests {
         let mock = {
             let mut mock = MockInterpreter::new();
             mock.expect_recognize().returning(|execution| {
-                Some(Command::Compiler(CompilerCommand::new(
-                    execution.working_dir.clone(),
-                    execution.executable.clone(),
+                RecognizeResult::Recognized(CompilerCommand::new(
+                    execution.working_dir,
+                    execution.executable,
                     vec![],
-                )))
+                ))
             });
 
             mock
@@ -233,14 +237,12 @@ mod tests {
         let (sut, _context) = create_sut(mock);
 
         for (execution, compiler) in executions {
-            let result = sut.recognize(&execution);
+            let result = sut.recognize(execution);
 
-            assert!(result.is_some(), "wrapper call should be recognized: {execution}");
-            if let Some(Command::Compiler(cmd)) = result {
-                assert_eq!(cmd.executable, PathBuf::from(compiler));
-            } else {
-                panic!("Expected Command::Compiler");
-            }
+            let RecognizeResult::Recognized(cmd) = result else {
+                panic!("wrapper call should be recognized");
+            };
+            assert_eq!(cmd.executable, PathBuf::from(compiler));
         }
     }
 
@@ -256,11 +258,11 @@ mod tests {
         let mock = {
             let mut mock = MockInterpreter::new();
             mock.expect_recognize().returning(|execution| {
-                Some(Command::Compiler(CompilerCommand::new(
-                    execution.working_dir.clone(),
-                    execution.executable.clone(),
+                RecognizeResult::Recognized(CompilerCommand::new(
+                    execution.working_dir,
+                    execution.executable,
                     vec![],
-                )))
+                ))
             });
 
             mock
@@ -269,9 +271,9 @@ mod tests {
         let (sut, _context) = create_sut(mock);
 
         for execution in executions {
-            let result = sut.recognize(&execution);
+            let result = sut.recognize(execution);
 
-            assert!(result.is_none(), "call should not be recognized: {execution}");
+            assert!(matches!(result, RecognizeResult::NotRecognized(_)), "call should not be recognized");
         }
     }
 
@@ -297,19 +299,22 @@ mod tests {
                         && execution.environment.get("CC") == Some(&"gcc".to_string())
                 })
                 .returning(|execution| {
-                    Some(Command::Compiler(CompilerCommand::new(
-                        execution.working_dir.clone(),
-                        execution.executable.clone(),
+                    RecognizeResult::Recognized(CompilerCommand::new(
+                        execution.working_dir,
+                        execution.executable,
                         vec![],
-                    )))
+                    ))
                 });
             mock
         };
 
         let (sut, _context) = create_sut(mock);
-        let result = sut.recognize(&execution);
+        let result = sut.recognize(execution);
 
-        assert!(result.is_some(), "Should delegate successfully and preserve execution context");
+        assert!(
+            matches!(result, RecognizeResult::Recognized(_)),
+            "Should delegate successfully and preserve execution context"
+        );
     }
 
     #[test]
@@ -329,19 +334,22 @@ mod tests {
                         && execution.arguments == vec!["gcc", "-c", "main.c", "-o", "main.o"]
                 })
                 .returning(|execution| {
-                    Some(Command::Compiler(CompilerCommand::new(
-                        execution.working_dir.clone(),
-                        execution.executable.clone(),
+                    RecognizeResult::Recognized(CompilerCommand::new(
+                        execution.working_dir,
+                        execution.executable,
                         vec![],
-                    )))
+                    ))
                 });
             mock
         };
 
         let (sut, _context) = create_sut(mock);
-        let result = sut.recognize(&execution);
+        let result = sut.recognize(execution);
 
-        assert!(result.is_some(), "Wrapper should strip its own args before delegating");
+        assert!(
+            matches!(result, RecognizeResult::Recognized(_)),
+            "Wrapper should strip its own args before delegating"
+        );
     }
 
     #[test]
@@ -350,14 +358,17 @@ mod tests {
 
         let mock = {
             let mut delegate = MockInterpreter::new();
-            delegate.expect_recognize().returning(|_| None);
+            delegate.expect_recognize().returning(RecognizeResult::NotRecognized);
 
             delegate
         };
 
         let (sut, _context) = create_sut(mock);
-        let result = sut.recognize(&execution);
+        let result = sut.recognize(execution);
 
-        assert!(result.is_none(), "Should return None when delegate does not recognize the compiler");
+        assert!(
+            matches!(result, RecognizeResult::NotRecognized(_)),
+            "Should return NotRecognized when delegate does not recognize the compiler"
+        );
     }
 }
