@@ -80,7 +80,7 @@ impl PathResolver {
             PathResolver::AsIs => Ok(path.to_path_buf()),
             PathResolver::Canonical => {
                 let result = path.canonicalize()?;
-                Ok(result)
+                Ok(strip_windows_extended_length_prefix(result))
             }
             PathResolver::Relative => {
                 let absolute = absolute_to(base, path)?;
@@ -89,6 +89,15 @@ impl PathResolver {
             PathResolver::Absolute => absolute_to(base, path),
         }
     }
+}
+
+/// Strip the Windows extended-length path prefix (`\\?\`) if present.
+///
+/// On Windows, `Path::canonicalize()` returns paths with this prefix,
+/// which tools like clangd do not understand. See GitHub issue #683.
+fn strip_windows_extended_length_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") { PathBuf::from(stripped) } else { path }
 }
 
 /// Compute the absolute path from the root directory if the path is relative.
@@ -304,7 +313,54 @@ mod tests {
 
         // Test with the full file path since canonicalize requires the file to exist
         let result = resolver.resolve(&temp_path, &file_path).unwrap();
-        assert_eq!(result, file_path);
+        // On Windows, canonicalize() adds \\?\ prefix to temp_path (and thus file_path),
+        // but resolve() strips it. Compare against the stripped expected path.
+        let expected = strip_windows_extended_length_prefix(file_path);
+        assert_eq!(result, expected);
         assert!(result.is_absolute());
+    }
+
+    #[test]
+    fn test_path_resolver_canonical_no_extended_length_prefix() {
+        // Regression test for GitHub issue #683:
+        // On Windows, Path::canonicalize() returns extended-length paths
+        // with "\\?\" prefix that clangd does not understand.
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        let file_path = temp_path.join("source.c");
+        fs::write(&file_path, "int main() {}").unwrap();
+
+        let resolver = PathResolver::Canonical;
+
+        let result = resolver.resolve(&temp_path, &file_path).unwrap();
+        let result_str = result.to_string_lossy();
+        assert!(
+            !result_str.starts_with(r"\\?\"),
+            "Canonical path should not have extended-length prefix '\\\\?\\': {}",
+            result_str
+        );
+
+        let dir_result = resolver.resolve(&temp_path, &temp_path).unwrap();
+        let dir_str = dir_result.to_string_lossy();
+        assert!(
+            !dir_str.starts_with(r"\\?\"),
+            "Canonical directory should not have extended-length prefix '\\\\?\\': {}",
+            dir_str
+        );
+    }
+
+    #[test]
+    fn test_strip_windows_extended_length_prefix() {
+        // Unit test for the strip function directly
+        let normal = PathBuf::from("/tmp/foo/bar");
+        assert_eq!(strip_windows_extended_length_prefix(normal.clone()), normal);
+
+        let with_prefix = PathBuf::from(r"\\?\C:\Users\foo\bar");
+        let stripped = strip_windows_extended_length_prefix(with_prefix);
+        assert_eq!(stripped, PathBuf::from(r"C:\Users\foo\bar"));
+
+        let unc_path = PathBuf::from(r"\\server\share\file");
+        assert_eq!(strip_windows_extended_length_prefix(unc_path.clone()), unc_path);
     }
 }
