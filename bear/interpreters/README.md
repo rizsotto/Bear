@@ -26,6 +26,12 @@ recognize:
     cross_compilation: true
     versioned: false
 
+# Optional: treat '/'-prefixed arguments as flags (default: false)
+# When true, arguments like /Fo, /c, /I are treated as compiler flags.
+# When false (default), only '-'-prefixed arguments are treated as flags.
+# Inherited from base file via `extends` if not specified.
+slash_prefix: false
+
 # Optional: conditions under which a recognized invocation should be ignored
 ignore_when:
   # Ignore if the executable filename matches any of these
@@ -55,10 +61,13 @@ The `pattern` string encodes both the flag name and how it consumes arguments:
 | `-flag{ }*`   | `-D{ }*`        | Exact match, value glued or as separate arg    |
 | `-flag=*`     | `-specs=*`      | Exact match, value after `=`                   |
 | `-flag{=}*`   | `--std{=}*`     | Exact match, value after `=` or as separate arg|
+| `-flag:*`     | `/std:*`        | Exact match, value after `:`                   |
+| `-flag{:}*`   | `/Fe{:}*`       | Exact match, value after `:` or as separate arg|
 
 The `{}` pair means the separator is optional:
 - `{ }` -- the space between flag and value is optional (value can be glued: `-Dfoo` or separate: `-D foo`)
 - `{=}` -- the `=` between flag and value is optional (value can follow `=`: `--std=c99` or be separate: `--std c99`)
+- `{:}` -- the `:` between flag and value is optional (value can follow `:`: `/std:c++20` or be separate: `/std c++20`)
 
 ## Result values
 
@@ -76,6 +85,7 @@ The `result` field describes what the flag means semantically:
 | `stops_at_assembling`       | Stop compilation after assembling           |
 | `info_and_exit`             | Print info and exit (e.g. `--version`)      |
 | `driver_option`             | Driver/toolchain behavior flag              |
+| `pass_through`              | Stop parsing; remaining args go to linker   |
 | `none`                      | No specific semantic effect                 |
 
 ## Ignore filters

@@ -218,19 +218,29 @@ include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc() -> impl Interpreter {
-    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS, false)
+    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS, GCC_SLASH_PREFIX)
 }
 
 pub(super) fn clang() -> impl Interpreter {
-    FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS, false)
+    FlagBasedInterpreter::new(
+        &CLANG_FLAGS,
+        &CLANG_IGNORE_EXECUTABLES,
+        &CLANG_IGNORE_FLAGS,
+        CLANG_SLASH_PREFIX,
+    )
 }
 
 pub(super) fn flang() -> impl Interpreter {
-    FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS, false)
+    FlagBasedInterpreter::new(
+        &FLANG_FLAGS,
+        &FLANG_IGNORE_EXECUTABLES,
+        &FLANG_IGNORE_FLAGS,
+        FLANG_SLASH_PREFIX,
+    )
 }
 
 pub(super) fn cuda() -> impl Interpreter {
-    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS, false)
+    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS, CUDA_SLASH_PREFIX)
 }
 
 pub(super) fn intel_fortran() -> impl Interpreter {
@@ -238,7 +248,7 @@ pub(super) fn intel_fortran() -> impl Interpreter {
         &INTEL_FORTRAN_FLAGS,
         &INTEL_FORTRAN_IGNORE_EXECUTABLES,
         &INTEL_FORTRAN_IGNORE_FLAGS,
-        false,
+        INTEL_FORTRAN_SLASH_PREFIX,
     )
 }
 
@@ -247,7 +257,7 @@ pub(super) fn cray_fortran() -> impl Interpreter {
         &CRAY_FORTRAN_FLAGS,
         &CRAY_FORTRAN_IGNORE_EXECUTABLES,
         &CRAY_FORTRAN_IGNORE_FLAGS,
-        false,
+        CRAY_FORTRAN_SLASH_PREFIX,
     )
 }
 

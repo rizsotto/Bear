@@ -10,6 +10,7 @@ recognize:
     versioned: false
 ignore_when:
   executables: ["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"]
+slash_prefix: false
 flags:
   - match: {pattern: "-x", count: 1}
     result: configures_compiling

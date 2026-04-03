@@ -6,6 +6,7 @@ recognize:
   - executables: ["nvcc"]
     cross_compilation: true
     versioned: true
+slash_prefix: false
 flags:
   - match: {pattern: "--gpu-architecture{=}*"}
     result: configures_compiling

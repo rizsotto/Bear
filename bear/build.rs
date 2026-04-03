@@ -73,6 +73,9 @@ mod flags {
         type_: Option<String>,
         recognize: Option<Vec<RecognizeEntry>>,
         ignore_when: Option<IgnoreWhen>,
+        /// When true, arguments starting with '/' are treated as flags (MSVC-style).
+        #[serde(default)]
+        slash_prefix: Option<bool>,
         flags: Vec<FlagEntry>,
     }
 
@@ -112,6 +115,7 @@ mod flags {
         static_name: &'static str,
         ignore_executables_name: &'static str,
         ignore_flags_name: &'static str,
+        slash_prefix_name: &'static str,
         output_file: &'static str,
     }
 
@@ -121,6 +125,7 @@ mod flags {
             static_name: "GCC_FLAGS",
             ignore_executables_name: "GCC_IGNORE_EXECUTABLES",
             ignore_flags_name: "GCC_IGNORE_FLAGS",
+            slash_prefix_name: "GCC_SLASH_PREFIX",
             output_file: "flags_gcc.rs",
         },
         TableConfig {
@@ -128,6 +133,7 @@ mod flags {
             static_name: "CLANG_FLAGS",
             ignore_executables_name: "CLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "CLANG_IGNORE_FLAGS",
+            slash_prefix_name: "CLANG_SLASH_PREFIX",
             output_file: "flags_clang.rs",
         },
         TableConfig {
@@ -135,6 +141,7 @@ mod flags {
             static_name: "FLANG_FLAGS",
             ignore_executables_name: "FLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "FLANG_IGNORE_FLAGS",
+            slash_prefix_name: "FLANG_SLASH_PREFIX",
             output_file: "flags_flang.rs",
         },
         TableConfig {
@@ -142,6 +149,7 @@ mod flags {
             static_name: "CUDA_FLAGS",
             ignore_executables_name: "CUDA_IGNORE_EXECUTABLES",
             ignore_flags_name: "CUDA_IGNORE_FLAGS",
+            slash_prefix_name: "CUDA_SLASH_PREFIX",
             output_file: "flags_cuda.rs",
         },
         TableConfig {
@@ -149,6 +157,7 @@ mod flags {
             static_name: "INTEL_FORTRAN_FLAGS",
             ignore_executables_name: "INTEL_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "INTEL_FORTRAN_IGNORE_FLAGS",
+            slash_prefix_name: "INTEL_FORTRAN_SLASH_PREFIX",
             output_file: "flags_intel_fortran.rs",
         },
         TableConfig {
@@ -156,6 +165,7 @@ mod flags {
             static_name: "CRAY_FORTRAN_FLAGS",
             ignore_executables_name: "CRAY_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "CRAY_FORTRAN_IGNORE_FLAGS",
+            slash_prefix_name: "CRAY_FORTRAN_SLASH_PREFIX",
             output_file: "flags_cray_fortran.rs",
         },
     ];
@@ -204,12 +214,14 @@ mod flags {
                 b_len.cmp(&a_len)
             });
 
-            // Resolve ignore_when (own + base)
+            // Resolve ignore_when and slash_prefix (own + base)
             let ignore_when = resolve_ignore_when(table, &raw_tables);
+            let slash_prefix = resolve_slash_prefix(table, &raw_tables);
 
             // Generate Rust source
             let mut rust_code = generate_static_array(config, &entries);
             rust_code.push_str(&generate_ignore_arrays(config, &ignore_when));
+            rust_code.push_str(&format!("static {}: bool = {};\n", config.slash_prefix_name, slash_prefix));
             let out_path = out_dir.join(config.output_file);
             fs::write(&out_path, rust_code)
                 .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
@@ -230,6 +242,19 @@ mod flags {
             };
         }
         own
+    }
+
+    /// Resolve `slash_prefix` for a table, inheriting from base if extending.
+    fn resolve_slash_prefix(table: &FlagTable, raw_tables: &HashMap<String, FlagTable>) -> bool {
+        if let Some(value) = table.slash_prefix {
+            return value;
+        }
+        if let Some(ref base_name) = table.extends
+            && let Some(base_table) = raw_tables.get(base_name.as_str())
+        {
+            return base_table.slash_prefix.unwrap_or(false);
+        }
+        false
     }
 
     /// Generate static arrays for ignore_when executables and flags.

@@ -5,6 +5,7 @@ recognize:
   - executables: ["ifort", "ifx"]
     cross_compilation: false
     versioned: true
+slash_prefix: false
 flags:
   - match: {pattern: "-preprocess-only"}
     result: stops_at_preprocessing

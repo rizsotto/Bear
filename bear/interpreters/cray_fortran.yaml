@@ -5,6 +5,7 @@ recognize:
   - executables: ["crayftn", "ftn"]
     cross_compilation: false
     versioned: true
+slash_prefix: false
 flags:
   - match: {pattern: "-no-add-rpath-shared"}
     result: configures_linking

@@ -8,6 +8,7 @@ recognize:
     versioned: true
 ignore_when:
   flags: ["-cc1"]
+slash_prefix: false
 flags:
   - match: {pattern: "--prefix=*"}
     result: configures_preprocessing
