@@ -650,12 +650,15 @@ mod environment_mapping_tests {
             ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         )];
         let mut env = HashMap::new();
-        env.insert("CPATH".to_string(), "/a:/b".to_string());
+        // std::env::split_paths uses `:` on Unix, `;` on Windows
+        let (value, expected_a, expected_b) =
+            if cfg!(windows) { (r"C:\a;C:\b", r"C:\a", r"C:\b") } else { ("/a:/b", "/a", "/b") };
+        env.insert("CPATH".to_string(), value.to_string());
 
         let (prepend, append) = parse_environment(&env, rules);
         assert!(prepend.is_empty());
         let args = collect_args(&append);
-        assert_eq!(args, vec!["-I", "/a", "-I", "/b"]);
+        assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
     }
 
     #[test]
@@ -666,11 +669,14 @@ mod environment_mapping_tests {
             ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
         )];
         let mut env = HashMap::new();
-        env.insert("CPATH".to_string(), ":/a::/b:".to_string());
+        // Leading/trailing/double separators produce empty elements that must be filtered
+        let (value, expected_a, expected_b) =
+            if cfg!(windows) { (r";C:\a;;C:\b;", r"C:\a", r"C:\b") } else { (":/a::/b:", "/a", "/b") };
+        env.insert("CPATH".to_string(), value.to_string());
 
         let (_prepend, append) = parse_environment(&env, rules);
         let args = collect_args(&append);
-        assert_eq!(args, vec!["-I", "/a", "-I", "/b"]);
+        assert_eq!(args, vec!["-I", expected_a, "-I", expected_b]);
     }
 
     #[test]
