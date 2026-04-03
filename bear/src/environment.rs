@@ -12,11 +12,8 @@ pub const KEY_OS__MACOS_FLAT_NAMESPACE: &str = "DYLD_FORCE_FLAT_NAMESPACE";
 // man page for `exec` (Linux system call)
 pub const KEY_OS__PATH: &str = "PATH";
 
-// https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
-pub const KEY_GCC__C_INCLUDE_1: &str = "CPATH";
-pub const KEY_GCC__C_INCLUDE_2: &str = "C_INCLUDE_PATH";
-pub const KEY_GCC__C_INCLUDE_3: &str = "CPLUS_INCLUDE_PATH";
-pub const KEY_GCC__OBJC_INCLUDE: &str = "OBJC_INCLUDE_PATH";
+// Compiler-specific environment variable names, generated from interpreters/*.yaml.
+include!(concat!(env!("OUT_DIR"), "/env_keys.rs"));
 
 // https://www.gnu.org/software/make/manual/html_node/Implicit-Variables.html
 pub const KEY_MAKE__C_COMPILER: &str = "CC";
@@ -97,20 +94,13 @@ static CARGO_PROGRAM_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::syn
 static CARGO_FLAGS_KEYS: std::sync::LazyLock<HashSet<&'static str>> =
     std::sync::LazyLock::new(|| [KEY_CARGO__RUSTFLAGS].iter().cloned().collect());
 
-static GCC_INCLUDE_KEYS: std::sync::LazyLock<HashSet<&'static str>> = std::sync::LazyLock::new(|| {
-    [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE]
-        .iter()
-        .cloned()
-        .collect()
-});
-
 pub fn relevant_env(key: &str) -> bool {
     matches!(key, KEY_INTERCEPT_STATE | KEY_OS__PRELOAD_PATH | KEY_OS__MACOS_PRELOAD_PATH | KEY_OS__MACOS_FLAT_NAMESPACE)
         || MAKE_PROGRAM_KEYS.contains(key)
         || MAKE_FLAGS_KEYS.contains(key)
         || CARGO_PROGRAM_KEYS.contains(key)
         || CARGO_FLAGS_KEYS.contains(key)
-        || GCC_INCLUDE_KEYS.contains(key)
+        || COMPILER_ENV_KEYS.contains(&key)
         // Windows PATH variable is case sensitive and not always capitalized
         || key.to_uppercase() == KEY_OS__PATH
 }
