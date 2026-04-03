@@ -4,13 +4,15 @@ use std::collections::{HashMap, HashSet};
 
 use crate::yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen};
 
-/// Resolve flags for a compiler, with transitive inheritance.
+/// Resolve flags for a compiler, with transitive inheritance and dedup.
 ///
-/// Own flags come first, then base flags (recursively). The caller is
-/// responsible for sorting by priority after collection.
-pub fn resolve_flags(key: &str, raw_tables: &HashMap<String, FlagTable>) -> Vec<FlagEntry> {
+/// Own flags come first, then base flags (recursively). Duplicate patterns
+/// (same pattern + count) are removed, keeping the child's version. If a
+/// pattern appears with conflicting results, returns an error.
+pub fn resolve_flags(key: &str, raw_tables: &HashMap<String, FlagTable>) -> Result<Vec<FlagEntry>, String> {
     let mut visited = HashSet::new();
-    resolve_flags_recursive(key, raw_tables, &mut visited)
+    let all = resolve_flags_recursive(key, raw_tables, &mut visited);
+    dedup_flags(all, key)
 }
 
 fn resolve_flags_recursive(
@@ -30,6 +32,36 @@ fn resolve_flags_recursive(
         entries.extend(resolve_flags_recursive(base_name, raw_tables, visited));
     }
     entries
+}
+
+/// Deduplicate flags by (pattern, count). Entries appear in priority order
+/// (own first), so the first occurrence wins. If a later entry has the
+/// same (pattern, count) but a different result, that is a conflict.
+fn dedup_flags(flags: Vec<FlagEntry>, compiler: &str) -> Result<Vec<FlagEntry>, String> {
+    // (pattern, count) -> result of the first occurrence
+    let mut seen: HashMap<(String, Option<u32>), String> = HashMap::new();
+    let mut result = Vec::new();
+
+    for entry in flags {
+        let key = (entry.match_.pattern.clone(), entry.match_.count);
+        match seen.get(&key) {
+            None => {
+                seen.insert(key, entry.result.clone());
+                result.push(entry);
+            }
+            Some(prev_result) => {
+                if *prev_result != entry.result {
+                    return Err(format!(
+                        "{}: flag pattern '{}' has conflicting results: '{}' vs '{}'",
+                        compiler, entry.match_.pattern, prev_result, entry.result
+                    ));
+                }
+                // Same result - pure duplicate, skip
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 /// Resolve `ignore_when` for a compiler, with transitive inheritance.

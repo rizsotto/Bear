@@ -30,7 +30,7 @@ impl ResolvedTable {
     /// Resolve a single compiler table by merging inherited flags, ignore_when,
     /// slash_prefix, and environment entries from the extends chain.
     pub fn new(key: &str, config: &'static TableConfig, raw_tables: &HashMap<String, FlagTable>) -> Self {
-        let mut flags = resolve_flags(key, raw_tables);
+        let mut flags = resolve_flags(key, raw_tables).unwrap_or_else(|e| panic!("{}", e));
         // Sort by flag length descending (stable sort preserves own-before-base order)
         flags.sort_by(|a, b| b.match_.name_len().cmp(&a.match_.name_len()));
 
@@ -523,7 +523,7 @@ mod tests {
         let mut t = make_empty_table();
         t.flags = vec![make_test_flag("-c", "output")];
         tables.insert("leaf".to_string(), t);
-        let flags = resolve_flags("leaf", &tables);
+        let flags = resolve_flags("leaf", &tables).unwrap();
         assert_eq!(flags.len(), 1);
     }
 
@@ -542,7 +542,7 @@ mod tests {
         child.flags = vec![make_test_flag("-ch", "output")];
         tables.insert("child".to_string(), child);
 
-        let flags = resolve_flags("child", &tables);
+        let flags = resolve_flags("child", &tables).unwrap();
         assert_eq!(flags.len(), 3);
         // Own flags first, then parent, then grandparent
         assert_eq!(flags[0].match_.pattern, "-ch");
@@ -551,10 +551,43 @@ mod tests {
     }
 
     #[test]
+    fn resolve_flags_dedup_same_result() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut parent = make_empty_table();
+        parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        tables.insert("parent".to_string(), parent);
+        let mut child = make_empty_table();
+        child.extends = Some("parent".to_string());
+        child.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        tables.insert("child".to_string(), child);
+
+        let flags = resolve_flags("child", &tables).unwrap();
+        // Duplicate removed, child's copy kept
+        assert_eq!(flags.len(), 1);
+        assert_eq!(flags[0].match_.pattern, "-c");
+    }
+
+    #[test]
+    fn resolve_flags_conflict_different_result() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut parent = make_empty_table();
+        parent.flags = vec![make_test_flag("-c", "stops_at_compiling")];
+        tables.insert("parent".to_string(), parent);
+        let mut child = make_empty_table();
+        child.extends = Some("parent".to_string());
+        child.flags = vec![make_test_flag("-c", "output")];
+        tables.insert("child".to_string(), child);
+
+        let err = resolve_flags("child", &tables).unwrap_err();
+        assert!(err.contains("conflicting results"), "{}", err);
+        assert!(err.contains("-c"), "{}", err);
+    }
+
+    #[test]
     fn resolve_flags_real_ibm_xl_includes_gcc() {
         let raw_tables = load_tables();
-        let ibm_flags = resolve_flags("ibm_xl", &raw_tables);
-        let gcc_flags = resolve_flags("gcc", &raw_tables);
+        let ibm_flags = resolve_flags("ibm_xl", &raw_tables).unwrap();
+        let gcc_flags = resolve_flags("gcc", &raw_tables).unwrap();
         // ibm_xl extends clang extends gcc - must include all gcc flags
         for gcc_flag in &gcc_flags {
             assert!(
@@ -562,6 +595,16 @@ mod tests {
                 "ibm_xl is missing gcc flag: {}",
                 gcc_flag.match_.pattern
             );
+        }
+    }
+
+    #[test]
+    fn resolve_flags_real_no_conflicts() {
+        // All real YAML files must resolve without conflicts
+        let raw_tables = load_tables();
+        for config in TABLES {
+            let key = config.yaml_file.strip_suffix(".yaml").unwrap();
+            resolve_flags(key, &raw_tables).unwrap_or_else(|e| panic!("{}: {}", config.yaml_file, e));
         }
     }
 

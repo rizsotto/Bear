@@ -3,7 +3,7 @@ source: bear-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"intel_cc\")"
 ---
 // Generated from interpreters/intel_cc.yaml -- DO NOT EDIT
-static INTEL_CC_FLAGS: [FlagRule; 265] = [
+static INTEL_CC_FLAGS: [FlagRule; 260] = [
     FlagRule::new(FlagPattern::Exactly("-qopt-multiple-gather-scatter-by-shuffles", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-qopt-assume-safe-padding", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-qopt-streaming-stores"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -45,7 +45,6 @@ static INTEL_CC_FLAGS: [FlagRule; 265] = [
     FlagRule::new(FlagPattern::Exactly("-bundle_loader", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-single_module", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xpreprocessor", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::Exactly("-Xpreprocessor", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-nodefaultlibs", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-qopenmp-link"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-qopenmp-simd", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -79,7 +78,6 @@ static INTEL_CC_FLAGS: [FlagRule; 265] = [
     FlagRule::new(FlagPattern::Exactly("-seglinkedit", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Prefix("-traditional", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Prefix("-plugin-arg-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::Prefix("-traditional", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-iwithprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-qno-openmp", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-diag-error"), ArgumentKind::Other(PassEffect::None)),
@@ -93,7 +91,6 @@ static INTEL_CC_FLAGS: [FlagRule; 265] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--cuda-path"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-iplugindir"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-static-pie", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
-    FlagRule::new(FlagPattern::Exactly("-Xassembler", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-diag-file"), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-diag-dump", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-prec-sqrt", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -111,7 +108,6 @@ static INTEL_CC_FLAGS: [FlagRule; 265] = [
     FlagRule::new(FlagPattern::Exactly("-trigraphs", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-idirafter", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-imultilib", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::Exactly("-arch_only", 1), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-parallel", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-prof-dir"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-prof-gen", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -200,7 +196,6 @@ static INTEL_CC_FLAGS: [FlagRule; 265] = [
     FlagRule::new(FlagPattern::Exactly("-time", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("-load", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(PassEffect::DriverOption)),
-    FlagRule::new(FlagPattern::Exactly("-arch", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-save", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("-ipo", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

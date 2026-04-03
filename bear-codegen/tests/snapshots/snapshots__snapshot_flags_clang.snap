@@ -3,7 +3,7 @@ source: bear-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"clang\")"
 ---
 // Generated from interpreters/clang.yaml -- DO NOT EDIT
-static CLANG_FLAGS: [FlagRule; 202] = [
+static CLANG_FLAGS: [FlagRule; 197] = [
     FlagRule::new(FlagPattern::Exactly("-iwithprefixbefore", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-allowable_client", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("--analyzer-output"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -28,7 +28,6 @@ static CLANG_FLAGS: [FlagRule; 202] = [
     FlagRule::new(FlagPattern::Exactly("-bundle_loader", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-single_module", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-Xpreprocessor", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::Exactly("-Xpreprocessor", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-nodefaultlibs", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-bind_at_load", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--dyld-prefix"), ArgumentKind::Other(PassEffect::None)),
@@ -48,7 +47,6 @@ static CLANG_FLAGS: [FlagRule; 202] = [
     FlagRule::new(FlagPattern::Exactly("-seglinkedit", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Prefix("-traditional", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Prefix("-plugin-arg-", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::Prefix("-traditional", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-iwithprefix", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-dead_strip", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("-dylib_file", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
@@ -60,7 +58,6 @@ static CLANG_FLAGS: [FlagRule; 202] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--cuda-path"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-iplugindir"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-static-pie", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
-    FlagRule::new(FlagPattern::Exactly("-Xassembler", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))),
     FlagRule::new(FlagPattern::Exactly("-Xanalyzer", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-arch_only", 1), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-framework", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
@@ -74,7 +71,6 @@ static CLANG_FLAGS: [FlagRule; 202] = [
     FlagRule::new(FlagPattern::Exactly("-trigraphs", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-idirafter", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-imultilib", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::Exactly("-arch_only", 1), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("-all_load", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
     FlagRule::new(FlagPattern::Exactly("--analyze", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-dsym-dir"), ArgumentKind::Other(PassEffect::None)),
@@ -145,7 +141,6 @@ static CLANG_FLAGS: [FlagRule; 202] = [
     FlagRule::new(FlagPattern::Exactly("-time", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("-load", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-pipe", 0), ArgumentKind::Other(PassEffect::DriverOption)),
-    FlagRule::new(FlagPattern::Exactly("-arch", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-ansi", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-save", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::Exactly("-###", 0), ArgumentKind::Other(PassEffect::DriverOption)),

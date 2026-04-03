@@ -3,7 +3,7 @@ source: bear-codegen/tests/snapshots.rs
 expression: "generate_flag_file(\"cuda\")"
 ---
 // Generated from interpreters/cuda.yaml -- DO NOT EDIT
-static CUDA_FLAGS: [FlagRule; 166] = [
+static CUDA_FLAGS: [FlagRule; 160] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--relocatable-device-code"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--expt-relaxed-constexpr", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("--expt-extended-lambda", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -58,7 +58,6 @@ static CUDA_FLAGS: [FlagRule; 166] = [
     FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("--machine"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-dumpbase", 1), ArgumentKind::Other(PassEffect::DriverOption)),
-    FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
     FlagRule::new(FlagPattern::Exactly("-isysroot", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithEq("--sysroot"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::Exactly("-nostdlib", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
@@ -136,11 +135,7 @@ static CUDA_FLAGS: [FlagRule; 166] = [
     FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-m"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-x", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
-    FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-S", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))),
-    FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
-    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
-    FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::DriverOption)),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-A"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-D"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
     FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-U"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
@@ -163,7 +158,6 @@ static CUDA_FLAGS: [FlagRule; 166] = [
     FlagRule::new(FlagPattern::Prefix("-f", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-m", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Prefix("-p", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-d", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-Q", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(PassEffect::None)),

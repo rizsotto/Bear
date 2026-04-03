@@ -34,14 +34,14 @@ pub struct IgnoreWhen {
     pub flags: Vec<String>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct FlagEntry {
     #[serde(rename = "match")]
     pub match_: FlagMatch,
     pub result: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct FlagMatch {
     pub pattern: String,
     pub count: Option<u32>,
