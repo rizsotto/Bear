@@ -1,0 +1,204 @@
+# NVIDIA HPC SDK compiler (nvc, nvc++, nvfortran) flag definitions
+# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-user-guide/
+# https://docs.nvidia.com/hpc-sdk/compilers/hpc-compilers-ref/
+type: nvidia_hpc
+recognize:
+  - executables: ["nvc", "nvc++", "nvfortran"]
+    cross_compilation: false
+    versioned: true
+  - executables: ["pgcc", "pgc++", "pgfortran"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  # Output
+  - match: {pattern: "-o{ }*"}
+    result: output
+  # Compilation control
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+  - match: {pattern: "-S"}
+    result: stops_at_assembling
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  # Include/define
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  # Standard
+  - match: {pattern: "-std{=}*"}
+    result: configures_compiling
+  # Optimization
+  - match: {pattern: "-O*"}
+    result: configures_compiling
+  - match: {pattern: "-fast"}
+    result: configures_compiling
+  - match: {pattern: "-Minline"}
+    result: configures_compiling
+  - match: {pattern: "-Mnoinline"}
+    result: configures_compiling
+  - match: {pattern: "-Munroll"}
+    result: configures_compiling
+  - match: {pattern: "-Mnounroll"}
+    result: configures_compiling
+  - match: {pattern: "-Mvect{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Mnovect"}
+    result: configures_compiling
+  - match: {pattern: "-Mconcur{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Mnoconcur"}
+    result: configures_compiling
+  - match: {pattern: "-Mipa{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Mnoipa"}
+    result: configures_compiling
+  - match: {pattern: "-Mfprelaxed"}
+    result: configures_compiling
+  - match: {pattern: "-Mnofprelaxed"}
+    result: configures_compiling
+  - match: {pattern: "-Mlre"}
+    result: configures_compiling
+  - match: {pattern: "-Mnolre"}
+    result: configures_compiling
+  - match: {pattern: "-Mautoinline"}
+    result: configures_compiling
+  - match: {pattern: "-Mnoautoinline"}
+    result: configures_compiling
+  # GPU/Accelerator
+  - match: {pattern: "-acc{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-noacc"}
+    result: configures_compiling
+  - match: {pattern: "-gpu{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-cuda"}
+    result: configures_compiling
+  - match: {pattern: "-nocuda"}
+    result: configures_compiling
+  - match: {pattern: "-mp{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-nomp"}
+    result: configures_compiling
+  - match: {pattern: "-Mcuda{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-Minfo{=}*"}
+    result: none
+  - match: {pattern: "-Mneginfo{=}*"}
+    result: none
+  # Target
+  - match: {pattern: "-tp{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-m32"}
+    result: configures_compiling
+  - match: {pattern: "-m64"}
+    result: configures_compiling
+  - match: {pattern: "-mcmodel{=}*"}
+    result: configures_compiling
+  # Debug/profiling
+  - match: {pattern: "-g"}
+    result: configures_compiling
+  - match: {pattern: "-gopt"}
+    result: configures_compiling
+  - match: {pattern: "-pg"}
+    result: configures_compiling
+  - match: {pattern: "-Mprof{=}*"}
+    result: configures_compiling
+  # Linking
+  - match: {pattern: "-L{ }*"}
+    result: configures_linking
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+  - match: {pattern: "-shared"}
+    result: configures_linking
+  - match: {pattern: "-static"}
+    result: configures_linking
+  - match: {pattern: "-Wl,*"}
+    result: configures_linking
+  - match: {pattern: "-rpath{ }*"}
+    result: configures_linking
+  - match: {pattern: "-soname{ }*"}
+    result: configures_linking
+  - match: {pattern: "-Bstatic"}
+    result: configures_linking
+  - match: {pattern: "-Bdynamic"}
+    result: configures_linking
+  - match: {pattern: "-r"}
+    result: configures_linking
+  - match: {pattern: "-nostdlib"}
+    result: configures_linking
+  - match: {pattern: "-nodefaultlibs"}
+    result: configures_linking
+  - match: {pattern: "-Mnostdlib"}
+    result: configures_linking
+  # Warnings
+  - match: {pattern: "-w"}
+    result: none
+  - match: {pattern: "-W*"}
+    result: none
+  - match: {pattern: "-Minform{=}*"}
+    result: none
+  # Preprocessing
+  - match: {pattern: "-Mpreprocess"}
+    result: configures_preprocessing
+  - match: {pattern: "-Mnostdinc"}
+    result: configures_preprocessing
+  # -M behavioral flags
+  - match: {pattern: "-Msave"}
+    result: configures_compiling
+  - match: {pattern: "-Mnosave"}
+    result: configures_compiling
+  - match: {pattern: "-Mbounds"}
+    result: configures_compiling
+  - match: {pattern: "-Mnobounds"}
+    result: configures_compiling
+  - match: {pattern: "-Mchkstk"}
+    result: configures_compiling
+  - match: {pattern: "-Mnochkstk"}
+    result: configures_compiling
+  - match: {pattern: "-Mflushz"}
+    result: configures_compiling
+  - match: {pattern: "-Mnoflushz"}
+    result: configures_compiling
+  - match: {pattern: "-Mdaz"}
+    result: configures_compiling
+  - match: {pattern: "-Mnodaz"}
+    result: configures_compiling
+  - match: {pattern: "-Mfma"}
+    result: configures_compiling
+  - match: {pattern: "-Mnofma"}
+    result: configures_compiling
+  - match: {pattern: "-Mstack_arrays"}
+    result: configures_compiling
+  - match: {pattern: "-Mnostack_arrays"}
+    result: configures_compiling
+  # Misc
+  - match: {pattern: "-V"}
+    result: info_and_exit
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  - match: {pattern: "-v"}
+    result: driver_option
+  - match: {pattern: "-###"}
+    result: info_and_exit
+  - match: {pattern: "-help"}
+    result: info_and_exit
+  - match: {pattern: "--help"}
+    result: info_and_exit
+  - match: {pattern: "-show"}
+    result: info_and_exit
+  - match: {pattern: "-dryrun"}
+    result: driver_option
+  - match: {pattern: "-Mkeepasm"}
+    result: configures_compiling
+  - match: {pattern: "-Manno"}
+    result: configures_compiling
+  - match: {pattern: "-noswitcherror"}
+    result: driver_option
+  - match: {pattern: "-Werror"}
+    result: none
+  - match: {pattern: "@*"}
+    result: configures_compiling
