@@ -47,9 +47,7 @@ which.workspace = true
 libc.workspace = true
 
 [build-dependencies]
-serde = { workspace = true }
-serde-saphyr.workspace = true
-regex.workspace = true
+bear-codegen = { path = "../bear-codegen" }
 
 [dev-dependencies]
 tempfile.workspace = true

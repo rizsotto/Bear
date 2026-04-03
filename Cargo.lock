@@ -100,6 +100,7 @@ name = "bear"
 version = "4.1.1"
 dependencies = [
  "anyhow",
+ "bear-codegen",
  "clap",
  "clap_complete",
  "crossbeam-channel",
@@ -117,6 +118,16 @@ dependencies = [
  "tempfile",
  "thiserror",
  "which",
+]
+
+[[package]]
+name = "bear-codegen"
+version = "4.1.1"
+dependencies = [
+ "regex",
+ "serde",
+ "serde-saphyr",
+ "tempfile",
 ]
 
 [[package]]

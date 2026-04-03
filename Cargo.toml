@@ -2,10 +2,11 @@
 
 [workspace]
 members = [
+  "bear-codegen",
   "platform-checks",
   "bear",
   "intercept-preload",
-  "integration-tests"
+  "integration-tests",
 ]
 resolver = "3"
 
