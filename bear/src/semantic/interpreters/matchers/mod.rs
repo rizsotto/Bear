@@ -225,6 +225,45 @@ impl FlagRule {
     }
 }
 
+/// Separator type for splitting environment variable values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum EnvSeparator {
+    /// Platform path separator (`:` on Unix, `;` on Windows) via `std::env::split_paths`.
+    Path,
+    /// Fixed separator string.
+    Fixed(&'static str),
+}
+
+/// Position for expanded environment variable arguments relative to command-line args.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum EnvPosition {
+    Prepend,
+    Append,
+}
+
+/// How an environment variable value maps to compiler arguments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum EnvMapping {
+    /// Split value by separator, emit `flag <entry>` per element.
+    Flag { flag: &'static str, separator: EnvSeparator },
+    /// Shell-split value and insert as raw arguments at the given position.
+    Expand { position: EnvPosition },
+}
+
+/// A rule mapping an environment variable to compiler arguments.
+#[derive(Debug, Clone)]
+pub(super) struct EnvRule {
+    pub variable: &'static str,
+    pub mapping: EnvMapping,
+    pub kind: ArgumentKind,
+}
+
+impl EnvRule {
+    pub const fn new(variable: &'static str, mapping: EnvMapping, kind: ArgumentKind) -> Self {
+        Self { variable, mapping, kind }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

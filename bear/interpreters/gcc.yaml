@@ -218,3 +218,29 @@ flags:
     result: none
   - match: {pattern: "--*"}
     result: none
+environment:
+  - variable: CPATH
+    effect: configures_preprocessing
+    mapping:
+      flag: "-I"
+      separator: path
+  - variable: C_INCLUDE_PATH
+    effect: configures_preprocessing
+    mapping:
+      flag: "-isystem"
+      separator: path
+  - variable: CPLUS_INCLUDE_PATH
+    effect: configures_preprocessing
+    mapping:
+      flag: "-isystem"
+      separator: path
+  - variable: OBJC_INCLUDE_PATH
+    effect: configures_preprocessing
+    mapping:
+      flag: "-isystem"
+      separator: path
+  - variable: LIBRARY_PATH
+    effect: configures_linking
+    mapping:
+      flag: "-L"
+      separator: path

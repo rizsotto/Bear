@@ -49,6 +49,7 @@ libc.workspace = true
 [build-dependencies]
 serde = { workspace = true }
 serde-saphyr.workspace = true
+regex.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -298,3 +298,25 @@ flags:
     result: driver_option
   - match: {pattern: "/FS"}
     result: driver_option
+
+environment:
+  - variable: CL
+    effect: configures_compiling
+    mapping:
+      expand: prepend
+      separator: space
+  - variable: _CL_
+    effect: configures_compiling
+    mapping:
+      expand: append
+      separator: space
+  - variable: INCLUDE
+    effect: configures_preprocessing
+    mapping:
+      flag: "/I"
+      separator: ";"
+  - variable: LIB
+    effect: configures_linking
+    mapping:
+      flag: "/LIBPATH:"
+      separator: ";"

@@ -24,3 +24,9 @@ flags:
     result: configures_compiling
   - match: {pattern: "--apcs{=}*"}
     result: configures_compiling
+environment:
+  - variable: ARMCOMPILER6_CLANGOPT
+    effect: configures_compiling
+    mapping:
+      expand: prepend
+      separator: space

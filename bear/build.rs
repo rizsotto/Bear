@@ -77,6 +77,8 @@ mod flags {
         #[serde(default)]
         slash_prefix: Option<bool>,
         flags: Vec<FlagEntry>,
+        #[serde(default)]
+        environment: Option<Vec<EnvEntry>>,
     }
 
     #[derive(Deserialize, Clone)]
@@ -109,6 +111,25 @@ mod flags {
         count: Option<u32>,
     }
 
+    #[derive(Deserialize, Clone)]
+    struct EnvEntry {
+        variable: String,
+        effect: String,
+        mapping: EnvMappingYaml,
+        #[serde(default)]
+        #[allow(dead_code)]
+        note: Option<String>,
+    }
+
+    #[derive(Deserialize, Clone)]
+    struct EnvMappingYaml {
+        #[serde(default)]
+        flag: Option<String>,
+        #[serde(default)]
+        expand: Option<String>,
+        separator: String,
+    }
+
     /// Table metadata: name of the static, which file to generate.
     struct TableConfig {
         yaml_file: &'static str,
@@ -116,6 +137,7 @@ mod flags {
         ignore_executables_name: &'static str,
         ignore_flags_name: &'static str,
         slash_prefix_name: &'static str,
+        env_rules_name: &'static str,
         output_file: &'static str,
     }
 
@@ -130,6 +152,7 @@ mod flags {
             ignore_executables_name: "GCC_IGNORE_EXECUTABLES",
             ignore_flags_name: "GCC_IGNORE_FLAGS",
             slash_prefix_name: "GCC_SLASH_PREFIX",
+            env_rules_name: "GCC_ENV_RULES",
             output_file: "flags_gcc.rs",
         },
         // IBM XL before Clang: ibm-clang looks like cross-compilation clang
@@ -139,6 +162,7 @@ mod flags {
             ignore_executables_name: "IBM_XL_IGNORE_EXECUTABLES",
             ignore_flags_name: "IBM_XL_IGNORE_FLAGS",
             slash_prefix_name: "IBM_XL_SLASH_PREFIX",
+            env_rules_name: "IBM_XL_ENV_RULES",
             output_file: "flags_ibm_xl.rs",
         },
         // clang-cl before Clang: clang-cl is versioned and could match clang's pattern
@@ -148,6 +172,7 @@ mod flags {
             ignore_executables_name: "CLANG_CL_IGNORE_EXECUTABLES",
             ignore_flags_name: "CLANG_CL_IGNORE_FLAGS",
             slash_prefix_name: "CLANG_CL_SLASH_PREFIX",
+            env_rules_name: "CLANG_CL_ENV_RULES",
             output_file: "flags_clang_cl.rs",
         },
         TableConfig {
@@ -156,6 +181,7 @@ mod flags {
             ignore_executables_name: "CLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "CLANG_IGNORE_FLAGS",
             slash_prefix_name: "CLANG_SLASH_PREFIX",
+            env_rules_name: "CLANG_ENV_RULES",
             output_file: "flags_clang.rs",
         },
         TableConfig {
@@ -164,6 +190,7 @@ mod flags {
             ignore_executables_name: "FLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "FLANG_IGNORE_FLAGS",
             slash_prefix_name: "FLANG_SLASH_PREFIX",
+            env_rules_name: "FLANG_ENV_RULES",
             output_file: "flags_flang.rs",
         },
         TableConfig {
@@ -172,6 +199,7 @@ mod flags {
             ignore_executables_name: "CUDA_IGNORE_EXECUTABLES",
             ignore_flags_name: "CUDA_IGNORE_FLAGS",
             slash_prefix_name: "CUDA_SLASH_PREFIX",
+            env_rules_name: "CUDA_ENV_RULES",
             output_file: "flags_cuda.rs",
         },
         TableConfig {
@@ -180,6 +208,7 @@ mod flags {
             ignore_executables_name: "INTEL_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "INTEL_FORTRAN_IGNORE_FLAGS",
             slash_prefix_name: "INTEL_FORTRAN_SLASH_PREFIX",
+            env_rules_name: "INTEL_FORTRAN_ENV_RULES",
             output_file: "flags_intel_fortran.rs",
         },
         TableConfig {
@@ -188,6 +217,7 @@ mod flags {
             ignore_executables_name: "CRAY_FORTRAN_IGNORE_EXECUTABLES",
             ignore_flags_name: "CRAY_FORTRAN_IGNORE_FLAGS",
             slash_prefix_name: "CRAY_FORTRAN_SLASH_PREFIX",
+            env_rules_name: "CRAY_FORTRAN_ENV_RULES",
             output_file: "flags_cray_fortran.rs",
         },
         TableConfig {
@@ -196,6 +226,7 @@ mod flags {
             ignore_executables_name: "MSVC_IGNORE_EXECUTABLES",
             ignore_flags_name: "MSVC_IGNORE_FLAGS",
             slash_prefix_name: "MSVC_SLASH_PREFIX",
+            env_rules_name: "MSVC_ENV_RULES",
             output_file: "flags_msvc.rs",
         },
         TableConfig {
@@ -204,6 +235,7 @@ mod flags {
             ignore_executables_name: "INTEL_CC_IGNORE_EXECUTABLES",
             ignore_flags_name: "INTEL_CC_IGNORE_FLAGS",
             slash_prefix_name: "INTEL_CC_SLASH_PREFIX",
+            env_rules_name: "INTEL_CC_ENV_RULES",
             output_file: "flags_intel_cc.rs",
         },
         TableConfig {
@@ -212,6 +244,7 @@ mod flags {
             ignore_executables_name: "NVIDIA_HPC_IGNORE_EXECUTABLES",
             ignore_flags_name: "NVIDIA_HPC_IGNORE_FLAGS",
             slash_prefix_name: "NVIDIA_HPC_SLASH_PREFIX",
+            env_rules_name: "NVIDIA_HPC_ENV_RULES",
             output_file: "flags_nvidia_hpc.rs",
         },
         TableConfig {
@@ -220,6 +253,7 @@ mod flags {
             ignore_executables_name: "ARMCLANG_IGNORE_EXECUTABLES",
             ignore_flags_name: "ARMCLANG_IGNORE_FLAGS",
             slash_prefix_name: "ARMCLANG_SLASH_PREFIX",
+            env_rules_name: "ARMCLANG_ENV_RULES",
             output_file: "flags_armclang.rs",
         },
     ];
@@ -272,14 +306,21 @@ mod flags {
             let ignore_when = resolve_ignore_when(table, &raw_tables);
             let slash_prefix = resolve_slash_prefix(table, &raw_tables);
 
+            // Resolve environment entries (transitive inheritance)
+            let env_entries = resolve_environment(key, &raw_tables);
+
             // Generate Rust source
             let mut rust_code = generate_static_array(config, &entries);
             rust_code.push_str(&generate_ignore_arrays(config, &ignore_when));
             rust_code.push_str(&format!("static {}: bool = {};\n", config.slash_prefix_name, slash_prefix));
+            rust_code.push_str(&generate_env_array(config, &env_entries));
             let out_path = out_dir.join(config.output_file);
             fs::write(&out_path, rust_code)
                 .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
         }
+
+        // Generate a combined list of all compiler environment variable names
+        generate_env_keys(&raw_tables, &out_dir);
     }
 
     /// Resolve `ignore_when` for a table, inheriting from base if extending.
@@ -469,6 +510,174 @@ mod flags {
             "none" => "ArgumentKind::Other(PassEffect::None)",
             other => panic!("Unknown result value: '{}'", other),
         }
+    }
+
+    /// Resolve environment entries for a compiler, with transitive inheritance.
+    ///
+    /// Walks the `extends` chain recursively, collecting environment entries.
+    /// Own entries override inherited ones matched by variable name.
+    fn resolve_environment(key: &str, raw_tables: &HashMap<String, FlagTable>) -> Vec<EnvEntry> {
+        let mut visited = std::collections::HashSet::new();
+        resolve_environment_recursive(key, raw_tables, &mut visited)
+    }
+
+    fn resolve_environment_recursive(
+        key: &str,
+        raw_tables: &HashMap<String, FlagTable>,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Vec<EnvEntry> {
+        if !visited.insert(key.to_string()) {
+            return vec![];
+        }
+        let table = &raw_tables[key];
+        let mut entries = table.environment.clone().unwrap_or_default();
+
+        if let Some(ref base_name) = table.extends
+            && raw_tables.contains_key(base_name.as_str())
+        {
+            let base_entries = resolve_environment_recursive(base_name, raw_tables, visited);
+            let own_vars: std::collections::HashSet<String> =
+                entries.iter().map(|e| e.variable.clone()).collect();
+            for entry in base_entries {
+                if !own_vars.contains(&entry.variable) {
+                    entries.push(entry);
+                }
+            }
+        }
+        entries
+    }
+
+    /// Validate an environment entry at build time.
+    fn validate_env_entry(entry: &EnvEntry, yaml_file: &str) {
+        let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
+        assert!(
+            var_re.is_match(&entry.variable),
+            "{}: invalid environment variable name: '{}'",
+            yaml_file,
+            entry.variable
+        );
+
+        // Validate effect is a known value
+        match entry.effect.as_str() {
+            "configures_preprocessing"
+            | "configures_compiling"
+            | "configures_assembling"
+            | "configures_linking"
+            | "stops_at_preprocessing"
+            | "stops_at_compiling"
+            | "stops_at_assembling"
+            | "info_and_exit"
+            | "driver_option"
+            | "none" => {}
+            other => panic!("{}: unknown effect value: '{}'", yaml_file, other),
+        }
+
+        // Validate mapping
+        let mapping = &entry.mapping;
+        if mapping.flag.is_some() && mapping.expand.is_some() {
+            panic!("{}: environment entry '{}' has both 'flag' and 'expand'", yaml_file, entry.variable);
+        }
+        if mapping.flag.is_none() && mapping.expand.is_none() && entry.effect != "none" {
+            panic!(
+                "{}: environment entry '{}' has neither 'flag' nor 'expand' (and effect is not 'none')",
+                yaml_file, entry.variable
+            );
+        }
+
+        // Validate separator
+        match mapping.separator.as_str() {
+            "path" | "space" | ";" => {}
+            other => panic!(
+                "{}: environment entry '{}' has unknown separator: '{}'",
+                yaml_file, entry.variable, other
+            ),
+        }
+
+        // Validate expand position
+        if let Some(ref expand) = mapping.expand {
+            match expand.as_str() {
+                "prepend" | "append" => {}
+                other => panic!(
+                    "{}: environment entry '{}' has unknown expand position: '{}'",
+                    yaml_file, entry.variable, other
+                ),
+            }
+        }
+    }
+
+    /// Map an environment entry's mapping to a Rust EnvMapping expression.
+    fn env_mapping_to_rust(mapping: &EnvMappingYaml) -> String {
+        if let Some(ref flag) = mapping.flag {
+            let sep = match mapping.separator.as_str() {
+                "path" => "EnvSeparator::Path".to_string(),
+                ";" => "EnvSeparator::Fixed(\";\")".to_string(),
+                other => format!("EnvSeparator::Fixed(\"{}\")", other),
+            };
+            format!("EnvMapping::Flag {{ flag: \"{}\", separator: {} }}", flag, sep)
+        } else if let Some(ref expand) = mapping.expand {
+            let pos = match expand.as_str() {
+                "prepend" => "EnvPosition::Prepend",
+                "append" => "EnvPosition::Append",
+                _ => unreachable!(),
+            };
+            format!("EnvMapping::Expand {{ position: {} }}", pos)
+        } else {
+            unreachable!()
+        }
+    }
+
+    /// Generate a static array of EnvRule for a compiler.
+    fn generate_env_array(config: &TableConfig, entries: &[EnvEntry]) -> String {
+        // Filter out effect: none entries (documentary only)
+        let active: Vec<&EnvEntry> = entries.iter().filter(|e| e.effect != "none").collect();
+
+        for entry in &active {
+            validate_env_entry(entry, config.yaml_file);
+        }
+
+        let mut out = String::new();
+        out.push_str(&format!("static {}: [EnvRule; {}] = [\n", config.env_rules_name, active.len()));
+
+        for entry in &active {
+            let mapping_rust = env_mapping_to_rust(&entry.mapping);
+            let effect_rust = result_to_rust(&entry.effect);
+            out.push_str(&format!(
+                "    EnvRule::new(\"{}\", {}, {}),\n",
+                entry.variable, mapping_rust, effect_rust
+            ));
+        }
+
+        out.push_str("];\n");
+        out
+    }
+
+    /// Generate a static array of all compiler environment variable names.
+    ///
+    /// Used by `environment.rs` to replace the hardcoded GCC include key set.
+    fn generate_env_keys(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
+        let mut all_vars = std::collections::BTreeSet::new();
+
+        for config in TABLES {
+            let key = config.yaml_file.strip_suffix(".yaml").unwrap();
+            let entries = resolve_environment(key, raw_tables);
+            for entry in &entries {
+                if entry.effect != "none" {
+                    all_vars.insert(entry.variable.clone());
+                }
+            }
+        }
+
+        let mut out = String::new();
+        out.push_str("// Generated from interpreters/*.yaml -- DO NOT EDIT\n");
+        out.push_str(&format!("static COMPILER_ENV_KEYS: [&str; {}] = [\n", all_vars.len()));
+        for var in &all_vars {
+            out.push_str(&format!("    \"{}\",\n", var));
+        }
+        out.push_str("];\n");
+
+        let out_path = out_dir.join("env_keys.rs");
+        fs::write(&out_path, &out)
+            .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
     }
 
     /// Generate a Rust source file containing a static array of FlagRule.
