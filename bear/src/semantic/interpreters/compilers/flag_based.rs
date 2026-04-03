@@ -23,6 +23,9 @@ struct FlagBasedInterpreter {
     analyzer: FlagAnalyzer,
     ignore_executables: &'static [&'static str],
     ignore_flags: &'static [&'static str],
+    /// When true, arguments starting with '/' are treated as flags (MSVC-style).
+    /// When false (default), only '-' prefixed arguments are treated as flags.
+    slash_prefix: bool,
 }
 
 impl FlagBasedInterpreter {
@@ -31,8 +34,9 @@ impl FlagBasedInterpreter {
         flags: &'static [FlagRule],
         ignore_executables: &'static [&'static str],
         ignore_flags: &'static [&'static str],
+        slash_prefix: bool,
     ) -> Self {
-        Self { analyzer: FlagAnalyzer::new(flags), ignore_executables, ignore_flags }
+        Self { analyzer: FlagAnalyzer::new(flags), ignore_executables, ignore_flags, slash_prefix }
     }
 
     fn should_ignore(&self, execution: &Execution) -> Option<&'static str> {
@@ -63,7 +67,7 @@ impl Interpreter for FlagBasedInterpreter {
         }
 
         let Execution { executable, mut arguments, working_dir, environment } = execution;
-        let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments);
+        let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments, self.slash_prefix);
         let env_args = parse_environment(&environment);
 
         let mut all_args = annotated_args;
@@ -77,7 +81,11 @@ impl Interpreter for FlagBasedInterpreter {
 ///
 /// Uses `std::mem::take` to move strings into Argument variants without cloning.
 /// The source Vec elements become empty strings after being taken.
-fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &mut [String]) -> Vec<Argument> {
+fn parse_arguments_owned(
+    flag_analyzer: &FlagAnalyzer,
+    args: &mut [String],
+    slash_prefix: bool,
+) -> Vec<Argument> {
     let mut result: Vec<Argument> = Vec::with_capacity(args.len());
     let mut i = 0;
 
@@ -125,14 +133,22 @@ fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &mut [String]) -> V
                 ArgumentKind::Output => match consumed_count {
                     1 => {
                         let val = std::mem::take(&mut args[i]);
-                        Argument::Output { flag: "-o".to_string(), path: val[2..].to_string() }
+                        let flag_str = match_result.rule.pattern.flag();
+                        let after_flag = &val[flag_str.len()..];
+                        // Skip separator character (= or :) if present
+                        let path = if after_flag.starts_with('=') || after_flag.starts_with(':') {
+                            after_flag[1..].to_string()
+                        } else {
+                            after_flag.to_string()
+                        };
+                        Argument::Output { flag: flag_str.to_string(), path }
                     }
                     2 => Argument::Output {
                         flag: std::mem::take(&mut args[i]),
                         path: std::mem::take(&mut args[i + 1]),
                     },
                     _ => {
-                        unreachable!("Output file should be specified either `-o file` or `-ofile`")
+                        unreachable!("Output file should be specified with glued or separate value")
                     }
                 },
                 ArgumentKind::Other(compiler_pass) => {
@@ -144,7 +160,7 @@ fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &mut [String]) -> V
 
             result.push(arg);
             i += consumed_count;
-        } else if args[i].starts_with('-') {
+        } else if args[i].starts_with('-') || (slash_prefix && args[i].starts_with('/')) {
             result.push(Argument::Other {
                 arguments: vec![std::mem::take(&mut args[i])],
                 kind: ArgumentKind::Other(PassEffect::None),
@@ -202,19 +218,19 @@ include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc() -> impl Interpreter {
-    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS)
+    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS, false)
 }
 
 pub(super) fn clang() -> impl Interpreter {
-    FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS)
+    FlagBasedInterpreter::new(&CLANG_FLAGS, &CLANG_IGNORE_EXECUTABLES, &CLANG_IGNORE_FLAGS, false)
 }
 
 pub(super) fn flang() -> impl Interpreter {
-    FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS)
+    FlagBasedInterpreter::new(&FLANG_FLAGS, &FLANG_IGNORE_EXECUTABLES, &FLANG_IGNORE_FLAGS, false)
 }
 
 pub(super) fn cuda() -> impl Interpreter {
-    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS)
+    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS, false)
 }
 
 pub(super) fn intel_fortran() -> impl Interpreter {
@@ -222,6 +238,7 @@ pub(super) fn intel_fortran() -> impl Interpreter {
         &INTEL_FORTRAN_FLAGS,
         &INTEL_FORTRAN_IGNORE_EXECUTABLES,
         &INTEL_FORTRAN_IGNORE_FLAGS,
+        false,
     )
 }
 
@@ -230,6 +247,7 @@ pub(super) fn cray_fortran() -> impl Interpreter {
         &CRAY_FORTRAN_FLAGS,
         &CRAY_FORTRAN_IGNORE_EXECUTABLES,
         &CRAY_FORTRAN_IGNORE_FLAGS,
+        false,
     )
 }
 
@@ -363,7 +381,7 @@ mod pass_through_tests {
             "/OUT:foo.exe".to_string(),
         ];
 
-        let result = parse_arguments_owned(&analyzer, &mut args);
+        let result = parse_arguments_owned(&analyzer, &mut args, false);
 
         // cl (compiler)
         assert!(matches!(result[0], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Compiler));
@@ -384,6 +402,84 @@ mod pass_through_tests {
         // /OUT:foo.exe (linker arg)
         assert!(
             matches!(result[5], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+        );
+    }
+}
+
+#[cfg(test)]
+mod slash_prefix_tests {
+    use super::*;
+    use crate::semantic::interpreters::matchers::{FlagAnalyzer, FlagRule};
+
+    #[test]
+    fn slash_prefixed_args_treated_as_source_without_slash_support() {
+        let flags: &[FlagRule] = &[];
+        let analyzer = FlagAnalyzer::new(flags);
+        let mut args = vec!["cl".to_string(), "/c".to_string(), "foo.c".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, false);
+        // /c should be a source file since slash_prefix is false
+        assert!(matches!(result[1], Argument::Source { .. }));
+    }
+
+    #[test]
+    fn slash_prefixed_args_treated_as_flags_with_slash_support() {
+        let flags: &[FlagRule] = &[];
+        let analyzer = FlagAnalyzer::new(flags);
+        let mut args = vec!["cl".to_string(), "/c".to_string(), "foo.c".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, true);
+        // /c should be an unrecognized flag (Other with None) since slash_prefix is true
+        assert!(matches!(
+            result[1],
+            Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::None)
+        ));
+    }
+
+    #[test]
+    fn output_extraction_works_with_glued_eq() {
+        use crate::semantic::interpreters::matchers::FlagPattern;
+        use std::sync::LazyLock;
+
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithEq("-o"), ArgumentKind::Output)]);
+
+        let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
+        let mut args = vec!["gcc".to_string(), "-o=foo.o".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, false);
+        assert!(
+            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "-o" && path == "foo.o")
+        );
+    }
+
+    #[test]
+    fn output_extraction_works_with_glued_colon() {
+        use crate::semantic::interpreters::matchers::FlagPattern;
+        use std::sync::LazyLock;
+
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> =
+            LazyLock::new(|| vec![FlagRule::new(FlagPattern::ExactlyWithColon("/Fo"), ArgumentKind::Output)]);
+
+        let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
+        let mut args = vec!["cl".to_string(), "/Fo:foo.obj".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, true);
+        assert!(
+            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "/Fo" && path == "foo.obj")
+        );
+    }
+
+    #[test]
+    fn output_extraction_works_with_glued_value() {
+        use crate::semantic::interpreters::matchers::FlagPattern;
+        use std::sync::LazyLock;
+
+        static OUTPUT_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
+            vec![FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output)]
+        });
+
+        let analyzer = FlagAnalyzer::new(&OUTPUT_FLAGS);
+        let mut args = vec!["gcc".to_string(), "-ofoo.o".to_string()];
+        let result = parse_arguments_owned(&analyzer, &mut args, false);
+        assert!(
+            matches!(result[1], Argument::Output { ref flag, ref path } if flag == "-o" && path == "foo.o")
         );
     }
 }
