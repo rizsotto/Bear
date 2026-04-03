@@ -7,9 +7,8 @@
 //! is parameterized by its generated flag table and optional ignore filters, eliminating
 //! the need for per-compiler structs and trait implementations.
 
-use super::super::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
-use crate::environment::{
-    KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3, KEY_GCC__OBJC_INCLUDE,
+use super::super::matchers::{
+    EnvMapping, EnvPosition, EnvRule, EnvSeparator, FlagAnalyzer, FlagPattern, FlagRule,
 };
 use crate::semantic::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
@@ -26,17 +25,20 @@ struct FlagBasedInterpreter {
     /// When true, arguments starting with '/' are treated as flags (MSVC-style).
     /// When false (default), only '-' prefixed arguments are treated as flags.
     slash_prefix: bool,
+    env_rules: &'static [EnvRule],
 }
 
 impl FlagBasedInterpreter {
-    /// Creates a new flag-based interpreter with the given flag table and ignore filters.
+    /// Creates a new flag-based interpreter with the given flag table, ignore filters,
+    /// and environment variable mapping rules.
     fn new(
         flags: &'static [FlagRule],
         ignore_executables: &'static [&'static str],
         ignore_flags: &'static [&'static str],
         slash_prefix: bool,
+        env_rules: &'static [EnvRule],
     ) -> Self {
-        Self { analyzer: FlagAnalyzer::new(flags), ignore_executables, ignore_flags, slash_prefix }
+        Self { analyzer: FlagAnalyzer::new(flags), ignore_executables, ignore_flags, slash_prefix, env_rules }
     }
 
     fn should_ignore(&self, execution: &Execution) -> Option<&'static str> {
@@ -68,10 +70,11 @@ impl Interpreter for FlagBasedInterpreter {
 
         let Execution { executable, mut arguments, working_dir, environment } = execution;
         let annotated_args = parse_arguments_owned(&self.analyzer, &mut arguments, self.slash_prefix);
-        let env_args = parse_environment(&environment);
+        let (prepend_args, append_args) = parse_environment(&environment, self.env_rules);
 
-        let mut all_args = annotated_args;
-        all_args.extend(env_args);
+        let mut all_args = prepend_args;
+        all_args.extend(annotated_args);
+        all_args.extend(append_args);
 
         RecognizeResult::Recognized(Command::new(working_dir, executable, all_args))
     }
@@ -175,37 +178,55 @@ fn parse_arguments_owned(
     result
 }
 
-/// Parse include directories from GCC-compatible environment variables.
+/// Parse environment variables into compiler arguments using the given rules.
 ///
-/// https://gcc.gnu.org/onlinedocs/cpp/Environment-Variables.html
-fn parse_environment(environment: &std::collections::HashMap<String, String>) -> Vec<Argument> {
-    let mut args: Vec<Argument> = Vec::with_capacity(4);
+/// Returns `(prepend, append)` argument vectors. Prepend args go before command-line
+/// args (e.g., MSVC `CL`), append args go after (e.g., include paths, MSVC `_CL_`).
+fn parse_environment(
+    environment: &std::collections::HashMap<String, String>,
+    rules: &[EnvRule],
+) -> (Vec<Argument>, Vec<Argument>) {
+    let mut prepend = Vec::new();
+    let mut append = Vec::new();
 
-    for env_key in [KEY_GCC__C_INCLUDE_1, KEY_GCC__C_INCLUDE_2, KEY_GCC__C_INCLUDE_3] {
-        if let Some(env_value) = environment.get(env_key) {
-            for path in std::env::split_paths(env_value) {
-                if !path.as_os_str().is_empty() {
-                    args.push(Argument::Other {
-                        arguments: vec!["-I".to_string(), path.to_string_lossy().to_string()],
-                        kind: ArgumentKind::Other(PassEffect::None),
-                    });
+    for rule in rules {
+        let Some(value) = environment.get(rule.variable) else {
+            continue;
+        };
+        match rule.mapping {
+            EnvMapping::Flag { flag, separator } => {
+                let parts = split_env_value(value, separator);
+                for part in parts {
+                    if !part.is_empty() {
+                        append.push(Argument::Other {
+                            arguments: vec![flag.to_string(), part],
+                            kind: rule.kind,
+                        });
+                    }
+                }
+            }
+            EnvMapping::Expand { position } => {
+                let words = shell_words::split(value).unwrap_or_else(|_| vec![value.clone()]);
+                let target = match position {
+                    EnvPosition::Prepend => &mut prepend,
+                    EnvPosition::Append => &mut append,
+                };
+                for word in words {
+                    target.push(Argument::Other { arguments: vec![word], kind: rule.kind });
                 }
             }
         }
     }
 
-    if let Some(env_value) = environment.get(KEY_GCC__OBJC_INCLUDE) {
-        for path in std::env::split_paths(env_value) {
-            if !path.as_os_str().is_empty() {
-                args.push(Argument::Other {
-                    arguments: vec!["-isystem".to_string(), path.to_string_lossy().to_string()],
-                    kind: ArgumentKind::Other(PassEffect::None),
-                });
-            }
-        }
-    }
+    (prepend, append)
+}
 
-    args
+/// Split an environment variable value by the given separator type.
+fn split_env_value(value: &str, separator: EnvSeparator) -> Vec<String> {
+    match separator {
+        EnvSeparator::Path => std::env::split_paths(value).map(|p| p.to_string_lossy().to_string()).collect(),
+        EnvSeparator::Fixed(sep) => value.split(sep).map(|s| s.to_string()).collect(),
+    }
 }
 
 // Flag tables and ignore arrays. Generated at build time from flags/*.yaml.
@@ -224,7 +245,13 @@ include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc() -> impl Interpreter {
-    FlagBasedInterpreter::new(&GCC_FLAGS, &GCC_IGNORE_EXECUTABLES, &GCC_IGNORE_FLAGS, GCC_SLASH_PREFIX)
+    FlagBasedInterpreter::new(
+        &GCC_FLAGS,
+        &GCC_IGNORE_EXECUTABLES,
+        &GCC_IGNORE_FLAGS,
+        GCC_SLASH_PREFIX,
+        &GCC_ENV_RULES,
+    )
 }
 
 pub(super) fn clang() -> impl Interpreter {
@@ -233,6 +260,7 @@ pub(super) fn clang() -> impl Interpreter {
         &CLANG_IGNORE_EXECUTABLES,
         &CLANG_IGNORE_FLAGS,
         CLANG_SLASH_PREFIX,
+        &CLANG_ENV_RULES,
     )
 }
 
@@ -242,11 +270,18 @@ pub(super) fn flang() -> impl Interpreter {
         &FLANG_IGNORE_EXECUTABLES,
         &FLANG_IGNORE_FLAGS,
         FLANG_SLASH_PREFIX,
+        &FLANG_ENV_RULES,
     )
 }
 
 pub(super) fn cuda() -> impl Interpreter {
-    FlagBasedInterpreter::new(&CUDA_FLAGS, &CUDA_IGNORE_EXECUTABLES, &CUDA_IGNORE_FLAGS, CUDA_SLASH_PREFIX)
+    FlagBasedInterpreter::new(
+        &CUDA_FLAGS,
+        &CUDA_IGNORE_EXECUTABLES,
+        &CUDA_IGNORE_FLAGS,
+        CUDA_SLASH_PREFIX,
+        &CUDA_ENV_RULES,
+    )
 }
 
 pub(super) fn intel_fortran() -> impl Interpreter {
@@ -255,6 +290,7 @@ pub(super) fn intel_fortran() -> impl Interpreter {
         &INTEL_FORTRAN_IGNORE_EXECUTABLES,
         &INTEL_FORTRAN_IGNORE_FLAGS,
         INTEL_FORTRAN_SLASH_PREFIX,
+        &INTEL_FORTRAN_ENV_RULES,
     )
 }
 
@@ -264,11 +300,18 @@ pub(super) fn cray_fortran() -> impl Interpreter {
         &CRAY_FORTRAN_IGNORE_EXECUTABLES,
         &CRAY_FORTRAN_IGNORE_FLAGS,
         CRAY_FORTRAN_SLASH_PREFIX,
+        &CRAY_FORTRAN_ENV_RULES,
     )
 }
 
 pub(super) fn msvc() -> impl Interpreter {
-    FlagBasedInterpreter::new(&MSVC_FLAGS, &MSVC_IGNORE_EXECUTABLES, &MSVC_IGNORE_FLAGS, MSVC_SLASH_PREFIX)
+    FlagBasedInterpreter::new(
+        &MSVC_FLAGS,
+        &MSVC_IGNORE_EXECUTABLES,
+        &MSVC_IGNORE_FLAGS,
+        MSVC_SLASH_PREFIX,
+        &MSVC_ENV_RULES,
+    )
 }
 
 pub(super) fn clang_cl() -> impl Interpreter {
@@ -277,6 +320,7 @@ pub(super) fn clang_cl() -> impl Interpreter {
         &CLANG_CL_IGNORE_EXECUTABLES,
         &CLANG_CL_IGNORE_FLAGS,
         CLANG_CL_SLASH_PREFIX,
+        &CLANG_CL_ENV_RULES,
     )
 }
 
@@ -286,6 +330,7 @@ pub(super) fn intel_cc() -> impl Interpreter {
         &INTEL_CC_IGNORE_EXECUTABLES,
         &INTEL_CC_IGNORE_FLAGS,
         INTEL_CC_SLASH_PREFIX,
+        &INTEL_CC_ENV_RULES,
     )
 }
 
@@ -295,6 +340,7 @@ pub(super) fn nvidia_hpc() -> impl Interpreter {
         &NVIDIA_HPC_IGNORE_EXECUTABLES,
         &NVIDIA_HPC_IGNORE_FLAGS,
         NVIDIA_HPC_SLASH_PREFIX,
+        &NVIDIA_HPC_ENV_RULES,
     )
 }
 
@@ -304,6 +350,7 @@ pub(super) fn armclang() -> impl Interpreter {
         &ARMCLANG_IGNORE_EXECUTABLES,
         &ARMCLANG_IGNORE_FLAGS,
         ARMCLANG_SLASH_PREFIX,
+        &ARMCLANG_ENV_RULES,
     )
 }
 
@@ -313,6 +360,7 @@ pub(super) fn ibm_xl() -> impl Interpreter {
         &IBM_XL_IGNORE_EXECUTABLES,
         &IBM_XL_IGNORE_FLAGS,
         IBM_XL_SLASH_PREFIX,
+        &IBM_XL_ENV_RULES,
     )
 }
 
@@ -576,5 +624,182 @@ mod slash_prefix_tests {
         assert!(
             matches!(result[1], Argument::Output { ref flag, ref path } if flag == "-o" && path == "foo.o")
         );
+    }
+}
+
+#[cfg(test)]
+mod environment_mapping_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn collect_args(args: &[Argument]) -> Vec<String> {
+        args.iter()
+            .flat_map(|a| match a {
+                Argument::Other { arguments, .. } => arguments.clone(),
+                Argument::Output { flag, path } => vec![flag.clone(), path.clone()],
+                Argument::Source { path, .. } => vec![path.clone()],
+            })
+            .collect()
+    }
+
+    #[test]
+    fn path_separator_mapping() {
+        let rules = &[EnvRule::new(
+            "CPATH",
+            EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("CPATH".to_string(), "/a:/b".to_string());
+
+        let (prepend, append) = parse_environment(&env, rules);
+        assert!(prepend.is_empty());
+        let args = collect_args(&append);
+        assert_eq!(args, vec!["-I", "/a", "-I", "/b"]);
+    }
+
+    #[test]
+    fn path_separator_filters_empty_elements() {
+        let rules = &[EnvRule::new(
+            "CPATH",
+            EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("CPATH".to_string(), ":/a::/b:".to_string());
+
+        let (_prepend, append) = parse_environment(&env, rules);
+        let args = collect_args(&append);
+        assert_eq!(args, vec!["-I", "/a", "-I", "/b"]);
+    }
+
+    #[test]
+    fn fixed_separator_mapping() {
+        let rules = &[EnvRule::new(
+            "INCLUDE",
+            EnvMapping::Flag { flag: "/I", separator: EnvSeparator::Fixed(";") },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("INCLUDE".to_string(), r"C:\a;C:\b".to_string());
+
+        let (_prepend, append) = parse_environment(&env, rules);
+        let args = collect_args(&append);
+        assert_eq!(args, vec!["/I", r"C:\a", "/I", r"C:\b"]);
+    }
+
+    #[test]
+    fn expand_prepend() {
+        let rules = &[EnvRule::new(
+            "CL",
+            EnvMapping::Expand { position: EnvPosition::Prepend },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("CL".to_string(), "/O2 /W4".to_string());
+
+        let (prepend, append) = parse_environment(&env, rules);
+        assert!(append.is_empty());
+        let args = collect_args(&prepend);
+        assert_eq!(args, vec!["/O2", "/W4"]);
+    }
+
+    #[test]
+    fn expand_append() {
+        let rules = &[EnvRule::new(
+            "_CL_",
+            EnvMapping::Expand { position: EnvPosition::Append },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("_CL_".to_string(), "/link foo.lib".to_string());
+
+        let (prepend, append) = parse_environment(&env, rules);
+        assert!(prepend.is_empty());
+        let args = collect_args(&append);
+        assert_eq!(args, vec!["/link", "foo.lib"]);
+    }
+
+    #[test]
+    fn missing_variable_produces_no_args() {
+        let rules = &[EnvRule::new(
+            "CPATH",
+            EnvMapping::Flag { flag: "-I", separator: EnvSeparator::Path },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing)),
+        )];
+        let env = HashMap::new();
+
+        let (prepend, append) = parse_environment(&env, rules);
+        assert!(prepend.is_empty());
+        assert!(append.is_empty());
+    }
+
+    #[test]
+    fn nvidia_hpc_has_no_gcc_env_rules() {
+        assert!(
+            NVIDIA_HPC_ENV_RULES.is_empty(),
+            "NVIDIA HPC should not inherit GCC environment variables, got {} rules",
+            NVIDIA_HPC_ENV_RULES.len()
+        );
+    }
+
+    #[test]
+    fn clang_inherits_gcc_env_rules() {
+        let gcc_vars: std::collections::HashSet<&str> = GCC_ENV_RULES.iter().map(|r| r.variable).collect();
+        let clang_vars: std::collections::HashSet<&str> =
+            CLANG_ENV_RULES.iter().map(|r| r.variable).collect();
+
+        let missing: Vec<&str> = gcc_vars.difference(&clang_vars).cloned().collect();
+        assert!(missing.is_empty(), "Clang should inherit all GCC env vars, missing: {:?}", missing);
+    }
+
+    #[test]
+    fn armclang_inherits_gcc_env_rules_transitively() {
+        let gcc_vars: std::collections::HashSet<&str> = GCC_ENV_RULES.iter().map(|r| r.variable).collect();
+        let arm_vars: std::collections::HashSet<&str> =
+            ARMCLANG_ENV_RULES.iter().map(|r| r.variable).collect();
+
+        let missing: Vec<&str> = gcc_vars.difference(&arm_vars).cloned().collect();
+        assert!(
+            missing.is_empty(),
+            "ARMClang should transitively inherit all GCC env vars, missing: {:?}",
+            missing
+        );
+        // Also has its own variable
+        assert!(arm_vars.contains("ARMCOMPILER6_CLANGOPT"));
+    }
+
+    #[test]
+    fn msvc_env_rules_present() {
+        let vars: Vec<&str> = MSVC_ENV_RULES.iter().map(|r| r.variable).collect();
+        assert!(vars.contains(&"CL"));
+        assert!(vars.contains(&"_CL_"));
+        assert!(vars.contains(&"INCLUDE"));
+        assert!(vars.contains(&"LIB"));
+    }
+
+    #[test]
+    fn clang_cl_inherits_msvc_env_rules() {
+        let msvc_vars: std::collections::HashSet<&str> = MSVC_ENV_RULES.iter().map(|r| r.variable).collect();
+        let clang_cl_vars: std::collections::HashSet<&str> =
+            CLANG_CL_ENV_RULES.iter().map(|r| r.variable).collect();
+
+        let missing: Vec<&str> = msvc_vars.difference(&clang_cl_vars).cloned().collect();
+        assert!(missing.is_empty(), "Clang-CL should inherit all MSVC env vars, missing: {:?}", missing);
+    }
+
+    #[test]
+    fn expand_with_quoted_values() {
+        let rules = &[EnvRule::new(
+            "CL",
+            EnvMapping::Expand { position: EnvPosition::Prepend },
+            ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+        )];
+        let mut env = HashMap::new();
+        env.insert("CL".to_string(), r#"/DPATH="C:\Program Files" /W4"#.to_string());
+
+        let (prepend, _append) = parse_environment(&env, rules);
+        let args = collect_args(&prepend);
+        assert_eq!(args, vec![r"/DPATH=C:\Program Files", "/W4"]);
     }
 }
