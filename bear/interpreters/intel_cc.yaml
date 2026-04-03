@@ -1,0 +1,152 @@
+# Intel C/C++ compiler (icx, icpx) flag definitions
+# https://www.intel.com/content/www/us/en/docs/dpcpp-cpp-compiler/developer-guide-reference/current/overview.html
+extends: clang
+type: intel_cc
+recognize:
+  - executables: ["icx", "icpx"]
+    cross_compilation: false
+    versioned: true
+  - executables: ["icc", "icpc"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  # Microarchitecture targeting
+  - match: {pattern: "-ax*"}
+    result: configures_compiling
+  - match: {pattern: "-x*"}
+    result: configures_compiling
+  # OpenMP (Intel -q prefix)
+  - match: {pattern: "-qopenmp-link{=}*"}
+    result: configures_linking
+  - match: {pattern: "-qopenmp-stubs"}
+    result: configures_compiling
+  - match: {pattern: "-qopenmp-simd"}
+    result: configures_compiling
+  - match: {pattern: "-qopenmp"}
+    result: configures_compiling
+  - match: {pattern: "-qno-openmp"}
+    result: configures_compiling
+  # Optimization reports
+  - match: {pattern: "-qopt-report-file{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-report-phase{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-report-format{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-report{=}*"}
+    result: configures_compiling
+  # Optimization tuning
+  - match: {pattern: "-qopt-zmm-usage{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-assume-safe-padding"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-streaming-stores{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-prefetch{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-mem-layout-trans{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qopt-multiple-gather-scatter-by-shuffles"}
+    result: configures_compiling
+  # MKL
+  - match: {pattern: "-qmkl{=}*"}
+    result: configures_linking
+  # IPO (interprocedural optimization)
+  - match: {pattern: "-ipo-c"}
+    result: configures_compiling
+  - match: {pattern: "-ipo-S"}
+    result: configures_compiling
+  - match: {pattern: "-ipo"}
+    result: configures_compiling
+  - match: {pattern: "-no-ipo"}
+    result: configures_compiling
+  - match: {pattern: "-ip"}
+    result: configures_compiling
+  # Parallelization
+  - match: {pattern: "-parallel"}
+    result: configures_compiling
+  - match: {pattern: "-no-parallel"}
+    result: configures_compiling
+  - match: {pattern: "-par-threshold{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-par-num-threads{=}*"}
+    result: configures_compiling
+  # Diagnostics
+  - match: {pattern: "-diag-file-append{=}*"}
+    result: none
+  - match: {pattern: "-diag-file{=}*"}
+    result: none
+  - match: {pattern: "-diag-disable{=}*"}
+    result: none
+  - match: {pattern: "-diag-enable{=}*"}
+    result: none
+  - match: {pattern: "-diag-error{=}*"}
+    result: none
+  - match: {pattern: "-diag-warning{=}*"}
+    result: none
+  - match: {pattern: "-diag-remark{=}*"}
+    result: none
+  - match: {pattern: "-diag-dump"}
+    result: none
+  - match: {pattern: "-diag-id-numbers"}
+    result: none
+  # Debug and profiling
+  - match: {pattern: "-debug", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-prof-dir{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-prof-gen"}
+    result: configures_compiling
+  - match: {pattern: "-prof-use"}
+    result: configures_compiling
+  # Intel-specific linking
+  - match: {pattern: "-shared-intel"}
+    result: configures_linking
+  - match: {pattern: "-static-intel"}
+    result: configures_linking
+  - match: {pattern: "-shared-libgcc"}
+    result: configures_linking
+  - match: {pattern: "-static-libgcc"}
+    result: configures_linking
+  # Floating-point model
+  - match: {pattern: "-fp-model{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-ftz"}
+    result: configures_compiling
+  - match: {pattern: "-no-ftz"}
+    result: configures_compiling
+  - match: {pattern: "-prec-div"}
+    result: configures_compiling
+  - match: {pattern: "-no-prec-div"}
+    result: configures_compiling
+  - match: {pattern: "-prec-sqrt"}
+    result: configures_compiling
+  - match: {pattern: "-no-prec-sqrt"}
+    result: configures_compiling
+  - match: {pattern: "-fimf-precision{=}*"}
+    result: configures_compiling
+  # Vectorization
+  - match: {pattern: "-vec"}
+    result: configures_compiling
+  - match: {pattern: "-no-vec"}
+    result: configures_compiling
+  - match: {pattern: "-simd"}
+    result: configures_compiling
+  - match: {pattern: "-no-simd"}
+    result: configures_compiling
+  # Other Intel-specific flags
+  - match: {pattern: "-align"}
+    result: configures_compiling
+  - match: {pattern: "-heap-arrays{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-traceback"}
+    result: configures_compiling
+  - match: {pattern: "-no-traceback"}
+    result: configures_compiling
+  - match: {pattern: "-V"}
+    result: info_and_exit
+  - match: {pattern: "-sox"}
+    result: configures_compiling
+  - match: {pattern: "-no-sox"}
+    result: configures_compiling
