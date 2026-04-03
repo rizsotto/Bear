@@ -18,6 +18,7 @@ pub use source::looks_like_a_source_file;
 /// Flag pattern definitions that describe HOW to consume arguments from the command line.
 /// These patterns define the syntactic structure of compiler flags and their arguments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub(super) enum FlagPattern {
     /// Match the flag exactly with specified number of required separate arguments: "-c", "-o file"
     /// The u32 represents how many additional arguments are required (0 for no additional args)
@@ -28,6 +29,12 @@ pub(super) enum FlagPattern {
 
     /// Match exactly with 1 required argument, glued with '=' OR separate: "-std=c99", "-std c99"
     ExactlyWithEqOrSep(&'static str),
+
+    /// Match the flag exactly with 1 required argument glued with ':': "/std:c++20"
+    ExactlyWithColon(&'static str),
+
+    /// Match exactly with 1 required argument, glued with ':' OR separate: "/std:c++20", "/std c++20"
+    ExactlyWithColonOrSep(&'static str),
 
     /// Match exactly with 1 required argument in any form: "-Dname=value", "-D name=value", "-Dname", "-D name"
     ExactlyWithGluedOrSep(&'static str),
@@ -44,6 +51,8 @@ impl FlagPattern {
             FlagPattern::Exactly(flag, _) => flag,
             FlagPattern::ExactlyWithEq(flag) => flag,
             FlagPattern::ExactlyWithEqOrSep(flag) => flag,
+            FlagPattern::ExactlyWithColon(flag) => flag,
+            FlagPattern::ExactlyWithColonOrSep(flag) => flag,
             FlagPattern::ExactlyWithGluedOrSep(flag) => flag,
             FlagPattern::Prefix(flag, _) => flag,
         }
@@ -77,6 +86,13 @@ pub(super) struct FlagMatch {
 /// Zero-allocation alternative to `arg.starts_with(&format!("{}=", prefix))`.
 fn starts_with_eq(arg: &str, prefix: &str) -> bool {
     arg.len() > prefix.len() && arg.as_bytes()[prefix.len()] == b'=' && arg.starts_with(prefix)
+}
+
+/// Check if `arg` starts with `prefix` followed by ':'.
+/// Zero-allocation alternative to `arg.starts_with(&format!("{}:", prefix))`.
+#[allow(dead_code)]
+fn starts_with_colon(arg: &str, prefix: &str) -> bool {
+    arg.len() > prefix.len() && arg.as_bytes()[prefix.len()] == b':' && arg.starts_with(prefix)
 }
 
 /// A flag matcher that contains flag definitions for a specific compiler
@@ -142,6 +158,24 @@ impl FlagAnalyzer {
                 if current_arg == flag && args.len() > 1 {
                     Some(FlagMatch { rule: definition.clone(), consumed_count: 2 })
                 } else if starts_with_eq(current_arg, flag) {
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
+                } else {
+                    None
+                }
+            }
+
+            FlagPattern::ExactlyWithColon(_) => {
+                if starts_with_colon(current_arg, flag) {
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
+                } else {
+                    None
+                }
+            }
+
+            FlagPattern::ExactlyWithColonOrSep(_) => {
+                if current_arg == flag && args.len() > 1 {
+                    Some(FlagMatch { rule: definition.clone(), consumed_count: 2 })
+                } else if starts_with_colon(current_arg, flag) {
                     Some(FlagMatch { rule: definition.clone(), consumed_count: 1 })
                 } else {
                     None
@@ -278,6 +312,45 @@ mod tests {
         let args = vec!["-Wall".to_string()];
         let result = matcher.match_flag(&args).unwrap();
         assert_eq!(result.consumed_count, 1);
+    }
+
+    #[test]
+    fn test_colon_matching() {
+        use std::sync::LazyLock;
+
+        static COLON_FLAGS: LazyLock<Vec<FlagRule>> = LazyLock::new(|| {
+            let mut flags = vec![
+                FlagRule::new(
+                    FlagPattern::ExactlyWithColon("/std"),
+                    ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling)),
+                ),
+                FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fe"), ArgumentKind::Output),
+            ];
+            flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+            flags
+        });
+
+        let matcher = FlagAnalyzer::new(&COLON_FLAGS);
+
+        // Test colon-glued form
+        let args = vec!["/std:c++20".to_string()];
+        let result = matcher.match_flag(&args).unwrap();
+        assert_eq!(result.consumed_count, 1);
+
+        // Test that plain /std does NOT match ExactlyWithColon
+        let args = vec!["/std".to_string()];
+        let result = matcher.match_flag(&args);
+        assert!(result.is_none());
+
+        // Test colon-or-sep glued form
+        let args = vec!["/Fe:prog.exe".to_string()];
+        let result = matcher.match_flag(&args).unwrap();
+        assert_eq!(result.consumed_count, 1);
+
+        // Test colon-or-sep separate form
+        let args = vec!["/Fe".to_string(), "prog.exe".to_string()];
+        let result = matcher.match_flag(&args).unwrap();
+        assert_eq!(result.consumed_count, 2);
     }
 
     #[test]

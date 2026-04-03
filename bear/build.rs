@@ -326,6 +326,10 @@ mod flags {
             flag.len()
         } else if let Some(flag) = pattern.strip_suffix("{=}*") {
             flag.len()
+        } else if let Some(flag) = pattern.strip_suffix("{:}*") {
+            flag.len()
+        } else if let Some(flag) = pattern.strip_suffix(":*") {
+            flag.len()
         } else if let Some(flag) = pattern.strip_suffix("=*") {
             if m.count.is_some() {
                 flag.len() + 1 // "=" is part of the flag name
@@ -345,6 +349,10 @@ mod flags {
             format!("FlagPattern::ExactlyWithGluedOrSep(\"{}\")", flag)
         } else if let Some(flag) = pattern.strip_suffix("{=}*") {
             format!("FlagPattern::ExactlyWithEqOrSep(\"{}\")", flag)
+        } else if let Some(flag) = pattern.strip_suffix("{:}*") {
+            format!("FlagPattern::ExactlyWithColonOrSep(\"{}\")", flag)
+        } else if let Some(flag) = pattern.strip_suffix(":*") {
+            format!("FlagPattern::ExactlyWithColon(\"{}\")", flag)
         } else if let Some(flag) = pattern.strip_suffix("=*") {
             if let Some(n) = count {
                 // "=*" with count means Prefix where "=" is part of the flag name
@@ -378,6 +386,7 @@ mod flags {
             "stops_at_assembling" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))",
             "info_and_exit" => "ArgumentKind::Other(PassEffect::InfoAndExit)",
             "driver_option" => "ArgumentKind::Other(PassEffect::DriverOption)",
+            "pass_through" => "ArgumentKind::Other(PassEffect::PassThrough)",
             "none" => "ArgumentKind::Other(PassEffect::None)",
             other => panic!("Unknown result value: '{}'", other),
         }
