@@ -2,16 +2,60 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::yaml_types::{EnvEntry, FlagTable, IgnoreWhen};
+use crate::yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen};
 
-/// Resolve `ignore_when` for a table, inheriting from base if extending.
-pub fn resolve_ignore_when(table: &FlagTable, raw_tables: &HashMap<String, FlagTable>) -> IgnoreWhen {
-    let own = table.ignore_when.clone().unwrap_or_default();
+/// Resolve flags for a compiler, with transitive inheritance.
+///
+/// Own flags come first, then base flags (recursively). The caller is
+/// responsible for sorting by priority after collection.
+pub fn resolve_flags(key: &str, raw_tables: &HashMap<String, FlagTable>) -> Vec<FlagEntry> {
+    let mut visited = HashSet::new();
+    resolve_flags_recursive(key, raw_tables, &mut visited)
+}
+
+fn resolve_flags_recursive(
+    key: &str,
+    raw_tables: &HashMap<String, FlagTable>,
+    visited: &mut HashSet<String>,
+) -> Vec<FlagEntry> {
+    if !visited.insert(key.to_string()) {
+        return vec![];
+    }
+    let table = &raw_tables[key];
+    let mut entries = table.flags.clone();
+
     if let Some(ref base_name) = table.extends
-        && let Some(base_table) = raw_tables.get(base_name.as_str())
+        && raw_tables.contains_key(base_name.as_str())
     {
-        let base = base_table.ignore_when.clone().unwrap_or_default();
-        // Own values take precedence; only inherit if own list is empty
+        entries.extend(resolve_flags_recursive(base_name, raw_tables, visited));
+    }
+    entries
+}
+
+/// Resolve `ignore_when` for a compiler, with transitive inheritance.
+///
+/// Walks the extends chain. At each level, a non-empty own list takes
+/// precedence over the inherited list (per field independently).
+pub fn resolve_ignore_when(key: &str, raw_tables: &HashMap<String, FlagTable>) -> IgnoreWhen {
+    let mut visited = HashSet::new();
+    resolve_ignore_when_recursive(key, raw_tables, &mut visited)
+}
+
+fn resolve_ignore_when_recursive(
+    key: &str,
+    raw_tables: &HashMap<String, FlagTable>,
+    visited: &mut HashSet<String>,
+) -> IgnoreWhen {
+    if !visited.insert(key.to_string()) {
+        return IgnoreWhen::default();
+    }
+    let table = &raw_tables[key];
+    let own = table.ignore_when.clone().unwrap_or_default();
+
+    if let Some(ref base_name) = table.extends
+        && raw_tables.contains_key(base_name.as_str())
+    {
+        let base = resolve_ignore_when_recursive(base_name, raw_tables, visited);
         return IgnoreWhen {
             executables: if own.executables.is_empty() { base.executables } else { own.executables },
             flags: if own.flags.is_empty() { base.flags } else { own.flags },
@@ -20,15 +64,31 @@ pub fn resolve_ignore_when(table: &FlagTable, raw_tables: &HashMap<String, FlagT
     own
 }
 
-/// Resolve `slash_prefix` for a table, inheriting from base if extending.
-pub fn resolve_slash_prefix(table: &FlagTable, raw_tables: &HashMap<String, FlagTable>) -> bool {
+/// Resolve `slash_prefix` for a compiler, with transitive inheritance.
+///
+/// Returns the first explicit value found walking up the extends chain,
+/// or `false` if no table in the chain sets it.
+pub fn resolve_slash_prefix(key: &str, raw_tables: &HashMap<String, FlagTable>) -> bool {
+    let mut visited = HashSet::new();
+    resolve_slash_prefix_recursive(key, raw_tables, &mut visited)
+}
+
+fn resolve_slash_prefix_recursive(
+    key: &str,
+    raw_tables: &HashMap<String, FlagTable>,
+    visited: &mut HashSet<String>,
+) -> bool {
+    if !visited.insert(key.to_string()) {
+        return false;
+    }
+    let table = &raw_tables[key];
     if let Some(value) = table.slash_prefix {
         return value;
     }
     if let Some(ref base_name) = table.extends
-        && let Some(base_table) = raw_tables.get(base_name.as_str())
+        && raw_tables.contains_key(base_name.as_str())
     {
-        return base_table.slash_prefix.unwrap_or(false);
+        return resolve_slash_prefix_recursive(base_name, raw_tables, visited);
     }
     false
 }

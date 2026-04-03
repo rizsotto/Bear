@@ -13,7 +13,7 @@ use std::path::Path;
 use codegen::{pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
 use recognition::generate_recognition_patterns;
-use resolve::{resolve_environment, resolve_ignore_when, resolve_slash_prefix};
+use resolve::{resolve_environment, resolve_flags, resolve_ignore_when, resolve_slash_prefix};
 use tables::{TABLES, TableConfig};
 use yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen};
 
@@ -30,23 +30,15 @@ impl ResolvedTable {
     /// Resolve a single compiler table by merging inherited flags, ignore_when,
     /// slash_prefix, and environment entries from the extends chain.
     pub fn new(key: &str, config: &'static TableConfig, raw_tables: &HashMap<String, FlagTable>) -> Self {
-        let table = &raw_tables[key];
-
-        let mut flags: Vec<FlagEntry> = table.flags.clone();
-        if let Some(ref base_name) = table.extends {
-            let base = raw_tables
-                .get(base_name.as_str())
-                .unwrap_or_else(|| panic!("{} extends unknown table '{}'", config.yaml_file, base_name));
-            flags.extend(base.flags.iter().cloned());
-        }
+        let mut flags = resolve_flags(key, raw_tables);
         // Sort by flag length descending (stable sort preserves own-before-base order)
         flags.sort_by(|a, b| b.match_.name_len().cmp(&a.match_.name_len()));
 
         ResolvedTable {
             config,
             flags,
-            ignore_when: resolve_ignore_when(table, raw_tables),
-            slash_prefix: resolve_slash_prefix(table, raw_tables),
+            ignore_when: resolve_ignore_when(key, raw_tables),
+            slash_prefix: resolve_slash_prefix(key, raw_tables),
             env_entries: resolve_environment(key, raw_tables),
         }
     }
@@ -408,37 +400,21 @@ mod tests {
 
     #[test]
     fn resolve_ignore_when_no_extends_no_ignore() {
-        let table = FlagTable {
-            extends: None,
-            type_: None,
-            recognize: None,
-            ignore_when: None,
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        let tables = HashMap::new();
-        let result = resolve_ignore_when(&table, &tables);
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        tables.insert("leaf".to_string(), make_empty_table());
+        let result = resolve_ignore_when("leaf", &tables);
         assert!(result.executables.is_empty());
         assert!(result.flags.is_empty());
     }
 
     #[test]
     fn resolve_ignore_when_own_values() {
-        let table = FlagTable {
-            extends: None,
-            type_: None,
-            recognize: None,
-            ignore_when: Some(IgnoreWhen {
-                executables: vec!["cpp".to_string()],
-                flags: vec!["-E".to_string()],
-            }),
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        let tables = HashMap::new();
-        let result = resolve_ignore_when(&table, &tables);
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut t = make_empty_table();
+        t.ignore_when =
+            Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
+        tables.insert("leaf".to_string(), t);
+        let result = resolve_ignore_when("leaf", &tables);
         assert_eq!(result.executables, vec!["cpp"]);
         assert_eq!(result.flags, vec!["-E"]);
     }
@@ -446,31 +422,14 @@ mod tests {
     #[test]
     fn resolve_ignore_when_inherits_from_base() {
         let mut tables: HashMap<String, FlagTable> = HashMap::new();
-        tables.insert(
-            "base".to_string(),
-            FlagTable {
-                extends: None,
-                type_: None,
-                recognize: None,
-                ignore_when: Some(IgnoreWhen {
-                    executables: vec!["cpp".to_string()],
-                    flags: vec!["-E".to_string()],
-                }),
-                slash_prefix: None,
-                flags: vec![],
-                environment: None,
-            },
-        );
-        let table = FlagTable {
-            extends: Some("base".to_string()),
-            type_: None,
-            recognize: None,
-            ignore_when: None,
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        let result = resolve_ignore_when(&table, &tables);
+        let mut base = make_empty_table();
+        base.ignore_when =
+            Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
+        tables.insert("base".to_string(), base);
+        let mut child = make_empty_table();
+        child.extends = Some("base".to_string());
+        tables.insert("child".to_string(), child);
+        let result = resolve_ignore_when("child", &tables);
         assert_eq!(result.executables, vec!["cpp"]);
         assert_eq!(result.flags, vec!["-E"]);
     }
@@ -478,32 +437,36 @@ mod tests {
     #[test]
     fn resolve_ignore_when_own_overrides_base() {
         let mut tables: HashMap<String, FlagTable> = HashMap::new();
-        tables.insert(
-            "base".to_string(),
-            FlagTable {
-                extends: None,
-                type_: None,
-                recognize: None,
-                ignore_when: Some(IgnoreWhen {
-                    executables: vec!["cpp".to_string()],
-                    flags: vec!["-E".to_string()],
-                }),
-                slash_prefix: None,
-                flags: vec![],
-                environment: None,
-            },
-        );
-        let table = FlagTable {
-            extends: Some("base".to_string()),
-            type_: None,
-            recognize: None,
-            ignore_when: Some(IgnoreWhen { executables: vec!["cc1".to_string()], flags: vec![] }),
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        let result = resolve_ignore_when(&table, &tables);
+        let mut base = make_empty_table();
+        base.ignore_when =
+            Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
+        tables.insert("base".to_string(), base);
+        let mut child = make_empty_table();
+        child.extends = Some("base".to_string());
+        child.ignore_when = Some(IgnoreWhen { executables: vec!["cc1".to_string()], flags: vec![] });
+        tables.insert("child".to_string(), child);
+        let result = resolve_ignore_when("child", &tables);
         assert_eq!(result.executables, vec!["cc1"]);
+        // flags is empty in own, so inherits base
+        assert_eq!(result.flags, vec!["-E"]);
+    }
+
+    #[test]
+    fn resolve_ignore_when_transitive_three_levels() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut grandparent = make_empty_table();
+        grandparent.ignore_when =
+            Some(IgnoreWhen { executables: vec!["cpp".to_string()], flags: vec!["-E".to_string()] });
+        tables.insert("grandparent".to_string(), grandparent);
+        let mut parent = make_empty_table();
+        parent.extends = Some("grandparent".to_string());
+        // parent has no ignore_when - should inherit from grandparent
+        tables.insert("parent".to_string(), parent);
+        let mut child = make_empty_table();
+        child.extends = Some("parent".to_string());
+        tables.insert("child".to_string(), child);
+        let result = resolve_ignore_when("child", &tables);
+        assert_eq!(result.executables, vec!["cpp"]);
         assert_eq!(result.flags, vec!["-E"]);
     }
 
@@ -511,57 +474,95 @@ mod tests {
 
     #[test]
     fn resolve_slash_prefix_default() {
-        let table = FlagTable {
-            extends: None,
-            type_: None,
-            recognize: None,
-            ignore_when: None,
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        assert!(!resolve_slash_prefix(&table, &HashMap::new()));
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        tables.insert("leaf".to_string(), make_empty_table());
+        assert!(!resolve_slash_prefix("leaf", &tables));
     }
 
     #[test]
     fn resolve_slash_prefix_own_value() {
-        let table = FlagTable {
-            extends: None,
-            type_: None,
-            recognize: None,
-            ignore_when: None,
-            slash_prefix: Some(true),
-            flags: vec![],
-            environment: None,
-        };
-        assert!(resolve_slash_prefix(&table, &HashMap::new()));
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut t = make_empty_table();
+        t.slash_prefix = Some(true);
+        tables.insert("leaf".to_string(), t);
+        assert!(resolve_slash_prefix("leaf", &tables));
     }
 
     #[test]
     fn resolve_slash_prefix_inherits_from_base() {
         let mut tables: HashMap<String, FlagTable> = HashMap::new();
-        tables.insert(
-            "base".to_string(),
-            FlagTable {
-                extends: None,
-                type_: None,
-                recognize: None,
-                ignore_when: None,
-                slash_prefix: Some(true),
-                flags: vec![],
-                environment: None,
-            },
-        );
-        let table = FlagTable {
-            extends: Some("base".to_string()),
-            type_: None,
-            recognize: None,
-            ignore_when: None,
-            slash_prefix: None,
-            flags: vec![],
-            environment: None,
-        };
-        assert!(resolve_slash_prefix(&table, &tables));
+        let mut base = make_empty_table();
+        base.slash_prefix = Some(true);
+        tables.insert("base".to_string(), base);
+        let mut child = make_empty_table();
+        child.extends = Some("base".to_string());
+        tables.insert("child".to_string(), child);
+        assert!(resolve_slash_prefix("child", &tables));
+    }
+
+    #[test]
+    fn resolve_slash_prefix_transitive_three_levels() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut grandparent = make_empty_table();
+        grandparent.slash_prefix = Some(true);
+        tables.insert("grandparent".to_string(), grandparent);
+        let mut parent = make_empty_table();
+        parent.extends = Some("grandparent".to_string());
+        tables.insert("parent".to_string(), parent);
+        let mut child = make_empty_table();
+        child.extends = Some("parent".to_string());
+        tables.insert("child".to_string(), child);
+        assert!(resolve_slash_prefix("child", &tables));
+    }
+
+    // -- resolve_flags tests --
+
+    #[test]
+    fn resolve_flags_no_extends() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut t = make_empty_table();
+        t.flags = vec![make_test_flag("-c", "output")];
+        tables.insert("leaf".to_string(), t);
+        let flags = resolve_flags("leaf", &tables);
+        assert_eq!(flags.len(), 1);
+    }
+
+    #[test]
+    fn resolve_flags_transitive_three_levels() {
+        let mut tables: HashMap<String, FlagTable> = HashMap::new();
+        let mut grandparent = make_empty_table();
+        grandparent.flags = vec![make_test_flag("-gp", "output")];
+        tables.insert("grandparent".to_string(), grandparent);
+        let mut parent = make_empty_table();
+        parent.extends = Some("grandparent".to_string());
+        parent.flags = vec![make_test_flag("-p", "output")];
+        tables.insert("parent".to_string(), parent);
+        let mut child = make_empty_table();
+        child.extends = Some("parent".to_string());
+        child.flags = vec![make_test_flag("-ch", "output")];
+        tables.insert("child".to_string(), child);
+
+        let flags = resolve_flags("child", &tables);
+        assert_eq!(flags.len(), 3);
+        // Own flags first, then parent, then grandparent
+        assert_eq!(flags[0].match_.pattern, "-ch");
+        assert_eq!(flags[1].match_.pattern, "-p");
+        assert_eq!(flags[2].match_.pattern, "-gp");
+    }
+
+    #[test]
+    fn resolve_flags_real_ibm_xl_includes_gcc() {
+        let raw_tables = load_tables();
+        let ibm_flags = resolve_flags("ibm_xl", &raw_tables);
+        let gcc_flags = resolve_flags("gcc", &raw_tables);
+        // ibm_xl extends clang extends gcc - must include all gcc flags
+        for gcc_flag in &gcc_flags {
+            assert!(
+                ibm_flags.iter().any(|f| f.match_.pattern == gcc_flag.match_.pattern),
+                "ibm_xl is missing gcc flag: {}",
+                gcc_flag.match_.pattern
+            );
+        }
     }
 
     // -- EnvEntry::validate tests --
@@ -682,6 +683,25 @@ mod tests {
 
         let env_keys = std::fs::read_to_string(out_dir.path().join("env_keys.rs")).unwrap();
         assert!(env_keys.contains("COMPILER_ENV_KEYS"));
+    }
+
+    fn make_empty_table() -> FlagTable {
+        FlagTable {
+            extends: None,
+            type_: None,
+            recognize: None,
+            ignore_when: None,
+            slash_prefix: None,
+            flags: vec![],
+            environment: None,
+        }
+    }
+
+    fn make_test_flag(pattern: &str, result: &str) -> FlagEntry {
+        FlagEntry {
+            match_: FlagMatch { pattern: pattern.to_string(), count: None },
+            result: result.to_string(),
+        }
     }
 
     fn make_test_env_entry(var: &str) -> EnvEntry {
