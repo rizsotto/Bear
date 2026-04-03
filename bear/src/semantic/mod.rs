@@ -136,6 +136,9 @@ pub enum PassEffect {
     StopsAt(CompilerPass),
     InfoAndExit,
     DriverOption,
+    /// Indicates remaining arguments should be passed through without interpretation.
+    /// Used for flags like MSVC's `/link` that forward all subsequent args to a different tool.
+    PassThrough,
     None,
 }
 

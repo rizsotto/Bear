@@ -96,6 +96,23 @@ fn parse_arguments_owned(flag_analyzer: &FlagAnalyzer, args: &mut [String]) -> V
         let remaining_args = &args[i..];
 
         if let Some(match_result) = flag_analyzer.match_flag(remaining_args) {
+            // Handle pass-through first (early exit)
+            if matches!(match_result.rule.kind, ArgumentKind::Other(PassEffect::PassThrough)) {
+                result.push(Argument::Other {
+                    arguments: vec![std::mem::take(&mut args[i])],
+                    kind: ArgumentKind::Other(PassEffect::PassThrough),
+                });
+                i += 1;
+                while i < args.len() {
+                    result.push(Argument::Other {
+                        arguments: vec![std::mem::take(&mut args[i])],
+                        kind: ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)),
+                    });
+                    i += 1;
+                }
+                break;
+            }
+
             let consumed_count = match_result.consumed_count;
             let arg = match match_result.rule.kind {
                 ArgumentKind::Compiler => Argument::Other {
@@ -244,8 +261,8 @@ mod flag_table_invariants {
 
             let flag = rule.pattern.flag();
             assert!(
-                flag.starts_with('-') || flag.starts_with('@'),
-                "Flag {:?} must start with '-' or '@'",
+                flag.starts_with('-') || flag.starts_with('@') || flag.starts_with('/'),
+                "Flag {:?} must start with '-', '@', or '/'",
                 flag
             );
 
@@ -256,6 +273,8 @@ mod flag_table_invariants {
                     }
                     FlagPattern::ExactlyWithEq(_)
                     | FlagPattern::ExactlyWithEqOrSep(_)
+                    | FlagPattern::ExactlyWithColon(_)
+                    | FlagPattern::ExactlyWithColonOrSep(_)
                     | FlagPattern::ExactlyWithGluedOrSep(_) => {}
                     FlagPattern::Prefix(_, n) => {
                         assert!(n <= 1, "Output rule {:?} must take 0 or 1 extra args", flag)
@@ -311,5 +330,60 @@ mod flag_table_invariants {
 
         let missing_flags: Vec<&str> = gcc_flag_strings.difference(&clang_flag_strings).cloned().collect();
         assert!(missing_flags.is_empty(), "These GCC flags are missing from Clang: {:?}", missing_flags);
+    }
+}
+
+#[cfg(test)]
+mod pass_through_tests {
+    use super::*;
+    use crate::semantic::interpreters::matchers::{FlagAnalyzer, FlagPattern, FlagRule};
+
+    #[test]
+    fn test_pass_through_flag_stops_parsing() {
+        static PASS_THROUGH_FLAGS: std::sync::LazyLock<Vec<FlagRule>> = std::sync::LazyLock::new(|| {
+            let mut flags = vec![
+                FlagRule::new(
+                    FlagPattern::Exactly("-c", 0),
+                    ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)),
+                ),
+                FlagRule::new(FlagPattern::Exactly("/link", 0), ArgumentKind::Other(PassEffect::PassThrough)),
+                FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
+            ];
+            flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+            flags
+        });
+
+        let analyzer = FlagAnalyzer::new(&PASS_THROUGH_FLAGS);
+        let mut args = vec![
+            "cl".to_string(),
+            "-c".to_string(),
+            "foo.c".to_string(),
+            "/link".to_string(),
+            "/SUBSYSTEM:CONSOLE".to_string(),
+            "/OUT:foo.exe".to_string(),
+        ];
+
+        let result = parse_arguments_owned(&analyzer, &mut args);
+
+        // cl (compiler)
+        assert!(matches!(result[0], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Compiler));
+        // -c (stops at compiling)
+        assert!(
+            matches!(result[1], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling)))
+        );
+        // foo.c (source)
+        assert!(matches!(result[2], Argument::Source { .. }));
+        // /link (pass-through marker)
+        assert!(
+            matches!(result[3], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::PassThrough))
+        );
+        // /SUBSYSTEM:CONSOLE (linker arg)
+        assert!(
+            matches!(result[4], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+        );
+        // /OUT:foo.exe (linker arg)
+        assert!(
+            matches!(result[5], Argument::Other { ref kind, .. } if *kind == ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)))
+        );
     }
 }

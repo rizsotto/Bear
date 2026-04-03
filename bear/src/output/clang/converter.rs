@@ -203,6 +203,7 @@ impl CommandConverter {
                 arg.kind(),
                 ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))
                     | ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Linking))
+                    | ArgumentKind::Other(PassEffect::PassThrough)
             ) {
                 continue;
             }
