@@ -1,0 +1,26 @@
+# ARM Compiler 6 (armclang) flag definitions
+# https://developer.arm.com/documentation/100748/latest/
+extends: clang
+type: armclang
+recognize:
+  - executables: ["armclang", "armclang++"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  - match: {pattern: "--library_type{=}*"}
+    result: configures_linking
+  - match: {pattern: "--depend{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--depend_format{=}*"}
+    result: configures_compiling
+  - match: {pattern: "--depend_target{ }*"}
+    result: configures_compiling
+  - match: {pattern: "--depend_single_line"}
+    result: configures_compiling
+  - match: {pattern: "--depend_system_headers"}
+    result: configures_compiling
+  - match: {pattern: "--no_depend_system_headers"}
+    result: configures_compiling
+  - match: {pattern: "--apcs{=}*"}
+    result: configures_compiling

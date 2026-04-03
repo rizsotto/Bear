@@ -1,0 +1,78 @@
+# IBM Open XL C/C++ compiler flag definitions
+# https://www.ibm.com/docs/en/openxl-c-and-cpp-lnx
+extends: clang
+type: ibm_xl
+recognize:
+  - executables: ["ibm-clang", "ibm-clang++"]
+    cross_compilation: false
+    versioned: true
+  - executables: ["xlclang", "xlclang++"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  # AltiVec/VSX
+  - match: {pattern: "-qaltivec"}
+    result: configures_compiling
+  - match: {pattern: "-qnoaltivec"}
+    result: configures_compiling
+  # Architecture and tuning
+  - match: {pattern: "-qtune{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qarch{=}*"}
+    result: configures_compiling
+  # High-order transformations
+  - match: {pattern: "-qhot"}
+    result: configures_compiling
+  - match: {pattern: "-qnohot"}
+    result: configures_compiling
+  # SMP parallelization
+  - match: {pattern: "-qsmp{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qnosmp"}
+    result: configures_compiling
+  # Interprocedural analysis
+  - match: {pattern: "-qipa{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qnoipa"}
+    result: configures_compiling
+  # Profile-directed feedback
+  - match: {pattern: "-qpdf1"}
+    result: configures_compiling
+  - match: {pattern: "-qpdf2"}
+    result: configures_compiling
+  - match: {pattern: "-qnopdf"}
+    result: configures_compiling
+  # Strict floating-point
+  - match: {pattern: "-qstrict"}
+    result: configures_compiling
+  - match: {pattern: "-qnostrict"}
+    result: configures_compiling
+  # Memory limit for optimization
+  - match: {pattern: "-qmaxmem{=}*"}
+    result: configures_compiling
+  # SIMD
+  - match: {pattern: "-qsimd{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qnosimd"}
+    result: configures_compiling
+  # Optimization report
+  - match: {pattern: "-qreport"}
+    result: configures_compiling
+  - match: {pattern: "-qnoreport"}
+    result: configures_compiling
+  # Listing file
+  - match: {pattern: "-qlist"}
+    result: configures_compiling
+  - match: {pattern: "-qnolist"}
+    result: configures_compiling
+  # Inlining
+  - match: {pattern: "-qinline{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qnoinline"}
+    result: configures_compiling
+  # Loop unrolling
+  - match: {pattern: "-qunroll{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-qnounroll"}
+    result: configures_compiling
