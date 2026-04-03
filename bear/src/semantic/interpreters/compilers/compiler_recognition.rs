@@ -46,6 +46,12 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "intel_fortran" => CompilerType::IntelFortran,
         "cray_fortran" => CompilerType::CrayFortran,
         "cuda" => CompilerType::Cuda,
+        "msvc" => CompilerType::Msvc,
+        "clang_cl" => CompilerType::ClangCl,
+        "intel_cc" => CompilerType::IntelCc,
+        "nvidia_hpc" => CompilerType::NvidiaHpc,
+        "armclang" => CompilerType::Armclang,
+        "ibm_xl" => CompilerType::IbmXl,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -625,6 +631,70 @@ mod tests {
         // At least one GCC pattern should have capture groups (the versioned one)
         let has_capture_groups = gcc_patterns.iter().any(|(_, regex)| regex.captures_len() > 1);
         assert!(has_capture_groups, "GCC patterns should include version capture groups");
+    }
+
+    #[test]
+    fn test_msvc_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("cl")), Some(CompilerType::Msvc));
+        assert_eq!(recognizer.recognize(path("cl.exe")), Some(CompilerType::Msvc));
+
+        // Internal executables should be recognized as MSVC (then ignored by interpreter)
+        assert_eq!(recognizer.recognize(path("c1")), Some(CompilerType::Msvc));
+        assert_eq!(recognizer.recognize(path("c1xx")), Some(CompilerType::Msvc));
+        assert_eq!(recognizer.recognize(path("c2")), Some(CompilerType::Msvc));
+    }
+
+    #[test]
+    fn test_clang_cl_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("clang-cl")), Some(CompilerType::ClangCl));
+        assert_eq!(recognizer.recognize(path("clang-cl.exe")), Some(CompilerType::ClangCl));
+        assert_eq!(recognizer.recognize(path("clang-cl-17")), Some(CompilerType::ClangCl));
+    }
+
+    #[test]
+    fn test_intel_cc_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("icx")), Some(CompilerType::IntelCc));
+        assert_eq!(recognizer.recognize(path("icpx")), Some(CompilerType::IntelCc));
+        assert_eq!(recognizer.recognize(path("icc")), Some(CompilerType::IntelCc));
+        assert_eq!(recognizer.recognize(path("icpc")), Some(CompilerType::IntelCc));
+        assert_eq!(recognizer.recognize(path("icx-2024")), Some(CompilerType::IntelCc));
+    }
+
+    #[test]
+    fn test_nvidia_hpc_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("nvc")), Some(CompilerType::NvidiaHpc));
+        assert_eq!(recognizer.recognize(path("nvc++")), Some(CompilerType::NvidiaHpc));
+        assert_eq!(recognizer.recognize(path("nvfortran")), Some(CompilerType::NvidiaHpc));
+        assert_eq!(recognizer.recognize(path("pgcc")), Some(CompilerType::NvidiaHpc));
+        assert_eq!(recognizer.recognize(path("pgc++")), Some(CompilerType::NvidiaHpc));
+        assert_eq!(recognizer.recognize(path("pgfortran")), Some(CompilerType::NvidiaHpc));
+    }
+
+    #[test]
+    fn test_armclang_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("armclang")), Some(CompilerType::Armclang));
+        assert_eq!(recognizer.recognize(path("armclang++")), Some(CompilerType::Armclang));
+        assert_eq!(recognizer.recognize(path("armclang-14")), Some(CompilerType::Armclang));
+    }
+
+    #[test]
+    fn test_ibm_xl_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("ibm-clang")), Some(CompilerType::IbmXl));
+        assert_eq!(recognizer.recognize(path("ibm-clang++")), Some(CompilerType::IbmXl));
+        assert_eq!(recognizer.recognize(path("xlclang")), Some(CompilerType::IbmXl));
+        assert_eq!(recognizer.recognize(path("xlclang++")), Some(CompilerType::IbmXl));
     }
 
     #[test]

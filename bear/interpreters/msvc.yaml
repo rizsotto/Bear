@@ -1,0 +1,300 @@
+# MSVC compiler (cl.exe) flag definitions
+# https://learn.microsoft.com/en-us/cpp/build/reference/compiler-options-listed-by-category
+type: msvc
+recognize:
+  - executables: ["cl"]
+    cross_compilation: false
+    versioned: false
+ignore_when:
+  executables: ["c1", "c1xx", "c2"]
+slash_prefix: true
+flags:
+  # --- Info and exit ---
+  - match: {pattern: "/help"}
+    result: info_and_exit
+  - match: {pattern: "/?"}
+    result: info_and_exit
+
+  # --- Compilation control ---
+  - match: {pattern: "/c"}
+    result: stops_at_compiling
+  - match: {pattern: "/EP"}
+    result: stops_at_preprocessing
+  - match: {pattern: "/E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "/P"}
+    result: stops_at_preprocessing
+
+  # --- Output flags ---
+  - match: {pattern: "/Fo{:}*"}
+    result: output
+  - match: {pattern: "/Fe{:}*"}
+    result: output
+  - match: {pattern: "/Fd{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/Fa{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/Fi{:}*"}
+    result: configures_preprocessing
+  - match: {pattern: "/Fm{:}*"}
+    result: configures_linking
+  - match: {pattern: "/FR{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/doc{:}*"}
+    result: configures_compiling
+
+  # --- Include/define ---
+  - match: {pattern: "/external:I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/external:anglebrackets"}
+    result: none
+  - match: {pattern: "/external:env:*"}
+    result: configures_preprocessing
+  - match: {pattern: "/external:W*"}
+    result: none
+  - match: {pattern: "/I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/FI{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/u"}
+    result: configures_preprocessing
+  - match: {pattern: "/X"}
+    result: configures_preprocessing
+  - match: {pattern: "/showIncludes"}
+    result: configures_preprocessing
+
+  # --- Standard/language ---
+  - match: {pattern: "/std:*"}
+    result: configures_compiling
+  - match: {pattern: "/Tc{ }*"}
+    result: configures_compiling
+  - match: {pattern: "/Tp{ }*"}
+    result: configures_compiling
+  - match: {pattern: "/TC"}
+    result: configures_compiling
+  - match: {pattern: "/TP"}
+    result: configures_compiling
+  - match: {pattern: "/Zc:*"}
+    result: configures_compiling
+  - match: {pattern: "/permissive-"}
+    result: configures_compiling
+
+  # --- Optimization ---
+  - match: {pattern: "/O1"}
+    result: configures_compiling
+  - match: {pattern: "/O2"}
+    result: configures_compiling
+  - match: {pattern: "/Ob*"}
+    result: configures_compiling
+  - match: {pattern: "/Od"}
+    result: configures_compiling
+  - match: {pattern: "/Og"}
+    result: configures_compiling
+  - match: {pattern: "/Oi"}
+    result: configures_compiling
+  - match: {pattern: "/Os"}
+    result: configures_compiling
+  - match: {pattern: "/Ot"}
+    result: configures_compiling
+  - match: {pattern: "/Ox"}
+    result: configures_compiling
+  - match: {pattern: "/Oy"}
+    result: configures_compiling
+  - match: {pattern: "/GL"}
+    result: configures_compiling
+  - match: {pattern: "/Gw"}
+    result: configures_compiling
+  - match: {pattern: "/Gy"}
+    result: configures_compiling
+
+  # --- Code generation ---
+  - match: {pattern: "/arch:*"}
+    result: configures_compiling
+  - match: {pattern: "/EH*"}
+    result: configures_compiling
+  - match: {pattern: "/fp:*"}
+    result: configures_compiling
+  - match: {pattern: "/favor:*"}
+    result: configures_compiling
+  - match: {pattern: "/GA"}
+    result: configures_compiling
+  - match: {pattern: "/Gd"}
+    result: configures_compiling
+  - match: {pattern: "/Ge"}
+    result: configures_compiling
+  - match: {pattern: "/GF"}
+    result: configures_compiling
+  - match: {pattern: "/Gh"}
+    result: configures_compiling
+  - match: {pattern: "/GH"}
+    result: configures_compiling
+  - match: {pattern: "/Gr"}
+    result: configures_compiling
+  - match: {pattern: "/GR-"}
+    result: configures_compiling
+  - match: {pattern: "/GR"}
+    result: configures_compiling
+  - match: {pattern: "/Gs*"}
+    result: configures_compiling
+  - match: {pattern: "/GT"}
+    result: configures_compiling
+  - match: {pattern: "/guard:*"}
+    result: configures_compiling
+  - match: {pattern: "/Gv"}
+    result: configures_compiling
+  - match: {pattern: "/Gz"}
+    result: configures_compiling
+  - match: {pattern: "/GZ"}
+    result: configures_compiling
+  - match: {pattern: "/volatile:*"}
+    result: configures_compiling
+
+  # --- Runtime library ---
+  - match: {pattern: "/MDd"}
+    result: configures_compiling
+  - match: {pattern: "/MD"}
+    result: configures_compiling
+  - match: {pattern: "/MTd"}
+    result: configures_compiling
+  - match: {pattern: "/MT"}
+    result: configures_compiling
+
+  # --- CLR ---
+  - match: {pattern: "/clr*"}
+    result: configures_compiling
+
+  # --- Runtime checks ---
+  - match: {pattern: "/RTC*"}
+    result: configures_compiling
+  - match: {pattern: "/sdl"}
+    result: configures_compiling
+
+  # --- Spectre/parallel ---
+  - match: {pattern: "/Qspectre-load"}
+    result: configures_compiling
+  - match: {pattern: "/Qspectre"}
+    result: configures_compiling
+  - match: {pattern: "/Qpar"}
+    result: configures_compiling
+  - match: {pattern: "/Qfast_transcendentals"}
+    result: configures_compiling
+  - match: {pattern: "/Qvec-report:*"}
+    result: configures_compiling
+
+  # --- Debug info ---
+  - match: {pattern: "/ZI"}
+    result: configures_compiling
+  - match: {pattern: "/Zi"}
+    result: configures_compiling
+  - match: {pattern: "/Z7"}
+    result: configures_compiling
+  - match: {pattern: "/Zf"}
+    result: configures_compiling
+  - match: {pattern: "/ZH:*"}
+    result: configures_compiling
+  - match: {pattern: "/Zo-"}
+    result: configures_compiling
+  - match: {pattern: "/Zo"}
+    result: configures_compiling
+
+  # --- Warnings ---
+  - match: {pattern: "/Wall"}
+    result: none
+  - match: {pattern: "/WX-"}
+    result: none
+  - match: {pattern: "/WX"}
+    result: none
+  - match: {pattern: "/W0"}
+    result: none
+  - match: {pattern: "/W1"}
+    result: none
+  - match: {pattern: "/W2"}
+    result: none
+  - match: {pattern: "/W3"}
+    result: none
+  - match: {pattern: "/W4"}
+    result: none
+  - match: {pattern: "/w"}
+    result: none
+  - match: {pattern: "/wd*"}
+    result: none
+  - match: {pattern: "/we*"}
+    result: none
+  - match: {pattern: "/wo*"}
+    result: none
+  - match: {pattern: "/diagnostics:*"}
+    result: none
+  - match: {pattern: "/errorReport:*"}
+    result: none
+  - match: {pattern: "/FC"}
+    result: none
+
+  # --- Precompiled headers ---
+  - match: {pattern: "/Yc{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/Yu{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/Fp{:}*"}
+    result: configures_compiling
+  - match: {pattern: "/YX"}
+    result: configures_compiling
+  - match: {pattern: "/Y-"}
+    result: configures_compiling
+
+  # --- Linking ---
+  - match: {pattern: "/link"}
+    result: pass_through
+  - match: {pattern: "/F{ }*"}
+    result: configures_linking
+  - match: {pattern: "/LDd"}
+    result: configures_linking
+  - match: {pattern: "/LD"}
+    result: configures_linking
+  - match: {pattern: "/LN"}
+    result: configures_linking
+
+  # --- Misc compilation ---
+  - match: {pattern: "/source-charset:*"}
+    result: configures_compiling
+  - match: {pattern: "/execution-charset:*"}
+    result: configures_compiling
+  - match: {pattern: "/utf-8"}
+    result: configures_compiling
+  - match: {pattern: "/validate-charset"}
+    result: configures_compiling
+  - match: {pattern: "/bigobj"}
+    result: configures_compiling
+  - match: {pattern: "/J"}
+    result: configures_compiling
+  - match: {pattern: "/openmp*"}
+    result: configures_compiling
+  - match: {pattern: "/AI{ }*"}
+    result: configures_compiling
+  - match: {pattern: "/FU{ }*"}
+    result: configures_compiling
+  - match: {pattern: "/await:strict"}
+    result: configures_compiling
+  - match: {pattern: "/await"}
+    result: configures_compiling
+  - match: {pattern: "/constexpr:*"}
+    result: configures_compiling
+
+  # --- Analysis ---
+  - match: {pattern: "/analyze-"}
+    result: configures_compiling
+  - match: {pattern: "/analyze:*"}
+    result: configures_compiling
+  - match: {pattern: "/analyze"}
+    result: configures_compiling
+
+  # --- Driver options ---
+  - match: {pattern: "/nologo"}
+    result: driver_option
+  - match: {pattern: "/MP*"}
+    result: driver_option
+  - match: {pattern: "/FS"}
+    result: driver_option

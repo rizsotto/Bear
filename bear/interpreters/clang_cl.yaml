@@ -1,0 +1,94 @@
+# clang-cl compiler flag definitions (MSVC-compatible Clang driver)
+# https://clang.llvm.org/docs/UsersManual.html#clang-cl
+extends: msvc
+type: clang_cl
+recognize:
+  - executables: ["clang-cl"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: true
+flags:
+  # Pass arg to clang frontend
+  - match: {pattern: "-Xclang", count: 1}
+    result: configures_compiling
+  # Diagnostics
+  - match: {pattern: "-fcolor-diagnostics"}
+    result: none
+  - match: {pattern: "-fno-color-diagnostics"}
+    result: none
+  - match: {pattern: "-fcrash-diagnostics-dir{=}*"}
+    result: none
+  # MSVC compatibility
+  - match: {pattern: "-fms-compatibility-version{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-fms-extensions"}
+    result: configures_compiling
+  - match: {pattern: "-fno-ms-extensions"}
+    result: configures_compiling
+  - match: {pattern: "-fmsc-version{=}*"}
+    result: configures_compiling
+  # Sanitizers
+  - match: {pattern: "-fsanitize{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-fno-sanitize{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-fsanitize-blacklist{=}*"}
+    result: configures_compiling
+  # LTO
+  - match: {pattern: "-flto"}
+    result: configures_compiling
+  - match: {pattern: "-flto=*"}
+    result: configures_compiling
+  - match: {pattern: "-fno-lto"}
+    result: configures_compiling
+  # Profiling and coverage
+  - match: {pattern: "-fprofile-instr-generate"}
+    result: configures_compiling
+  - match: {pattern: "-fprofile-instr-generate=*"}
+    result: configures_compiling
+  - match: {pattern: "-fprofile-instr-use{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-fcoverage-mapping"}
+    result: configures_compiling
+  - match: {pattern: "-fno-coverage-mapping"}
+    result: configures_compiling
+  # Auto variable initialization
+  - match: {pattern: "-ftrivial-auto-var-init{=}*"}
+    result: configures_compiling
+  # Target
+  - match: {pattern: "--target{=}*"}
+    result: configures_compiling
+  - match: {pattern: "-m32"}
+    result: configures_compiling
+  - match: {pattern: "-m64"}
+    result: configures_compiling
+  - match: {pattern: "-msse*"}
+    result: configures_compiling
+  - match: {pattern: "-mavx*"}
+    result: configures_compiling
+  # Driver options
+  - match: {pattern: "--driver-mode{=}*"}
+    result: driver_option
+  - match: {pattern: "-v"}
+    result: driver_option
+  # Linker
+  - match: {pattern: "-fuse-ld{=}*"}
+    result: configures_linking
+  # Info and exit
+  - match: {pattern: "-###"}
+    result: info_and_exit
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  # clang-cl specific slash flags
+  - match: {pattern: "/clang:*"}
+    result: configures_compiling
+  - match: {pattern: "/imsvc{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "/showFilenames"}
+    result: none
+  - match: {pattern: "/vctoolsdir{ }*"}
+    result: driver_option
+  - match: {pattern: "/vctoolsversion{ }*"}
+    result: driver_option
+  - match: {pattern: "/winsysroot{ }*"}
+    result: driver_option

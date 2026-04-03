@@ -119,6 +119,10 @@ mod flags {
         output_file: &'static str,
     }
 
+    // Table order matters: it determines recognition pattern priority.
+    // More specific compilers (whose executable names could be mistaken for
+    // cross-compilation variants of general compilers) must come first.
+    // E.g., ibm-clang must match IbmXl before Clang's cross-compilation pattern.
     const TABLES: &[TableConfig] = &[
         TableConfig {
             yaml_file: "gcc.yaml",
@@ -127,6 +131,24 @@ mod flags {
             ignore_flags_name: "GCC_IGNORE_FLAGS",
             slash_prefix_name: "GCC_SLASH_PREFIX",
             output_file: "flags_gcc.rs",
+        },
+        // IBM XL before Clang: ibm-clang looks like cross-compilation clang
+        TableConfig {
+            yaml_file: "ibm_xl.yaml",
+            static_name: "IBM_XL_FLAGS",
+            ignore_executables_name: "IBM_XL_IGNORE_EXECUTABLES",
+            ignore_flags_name: "IBM_XL_IGNORE_FLAGS",
+            slash_prefix_name: "IBM_XL_SLASH_PREFIX",
+            output_file: "flags_ibm_xl.rs",
+        },
+        // clang-cl before Clang: clang-cl is versioned and could match clang's pattern
+        TableConfig {
+            yaml_file: "clang_cl.yaml",
+            static_name: "CLANG_CL_FLAGS",
+            ignore_executables_name: "CLANG_CL_IGNORE_EXECUTABLES",
+            ignore_flags_name: "CLANG_CL_IGNORE_FLAGS",
+            slash_prefix_name: "CLANG_CL_SLASH_PREFIX",
+            output_file: "flags_clang_cl.rs",
         },
         TableConfig {
             yaml_file: "clang.yaml",
@@ -167,6 +189,38 @@ mod flags {
             ignore_flags_name: "CRAY_FORTRAN_IGNORE_FLAGS",
             slash_prefix_name: "CRAY_FORTRAN_SLASH_PREFIX",
             output_file: "flags_cray_fortran.rs",
+        },
+        TableConfig {
+            yaml_file: "msvc.yaml",
+            static_name: "MSVC_FLAGS",
+            ignore_executables_name: "MSVC_IGNORE_EXECUTABLES",
+            ignore_flags_name: "MSVC_IGNORE_FLAGS",
+            slash_prefix_name: "MSVC_SLASH_PREFIX",
+            output_file: "flags_msvc.rs",
+        },
+        TableConfig {
+            yaml_file: "intel_cc.yaml",
+            static_name: "INTEL_CC_FLAGS",
+            ignore_executables_name: "INTEL_CC_IGNORE_EXECUTABLES",
+            ignore_flags_name: "INTEL_CC_IGNORE_FLAGS",
+            slash_prefix_name: "INTEL_CC_SLASH_PREFIX",
+            output_file: "flags_intel_cc.rs",
+        },
+        TableConfig {
+            yaml_file: "nvidia_hpc.yaml",
+            static_name: "NVIDIA_HPC_FLAGS",
+            ignore_executables_name: "NVIDIA_HPC_IGNORE_EXECUTABLES",
+            ignore_flags_name: "NVIDIA_HPC_IGNORE_FLAGS",
+            slash_prefix_name: "NVIDIA_HPC_SLASH_PREFIX",
+            output_file: "flags_nvidia_hpc.rs",
+        },
+        TableConfig {
+            yaml_file: "armclang.yaml",
+            static_name: "ARMCLANG_FLAGS",
+            ignore_executables_name: "ARMCLANG_IGNORE_EXECUTABLES",
+            ignore_flags_name: "ARMCLANG_IGNORE_FLAGS",
+            slash_prefix_name: "ARMCLANG_SLASH_PREFIX",
+            output_file: "flags_armclang.rs",
         },
     ];
 

@@ -98,6 +98,18 @@ pub enum CompilerType {
     CrayFortran,
     #[serde(alias = "nvcc", alias = "cuda")]
     Cuda,
+    #[serde(alias = "msvc", alias = "cl")]
+    Msvc,
+    #[serde(alias = "clang_cl", alias = "clang-cl")]
+    ClangCl,
+    #[serde(alias = "intel_cc", alias = "intel-cc", alias = "icx")]
+    IntelCc,
+    #[serde(alias = "nvidia_hpc", alias = "nvidia-hpc", alias = "nvc", alias = "pgi")]
+    NvidiaHpc,
+    #[serde(alias = "armclang", alias = "arm-clang")]
+    Armclang,
+    #[serde(alias = "ibm_xl", alias = "ibm-xl", alias = "xlclang")]
+    IbmXl,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
     Wrapper,
 }
@@ -111,6 +123,12 @@ impl std::fmt::Display for CompilerType {
             CompilerType::IntelFortran => "Intel Fortran",
             CompilerType::CrayFortran => "Cray Fortran",
             CompilerType::Cuda => "CUDA",
+            CompilerType::Msvc => "MSVC",
+            CompilerType::ClangCl => "clang-cl",
+            CompilerType::IntelCc => "Intel C/C++",
+            CompilerType::NvidiaHpc => "NVIDIA HPC",
+            CompilerType::Armclang => "ARM Compiler",
+            CompilerType::IbmXl => "IBM Open XL",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

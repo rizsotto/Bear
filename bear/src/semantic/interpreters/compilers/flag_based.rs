@@ -215,6 +215,12 @@ include!(concat!(env!("OUT_DIR"), "/flags_flang.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cuda.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_intel_fortran.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cray_fortran.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_msvc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_clang_cl.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_intel_cc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_nvidia_hpc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc() -> impl Interpreter {
@@ -258,6 +264,55 @@ pub(super) fn cray_fortran() -> impl Interpreter {
         &CRAY_FORTRAN_IGNORE_EXECUTABLES,
         &CRAY_FORTRAN_IGNORE_FLAGS,
         CRAY_FORTRAN_SLASH_PREFIX,
+    )
+}
+
+pub(super) fn msvc() -> impl Interpreter {
+    FlagBasedInterpreter::new(&MSVC_FLAGS, &MSVC_IGNORE_EXECUTABLES, &MSVC_IGNORE_FLAGS, MSVC_SLASH_PREFIX)
+}
+
+pub(super) fn clang_cl() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &CLANG_CL_FLAGS,
+        &CLANG_CL_IGNORE_EXECUTABLES,
+        &CLANG_CL_IGNORE_FLAGS,
+        CLANG_CL_SLASH_PREFIX,
+    )
+}
+
+pub(super) fn intel_cc() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &INTEL_CC_FLAGS,
+        &INTEL_CC_IGNORE_EXECUTABLES,
+        &INTEL_CC_IGNORE_FLAGS,
+        INTEL_CC_SLASH_PREFIX,
+    )
+}
+
+pub(super) fn nvidia_hpc() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &NVIDIA_HPC_FLAGS,
+        &NVIDIA_HPC_IGNORE_EXECUTABLES,
+        &NVIDIA_HPC_IGNORE_FLAGS,
+        NVIDIA_HPC_SLASH_PREFIX,
+    )
+}
+
+pub(super) fn armclang() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &ARMCLANG_FLAGS,
+        &ARMCLANG_IGNORE_EXECUTABLES,
+        &ARMCLANG_IGNORE_FLAGS,
+        ARMCLANG_SLASH_PREFIX,
+    )
+}
+
+pub(super) fn ibm_xl() -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &IBM_XL_FLAGS,
+        &IBM_XL_IGNORE_EXECUTABLES,
+        &IBM_XL_IGNORE_FLAGS,
+        IBM_XL_SLASH_PREFIX,
     )
 }
 
@@ -340,6 +395,36 @@ mod flag_table_invariants {
     #[test]
     fn cray_fortran() {
         assert_invariants(&CRAY_FORTRAN_FLAGS);
+    }
+
+    #[test]
+    fn msvc() {
+        assert_invariants(&MSVC_FLAGS);
+    }
+
+    #[test]
+    fn clang_cl() {
+        assert_invariants(&CLANG_CL_FLAGS);
+    }
+
+    #[test]
+    fn intel_cc() {
+        assert_invariants(&INTEL_CC_FLAGS);
+    }
+
+    #[test]
+    fn nvidia_hpc() {
+        assert_invariants(&NVIDIA_HPC_FLAGS);
+    }
+
+    #[test]
+    fn armclang() {
+        assert_invariants(&ARMCLANG_FLAGS);
+    }
+
+    #[test]
+    fn ibm_xl() {
+        assert_invariants(&IBM_XL_FLAGS);
     }
 
     #[test]

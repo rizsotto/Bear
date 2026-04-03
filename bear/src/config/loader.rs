@@ -396,6 +396,38 @@ mod test {
         assert_compiler_type_deserializes("\"crayftn\"", CompilerType::CrayFortran);
         assert_compiler_type_deserializes("\"cray-fortran\"", CompilerType::CrayFortran);
         assert_compiler_type_deserializes("\"cray_fortran\"", CompilerType::CrayFortran);
+
+        // Test MSVC
+        assert_compiler_type_deserializes("\"msvc\"", CompilerType::Msvc);
+        assert_compiler_type_deserializes("\"cl\"", CompilerType::Msvc);
+
+        // Test clang-cl
+        assert_compiler_type_deserializes("\"clangcl\"", CompilerType::ClangCl);
+        assert_compiler_type_deserializes("\"clang_cl\"", CompilerType::ClangCl);
+        assert_compiler_type_deserializes("\"clang-cl\"", CompilerType::ClangCl);
+
+        // Test Intel C/C++
+        assert_compiler_type_deserializes("\"intelcc\"", CompilerType::IntelCc);
+        assert_compiler_type_deserializes("\"intel_cc\"", CompilerType::IntelCc);
+        assert_compiler_type_deserializes("\"intel-cc\"", CompilerType::IntelCc);
+        assert_compiler_type_deserializes("\"icx\"", CompilerType::IntelCc);
+
+        // Test NVIDIA HPC
+        assert_compiler_type_deserializes("\"nvidiahpc\"", CompilerType::NvidiaHpc);
+        assert_compiler_type_deserializes("\"nvidia_hpc\"", CompilerType::NvidiaHpc);
+        assert_compiler_type_deserializes("\"nvidia-hpc\"", CompilerType::NvidiaHpc);
+        assert_compiler_type_deserializes("\"nvc\"", CompilerType::NvidiaHpc);
+        assert_compiler_type_deserializes("\"pgi\"", CompilerType::NvidiaHpc);
+
+        // Test ARM Compiler
+        assert_compiler_type_deserializes("\"armclang\"", CompilerType::Armclang);
+        assert_compiler_type_deserializes("\"arm-clang\"", CompilerType::Armclang);
+
+        // Test IBM Open XL
+        assert_compiler_type_deserializes("\"ibmxl\"", CompilerType::IbmXl);
+        assert_compiler_type_deserializes("\"ibm_xl\"", CompilerType::IbmXl);
+        assert_compiler_type_deserializes("\"ibm-xl\"", CompilerType::IbmXl);
+        assert_compiler_type_deserializes("\"xlclang\"", CompilerType::IbmXl);
     }
 
     #[test]
@@ -476,5 +508,11 @@ mod test {
         assert_eq!(CompilerType::Flang.to_string(), "Flang");
         assert_eq!(CompilerType::IntelFortran.to_string(), "Intel Fortran");
         assert_eq!(CompilerType::CrayFortran.to_string(), "Cray Fortran");
+        assert_eq!(CompilerType::Msvc.to_string(), "MSVC");
+        assert_eq!(CompilerType::ClangCl.to_string(), "clang-cl");
+        assert_eq!(CompilerType::IntelCc.to_string(), "Intel C/C++");
+        assert_eq!(CompilerType::NvidiaHpc.to_string(), "NVIDIA HPC");
+        assert_eq!(CompilerType::Armclang.to_string(), "ARM Compiler");
+        assert_eq!(CompilerType::IbmXl.to_string(), "IBM Open XL");
     }
 }

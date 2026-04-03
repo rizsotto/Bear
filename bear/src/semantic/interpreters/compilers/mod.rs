@@ -50,6 +50,12 @@ impl CompilerInterpreter {
         result.register(CompilerType::IntelFortran, flag_based::intel_fortran());
         result.register(CompilerType::CrayFortran, flag_based::cray_fortran());
         result.register(CompilerType::Cuda, flag_based::cuda());
+        result.register(CompilerType::Msvc, flag_based::msvc());
+        result.register(CompilerType::ClangCl, flag_based::clang_cl());
+        result.register(CompilerType::IntelCc, flag_based::intel_cc());
+        result.register(CompilerType::NvidiaHpc, flag_based::nvidia_hpc());
+        result.register(CompilerType::Armclang, flag_based::armclang());
+        result.register(CompilerType::IbmXl, flag_based::ibm_xl());
 
         Arc::new_cyclic(|weak_self| {
             // Create wrapper interpreter with weak references
