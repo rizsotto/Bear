@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use anyhow::{Result, bail};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -60,11 +61,7 @@ impl FlagMatch {
         } else if let Some(flag) = pattern.strip_suffix(":*") {
             flag.len()
         } else if let Some(flag) = pattern.strip_suffix("=*") {
-            if self.count.is_some() {
-                flag.len() + 1 // "=" is part of the flag name
-            } else {
-                flag.len()
-            }
+            if self.count.is_some() { flag.len() + 1 } else { flag.len() }
         } else if let Some(flag) = pattern.strip_suffix('*') {
             flag.len()
         } else {
@@ -85,10 +82,10 @@ pub struct EnvEntry {
 
 impl EnvEntry {
     /// Validate this environment entry against the schema.
-    pub fn validate(&self, yaml_file: &str) -> Result<(), String> {
+    pub fn validate(&self) -> Result<()> {
         let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
         if !var_re.is_match(&self.variable) {
-            return Err(format!("{}: invalid environment variable name: '{}'", yaml_file, self.variable));
+            bail!("invalid environment variable name '{}'", self.variable);
         }
 
         match self.effect.as_str() {
@@ -102,42 +99,26 @@ impl EnvEntry {
             | "info_and_exit"
             | "driver_option"
             | "none" => {}
-            other => return Err(format!("{}: unknown effect value: '{}'", yaml_file, other)),
+            other => bail!("variable '{}': unknown effect '{}'", self.variable, other),
         }
 
         let mapping = &self.mapping;
         if mapping.flag.is_some() && mapping.expand.is_some() {
-            return Err(format!(
-                "{}: environment entry '{}' has both 'flag' and 'expand'",
-                yaml_file, self.variable
-            ));
+            bail!("variable '{}': has both 'flag' and 'expand'", self.variable);
         }
         if mapping.flag.is_none() && mapping.expand.is_none() && self.effect != "none" {
-            return Err(format!(
-                "{}: environment entry '{}' has neither 'flag' nor 'expand' (and effect is not 'none')",
-                yaml_file, self.variable
-            ));
+            bail!("variable '{}': has neither 'flag' nor 'expand' (and effect is not 'none')", self.variable);
         }
 
         match mapping.separator.as_str() {
             "path" | "space" | ";" => {}
-            other => {
-                return Err(format!(
-                    "{}: environment entry '{}' has unknown separator: '{}'",
-                    yaml_file, self.variable, other
-                ));
-            }
+            other => bail!("variable '{}': unknown separator '{}'", self.variable, other),
         }
 
         if let Some(ref expand) = mapping.expand {
             match expand.as_str() {
                 "prepend" | "append" => {}
-                other => {
-                    return Err(format!(
-                        "{}: environment entry '{}' has unknown expand position: '{}'",
-                        yaml_file, self.variable, other
-                    ));
-                }
+                other => bail!("variable '{}': unknown expand position '{}'", self.variable, other),
             }
         }
 
@@ -156,23 +137,23 @@ pub struct EnvMappingYaml {
 
 impl EnvMappingYaml {
     /// Convert this mapping to a Rust `EnvMapping` expression string.
-    pub fn to_rust(&self) -> String {
+    pub fn to_rust(&self) -> Result<String> {
         if let Some(ref flag) = self.flag {
             let sep = match self.separator.as_str() {
                 "path" => "EnvSeparator::Path".to_string(),
                 ";" => "EnvSeparator::Fixed(\";\")".to_string(),
                 other => format!("EnvSeparator::Fixed(\"{}\")", other),
             };
-            format!("EnvMapping::Flag {{ flag: \"{}\", separator: {} }}", flag, sep)
+            Ok(format!("EnvMapping::Flag {{ flag: \"{}\", separator: {} }}", flag, sep))
         } else if let Some(ref expand) = self.expand {
             let pos = match expand.as_str() {
                 "prepend" => "EnvPosition::Prepend",
                 "append" => "EnvPosition::Append",
-                _ => unreachable!(),
+                other => bail!("unknown expand position '{}'", other),
             };
-            format!("EnvMapping::Expand {{ position: {} }}", pos)
+            Ok(format!("EnvMapping::Expand {{ position: {} }}", pos))
         } else {
-            unreachable!()
+            bail!("mapping has neither 'flag' nor 'expand'")
         }
     }
 }

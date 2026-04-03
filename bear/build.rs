@@ -30,7 +30,13 @@ fn main() {
 
     let flags_dir = std::path::Path::new("interpreters");
     let out_dir: std::path::PathBuf = std::env::var("OUT_DIR").unwrap().into();
-    bear_codegen::generate(flags_dir, &out_dir);
+    if let Err(e) = bear_codegen::generate(flags_dir, &out_dir) {
+        eprintln!("error: flag codegen failed");
+        for cause in e.chain() {
+            eprintln!("  caused by: {}", cause);
+        }
+        std::process::exit(1);
+    }
 }
 
 /// Validate the `INTERCEPT_LIBDIR` environment variable.

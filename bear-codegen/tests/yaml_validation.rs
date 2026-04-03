@@ -13,15 +13,14 @@ use bear_codegen::tables::TABLES;
 /// Every YAML file parses successfully.
 #[test]
 fn all_yaml_files_parse() {
-    // load_tables panics on parse failure, so just calling it is the test
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     assert_eq!(tables.len(), TABLES.len());
 }
 
 /// Every `extends` reference points to an existing table.
 #[test]
 fn extends_references_are_valid() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
@@ -39,13 +38,13 @@ fn extends_references_are_valid() {
 /// Every flag entry uses a known result string.
 #[test]
 fn all_flag_results_are_valid() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
         for entry in &table.flags {
-            // result_to_rust panics on unknown values
-            let _ = result_to_rust(&entry.result);
+            result_to_rust(&entry.result)
+                .unwrap_or_else(|e| panic!("{}: flag '{}': {}", config.yaml_file, entry.match_.pattern, e));
         }
     }
 }
@@ -53,7 +52,7 @@ fn all_flag_results_are_valid() {
 /// Every flag pattern produces valid codegen output.
 #[test]
 fn all_flag_patterns_produce_valid_codegen() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
@@ -73,7 +72,7 @@ fn all_flag_patterns_produce_valid_codegen() {
 /// Every environment entry in every YAML file passes validation.
 #[test]
 fn all_env_entries_are_valid() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     let mut errors = Vec::new();
 
     for config in TABLES {
@@ -83,8 +82,8 @@ fn all_env_entries_are_valid() {
             if entry.effect == "none" {
                 continue;
             }
-            if let Err(e) = entry.validate(config.yaml_file) {
-                errors.push(e);
+            if let Err(e) = entry.validate() {
+                errors.push(format!("{}: {}", config.yaml_file, e));
             }
         }
     }
@@ -96,7 +95,7 @@ fn all_env_entries_are_valid() {
 #[test]
 fn env_variable_names_are_c_identifiers() {
     let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
 
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
@@ -116,7 +115,7 @@ fn env_variable_names_are_c_identifiers() {
 /// No two YAML files extend into a cycle.
 #[test]
 fn no_circular_extends() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let mut visited = std::collections::HashSet::new();
@@ -136,7 +135,7 @@ fn no_circular_extends() {
 /// Every table with a `type` field has at least one `recognize` entry.
 #[test]
 fn typed_tables_have_recognition_entries() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];
@@ -153,7 +152,7 @@ fn typed_tables_have_recognition_entries() {
 /// Every table has at least one flag entry (own or inherited).
 #[test]
 fn all_tables_have_flags() {
-    let tables = load_tables();
+    let tables = load_tables().unwrap();
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
         let table = &tables[key];

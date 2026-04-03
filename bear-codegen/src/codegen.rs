@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use anyhow::{Result, bail};
+
 /// Parse a pattern string into a FlagPattern Rust expression.
 pub fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
     if let Some(flag) = pattern.strip_suffix("{ }*") {
@@ -12,7 +14,6 @@ pub fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
         format!("FlagPattern::ExactlyWithColon(\"{}\")", flag)
     } else if let Some(flag) = pattern.strip_suffix("=*") {
         if let Some(n) = count {
-            // "=*" with count means Prefix where "=" is part of the flag name
             format!("FlagPattern::Prefix(\"{}=\", {})", flag, n)
         } else {
             format!("FlagPattern::ExactlyWithEq(\"{}\")", flag)
@@ -25,22 +26,26 @@ pub fn pattern_to_rust(pattern: &str, count: Option<u32>) -> String {
 }
 
 /// Map a result string to its Rust ArgumentKind expression.
-pub fn result_to_rust(result: &str) -> &'static str {
+pub fn result_to_rust(result: &str) -> Result<&'static str> {
     match result {
-        "output" => "ArgumentKind::Output",
+        "output" => Ok("ArgumentKind::Output"),
         "configures_preprocessing" => {
-            "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))"
+            Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))")
         }
-        "configures_compiling" => "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))",
-        "configures_assembling" => "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))",
-        "configures_linking" => "ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))",
-        "stops_at_preprocessing" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))",
-        "stops_at_compiling" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))",
-        "stops_at_assembling" => "ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))",
-        "info_and_exit" => "ArgumentKind::Other(PassEffect::InfoAndExit)",
-        "driver_option" => "ArgumentKind::Other(PassEffect::DriverOption)",
-        "pass_through" => "ArgumentKind::Other(PassEffect::PassThrough)",
-        "none" => "ArgumentKind::Other(PassEffect::None)",
-        other => panic!("Unknown result value: '{}'", other),
+        "configures_compiling" => Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))"),
+        "configures_assembling" => {
+            Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Assembling))")
+        }
+        "configures_linking" => Ok("ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))"),
+        "stops_at_preprocessing" => {
+            Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))")
+        }
+        "stops_at_compiling" => Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))"),
+        "stops_at_assembling" => Ok("ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Assembling))"),
+        "info_and_exit" => Ok("ArgumentKind::Other(PassEffect::InfoAndExit)"),
+        "driver_option" => Ok("ArgumentKind::Other(PassEffect::DriverOption)"),
+        "pass_through" => Ok("ArgumentKind::Other(PassEffect::PassThrough)"),
+        "none" => Ok("ArgumentKind::Other(PassEffect::None)"),
+        other => bail!("unknown result value '{}'", other),
     }
 }

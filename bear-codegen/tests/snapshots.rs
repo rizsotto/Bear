@@ -12,9 +12,9 @@ use bear_codegen::tables::TABLES;
 use bear_codegen::{ResolvedTable, load_tables};
 
 fn generate_flag_file(yaml_stem: &str) -> String {
-    let raw_tables = load_tables();
+    let raw_tables = load_tables().unwrap();
     let config = TABLES.iter().find(|c| c.yaml_file == format!("{}.yaml", yaml_stem)).unwrap();
-    ResolvedTable::new(yaml_stem, config, &raw_tables).generate()
+    ResolvedTable::new(yaml_stem, config, &raw_tables).unwrap().generate().unwrap()
 }
 
 #[test]
@@ -79,12 +79,12 @@ fn snapshot_flags_armclang() {
 
 #[test]
 fn snapshot_recognition() {
-    let raw_tables = load_tables();
+    let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));
 }
 
 #[test]
 fn snapshot_env_keys() {
-    let raw_tables = load_tables();
+    let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_env_keys(&raw_tables));
 }
