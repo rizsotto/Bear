@@ -132,10 +132,84 @@ recognition entries with `cross_compilation: false, versioned: false`. This
 ensures the recognizer routes them to the right compiler type, where the
 interpreter then ignores them. You do not need to list them under `recognize`.
 
+## Environment variables
+
+The optional `environment` section declares environment variables that the
+compiler binary reads and how their values map to command-line arguments.
+
+```yaml
+environment:
+  - variable: CPATH
+    effect: configures_preprocessing
+    mapping:
+      flag: "-I"
+      separator: path
+
+  - variable: CL
+    effect: configures_compiling
+    mapping:
+      expand: prepend
+      separator: space
+```
+
+Each entry has:
+
+- `variable` -- the environment variable name (must match `[A-Za-z_][A-Za-z0-9_]*`)
+- `effect` -- semantic effect (same vocabulary as `result` in flags)
+- `mapping` -- how the value translates to arguments
+
+### Mapping types
+
+| Type | Fields | Behavior |
+|------|--------|----------|
+| Flag | `flag` + `separator` | Split value by separator, emit `<flag> <entry>` per element |
+| Expand | `expand` + `separator: space` | Shell-split value, insert as raw arguments |
+
+### Separators
+
+| Value | Meaning |
+|-------|---------|
+| `path` | Platform path separator (`:` on Unix, `;` on Windows) |
+| `";"` | Fixed semicolon separator |
+| `space` | POSIX shell-word splitting (used with `expand`) |
+
+### Expand positions
+
+| Value | Meaning |
+|-------|---------|
+| `prepend` | Insert before command-line arguments (e.g., MSVC `CL`) |
+| `append` | Insert after command-line arguments (e.g., MSVC `_CL_`) |
+
+### Documentary entries
+
+Variables the compiler reads but Bear cannot parse (e.g., config file paths)
+can be listed with `effect: none`:
+
+```yaml
+  - variable: ICXCFG
+    effect: none
+    note: "Config file - not parsed"
+    mapping:
+      separator: space
+```
+
+These are skipped during code generation but document the variable for
+future contributors.
+
+### Environment inheritance
+
+Environment variables follow the `extends` chain transitively. If
+`armclang.yaml` extends `clang.yaml` which extends `gcc.yaml`, armclang
+inherits all GCC and Clang environment entries. Own entries override
+inherited ones matched by variable name.
+
+Compilers that do not read GCC variables (e.g., NVIDIA HPC SDK) must not
+extend GCC and will have an empty environment table.
+
 ## Adding a new compiler
 
 1. Create a new YAML file in this directory (e.g., `mycompiler.yaml`)
-2. Add `type:`, `recognize:`, `flags:` entries and optionally `extends:`, `ignore_when:`
+2. Add `type:`, `recognize:`, `flags:` entries and optionally `extends:`, `ignore_when:`, `environment:`
 3. Add a `TableConfig` entry in `bear/build.rs`
 4. Add a `CompilerType` variant in `config.rs` and a mapping in
    `compiler_recognition.rs::parse_compiler_type`

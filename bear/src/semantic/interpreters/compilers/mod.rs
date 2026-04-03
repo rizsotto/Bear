@@ -617,7 +617,7 @@ mod tests {
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
-                assert!(args.contains(&"-I".to_string()));
+                assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
             } else {
                 panic!("Expected compiler command");
@@ -642,7 +642,7 @@ mod tests {
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
-                assert!(args.contains(&"-I".to_string()));
+                assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
             } else {
                 panic!("Expected compiler command");
@@ -1309,7 +1309,7 @@ mod tests {
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
-                assert!(args.contains(&"-I".to_string()));
+                assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/usr/local/include".to_string()));
             } else {
                 panic!("Expected compiler command");
@@ -1334,7 +1334,7 @@ mod tests {
                 assert_eq!(cmd.arguments.len(), 5);
                 let args: Vec<String> =
                     cmd.arguments.iter().flat_map(|a| a.as_arguments(&|p| Cow::Borrowed(p))).collect();
-                assert!(args.contains(&"-I".to_string()));
+                assert!(args.contains(&"-isystem".to_string()));
                 assert!(args.contains(&"/usr/include/c++/11".to_string()));
             } else {
                 panic!("Expected compiler command");
