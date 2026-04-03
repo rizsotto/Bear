@@ -5,7 +5,7 @@
 //! These tests validate all YAML compiler definitions at test time,
 //! providing better error messages than build-time panics.
 
-use bear_codegen::codegen::{pattern_to_rust, result_to_rust, validate_env_entry};
+use bear_codegen::codegen::{pattern_to_rust, result_to_rust};
 use bear_codegen::load_tables;
 use bear_codegen::resolve::resolve_environment;
 use bear_codegen::tables::TABLES;
@@ -83,7 +83,7 @@ fn all_env_entries_are_valid() {
             if entry.effect == "none" {
                 continue;
             }
-            if let Err(e) = validate_env_entry(entry, config.yaml_file) {
+            if let Err(e) = entry.validate(config.yaml_file) {
                 errors.push(e);
             }
         }

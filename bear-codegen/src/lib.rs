@@ -10,12 +10,115 @@ pub mod yaml_types;
 use std::collections::HashMap;
 use std::path::Path;
 
-use codegen::{env_mapping_to_rust, flag_name_len, result_to_rust, validate_env_entry};
+use codegen::{pattern_to_rust, result_to_rust};
 use env_keys::generate_env_keys;
 use recognition::generate_recognition_patterns;
 use resolve::{resolve_environment, resolve_ignore_when, resolve_slash_prefix};
 use tables::{TABLES, TableConfig};
-use yaml_types::{FlagEntry, FlagTable, IgnoreWhen};
+use yaml_types::{EnvEntry, FlagEntry, FlagTable, IgnoreWhen};
+
+/// A compiler flag table with all inheritance resolved and ready for code generation.
+pub struct ResolvedTable {
+    pub config: &'static TableConfig,
+    pub flags: Vec<FlagEntry>,
+    pub ignore_when: IgnoreWhen,
+    pub slash_prefix: bool,
+    pub env_entries: Vec<EnvEntry>,
+}
+
+impl ResolvedTable {
+    /// Resolve a single compiler table by merging inherited flags, ignore_when,
+    /// slash_prefix, and environment entries from the extends chain.
+    pub fn new(key: &str, config: &'static TableConfig, raw_tables: &HashMap<String, FlagTable>) -> Self {
+        let table = &raw_tables[key];
+
+        let mut flags: Vec<FlagEntry> = table.flags.clone();
+        if let Some(ref base_name) = table.extends {
+            let base = raw_tables
+                .get(base_name.as_str())
+                .unwrap_or_else(|| panic!("{} extends unknown table '{}'", config.yaml_file, base_name));
+            flags.extend(base.flags.iter().cloned());
+        }
+        // Sort by flag length descending (stable sort preserves own-before-base order)
+        flags.sort_by(|a, b| b.match_.name_len().cmp(&a.match_.name_len()));
+
+        ResolvedTable {
+            config,
+            flags,
+            ignore_when: resolve_ignore_when(table, raw_tables),
+            slash_prefix: resolve_slash_prefix(table, raw_tables),
+            env_entries: resolve_environment(key, raw_tables),
+        }
+    }
+
+    /// Generate the complete Rust source file for this compiler's flag table.
+    pub fn generate(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&self.generate_flag_array());
+        out.push_str(&self.generate_ignore_arrays());
+        out.push_str(&format!("static {}: bool = {};\n", self.config.slash_prefix_name, self.slash_prefix));
+        out.push_str(&self.generate_env_array());
+        out
+    }
+
+    fn generate_flag_array(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!("// Generated from interpreters/{} -- DO NOT EDIT\n", self.config.yaml_file));
+        out.push_str(&format!("static {}: [FlagRule; {}] = [\n", self.config.static_name, self.flags.len()));
+        for entry in &self.flags {
+            let pattern_rust = pattern_to_rust(&entry.match_.pattern, entry.match_.count);
+            let result_rust = result_to_rust(&entry.result);
+            out.push_str(&format!("    FlagRule::new({}, {}),\n", pattern_rust, result_rust));
+        }
+        out.push_str("];\n");
+        out
+    }
+
+    fn generate_ignore_arrays(&self) -> String {
+        let mut out = String::new();
+        out.push_str(&format!(
+            "static {}: [&str; {}] = [",
+            self.config.ignore_executables_name,
+            self.ignore_when.executables.len()
+        ));
+        for exe in &self.ignore_when.executables {
+            out.push_str(&format!("\"{}\", ", exe));
+        }
+        out.push_str("];\n");
+
+        out.push_str(&format!(
+            "static {}: [&str; {}] = [",
+            self.config.ignore_flags_name,
+            self.ignore_when.flags.len()
+        ));
+        for flag in &self.ignore_when.flags {
+            out.push_str(&format!("\"{}\", ", flag));
+        }
+        out.push_str("];\n");
+        out
+    }
+
+    fn generate_env_array(&self) -> String {
+        let active: Vec<&EnvEntry> = self.env_entries.iter().filter(|e| e.effect != "none").collect();
+
+        for entry in &active {
+            entry.validate(self.config.yaml_file).unwrap_or_else(|e| panic!("{}", e));
+        }
+
+        let mut out = String::new();
+        out.push_str(&format!("static {}: [EnvRule; {}] = [\n", self.config.env_rules_name, active.len()));
+        for entry in &active {
+            let mapping_rust = entry.mapping.to_rust();
+            let effect_rust = result_to_rust(&entry.effect);
+            out.push_str(&format!(
+                "    EnvRule::new(\"{}\", {}, {}),\n",
+                entry.variable, mapping_rust, effect_rust
+            ));
+        }
+        out.push_str("];\n");
+        out
+    }
+}
 
 /// Generate all flag tables, recognition patterns, and env keys.
 ///
@@ -35,126 +138,30 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) {
         let table: FlagTable = serde_saphyr::from_str(&content)
             .unwrap_or_else(|e| panic!("Failed to parse {}: {}", yaml_path.display(), e));
 
-        // Key by yaml filename stem (e.g., "gcc", "clang")
         let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
         raw_tables.insert(key, table);
     }
 
-    // Generate recognition patterns from all tables
+    // Generate recognition patterns
     let recognition = generate_recognition_patterns(&raw_tables);
-    let out_path = out_dir.join("recognition.rs");
-    std::fs::write(&out_path, recognition)
-        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+    write_output(out_dir, "recognition.rs", recognition);
 
-    // Generate each table
+    // Generate each compiler's flag table
     for config in TABLES {
         let key = config.yaml_file.strip_suffix(".yaml").unwrap();
-        let table = &raw_tables[key];
-
-        // Collect own flags + base flags (if extending)
-        let mut entries: Vec<FlagEntry> = table.flags.clone();
-        if let Some(ref base_name) = table.extends {
-            let base = raw_tables
-                .get(base_name.as_str())
-                .unwrap_or_else(|| panic!("{} extends unknown table '{}'", config.yaml_file, base_name));
-            entries.extend(base.flags.iter().cloned());
-        }
-
-        // Sort by flag length descending (stable sort preserves own-before-base order)
-        entries.sort_by(|a, b| {
-            let a_len = flag_name_len(&a.match_);
-            let b_len = flag_name_len(&b.match_);
-            b_len.cmp(&a_len)
-        });
-
-        // Resolve ignore_when and slash_prefix (own + base)
-        let ignore_when = resolve_ignore_when(table, &raw_tables);
-        let slash_prefix = resolve_slash_prefix(table, &raw_tables);
-
-        // Resolve environment entries (transitive inheritance)
-        let env_entries = resolve_environment(key, &raw_tables);
-
-        // Generate Rust source
-        let mut rust_code = generate_static_array(config, &entries);
-        rust_code.push_str(&generate_ignore_arrays(config, &ignore_when));
-        rust_code.push_str(&format!("static {}: bool = {};\n", config.slash_prefix_name, slash_prefix));
-        rust_code.push_str(&generate_env_array(config, &env_entries));
-        let out_path = out_dir.join(config.output_file);
-        std::fs::write(&out_path, rust_code)
-            .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+        let resolved = ResolvedTable::new(key, config, &raw_tables);
+        write_output(out_dir, config.output_file, resolved.generate());
     }
 
-    // Generate a combined list of all compiler environment variable names
+    // Generate combined environment variable keys
     let env_keys = generate_env_keys(&raw_tables);
-    let out_path = out_dir.join("env_keys.rs");
-    std::fs::write(&out_path, env_keys)
+    write_output(out_dir, "env_keys.rs", env_keys);
+}
+
+fn write_output(out_dir: &Path, filename: &str, content: String) {
+    let out_path = out_dir.join(filename);
+    std::fs::write(&out_path, content)
         .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
-}
-
-/// Generate static arrays for ignore_when executables and flags.
-pub fn generate_ignore_arrays(config: &TableConfig, ignore_when: &IgnoreWhen) -> String {
-    let mut out = String::new();
-
-    // Generate ignore executables array
-    out.push_str(&format!(
-        "static {}: [&str; {}] = [",
-        config.ignore_executables_name,
-        ignore_when.executables.len()
-    ));
-    for exe in &ignore_when.executables {
-        out.push_str(&format!("\"{}\", ", exe));
-    }
-    out.push_str("];\n");
-
-    // Generate ignore flags array
-    out.push_str(&format!("static {}: [&str; {}] = [", config.ignore_flags_name, ignore_when.flags.len()));
-    for flag in &ignore_when.flags {
-        out.push_str(&format!("\"{}\", ", flag));
-    }
-    out.push_str("];\n");
-
-    out
-}
-
-/// Generate a static array of EnvRule for a compiler.
-pub fn generate_env_array(config: &TableConfig, entries: &[yaml_types::EnvEntry]) -> String {
-    // Filter out effect: none entries (documentary only)
-    let active: Vec<&yaml_types::EnvEntry> = entries.iter().filter(|e| e.effect != "none").collect();
-
-    for entry in &active {
-        validate_env_entry(entry, config.yaml_file).unwrap_or_else(|e| panic!("{}", e));
-    }
-
-    let mut out = String::new();
-    out.push_str(&format!("static {}: [EnvRule; {}] = [\n", config.env_rules_name, active.len()));
-
-    for entry in &active {
-        let mapping_rust = env_mapping_to_rust(&entry.mapping);
-        let effect_rust = result_to_rust(&entry.effect);
-        out.push_str(&format!(
-            "    EnvRule::new(\"{}\", {}, {}),\n",
-            entry.variable, mapping_rust, effect_rust
-        ));
-    }
-
-    out.push_str("];\n");
-    out
-}
-
-/// Generate a Rust source file containing a static array of FlagRule.
-pub fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
-    let mut out = String::new();
-    out.push_str(&format!("// Generated from interpreters/{} -- DO NOT EDIT\n", config.yaml_file));
-    out.push_str(&format!("static {}: [FlagRule; {}] = [\n", config.static_name, entries.len()));
-
-    for entry in entries {
-        let pattern_rust = codegen::pattern_to_rust(&entry.match_.pattern, entry.match_.count);
-        let result_rust = result_to_rust(&entry.result);
-        out.push_str(&format!("    FlagRule::new({}, {}),\n", pattern_rust, result_rust));
-    }
-
-    out.push_str("];\n");
-    out
 }
 
 /// Path to the YAML flag definitions in the workspace.
@@ -320,30 +327,30 @@ mod tests {
         result_to_rust("bogus");
     }
 
-    // -- flag_name_len tests --
+    // -- FlagMatch::name_len tests --
 
     #[test]
-    fn flag_name_len_exact_with_glued() {
+    fn name_len_exact_with_glued() {
         let m = FlagMatch { pattern: "-std{=}*".to_string(), count: None };
-        assert_eq!(flag_name_len(&m), 4);
+        assert_eq!(m.name_len(), 4);
     }
 
     #[test]
-    fn flag_name_len_exact() {
+    fn name_len_exact() {
         let m = FlagMatch { pattern: "-std".to_string(), count: None };
-        assert_eq!(flag_name_len(&m), 4);
+        assert_eq!(m.name_len(), 4);
     }
 
     #[test]
-    fn flag_name_len_eq_with_count() {
+    fn name_len_eq_with_count() {
         let m = FlagMatch { pattern: "-o=*".to_string(), count: Some(1) };
-        assert_eq!(flag_name_len(&m), 3); // "-o" + "="
+        assert_eq!(m.name_len(), 3); // "-o" + "="
     }
 
     #[test]
-    fn flag_name_len_prefix() {
+    fn name_len_prefix() {
         let m = FlagMatch { pattern: "-Wall*".to_string(), count: None };
-        assert_eq!(flag_name_len(&m), 5);
+        assert_eq!(m.name_len(), 5);
     }
 
     // -- resolve_environment tests --
@@ -352,9 +359,7 @@ mod tests {
     fn resolve_environment_no_extends() {
         let raw_tables = load_tables();
         let entries = resolve_environment("gcc", &raw_tables);
-        // gcc has its own environment entries
         assert!(!entries.is_empty());
-        // All entries should have valid variable names
         for entry in &entries {
             assert!(!entry.variable.is_empty());
         }
@@ -363,16 +368,13 @@ mod tests {
     #[test]
     fn resolve_environment_with_extends() {
         let raw_tables = load_tables();
-        // clang extends gcc
         let clang_entries = resolve_environment("clang", &raw_tables);
         let gcc_entries = resolve_environment("gcc", &raw_tables);
-        // clang should have at least as many entries as gcc (inherits + may add)
         assert!(clang_entries.len() >= gcc_entries.len());
     }
 
     #[test]
     fn resolve_environment_circular_safe() {
-        // Create tables with circular extends (shouldn't happen in practice, but must not loop)
         let mut tables: HashMap<String, FlagTable> = HashMap::new();
         tables.insert(
             "a".to_string(),
@@ -502,7 +504,6 @@ mod tests {
         };
         let result = resolve_ignore_when(&table, &tables);
         assert_eq!(result.executables, vec!["cc1"]);
-        // flags is empty in own, so inherits base
         assert_eq!(result.flags, vec!["-E"]);
     }
 
@@ -563,7 +564,7 @@ mod tests {
         assert!(resolve_slash_prefix(&table, &tables));
     }
 
-    // -- validate_env_entry tests --
+    // -- EnvEntry::validate tests --
 
     #[test]
     fn validate_env_entry_valid() {
@@ -577,7 +578,7 @@ mod tests {
             },
             note: None,
         };
-        assert!(validate_env_entry(&entry, "test.yaml").is_ok());
+        assert!(entry.validate("test.yaml").is_ok());
     }
 
     #[test]
@@ -592,7 +593,7 @@ mod tests {
             },
             note: None,
         };
-        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        let err = entry.validate("test.yaml").unwrap_err();
         assert!(err.contains("invalid environment variable name"), "{}", err);
     }
 
@@ -608,7 +609,7 @@ mod tests {
             },
             note: None,
         };
-        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        let err = entry.validate("test.yaml").unwrap_err();
         assert!(err.contains("unknown effect value"), "{}", err);
     }
 
@@ -624,7 +625,7 @@ mod tests {
             },
             note: None,
         };
-        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        let err = entry.validate("test.yaml").unwrap_err();
         assert!(err.contains("has both 'flag' and 'expand'"), "{}", err);
     }
 
@@ -636,7 +637,7 @@ mod tests {
             mapping: EnvMappingYaml { flag: None, expand: None, separator: "path".to_string() },
             note: None,
         };
-        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        let err = entry.validate("test.yaml").unwrap_err();
         assert!(err.contains("has neither 'flag' nor 'expand'"), "{}", err);
     }
 
@@ -652,7 +653,7 @@ mod tests {
             },
             note: None,
         };
-        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        let err = entry.validate("test.yaml").unwrap_err();
         assert!(err.contains("unknown separator"), "{}", err);
     }
 
@@ -663,7 +664,6 @@ mod tests {
         let out_dir = tempfile::tempdir().unwrap();
         generate(&flags_dir(), out_dir.path());
 
-        // Check all expected output files exist and are non-empty
         for config in TABLES {
             let path = out_dir.path().join(config.output_file);
             let content = std::fs::read_to_string(&path)
@@ -677,11 +677,9 @@ mod tests {
             );
         }
 
-        // Check recognition.rs
         let recognition = std::fs::read_to_string(out_dir.path().join("recognition.rs")).unwrap();
         assert!(recognition.contains("RECOGNITION_PATTERNS"));
 
-        // Check env_keys.rs
         let env_keys = std::fs::read_to_string(out_dir.path().join("env_keys.rs")).unwrap();
         assert!(env_keys.contains("COMPILER_ENV_KEYS"));
     }

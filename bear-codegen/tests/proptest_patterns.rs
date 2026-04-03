@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Property-based tests for pattern_to_rust and flag_name_len.
+//! Property-based tests for pattern_to_rust and FlagMatch::name_len.
 
-use bear_codegen::codegen::{flag_name_len, pattern_to_rust};
+use bear_codegen::codegen::pattern_to_rust;
 use bear_codegen::yaml_types::FlagMatch;
 use proptest::prelude::*;
 
@@ -99,35 +99,35 @@ proptest! {
     }
 }
 
-// flag_name_len is always <= the pattern length.
+// FlagMatch::name_len is always <= the pattern length.
 proptest! {
     #[test]
-    fn flag_name_len_bounded_by_pattern(
+    fn name_len_bounded_by_pattern(
         flag in flag_name_strategy(),
         suffix in suffix_strategy(),
         count in count_strategy(),
     ) {
         let pattern = format!("{}{}", flag, suffix);
         let m = FlagMatch { pattern: pattern.clone(), count };
-        let len = flag_name_len(&m);
+        let len = m.name_len();
         prop_assert!(
             len <= pattern.len(),
-            "flag_name_len({}) = {} > pattern.len() = {}",
+            "name_len({}) = {} > pattern.len() = {}",
             pattern, len, pattern.len()
         );
     }
 }
 
-// flag_name_len is always > 0 for non-empty patterns.
+// FlagMatch::name_len is always > 0 for non-empty patterns.
 proptest! {
     #[test]
-    fn flag_name_len_positive(
+    fn name_len_positive(
         flag in flag_name_strategy(),
         suffix in suffix_strategy(),
         count in count_strategy(),
     ) {
         let pattern = format!("{}{}", flag, suffix);
         let m = FlagMatch { pattern, count };
-        prop_assert!(flag_name_len(&m) > 0);
+        prop_assert!(m.name_len() > 0);
     }
 }
