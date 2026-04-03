@@ -5,4 +5,5 @@ quiet-level = 3
 
 # serde -> ser
 # abd -> source matcher for ADA files
-ignore-words-list = ser,abd,exect
+# Fo -> MSVC output flag /Fo
+ignore-words-list = ser,abd,exect,Fo
