@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% Jan 03, 2026
+% March 03, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
@@ -144,7 +144,7 @@ This example configuration file:
 
 ## Configuration Sections
 
-The configuration file uses schema version `4.0` and has the following structure:
+The configuration file uses schema version `4.1` and has the following structure:
 
 ### intercept
 
@@ -157,8 +157,18 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`.
 - **ignore**: Whether to ignore this compiler.
+
+The generic compiler names `cc` and `c++` default to GCC semantics. On platforms where these map to a different compiler (macOS, FreeBSD, OpenBSD), use the `as` field to override:
+
+```yaml
+compilers:
+  - path: /usr/bin/cc
+    as: clang
+  - path: /usr/bin/c++
+    as: clang
+```
 
 ### sources
 
