@@ -66,7 +66,9 @@ fn create_compiler_regex(executables: &[&str], cross_compilation: bool, versione
     let with_version =
         if versioned { format!(r"{}(?:[-_]?([0-9]+(?:[._-][0-9a-zA-Z]+)*))?", base) } else { base };
 
-    let full_pattern = format!(r"^{}(?:\.exe)?$", with_version);
+    // On Windows, executable names are case-insensitive (CL.EXE, cl.exe, Cl.exe)
+    let case_flag = if cfg!(windows) { "(?i)" } else { "" };
+    let full_pattern = format!(r"^{}{}(?:\.exe)?$", case_flag, with_version);
     Regex::new(&full_pattern).unwrap_or_else(|_| panic!("Invalid regex pattern: {}", full_pattern))
 }
 
@@ -623,5 +625,40 @@ mod tests {
         // At least one GCC pattern should have capture groups (the versioned one)
         let has_capture_groups = gcc_patterns.iter().any(|(_, regex)| regex.captures_len() > 1);
         assert!(has_capture_groups, "GCC patterns should include version capture groups");
+    }
+
+    #[test]
+    fn test_case_sensitivity_behavior() {
+        let recognizer = CompilerRecognizer::new();
+
+        // On Windows, these should match (case-insensitive regex)
+        // On Unix, these should NOT match (case-sensitive regex)
+        let upper_gcc = recognizer.recognize(path("GCC"));
+        let upper_clang = recognizer.recognize(path("CLANG"));
+        let mixed_gcc = recognizer.recognize(path("Gcc"));
+
+        if cfg!(windows) {
+            assert_eq!(upper_gcc, Some(CompilerType::Gcc));
+            assert_eq!(upper_clang, Some(CompilerType::Clang));
+            assert_eq!(mixed_gcc, Some(CompilerType::Gcc));
+        } else {
+            assert_eq!(upper_gcc, None);
+            assert_eq!(upper_clang, None);
+            assert_eq!(mixed_gcc, None);
+        }
+    }
+
+    #[test]
+    fn test_exe_extension_case_on_windows() {
+        let recognizer = CompilerRecognizer::new();
+
+        // On Windows, .EXE should also match due to case-insensitive regex
+        let upper_exe = recognizer.recognize(path("gcc.EXE"));
+
+        if cfg!(windows) {
+            assert_eq!(upper_exe, Some(CompilerType::Gcc));
+        } else {
+            assert_eq!(upper_exe, None);
+        }
     }
 }
