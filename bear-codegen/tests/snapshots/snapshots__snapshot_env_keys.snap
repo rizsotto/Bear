@@ -1,0 +1,17 @@
+---
+source: bear-codegen/tests/snapshots.rs
+expression: generate_env_keys(&raw_tables)
+---
+// Generated from interpreters/*.yaml -- DO NOT EDIT
+static COMPILER_ENV_KEYS: [&str; 10] = [
+    "ARMCOMPILER6_CLANGOPT",
+    "CL",
+    "CPATH",
+    "CPLUS_INCLUDE_PATH",
+    "C_INCLUDE_PATH",
+    "INCLUDE",
+    "LIB",
+    "LIBRARY_PATH",
+    "OBJC_INCLUDE_PATH",
+    "_CL_",
+];

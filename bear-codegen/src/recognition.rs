@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::HashMap;
-use std::path::Path;
 
 use crate::tables::TABLES;
 use crate::yaml_types::FlagTable;
 
 /// Generate a static array of recognition pattern data from all YAML files.
 ///
-/// Produces `recognition.rs` containing `RECOGNITION_PATTERNS`, a static array of
-/// `(&str, &[&str], bool, bool)` tuples: (compiler_type, executables, cross_compilation, versioned).
+/// Returns the generated Rust source as a string containing `RECOGNITION_PATTERNS`,
+/// a static array of `(&str, &[&str], bool, bool)` tuples:
+/// (compiler_type, executables, cross_compilation, versioned).
 ///
 /// Executables listed in `ignore_when.executables` are automatically added as
 /// recognition entries with `(false, false)` so the recognizer can route them
 /// to the right compiler type (where the interpreter will then ignore them).
-pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
+pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>) -> String {
     let mut out = String::new();
     out.push_str("// Generated from interpreters/*.yaml -- DO NOT EDIT\n");
     out.push_str("pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[\n");
@@ -55,7 +55,5 @@ pub fn generate_recognition_patterns(raw_tables: &HashMap<String, FlagTable>, ou
 
     out.push_str("];\n");
 
-    let out_path = out_dir.join("recognition.rs");
-    std::fs::write(&out_path, out)
-        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+    out
 }

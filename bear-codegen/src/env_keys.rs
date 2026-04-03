@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::collections::{BTreeSet, HashMap};
-use std::path::Path;
 
 use crate::resolve::resolve_environment;
 use crate::tables::TABLES;
@@ -9,8 +8,8 @@ use crate::yaml_types::FlagTable;
 
 /// Generate a static array of all compiler environment variable names.
 ///
-/// Used by `environment.rs` to replace the hardcoded GCC include key set.
-pub fn generate_env_keys(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path) {
+/// Returns the generated Rust source as a string.
+pub fn generate_env_keys(raw_tables: &HashMap<String, FlagTable>) -> String {
     let mut all_vars = BTreeSet::new();
 
     for config in TABLES {
@@ -31,7 +30,5 @@ pub fn generate_env_keys(raw_tables: &HashMap<String, FlagTable>, out_dir: &Path
     }
     out.push_str("];\n");
 
-    let out_path = out_dir.join("env_keys.rs");
-    std::fs::write(&out_path, &out)
-        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
+    out
 }

@@ -41,7 +41,10 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) {
     }
 
     // Generate recognition patterns from all tables
-    generate_recognition_patterns(&raw_tables, out_dir);
+    let recognition = generate_recognition_patterns(&raw_tables);
+    let out_path = out_dir.join("recognition.rs");
+    std::fs::write(&out_path, recognition)
+        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
 
     // Generate each table
     for config in TABLES {
@@ -82,11 +85,14 @@ pub fn generate(flags_dir: &Path, out_dir: &Path) {
     }
 
     // Generate a combined list of all compiler environment variable names
-    generate_env_keys(&raw_tables, out_dir);
+    let env_keys = generate_env_keys(&raw_tables);
+    let out_path = out_dir.join("env_keys.rs");
+    std::fs::write(&out_path, env_keys)
+        .unwrap_or_else(|e| panic!("Failed to write {}: {}", out_path.display(), e));
 }
 
 /// Generate static arrays for ignore_when executables and flags.
-fn generate_ignore_arrays(config: &TableConfig, ignore_when: &IgnoreWhen) -> String {
+pub fn generate_ignore_arrays(config: &TableConfig, ignore_when: &IgnoreWhen) -> String {
     let mut out = String::new();
 
     // Generate ignore executables array
@@ -111,12 +117,12 @@ fn generate_ignore_arrays(config: &TableConfig, ignore_when: &IgnoreWhen) -> Str
 }
 
 /// Generate a static array of EnvRule for a compiler.
-fn generate_env_array(config: &TableConfig, entries: &[yaml_types::EnvEntry]) -> String {
+pub fn generate_env_array(config: &TableConfig, entries: &[yaml_types::EnvEntry]) -> String {
     // Filter out effect: none entries (documentary only)
     let active: Vec<&yaml_types::EnvEntry> = entries.iter().filter(|e| e.effect != "none").collect();
 
     for entry in &active {
-        validate_env_entry(entry, config.yaml_file);
+        validate_env_entry(entry, config.yaml_file).unwrap_or_else(|e| panic!("{}", e));
     }
 
     let mut out = String::new();
@@ -136,7 +142,7 @@ fn generate_env_array(config: &TableConfig, entries: &[yaml_types::EnvEntry]) ->
 }
 
 /// Generate a Rust source file containing a static array of FlagRule.
-fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
+pub fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String {
     let mut out = String::new();
     out.push_str(&format!("// Generated from interpreters/{} -- DO NOT EDIT\n", config.yaml_file));
     out.push_str(&format!("static {}: [FlagRule; {}] = [\n", config.static_name, entries.len()));
@@ -151,9 +157,25 @@ fn generate_static_array(config: &TableConfig, entries: &[FlagEntry]) -> String 
     out
 }
 
-#[cfg(test)]
-fn test_flags_dir() -> std::path::PathBuf {
+/// Path to the YAML flag definitions in the workspace.
+pub fn flags_dir() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().join("bear/interpreters")
+}
+
+/// Load all YAML flag tables from the workspace interpreters directory.
+pub fn load_tables() -> HashMap<String, FlagTable> {
+    let flags_dir = flags_dir();
+    let mut raw_tables = HashMap::new();
+    for config in TABLES {
+        let yaml_path = flags_dir.join(config.yaml_file);
+        let content = std::fs::read_to_string(&yaml_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {}", yaml_path.display(), e));
+        let table: FlagTable = serde_saphyr::from_str(&content)
+            .unwrap_or_else(|e| panic!("Failed to parse {}: {}", yaml_path.display(), e));
+        let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
+        raw_tables.insert(key, table);
+    }
+    raw_tables
 }
 
 #[cfg(test)]
@@ -328,7 +350,7 @@ mod tests {
 
     #[test]
     fn resolve_environment_no_extends() {
-        let raw_tables = load_test_tables();
+        let raw_tables = load_tables();
         let entries = resolve_environment("gcc", &raw_tables);
         // gcc has its own environment entries
         assert!(!entries.is_empty());
@@ -340,7 +362,7 @@ mod tests {
 
     #[test]
     fn resolve_environment_with_extends() {
-        let raw_tables = load_test_tables();
+        let raw_tables = load_tables();
         // clang extends gcc
         let clang_entries = resolve_environment("clang", &raw_tables);
         let gcc_entries = resolve_environment("gcc", &raw_tables);
@@ -555,11 +577,10 @@ mod tests {
             },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        assert!(validate_env_entry(&entry, "test.yaml").is_ok());
     }
 
     #[test]
-    #[should_panic(expected = "invalid environment variable name")]
     fn validate_env_entry_invalid_name() {
         let entry = EnvEntry {
             variable: "123BAD".to_string(),
@@ -571,11 +592,11 @@ mod tests {
             },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        assert!(err.contains("invalid environment variable name"), "{}", err);
     }
 
     #[test]
-    #[should_panic(expected = "unknown effect value")]
     fn validate_env_entry_unknown_effect() {
         let entry = EnvEntry {
             variable: "CPATH".to_string(),
@@ -587,11 +608,11 @@ mod tests {
             },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        assert!(err.contains("unknown effect value"), "{}", err);
     }
 
     #[test]
-    #[should_panic(expected = "has both 'flag' and 'expand'")]
     fn validate_env_entry_both_flag_and_expand() {
         let entry = EnvEntry {
             variable: "CPATH".to_string(),
@@ -603,11 +624,11 @@ mod tests {
             },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        assert!(err.contains("has both 'flag' and 'expand'"), "{}", err);
     }
 
     #[test]
-    #[should_panic(expected = "has neither 'flag' nor 'expand'")]
     fn validate_env_entry_neither_flag_nor_expand() {
         let entry = EnvEntry {
             variable: "CPATH".to_string(),
@@ -615,11 +636,11 @@ mod tests {
             mapping: EnvMappingYaml { flag: None, expand: None, separator: "path".to_string() },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        assert!(err.contains("has neither 'flag' nor 'expand'"), "{}", err);
     }
 
     #[test]
-    #[should_panic(expected = "unknown separator")]
     fn validate_env_entry_unknown_separator() {
         let entry = EnvEntry {
             variable: "CPATH".to_string(),
@@ -631,16 +652,16 @@ mod tests {
             },
             note: None,
         };
-        validate_env_entry(&entry, "test.yaml");
+        let err = validate_env_entry(&entry, "test.yaml").unwrap_err();
+        assert!(err.contains("unknown separator"), "{}", err);
     }
 
     // -- Integration test: full generation from real YAML --
 
     #[test]
     fn generate_from_real_yaml() {
-        let flags_dir = super::test_flags_dir();
         let out_dir = tempfile::tempdir().unwrap();
-        generate(&flags_dir, out_dir.path());
+        generate(&flags_dir(), out_dir.path());
 
         // Check all expected output files exist and are non-empty
         for config in TABLES {
@@ -663,21 +684,6 @@ mod tests {
         // Check env_keys.rs
         let env_keys = std::fs::read_to_string(out_dir.path().join("env_keys.rs")).unwrap();
         assert!(env_keys.contains("COMPILER_ENV_KEYS"));
-    }
-
-    // -- helpers --
-
-    fn load_test_tables() -> HashMap<String, FlagTable> {
-        let flags_dir = super::test_flags_dir();
-        let mut raw_tables = HashMap::new();
-        for config in TABLES {
-            let yaml_path = flags_dir.join(config.yaml_file);
-            let content = std::fs::read_to_string(&yaml_path).unwrap();
-            let table: FlagTable = serde_saphyr::from_str(&content).unwrap();
-            let key = config.yaml_file.strip_suffix(".yaml").unwrap().to_string();
-            raw_tables.insert(key, table);
-        }
-        raw_tables
     }
 
     fn make_test_env_entry(var: &str) -> EnvEntry {

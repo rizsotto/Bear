@@ -1,0 +1,25 @@
+---
+source: bear-codegen/tests/snapshots.rs
+expression: generate_recognition_patterns(&raw_tables)
+---
+// Generated from interpreters/*.yaml -- DO NOT EDIT
+pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
+    ("gcc", &["gcc", "g++", "gfortran", "egfortran", "f95"], true, true),
+    ("gcc", &["cc", "c++"], true, false),
+    ("gcc", &["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"], false, false),
+    ("ibm_xl", &["ibm-clang", "ibm-clang++"], false, true),
+    ("ibm_xl", &["xlclang", "xlclang++"], false, true),
+    ("clang_cl", &["clang-cl"], false, true),
+    ("clang", &["clang", "clang++"], true, true),
+    ("flang", &["flang", "flang-new"], true, true),
+    ("cuda", &["nvcc"], true, true),
+    ("intel_fortran", &["ifort", "ifx"], false, true),
+    ("cray_fortran", &["crayftn", "ftn"], false, true),
+    ("msvc", &["cl"], false, false),
+    ("msvc", &["c1", "c1xx", "c2"], false, false),
+    ("intel_cc", &["icx", "icpx"], false, true),
+    ("intel_cc", &["icc", "icpc"], false, true),
+    ("nvidia_hpc", &["nvc", "nvc++", "nvfortran"], false, true),
+    ("nvidia_hpc", &["pgcc", "pgc++", "pgfortran"], false, true),
+    ("armclang", &["armclang", "armclang++"], false, true),
+];

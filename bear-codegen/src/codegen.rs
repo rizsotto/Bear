@@ -71,15 +71,12 @@ pub fn result_to_rust(result: &str) -> &'static str {
     }
 }
 
-/// Validate an environment entry at build time.
-pub fn validate_env_entry(entry: &EnvEntry, yaml_file: &str) {
+/// Validate an environment entry, returning errors instead of panicking.
+pub fn validate_env_entry(entry: &EnvEntry, yaml_file: &str) -> Result<(), String> {
     let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
-    assert!(
-        var_re.is_match(&entry.variable),
-        "{}: invalid environment variable name: '{}'",
-        yaml_file,
-        entry.variable
-    );
+    if !var_re.is_match(&entry.variable) {
+        return Err(format!("{}: invalid environment variable name: '{}'", yaml_file, entry.variable));
+    }
 
     // Validate effect is a known value
     match entry.effect.as_str() {
@@ -93,26 +90,32 @@ pub fn validate_env_entry(entry: &EnvEntry, yaml_file: &str) {
         | "info_and_exit"
         | "driver_option"
         | "none" => {}
-        other => panic!("{}: unknown effect value: '{}'", yaml_file, other),
+        other => return Err(format!("{}: unknown effect value: '{}'", yaml_file, other)),
     }
 
     // Validate mapping
     let mapping = &entry.mapping;
     if mapping.flag.is_some() && mapping.expand.is_some() {
-        panic!("{}: environment entry '{}' has both 'flag' and 'expand'", yaml_file, entry.variable);
+        return Err(format!(
+            "{}: environment entry '{}' has both 'flag' and 'expand'",
+            yaml_file, entry.variable
+        ));
     }
     if mapping.flag.is_none() && mapping.expand.is_none() && entry.effect != "none" {
-        panic!(
+        return Err(format!(
             "{}: environment entry '{}' has neither 'flag' nor 'expand' (and effect is not 'none')",
             yaml_file, entry.variable
-        );
+        ));
     }
 
     // Validate separator
     match mapping.separator.as_str() {
         "path" | "space" | ";" => {}
         other => {
-            panic!("{}: environment entry '{}' has unknown separator: '{}'", yaml_file, entry.variable, other)
+            return Err(format!(
+                "{}: environment entry '{}' has unknown separator: '{}'",
+                yaml_file, entry.variable, other
+            ));
         }
     }
 
@@ -120,12 +123,16 @@ pub fn validate_env_entry(entry: &EnvEntry, yaml_file: &str) {
     if let Some(ref expand) = mapping.expand {
         match expand.as_str() {
             "prepend" | "append" => {}
-            other => panic!(
-                "{}: environment entry '{}' has unknown expand position: '{}'",
-                yaml_file, entry.variable, other
-            ),
+            other => {
+                return Err(format!(
+                    "{}: environment entry '{}' has unknown expand position: '{}'",
+                    yaml_file, entry.variable, other
+                ));
+            }
         }
     }
+
+    Ok(())
 }
 
 /// Map an environment entry's mapping to a Rust EnvMapping expression.
