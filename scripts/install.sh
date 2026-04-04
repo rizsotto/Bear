@@ -158,21 +158,21 @@ UNINSTALL_HEADER
 
     # bear-driver and bear-wrapper
     echo "# Remove bear binaries" >> "$DESTDIR$UNINSTALL_SCRIPT"
-    mkdir -p "$DESTDIR$PREFIX/share/bear/bin"
-    install -m 755 "$SRCDIR/bear-driver" "$DESTDIR$PREFIX/share/bear/bin/bear-driver"
-    echo "rm -f '$PREFIX/share/bear/bin/bear-driver'" >> "$DESTDIR$UNINSTALL_SCRIPT"
-    install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR$PREFIX/share/bear/bin/bear-wrapper"
-    echo "rm -f '$PREFIX/share/bear/bin/bear-wrapper'" >> "$DESTDIR$UNINSTALL_SCRIPT"
-    emit_rmdir "$PREFIX/share/bear/bin" "$PREFIX"
+    mkdir -p "$DESTDIR$PREFIX/libexec/bear/bin"
+    install -m 755 "$SRCDIR/bear-driver" "$DESTDIR$PREFIX/libexec/bear/bin/bear-driver"
+    echo "rm -f '$PREFIX/libexec/bear/bin/bear-driver'" >> "$DESTDIR$UNINSTALL_SCRIPT"
+    install -m 755 "$SRCDIR/bear-wrapper" "$DESTDIR$PREFIX/libexec/bear/bin/bear-wrapper"
+    echo "rm -f '$PREFIX/libexec/bear/bin/bear-wrapper'" >> "$DESTDIR$UNINSTALL_SCRIPT"
+    emit_rmdir "$PREFIX/libexec/bear/bin" "$PREFIX"
 
     # preload library (Unix only)
     if [ "$HAS_PRELOAD" = true ] && [ -f "$SRCDIR/$PRELOAD_NAME" ]; then
         echo "" >> "$DESTDIR$UNINSTALL_SCRIPT"
         echo "# Remove preload library" >> "$DESTDIR$UNINSTALL_SCRIPT"
-        mkdir -p "$DESTDIR$PREFIX/share/bear/$INTERCEPT_LIBDIR"
-        install -m 644 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$PREFIX/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
-        echo "rm -f '$PREFIX/share/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME'" >> "$DESTDIR$UNINSTALL_SCRIPT"
-        emit_rmdir "$PREFIX/share/bear/$INTERCEPT_LIBDIR" "$PREFIX"
+        mkdir -p "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR"
+        install -m 644 "$SRCDIR/$PRELOAD_NAME" "$DESTDIR$PREFIX/libexec/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME"
+        echo "rm -f '$PREFIX/libexec/bear/$INTERCEPT_LIBDIR/$PRELOAD_NAME'" >> "$DESTDIR$UNINSTALL_SCRIPT"
+        emit_rmdir "$PREFIX/libexec/bear/$INTERCEPT_LIBDIR" "$PREFIX"
     fi
 
     # bear entry script
@@ -183,7 +183,7 @@ UNINSTALL_HEADER
     trap 'rm -f "$tmp_bear_sh"' EXIT
     cat > "$tmp_bear_sh" <<ENTRY_SCRIPT
 #!/bin/sh
-$PREFIX/share/bear/bin/bear-driver "\$@"
+$PREFIX/libexec/bear/bin/bear-driver "\$@"
 ENTRY_SCRIPT
     install -m 755 "$tmp_bear_sh" "$DESTDIR$PREFIX/bin/bear"
     rm -f "$tmp_bear_sh"
