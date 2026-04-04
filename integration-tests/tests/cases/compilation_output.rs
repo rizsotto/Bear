@@ -8,6 +8,8 @@
 use crate::fixtures::constants::*;
 use crate::fixtures::infrastructure::{TestEnvironment, compilation_entry, filename_of};
 use anyhow::Result;
+#[cfg(target_family = "unix")]
+use serde_json::Value;
 
 /// Test compilation with build script that calls compiler
 /// This generates events that the semantic analyzer can process
@@ -417,6 +419,113 @@ fn multiple_sources_single_command() -> Result<()> {
             "src3.c".to_string(),
         ]
     ))?;
+
+    Ok(())
+}
+
+/// Helper to extract the arguments array from a compilation database entry.
+#[cfg(target_family = "unix")]
+fn get_arguments(entry: &Value) -> Vec<String> {
+    entry
+        .get("arguments")
+        .and_then(Value::as_array)
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(String::from)
+        .collect()
+}
+
+/// Verifies that CPATH environment variable survives interception and appears
+/// as -I flags in the compilation database.
+///
+/// This exercises the full pipeline: shell sets CPATH, compiler is intercepted,
+/// environment is trimmed (must keep CPATH), event is sent over TCP, semantic
+/// analyzer converts CPATH to -I flags, and the compilation database is written.
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn env_cpath_produces_include_flags() -> Result<()> {
+    let env = TestEnvironment::new("env_cpath_produces_include_flags")?;
+
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let build_commands = format!(
+        "export CPATH=/test/include_a:/test/include_b\n{} -c test.c -o test.o",
+        filename_of(COMPILER_C_PATH)
+    );
+    let build_script = env.create_shell_script("build.sh", &build_commands)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        build_script.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    // Find the entry for test.c (ccache may produce extra entries)
+    let entry = db
+        .entries()
+        .iter()
+        .find(|e| e.get("file").and_then(Value::as_str) == Some("test.c"))
+        .expect("Expected a compilation entry for test.c");
+
+    let args = get_arguments(entry);
+    assert!(
+        args.windows(2).any(|w| w[0] == "-I" && w[1] == "/test/include_a"),
+        "Expected '-I /test/include_a' from CPATH in: {:?}",
+        args
+    );
+    assert!(
+        args.windows(2).any(|w| w[0] == "-I" && w[1] == "/test/include_b"),
+        "Expected '-I /test/include_b' from CPATH in: {:?}",
+        args
+    );
+
+    Ok(())
+}
+
+/// Verifies that C_INCLUDE_PATH environment variable survives interception
+/// and appears as -isystem flags in the compilation database.
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn env_c_include_path_produces_isystem_flags() -> Result<()> {
+    let env = TestEnvironment::new("env_c_include_path_produces_isystem_flags")?;
+
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let build_commands = format!(
+        "export C_INCLUDE_PATH=/test/sys_include\n{} -c test.c -o test.o",
+        filename_of(COMPILER_C_PATH)
+    );
+    let build_script = env.create_shell_script("build.sh", &build_commands)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        build_script.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    let entry = db
+        .entries()
+        .iter()
+        .find(|e| e.get("file").and_then(Value::as_str) == Some("test.c"))
+        .expect("Expected a compilation entry for test.c");
+
+    let args = get_arguments(entry);
+    assert!(
+        args.windows(2).any(|w| w[0] == "-isystem" && w[1] == "/test/sys_include"),
+        "Expected '-isystem /test/sys_include' from C_INCLUDE_PATH in: {:?}",
+        args
+    );
 
     Ok(())
 }
