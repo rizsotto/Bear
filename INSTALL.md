@@ -117,7 +117,7 @@ By default, Bear is installed to `/usr/local` (when run as root) or
 
 `PREFIX` is the final install location (e.g., `/usr`, `/usr/local`,
 `$HOME/.local`). Binaries go into `$PREFIX/bin/`, libraries into
-`$PREFIX/share/bear/`, and so on.
+`$PREFIX/libexec/bear/`, and so on.
 
 The preload library directory name defaults to `lib`. On systems where a
 different directory is needed, set `INTERCEPT_LIBDIR` at both build and
@@ -182,6 +182,13 @@ If you are a package maintainer for a distribution:
   $PREFIX/
   ├── bin/
   │   └── bear                              (shell script)
+  ├── libexec/
+  │   └── bear/
+  │       ├── bin/
+  │       │   ├── bear-driver
+  │       │   └── bear-wrapper
+  │       └── $INTERCEPT_LIBDIR/
+  │           └── libexec.so
   └── share/
       ├── bash-completion/
       │   └── completions/
@@ -199,13 +206,7 @@ If you are a package maintainer for a distribution:
       │   └── bear/
       │       ├── README.md
       │       └── COPYING
-      ├── man/
-      │   └── man1/
-      │       └── bear.1
-      └── bear/
-          ├── bin/
-          │   ├── bear-driver
-          │   └── bear-wrapper
-          └── $INTERCEPT_LIBDIR/
-              └── libexec.so
+      └── man/
+          └── man1/
+              └── bear.1
   ```
