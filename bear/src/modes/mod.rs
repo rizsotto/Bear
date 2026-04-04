@@ -292,8 +292,7 @@ mod impls {
             config: &config::Main,
             confstr_path: String,
         ) -> Result<Self, WriterCreationError> {
-            let interpreter = semantic::interpreters::create(config, confstr_path)
-                .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
+            let interpreter = semantic::interpreters::create(config, confstr_path);
             let writer = output::OutputWriter::try_from((&output, config))?;
 
             Ok(Self { interpreter: Box::new(interpreter), writer })
