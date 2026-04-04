@@ -2,7 +2,6 @@
 
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::path::PathBuf;
 
 use crate::semantic::{Execution, Interpreter, RecognizeResult};
 
@@ -24,8 +23,9 @@ impl IgnoreByPath {
         Self { filenames, reason: COREUTILS_MESSAGE }
     }
 
-    pub(super) fn from(compilers: &[PathBuf]) -> Self {
-        let filenames = compilers.iter().filter_map(|p| p.file_name()).map(OsString::from).collect();
+    pub(super) fn from(compilers: impl IntoIterator<Item = impl AsRef<std::path::Path>>) -> Self {
+        let filenames =
+            compilers.into_iter().filter_map(|p| p.as_ref().file_name().map(OsString::from)).collect();
         Self { filenames, reason: COMPILER_MESSAGE }
     }
 }
@@ -157,6 +157,7 @@ const COREUTILS_FILES: [&str; 106] = [
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     use super::*;
 

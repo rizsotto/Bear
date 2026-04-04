@@ -17,8 +17,6 @@ use combinators::{Any, InputLogger, OutputLogger};
 use compilers::CompilerInterpreter;
 use ignore::IgnoreByPath;
 use resolve::ResolveExecutable;
-use std::path::PathBuf;
-
 /// Creates an interpreter to recognize the compiler calls.
 ///
 /// Using the configuration we can define which compilers to include and exclude.
@@ -33,9 +31,10 @@ pub fn create<'a>(config: &config::Main, confstr_path: String) -> impl Interpret
         Box::new(OutputLogger::new(IgnoreByPath::default(), "coreutils_to_ignore")),
     ];
 
-    let compilers_to_exclude = compilers_to_exclude(config);
+    let compilers_to_exclude: Vec<_> =
+        config.compilers.iter().filter(|compiler| compiler.ignore).map(|compiler| &compiler.path).collect();
     if !compilers_to_exclude.is_empty() {
-        let tool = OutputLogger::new(IgnoreByPath::from(&compilers_to_exclude), "compilers_to_ignore");
+        let tool = OutputLogger::new(IgnoreByPath::from(compilers_to_exclude), "compilers_to_ignore");
         interpreters.push(Box::new(tool));
     }
 
@@ -48,13 +47,10 @@ pub fn create<'a>(config: &config::Main, confstr_path: String) -> impl Interpret
     ResolveExecutable::new(InputLogger::new(Any::new(interpreters)), confstr_path)
 }
 
-fn compilers_to_exclude(config: &config::Main) -> Vec<PathBuf> {
-    config.compilers.iter().filter(|compiler| compiler.ignore).map(|compiler| compiler.path.clone()).collect()
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     use super::*;
     use crate::config;
@@ -117,7 +113,7 @@ mod test {
     }
 
     #[test]
-    fn test_compilers_to_exclude_function() {
+    fn test_compilers_to_exclude_ignores_only_flagged() {
         let config = config::Main {
             compilers: vec![
                 config::Compiler { path: PathBuf::from("/usr/bin/gcc"), as_: None, ignore: true },
@@ -126,9 +122,15 @@ mod test {
             ..Default::default()
         };
 
-        let excluded = compilers_to_exclude(&config);
-        assert_eq!(excluded.len(), 1);
-        assert_eq!(excluded[0], PathBuf::from("/usr/bin/gcc"));
+        let interpreter = create(&config, "/usr/bin:/bin".to_string());
+
+        let gcc =
+            Execution::from_strings("/usr/bin/gcc", vec!["gcc", "-c", "test.c"], "/tmp", HashMap::new());
+        assert!(matches!(interpreter.recognize(gcc), RecognizeResult::Ignored(_)));
+
+        let clang =
+            Execution::from_strings("/usr/bin/clang", vec!["clang", "-c", "test.c"], "/tmp", HashMap::new());
+        assert!(matches!(interpreter.recognize(clang), RecognizeResult::Recognized(_)));
     }
 
     #[test]
