@@ -84,26 +84,14 @@ ensure `gcc` or `clang` is installed.
 5. Verify the installation:
    ```bash
    bear --version
-   bear -- true   # quick smoke test — should produce an empty compile_commands.json
+   bear -- true   # quick smoke test - should produce an empty compile_commands.json
    ```
 
 ## Uninstall
 
-Once installed, the easiest way to remove all files is to run the original
-install script with the uninstall option:
-
-   ```bash
-   ./scripts/install.sh --uninstall
-   ```
-
-If the source tree is no longer available, run the `uninstall.sh` script:
-
-   ```bash
-   sh $HOME/.local/share/bear/uninstall.sh
-   ```
-
-The path above assumes Bear was installed under `$HOME/.local`. Depending on
-customization, the uninstall script may be located elsewhere.
+The install script does not generate an uninstall script. To remove Bear,
+delete the installed files manually. The installation layout is listed at the
+end of this document.
 
 ## Custom installation
 
@@ -131,7 +119,7 @@ install time:
    INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
    ```
 
-On glibc-based Linux, the special value `$LIB` can be used — the dynamic
+On glibc-based Linux, the special value `$LIB` can be used - the dynamic
 linker expands it at runtime (see `man ld.so`). On other platforms (macOS,
 musl, FreeBSD), use a concrete directory name.
 
@@ -141,17 +129,17 @@ When Bear is installed to a system prefix like `/usr` or `/usr/local`, shells
 typically find completions automatically. For a user-local install
 (`$HOME/.local`), you need to tell your shell where to look:
 
-**Bash** — add to `~/.bashrc`:
+**Bash** - add to `~/.bashrc`:
    ```bash
    source "$HOME/.local/share/bash-completion/completions/bear"
    ```
 
-**Zsh** — add to `~/.zshrc` (before `compinit`):
+**Zsh** - add to `~/.zshrc` (before `compinit`):
    ```zsh
    fpath=("$HOME/.local/share/zsh/site-functions" $fpath)
    ```
 
-**Fish** — add to `~/.config/fish/config.fish`:
+**Fish** - add to `~/.config/fish/config.fish`:
    ```fish
    set -p fish_complete_path $HOME/.local/share/fish/vendor_completions.d
    ```
@@ -161,13 +149,18 @@ typically find completions automatically. For a user-local install
 
 If you are a package maintainer for a distribution:
 
-- Build, generate completions, and install with explicit values for `PREFIX`
-  and `INTERCEPT_LIBDIR`:
+- Build, generate completions, and install with `DESTDIR`, `PREFIX`, and
+  `INTERCEPT_LIBDIR`:
   ```bash
   INTERCEPT_LIBDIR=lib64 cargo build --release
   target/release/generate-completions target/release/completions
-  INTERCEPT_LIBDIR=lib64 PREFIX=$pkgdir/usr ./scripts/install.sh
+  DESTDIR=$pkgdir PREFIX=/usr INTERCEPT_LIBDIR=lib64 ./scripts/install.sh
   ```
+
+  `DESTDIR` is the staging root prepended to all install paths. `PREFIX` is
+  the final on-system prefix (e.g. `/usr`). Do not combine them into
+  `PREFIX` - the entry script embeds `PREFIX` as a literal runtime path,
+  so it must match the installed system, not the build chroot.
 
 - The preload library (`libexec.so`) is only built on Unix. Windows builds
   only produce `bear-driver` and `bear-wrapper`. Consult
