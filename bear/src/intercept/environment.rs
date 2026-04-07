@@ -171,10 +171,12 @@ impl BuildEnvironment {
         let mut environment_overrides = HashMap::new();
         for (key, value) in &context.environment {
             if crate::environment::program_env(key) && !value.is_empty() {
-                let program_path = std::path::PathBuf::from(value);
-                let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
-                // Update the environment overrides with the wrapper path
-                environment_overrides.insert(key.clone(), wrapper_path.to_string_lossy().to_string());
+                if let Some(program_path) = Self::resolve_program_path(context, value) {
+                    let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
+                    environment_overrides.insert(key.clone(), wrapper_path.to_string_lossy().to_string());
+                } else {
+                    log::debug!("Skipping unresolved compiler environment override: {key}={value}");
+                }
             }
         }
 
@@ -229,6 +231,41 @@ impl BuildEnvironment {
                 }
             })
             .filter(move |path| is_executable_file(path) && predicate(path))
+    }
+
+    fn resolve_program_path(context: &context::Context, value: &str) -> Option<PathBuf> {
+        let executable = Self::extract_program_from_env(value)?;
+
+        if executable.is_absolute() {
+            return Some(executable.canonicalize().unwrap_or(executable));
+        }
+
+        if executable.parent().is_some_and(|parent| !parent.as_os_str().is_empty()) {
+            let absolute = context.current_directory.join(executable);
+            return Some(absolute.canonicalize().unwrap_or(absolute));
+        }
+
+        let search_path = context.path().map(|(_, path)| path).unwrap_or_else(|| context.confstr_path.clone());
+        which::which_in(&executable, Some(search_path.as_str()), &context.current_directory).ok()
+    }
+
+    fn extract_program_from_env(value: &str) -> Option<PathBuf> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix('"') {
+            let end = rest.find('"')?;
+            return Some(PathBuf::from(&rest[..end]));
+        }
+
+        if let Some(rest) = trimmed.strip_prefix('\'') {
+            let end = rest.find('\'')?;
+            return Some(PathBuf::from(&rest[..end]));
+        }
+
+        trimmed.split_whitespace().next().map(PathBuf::from)
     }
 
     /// Creates a `BuildEnvironment` configured for preload mode interception.
@@ -884,5 +921,52 @@ mod test {
         // Should NOT have gcc from PATH (PATH discovery should be skipped)
         // The gcc in bin_dir should not be discovered because we provided explicit executables
         assert!(wrapper_config.get_executable("gcc").is_none(), "gcc from PATH should not be discovered");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_program_env_resolution_uses_path_on_windows() {
+        let current_dir = TempDir::new().unwrap();
+        let install_dir = {
+            let dir = TempDir::new().unwrap();
+            let bin_dir = dir.path().join("bin");
+            std::fs::create_dir(&bin_dir).unwrap();
+            let file = bin_dir.join(env!("WRAPPER_NAME"));
+            std::fs::write(&file, "wrapper").unwrap();
+            dir
+        };
+
+        let tool_dir = TempDir::new().unwrap();
+        let compiler_path = tool_dir.path().join("cl.exe");
+        std::fs::write(&compiler_path, "compiler").unwrap();
+
+        let context = {
+            let mut environment = HashMap::new();
+            environment.insert("PATH".to_string(), tool_dir.path().to_string_lossy().to_string());
+            environment.insert("CC".to_string(), "cl".to_string());
+
+            crate::context::Context {
+                current_executable: install_dir.path().join("bin").join("bear-driver.exe"),
+                current_directory: current_dir.path().to_path_buf(),
+                environment,
+                preload_supported: false,
+                confstr_path: String::new(),
+            }
+        };
+
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        assert_eq!(wrapper_config.get_executable("cl.EXE"), Some(&compiler_path));
+
+        let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
+        assert!(
+            cc_value.ends_with("cl.exe"),
+            "CC should point to a wrapper executable with .exe extension: {}",
+            cc_value
+        );
     }
 }

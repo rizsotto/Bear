@@ -92,8 +92,32 @@ impl WrapperConfig {
 
     /// Gets the real executable path for a given wrapper name.
     pub fn get_executable(&self, name: &str) -> Option<&PathBuf> {
-        self.executables.get(name)
+        if let Some(path) = self.executables.get(name) {
+            return Some(path);
+        }
+
+        #[cfg(windows)]
+        {
+            let normalized_name = normalize_windows_executable_name(name);
+            return self
+                .executables
+                .iter()
+                .find_map(|(candidate, path)| {
+                    (normalize_windows_executable_name(candidate) == normalized_name).then_some(path)
+                });
+        }
+
+        #[cfg(not(windows))]
+        {
+            None
+        }
     }
+}
+
+#[cfg(windows)]
+fn normalize_windows_executable_name(name: &str) -> String {
+    let lowercase = name.to_ascii_lowercase();
+    lowercase.strip_suffix(".exe").unwrap_or(&lowercase).to_string()
 }
 
 impl Display for WrapperConfig {
@@ -344,6 +368,20 @@ mod tests {
         assert_eq!(config.get_executable("gcc"), Some(&PathBuf::from("/usr/bin/gcc")));
         assert_eq!(config.get_executable("g++"), Some(&PathBuf::from("/usr/bin/g++")));
         assert_eq!(config.get_executable("clang"), None);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_wrapper_config_get_executable_windows_case_insensitive_and_extension_agnostic() {
+        let config = {
+            let mut builder = WrapperConfig::new(address());
+            builder.add_executable("cl".to_string(), PathBuf::from(r"C:\VS\cl.exe"));
+            builder
+        };
+
+        assert_eq!(config.get_executable("cl"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+        assert_eq!(config.get_executable("cl.exe"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+        assert_eq!(config.get_executable("cl.EXE"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
     }
 
     #[test]
