@@ -235,6 +235,9 @@ impl BuildEnvironment {
 
     fn resolve_program_path(context: &context::Context, value: &str) -> Option<PathBuf> {
         let executable = Self::extract_program_from_env(value)?;
+        if executable.as_os_str().is_empty() {
+            return None;
+        }
 
         if executable.is_absolute() {
             return Some(executable.canonicalize().unwrap_or(executable));
