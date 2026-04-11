@@ -526,3 +526,158 @@ fn fakeroot_integration() -> Result<()> {
 
     Ok(())
 }
+
+/// Test that wrapper mode resolves bare compiler names from CC env var via PATH.
+///
+/// Covers the PATH resolution part of issue #686: when CC is set to a bare name
+/// (e.g. "gcc" instead of "/usr/bin/gcc"), Bear's wrapper mode should resolve it
+/// through PATH before registering wrapper targets.
+///
+/// The build script uses $CC so the wrapper actually intercepts it. To avoid
+/// ccache recursion (where the wrapper calls ccache which finds the wrapper
+/// again via PATH), we construct a PATH containing only the real compiler
+/// directory, excluding any ccache directories.
+#[test]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_resolves_cc_bare_name_via_path() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_cc_bare_name")?;
+
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let compiler_filename = filename_of(COMPILER_C_PATH);
+
+    // Build a PATH that excludes ccache directories to avoid wrapper recursion
+    // (ccache symlinks search PATH for the real compiler, finding the wrapper).
+    let safe_path = std::env::join_paths(
+        std::env::split_paths(&std::env::var("PATH").unwrap_or_default())
+            .filter(|p| !p.to_string_lossy().contains("ccache")),
+    )
+    .expect("failed to join PATH");
+    // Ensure the real compiler is reachable: resolve the compiler filename
+    // in the safe PATH to get a non-ccache path (e.g. /usr/bin/gcc).
+    let real_compiler = which::which_in(&compiler_filename, Some(&safe_path), env.test_dir())
+        .unwrap_or_else(|_| std::path::PathBuf::from(COMPILER_C_PATH));
+    let real_compiler_str = real_compiler.to_str().unwrap();
+
+    // Build script uses $CC so the wrapper intercepts the call.
+    let build_commands = "$CC -c test.c".to_string();
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    // Config forces wrapper mode and lists the real (non-ccache) compiler
+    // to suppress PATH-based discovery.
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+
+compilers:
+  - path: {}
+"#,
+        real_compiler_str
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, &config)?;
+
+    // Run the full bear pipeline with CC set to the bare compiler name (no path).
+    // Bear must resolve "gcc" via PATH before creating wrapper symlinks.
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
+        .env("RUST_LOG", "debug")
+        .env("RUST_BACKTRACE", "1")
+        .env("CC", &compiler_filename)
+        .env("PATH", &safe_path)
+        .args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script_path.to_str().unwrap(),
+        ]);
+
+    let output = cmd.output()?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Verify Bear resolved the bare CC name: the CC env var should be
+    // overridden to point to a wrapper in the .bear directory. Without
+    // PATH resolution, this would fail with "Executable not found".
+    assert!(
+        !stderr.contains("Skipping compiler env var CC="),
+        "Bear should resolve CC={} via PATH, but it was skipped:\n{}",
+        compiler_filename,
+        stderr,
+    );
+
+    // Build should succeed and produce a compilation database entry.
+    assert!(output.status.success(), "bear failed:\n{}", stderr);
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    Ok(())
+}
+
+/// Test that wrapper mode handles CC without .exe extension on Windows.
+///
+/// Reproduces the exact user scenario from issue #686: CC=cl (no extension,
+/// no path) when cl.exe exists on PATH. On Windows, the OS may resolve the
+/// wrapper executable name with different casing (e.g. "cl.EXE"), so the
+/// wrapper config lookup must be case-insensitive and extension-agnostic.
+#[test]
+#[cfg(target_family = "windows")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_resolves_cc_without_exe_extension_on_windows() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_cc_no_exe_ext")?;
+
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let compiler_filename = filename_of(COMPILER_C_PATH);
+    // Strip .exe extension to mimic CC=cl (the exact user scenario)
+    let bare_name = compiler_filename
+        .strip_suffix(".exe")
+        .or_else(|| compiler_filename.strip_suffix(".EXE"))
+        .unwrap_or(&compiler_filename);
+
+    // Build script uses %CC% on Windows
+    let build_commands = "%CC% -c test.c".to_string();
+    let script_path = env.test_dir().join("build.bat");
+    std::fs::write(&script_path, &build_commands)?;
+
+    let config = r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // CC is set to bare name WITHOUT .exe (e.g. "cl" or "gcc")
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
+        .env("RUST_LOG", "debug")
+        .env("RUST_BACKTRACE", "1")
+        .env("CC", bare_name)
+        .args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            "cmd",
+            "/c",
+            script_path.to_str().unwrap(),
+        ]);
+
+    let output = cmd.output()?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "bear failed:\n{}", stderr);
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    Ok(())
+}

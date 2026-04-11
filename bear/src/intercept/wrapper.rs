@@ -86,13 +86,38 @@ impl WrapperConfig {
     }
 
     /// Adds an executable mapping to the configuration.
+    ///
+    /// On Windows, the key is normalized to lowercase with `.exe` stripped,
+    /// so that lookup is case-insensitive and extension-agnostic.
     pub fn add_executable(&mut self, name: String, path: PathBuf) {
-        self.executables.insert(name, path);
+        self.executables.insert(normalize_executable_key(&name), path);
     }
 
     /// Gets the real executable path for a given wrapper name.
+    ///
+    /// The lookup key is normalized the same way as in `add_executable`,
+    /// so on Windows "cl", "cl.exe", and "CL.EXE" all match.
     pub fn get_executable(&self, name: &str) -> Option<&PathBuf> {
-        self.executables.get(name)
+        self.executables.get(&normalize_executable_key(name))
+    }
+}
+
+/// Normalizes an executable name for use as a HashMap key.
+///
+/// On Windows, executable lookup is case-insensitive and the `.exe` extension
+/// is optional. This function lowercases the name and strips `.exe` so that
+/// "cl", "cl.exe", and "CL.EXE" all produce the same key.
+///
+/// On non-Windows platforms, the name is returned unchanged.
+fn normalize_executable_key(name: &str) -> String {
+    #[cfg(windows)]
+    {
+        let lower = name.to_ascii_lowercase();
+        lower.strip_suffix(".exe").unwrap_or(&lower).to_string()
+    }
+    #[cfg(not(windows))]
+    {
+        name.to_string()
     }
 }
 
@@ -204,9 +229,10 @@ impl WrapperDirectoryBuilder {
             .to_string_lossy()
             .to_string();
 
-        // Check for filename uniqueness
+        // Check for filename uniqueness (uses normalized key on Windows)
         if self.config.get_executable(&executable_name).is_some() {
-            // Same executable is already registered, return existing wrapper path
+            // Same executable is already registered, return existing wrapper path.
+            // Use the original executable_name (not normalized) to match the file on disk.
             return Ok(self.wrapper_dir.path().join(&executable_name));
         }
 
@@ -344,6 +370,63 @@ mod tests {
         assert_eq!(config.get_executable("gcc"), Some(&PathBuf::from("/usr/bin/gcc")));
         assert_eq!(config.get_executable("g++"), Some(&PathBuf::from("/usr/bin/g++")));
         assert_eq!(config.get_executable("clang"), None);
+    }
+
+    // U5: normalize_key lowercases and strips .exe on Windows
+    #[cfg(windows)]
+    #[test]
+    fn test_wrapper_config_get_executable_windows_case_insensitive() {
+        let config = {
+            let mut builder = WrapperConfig::new(address());
+            builder.add_executable("cl.exe".to_string(), PathBuf::from(r"C:\VS\cl.exe"));
+            builder
+        };
+
+        // All casing/extension variants should resolve to the same entry
+        assert_eq!(config.get_executable("cl"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+        assert_eq!(config.get_executable("cl.exe"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+        assert_eq!(config.get_executable("cl.EXE"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+        assert_eq!(config.get_executable("CL.EXE"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
+    }
+
+    // U6: normalize_key is identity on non-Windows (exact match only)
+    #[cfg(not(windows))]
+    #[test]
+    fn test_wrapper_config_get_executable_unix_exact_match_only() {
+        let config = {
+            let mut builder = WrapperConfig::new(address());
+            builder.add_executable("gcc".to_string(), PathBuf::from("/usr/bin/gcc"));
+            builder
+        };
+
+        assert_eq!(config.get_executable("gcc"), Some(&PathBuf::from("/usr/bin/gcc")));
+        assert_eq!(config.get_executable("GCC"), None);
+        assert_eq!(config.get_executable("gcc.exe"), None);
+    }
+
+    // U10: Duplicate detection works across normalized keys on Windows
+    #[cfg(windows)]
+    #[test]
+    fn test_wrapper_config_duplicate_detection_across_normalized_keys() {
+        let temp_dir = TempDir::new().unwrap();
+        let wrapper_path = {
+            let file = temp_dir.path().join("wrapper.exe");
+            std::fs::write(&file, "wrapper").unwrap();
+            file
+        };
+
+        let mut builder = WrapperDirectoryBuilder::create(&wrapper_path, temp_dir.path(), address()).unwrap();
+
+        // Register "cl.exe"
+        builder.register_executable(PathBuf::from(r"C:\VS\cl.exe")).unwrap();
+        // Register "cl.EXE" - should be treated as duplicate after normalization
+        builder.register_executable(PathBuf::from(r"C:\Other\cl.EXE")).unwrap();
+
+        // Only one entry should exist in the config (de-duped via normalized key)
+        let config = builder.build().unwrap();
+        assert_eq!(config.config().executables.len(), 1, "cl.EXE should be de-duped against cl.exe");
+        // The stored path should be from the first registration
+        assert_eq!(config.config().get_executable("cl"), Some(&PathBuf::from(r"C:\VS\cl.exe")));
     }
 
     #[test]

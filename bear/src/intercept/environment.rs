@@ -167,14 +167,21 @@ impl BuildEnvironment {
         }
 
         // Register executables from environment variables that point to compiler programs
-        // and immediately update the final environment with wrapper paths
+        // and immediately update the final environment with wrapper paths.
+        // Bare names (e.g. CC=gcc) are resolved via PATH before registration.
         let mut environment_overrides = HashMap::new();
         for (key, value) in &context.environment {
             if crate::environment::program_env(key) && !value.is_empty() {
-                let program_path = std::path::PathBuf::from(value);
-                let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
-                // Update the environment overrides with the wrapper path
-                environment_overrides.insert(key.clone(), wrapper_path.to_string_lossy().to_string());
+                if let Some(program_path) = Self::resolve_program_path(context, value) {
+                    let wrapper_path = wrapper_dir_builder.register_executable(program_path)?;
+                    environment_overrides.insert(key.clone(), wrapper_path.to_string_lossy().to_string());
+                } else {
+                    log::warn!(
+                        "Skipping compiler env var {}={}: could not resolve to an executable on PATH",
+                        key,
+                        value,
+                    );
+                }
             }
         }
 
@@ -229,6 +236,40 @@ impl BuildEnvironment {
                 }
             })
             .filter(move |path| is_executable_file(path) && predicate(path))
+    }
+
+    /// Resolves a program env var value to an absolute executable path.
+    ///
+    /// Handles three cases:
+    /// - Absolute path: returned as-is (canonicalized if possible)
+    /// - Relative path (contains directory component): joined with cwd
+    /// - Bare name: resolved via PATH using `which`
+    ///
+    /// Returns `None` if the program cannot be found.
+    fn resolve_program_path(context: &context::Context, value: &str) -> Option<PathBuf> {
+        let name = value.trim();
+        if name.is_empty() {
+            return None;
+        }
+
+        let path = PathBuf::from(name);
+
+        // Absolute path: pass through as-is. Do not canonicalize because that
+        // resolves symlinks, which can change the filename (e.g. /usr/bin/gcc ->
+        // /usr/bin/x86_64-linux-gnu-gcc-13) and break wrapper name matching.
+        if path.is_absolute() {
+            return Some(path);
+        }
+
+        // Relative path with directory component (e.g. "./gcc" or "tools/gcc"):
+        // resolve against cwd to make it absolute.
+        if path.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
+            return Some(context.current_directory.join(&path));
+        }
+
+        // Bare name: resolve via PATH
+        let search_path = context.path().map(|(_, p)| p).unwrap_or_else(|| context.confstr_path.clone());
+        which::which_in(name, Some(search_path.as_str()), &context.current_directory).ok()
     }
 
     /// Creates a `BuildEnvironment` configured for preload mode interception.
@@ -647,20 +688,33 @@ mod test {
             dir
         };
 
+        // Create fake compiler binaries in a temp directory so the paths are
+        // genuinely absolute on every platform (including Windows, where
+        // "/usr/bin/gcc" is not absolute because it lacks a drive letter).
+        let compiler_dir = TempDir::new().unwrap();
+        let cc_path = compiler_dir.path().join("cc");
+        let clang_path = compiler_dir.path().join("clang");
+        let gcc_path = compiler_dir.path().join("gcc");
+        let gxx_path = compiler_dir.path().join("g++");
+        for p in [&cc_path, &clang_path, &gcc_path, &gxx_path] {
+            std::fs::write(p, "fake").unwrap();
+        }
+
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
         let sut = {
             let intercept = config::Intercept::Wrapper;
             let compilers = vec![
-                config::Compiler { path: PathBuf::from("/usr/bin/cc"), as_: None, ignore: false },
-                config::Compiler { path: PathBuf::from("/usr/bin/clang"), as_: None, ignore: false },
+                config::Compiler { path: cc_path.clone(), as_: None, ignore: false },
+                config::Compiler { path: clang_path.clone(), as_: None, ignore: false },
             ];
             let context = {
+                let path_value = compiler_dir.path().to_string_lossy().to_string();
                 let environment = {
                     let mut builder = HashMap::new();
-                    builder.insert(KEY_OS__PATH.to_string(), "/usr/bin:/bin".to_string());
-                    builder.insert("CC".to_string(), "/usr/bin/gcc".to_string());
-                    builder.insert("CXX".to_string(), "/usr/bin/g++".to_string());
+                    builder.insert(KEY_OS__PATH.to_string(), path_value.clone());
+                    builder.insert("CC".to_string(), gcc_path.to_string_lossy().to_string());
+                    builder.insert("CXX".to_string(), gxx_path.to_string_lossy().to_string());
                     builder
                 };
 
@@ -669,7 +723,7 @@ mod test {
                     current_directory: current_dir.path().to_path_buf(),
                     environment,
                     preload_supported: true,
-                    confstr_path: String::from("/usr/bin:/bin"),
+                    confstr_path: path_value,
                 }
             };
 
@@ -690,10 +744,10 @@ mod test {
         assert_eq!(wrapper_config.collector_address, address);
 
         // Check that compilers configured are in the wrapper config
-        assert_eq!("/usr/bin/cc", wrapper_config.get_executable("cc").unwrap()); // this is from the config
-        assert_eq!("/usr/bin/clang", wrapper_config.get_executable("clang").unwrap()); // this if from the config
-        assert_eq!("/usr/bin/gcc", wrapper_config.get_executable("gcc").unwrap()); // this is from context
-        assert_eq!("/usr/bin/g++", wrapper_config.get_executable("g++").unwrap()); // this is from context
+        assert_eq!(&cc_path, wrapper_config.get_executable("cc").unwrap());
+        assert_eq!(&clang_path, wrapper_config.get_executable("clang").unwrap());
+        assert_eq!(&gcc_path, wrapper_config.get_executable("gcc").unwrap());
+        assert_eq!(&gxx_path, wrapper_config.get_executable("g++").unwrap());
 
         // Check that environment variables were redirected to wrapper executables
         let cc_value = sut.environment_overrides.get("CC").unwrap();
@@ -884,5 +938,222 @@ mod test {
         // Should NOT have gcc from PATH (PATH discovery should be skipped)
         // The gcc in bin_dir should not be discovered because we provided explicit executables
         assert!(wrapper_config.get_executable("gcc").is_none(), "gcc from PATH should not be discovered");
+    }
+
+    // U1: resolve_program_path finds bare name via PATH
+    #[test]
+    fn test_env_var_bare_name_resolved_via_path() {
+        let current_dir = TempDir::new().unwrap();
+        let install_dir = {
+            let dir = TempDir::new().unwrap();
+            let bin_dir = dir.path().join("bin");
+            std::fs::create_dir(&bin_dir).unwrap();
+            let file = bin_dir.join(env!("WRAPPER_NAME"));
+            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+            dir
+        };
+
+        // Create a fake compiler on a tool directory that will be in PATH
+        let tool_dir = TempDir::new().unwrap();
+        let compiler_name = if cfg!(windows) { "fake-cc.exe" } else { "fake-cc" };
+        let compiler_path = {
+            let path = tool_dir.path().join(compiler_name);
+            std::fs::write(&path, "#!/usr/bin/true").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            path
+        };
+
+        let context = {
+            let mut environment = HashMap::new();
+            environment.insert(KEY_OS__PATH.to_string(), tool_dir.path().to_string_lossy().to_string());
+            // CC is set to a bare name - no path, just "fake-cc"
+            environment.insert("CC".to_string(), "fake-cc".to_string());
+
+            crate::context::Context {
+                current_executable: install_dir.path().join("bin").join("bear-driver"),
+                current_directory: current_dir.path().to_path_buf(),
+                environment,
+                preload_supported: false,
+                confstr_path: String::new(),
+            }
+        };
+
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // The bare name "fake-cc" should have been resolved via PATH to the real path
+        let resolved = wrapper_config
+            .get_executable(compiler_name)
+            .expect("bare CC=fake-cc should be resolved via PATH and registered");
+        assert_eq!(
+            resolved, &compiler_path,
+            "resolved path should be the actual compiler on PATH, not a bare name",
+        );
+
+        // CC should be overridden to point to the wrapper
+        let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
+        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+    }
+
+    // U2: resolve_program_path returns absolute path as-is
+    #[test]
+    fn test_env_var_absolute_path_passed_through() {
+        let current_dir = TempDir::new().unwrap();
+        let install_dir = {
+            let dir = TempDir::new().unwrap();
+            let bin_dir = dir.path().join("bin");
+            std::fs::create_dir(&bin_dir).unwrap();
+            let file = bin_dir.join(env!("WRAPPER_NAME"));
+            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+            dir
+        };
+
+        let compiler_name = if cfg!(windows) { "my-gcc.exe" } else { "my-gcc" };
+        let compiler_path = {
+            let path = current_dir.path().join(compiler_name);
+            std::fs::write(&path, "#!/usr/bin/true").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            path
+        };
+
+        let context = {
+            let mut environment = HashMap::new();
+            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
+            // CC is set to an absolute path
+            environment.insert("CC".to_string(), compiler_path.to_string_lossy().to_string());
+
+            crate::context::Context {
+                current_executable: install_dir.path().join("bin").join("bear-driver"),
+                current_directory: current_dir.path().to_path_buf(),
+                environment,
+                preload_supported: false,
+                confstr_path: String::new(),
+            }
+        };
+
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // The absolute path should be registered using the filename
+        assert!(
+            wrapper_config.get_executable(compiler_name).is_some(),
+            "absolute CC path should be registered as {}",
+            compiler_name,
+        );
+    }
+
+    // U4: resolve_program_path returns None for unresolvable name
+    #[test]
+    fn test_env_var_unresolvable_name_skipped() {
+        let current_dir = TempDir::new().unwrap();
+        let install_dir = {
+            let dir = TempDir::new().unwrap();
+            let bin_dir = dir.path().join("bin");
+            std::fs::create_dir(&bin_dir).unwrap();
+            let file = bin_dir.join(env!("WRAPPER_NAME"));
+            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+            dir
+        };
+
+        let context = {
+            let mut environment = HashMap::new();
+            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
+            // CC is set to a name that does not exist anywhere on PATH
+            environment.insert("CC".to_string(), "nonexistent-compiler-xyz".to_string());
+
+            crate::context::Context {
+                current_executable: install_dir.path().join("bin").join("bear-driver"),
+                current_directory: current_dir.path().to_path_buf(),
+                environment,
+                preload_supported: false,
+                confstr_path: String::new(),
+            }
+        };
+
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        // Should not fail - unresolvable env vars are skipped
+        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+
+        // CC should NOT be in overrides (it was skipped)
+        assert!(
+            !sut.environment_overrides.contains_key("CC"),
+            "unresolvable CC should be skipped, not overridden",
+        );
+    }
+
+    // U3: resolve_program_path resolves relative path against cwd
+    #[test]
+    fn test_env_var_relative_path_resolved_against_cwd() {
+        let current_dir = TempDir::new().unwrap();
+        let install_dir = {
+            let dir = TempDir::new().unwrap();
+            let bin_dir = dir.path().join("bin");
+            std::fs::create_dir(&bin_dir).unwrap();
+            let file = bin_dir.join(env!("WRAPPER_NAME"));
+            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+            dir
+        };
+
+        // Create a compiler in a subdirectory of the working directory
+        let tools_subdir = current_dir.path().join("tools");
+        std::fs::create_dir(&tools_subdir).unwrap();
+        let compiler_name = if cfg!(windows) { "my-cc.exe" } else { "my-cc" };
+        let _compiler_path = {
+            let path = tools_subdir.join(compiler_name);
+            std::fs::write(&path, "#!/usr/bin/true").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            path
+        };
+
+        let relative_cc = format!("tools/{}", compiler_name);
+
+        let context = {
+            let mut environment = HashMap::new();
+            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
+            // CC is set to a relative path
+            environment.insert("CC".to_string(), relative_cc);
+
+            crate::context::Context {
+                current_executable: install_dir.path().join("bin").join("bear-driver"),
+                current_directory: current_dir.path().to_path_buf(),
+                environment,
+                preload_supported: false,
+                confstr_path: String::new(),
+            }
+        };
+
+        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_config = wrapper_dir.config();
+
+        // The relative path should be resolved against cwd to an absolute path
+        let resolved = wrapper_config
+            .get_executable(compiler_name)
+            .unwrap_or_else(|| panic!("relative CC=tools/{compiler_name} should be resolved against cwd"));
+        assert!(resolved.is_absolute(), "resolved path should be absolute, got: {}", resolved.display(),);
+
+        // CC should be overridden to point to the wrapper
+        let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
+        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
     }
 }
