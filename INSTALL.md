@@ -53,6 +53,7 @@ Ensure that `cargo` and `rustc` are available in your `PATH`:
 **C compiler**: A C compiler is required to build the preload library
 (`intercept-preload`). The `cc` crate will typically find one automatically;
 ensure `gcc` or `clang` is installed.
+If your are building for Linux/ELF platform, ensure `lld` is installed, as `ld` lacks an essetial feature.
 
 ## Simple installation
 
