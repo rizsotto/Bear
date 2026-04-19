@@ -1,5 +1,4 @@
 ---
-id: interception-006
 title: Prevent wrapper recursion with compiler wrappers
 status: proposed
 tests: []

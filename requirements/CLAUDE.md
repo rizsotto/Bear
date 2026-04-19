@@ -7,12 +7,16 @@ verify that implemented requirements work correctly.
 ## File naming
 
 ```
-<area>-<number>-<short-name>.md
+<area>-<short-name>.md
 ```
 
+The filename serves as the requirement's unique identifier. Use it for
+cross-references in other requirement files (e.g. "see `output-path-format`").
+
 Examples (see existing files in this directory):
-- `output-001-json-compilation-database.md`
-- `interception-001-preload-mechanism.md`
+- `output-json-compilation-database.md`
+- `output-append.md`
+- `interception-preload-mechanism.md`
 
 ## Requirement template
 
@@ -20,7 +24,6 @@ Every requirement file must follow this structure:
 
 ```markdown
 ---
-id: output-001
 title: JSON compilation database format
 status: implemented
 tests:
@@ -34,8 +37,8 @@ What the user expects to happen, written from the user's perspective.
 
 ## Acceptance criteria
 
-- [ ] Criterion 1
-- [ ] Criterion 2
+- Criterion 1
+- Criterion 2
 
 ## Non-functional constraints
 
@@ -62,7 +65,7 @@ Design decisions, trade-offs, links to issues or discussions.
 
 The `tests:` frontmatter field lists integration test function names that protect
 this requirement. When writing a new integration test for a requirement, add the
-test name here. Use the naming convention `test_req_<id>_<description>` when possible.
+test name here.
 
 ## How agents should use this
 
@@ -92,6 +95,5 @@ a requirement before it reaches `accepted`.
 The link between requirements and integration tests is the regression safety net:
 
 - Every `implemented` requirement must have at least one test in its `tests:` field
-- Tests use the naming convention `test_req_<id>_<description>` for traceability
 - If a test is deleted or renamed, update the requirement's `tests:` field
 - Run `cargo test` to verify all listed tests still pass

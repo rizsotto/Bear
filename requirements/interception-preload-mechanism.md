@@ -1,5 +1,4 @@
 ---
-id: interception-001
 title: LD_PRELOAD-based command interception
 status: implemented
 tests:
