@@ -42,7 +42,7 @@ impl ResolvedTable {
 
         let mut flags = resolve_flags(key, raw_tables)
             .with_context(|| format!("resolving flags for {}", config.yaml_file))?;
-        flags.sort_by(|a, b| b.match_.name_len().cmp(&a.match_.name_len()));
+        flags.sort_by_key(|b| std::cmp::Reverse(b.match_.name_len()));
 
         Ok(ResolvedTable {
             config,

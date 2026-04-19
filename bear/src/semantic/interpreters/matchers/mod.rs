@@ -290,7 +290,7 @@ mod tests {
         ];
 
         // Sort by flag length descending to ensure longer matches are tried first
-        flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+        flags.sort_by_key(|b| std::cmp::Reverse(b.pattern.flag().len()));
 
         flags
     });
@@ -365,7 +365,7 @@ mod tests {
                 ),
                 FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Fe"), ArgumentKind::Output),
             ];
-            flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+            flags.sort_by_key(|b| std::cmp::Reverse(b.pattern.flag().len()));
             flags
         });
 

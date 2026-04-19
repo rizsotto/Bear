@@ -510,7 +510,7 @@ mod pass_through_tests {
                 FlagRule::new(FlagPattern::Exactly("/link", 0), ArgumentKind::Other(PassEffect::PassThrough)),
                 FlagRule::new(FlagPattern::Exactly("-o", 1), ArgumentKind::Output),
             ];
-            flags.sort_by(|a, b| b.pattern.flag().len().cmp(&a.pattern.flag().len()));
+            flags.sort_by_key(|b| std::cmp::Reverse(b.pattern.flag().len()));
             flags
         });
 
