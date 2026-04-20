@@ -1,9 +1,10 @@
 ---
 source: bear-codegen/tests/snapshots.rs
+assertion_line: 32
 expression: "generate_flag_file(\"clang_cl\")"
 ---
 // Generated from interpreters/clang_cl.yaml -- DO NOT EDIT
-static CLANG_CL_FLAGS: [FlagRule; 163] = [
+static CLANG_CL_FLAGS: [FlagRule; 169] = [
     FlagRule::new(FlagPattern::ExactlyWithEqOrSep("-fms-compatibility-version"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::Exactly("-fprofile-instr-generate", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithEq("-fprofile-instr-generate"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
@@ -139,9 +140,15 @@ static CLANG_CL_FLAGS: [FlagRule; 163] = [
     FlagRule::new(FlagPattern::Exactly("/W2", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/W3", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/W4", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Prefix("/wd", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Prefix("/we", 0), ArgumentKind::Other(PassEffect::None)),
-    FlagRule::new(FlagPattern::Prefix("/wo", 0), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithColon("/Wv"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("/Wv", 0), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/w1"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/w2"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/w3"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/w4"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/wd"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/we"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("/wo"), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::Exactly("/FC", 0), ArgumentKind::Other(PassEffect::None)),
     FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Yc"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
     FlagRule::new(FlagPattern::ExactlyWithColonOrSep("/Yu"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),

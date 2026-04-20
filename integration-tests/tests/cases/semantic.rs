@@ -504,3 +504,139 @@ fn semantic_output_format() -> Result<()> {
 
     Ok(())
 }
+
+/// Regression test: all MSVC per-warning options documented on
+/// <https://learn.microsoft.com/en-us/cpp/build/reference/compiler-option-warning-level>
+/// accept their numeric value either glued (`/wd4995`) or separated by whitespace
+/// (`/wd 4995`). Both forms are emitted by real `cl.exe` invocations and by
+/// Makefiles in the wild (e.g. `CFLAGS = /wd 4995 /wd 4996 ...`). The separated
+/// form must survive semantic analysis intact; dropping the number silently would
+/// corrupt compile_commands.json and break downstream tools such as clangd
+/// (emits `drv_invalid_int_value` per translation unit).
+///
+/// Covers `/w1`, `/w2`, `/w3`, `/w4` (set warning level for a specific warning)
+/// and `/wd`, `/we`, `/wo` (disable / as-error / report-once).
+///
+/// This test is platform-independent: it exercises the `semantic` subcommand on
+/// a hand-crafted events file and does not require a real `cl.exe` to be present.
+#[test]
+fn msvc_per_warning_options_preserve_separated_value() -> Result<()> {
+    let env = TestEnvironment::new("msvc_per_warning_options_separated")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    // Use a bare "cl.exe" -- the recognizer matches on the filename stem only, so we
+    // do not need the file to exist on disk. Keeps the test hermetic across platforms.
+    let cl = "cl.exe";
+
+    let event = json!({
+        "pid": 1,
+        "execution": {
+            "executable": cl,
+            "arguments": [
+                cl,
+                "/w1", "4100",
+                "/w2", "4101",
+                "/w3", "4102",
+                "/w4", "4103",
+                "/wd", "4995",
+                "/we", "4996",
+                "/wo", "4819",
+                "/c", "test.c",
+            ],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("test.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    // Each flag/value pair must round-trip with its numeric value intact. Before
+    // the fix, these flags matched a prefix-only pattern, so the standalone
+    // numeric token following each flag was reclassified as a source file and
+    // dropped from the output.
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(),
+            "/w1".to_string(), "4100".to_string(),
+            "/w2".to_string(), "4101".to_string(),
+            "/w3".to_string(), "4102".to_string(),
+            "/w4".to_string(), "4103".to_string(),
+            "/wd".to_string(), "4995".to_string(),
+            "/we".to_string(), "4996".to_string(),
+            "/wo".to_string(), "4819".to_string(),
+            "/c".to_string(),
+            "test.c".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+/// Regression test: `/Wv[:version]` has an optional value (cl uses the current
+/// compiler version when omitted). Both forms -- bare `/Wv` and `/Wv:17` -- must
+/// round-trip through semantic analysis without losing tokens or dropping the
+/// entry.
+#[test]
+fn msvc_wv_optional_version_is_preserved() -> Result<()> {
+    let env = TestEnvironment::new("msvc_wv_optional_version")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+
+    // Two translation units, one per /Wv form, so the test exercises both paths
+    // in a single run.
+    let event_bare = json!({
+        "pid": 1,
+        "execution": {
+            "executable": cl,
+            "arguments": [cl, "/Wv", "/c", "bare.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    let event_with_version = json!({
+        "pid": 2,
+        "execution": {
+            "executable": cl,
+            "arguments": [cl, "/Wv:17", "/c", "versioned.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+
+    let events = format!("{}\n{}", event_bare, event_with_version);
+
+    env.create_source_files(&[
+        ("events.json", &events),
+        ("bare.c", "int main(void) { return 0; }"),
+        ("versioned.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    db.assert_contains(&compilation_entry!(
+        file: "bare.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![cl.to_string(), "/Wv".to_string(), "/c".to_string(), "bare.c".to_string()]
+    ))?;
+    db.assert_contains(&compilation_entry!(
+        file: "versioned.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![cl.to_string(), "/Wv:17".to_string(), "/c".to_string(), "versioned.c".to_string()]
+    ))?;
+
+    Ok(())
+}

@@ -220,11 +220,28 @@ flags:
     result: none
   - match: {pattern: "/w"}
     result: none
-  - match: {pattern: "/wd*"}
+  # /Wv[:version]: the value is optional (cl uses the current compiler version
+  # when omitted), so we accept both the bare form and "/Wv:<version>".
+  - match: {pattern: "/Wv:*"}
     result: none
-  - match: {pattern: "/we*"}
+  - match: {pattern: "/Wv"}
     result: none
-  - match: {pattern: "/wo*"}
+  # cl.exe accepts the warning-number value either glued ("/wd4995") or as a
+  # separate argument ("/wd 4995") for all per-warning options; the patterns
+  # below must consume both forms.
+  - match: {pattern: "/w1{ }*"}
+    result: none
+  - match: {pattern: "/w2{ }*"}
+    result: none
+  - match: {pattern: "/w3{ }*"}
+    result: none
+  - match: {pattern: "/w4{ }*"}
+    result: none
+  - match: {pattern: "/wd{ }*"}
+    result: none
+  - match: {pattern: "/we{ }*"}
+    result: none
+  - match: {pattern: "/wo{ }*"}
     result: none
   - match: {pattern: "/diagnostics:*"}
     result: none
