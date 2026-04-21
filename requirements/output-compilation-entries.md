@@ -136,8 +136,6 @@ invocation:
 > and the other two source files do not appear in that entry's
 > `arguments`.
 
-Protected by `multiple_sources_single_command`.
-
 Given a build that compiles multiple files via separate compiler
 invocations (the typical `make -j` case):
 
@@ -145,15 +143,11 @@ invocations (the typical `make -j` case):
 > then `compile_commands.json` contains one entry per source file,
 > and each entry names the compiler used for that source.
 
-Protected by `successful_build_multiple_sources`.
-
 Given a build that compiles a single source file:
 
 > When the user runs `bear -- cc -c src.c`,
 > then `compile_commands.json` contains exactly one entry,
 > with `file` set to `src.c` and the compiler at `arguments[0]`.
-
-Protected by `simple_single_file_compilation`.
 
 Given a build that runs `cc -o a.out src1.c src2.c src3.c`:
 
@@ -163,15 +157,11 @@ Given a build that runs `cc -o a.out src1.c src2.c src3.c`:
 > each entry describes a pure compile step (no link-only flags),
 > and no entry's `file` is `a.out`.
 
-Coverage pending.
-
 Given a build that runs `cc -o a.out obj1.o obj2.o obj3.o`:
 
 > When the user runs Bear wrapping that build,
 > then `compile_commands.json` contains no entries for this
 > invocation.
-
-Coverage pending.
 
 Given a build that runs `cc -o a.out -lsomething -O2 src.c`:
 
@@ -179,23 +169,17 @@ Given a build that runs `cc -o a.out -lsomething -O2 src.c`:
 > then the resulting entry contains `-O2`,
 > and it does not contain `-lsomething`.
 
-Coverage pending.
-
 Given a build that runs `cc -I first -I second -DFOO -DBAR -c src.c`:
 
 > When the user runs Bear wrapping that build,
 > then the entry lists `-I first` before `-I second`,
 > and `-DFOO` before `-DBAR`, matching the original order.
 
-Coverage pending.
-
 Given a build that runs `cc --version` or `cc -###`:
 
 > When the user runs Bear wrapping that build,
 > then `compile_commands.json` contains no entries for this
 > invocation.
-
-Coverage pending.
 
 Given a build that runs `cc -o a.out src1.c src2.c` with the
 `output` field enabled via configuration:
@@ -204,18 +188,12 @@ Given a build that runs `cc -o a.out src1.c src2.c` with the
 > then every entry's `output` is `a.out` (reflecting the known
 > limitation documented above, not an ideal behaviour).
 
-Coverage pending.
-
 ## Notes
 
 - Per-source inference of object names (`src1.o`, `src2.o`) for
   multi-source invocations that share a single `-o` output is a
   plausible future improvement. It is not implemented today; the
   first output value is copied into every entry.
-- Dedicated integration tests for the compile-and-link split, the
-  pure-link case, link-flag stripping, argument-order preservation,
-  info-only invocations, and the `output` field behaviour are
-  pending.
 - Related: `output-json-compilation-database` -- per-entry JSON
   shape.
 - Related: `interception-compiler-env-with-flags` -- environment

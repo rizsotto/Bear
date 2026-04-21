@@ -94,22 +94,15 @@ Given a long-running build under `bear --`:
 > second,
 > and `bear` reports a non-success exit status.
 
-Protected by `exit_code_when_signaled` (gated on the presence of a
-`sleep` executable on the host).
-
 Given a build that exits successfully:
 
 > When the user runs `bear -- true`,
 > then `bear` exits with code `0`.
 
-Protected by `exit_code_for_true`.
-
 Given a build that exits with a non-zero code:
 
 > When the user runs `bear -- false`,
 > then `bear` exits with a non-zero code matching the build's.
-
-Protected by `exit_code_for_false`.
 
 Given an interception-only run (`bear intercept`), the exit-code
 contract still holds:
@@ -118,21 +111,13 @@ contract still holds:
 > when the user runs `bear intercept -- false`, the exit code is
 > non-zero and matches the build's.
 
-Protected by `intercept_exit_code_for_success` and
-`intercept_exit_code_for_failure`.
-
 Given a build that is interrupted mid-compile:
 
 > When the user presses Ctrl-C while the compiler is running,
 > then the compiler terminates,
 > and `bear` exits with a non-zero status.
 
-Coverage pending.
-
 ## Notes
 
-- Dedicated integration coverage for the interrupted-mid-compile
-  case (as opposed to the interrupted `sleep` case) is the next
-  test worth adding under this requirement.
 - Related: `interception-preload-mechanism`,
   `interception-wrapper-mechanism`.
