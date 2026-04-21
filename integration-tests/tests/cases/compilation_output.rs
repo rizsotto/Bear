@@ -692,6 +692,69 @@ fn info_only_invocation_produces_no_entries() -> Result<()> {
     Ok(())
 }
 
+/// Given a successful build, Bear's atomic-write step removes the deterministic
+/// temp file (output extension replaced with `.tmp`) so only the final
+/// compile_commands.json remains in the output directory.
+// Requirements: output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn atomic_write_cleans_up_temp_file_on_success() -> Result<()> {
+    let env = TestEnvironment::new("atomic_write_temp_cleanup")?;
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    let build = format!("{} -c src.c -o src.o", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear_success(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    assert!(env.file_exists("compile_commands.json"));
+    assert!(
+        !env.file_exists("compile_commands.tmp"),
+        "temp file compile_commands.tmp must not remain after successful write"
+    );
+
+    Ok(())
+}
+
+/// Given a write failure (the output path exists as a non-empty directory, so
+/// the final rename cannot succeed), Bear's atomic-write step must leave the
+/// pre-existing filesystem object untouched.
+// Requirements: output-atomic-write
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn atomic_write_preserves_existing_object_on_failure() -> Result<()> {
+    use std::fs;
+
+    let env = TestEnvironment::new("atomic_write_preserves_on_failure")?;
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    // Make the output path a non-empty directory. A rename of the temp file
+    // over a non-empty directory fails with EISDIR/ENOTEMPTY even for root,
+    // so this is stable across test environments.
+    let out_path = env.test_dir().join("compile_commands.json");
+    fs::create_dir(&out_path)?;
+    let sentinel = out_path.join("sentinel.txt");
+    fs::write(&sentinel, "untouched")?;
+
+    let build = format!("{} -c src.c -o src.o", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    // Bear is expected to fail; the key property is what survives.
+    let _ =
+        env.run_bear(&["--output", out_path.to_str().unwrap(), "--", SHELL_PATH, script.to_str().unwrap()]);
+
+    assert!(out_path.is_dir(), "output path must still be a directory after failed write");
+    assert_eq!(
+        fs::read_to_string(&sentinel)?,
+        "untouched",
+        "pre-existing content inside output path must not be modified on write failure"
+    );
+
+    Ok(())
+}
+
 /// Given cc -o a.out src1.c src2.c with the output field enabled via
 /// configuration, every resulting entry records output = a.out (the known
 /// limitation: the single -o value is copied verbatim, not inferred per
