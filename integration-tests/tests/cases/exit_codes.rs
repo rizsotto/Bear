@@ -151,6 +151,67 @@ fn intercept_exit_code_for_failure() -> Result<()> {
     Ok(())
 }
 
+/// A compiler that is blocked reading from a FIFO with no writer is in the
+/// mid-compile state. Signaling Bear with SIGTERM must stop both Bear and
+/// the compiler quickly, with Bear reporting non-success.
+// Requirements: interception-signal-forwarding
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn exit_code_when_compiler_is_interrupted_mid_compile() -> Result<()> {
+    let env = TestEnvironment::new("exit_code_mid_compile_signal")?;
+
+    // Named pipe as the compiler's input. With no writer, the compiler
+    // blocks in read() and stays mid-compile until a signal arrives.
+    let fifo = env.test_dir().join("source.c");
+    let mkfifo_status = std::process::Command::new("mkfifo").arg(&fifo).status()?;
+    assert!(mkfifo_status.success(), "mkfifo failed -- this test needs a POSIX environment");
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
+        .args([
+            "--output",
+            "compile_commands.json",
+            "--",
+            COMPILER_C_PATH,
+            "-x",
+            "c",
+            "-c",
+            fifo.to_str().unwrap(),
+            "-o",
+            "out.o",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut child = cmd.spawn().expect("failed to spawn bear");
+
+    // Give the compiler time to start and block on opening/reading the FIFO.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    // Send SIGTERM so Bear's signal forwarding path is exercised (unlike
+    // Child::kill() which sends SIGKILL and bypasses handlers).
+    let signal_time = Instant::now();
+    let pid = child.id().to_string();
+    let kill_status = std::process::Command::new("kill")
+        .arg("-TERM")
+        .arg(&pid)
+        .status()
+        .expect("kill -TERM command failed to run");
+    assert!(kill_status.success(), "kill -TERM reported failure");
+
+    let status = child.wait().expect("failed to wait for bear");
+    let elapsed = signal_time.elapsed();
+
+    assert!(!status.success(), "bear must report non-success after signal");
+    assert!(
+        elapsed.as_secs() < 2,
+        "bear must exit within ~1s of signal while the compiler was mid-compile, took {:?}",
+        elapsed
+    );
+
+    Ok(())
+}
+
 // Semantic mode exit code tests (note: this is now called 'semantic' not 'citnames')
 
 /// Test that semantic command returns 0 for valid input
