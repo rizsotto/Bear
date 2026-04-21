@@ -180,6 +180,7 @@ fn hardened_overwrite_bear_intercept() -> Result<()> {
 }
 
 /// HI-3: Build script that clears the entire environment with `env -i`.
+// Requirements: interception-preload-mechanism
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell, has_executable_env))]
@@ -493,6 +494,7 @@ int main() {{
 ///   This test covers the basic "chain of RTLD_NEXT" scenario only.
 ///
 /// See also HI-9 which tests the harder case: competing library + `env -i`.
+// Requirements: interception-preload-mechanism
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]

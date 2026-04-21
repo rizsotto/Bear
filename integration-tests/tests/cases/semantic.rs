@@ -412,6 +412,7 @@ fn semantic_malformed_events() -> Result<()> {
     Ok(())
 }
 
+// Requirements: output-compilation-entries
 #[test]
 #[cfg(all(has_executable_echo, has_executable_mkdir, has_executable_rm))]
 fn semantic_non_compilation_events() -> Result<()> {

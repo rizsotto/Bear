@@ -37,6 +37,7 @@ fn basic_command_interception() -> Result<()> {
 }
 
 /// Test shell command interception
+// Requirements: interception-preload-mechanism
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_echo, has_executable_shell))]
