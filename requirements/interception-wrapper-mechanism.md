@@ -1,9 +1,6 @@
 ---
 title: Wrapper-based command interception
 status: implemented
-tests:
-  - wrapper_based_interception
-  - wrapper_mode_resolves_cc_bare_name_via_path
 ---
 
 ## Intent

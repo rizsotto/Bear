@@ -12,6 +12,7 @@ use anyhow::Result;
 use encoding_rs;
 
 /// Test basic command interception with preload mechanism
+// Requirements: interception-preload-mechanism
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(has_executable_compiler_c)]
@@ -320,6 +321,7 @@ fn libtool_command_interception() -> Result<()> {
 }
 
 /// Test wrapper-based interception
+// Requirements: interception-wrapper-mechanism
 #[test]
 #[cfg(target_family = "unix")]
 #[cfg(all(has_executable_compiler_c, has_executable_echo))]
@@ -537,6 +539,7 @@ fn fakeroot_integration() -> Result<()> {
 /// ccache recursion (where the wrapper calls ccache which finds the wrapper
 /// again via PATH), we construct a PATH containing only the real compiler
 /// directory, excluding any ccache directories.
+// Requirements: interception-wrapper-mechanism
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn wrapper_mode_resolves_cc_bare_name_via_path() -> Result<()> {

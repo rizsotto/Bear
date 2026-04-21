@@ -1,9 +1,6 @@
 ---
 title: Append mode for compilation database
 status: implemented
-tests:
-  - append_works_as_expected
-  - without_append_output_is_overwritten
 ---
 
 ## Intent

@@ -68,6 +68,7 @@ fn exit_code_for_non_existing_command() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-signal-forwarding
 #[test]
 #[cfg(has_executable_true)]
 fn exit_code_for_true() -> Result<()> {
@@ -79,6 +80,7 @@ fn exit_code_for_true() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-signal-forwarding
 #[test]
 #[cfg(has_executable_false)]
 fn exit_code_for_false() -> Result<()> {
@@ -90,6 +92,7 @@ fn exit_code_for_false() -> Result<()> {
     Ok(())
 }
 
+// Requirements: interception-signal-forwarding
 #[test]
 #[cfg(has_executable_sleep)]
 fn exit_code_when_signaled() -> Result<()> {
@@ -125,6 +128,7 @@ fn exit_code_when_signaled() -> Result<()> {
 // Intercept mode exit code tests
 
 /// Test that intercept command returns 0 for successful interception
+// Requirements: interception-signal-forwarding
 #[test]
 #[cfg(has_executable_true)]
 fn intercept_exit_code_for_success() -> Result<()> {
@@ -136,6 +140,7 @@ fn intercept_exit_code_for_success() -> Result<()> {
 }
 
 /// Test that intercept command propagates command failure exit codes
+// Requirements: interception-signal-forwarding
 #[test]
 #[cfg(has_executable_false)]
 fn intercept_exit_code_for_failure() -> Result<()> {

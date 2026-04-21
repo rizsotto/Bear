@@ -1,9 +1,6 @@
 ---
 title: Path format for file and directory fields
 status: implemented
-tests:
-  - path_format_config
-  - simple_single_file_compilation
 ---
 
 ## Intent

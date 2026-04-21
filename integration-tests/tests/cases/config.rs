@@ -205,6 +205,7 @@ sources:
 
 /// Test path format configuration
 /// Verifies different path formatting options
+// Requirements: output-path-format
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
@@ -357,6 +358,7 @@ sources:
 
 /// Test duplicate filter configuration
 /// Verifies duplicate filtering options work
+// Requirements: output-duplicate-detection
 #[test]
 #[cfg(has_preload_library)]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]

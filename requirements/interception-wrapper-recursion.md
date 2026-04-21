@@ -1,7 +1,6 @@
 ---
 title: Prevent wrapper recursion with compiler wrappers
 status: proposed
-tests: []
 ---
 
 ## Problem

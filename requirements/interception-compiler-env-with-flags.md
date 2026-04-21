@@ -1,7 +1,6 @@
 ---
 title: Handle compiler env vars that contain flags
 status: proposed
-tests: []
 ---
 
 ## Problem

@@ -1,10 +1,6 @@
 ---
 title: Compilation entries from an intercepted invocation
 status: implemented
-tests:
-  - multiple_sources_single_command
-  - successful_build_multiple_sources
-  - simple_single_file_compilation
 ---
 
 ## Intent

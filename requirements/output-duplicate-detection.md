@@ -1,8 +1,6 @@
 ---
 title: Duplicate entry detection and filtering
 status: implemented
-tests:
-  - duplicate_filter_config
 ---
 
 ## Intent

@@ -13,6 +13,7 @@ use serde_json::Value;
 
 /// Test compilation with build script that calls compiler
 /// This generates events that the semantic analyzer can process
+// Requirements: output-json-compilation-database, output-compilation-entries, output-atomic-write, output-path-format
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn simple_single_file_compilation() -> Result<()> {
@@ -68,6 +69,7 @@ fn simple_single_file_compilation() -> Result<()> {
 
 /// Test successful build with multiple sources (C and C++)
 /// Verifies Bear handles mixed compilation units
+// Requirements: output-json-compilation-database, output-compilation-entries
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_compiler_cxx, has_executable_shell))]
 fn successful_build_multiple_sources() -> Result<()> {
@@ -160,6 +162,7 @@ fn successful_build_multiple_sources() -> Result<()> {
 }
 
 /// Test output is overwritten when no append flag
+// Requirements: output-append
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn without_append_output_is_overwritten() -> Result<()> {
@@ -210,6 +213,7 @@ fn without_append_output_is_overwritten() -> Result<()> {
 }
 
 /// Test append functionality
+// Requirements: output-append
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn append_works_as_expected() -> Result<()> {
@@ -262,6 +266,7 @@ fn append_works_as_expected() -> Result<()> {
 
 /// Test build with compilation failures - should still generate partial database
 /// Verifies Bear can handle partial build failures
+// Requirements: output-json-compilation-database
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn broken_build_partial_success() -> Result<()> {
@@ -331,6 +336,7 @@ fn broken_build_partial_success() -> Result<()> {
 
 /// Test empty build - should generate empty compilation database
 /// Verifies Bear handles builds with no compilation commands
+// Requirements: output-json-compilation-database
 #[test]
 #[cfg(all(has_executable_true, has_executable_shell, has_executable_echo))]
 fn empty_build_generates_empty_database() -> Result<()> {
@@ -359,6 +365,7 @@ fn empty_build_generates_empty_database() -> Result<()> {
 
 /// Test compilation with multiple source files using single command
 /// Verifies Bear handles batch compilation commands
+// Requirements: output-json-compilation-database, output-compilation-entries
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn multiple_sources_single_command() -> Result<()> {

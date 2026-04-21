@@ -1,7 +1,6 @@
 ---
 title: Source directory filtering
 status: implemented
-tests: []
 ---
 
 ## Intent

@@ -1,12 +1,6 @@
 ---
 title: JSON compilation database output
 status: implemented
-tests:
-  - simple_single_file_compilation
-  - successful_build_multiple_sources
-  - empty_build_generates_empty_database
-  - multiple_sources_single_command
-  - broken_build_partial_success
 ---
 
 ## Intent

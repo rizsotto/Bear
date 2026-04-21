@@ -1,8 +1,6 @@
 ---
 title: Atomic file write for compilation database
 status: implemented
-tests:
-  - simple_single_file_compilation
 ---
 
 ## Intent

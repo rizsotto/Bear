@@ -1,12 +1,6 @@
 ---
 title: Signal forwarding and exit-code propagation
 status: implemented
-tests:
-  - exit_code_when_signaled
-  - exit_code_for_true
-  - exit_code_for_false
-  - intercept_exit_code_for_success
-  - intercept_exit_code_for_failure
 ---
 
 ## Intent
