@@ -640,3 +640,114 @@ fn msvc_wv_optional_version_is_preserved() -> Result<()> {
 
     Ok(())
 }
+
+/// Companion to `msvc_per_warning_options_preserve_separated_value`: the fix
+/// switched /wd, /we, /wo from `FlagPattern::Prefix` to
+/// `FlagPattern::ExactlyWithGluedOrSep`, so the glued path now runs through
+/// different generated code than before. Lock the glued form behavior so a
+/// future refactor of the pattern types cannot silently regress the common
+/// cl.exe spelling (/wd4995, /w34326).
+#[test]
+fn msvc_per_warning_options_preserve_glued_value() -> Result<()> {
+    let env = TestEnvironment::new("msvc_per_warning_options_glued")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "cl.exe";
+
+    let event = json!({
+        "pid": 1,
+        "execution": {
+            "executable": cl,
+            "arguments": [
+                cl,
+                "/w14100", "/w24101", "/w34102", "/w44103",
+                "/wd4995", "/we4996", "/wo4819",
+                "/c", "test.c",
+            ],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("test.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(),
+            "/w14100".to_string(), "/w24101".to_string(), "/w34102".to_string(), "/w44103".to_string(),
+            "/wd4995".to_string(), "/we4996".to_string(), "/wo4819".to_string(),
+            "/c".to_string(),
+            "test.c".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
+
+/// `clang_cl.yaml` inherits the per-warning rules via `extends: msvc`. The
+/// bear-codegen snapshot proves the generated flag array is correct, but does
+/// not exercise the runtime matcher. This test drives the `semantic` subcommand
+/// with a clang-cl executable and a mix of glued / separated / colon forms to
+/// confirm the inheritance is effective end-to-end.
+#[test]
+fn clang_cl_inherits_msvc_per_warning_options() -> Result<()> {
+    let env = TestEnvironment::new("clang_cl_inherits_msvc_per_warning")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let cl = "clang-cl.exe";
+
+    let event = json!({
+        "pid": 1,
+        "execution": {
+            "executable": cl,
+            "arguments": [
+                cl,
+                "/wd4995",
+                "/we", "4996",
+                "/w3", "4102",
+                "/w44103",
+                "/Wv:17",
+                "/c", "test.c",
+            ],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("test.c", "int main(void) { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    db.assert_contains(&compilation_entry!(
+        file: "test.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            cl.to_string(),
+            "/wd4995".to_string(),
+            "/we".to_string(), "4996".to_string(),
+            "/w3".to_string(), "4102".to_string(),
+            "/w44103".to_string(),
+            "/Wv:17".to_string(),
+            "/c".to_string(),
+            "test.c".to_string(),
+        ]
+    ))?;
+
+    Ok(())
+}
