@@ -203,6 +203,91 @@ sources:
     Ok(())
 }
 
+/// Test source directory filter with include/exclude rules.
+/// Verifies last-match-wins semantics and default-include behavior end-to-end
+/// through the YAML config -> output pipeline path.
+// Requirements: output-source-directory-filter
+#[test]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn source_directory_filter_config() -> Result<()> {
+    let env = TestEnvironment::new("source_directory_filter")?;
+
+    // Four files across three directories: one top-level matched by `include src`,
+    // one excluded by `exclude src/test`, one re-included by a more specific
+    // `include src/test/integration` (last-match-wins), and one outside any rule
+    // (default include).
+    env.create_source_files(&[
+        ("src/main.c", "int main() { return 0; }"),
+        ("src/test/unit.c", "int unit() { return 0; }"),
+        ("src/test/integration/api.c", "int api() { return 0; }"),
+        ("lib/util.c", "int util() { return 0; }"),
+    ])?;
+
+    let build_commands = [
+        format!("{} -c src/main.c -o src/main.o", COMPILER_C_PATH),
+        format!("{} -c src/test/unit.c -o src/test/unit.o", COMPILER_C_PATH),
+        format!("{} -c src/test/integration/api.c -o src/test/integration/api.o", COMPILER_C_PATH),
+        format!("{} -c lib/util.c -o lib/util.o", COMPILER_C_PATH),
+    ]
+    .join("\n");
+    let script_path = env.create_shell_script("build.sh", &build_commands)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+sources:
+  directories:
+    - path: src
+      action: include
+    - path: src/test
+      action: exclude
+    - path: src/test/integration
+      action: include
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script_path.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    // Should contain: src/main.c (include), src/test/integration/api.c (re-included
+    // by the more specific rule), lib/util.c (default include).
+    db.assert_contains(&CompilationEntryMatcher::new().file("src/main.c"))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src/test/integration/api.c"))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("lib/util.c"))?;
+
+    // Must NOT contain src/test/unit.c - excluded by `exclude src/test`.
+    let excluded = db
+        .entries()
+        .iter()
+        .any(|entry| entry.get("file").and_then(|v| v.as_str()) == Some("src/test/unit.c"));
+    assert!(!excluded, "src/test/unit.c should have been excluded by `exclude src/test` rule");
+
+    Ok(())
+}
+
 /// Test path format configuration
 /// Verifies different path formatting options
 // Requirements: output-path-format

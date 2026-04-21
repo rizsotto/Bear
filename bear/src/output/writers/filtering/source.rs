@@ -86,6 +86,7 @@ impl From<SourceFilter> for SourceEntryFilter {
     }
 }
 
+// Requirements: output-source-directory-filter
 #[cfg(test)]
 mod tests {
     use super::*;
