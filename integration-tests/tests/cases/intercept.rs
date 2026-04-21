@@ -321,6 +321,160 @@ fn libtool_command_interception() -> Result<()> {
     Ok(())
 }
 
+/// Build a PATH that excludes ccache directories and resolve the bare
+/// compiler name within it. Without this, wrapper mode on a ccache-equipped
+/// host recurses: `.bear/gcc` -> ccache -> PATH lookup for `gcc` -> `.bear/gcc`.
+/// Same workaround used by `wrapper_mode_resolves_cc_bare_name_via_path`.
+#[cfg(target_family = "unix")]
+fn ccache_free_path_and_compiler() -> (std::ffi::OsString, std::path::PathBuf) {
+    let safe_path = std::env::join_paths(
+        std::env::split_paths(&std::env::var("PATH").unwrap_or_default())
+            .filter(|p| !p.to_string_lossy().contains("ccache")),
+    )
+    .expect("failed to join PATH");
+    let compiler_filename = filename_of(COMPILER_C_PATH);
+    let real_compiler =
+        which::which_in(&compiler_filename, Some(&safe_path), std::env::current_dir().unwrap())
+            .unwrap_or_else(|_| std::path::PathBuf::from(COMPILER_C_PATH));
+    (safe_path, real_compiler)
+}
+
+/// In wrapper mode, Bear creates a deterministic `.bear/` directory in the
+/// working directory during the build and removes it automatically on exit.
+/// Verify both: the build observes `.bear/` while it runs, and after Bear
+/// returns the directory is gone.
+// Requirements: interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_creates_and_cleans_up_bear_directory() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_bear_dir_cleanup")?;
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let (safe_path, real_compiler) = ccache_free_path_and_compiler();
+
+    // Build script records whether `.bear/` was present during the build,
+    // then invokes the compiler via $CC so the wrapper is exercised.
+    let build = r#"if [ -d .bear ]; then echo present > bear_dir_status.txt; else echo missing > bear_dir_status.txt; fi
+$CC -c test.c -o test.o
+"#;
+    let script = env.create_shell_script("build.sh", build)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+
+compilers:
+  - path: {}
+"#,
+        real_compiler.to_str().unwrap()
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).env("PATH", &safe_path).args([
+        "--config",
+        config_path.to_str().unwrap(),
+        "--output",
+        "compile_commands.json",
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ]);
+    let output = cmd.output()?;
+    assert!(
+        output.status.success(),
+        "bear failed: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let status = env.read_file("bear_dir_status.txt")?;
+    assert_eq!(status.trim(), "present", "expected .bear/ to exist during the build, got {status:?}");
+
+    let bear_dir = env.test_dir().join(".bear");
+    assert!(
+        !bear_dir.exists(),
+        ".bear/ must be cleaned up after Bear exits but still present at {bear_dir:?}"
+    );
+
+    Ok(())
+}
+
+/// Two back-to-back wrapper-mode runs in the same working directory must each
+/// create `.bear/` (deterministic name, not a random temp dir) and clean it
+/// up. This matches the "deterministic directory" guarantee so that paths
+/// recorded during `./configure` survive when a follow-on step re-runs Bear.
+// Requirements: interception-wrapper-mechanism
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_bear_directory_is_deterministic_across_runs() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_bear_dir_deterministic")?;
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let (safe_path, real_compiler) = ccache_free_path_and_compiler();
+
+    let build = r#"ls -d .bear >> bear_dir_observed.txt 2>/dev/null || echo missing >> bear_dir_observed.txt
+$CC -c test.c -o test.o
+"#;
+    let script = env.create_shell_script("build.sh", build)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+
+compilers:
+  - path: {}
+"#,
+        real_compiler.to_str().unwrap()
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    for _ in 0..2 {
+        let mut cmd = env.command_bear();
+        cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).env("PATH", &safe_path).args(
+            [
+                "--config",
+                config_path.to_str().unwrap(),
+                "--output",
+                "compile_commands.json",
+                "--",
+                SHELL_PATH,
+                script.to_str().unwrap(),
+            ],
+        );
+        let output = cmd.output()?;
+        assert!(
+            output.status.success(),
+            "bear failed on iteration: stdout={}\nstderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!env.test_dir().join(".bear").exists(), ".bear/ must be cleaned up after each Bear run");
+    }
+
+    // Each run logged a line with the observed directory. Both lines must be
+    // the deterministic `.bear/` form (no random temp dir), confirming the
+    // name is stable across invocations.
+    let observed = env.read_file("bear_dir_observed.txt")?;
+    let lines: Vec<&str> = observed.lines().collect();
+    assert_eq!(lines.len(), 2, "expected two observation lines, got {observed:?}");
+    for line in &lines {
+        assert_eq!(*line, ".bear", "wrapper directory must be the deterministic `.bear`, got {line:?}");
+    }
+
+    Ok(())
+}
+
 /// Test wrapper-based interception
 // Requirements: interception-wrapper-mechanism
 #[test]
