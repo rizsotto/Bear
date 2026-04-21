@@ -360,6 +360,190 @@ sources:
     Ok(())
 }
 
+/// With `file: canonical`, symlinked source paths are written as the resolved
+/// real path (symlinks followed).
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn canonical_path_format_resolves_symlinks() -> Result<()> {
+    use std::os::unix::fs::symlink;
+
+    let env = TestEnvironment::new("canonical_symlinks")?;
+
+    // Real source under real/; src/ is a symlink pointing at real/. Compiling
+    // via src/main.c records "src/main.c" in the event, which canonical must
+    // resolve back to .../real/main.c.
+    env.create_source_files(&[("real/main.c", "int main() { return 0; }")])?;
+    symlink(env.test_dir().join("real"), env.test_dir().join("src"))?;
+
+    let build = format!("{} -c src/main.c -o src/main.o", COMPILER_C_PATH);
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+format:
+  paths:
+    directory: canonical
+    file: canonical
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let file = db
+        .entries()
+        .first()
+        .and_then(|e| e.get("file").and_then(|v| v.as_str()))
+        .expect("expected at least one entry")
+        .to_string();
+
+    assert!(
+        file.ends_with("/real/main.c"),
+        "canonical file field must resolve symlinks; got {file}, expected path ending with /real/main.c"
+    );
+    assert!(
+        !file.contains("/src/"),
+        "canonical file field must not contain the symlink segment /src/; got {file}"
+    );
+
+    Ok(())
+}
+
+/// With `directory: absolute` and `file: relative`, an absolute source path
+/// observed at interception is rewritten relative to the (formatted) directory.
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn relative_file_format_is_relative_to_directory() -> Result<()> {
+    let env = TestEnvironment::new("relative_file_format")?;
+
+    env.create_source_files(&[("src/main.c", "int main() { return 0; }")])?;
+
+    // Compile using an absolute source path so the intercepted event records
+    // the absolute form; `file: relative` must then rewrite it to src/main.c.
+    let build = format!(r#"{} -c "$(pwd)/src/main.c" -o src/main.o"#, COMPILER_C_PATH);
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+format:
+  paths:
+    directory: absolute
+    file: relative
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let entry = db.entries().first().expect("expected at least one entry");
+    let file = entry.get("file").and_then(|v| v.as_str()).unwrap_or("");
+    let directory = entry.get("directory").and_then(|v| v.as_str()).unwrap_or("");
+
+    assert_eq!(file, "src/main.c", "file must be relative to directory, got {file:?}");
+    assert!(std::path::Path::new(directory).is_absolute(), "directory must be absolute, got {directory:?}");
+
+    Ok(())
+}
+
+/// With `file: canonical` and a source that does not exist at output-write
+/// time, Bear must not drop the entry: it falls back to the unformatted path
+/// (and logs a warning). Exercised via the `semantic` subcommand so we can
+/// feed a hand-crafted event referencing a ghost source.
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+fn canonical_file_format_falls_back_for_missing_source() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("canonical_missing_fallback")?;
+
+    // Working dir exists (so directory canonicalization succeeds and the entry
+    // is kept); the source file does not exist, so file canonicalization must
+    // fall back to the unformatted path.
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+    let event = json!({
+        "pid": 12345,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "ghost.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+
+    let config = r#"
+schema: "4.1"
+
+format:
+  paths:
+    directory: canonical
+    file: canonical
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let file = db
+        .entries()
+        .first()
+        .and_then(|e| e.get("file").and_then(|v| v.as_str()))
+        .expect("entry must survive the canonical-file fallback");
+    assert_eq!(file, "ghost.c", "file field must fall back to the unformatted path; got {file:?}");
+
+    Ok(())
+}
+
 /// Test invalid configuration handling
 /// Verifies Bear handles invalid config gracefully
 #[test]
