@@ -677,3 +677,284 @@ sources:
 
     Ok(())
 }
+
+/// With `match_on: [file]`, two entries for the same file with different flags
+/// collapse to one (the first).
+// Requirements: output-duplicate-detection
+#[test]
+#[cfg(target_family = "unix")]
+fn duplicate_match_on_file_alone_collapses_flag_variants() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("dup_match_file")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event1 = json!({
+        "pid": 1001,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "-O2", "test.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    let event2 = json!({
+        "pid": 1002,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "-O3", "test.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    let events_content = format!("{}\n{}", event1, event2);
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
+
+    let config = r#"
+schema: "4.1"
+
+duplicates:
+  match_on: [file]
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    // First-occurrence wins: -O2 is kept, -O3 is dropped.
+    let entry = db.entries().first().expect("one entry expected");
+    let args: Vec<String> = entry
+        .get("arguments")
+        .and_then(|v| v.as_array())
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .map(String::from)
+        .collect();
+    assert!(args.iter().any(|a| a == "-O2"), "first-occurrence entry must carry -O2, got {:?}", args);
+    assert!(!args.iter().any(|a| a == "-O3"), "second-occurrence -O3 entry must be dropped, got {:?}", args);
+
+    Ok(())
+}
+
+/// With `match_on: [file, output]`, the same source compiled to different
+/// output paths yields two entries (different output means not a duplicate).
+// Requirements: output-duplicate-detection
+#[test]
+#[cfg(target_family = "unix")]
+fn duplicate_match_on_file_and_output_preserves_differing_outputs() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("dup_match_file_output")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event1 = json!({
+        "pid": 2001,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "test.c", "-o", "debug/test.o"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    let event2 = json!({
+        "pid": 2002,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "test.c", "-o", "release/test.o"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    let events_content = format!("{}\n{}", event1, event2);
+    env.create_source_files(&[("events.json", &events_content), ("test.c", "int main() { return 0; }")])?;
+
+    let config = r#"
+schema: "4.1"
+
+duplicates:
+  match_on: [file, output]
+
+format:
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(2)?;
+
+    Ok(())
+}
+
+/// Configuration validation must reject `match_on` that contains both
+/// `command` and `arguments` (they are alternative representations of the
+/// same data).
+// Requirements: output-duplicate-detection
+#[test]
+fn duplicate_match_on_command_and_arguments_is_rejected() -> Result<()> {
+    let env = TestEnvironment::new("dup_match_conflict")?;
+
+    let config = r#"
+schema: "4.1"
+
+duplicates:
+  match_on: [command, arguments]
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    let output = env.run_bear(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+    assert!(output.exit_code() != Some(0), "config with conflicting match_on must be rejected");
+
+    Ok(())
+}
+
+/// Configuration validation must reject an empty `match_on` list.
+// Requirements: output-duplicate-detection
+#[test]
+fn duplicate_match_on_empty_is_rejected() -> Result<()> {
+    let env = TestEnvironment::new("dup_match_empty")?;
+
+    let config = r#"
+schema: "4.1"
+
+duplicates:
+  match_on: []
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    let output = env.run_bear(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+    assert!(output.exit_code() != Some(0), "config with empty match_on must be rejected");
+
+    Ok(())
+}
+
+/// In append mode, the original entry from the existing compilation database
+/// wins over a new entry that matches on the configured fields: the original
+/// arguments survive, the new ones are dropped.
+// Requirements: output-duplicate-detection, output-append
+#[test]
+#[cfg(target_family = "unix")]
+fn duplicate_append_mode_preserves_original_entry() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("dup_append_priority")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    // First run builds the existing database with -O2.
+    let first_event = json!({
+        "pid": 3001,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "-O2", "test.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    env.create_source_files(&[
+        ("events1.json", &first_event.to_string()),
+        ("test.c", "int main() { return 0; }"),
+    ])?;
+
+    // match_on deliberately excludes arguments: same file+directory = duplicate.
+    let config = r#"
+schema: "4.1"
+
+duplicates:
+  match_on: [file, directory]
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events1.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    // Second run tries to add a new entry for the same file with -O3. The
+    // append-mode guarantee: the original -O2 entry wins.
+    let second_event = json!({
+        "pid": 3002,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "-O3", "test.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    std::fs::write(env.test_dir().join("events2.json"), second_event.to_string())?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--append",
+        "--input",
+        "events2.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    let args: Vec<String> = db
+        .entries()
+        .first()
+        .and_then(|e| e.get("arguments"))
+        .and_then(|v| v.as_array())
+        .unwrap()
+        .iter()
+        .filter_map(|v| v.as_str())
+        .map(String::from)
+        .collect();
+    assert!(args.iter().any(|a| a == "-O2"), "original -O2 entry must survive, got {:?}", args);
+    assert!(!args.iter().any(|a| a == "-O3"), "new -O3 entry must be dropped, got {:?}", args);
+
+    Ok(())
+}
