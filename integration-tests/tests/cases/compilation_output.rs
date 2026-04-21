@@ -6,7 +6,9 @@
 //! for various build scenarios, ported from the Python/lit test suite.
 
 use crate::fixtures::constants::*;
-use crate::fixtures::infrastructure::{TestEnvironment, compilation_entry, filename_of};
+use crate::fixtures::infrastructure::{
+    CompilationEntryMatcher, TestEnvironment, compilation_entry, filename_of,
+};
 use anyhow::Result;
 #[cfg(target_family = "unix")]
 use serde_json::Value;
@@ -533,6 +535,236 @@ fn env_c_include_path_produces_isystem_flags() -> Result<()> {
         "Expected '-isystem /test/sys_include' from C_INCLUDE_PATH in: {:?}",
         args
     );
+
+    Ok(())
+}
+
+/// Given cc -o a.out src1.c src2.c src3.c (compile-and-link in one invocation),
+/// one compile entry is produced per source and no entry describes the link
+/// output a.out.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn compile_and_link_split_produces_compile_entries() -> Result<()> {
+    let env = TestEnvironment::new("compile_and_link_split")?;
+
+    env.create_source_files(&[
+        ("src1.c", "int f1(void) { return 1; }"),
+        ("src2.c", "int f2(void) { return 2; }"),
+        ("src3.c", "int main(void) { return 0; }"),
+    ])?;
+
+    let build = format!("{} -o a.out src1.c src2.c src3.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src1.c"))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src2.c"))?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("src3.c"))?;
+
+    let has_linker_output =
+        db.entries().iter().any(|e| e.get("file").and_then(Value::as_str) == Some("a.out"));
+    assert!(!has_linker_output, "link output a.out must not appear as a source entry");
+
+    Ok(())
+}
+
+/// Given cc -o a.out src.o (pure link of a pre-built object file), no entry
+/// is produced for this invocation.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn pure_link_invocation_produces_no_entries() -> Result<()> {
+    let env = TestEnvironment::new("pure_link_no_entries")?;
+
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    // Pre-build src.o outside of Bear so only the link step is captured.
+    let prep = format!("{} -c src.c -o src.o", filename_of(COMPILER_C_PATH));
+    let prep_script = env.create_shell_script("prep.sh", &prep)?;
+    let status = std::process::Command::new(SHELL_PATH)
+        .arg(prep_script.to_str().unwrap())
+        .current_dir(env.test_dir())
+        .status()?;
+    assert!(status.success(), "setup compile step failed");
+
+    // Now capture only the pure-link invocation.
+    let link = format!("{} -o a.out src.o", filename_of(COMPILER_C_PATH));
+    let link_script = env.create_shell_script("link.sh", &link)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, link_script.to_str().unwrap()])?;
+
+    let content = env.read_file("compile_commands.json")?;
+    assert_eq!(content.trim(), "[]", "pure-link invocation must produce zero entries");
+
+    Ok(())
+}
+
+/// Given cc -o a.out -lm -O2 src.c, the resulting compile entry preserves -O2
+/// but drops the link-only -lm flag.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn link_only_flags_are_stripped_from_entries() -> Result<()> {
+    let env = TestEnvironment::new("link_only_flags_stripped")?;
+
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+
+    let build = format!("{} -o a.out -lm -O2 src.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let entry = db
+        .entries()
+        .iter()
+        .find(|e| e.get("file").and_then(Value::as_str) == Some("src.c"))
+        .expect("expected a compile entry for src.c");
+    let args = get_arguments(entry);
+
+    assert!(args.iter().any(|a| a == "-O2"), "compile flag -O2 must be preserved, got {:?}", args);
+    assert!(!args.iter().any(|a| a == "-lm"), "link-only flag -lm must be stripped, got {:?}", args);
+
+    Ok(())
+}
+
+/// Given cc -I first -I second -DFOO -DBAR -c src.c, the entry preserves the
+/// original relative order of flags (consumers depend on it for include search
+/// order and macro overrides).
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn argument_order_is_preserved_in_entries() -> Result<()> {
+    let env = TestEnvironment::new("argument_order_preserved")?;
+
+    env.create_source_files(&[("src.c", "int main(void) { return 0; }")])?;
+    std::fs::create_dir_all(env.test_dir().join("first"))?;
+    std::fs::create_dir_all(env.test_dir().join("second"))?;
+
+    let build = format!("{} -I first -I second -DFOO -DBAR -c src.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    let entry = db
+        .entries()
+        .iter()
+        .find(|e| e.get("file").and_then(Value::as_str) == Some("src.c"))
+        .expect("expected a compile entry for src.c");
+    let args = get_arguments(entry);
+
+    let pos = |needle: &str| args.iter().position(|a| a == needle);
+    let first = pos("first").expect("missing include path 'first'");
+    let second = pos("second").expect("missing include path 'second'");
+    let foo = pos("-DFOO").expect("missing -DFOO");
+    let bar = pos("-DBAR").expect("missing -DBAR");
+
+    assert!(first < second, "'-I first' must precede '-I second', got {:?}", args);
+    assert!(foo < bar, "'-DFOO' must precede '-DBAR', got {:?}", args);
+
+    Ok(())
+}
+
+/// Given cc --version (info-only invocation), no entry is produced.
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn info_only_invocation_produces_no_entries() -> Result<()> {
+    let env = TestEnvironment::new("info_only_no_entries")?;
+
+    let build = format!("{} --version", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    env.run_bear(&["--output", "compile_commands.json", "--", SHELL_PATH, script.to_str().unwrap()])?;
+
+    let content = env.read_file("compile_commands.json")?;
+    assert_eq!(content.trim(), "[]", "info-only invocation must produce zero entries");
+
+    Ok(())
+}
+
+/// Given cc -o a.out src1.c src2.c with the output field enabled via
+/// configuration, every resulting entry records output = a.out (the known
+/// limitation: the single -o value is copied verbatim, not inferred per
+/// source).
+// Requirements: output-compilation-entries
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(has_preload_library)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn output_field_is_recorded_when_enabled() -> Result<()> {
+    let env = TestEnvironment::new("output_field_enabled")?;
+
+    env.create_source_files(&[
+        ("src1.c", "int f1(void) { return 1; }"),
+        ("src2.c", "int main(void) { return 0; }"),
+    ])?;
+
+    let build = format!("{} -o a.out src1.c src2.c", filename_of(COMPILER_C_PATH));
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    let config = format!(
+        r#"
+schema: "4.1"
+
+intercept:
+  mode: preload
+  path: "{preload}"
+
+format:
+  paths:
+    directory: as-is
+    file: as-is
+  entries:
+    use_array_format: true
+    include_output_field: true
+"#,
+        preload = PRELOAD_LIBRARY_PATH
+    );
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear(&[
+        "--output",
+        "compile_commands.json",
+        "--config",
+        config_path.to_str().unwrap(),
+        "--",
+        SHELL_PATH,
+        script.to_str().unwrap(),
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+
+    // Every entry from this invocation must record output = a.out.
+    let compile_entries: Vec<_> = db
+        .entries()
+        .iter()
+        .filter(|e| {
+            let file = e.get("file").and_then(Value::as_str).unwrap_or("");
+            file == "src1.c" || file == "src2.c"
+        })
+        .collect();
+    assert!(!compile_entries.is_empty(), "expected compile entries for src1.c / src2.c");
+    for entry in compile_entries {
+        let output = entry.get("output").and_then(Value::as_str);
+        assert_eq!(
+            output,
+            Some("a.out"),
+            "entry {:?} must have output = a.out, got {:?}",
+            entry.get("file"),
+            output
+        );
+    }
 
     Ok(())
 }
