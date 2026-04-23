@@ -544,6 +544,118 @@ format:
     Ok(())
 }
 
+/// Reproduces GitHub issue #692: with `directory: relative`, the working
+/// directory resolves relative to itself and produces an empty path, which
+/// fails entry validation and aborts the output pipeline. The symptom the
+/// reporter saw was repeated "sending on a disconnected channel" errors and
+/// no compilation database being written.
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+fn relative_directory_format_does_not_break_pipeline() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("relative_directory_format")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "pid": 9001,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
+
+    let config = r#"
+schema: "4.1"
+
+format:
+  paths:
+    directory: relative
+    file: relative
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    let entry = db.entries().first().expect("expected at least one entry");
+    let directory = entry.get("directory").and_then(|v| v.as_str()).unwrap_or("");
+    assert!(!directory.is_empty(), "directory field must not be empty; got {directory:?}");
+
+    Ok(())
+}
+
+/// Companion to `relative_directory_format_does_not_break_pipeline`: with
+/// only `directory: relative` (and `file: as-is`) the output pipeline
+/// succeeds too. Isolates the regression guard to the `directory` axis --
+/// when issue #692 was open, this config reproduced the bug independently
+/// of the `file` setting.
+// Requirements: output-path-format
+#[test]
+#[cfg(target_family = "unix")]
+fn relative_directory_alone_does_not_break_pipeline() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("relative_directory_alone")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "pid": 9101,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+            "working_dir": temp_dir,
+            "environment": {}
+        }
+    });
+    env.create_source_files(&[("events.json", &event.to_string()), ("main.c", "int main() { return 0; }")])?;
+
+    let config = r#"
+schema: "4.1"
+
+format:
+  paths:
+    directory: relative
+    file: as-is
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    env.run_bear_success(&[
+        "--config",
+        config_path.to_str().unwrap(),
+        "semantic",
+        "--input",
+        "events.json",
+        "--output",
+        "compile_commands.json",
+    ])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    let entry = db.entries().first().expect("expected at least one entry");
+    let directory = entry.get("directory").and_then(|v| v.as_str()).unwrap_or("");
+    assert!(!directory.is_empty(), "directory field must not be empty; got {directory:?}");
+
+    Ok(())
+}
+
 /// Test invalid configuration handling
 /// Verifies Bear handles invalid config gracefully
 #[test]

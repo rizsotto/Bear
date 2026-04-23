@@ -166,6 +166,14 @@ fn relative_to(root: &Path, path: &Path) -> Result<PathBuf, FormatError> {
         }
     }
 
+    // When root and path are identical, the component walk leaves `result`
+    // empty. An empty path is not a valid JSON compilation database value
+    // (it fails entry validation downstream), so emit the POSIX "same
+    // directory" form instead.
+    if result.as_os_str().is_empty() {
+        result.push(std::path::Component::CurDir);
+    }
+
     Ok(result)
 }
 
@@ -298,6 +306,23 @@ mod tests {
         let resolver = PathResolver::Relative;
         let result = resolver.resolve(&temp_path, &file_path).unwrap();
         assert_eq!(result, PathBuf::from("test.txt"));
+    }
+
+    #[test]
+    fn test_relative_to_same_path_returns_curdir() {
+        // Regression test for GitHub issue #692: `directory: relative` calls
+        // relative_to(working_dir, working_dir); the component walk produces
+        // no remaining components and must yield "." rather than an empty
+        // path (an empty directory field fails Entry::validate).
+        let temp_dir = tempdir().unwrap();
+        let temp_path = temp_dir.path().canonicalize().unwrap();
+
+        let result = relative_to(&temp_path, &temp_path).unwrap();
+        assert_eq!(result, PathBuf::from("."));
+
+        let resolver = PathResolver::Relative;
+        let via_resolver = resolver.resolve(&temp_path, &temp_path).unwrap();
+        assert_eq!(via_resolver, PathBuf::from("."));
     }
 
     #[test]
