@@ -59,6 +59,18 @@ impl OutputWriter {
         // Log pipeline statistics
         log::info!("{}", self.stats);
 
+        // If every candidate entry was dropped by validation, surface that
+        // at ERROR level so the empty compilation database is never silent.
+        // The per-entry WARN logs from the validator explain individual
+        // drops; this one explains the shape of the whole output.
+        let written = self.stats.entries_written.load(std::sync::atomic::Ordering::Relaxed);
+        let dropped = self.stats.entries_dropped_invalid.load(std::sync::atomic::Ordering::Relaxed);
+        if written == 0 && dropped > 0 {
+            log::error!(
+                "Compilation database is empty: all {dropped} candidate entries were dropped due to validation failures; see WARN log lines above for per-entry reasons",
+            );
+        }
+
         result
     }
 

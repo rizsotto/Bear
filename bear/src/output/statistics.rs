@@ -29,6 +29,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// - **AppendClangOutputWriter**: `entries_read_from_existing`
 /// - **UniqueOutputWriter**: `duplicates_detected`
 /// - **SourceFilterOutputWriter**: `entries_filtered_by_source`
+/// - **ValidatingOutputWriter**: `entries_dropped_invalid`
 /// - **ClangOutputWriter**: `entries_written`
 #[derive(Debug, Default)]
 pub struct OutputStatistics {
@@ -46,6 +47,9 @@ pub struct OutputStatistics {
 
     /// Number of entries filtered out based on source file location rules.
     pub entries_filtered_by_source: AtomicUsize,
+
+    /// Number of entries dropped because they failed validation before serialization.
+    pub entries_dropped_invalid: AtomicUsize,
 
     /// Total number of entries written to the final output file.
     pub entries_written: AtomicUsize,
@@ -65,6 +69,7 @@ impl fmt::Display for OutputStatistics {
         let from_existing = self.entries_read_from_existing.load(Ordering::Relaxed);
         let duplicates = self.duplicates_detected.load(Ordering::Relaxed);
         let filtered = self.entries_filtered_by_source.load(Ordering::Relaxed);
+        let dropped_invalid = self.entries_dropped_invalid.load(Ordering::Relaxed);
         let written = self.entries_written.load(Ordering::Relaxed);
 
         writeln!(f, "Output pipeline:")?;
@@ -73,6 +78,7 @@ impl fmt::Display for OutputStatistics {
         writeln!(f, "  previous entries: {}", from_existing)?;
         writeln!(f, "  filtered entries by duplicate: {}", duplicates)?;
         writeln!(f, "  filtered entries by source: {}", filtered)?;
+        writeln!(f, "  dropped entries (invalid): {}", dropped_invalid)?;
         write!(f, "  total entries written: {}", written)
     }
 }
@@ -96,6 +102,7 @@ mod tests {
         stats.entries_read_from_existing.store(5, Ordering::Relaxed);
         stats.duplicates_detected.store(3, Ordering::Relaxed);
         stats.entries_filtered_by_source.store(2, Ordering::Relaxed);
+        stats.entries_dropped_invalid.store(1, Ordering::Relaxed);
         stats.entries_written.store(10, Ordering::Relaxed);
 
         let output = format!("{}", stats);
@@ -105,6 +112,7 @@ mod tests {
         assert!(output.contains("previous entries: 5"));
         assert!(output.contains("filtered entries by duplicate: 3"));
         assert!(output.contains("filtered entries by source: 2"));
+        assert!(output.contains("dropped entries (invalid): 1"));
         assert!(output.contains("total entries written: 10"));
     }
 

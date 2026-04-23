@@ -174,8 +174,13 @@ mod impls {
             for event in self.source.events() {
                 match event {
                     Ok(event) => {
-                        if let Err(error) = destination.send(event) {
-                            log::error!("Failed to forward event: {error}");
+                        // A disconnected destination means the consumer finished
+                        // (normal shutdown) or failed (already logged upstream).
+                        // Break out quietly rather than spamming an error line
+                        // per remaining intercepted event.
+                        if destination.send(event).is_err() {
+                            log::debug!("Consumer channel closed; stopping event forwarding");
+                            break;
                         }
                     }
                     Err(error) => {
@@ -231,8 +236,9 @@ mod impls {
             });
 
             for event in events {
-                if let Err(error) = destination.send(event) {
-                    log::error!("Failed to forward event: {error}");
+                if destination.send(event).is_err() {
+                    log::debug!("Consumer channel closed; stopping event forwarding");
+                    break;
                 }
             }
 

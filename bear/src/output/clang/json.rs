@@ -19,22 +19,18 @@ use serde::ser::{Serialize, SerializeSeq};
 
 /// Serialize entries from an iterator into a JSON array.
 ///
-/// The iterator must yield `Result<T, E>` where `T` is the type to be serialized
-/// and `E` is the error type. If an error occurs during serialization,
-/// the function will return that error.
-pub fn serialize_result_seq<W, T, E>(writer: W, entries: impl Iterator<Item = Result<T, E>>) -> Result<(), E>
+/// The caller is responsible for ensuring entries are already valid for the
+/// target format. Returns a `serde_json::Error` if JSON emission itself
+/// fails (I/O or encoding errors).
+pub fn serialize_seq<W, T>(writer: W, entries: impl Iterator<Item = T>) -> Result<(), serde_json::Error>
 where
     W: io::Write,
     T: Serialize,
-    E: std::error::Error + From<serde_json::Error>,
 {
     let mut ser = serde_json::Serializer::pretty(writer);
     let mut seq = ser.serialize_seq(None)?;
     for entry in entries {
-        match entry {
-            Ok(object) => seq.serialize_element(&object)?,
-            Err(err) => return Err(err),
-        }
+        seq.serialize_element(&entry)?;
     }
     seq.end()?;
 
@@ -223,7 +219,7 @@ mod tests {
     {
         // Create fake "file"
         let mut buffer = Cursor::new(Vec::new());
-        serialize_result_seq(&mut buffer, input.iter().cloned().map(Ok::<_, serde_json::Error>)).unwrap();
+        serialize_seq(&mut buffer, input.iter().cloned()).unwrap();
 
         // Use the fake "file" as input
         buffer.seek(SeekFrom::Start(0)).unwrap();

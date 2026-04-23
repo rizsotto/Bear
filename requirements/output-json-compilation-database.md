@@ -113,6 +113,12 @@ Related issues: #240, #678, #679, #671.
 - A `command` field that cannot be parsed by POSIX shell-word splitting is
   rejected during validation
 - Empty `file` or `directory` fields are rejected during validation
+- An entry that fails validation is dropped from the output, logged at
+  `WARN` level with the reason, and counted in the pipeline summary; it
+  never aborts processing of subsequent entries
+- When every entry that would otherwise have been written is dropped due to
+  validation failures, Bear emits a single `ERROR`-level summary line so
+  the empty compilation database is never silent
 - Entries correspond to actual compiler invocations observed during the build
 - Non-compiler commands (linker-only, preprocessor-only, info-only such as
   `--version` or `--help`) are excluded
@@ -137,6 +143,34 @@ format:
     use_array_format: true        # true = arguments, false = command
     include_output_field: false   # include the output field
 ```
+
+## Validation failure handling
+
+Entry validation runs as a distinct stage in the output pipeline, immediately
+before JSON serialization. When an entry fails validation:
+
+- The entry is dropped and does not appear in `compile_commands.json`.
+- A `WARN`-level log line names the `file`, `directory`, and the specific
+  validation reason (e.g. empty `directory`, unparsable `command`).
+- The `entries_dropped_invalid` counter in the pipeline summary is
+  incremented.
+- Processing of subsequent entries continues unaffected.
+
+This contract ensures a single malformed entry cannot destroy the usable
+output produced from the rest of a build. It also replaces the prior
+fail-fast behavior, which aborted the whole pipeline on the first invalid
+entry and produced no database at all -- a failure mode that both lost
+information and yielded unclear error signals (see issue #692).
+
+When `entries_dropped_invalid > 0 && entries_written == 0`, Bear emits a
+single `ERROR`-level summary line stating that every entry was dropped.
+The compilation database is still written (as an empty array) so downstream
+tooling sees a valid file, but the log makes the empty result impossible to
+miss.
+
+The pipeline exit code is not affected by validation drops alone. Exit
+codes reflect the build command's own status and genuine I/O failures,
+not data-quality issues with individual entries.
 
 ## Non-functional constraints
 
@@ -190,6 +224,23 @@ Given a compiler invoked with a full path (e.g. `/usr/bin/gcc`):
 > When Bear writes the entry,
 > then `arguments[0]` is `/usr/bin/gcc`.
 
+Given a build that produces a mix of valid entries and one entry that
+fails validation (for example, an empty `directory` field):
+
+> When Bear writes the output,
+> then the valid entries appear in `compile_commands.json` unchanged,
+> a `WARN` log line names the dropped entry and the validation reason,
+> the pipeline summary reports `entries_dropped_invalid = 1`,
+> and the process exit code is not affected by the drop.
+
+Given a build where every candidate entry fails validation:
+
+> When Bear writes the output,
+> then `compile_commands.json` is written as an empty JSON array `[]`,
+> a `WARN` log line is emitted for each dropped entry,
+> and a single `ERROR`-level summary line reports that every entry was
+> dropped.
+
 ## Notes
 
 - The specification allows multiple entries for the same file (different
@@ -197,3 +248,9 @@ Given a compiler invoked with a full path (e.g. `/usr/bin/gcc`):
   unless the duplicate filter removes them (see `output-duplicate-detection`).
 - Path formatting for the `file` and `directory` fields is configurable;
   see `output-path-format` for details.
+- The validation-drop contract was introduced in response to issue #692,
+  where a path-format edge case produced empty `directory` fields. Under
+  the old fail-fast behavior, the first such entry aborted the pipeline
+  and no database was written for the rest of the build. The new contract
+  keeps the rest of the output usable while making the failure visible in
+  the logs.

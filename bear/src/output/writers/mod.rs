@@ -15,6 +15,7 @@ mod atomic;
 mod converter;
 mod file;
 mod filtering;
+mod validating;
 
 use super::statistics::OutputStatistics;
 use super::{WriterCreationError, WriterError};
@@ -26,6 +27,7 @@ use atomic::AtomicClangOutputWriter;
 use converter::ConverterClangOutputWriter;
 use file::ClangOutputWriter;
 use filtering::{DuplicateEntryFilter, FilteredOutputWriter, SourceEntryFilter};
+use validating::ValidatingOutputWriter;
 
 /// A trait representing a writer for iterator type `T`.
 ///
@@ -44,7 +46,7 @@ type ClangWriterStack = ConverterClangOutputWriter<
     AppendClangOutputWriter<
         AtomicClangOutputWriter<
             FilteredOutputWriter<
-                FilteredOutputWriter<ClangOutputWriter, DuplicateEntryFilter>,
+                FilteredOutputWriter<ValidatingOutputWriter<ClangOutputWriter>, DuplicateEntryFilter>,
                 SourceEntryFilter,
             >,
         >,
@@ -74,7 +76,9 @@ impl SemanticCommandWriter {
 /// 3. Atomic file write (via temp file + rename)
 /// 4. Source file path filtering
 /// 5. Duplicate entry filtering
-/// 6. Final file serialization
+/// 6. Entry validation (drop invalid entries with a warning; earlier filters
+///    never see an entry that will be dropped here)
+/// 7. Final file serialization
 pub(crate) fn create_pipeline(
     args: &args::BuildSemantic,
     config: &config::Main,
@@ -84,11 +88,13 @@ pub(crate) fn create_pipeline(
     let temp_path = &args.path.with_extension("tmp");
 
     let base_writer = ClangOutputWriter::create(temp_path, Arc::clone(&stats))?;
+    let validating_writer = ValidatingOutputWriter::new(base_writer, Arc::clone(&stats));
     let duplicate_filter = DuplicateEntryFilter::try_from(config.duplicates.clone())
         .map_err(|err| WriterCreationError::Configuration(err.to_string()))?;
-    let unique_writer = FilteredOutputWriter::new(base_writer, duplicate_filter, Arc::clone(&stats), |s| {
-        &s.duplicates_detected
-    });
+    let unique_writer =
+        FilteredOutputWriter::new(validating_writer, duplicate_filter, Arc::clone(&stats), |s| {
+            &s.duplicates_detected
+        });
     let source_filter_writer = FilteredOutputWriter::new(
         unique_writer,
         SourceEntryFilter::from(config.sources.clone()),

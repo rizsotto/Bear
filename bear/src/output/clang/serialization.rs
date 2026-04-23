@@ -16,18 +16,17 @@ use crate::output::{SerializationError, SerializationFormat};
 pub struct JsonCompilationDatabase;
 
 impl SerializationFormat<Entry> for JsonCompilationDatabase {
+    /// Serialize entries as a JSON compilation database.
+    ///
+    /// Entries are expected to already be validated (see
+    /// `ValidatingOutputWriter` in the output pipeline). This function
+    /// performs no further semantic validation; it reports only I/O and
+    /// JSON-encoding errors.
     fn write(
         writer: impl std::io::Write,
         entries: impl Iterator<Item = Entry>,
     ) -> Result<(), SerializationError> {
-        json::serialize_result_seq(
-            writer,
-            // Ensure only valid entries are serialized.
-            entries.map(|entry| match entry.validate() {
-                Ok(_) => Ok(entry),
-                Err(err) => Err(SerializationError::Semantic(err)),
-            }),
-        )
+        json::serialize_seq(writer, entries).map_err(SerializationError::Syntax)
     }
 
     fn read(reader: impl std::io::Read) -> impl Iterator<Item = Result<Entry, SerializationError>> {
@@ -46,7 +45,6 @@ impl SerializationFormat<Entry> for JsonCompilationDatabase {
 mod test {
     use super::JsonCompilationDatabase as Sut;
     use super::{Entry, SerializationError, SerializationFormat};
-    use crate::output::clang::EntryError;
     use serde_json::error::Category;
     use serde_json::json;
     use std::io::{Cursor, Seek, SeekFrom};
@@ -128,17 +126,9 @@ mod test {
         assert!(result.next().is_none());
     }
 
-    #[test]
-    fn write_fails_on_invalid_entry() {
-        let entry = Entry::from_arguments_str("main.cpp", vec!["clang", "-c"], "", None);
-        assert_eq!(entry.validate(), Err(EntryError::EmptyDirectory));
-
-        let mut buffer = Cursor::new(Vec::new());
-        let result = Sut::write(&mut buffer, vec![entry].into_iter());
-
-        assert!(result.is_err());
-        assert!(matches!(result, Err(SerializationError::Semantic(_))));
-    }
+    // Serializer trusts its input; the upstream `ValidatingOutputWriter`
+    // filters invalid entries before they reach `write`. See
+    // `bear/src/output/writers/validating.rs` for the validation tests.
 
     fn expected_values_with_arguments() -> Vec<Entry> {
         vec![

@@ -656,6 +656,102 @@ format:
     Ok(())
 }
 
+/// A single invalid entry must not prevent valid ones from being written.
+/// Feeds two events: one with an empty working_dir (produces an entry with
+/// an empty directory field, which fails validation) and one with a valid
+/// working_dir. Expects the valid entry to survive, exit code 0, and a
+/// per-drop WARN log line.
+// Requirements: output-json-compilation-database
+#[test]
+#[cfg(target_family = "unix")]
+fn invalid_entry_is_dropped_with_warning_not_fatal() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("invalid_entry_drop")?;
+    let valid_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event_invalid = json!({
+        "pid": 7001,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "bogus.c"],
+            "working_dir": "",
+            "environment": {}
+        }
+    });
+    let event_valid = json!({
+        "pid": 7002,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+            "working_dir": valid_dir,
+            "environment": {}
+        }
+    });
+    let events_content = format!("{}\n{}", event_invalid, event_valid);
+    env.create_source_files(&[("events.json", &events_content), ("main.c", "int main() { return 0; }")])?;
+
+    let output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    // Valid entry survives; invalid one is dropped.
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&CompilationEntryMatcher::new().file("main.c"))?;
+
+    // The drop is visible in logs -- both per-entry WARN and the pipeline
+    // summary counter.
+    let stderr = output.stderr();
+    assert!(
+        stderr.contains("Dropping invalid compilation database entry"),
+        "expected WARN log for dropped entry in stderr; got:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("dropped entries (invalid): 1"),
+        "expected pipeline summary to report 1 dropped entry; got:\n{stderr}"
+    );
+
+    Ok(())
+}
+
+/// When every candidate entry fails validation, the pipeline still exits 0
+/// and produces an empty compilation database, but emits a single
+/// ERROR-level summary line so the empty result is not silent.
+// Requirements: output-json-compilation-database
+#[test]
+#[cfg(target_family = "unix")]
+fn all_entries_dropped_emits_error_summary() -> Result<()> {
+    use serde_json::json;
+
+    let env = TestEnvironment::new("all_entries_dropped")?;
+
+    let event = json!({
+        "pid": 7101,
+        "execution": {
+            "executable": COMPILER_C_PATH,
+            "arguments": [COMPILER_C_PATH, "-c", "main.c"],
+            "working_dir": "",
+            "environment": {}
+        }
+    });
+    env.create_source_files(&[("events.json", &event.to_string())])?;
+
+    let output =
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    // Empty DB is still valid JSON.
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    let stderr = output.stderr();
+    assert!(
+        stderr.contains("Compilation database is empty"),
+        "expected ERROR summary line when every entry is dropped; got:\n{stderr}"
+    );
+
+    Ok(())
+}
+
 /// Test invalid configuration handling
 /// Verifies Bear handles invalid config gracefully
 #[test]
