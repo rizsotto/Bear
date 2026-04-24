@@ -303,6 +303,33 @@ project.
 In case of Bear is using the \f[I]wrapper\f[R] mode, it needs to run the
 configure step with Bear too (and discard that output), before run the
 build with Bear.
+.SS Compiler Env Vars With Flags
+In wrapper mode, Bear accepts compiler environment variables that carry
+a trailing flag or two, matching the GNU Make convention:
+.IP
+.EX
+CC=\[dq]gcc \-std=c11\[dq] make
+CXX=\[dq]clang++ \-stdlib=libc++\[dq] make
+CC=\[dq]/usr/local/bin/gcc \-m32\[dq] make
+.EE
+.PP
+Bear splits the value on whitespace, resolves the first token as the
+compiler, and rewrites the variable so the build still sees the flags
+(\f[CR]CC=<wrapper_path> \-std=c11\f[R]).
+.PP
+This convention is a Unix / GNU Make inheritance; it applies when
+\f[CR]bear \-\- make\f[R] runs under sh/bash (including MSYS2, Git Bash,
+WSL on Windows), not under native Windows build systems (MSBuild,
+\f[CR]nmake\f[R], \f[CR]cmd\f[R], PowerShell), which do not consume
+\f[CR]CC\f[R]/\f[CR]CXX\f[R] from the environment.
+.PP
+For anything beyond simple whitespace\-separated tokens (flags
+containing spaces, shell quoting, metacharacters, command
+substitutions), use \f[CR]CFLAGS\f[R], \f[CR]CXXFLAGS\f[R], or
+\f[CR]LDFLAGS\f[R] instead of packing it into \f[CR]CC\f[R].
+Those variables are the portable channel for compilation flags and every
+build system expects them.
+Bear does not parse or rewrite them; they reach the compiler untouched.
 .SS Getting Help
 There could be many reasons for any of these failures.
 When seeking help:

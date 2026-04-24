@@ -258,6 +258,34 @@ step, which captures the compiler to build the project. In case of Bear is
 using the _wrapper_ mode, it needs to run the configure step with Bear too
 (and discard that output), before run the build with Bear.
 
+## Compiler Env Vars With Flags
+
+In wrapper mode, Bear accepts compiler environment variables that carry a
+trailing flag or two, matching the GNU Make convention:
+
+```
+CC="gcc -std=c11" make
+CXX="clang++ -stdlib=libc++" make
+CC="/usr/local/bin/gcc -m32" make
+```
+
+Bear splits the value on whitespace, resolves the first token as the
+compiler, and rewrites the variable so the build still sees the flags
+(`CC=<wrapper_path> -std=c11`).
+
+This convention is a Unix / GNU Make inheritance; it applies when
+`bear -- make` runs under sh/bash (including MSYS2, Git Bash, WSL on
+Windows), not under native Windows build systems (MSBuild, `nmake`,
+`cmd`, PowerShell), which do not consume `CC`/`CXX` from the
+environment.
+
+For anything beyond simple whitespace-separated tokens (flags containing
+spaces, shell quoting, metacharacters, command substitutions), use
+`CFLAGS`, `CXXFLAGS`, or `LDFLAGS` instead of packing it into `CC`. Those
+variables are the portable channel for compilation flags and every build
+system expects them. Bear does not parse or rewrite them; they reach the
+compiler untouched.
+
 ## Getting Help
 
 There could be many reasons for any of these failures. When seeking help:
