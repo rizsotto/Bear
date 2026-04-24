@@ -792,7 +792,10 @@ intercept:
     db.assert_count(1)?;
 
     // Recorded compiler must be a real compiler, not the ccache symlink and
-    // not Bear's own wrapper in `.bear/`.
+    // not Bear's own wrapper in `.bear/`. `starts_with` on the exact wrapper
+    // dir is the tight check (a substring match would false-positive on any
+    // path that happens to contain `.bear`).
+    let wrapper_dir = env.test_dir().join(".bear");
     for entry in db.entries() {
         let argv = entry.get("arguments").and_then(|v| v.as_array());
         let compiler = argv
@@ -800,7 +803,11 @@ intercept:
             .and_then(|v| v.as_str())
             .expect("compilation db entry must have argv[0]");
         assert!(!compiler.contains("ccache"), "compilation db must not reference ccache: {compiler}");
-        assert!(!compiler.contains(".bear"), "compilation db must not reference Bear wrapper: {compiler}");
+        assert!(
+            !std::path::Path::new(compiler).starts_with(&wrapper_dir),
+            "compilation db must not reference Bear wrapper at {}: {compiler}",
+            wrapper_dir.display(),
+        );
     }
 
     Ok(())

@@ -243,12 +243,15 @@ impl BuildEnvironment {
     /// Resolves a program env var value to an absolute executable path.
     ///
     /// Handles three cases:
-    /// - Absolute path: returned as-is (not canonicalized)
-    /// - Relative path (contains directory component): joined with cwd
+    /// - Absolute path: returned as-is (not canonicalized); if the path is a
+    ///   masquerade wrapper, falls back to resolving the basename via PATH.
+    /// - Relative path (contains directory component): joined with cwd; same
+    ///   masquerade fallback applies.
     /// - Bare name: resolved via PATH, skipping masquerade wrapper
-    ///   directories (ccache, distcc, icecc, colorgcc, buildcache)
+    ///   directories (ccache, distcc, icecc, colorgcc, buildcache).
     ///
-    /// Returns `None` if the program cannot be found.
+    /// Returns `None` if the program cannot be found or every resolution
+    /// lands on a masquerade wrapper with no real compiler past it.
     fn resolve_program_path(context: &context::Context, value: &str) -> Option<PathBuf> {
         let name = value.trim();
         if name.is_empty() {
@@ -256,22 +259,36 @@ impl BuildEnvironment {
         }
 
         let path = PathBuf::from(name);
+        let search_path = context.path().map(|(_, p)| p).unwrap_or_else(|| context.confstr_path.clone());
 
-        // Absolute path: pass through as-is. Do not canonicalize because that
-        // resolves symlinks, which can change the filename (e.g. /usr/bin/gcc ->
-        // /usr/bin/x86_64-linux-gnu-gcc-13) and break wrapper name matching.
-        if path.is_absolute() {
-            return Some(path);
-        }
+        // Absolute path, or relative path with a directory component. We do
+        // not canonicalize here because that resolves symlinks and can change
+        // the filename (e.g. /usr/bin/gcc -> /usr/bin/x86_64-linux-gnu-gcc-13),
+        // breaking wrapper name matching. If the supplied path IS a masquerade
+        // wrapper, fall back to resolving the basename via PATH so we do not
+        // register a wrapper that loops (see interception-wrapper-recursion).
+        let supplied: Option<PathBuf> = if path.is_absolute() {
+            Some(path)
+        } else if path.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
+            Some(context.current_directory.join(&path))
+        } else {
+            None
+        };
 
-        // Relative path with directory component (e.g. "./gcc" or "tools/gcc"):
-        // resolve against cwd to make it absolute.
-        if path.parent().is_some_and(|p| !p.as_os_str().is_empty()) {
-            return Some(context.current_directory.join(&path));
+        if let Some(candidate) = supplied {
+            if !is_masquerade_wrapper(&candidate) {
+                return Some(candidate);
+            }
+            let basename = candidate.file_name().and_then(|n| n.to_str())?;
+            log::info!(
+                "resolve: {} is a masquerade wrapper; retrying basename '{}' via PATH",
+                candidate.display(),
+                basename,
+            );
+            return resolve_past_masquerade_wrappers(basename, &search_path, &context.current_directory);
         }
 
         // Bare name: resolve via PATH, skipping masquerade wrappers.
-        let search_path = context.path().map(|(_, p)| p).unwrap_or_else(|| context.confstr_path.clone());
         resolve_past_masquerade_wrappers(name, &search_path, &context.current_directory)
     }
 
@@ -446,17 +463,21 @@ const MASQUERADE_WRAPPERS: &[&str] = &["ccache", "distcc", "icecc", "colorgcc", 
 /// Checks whether `path` is a symlink whose ultimate target's filename is one
 /// of the known masquerade wrappers.
 ///
-/// Uses `canonicalize` to follow the symlink chain because we only inspect
-/// the basename of the final target; the canonicalised path itself is
-/// discarded. This must not be used when registering a compiler, since
-/// canonicalisation would change the name (e.g. `/usr/bin/gcc` ->
-/// `/usr/bin/gcc-13`) and break wrapper lookup.
+/// Short-circuits on non-symlinks so iterating every executable in a PATH
+/// directory stays cheap. For symlinks, uses `canonicalize` to follow the
+/// chain because only the basename of the final target is inspected; the
+/// canonicalised path itself is discarded. Callers must not use this helper
+/// when registering a compiler -- canonicalisation would change the name
+/// (e.g. `/usr/bin/gcc` -> `/usr/bin/gcc-13`) and break wrapper lookup.
 fn is_masquerade_wrapper(path: &Path) -> bool {
+    let Ok(meta) = std::fs::symlink_metadata(path) else { return false };
+    if !meta.file_type().is_symlink() {
+        return false;
+    }
     let Ok(target) = std::fs::canonicalize(path) else { return false };
     let Some(name) = target.file_name().and_then(|n| n.to_str()) else { return false };
     let stem = name.strip_suffix(".exe").or_else(|| name.strip_suffix(".EXE")).unwrap_or(name);
-    let stem_lower = stem.to_ascii_lowercase();
-    MASQUERADE_WRAPPERS.iter().any(|w| *w == stem_lower)
+    MASQUERADE_WRAPPERS.iter().any(|w| w.eq_ignore_ascii_case(stem))
 }
 
 /// Resolves a bare program name via PATH, transparently skipping masquerade
@@ -472,7 +493,17 @@ fn resolve_past_masquerade_wrappers(name: &str, search_path: &str, cwd: &Path) -
     let mut excluded: Vec<PathBuf> = Vec::new();
     loop {
         let current = filter_out_paths(search_path, &excluded);
-        let found = which::which_in(name, Some(current.as_str()), cwd).ok()?;
+        let found = match which::which_in(name, Some(current.as_str()), cwd) {
+            Ok(path) => path,
+            Err(_) => {
+                if !excluded.is_empty() {
+                    let dirs =
+                        excluded.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ");
+                    log::warn!("resolve: no real '{}' on PATH past masquerade dir(s): {}", name, dirs,);
+                }
+                return None;
+            }
+        };
 
         if !is_masquerade_wrapper(&found) {
             return Some(found);
@@ -1381,5 +1412,53 @@ mod test {
             let found = resolve_past_masquerade_wrappers("gcc", &path, dir.path()).unwrap();
             assert_eq!(found, real_gcc);
         }
+    }
+
+    /// An explicit CC=/path/to/ccache-masquerade/gcc must not be stored
+    /// verbatim in the wrapper config -- that would recreate the recursion
+    /// the masquerade filter is meant to prevent.
+    // Requirements: interception-wrapper-recursion
+    #[cfg(unix)]
+    #[test]
+    fn resolve_program_path_falls_back_past_masquerade_for_absolute_cc() {
+        use std::os::unix::fs::PermissionsExt;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let ccache_bin = dir.path().join("ccache");
+        std::fs::write(&ccache_bin, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&ccache_bin, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let masq_dir = dir.path().join("masq");
+        std::fs::create_dir_all(&masq_dir).unwrap();
+        let masq_gcc = masq_dir.join("gcc");
+        std::os::unix::fs::symlink(&ccache_bin, &masq_gcc).unwrap();
+
+        let real_dir = dir.path().join("real");
+        std::fs::create_dir_all(&real_dir).unwrap();
+        let real_gcc = real_dir.join("gcc");
+        std::fs::write(&real_gcc, "#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&real_gcc, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let mut environment = HashMap::new();
+        environment.insert(
+            KEY_OS__PATH.to_string(),
+            std::env::join_paths([&masq_dir, &real_dir]).unwrap().into_string().unwrap(),
+        );
+
+        let context = crate::context::Context {
+            current_executable: PathBuf::from("/unused"),
+            current_directory: dir.path().to_path_buf(),
+            environment,
+            preload_supported: true,
+            confstr_path: String::new(),
+        };
+
+        let resolved = BuildEnvironment::resolve_program_path(&context, masq_gcc.to_str().unwrap());
+        assert_eq!(
+            resolved.as_deref(),
+            Some(real_gcc.as_path()),
+            "absolute CC pointing at a masquerade symlink must fall back to the real compiler on PATH",
+        );
     }
 }

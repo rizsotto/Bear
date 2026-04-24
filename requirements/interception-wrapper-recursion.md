@@ -87,12 +87,22 @@ For each compiler that Bear resolves during wrapper setup (from
 `CC`/`CXX`/... env vars or PATH discovery), Bear classifies the
 resolved binary as a masquerade wrapper by:
 
-1. Reading the file as a symbolic link (`read_link`, followed
-   iteratively -- not `canonicalize`, which resolves too aggressively
-   and would hide, for example, `/usr/bin/gcc -> gcc-13`).
-2. Taking the final target's file name and comparing it, lowercased,
-   against a fixed set of known wrapper names: `ccache`, `distcc`,
-   `icecc`, `colorgcc`, `buildcache`.
+1. Short-circuiting on non-symlinks so iterating every executable
+   on PATH stays cheap.
+2. For symlinks, following the chain to its ultimate target. Only
+   the final target's basename is inspected; the resolved path
+   itself is discarded. Implementation uses `std::fs::canonicalize`;
+   iterative `read_link` would work equivalently.
+3. Comparing that basename, ASCII-case-insensitive, against a fixed
+   set of known wrapper names: `ccache`, `distcc`, `icecc`,
+   `colorgcc`, `buildcache`.
+
+Note that Bear must NOT canonicalise when *registering* a compiler,
+because that would change the name (e.g. `/usr/bin/gcc` ->
+`/usr/bin/gcc-13`) and break wrapper lookup. The classification
+helper is used only to decide whether to keep looking; the path
+stored in the wrapper config is whatever PATH resolution returned
+past the masquerade dirs.
 
 If the match succeeds, the directory containing the resolved binary is
 flagged as a masquerade directory. The resolution retries with that
@@ -158,18 +168,17 @@ Given a compiler that exists only as a masquerade symlink on PATH
 (no real compiler past it):
 
 > When Bear resolves it,
-> then Bear logs a warning naming the compiler and the detected
-> wrapper,
+> then Bear logs a warning naming the compiler and the masquerade
+> dir(s) it excluded,
 > and does not register a `.bear/` wrapper for it,
 > and the build uses the compiler directly without Bear interception
 > for that name.
 
-Given a nested compiler invocation (a compiler-driver calls another
-bare-name compiler from the child process):
-
-> When the child invokes `cc -c foo.c`,
-> then `.bear/cc` is still first on PATH in the grandchild process,
-> so the invocation is intercepted.
+Nested compiler invocations (a compiler driver spawning another
+bare-name compiler in a grandchild process) must still be
+intercepted; that guarantee is not specific to masquerade handling
+and is covered by `interception-wrapper-mechanism`. This
+requirement preserves it by not modifying the child's PATH.
 
 ### CI coverage
 
