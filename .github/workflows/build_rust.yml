@@ -49,6 +49,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.toolchain }}
+      - name: Install ccache on Ubuntu
+        # Bear's wrapper-recursion integration test
+        # (wrapper_mode_survives_masquerade_wrapper_in_path) needs a ccache
+        # masquerade dir to exist. The ccache package creates
+        # /usr/lib/ccache/* symlinks; the test injects that dir into its own
+        # child PATH. We deliberately do NOT prepend the dir to the job
+        # PATH, because ccache first on PATH would inflate event counts
+        # for other tests that assert exact compiler-event counts.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache
       - name: Run integration tests
         run: |
           cargo build --verbose

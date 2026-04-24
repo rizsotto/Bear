@@ -321,24 +321,6 @@ fn libtool_command_interception() -> Result<()> {
     Ok(())
 }
 
-/// Build a PATH that excludes ccache directories and resolve the bare
-/// compiler name within it. Without this, wrapper mode on a ccache-equipped
-/// host recurses: `.bear/gcc` -> ccache -> PATH lookup for `gcc` -> `.bear/gcc`.
-/// Same workaround used by `wrapper_mode_resolves_cc_bare_name_via_path`.
-#[cfg(target_family = "unix")]
-fn ccache_free_path_and_compiler() -> (std::ffi::OsString, std::path::PathBuf) {
-    let safe_path = std::env::join_paths(
-        std::env::split_paths(&std::env::var("PATH").unwrap_or_default())
-            .filter(|p| !p.to_string_lossy().contains("ccache")),
-    )
-    .expect("failed to join PATH");
-    let compiler_filename = filename_of(COMPILER_C_PATH);
-    let real_compiler =
-        which::which_in(&compiler_filename, Some(&safe_path), std::env::current_dir().unwrap())
-            .unwrap_or_else(|_| std::path::PathBuf::from(COMPILER_C_PATH));
-    (safe_path, real_compiler)
-}
-
 /// In wrapper mode, Bear creates a deterministic `.bear/` directory in the
 /// working directory during the build and removes it automatically on exit.
 /// Verify both: the build observes `.bear/` while it runs, and after Bear
@@ -351,8 +333,6 @@ fn wrapper_mode_creates_and_cleans_up_bear_directory() -> Result<()> {
     let env = TestEnvironment::new("wrapper_bear_dir_cleanup")?;
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
-    let (safe_path, real_compiler) = ccache_free_path_and_compiler();
-
     // Build script records whether `.bear/` was present during the build,
     // then invokes the compiler via $CC so the wrapper is exercised.
     let build = r#"if [ -d .bear ]; then echo present > bear_dir_status.txt; else echo missing > bear_dir_status.txt; fi
@@ -360,23 +340,20 @@ $CC -c test.c -o test.o
 "#;
     let script = env.create_shell_script("build.sh", build)?;
 
-    let config = format!(
-        r#"
+    // Config forces wrapper mode and does not list compilers: Bear discovers
+    // them via the CC env var and PATH scan (masquerade-aware, see
+    // `interception-wrapper-recursion`).
+    let config = r#"
 schema: "4.1"
 
 intercept:
   mode: wrapper
-
-compilers:
-  - path: {}
-"#,
-        real_compiler.to_str().unwrap()
-    );
+"#;
     let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     let mut cmd = env.command_bear();
-    cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).env("PATH", &safe_path).args([
+    cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).args([
         "--config",
         config_path.to_str().unwrap(),
         "--output",
@@ -417,41 +394,31 @@ fn wrapper_mode_bear_directory_is_deterministic_across_runs() -> Result<()> {
     let env = TestEnvironment::new("wrapper_bear_dir_deterministic")?;
     env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
 
-    let (safe_path, real_compiler) = ccache_free_path_and_compiler();
-
     let build = r#"ls -d .bear >> bear_dir_observed.txt 2>/dev/null || echo missing >> bear_dir_observed.txt
 $CC -c test.c -o test.o
 "#;
     let script = env.create_shell_script("build.sh", build)?;
 
-    let config = format!(
-        r#"
+    let config = r#"
 schema: "4.1"
 
 intercept:
   mode: wrapper
-
-compilers:
-  - path: {}
-"#,
-        real_compiler.to_str().unwrap()
-    );
+"#;
     let config_path = env.test_dir().join("config.yaml");
     std::fs::write(&config_path, config)?;
 
     for _ in 0..2 {
         let mut cmd = env.command_bear();
-        cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).env("PATH", &safe_path).args(
-            [
-                "--config",
-                config_path.to_str().unwrap(),
-                "--output",
-                "compile_commands.json",
-                "--",
-                SHELL_PATH,
-                script.to_str().unwrap(),
-            ],
-        );
+        cmd.current_dir(env.test_dir()).env("CC", filename_of(COMPILER_C_PATH)).args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script.to_str().unwrap(),
+        ]);
         let output = cmd.output()?;
         assert!(
             output.status.success(),
@@ -687,14 +654,12 @@ fn fakeroot_integration() -> Result<()> {
 /// Test that wrapper mode resolves bare compiler names from CC env var via PATH.
 ///
 /// Covers the PATH resolution part of issue #686: when CC is set to a bare name
-/// (e.g. "gcc" instead of "/usr/bin/gcc"), Bear's wrapper mode should resolve it
-/// through PATH before registering wrapper targets.
-///
-/// The build script uses $CC so the wrapper actually intercepts it. To avoid
-/// ccache recursion (where the wrapper calls ccache which finds the wrapper
-/// again via PATH), we construct a PATH containing only the real compiler
-/// directory, excluding any ccache directories.
-// Requirements: interception-wrapper-mechanism
+/// (e.g. "gcc" instead of "/usr/bin/gcc"), Bear's wrapper mode must resolve it
+/// through PATH before registering wrapper targets. On ccache-equipped hosts
+/// the bare-name resolution also exercises `interception-wrapper-recursion`,
+/// since Bear must step past the ccache masquerade directory to reach the
+/// real compiler.
+// Requirements: interception-wrapper-mechanism, interception-wrapper-recursion
 #[test]
 #[cfg(all(has_executable_compiler_c, has_executable_shell))]
 fn wrapper_mode_resolves_cc_bare_name_via_path() -> Result<()> {
@@ -704,39 +669,20 @@ fn wrapper_mode_resolves_cc_bare_name_via_path() -> Result<()> {
 
     let compiler_filename = filename_of(COMPILER_C_PATH);
 
-    // Build a PATH that excludes ccache directories to avoid wrapper recursion
-    // (ccache symlinks search PATH for the real compiler, finding the wrapper).
-    let safe_path = std::env::join_paths(
-        std::env::split_paths(&std::env::var("PATH").unwrap_or_default())
-            .filter(|p| !p.to_string_lossy().contains("ccache")),
-    )
-    .expect("failed to join PATH");
-    // Ensure the real compiler is reachable: resolve the compiler filename
-    // in the safe PATH to get a non-ccache path (e.g. /usr/bin/gcc).
-    let real_compiler = which::which_in(&compiler_filename, Some(&safe_path), env.test_dir())
-        .unwrap_or_else(|_| std::path::PathBuf::from(COMPILER_C_PATH));
-    let real_compiler_str = real_compiler.to_str().unwrap();
-
     // Build script uses $CC so the wrapper intercepts the call.
     let build_commands = "$CC -c test.c".to_string();
     let script_path = env.create_shell_script("build.sh", &build_commands)?;
 
-    // Config forces wrapper mode and lists the real (non-ccache) compiler
-    // to suppress PATH-based discovery.
-    let config = format!(
-        r#"
+    // Config forces wrapper mode. No `compilers:` entry -- Bear discovers the
+    // compiler via CC (masquerade-aware resolution).
+    let config = r#"
 schema: "4.1"
 
 intercept:
   mode: wrapper
-
-compilers:
-  - path: {}
-"#,
-        real_compiler_str
-    );
+"#;
     let config_path = env.test_dir().join("config.yaml");
-    std::fs::write(&config_path, &config)?;
+    std::fs::write(&config_path, config)?;
 
     // Run the full bear pipeline with CC set to the bare compiler name (no path).
     // Bear must resolve "gcc" via PATH before creating wrapper symlinks.
@@ -745,7 +691,6 @@ compilers:
         .env("RUST_LOG", "debug")
         .env("RUST_BACKTRACE", "1")
         .env("CC", &compiler_filename)
-        .env("PATH", &safe_path)
         .args([
             "--config",
             config_path.to_str().unwrap(),
@@ -774,6 +719,89 @@ compilers:
 
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
+
+    Ok(())
+}
+
+/// When a ccache masquerade directory is first on PATH (the default on
+/// Fedora/Arch/Gentoo and on the CI Ubuntu job after `apt-get install
+/// ccache`), wrapper mode must resolve past it to the real compiler. Before
+/// the fix for `interception-wrapper-recursion`, Bear's wrapper config held
+/// the ccache symlink as the "real compiler"; ccache's PATH search then
+/// picked up Bear's hard-linked wrapper in `.bear/` and the two looped
+/// forever.
+///
+/// The test prepends the masquerade dir into its own child PATH so the
+/// scenario runs regardless of the host's default PATH. Other integration
+/// tests keep the host's PATH so ccache does not leak into their event
+/// counts.
+// Requirements: interception-wrapper-recursion
+#[test]
+#[cfg(target_family = "unix")]
+#[cfg(host_has_ccache_masquerade)]
+#[cfg(all(has_executable_compiler_c, has_executable_shell))]
+fn wrapper_mode_survives_masquerade_wrapper_in_path() -> Result<()> {
+    let env = TestEnvironment::new("wrapper_ccache_masquerade")?;
+    env.create_source_files(&[("test.c", "int main() { return 0; }")])?;
+
+    let compiler_filename = filename_of(COMPILER_C_PATH);
+
+    let build = "$CC -c test.c -o test.o\n".to_string();
+    let script = env.create_shell_script("build.sh", &build)?;
+
+    let config = r#"
+schema: "4.1"
+
+intercept:
+  mode: wrapper
+"#;
+    let config_path = env.test_dir().join("config.yaml");
+    std::fs::write(&config_path, config)?;
+
+    // Prepend the ccache masquerade directory to the child's PATH so the
+    // recursion scenario is exercised. Without the masquerade fix the
+    // build hangs and the test harness timeout will surface it.
+    let masquerade_dir = env!("CCACHE_MASQUERADE_DIR");
+    let host_path = std::env::var("PATH").unwrap_or_default();
+    let child_path = std::env::join_paths(
+        std::iter::once(std::path::PathBuf::from(masquerade_dir)).chain(std::env::split_paths(&host_path)),
+    )
+    .expect("join PATH failed");
+
+    let mut cmd = env.command_bear();
+    cmd.current_dir(env.test_dir())
+        .env("RUST_LOG", "debug")
+        .env("RUST_BACKTRACE", "1")
+        .env("CC", &compiler_filename)
+        .env("PATH", &child_path)
+        .args([
+            "--config",
+            config_path.to_str().unwrap(),
+            "--output",
+            "compile_commands.json",
+            "--",
+            SHELL_PATH,
+            script.to_str().unwrap(),
+        ]);
+
+    let output = cmd.output()?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "bear failed: {stderr}");
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+
+    // Recorded compiler must be a real compiler, not the ccache symlink and
+    // not Bear's own wrapper in `.bear/`.
+    for entry in db.entries() {
+        let argv = entry.get("arguments").and_then(|v| v.as_array());
+        let compiler = argv
+            .and_then(|a| a.first())
+            .and_then(|v| v.as_str())
+            .expect("compilation db entry must have argv[0]");
+        assert!(!compiler.contains("ccache"), "compilation db must not reference ccache: {compiler}");
+        assert!(!compiler.contains(".bear"), "compilation db must not reference Bear wrapper: {compiler}");
+    }
 
     Ok(())
 }

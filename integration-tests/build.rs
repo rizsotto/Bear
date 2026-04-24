@@ -73,6 +73,7 @@ fn main() {
     check_one_executable_exists("make", &["make", "gmake", "mingw32-make"]);
     check_one_executable_exists("compiler_c", &["gcc", "clang", "cc"]);
     check_one_executable_exists("compiler_cxx", &["g++", "clang++", "c++"]);
+    check_ccache_masquerade_dir();
     check_one_executable_exists("compiler_fortran", &["gfortran", "flang"]);
     check_one_executable_exists("compiler_cuda", &["nvcc"]);
     check_executable_exists("libtool");
@@ -128,6 +129,49 @@ fn check_one_executable_exists(define: &str, executables: &[&str]) {
         }
     }
     println!("cargo:warning=Checking for executable: {} ... missing", define);
+}
+
+/// Locate a ccache masquerade directory on this host, independent of PATH.
+/// When one is found, expose it via the `CCACHE_MASQUERADE_DIR` env var and
+/// set `cfg(host_has_ccache_masquerade)`. The dedicated recursion test (see
+/// `interception-wrapper-recursion`) prepends that dir to its own PATH at
+/// runtime so the masquerade setup is exercised regardless of whether the
+/// host's default PATH already includes it. CI installs ccache so the dir
+/// exists on the Ubuntu matrix entry.
+fn check_ccache_masquerade_dir() {
+    println!("cargo:rustc-check-cfg=cfg(host_has_ccache_masquerade)");
+    let candidates = ["/usr/lib/ccache", "/usr/lib64/ccache", "/usr/libexec/ccache"];
+    for dir in candidates {
+        if let Some(path) = detect_ccache_masquerade_dir(dir) {
+            println!("cargo:rustc-cfg=host_has_ccache_masquerade");
+            println!("cargo:rustc-env=CCACHE_MASQUERADE_DIR={}", path);
+            println!("cargo:warning=ccache masquerade directory found at {}", path);
+            return;
+        }
+    }
+    println!("cargo:warning=no ccache masquerade directory detected");
+}
+
+/// A directory qualifies as a ccache masquerade dir if it contains a `gcc`,
+/// `cc`, `g++`, `c++`, `clang`, or `clang++` entry whose ultimate target's
+/// file name is `ccache`.
+fn detect_ccache_masquerade_dir(dir: &str) -> Option<String> {
+    let path = std::path::Path::new(dir);
+    if !path.is_dir() {
+        return None;
+    }
+    for name in ["gcc", "cc", "g++", "c++", "clang", "clang++"] {
+        let candidate = path.join(name);
+        if !candidate.exists() {
+            continue;
+        }
+        if let Ok(target) = std::fs::canonicalize(&candidate)
+            && target.file_name().and_then(|n| n.to_str()) == Some("ccache")
+        {
+            return Some(dir.to_string());
+        }
+    }
+    None
 }
 
 fn check_preload_library_availability(preload_path: &str) {

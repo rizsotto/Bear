@@ -213,7 +213,9 @@ impl BuildEnvironment {
     ///
     /// This function scans all directories in the PATH environment variable and applies
     /// the provided predicate to each executable file found. Executables that match
-    /// the predicate are returned.
+    /// the predicate are returned. Masquerade wrappers (ccache, distcc, ...) are
+    /// filtered out so that the registered compiler is always the real one; the
+    /// iteration continues past them to find the next candidate on PATH.
     fn compiler_candidates<P>(context: &context::Context, predicate: P) -> impl Iterator<Item = PathBuf>
     where
         P: Fn(&Path) -> bool,
@@ -235,15 +237,16 @@ impl BuildEnvironment {
                     Vec::new().into_iter()
                 }
             })
-            .filter(move |path| is_executable_file(path) && predicate(path))
+            .filter(move |path| is_executable_file(path) && !is_masquerade_wrapper(path) && predicate(path))
     }
 
     /// Resolves a program env var value to an absolute executable path.
     ///
     /// Handles three cases:
-    /// - Absolute path: returned as-is (canonicalized if possible)
+    /// - Absolute path: returned as-is (not canonicalized)
     /// - Relative path (contains directory component): joined with cwd
-    /// - Bare name: resolved via PATH using `which`
+    /// - Bare name: resolved via PATH, skipping masquerade wrapper
+    ///   directories (ccache, distcc, icecc, colorgcc, buildcache)
     ///
     /// Returns `None` if the program cannot be found.
     fn resolve_program_path(context: &context::Context, value: &str) -> Option<PathBuf> {
@@ -267,9 +270,9 @@ impl BuildEnvironment {
             return Some(context.current_directory.join(&path));
         }
 
-        // Bare name: resolve via PATH
+        // Bare name: resolve via PATH, skipping masquerade wrappers.
         let search_path = context.path().map(|(_, p)| p).unwrap_or_else(|| context.confstr_path.clone());
-        which::which_in(name, Some(search_path.as_str()), &context.current_directory).ok()
+        resolve_past_masquerade_wrappers(name, &search_path, &context.current_directory)
     }
 
     /// Creates a `BuildEnvironment` configured for preload mode interception.
@@ -432,6 +435,75 @@ pub fn insert_to_path<P: AsRef<Path>>(original: &str, first: P) -> Result<String
         std::env::split_paths(original).filter(|path| path.as_path() != first_path).collect();
     paths.insert(0, first_path.to_owned());
     std::env::join_paths(paths).map(|os_string| os_string.into_string().unwrap_or_default())
+}
+
+/// Known masquerade wrappers. A directory full of symlinks named after
+/// compilers, where each symlink resolves to one of these binaries, is a
+/// masquerade directory; Bear skips such directories when resolving the real
+/// compiler. See `interception-wrapper-recursion`.
+const MASQUERADE_WRAPPERS: &[&str] = &["ccache", "distcc", "icecc", "colorgcc", "buildcache"];
+
+/// Checks whether `path` is a symlink whose ultimate target's filename is one
+/// of the known masquerade wrappers.
+///
+/// Uses `canonicalize` to follow the symlink chain because we only inspect
+/// the basename of the final target; the canonicalised path itself is
+/// discarded. This must not be used when registering a compiler, since
+/// canonicalisation would change the name (e.g. `/usr/bin/gcc` ->
+/// `/usr/bin/gcc-13`) and break wrapper lookup.
+fn is_masquerade_wrapper(path: &Path) -> bool {
+    let Ok(target) = std::fs::canonicalize(path) else { return false };
+    let Some(name) = target.file_name().and_then(|n| n.to_str()) else { return false };
+    let stem = name.strip_suffix(".exe").or_else(|| name.strip_suffix(".EXE")).unwrap_or(name);
+    let stem_lower = stem.to_ascii_lowercase();
+    MASQUERADE_WRAPPERS.iter().any(|w| *w == stem_lower)
+}
+
+/// Resolves a bare program name via PATH, transparently skipping masquerade
+/// wrapper directories. If the first match on PATH is a masquerade wrapper
+/// (e.g. `/usr/lib64/ccache/gcc` -> `/usr/bin/ccache`), the containing
+/// directory is excluded and the search is retried. The process repeats until
+/// a non-masquerade compiler is found or PATH is exhausted.
+///
+/// Returns `None` if no real compiler is reachable past the masquerade
+/// directories. In that case the caller must not register a wrapper; doing so
+/// would re-create the recursion the filtering is designed to prevent.
+fn resolve_past_masquerade_wrappers(name: &str, search_path: &str, cwd: &Path) -> Option<PathBuf> {
+    let mut excluded: Vec<PathBuf> = Vec::new();
+    loop {
+        let current = filter_out_paths(search_path, &excluded);
+        let found = which::which_in(name, Some(current.as_str()), cwd).ok()?;
+
+        if !is_masquerade_wrapper(&found) {
+            return Some(found);
+        }
+
+        let parent = found.parent()?.to_path_buf();
+        if excluded.contains(&parent) {
+            // Defensive: the excluded dir came back, which would loop forever.
+            log::warn!(
+                "resolve: masquerade dir {} already excluded but returned again for '{}'",
+                parent.display(),
+                name,
+            );
+            return None;
+        }
+        log::info!(
+            "resolve: masquerade wrapper at {}; re-resolving '{}' past {}",
+            found.display(),
+            name,
+            parent.display(),
+        );
+        excluded.push(parent);
+    }
+}
+
+/// Joins a path-separated string, removing any entries that match one of the
+/// excluded paths. Matching is by value; no canonicalisation.
+fn filter_out_paths(original: &str, excluded: &[PathBuf]) -> String {
+    let kept: Vec<PathBuf> =
+        std::env::split_paths(original).filter(|p| !excluded.iter().any(|e| e == p)).collect();
+    std::env::join_paths(kept).map(|os| os.into_string().unwrap_or_default()).unwrap_or_default()
 }
 
 /// Checks if a path represents an executable file.
@@ -1155,5 +1227,159 @@ mod test {
         // CC should be overridden to point to the wrapper
         let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
         assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+    }
+
+    #[cfg(unix)]
+    mod masquerade {
+        use super::super::{filter_out_paths, is_masquerade_wrapper, resolve_past_masquerade_wrappers};
+        use std::os::unix::fs::PermissionsExt;
+        use std::path::PathBuf;
+        use tempfile::TempDir;
+
+        fn write_executable(path: &std::path::Path, content: &str) {
+            std::fs::write(path, content).unwrap();
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn detects_symlink_to_ccache() {
+            let dir = TempDir::new().unwrap();
+            let fake_ccache = dir.path().join("ccache");
+            write_executable(&fake_ccache, "#!/bin/sh\n");
+            let gcc_symlink = dir.path().join("masq").join("gcc");
+            std::fs::create_dir_all(gcc_symlink.parent().unwrap()).unwrap();
+            std::os::unix::fs::symlink(&fake_ccache, &gcc_symlink).unwrap();
+
+            assert!(is_masquerade_wrapper(&gcc_symlink));
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn detects_all_known_wrapper_names() {
+            let dir = TempDir::new().unwrap();
+            for name in ["distcc", "icecc", "colorgcc", "buildcache"] {
+                let target = dir.path().join(name);
+                write_executable(&target, "#!/bin/sh\n");
+                let link = dir.path().join(format!("{name}-gcc-link"));
+                std::os::unix::fs::symlink(&target, &link).unwrap();
+                assert!(is_masquerade_wrapper(&link), "{name} target should be detected");
+            }
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn ignores_real_compiler_and_non_wrapper_symlinks() {
+            let dir = TempDir::new().unwrap();
+            let real_gcc = dir.path().join("gcc-13");
+            write_executable(&real_gcc, "#!/bin/sh\n");
+            assert!(!is_masquerade_wrapper(&real_gcc));
+
+            let gcc_symlink = dir.path().join("gcc");
+            std::os::unix::fs::symlink(&real_gcc, &gcc_symlink).unwrap();
+            assert!(!is_masquerade_wrapper(&gcc_symlink));
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn ignores_broken_and_missing_paths() {
+            let dir = TempDir::new().unwrap();
+            let broken = dir.path().join("broken-link");
+            std::os::unix::fs::symlink(dir.path().join("does-not-exist"), &broken).unwrap();
+            assert!(!is_masquerade_wrapper(&broken));
+            assert!(!is_masquerade_wrapper(&dir.path().join("does-not-exist")));
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn filter_out_paths_drops_matching_entries_only() {
+            let a = PathBuf::from("/a");
+            let b = PathBuf::from("/b");
+            let c = PathBuf::from("/c");
+            let original = std::env::join_paths([&a, &b, &c]).unwrap().into_string().unwrap_or_default();
+
+            let kept = filter_out_paths(&original, std::slice::from_ref(&b));
+            let entries: Vec<PathBuf> = std::env::split_paths(&kept).collect();
+            assert_eq!(entries, vec![a, c]);
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn resolver_returns_real_compiler_when_no_masquerade() {
+            let dir = TempDir::new().unwrap();
+            let real = dir.path().join("gcc");
+            write_executable(&real, "#!/bin/sh\n");
+
+            let path = std::env::join_paths([dir.path()]).unwrap().into_string().unwrap_or_default();
+            let found = resolve_past_masquerade_wrappers("gcc", &path, dir.path()).unwrap();
+            assert_eq!(found, real);
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn resolver_skips_masquerade_and_returns_next_real_compiler() {
+            let dir = TempDir::new().unwrap();
+            let ccache_bin = dir.path().join("bin").join("ccache");
+            std::fs::create_dir_all(ccache_bin.parent().unwrap()).unwrap();
+            write_executable(&ccache_bin, "#!/bin/sh\n");
+
+            let masq_dir = dir.path().join("ccache_dir");
+            std::fs::create_dir_all(&masq_dir).unwrap();
+            let masq_gcc = masq_dir.join("gcc");
+            std::os::unix::fs::symlink(&ccache_bin, &masq_gcc).unwrap();
+
+            let real_dir = dir.path().join("real");
+            std::fs::create_dir_all(&real_dir).unwrap();
+            let real_gcc = real_dir.join("gcc");
+            write_executable(&real_gcc, "#!/bin/sh\n");
+
+            let path =
+                std::env::join_paths([&masq_dir, &real_dir]).unwrap().into_string().unwrap_or_default();
+            let found = resolve_past_masquerade_wrappers("gcc", &path, dir.path()).unwrap();
+            assert_eq!(found, real_gcc);
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn resolver_returns_none_when_only_masquerade_is_reachable() {
+            let dir = TempDir::new().unwrap();
+            let ccache_bin = dir.path().join("ccache");
+            write_executable(&ccache_bin, "#!/bin/sh\n");
+
+            let masq_dir = dir.path().join("masq");
+            std::fs::create_dir_all(&masq_dir).unwrap();
+            let masq_gcc = masq_dir.join("gcc");
+            std::os::unix::fs::symlink(&ccache_bin, &masq_gcc).unwrap();
+
+            let path = std::env::join_paths([&masq_dir]).unwrap().into_string().unwrap_or_default();
+            assert!(resolve_past_masquerade_wrappers("gcc", &path, dir.path()).is_none());
+        }
+
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn resolver_skips_multiple_masquerade_layers() {
+            let dir = TempDir::new().unwrap();
+            let ccache_bin = dir.path().join("ccache");
+            let distcc_bin = dir.path().join("distcc");
+            write_executable(&ccache_bin, "#!/bin/sh\n");
+            write_executable(&distcc_bin, "#!/bin/sh\n");
+
+            let masq1 = dir.path().join("m1");
+            let masq2 = dir.path().join("m2");
+            let real = dir.path().join("real");
+            std::fs::create_dir_all(&masq1).unwrap();
+            std::fs::create_dir_all(&masq2).unwrap();
+            std::fs::create_dir_all(&real).unwrap();
+
+            std::os::unix::fs::symlink(&ccache_bin, masq1.join("gcc")).unwrap();
+            std::os::unix::fs::symlink(&distcc_bin, masq2.join("gcc")).unwrap();
+            let real_gcc = real.join("gcc");
+            write_executable(&real_gcc, "#!/bin/sh\n");
+
+            let path =
+                std::env::join_paths([&masq1, &masq2, &real]).unwrap().into_string().unwrap_or_default();
+            let found = resolve_past_masquerade_wrappers("gcc", &path, dir.path()).unwrap();
+            assert_eq!(found, real_gcc);
+        }
     }
 }
