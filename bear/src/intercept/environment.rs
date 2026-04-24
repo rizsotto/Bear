@@ -647,6 +647,187 @@ mod test {
         temp_dir.path().join(".bear").to_string_lossy().to_string()
     }
 
+    mod fixture {
+        //! Shared fixture builder for `BuildEnvironment` wrapper-mode tests.
+        //!
+        //! Each test needs roughly the same on-disk scaffolding: a
+        //! `current_dir` for the `.bear/` directory, an `install_dir`
+        //! containing `bin/<WRAPPER_NAME>` that `register_executable`
+        //! copies/hard-links, and some number of fake compiler binaries
+        //! on PATH or at known locations. Assembling that inline burns
+        //! ~20 lines per test and buries the intent. The `Fixture`
+        //! builder below owns the backing `TempDir`s, assembles the
+        //! `Context`, and exposes just the knobs the tests care about.
+        //!
+        //! The fixture cannot mock the filesystem away: `create_as_wrapper`
+        //! really creates a directory, `register_executable` really copies
+        //! files, and `which::which_in` really stats PATH entries. The
+        //! fixture minimises the ceremony, not the I/O.
+        use super::*;
+        use std::collections::HashMap;
+        use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+        use std::path::{Path, PathBuf};
+        use tempfile::TempDir;
+
+        /// Standard test socket address.
+        pub fn test_address() -> SocketAddr {
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080)
+        }
+
+        /// Platform-appropriate fake-compiler basename.
+        pub fn compiler_basename() -> &'static str {
+            if cfg!(windows) { "fake-cc.exe" } else { "fake-cc" }
+        }
+
+        /// Writes a file and marks it executable on Unix.
+        pub fn write_executable(path: &Path) {
+            std::fs::write(path, "#!/usr/bin/true").unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+        }
+
+        /// Builder-style fixture. Owns every `TempDir` it creates so
+        /// paths handed out stay valid for the test's lifetime. Drop
+        /// cleans everything up.
+        pub struct Fixture {
+            current_dir: TempDir,
+            install_dir: TempDir,
+            tool_dirs: Vec<TempDir>,
+            environment: HashMap<String, String>,
+            preload_supported: bool,
+            confstr_path: String,
+        }
+
+        impl Fixture {
+            /// Fresh fixture: empty `current_dir`, `install_dir` with a
+            /// fake wrapper binary under `bin/<WRAPPER_NAME>`, empty
+            /// environment, `preload_supported=false`, `confstr_path=""`.
+            pub fn new() -> Self {
+                let install_dir = TempDir::new().unwrap();
+                let bin_dir = install_dir.path().join("bin");
+                std::fs::create_dir(&bin_dir).unwrap();
+                write_executable(&bin_dir.join(env!("WRAPPER_NAME")));
+                Self {
+                    current_dir: TempDir::new().unwrap(),
+                    install_dir,
+                    tool_dirs: Vec::new(),
+                    environment: HashMap::new(),
+                    preload_supported: false,
+                    confstr_path: String::new(),
+                }
+            }
+
+            /// Overwrites `PATH` with the string produced by joining
+            /// the tool_dirs registered via `add_compiler_on_path` /
+            /// `add_compilers_on_path`. Callers normally do not need to
+            /// invoke this directly.
+            fn refresh_path(&mut self) {
+                let joined = std::env::join_paths(self.tool_dirs.iter().map(|d| d.path().to_owned()))
+                    .expect("join PATH");
+                self.environment.insert(KEY_OS__PATH.to_string(), joined.into_string().expect("utf-8 PATH"));
+            }
+
+            /// Creates a new tool directory, writes a fake compiler
+            /// named `name`, adds the directory to `PATH`, returns the
+            /// compiler's absolute path.
+            pub fn add_compiler_on_path(&mut self, name: &str) -> PathBuf {
+                let paths = self.add_compilers_on_path(&[name]);
+                paths.into_iter().next().unwrap()
+            }
+
+            /// Creates one tool directory, writes one fake binary per
+            /// name, adds the directory to `PATH`, returns their paths
+            /// in the order passed.
+            pub fn add_compilers_on_path(&mut self, names: &[&str]) -> Vec<PathBuf> {
+                let dir = TempDir::new().unwrap();
+                let paths: Vec<PathBuf> = names
+                    .iter()
+                    .map(|n| {
+                        let p = dir.path().join(n);
+                        write_executable(&p);
+                        p
+                    })
+                    .collect();
+                self.tool_dirs.push(dir);
+                self.refresh_path();
+                paths
+            }
+
+            /// Creates a fake compiler in a new tool directory that is
+            /// NOT added to `PATH`. Use for tests that set `CC` to an
+            /// absolute path directly.
+            pub fn add_compiler_off_path(&mut self, name: &str) -> PathBuf {
+                let dir = TempDir::new().unwrap();
+                let path = dir.path().join(name);
+                write_executable(&path);
+                self.tool_dirs.push(dir);
+                path
+            }
+
+            /// Writes a fake compiler at `current_dir/<subdir>/<name>`.
+            /// Used for relative-path tests.
+            pub fn add_compiler_in_cwd_subdir(&mut self, subdir: &str, name: &str) -> PathBuf {
+                let dir = self.current_dir.path().join(subdir);
+                std::fs::create_dir_all(&dir).unwrap();
+                let path = dir.join(name);
+                write_executable(&path);
+                path
+            }
+
+            pub fn with_env(mut self, key: &str, value: &str) -> Self {
+                self.environment.insert(key.into(), value.into());
+                self
+            }
+
+            /// Overrides PATH with the given string. Use only for tests
+            /// that want a specific, non-tool-dir PATH (e.g. to force
+            /// PATH resolution failure).
+            pub fn with_path_string(mut self, value: &str) -> Self {
+                self.environment.insert(KEY_OS__PATH.to_string(), value.into());
+                self
+            }
+
+            pub fn with_preload_supported(mut self, v: bool) -> Self {
+                self.preload_supported = v;
+                self
+            }
+
+            pub fn current_dir(&self) -> &Path {
+                self.current_dir.path()
+            }
+
+            /// The `.bear` directory path that `create_as_wrapper` will
+            /// populate.
+            pub fn wrapper_dir(&self) -> PathBuf {
+                self.current_dir.path().join(".bear")
+            }
+
+            /// Full path of a named wrapper inside `.bear/`.
+            pub fn wrapper_path_for(&self, name: &str) -> PathBuf {
+                self.wrapper_dir().join(name)
+            }
+
+            /// Borrows the underlying `current_dir` TempDir, for
+            /// compatibility with helpers like `get_wrapper_dir_path`.
+            pub fn current_dir_tempdir(&self) -> &TempDir {
+                &self.current_dir
+            }
+
+            pub fn context(&self) -> crate::context::Context {
+                crate::context::Context {
+                    current_executable: self.install_dir.path().join("bin").join("bear-driver"),
+                    current_directory: self.current_dir.path().to_path_buf(),
+                    environment: self.environment.clone(),
+                    preload_supported: self.preload_supported,
+                    confstr_path: self.confstr_path.clone(),
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_insert_to_path_empty_original() {
         let original = "";
@@ -788,42 +969,19 @@ mod test {
 
     #[test]
     fn test_wrapper_environment_path_setting_when_it_was_empty_before() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
+        let fx = fixture::Fixture::new();
+        let sut = BuildEnvironment::create(
+            &fx.context(),
+            &config::Intercept::Wrapper,
+            &[],
+            fixture::test_address(),
+            |_| true,
+        )
+        .unwrap();
 
-            // create bin dir
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            // create wrapper mock
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
-
-            dir
-        };
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-        let sut = {
-            let intercept = config::Intercept::Wrapper;
-            let compilers = vec![];
-            let context = {
-                crate::context::Context {
-                    current_executable: install_dir.path().join("bin").join("bear-driver"),
-                    current_directory: current_dir.path().to_path_buf(),
-                    environment: HashMap::new(),
-                    preload_supported: false,
-                    confstr_path: String::from("/usr/bin:/bin"),
-                }
-            };
-
-            BuildEnvironment::create(&context, &intercept, &compilers, address, |_| true).unwrap()
-        };
-
-        // Check that PATH is updated (should contain .bear directory at the beginning)
         let path = sut.environment_overrides.get("PATH").unwrap();
-        let expected_wrapper_path = get_wrapper_dir_path(&current_dir);
-        assert_first_path_entry(&expected_wrapper_path, path);
+        let expected = get_wrapper_dir_path(fx.current_dir_tempdir());
+        assert_first_path_entry(&expected, path);
     }
 
     // Sets `CC`/`CXX` to raw absolute paths from a TempDir, which materialise
@@ -835,332 +993,116 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn test_build_environment_create_wrapper() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
+        let mut fx = fixture::Fixture::new().with_preload_supported(true);
+        let paths = fx.add_compilers_on_path(&["cc", "clang", "gcc", "g++"]);
+        let [cc_path, clang_path, gcc_path, gxx_path] = [&paths[0], &paths[1], &paths[2], &paths[3]];
+        let fx = fx.with_env("CC", &gcc_path.to_string_lossy()).with_env("CXX", &gxx_path.to_string_lossy());
 
-            // create bin dir
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            // create wrapper mock
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+        let compilers = vec![
+            config::Compiler { path: cc_path.clone(), as_: None, ignore: false },
+            config::Compiler { path: clang_path.clone(), as_: None, ignore: false },
+        ];
+        let address = fixture::test_address();
+        let sut =
+            BuildEnvironment::create(&fx.context(), &config::Intercept::Wrapper, &compilers, address, |_| {
+                true
+            })
+            .unwrap();
 
-            dir
-        };
-
-        // Create fake compiler binaries in a temp directory so the paths are
-        // genuinely absolute on every platform (including Windows, where
-        // "/usr/bin/gcc" is not absolute because it lacks a drive letter).
-        let compiler_dir = TempDir::new().unwrap();
-        let cc_path = compiler_dir.path().join("cc");
-        let clang_path = compiler_dir.path().join("clang");
-        let gcc_path = compiler_dir.path().join("gcc");
-        let gxx_path = compiler_dir.path().join("g++");
-        for p in [&cc_path, &clang_path, &gcc_path, &gxx_path] {
-            std::fs::write(p, "fake").unwrap();
-        }
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-        let sut = {
-            let intercept = config::Intercept::Wrapper;
-            let compilers = vec![
-                config::Compiler { path: cc_path.clone(), as_: None, ignore: false },
-                config::Compiler { path: clang_path.clone(), as_: None, ignore: false },
-            ];
-            let context = {
-                let path_value = compiler_dir.path().to_string_lossy().to_string();
-                let environment = {
-                    let mut builder = HashMap::new();
-                    builder.insert(KEY_OS__PATH.to_string(), path_value.clone());
-                    builder.insert("CC".to_string(), gcc_path.to_string_lossy().to_string());
-                    builder.insert("CXX".to_string(), gxx_path.to_string_lossy().to_string());
-                    builder
-                };
-
-                crate::context::Context {
-                    current_executable: install_dir.path().join("bin").join("bear-driver"),
-                    current_directory: current_dir.path().to_path_buf(),
-                    environment,
-                    preload_supported: true,
-                    confstr_path: path_value,
-                }
-            };
-
-            BuildEnvironment::create(&context, &intercept, &compilers, address, |_| true).unwrap()
-        };
-
-        // Check that PATH is updated (should contain .bear directory at the beginning)
         let path = sut.environment_overrides.get("PATH").unwrap();
-        let expected_wrapper_path = get_wrapper_dir_path(&current_dir);
-        assert_first_path_entry(&expected_wrapper_path, path);
+        assert_first_path_entry(&get_wrapper_dir_path(fx.current_dir_tempdir()), path);
 
-        // Verify wrapper directory is kept alive
-        assert!(sut._wrapper_directory.is_some());
-        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
+        let wrapper_dir = sut._wrapper_directory.as_ref().expect("wrapper directory");
         let wrapper_config = wrapper_dir.config();
-
-        // Check that collector address is in the config
         assert_eq!(wrapper_config.collector_address, address);
+        assert_eq!(wrapper_config.get_executable("cc").unwrap(), cc_path);
+        assert_eq!(wrapper_config.get_executable("clang").unwrap(), clang_path);
+        assert_eq!(wrapper_config.get_executable("gcc").unwrap(), gcc_path);
+        assert_eq!(wrapper_config.get_executable("g++").unwrap(), gxx_path);
 
-        // Check that compilers configured are in the wrapper config
-        assert_eq!(&cc_path, wrapper_config.get_executable("cc").unwrap());
-        assert_eq!(&clang_path, wrapper_config.get_executable("clang").unwrap());
-        assert_eq!(&gcc_path, wrapper_config.get_executable("gcc").unwrap());
-        assert_eq!(&gxx_path, wrapper_config.get_executable("g++").unwrap());
-
-        // Check that environment variables were redirected to wrapper executables
-        let cc_value = sut.environment_overrides.get("CC").unwrap();
-        let cxx_value = sut.environment_overrides.get("CXX").unwrap();
-        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
-        assert!(cxx_value.contains(".bear"), "CXX should point to wrapper: {}", cxx_value);
+        assert!(sut.environment_overrides.get("CC").unwrap().contains(".bear"));
+        assert!(sut.environment_overrides.get("CXX").unwrap().contains(".bear"));
     }
 
     #[test]
     fn test_path_discovery_with_empty_executables() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
+        #[cfg(unix)]
+        let compilers = ["gcc", "g++", "clang", "notacompiler"];
+        #[cfg(not(unix))]
+        let compilers = ["gcc.exe", "g++.exe", "clang.exe", "notacompiler"];
 
-            // create bin dir
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            // create wrapper mock
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+        let mut fx = fixture::Fixture::new().with_preload_supported(true);
+        fx.add_compilers_on_path(&compilers);
 
-            dir
-        };
+        let known_compilers = ["gcc", "g++", "clang", "gcc.exe", "g++.exe", "clang.exe"];
+        let build_env = BuildEnvironment::create_as_wrapper(
+            &fx.context(),
+            &[], // Empty executables - should trigger PATH discovery
+            fixture::test_address(),
+            |path| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| known_compilers.contains(&n))
+                    .unwrap_or(false)
+            },
+        )
+        .expect("PATH discovery should succeed");
 
-        // Create a directory with mock compilers
-        let tool_dir = {
-            let dir = TempDir::new().unwrap();
-
-            // Create mock compiler executables
-            #[cfg(unix)]
-            let compilers = ["gcc", "g++", "clang", "notacompiler"];
-            #[cfg(not(unix))]
-            let compilers = ["gcc.exe", "g++.exe", "clang.exe", "notacompiler"];
-
-            for compiler in &compilers {
-                let compiler_path = dir.path().join(compiler);
-                std::fs::write(&compiler_path, "#!/usr/bin/true").unwrap();
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    std::fs::set_permissions(&compiler_path, std::fs::Permissions::from_mode(0o755)).unwrap();
-                }
-            }
-            dir
-        };
-
-        let sut = {
-            let context = {
-                let environment = {
-                    let mut builder = HashMap::new();
-                    builder.insert("PATH".to_string(), tool_dir.path().to_string_lossy().to_string());
-                    builder
-                };
-
-                crate::context::Context {
-                    current_executable: install_dir.path().join("bin").join("bear-driver"),
-                    current_directory: current_dir.path().to_path_buf(),
-                    environment,
-                    preload_supported: true,
-                    confstr_path: String::from("/usr/bin:/bin"),
-                }
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-            let known_compilers = ["gcc", "g++", "clang", "gcc.exe", "g++.exe", "clang.exe"];
-            BuildEnvironment::create_as_wrapper(
-                &context,
-                &[], // Empty executables - should trigger PATH discovery
-                address,
-                |path| {
-                    path.file_name()
-                        .and_then(|n| n.to_str())
-                        .map(|n| known_compilers.contains(&n))
-                        .unwrap_or(false)
-                },
-            )
-        };
-
-        assert!(sut.is_ok(), "PATH discovery should succeed");
-        let build_env = sut.unwrap();
-
-        // Verify that the PATH was updated to include the wrapper directory
         let path = build_env.environment_overrides.get("PATH").unwrap();
-        let expected_wrapper_path = get_wrapper_dir_path(&current_dir);
-        assert_first_path_entry(&expected_wrapper_path, path);
+        assert_first_path_entry(&get_wrapper_dir_path(fx.current_dir_tempdir()), path);
 
-        // Verify that compilers were discovered and registered in the config
-        let wrapper_dir = build_env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let wrapper_config = wrapper_dir.config();
-
-        // Should have discovered gcc, g++, and clang from PATH (but not notacompiler)
+        let wrapper_config = build_env._wrapper_directory.as_ref().unwrap().config();
         #[cfg(unix)]
-        assert!(wrapper_config.get_executable("gcc").is_some(), "gcc should be discovered");
-        #[cfg(unix)]
-        assert!(wrapper_config.get_executable("g++").is_some(), "g++ should be discovered");
-        #[cfg(unix)]
-        assert!(wrapper_config.get_executable("clang").is_some(), "clang should be discovered");
+        for name in ["gcc", "g++", "clang"] {
+            assert!(wrapper_config.get_executable(name).is_some(), "{name} should be discovered");
+        }
         #[cfg(not(unix))]
-        assert!(wrapper_config.get_executable("gcc.exe").is_some(), "gcc should be discovered");
-        #[cfg(not(unix))]
-        assert!(wrapper_config.get_executable("g++.exe").is_some(), "g++ should be discovered");
-        #[cfg(not(unix))]
-        assert!(wrapper_config.get_executable("clang.exe").is_some(), "clang should be discovered");
-        assert!(
-            wrapper_config.get_executable("notacompiler").is_none(),
-            "notacompiler should not be registered"
-        );
+        for name in ["gcc.exe", "g++.exe", "clang.exe"] {
+            assert!(wrapper_config.get_executable(name).is_some(), "{name} should be discovered");
+        }
+        assert!(wrapper_config.get_executable("notacompiler").is_none());
     }
 
     #[test]
     fn test_path_discovery_skipped_with_executables() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
+        let compiler = if cfg!(unix) { "gcc" } else { "gcc.exe" };
+        let mut fx = fixture::Fixture::new().with_preload_supported(true);
+        fx.add_compiler_on_path(compiler);
 
-            // create bin dir
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            // create wrapper mock
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
+        let custom_compiler =
+            config::Compiler { path: PathBuf::from("/usr/bin/custom-gcc"), as_: None, ignore: false };
 
-            dir
-        };
+        let build_env = BuildEnvironment::create(
+            &fx.context(),
+            &config::Intercept::Wrapper,
+            &[custom_compiler],
+            fixture::test_address(),
+            |_| true,
+        )
+        .expect("should succeed with explicit executables");
 
-        // Create a directory with a compiler
-        let tool_dir = {
-            let dir = TempDir::new().unwrap();
-
-            #[cfg(unix)]
-            let compiler = "gcc";
-            #[cfg(not(unix))]
-            let compiler = "gcc.exe";
-
-            let compiler_path = dir.path().join(compiler);
-            std::fs::write(&compiler_path, "#!/usr/bin/true").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&compiler_path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            }
-            dir
-        };
-
-        // Use temp_dir as working directory through context
-        let sut = {
-            let context = {
-                let environment = {
-                    let mut builder = std::collections::HashMap::new();
-                    builder.insert("PATH".to_string(), tool_dir.path().to_string_lossy().to_string());
-                    builder
-                };
-
-                crate::context::Context {
-                    current_executable: install_dir.path().join("bin").join("bear-driver"),
-                    current_directory: current_dir.path().to_path_buf(),
-                    environment,
-                    preload_supported: true,
-                    confstr_path: String::from("/usr/bin:/bin"),
-                }
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-
-            let custom_compiler =
-                config::Compiler { path: PathBuf::from("/usr/bin/custom-gcc"), as_: None, ignore: false };
-
-            BuildEnvironment::create(
-                &context,
-                &config::Intercept::Wrapper,
-                &[custom_compiler],
-                address,
-                |_| true,
-            )
-        };
-
-        assert!(sut.is_ok(), "Should succeed with explicit executables");
-
-        // Verify that only the explicit executable is registered (no PATH discovery)
-        let build_env = sut.unwrap();
-        let wrapper_dir = build_env._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let wrapper_config = wrapper_dir.config();
-
-        // Should have custom-gcc registered
-        assert!(wrapper_config.get_executable("custom-gcc").is_some(), "custom-gcc should be registered");
-
-        // Should NOT have gcc from PATH (PATH discovery should be skipped)
-        // The gcc in bin_dir should not be discovered because we provided explicit executables
-        assert!(wrapper_config.get_executable("gcc").is_none(), "gcc from PATH should not be discovered");
+        let wrapper_config = build_env._wrapper_directory.as_ref().unwrap().config();
+        assert!(wrapper_config.get_executable("custom-gcc").is_some());
+        assert!(
+            wrapper_config.get_executable(compiler).is_none(),
+            "PATH discovery should be skipped when explicit executables are provided",
+        );
     }
 
     // U1: resolve_program_path finds bare name via PATH
     #[test]
     fn test_env_var_bare_name_resolved_via_path() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
-            dir
-        };
+        let basename = fixture::compiler_basename();
+        let mut fx = fixture::Fixture::new();
+        let compiler_path = fx.add_compiler_on_path(basename);
+        let fx = fx.with_env("CC", "fake-cc");
 
-        // Create a fake compiler on a tool directory that will be in PATH
-        let tool_dir = TempDir::new().unwrap();
-        let compiler_name = if cfg!(windows) { "fake-cc.exe" } else { "fake-cc" };
-        let compiler_path = {
-            let path = tool_dir.path().join(compiler_name);
-            std::fs::write(&path, "#!/usr/bin/true").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            }
-            path
-        };
+        let sut = BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+            .unwrap();
 
-        let context = {
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), tool_dir.path().to_string_lossy().to_string());
-            // CC is set to a bare name - no path, just "fake-cc"
-            environment.insert("CC".to_string(), "fake-cc".to_string());
-
-            crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            }
-        };
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let wrapper_config = wrapper_dir.config();
-
-        // The bare name "fake-cc" should have been resolved via PATH to the real path
-        let resolved = wrapper_config
-            .get_executable(compiler_name)
-            .expect("bare CC=fake-cc should be resolved via PATH and registered");
-        assert_eq!(
-            resolved, &compiler_path,
-            "resolved path should be the actual compiler on PATH, not a bare name",
-        );
-
-        // CC should be overridden to point to the wrapper
-        let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
-        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+        let wrapper_config = sut._wrapper_directory.as_ref().unwrap().config();
+        assert_eq!(wrapper_config.get_executable(basename).unwrap(), &compiler_path);
+        assert!(sut.environment_overrides.get("CC").unwrap().contains(".bear"));
     }
 
     // U2: resolve_program_path returns absolute path as-is.
@@ -1170,156 +1112,52 @@ mod test {
     #[cfg(unix)]
     #[test]
     fn test_env_var_absolute_path_passed_through() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
-            dir
-        };
+        let compiler_name = "my-gcc";
+        let mut fx = fixture::Fixture::new().with_path_string("/usr/bin");
+        let compiler_path = fx.add_compiler_off_path(compiler_name);
+        let fx = fx.with_env("CC", &compiler_path.to_string_lossy());
 
-        let compiler_name = if cfg!(windows) { "my-gcc.exe" } else { "my-gcc" };
-        let compiler_path = {
-            let path = current_dir.path().join(compiler_name);
-            std::fs::write(&path, "#!/usr/bin/true").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            }
-            path
-        };
+        let sut = BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+            .unwrap();
 
-        let context = {
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
-            // CC is set to an absolute path
-            environment.insert("CC".to_string(), compiler_path.to_string_lossy().to_string());
-
-            crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            }
-        };
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let wrapper_config = wrapper_dir.config();
-
-        // The absolute path should be registered using the filename
         assert!(
-            wrapper_config.get_executable(compiler_name).is_some(),
-            "absolute CC path should be registered as {}",
-            compiler_name,
+            sut._wrapper_directory.as_ref().unwrap().config().get_executable(compiler_name).is_some(),
+            "absolute CC path should be registered as {compiler_name}",
         );
     }
 
     // U4: resolve_program_path returns None for unresolvable name
     #[test]
     fn test_env_var_unresolvable_name_skipped() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
-            dir
-        };
+        let fx =
+            fixture::Fixture::new().with_path_string("/usr/bin").with_env("CC", "nonexistent-compiler-xyz");
 
-        let context = {
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
-            // CC is set to a name that does not exist anywhere on PATH
-            environment.insert("CC".to_string(), "nonexistent-compiler-xyz".to_string());
+        let sut = BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+            .unwrap();
 
-            crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            }
-        };
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        // Should not fail - unresolvable env vars are skipped
-        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-        // CC should NOT be in overrides (it was skipped)
-        assert!(
-            !sut.environment_overrides.contains_key("CC"),
-            "unresolvable CC should be skipped, not overridden",
-        );
+        assert!(!sut.environment_overrides.contains_key("CC"));
     }
 
     // U3: resolve_program_path resolves relative path against cwd
     #[test]
     fn test_env_var_relative_path_resolved_against_cwd() {
-        let current_dir = TempDir::new().unwrap();
-        let install_dir = {
-            let dir = TempDir::new().unwrap();
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            let file = bin_dir.join(env!("WRAPPER_NAME"));
-            std::fs::write(&file, "#!/usr/bin/true").unwrap();
-            dir
-        };
-
-        // Create a compiler in a subdirectory of the working directory
-        let tools_subdir = current_dir.path().join("tools");
-        std::fs::create_dir(&tools_subdir).unwrap();
         let compiler_name = if cfg!(windows) { "my-cc.exe" } else { "my-cc" };
-        let _compiler_path = {
-            let path = tools_subdir.join(compiler_name);
-            std::fs::write(&path, "#!/usr/bin/true").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            }
-            path
-        };
+        let mut fx = fixture::Fixture::new().with_path_string("/usr/bin");
+        fx.add_compiler_in_cwd_subdir("tools", compiler_name);
+        let fx = fx.with_env("CC", &format!("tools/{compiler_name}"));
 
-        let relative_cc = format!("tools/{}", compiler_name);
+        let sut = BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+            .unwrap();
 
-        let context = {
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
-            // CC is set to a relative path
-            environment.insert("CC".to_string(), relative_cc);
-
-            crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            }
-        };
-
-        let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-        let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-        let wrapper_dir = sut._wrapper_directory.as_ref().expect("Wrapper directory should exist");
-        let wrapper_config = wrapper_dir.config();
-
-        // The relative path should be resolved against cwd to an absolute path
-        let resolved = wrapper_config
+        let resolved = sut
+            ._wrapper_directory
+            .as_ref()
+            .unwrap()
+            .config()
             .get_executable(compiler_name)
-            .unwrap_or_else(|| panic!("relative CC=tools/{compiler_name} should be resolved against cwd"));
-        assert!(resolved.is_absolute(), "resolved path should be absolute, got: {}", resolved.display(),);
-
-        // CC should be overridden to point to the wrapper
-        let cc_value = sut.environment_overrides.get("CC").expect("CC should be overridden");
-        assert!(cc_value.contains(".bear"), "CC should point to wrapper: {}", cc_value);
+            .unwrap_or_else(|| panic!("relative CC=tools/{compiler_name} should resolve against cwd"));
+        assert!(resolved.is_absolute(), "resolved path should be absolute, got: {}", resolved.display());
+        assert!(sut.environment_overrides.get("CC").unwrap().contains(".bear"));
     }
 
     #[cfg(unix)]
@@ -1547,27 +1385,6 @@ mod test {
         use super::super::parse_program_env_value;
         use super::*;
 
-        fn fake_install_dir() -> TempDir {
-            let dir = TempDir::new().unwrap();
-            let bin_dir = dir.path().join("bin");
-            std::fs::create_dir(&bin_dir).unwrap();
-            std::fs::write(bin_dir.join(env!("WRAPPER_NAME")), "#!/usr/bin/true").unwrap();
-            dir
-        }
-
-        fn write_executable(path: &std::path::Path) {
-            std::fs::write(path, "#!/usr/bin/true").unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
-            }
-        }
-
-        fn compiler_basename() -> &'static str {
-            if cfg!(windows) { "fake-cc.exe" } else { "fake-cc" }
-        }
-
         #[test]
         fn parser_skips_empty_and_whitespace() {
             assert_eq!(parse_program_env_value(""), None);
@@ -1601,70 +1418,39 @@ mod test {
         #[cfg(unix)]
         #[test]
         fn no_flag_override_is_byte_identical_to_wrapper_path() {
-            let current_dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
+            let basename = fixture::compiler_basename();
+            let mut fx = fixture::Fixture::new();
+            let compiler_path = fx.add_compiler_on_path(basename);
+            let fx = fx.with_env("CC", &compiler_path.to_string_lossy());
 
-            let tool_dir = TempDir::new().unwrap();
-            let compiler_path = tool_dir.path().join(compiler_basename());
-            write_executable(&compiler_path);
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), tool_dir.path().to_string_lossy().to_string());
-            environment.insert("CC".to_string(), compiler_path.to_string_lossy().to_string());
-
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-            let wrapper_dir = sut._wrapper_directory.as_ref().unwrap();
-            let wrapper_path = wrapper_dir.path().join(compiler_basename()).to_string_lossy().into_owned();
-
-            let cc_value = sut.environment_overrides.get("CC").unwrap();
             assert_eq!(
-                cc_value, &wrapper_path,
+                sut.environment_overrides.get("CC").unwrap(),
+                &fx.wrapper_path_for(basename).to_string_lossy().into_owned(),
                 "no-flag override must be the raw wrapper path, no shell quoting",
             );
         }
 
         #[test]
         fn bare_cc_with_flags_resolves_program_and_preserves_flags() {
-            let current_dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
+            let basename = fixture::compiler_basename();
+            let mut fx = fixture::Fixture::new();
+            let compiler_path = fx.add_compiler_on_path(basename);
+            let fx = fx.with_env("CC", &format!("{basename} -std=c11 -Wall"));
 
-            let tool_dir = TempDir::new().unwrap();
-            let compiler_path = tool_dir.path().join(compiler_basename());
-            write_executable(&compiler_path);
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), tool_dir.path().to_string_lossy().to_string());
-            environment.insert("CC".to_string(), format!("{} -std=c11 -Wall", compiler_basename()));
-
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-            let wrapper_dir = sut._wrapper_directory.as_ref().unwrap();
-            assert_eq!(wrapper_dir.config().get_executable(compiler_basename()).unwrap(), &compiler_path,);
-
-            let cc_value = sut.environment_overrides.get("CC").expect("CC must be overridden");
-            let wrapper_dir_path =
-                wrapper_dir.path().join(compiler_basename()).to_string_lossy().into_owned();
-            let expected = format!("{} -std=c11 -Wall", wrapper_dir_path);
-            assert_eq!(cc_value, &expected, "override must be wrapper path + flags, space-joined");
+            assert_eq!(
+                sut._wrapper_directory.as_ref().unwrap().config().get_executable(basename).unwrap(),
+                &compiler_path
+            );
+            let expected = format!("{} -std=c11 -Wall", fx.wrapper_path_for(basename).to_string_lossy());
+            assert_eq!(sut.environment_overrides.get("CC").unwrap(), &expected);
         }
 
         // Unix-only for the same reason as
@@ -1673,53 +1459,26 @@ mod test {
         #[cfg(unix)]
         #[test]
         fn absolute_cc_with_flags_resolves_program_and_preserves_flags() {
-            let current_dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
+            let basename = fixture::compiler_basename();
+            let mut fx = fixture::Fixture::new().with_path_string("/usr/bin");
+            let compiler_path = fx.add_compiler_off_path(basename);
+            let fx = fx.with_env("CC", &format!("{} -m32 -DX=1", compiler_path.to_string_lossy()));
 
-            let tool_dir = TempDir::new().unwrap();
-            let compiler_path = tool_dir.path().join(compiler_basename());
-            write_executable(&compiler_path);
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
-            environment.insert("CC".to_string(), format!("{} -m32 -DX=1", compiler_path.to_string_lossy()));
-
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-            let cc_value = sut.environment_overrides.get("CC").expect("CC must be overridden");
-            let wrapper_dir = sut._wrapper_directory.as_ref().unwrap().path().join(compiler_basename());
-            let expected = format!("{} -m32 -DX=1", wrapper_dir.to_string_lossy());
-            assert_eq!(cc_value, &expected);
+            let expected = format!("{} -m32 -DX=1", fx.wrapper_path_for(basename).to_string_lossy());
+            assert_eq!(sut.environment_overrides.get("CC").unwrap(), &expected);
         }
 
         #[test]
         fn whitespace_only_cc_is_skipped() {
-            let current_dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
+            let fx = fixture::Fixture::new().with_path_string("/usr/bin").with_env("CC", "   ");
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "/usr/bin".to_string());
-            environment.insert("CC".to_string(), "   ".to_string());
-
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
             assert!(!sut.environment_overrides.contains_key("CC"));
         }
@@ -1734,51 +1493,39 @@ mod test {
         fn masquerade_with_flags_resolves_real_compiler_and_preserves_flags() {
             use std::os::unix::fs::PermissionsExt;
 
-            let dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
+            let fx = fixture::Fixture::new();
+            let dir = fx.current_dir();
 
-            let ccache_bin = dir.path().join("ccache");
+            // ccache binary and a masq dir with a symlink to it. Bear's
+            // resolver must step past the masq dir and land on `real/gcc`.
+            let ccache_bin = dir.join("ccache");
             std::fs::write(&ccache_bin, "#!/bin/sh\n").unwrap();
             std::fs::set_permissions(&ccache_bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-            let masq_dir = dir.path().join("masq");
+            let masq_dir = dir.join("masq");
             std::fs::create_dir_all(&masq_dir).unwrap();
             std::os::unix::fs::symlink(&ccache_bin, masq_dir.join("gcc")).unwrap();
 
-            let real_dir = dir.path().join("real");
+            let real_dir = dir.join("real");
             std::fs::create_dir_all(&real_dir).unwrap();
             let real_gcc = real_dir.join("gcc");
             std::fs::write(&real_gcc, "#!/bin/sh\n").unwrap();
             std::fs::set_permissions(&real_gcc, std::fs::Permissions::from_mode(0o755)).unwrap();
 
             let path_value = std::env::join_paths([&masq_dir, &real_dir]).unwrap().into_string().unwrap();
+            let fx = fx.with_path_string(&path_value).with_env("CC", "gcc -std=c11");
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), path_value);
-            environment.insert("CC".to_string(), "gcc -std=c11".to_string());
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-            let wrapper_dir = sut._wrapper_directory.as_ref().unwrap();
             assert_eq!(
-                wrapper_dir.config().get_executable("gcc").unwrap(),
+                sut._wrapper_directory.as_ref().unwrap().config().get_executable("gcc").unwrap(),
                 &real_gcc,
                 "masquerade symlink must be resolved past, just like without flags",
             );
-
-            let cc_value = sut.environment_overrides.get("CC").unwrap();
-            let wrapper_path = wrapper_dir.path().join("gcc");
-            let expected = format!("{} -std=c11", wrapper_path.to_string_lossy());
-            assert_eq!(cc_value, &expected);
+            let expected = format!("{} -std=c11", fx.wrapper_path_for("gcc").to_string_lossy());
+            assert_eq!(sut.environment_overrides.get("CC").unwrap(), &expected);
         }
 
         /// Windows coverage of `CC=<absolute path> -flag` using the path
@@ -1789,50 +1536,26 @@ mod test {
         #[cfg(windows)]
         #[test]
         fn forward_slash_absolute_cc_registers_wrapper_on_windows() {
-            let current_dir = TempDir::new().unwrap();
-            let install_dir = fake_install_dir();
-
-            let tool_dir = TempDir::new().unwrap();
-            let compiler_path = tool_dir.path().join(compiler_basename());
-            write_executable(&compiler_path);
-
-            // Convert the Windows backslash rendering to forward slashes,
-            // matching the MSYS2/Git Bash `CC` convention.
+            let basename = fixture::compiler_basename();
+            let mut fx = fixture::Fixture::new().with_path_string("C:/Windows/System32");
+            let compiler_path = fx.add_compiler_off_path(basename);
             let forward_slash_path = compiler_path.to_string_lossy().replace('\\', "/");
+            let fx = fx.with_env("CC", &format!("{forward_slash_path} -DBEAR_TEST=1"));
 
-            let mut environment = HashMap::new();
-            environment.insert(KEY_OS__PATH.to_string(), "C:/Windows/System32".to_string());
-            environment.insert("CC".to_string(), format!("{} -DBEAR_TEST=1", forward_slash_path));
+            let sut =
+                BuildEnvironment::create_as_wrapper(&fx.context(), &[], fixture::test_address(), |_| false)
+                    .unwrap();
 
-            let context = crate::context::Context {
-                current_executable: install_dir.path().join("bin").join("bear-driver"),
-                current_directory: current_dir.path().to_path_buf(),
-                environment,
-                preload_supported: false,
-                confstr_path: String::new(),
-            };
-
-            let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
-            let sut = BuildEnvironment::create_as_wrapper(&context, &[], address, |_| false).unwrap();
-
-            let wrapper_dir = sut._wrapper_directory.as_ref().unwrap();
             assert!(
-                wrapper_dir.config().get_executable(compiler_basename()).is_some(),
-                "forward-slash absolute CC path must register a wrapper for {}",
-                compiler_basename(),
+                sut._wrapper_directory.as_ref().unwrap().config().get_executable(basename).is_some(),
+                "forward-slash absolute CC path must register a wrapper for {basename}",
             );
-
-            let cc_value = sut.environment_overrides.get("CC").expect("CC must be overridden");
+            let cc_value = sut.environment_overrides.get("CC").unwrap();
             assert!(
                 cc_value.ends_with(" -DBEAR_TEST=1"),
-                "override must preserve the trailing flag, got: {:?}",
-                cc_value,
+                "override must preserve -DBEAR_TEST=1: {cc_value:?}"
             );
-            assert!(
-                cc_value.contains(".bear"),
-                "override must point at the .bear wrapper, got: {:?}",
-                cc_value,
-            );
+            assert!(cc_value.contains(".bear"), "override must point at the .bear wrapper: {cc_value:?}");
         }
     }
 }
