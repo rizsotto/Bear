@@ -140,7 +140,18 @@ fn check_one_executable_exists(define: &str, executables: &[&str]) {
 /// exists on the Ubuntu matrix entry.
 fn check_ccache_masquerade_dir() {
     println!("cargo:rustc-check-cfg=cfg(host_has_ccache_masquerade)");
-    let candidates = ["/usr/lib/ccache", "/usr/lib64/ccache", "/usr/libexec/ccache"];
+    let candidates = [
+        // Debian/Ubuntu
+        "/usr/lib/ccache",
+        // Fedora/Arch/Gentoo (lib64 multilib)
+        "/usr/lib64/ccache",
+        // Some BSDs / older distros
+        "/usr/libexec/ccache",
+        // Homebrew on Apple Silicon
+        "/opt/homebrew/opt/ccache/libexec",
+        // Homebrew on Intel macOS / Linuxbrew
+        "/usr/local/opt/ccache/libexec",
+    ];
     for dir in candidates {
         if let Some(path) = detect_ccache_masquerade_dir(dir) {
             println!("cargo:rustc-cfg=host_has_ccache_masquerade");

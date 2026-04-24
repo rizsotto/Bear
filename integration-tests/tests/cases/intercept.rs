@@ -791,10 +791,10 @@ intercept:
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
 
-    // Recorded compiler must be a real compiler, not the ccache symlink and
-    // not Bear's own wrapper in `.bear/`. `starts_with` on the exact wrapper
-    // dir is the tight check (a substring match would false-positive on any
-    // path that happens to contain `.bear`).
+    // Recorded compiler must be (a) an absolute path, (b) not the ccache
+    // symlink, and (c) not Bear's own wrapper in `.bear/`. `starts_with` on
+    // the exact wrapper dir is the tight check -- a substring match would
+    // false-positive on any path that happens to contain `.bear`.
     let wrapper_dir = env.test_dir().join(".bear");
     for entry in db.entries() {
         let argv = entry.get("arguments").and_then(|v| v.as_array());
@@ -802,9 +802,11 @@ intercept:
             .and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .expect("compilation db entry must have argv[0]");
+        let compiler_path = std::path::Path::new(compiler);
+        assert!(compiler_path.is_absolute(), "compilation db compiler path must be absolute: {compiler}",);
         assert!(!compiler.contains("ccache"), "compilation db must not reference ccache: {compiler}");
         assert!(
-            !std::path::Path::new(compiler).starts_with(&wrapper_dir),
+            !compiler_path.starts_with(&wrapper_dir),
             "compilation db must not reference Bear wrapper at {}: {compiler}",
             wrapper_dir.display(),
         );

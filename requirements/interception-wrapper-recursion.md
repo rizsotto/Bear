@@ -70,9 +70,6 @@ their installer symlinks compiler names to a wrapper binary.
 - The compiler path recorded in each entry is an absolute path to the
   real compiler, never the masquerade wrapper and never a `.bear/`
   wrapper
-- Nested compiler invocations (a compiler driver spawning another
-  bare-name compiler) are still intercepted: `.bear/` stays at the
-  front of the child's PATH
 - The user is not required to strip any directory from PATH, unset
   any environment variable, or configure `CCACHE_*` manually
 - If every `gcc` on PATH is a masquerade wrapper and no real compiler
@@ -104,10 +101,19 @@ helper is used only to decide whether to keep looking; the path
 stored in the wrapper config is whatever PATH resolution returned
 past the masquerade dirs.
 
-If the match succeeds, the directory containing the resolved binary is
-flagged as a masquerade directory. The resolution retries with that
-directory removed from the search PATH. The process repeats until it
-lands on a non-masquerade compiler or exhausts PATH.
+When `resolve_program_path` matches a masquerade wrapper, the
+containing directory is excluded from Bear's lookup PATH and the
+basename is re-resolved. The process repeats until it lands on a
+non-masquerade compiler or exhausts PATH.
+
+The PATH-scan path (`compiler_candidates`) uses the classification
+helper as a per-file filter rather than a per-directory exclusion:
+entries that are not themselves masquerade symlinks are registered
+even when they sit in a known masquerade dir. In practice the
+distro-shipped masquerade dirs contain nothing but symlinks to the
+wrapper binary, so the behaviours coincide; the per-file filter
+avoids surprising the user if a distribution ever adds a real
+binary alongside the symlinks.
 
 If a non-masquerade compiler is not found, Bear logs a warning and
 does not register a wrapper for that name. The build will see its
@@ -145,6 +151,14 @@ better than registering a wrapper that loops.
 - The set of recognised wrapper names is fixed in source. Uncommon
   or locally built wrappers that do not match are not detected; the
   user can either unset them from PATH or use preload mode.
+- Detection is symlink-based. A masquerade wrapper installed as a
+  shell script or hard copy (rather than a symlink) is out of scope
+  and will not be detected. All major distros (Debian/Ubuntu,
+  Fedora, Arch, Gentoo, macOS Homebrew) ship masquerade dirs as
+  directories of symlinks, so this is a theoretical gap. If a
+  non-symlink masquerade does surface in the wild, extend detection
+  rather than widening the classification helper to read file
+  contents.
 
 ## Testing
 

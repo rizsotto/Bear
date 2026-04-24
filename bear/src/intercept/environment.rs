@@ -530,11 +530,29 @@ fn resolve_past_masquerade_wrappers(name: &str, search_path: &str, cwd: &Path) -
 }
 
 /// Joins a path-separated string, removing any entries that match one of the
-/// excluded paths. Matching is by value; no canonicalisation.
+/// excluded paths. Trailing path separators are stripped on both sides before
+/// comparison so that a PATH entry written as `/usr/lib64/ccache/` still
+/// matches an excluded dir derived from `PathBuf::parent()` (which has no
+/// trailing slash). No further canonicalisation: matching is otherwise by
+/// byte-equal path.
 fn filter_out_paths(original: &str, excluded: &[PathBuf]) -> String {
-    let kept: Vec<PathBuf> =
-        std::env::split_paths(original).filter(|p| !excluded.iter().any(|e| e == p)).collect();
+    let excluded_normalised: Vec<PathBuf> = excluded.iter().map(|p| normalise_path(p)).collect();
+    let kept: Vec<PathBuf> = std::env::split_paths(original)
+        .filter(|p| {
+            let candidate = normalise_path(p);
+            !excluded_normalised.iter().any(|e| e == &candidate)
+        })
+        .collect();
     std::env::join_paths(kept).map(|os| os.into_string().unwrap_or_default()).unwrap_or_default()
+}
+
+/// Strips trailing path separators from a path (except when the path is just
+/// a root, e.g. `/` on Unix or `C:\` on Windows). Returns the input unchanged
+/// for non-UTF-8 paths.
+fn normalise_path(path: &Path) -> PathBuf {
+    let Some(s) = path.to_str() else { return path.to_path_buf() };
+    let trimmed = s.trim_end_matches(std::path::MAIN_SEPARATOR);
+    if trimmed.is_empty() { path.to_path_buf() } else { PathBuf::from(trimmed) }
 }
 
 /// Checks if a path represents an executable file.
@@ -1332,6 +1350,24 @@ mod test {
             let kept = filter_out_paths(&original, std::slice::from_ref(&b));
             let entries: Vec<PathBuf> = std::env::split_paths(&kept).collect();
             assert_eq!(entries, vec![a, c]);
+        }
+
+        /// A PATH entry written with a trailing separator must still match an
+        /// excluded dir derived from `Path::parent()` (which never has one).
+        // Requirements: interception-wrapper-recursion
+        #[test]
+        fn filter_out_paths_matches_across_trailing_separator() {
+            let sep = std::path::MAIN_SEPARATOR;
+            let original = format!("{sep}a{sep}:{sep}b{sep}:{sep}c");
+            let excluded = PathBuf::from(format!("{sep}b"));
+
+            let kept = filter_out_paths(&original, std::slice::from_ref(&excluded));
+            let entries: Vec<PathBuf> = std::env::split_paths(&kept).collect();
+            assert_eq!(
+                entries,
+                vec![PathBuf::from(format!("{sep}a{sep}")), PathBuf::from(format!("{sep}c"))],
+                "trailing-slash PATH entry was not filtered",
+            );
         }
 
         // Requirements: interception-wrapper-recursion
