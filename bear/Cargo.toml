@@ -51,4 +51,4 @@ bear-codegen = { path = "../bear-codegen" }
 
 [dev-dependencies]
 tempfile.workspace = true
-mockall = "0.14"
+mockall.workspace = true

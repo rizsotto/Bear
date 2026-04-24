@@ -15,5 +15,5 @@ regex = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-insta = "1.42"
-proptest = "1.6"
+insta = { workspace = true }
+proptest = { workspace = true }
