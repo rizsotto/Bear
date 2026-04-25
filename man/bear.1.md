@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% March 03, 2026
+% April 25, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
