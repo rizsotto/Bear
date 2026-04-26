@@ -1,12 +1,13 @@
+.idea/
+.vscode/
+.claude/
+.zed/
+
 cmake-build*/
 cmake-build-debug/
 Output/
 target/
 .DS_Store
 
-.idea/
-.vscode
-.vs
-settings.json
 *~
 *.profraw
