@@ -30,7 +30,6 @@ serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true
 clap.workspace = true
-directories.workspace = true
 log.workspace = true
 env_logger.workspace = true
 shell-words.workspace = true

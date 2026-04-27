@@ -2,7 +2,6 @@
 
 use super::Main;
 use super::validation::Validator;
-use directories::{BaseDirs, ProjectDirs};
 use log::{debug, info};
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
@@ -36,31 +35,56 @@ impl Loader {
         }
     }
 
-    /// The default locations where the configuration file can be found.
+    /// The default locations searched for the configuration file.
     ///
-    /// The locations are searched in the following order:
-    /// - The current working directory.
-    /// - The local configuration directory of the user.
-    /// - The configuration directory of the user.
-    /// - The local configuration directory of the application.
-    /// - The configuration directory of the application.
+    /// The search order is:
+    /// - the current working directory
+    /// - on Unix:
+    ///   - `$XDG_CONFIG_HOME` if set, else `$HOME/.config`
+    ///   - `<above>/Bear/`
+    /// - on Windows:
+    ///   - `%LOCALAPPDATA%`
+    ///   - `%LOCALAPPDATA%\Bear`
+    ///   - `%APPDATA%`
+    ///   - `%APPDATA%\Bear`
+    ///
+    /// Each directory is probed for a `bear.yml` file. The first existing file
+    /// is used; remaining locations are not consulted.
     fn file_locations(context: &crate::context::Context) -> Vec<PathBuf> {
-        let mut locations = Vec::new();
+        let mut locations: Vec<PathBuf> = Vec::new();
 
-        locations.push(context.current_directory.clone());
-        if let Some(base_dirs) = BaseDirs::new() {
-            locations.push(base_dirs.config_local_dir().to_path_buf());
-            locations.push(base_dirs.config_dir().to_path_buf());
+        locations.push(context.current_directory.clone().join("bear.yml"));
+
+        #[cfg(unix)]
+        {
+            let base = std::env::var_os("XDG_CONFIG_HOME")
+                .filter(|v| !v.is_empty())
+                .map(PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME")
+                        .filter(|v| !v.is_empty())
+                        .map(|home| PathBuf::from(home).join(".config"))
+                });
+            if let Some(dir) = base {
+                locations.push(dir.join("bear.yml"));
+                locations.push(dir.join("Bear").join("bear.yml"));
+            }
         }
 
-        if let Some(proj_dirs) = ProjectDirs::from("com.github", "rizsotto", "Bear") {
-            locations.push(proj_dirs.config_local_dir().to_path_buf());
-            locations.push(proj_dirs.config_dir().to_path_buf());
+        #[cfg(windows)]
+        {
+            for var in &["LOCALAPPDATA", "APPDATA"] {
+                if let Some(value) = std::env::var_os(var).filter(|v| !v.is_empty()) {
+                    let dir = PathBuf::from(value);
+                    locations.push(dir.join("bear.yml"));
+                    locations.push(dir.join("Bear").join("bear.yml"));
+                }
+            }
         }
-        // filter out duplicate elements from the list
+
+        // Drop adjacent duplicates (e.g. when $XDG_CONFIG_HOME == $HOME/.config).
         locations.dedup();
-        // append the default configuration file name to the locations
-        locations.iter().map(|p| p.join("bear.yml")).collect()
+        locations
     }
 
     /// Loads the configuration from the specified file.

@@ -1,6 +1,6 @@
 % BEAR(1) Bear User Manuals
 % László Nagy
-% April 25, 2026
+% April 27, 2026
 <!-- to generate the final `bear.1` file, run `pandoc -s -t man bear.1.md -o bear.1` -->
 
 # NAME
@@ -218,6 +218,28 @@ If no configuration file is specified, Bear uses built-in defaults optimized for
     RUST_LOG=debug bear -- make all
     RUST_LOG=info bear intercept -- cmake --build .
     ```
+
+# FILES
+
+The configuration file `bear.yml` is searched in the following locations, in order:
+
+**`./bear.yml`**
+: The current working directory.
+
+**`$XDG_CONFIG_HOME/bear.yml`**, **`$XDG_CONFIG_HOME/Bear/bear.yml`** (Unix)
+: When `$XDG_CONFIG_HOME` is set.
+
+**`$HOME/.config/bear.yml`**, **`$HOME/.config/Bear/bear.yml`** (Unix)
+: When `$XDG_CONFIG_HOME` is unset.
+
+**`%LOCALAPPDATA%\bear.yml`**, **`%LOCALAPPDATA%\Bear\bear.yml`** (Windows)
+: When `%LOCALAPPDATA%` is set.
+
+**`%APPDATA%\bear.yml`**, **`%APPDATA%\Bear\bear.yml`** (Windows)
+: When `%APPDATA%` is set.
+
+The first file found is loaded; remaining locations are not consulted.
+
 
 # EXIT STATUS
 
