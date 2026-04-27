@@ -128,8 +128,12 @@ pub unsafe extern "C" fn rust_session_init(envp: *const *const c_char) {
         let pid = std::process::id();
         let _ = env_logger::Builder::from_default_env()
             .format(move |buf, record| {
-                let timestamp = buf.timestamp();
-                writeln!(buf, "[{timestamp} preload/{pid}] {}", record.args())
+                let now =
+                    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+                let secs = now.as_secs();
+                let ms = now.subsec_millis();
+                let (h, m, s) = ((secs / 3600) % 24, (secs / 60) % 60, secs % 60);
+                writeln!(buf, "[{h:02}:{m:02}:{s:02}.{ms:03} preload/{pid}] {}", record.args())
             })
             .try_init();
     }
