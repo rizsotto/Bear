@@ -7,10 +7,26 @@
 //! matching functions for each compiler.
 
 use crate::config::{Compiler, CompilerType};
-use regex::Regex;
+use regex_lite::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
+
+/// Escape regex metacharacters that may appear in compiler executable names.
+///
+/// The only metacharacter that actually appears in the YAML-defined executable
+/// names is `+` (e.g. `c++`, `g++`, `clang++`). `regex-lite` does not expose a
+/// public `escape` helper, so we provide a minimal local one.
+fn escape_executable(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for c in name.chars() {
+        if c == '+' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
+}
 
 // Generated recognition pattern data from flags/*.yaml.
 include!(concat!(env!("OUT_DIR"), "/recognition.rs"));
@@ -60,7 +76,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
 /// cross-compilation prefix and version suffix support, plus `.exe` extension.
 fn create_compiler_regex(executables: &[&str], cross_compilation: bool, versioned: bool) -> Regex {
     // Escape for regex (handles '+' in names like "c++", "clang++")
-    let escaped: Vec<String> = executables.iter().map(|n| regex::escape(n)).collect();
+    let escaped: Vec<String> = executables.iter().map(|n| escape_executable(n)).collect();
     let alternation = escaped.join("|");
 
     let base = if cross_compilation {
@@ -621,16 +637,11 @@ mod tests {
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("ccache-1.0")), None); // No version pattern for wrappers
 
-        // Verify that the patterns created with version capture actually have capture groups
-        // by manually testing the regex structure
-        let gcc_patterns: Vec<_> = DEFAULT_PATTERNS
-            .iter()
-            .filter(|(compiler_type, _)| *compiler_type == CompilerType::Gcc)
-            .collect();
-
-        // At least one GCC pattern should have capture groups (the versioned one)
-        let has_capture_groups = gcc_patterns.iter().any(|(_, regex)| regex.captures_len() > 1);
-        assert!(has_capture_groups, "GCC patterns should include version capture groups");
+        // Verify behaviorally that GCC patterns include a versioned variant:
+        // a numeric-suffixed name resolves to GCC, while a non-numeric suffix
+        // (which the version sub-pattern rejects) does not.
+        assert_eq!(recognizer.recognize(path("gcc-11")), Some(CompilerType::Gcc));
+        assert_eq!(recognizer.recognize(path("gcc-abc")), None);
     }
 
     #[test]

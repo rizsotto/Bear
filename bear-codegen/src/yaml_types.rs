@@ -80,11 +80,19 @@ pub struct EnvEntry {
     pub note: Option<String>,
 }
 
+/// Validate that `s` is a C-style identifier:
+/// non-empty, first char is ASCII letter or `_`, remaining chars
+/// are ASCII alphanumeric or `_`.
+fn is_valid_var_name(s: &str) -> bool {
+    let mut chars = s.chars();
+    matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 impl EnvEntry {
     /// Validate this environment entry against the schema.
     pub fn validate(&self) -> Result<()> {
-        let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
-        if !var_re.is_match(&self.variable) {
+        if !is_valid_var_name(&self.variable) {
             bail!("invalid environment variable name '{}'", self.variable);
         }
 

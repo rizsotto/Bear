@@ -41,7 +41,7 @@ env_logger.workspace = true
 shell-words.workspace = true
 signal-hook.workspace = true
 crossbeam-channel.workspace = true
-regex.workspace = true
+regex-lite.workspace = true
 which.workspace = true
 libc.workspace = true
 

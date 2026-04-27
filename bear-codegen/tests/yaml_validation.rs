@@ -94,7 +94,12 @@ fn all_env_entries_are_valid() {
 /// Every environment variable name is a valid C identifier.
 #[test]
 fn env_variable_names_are_c_identifiers() {
-    let var_re = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
+    fn is_valid_var_name(s: &str) -> bool {
+        let mut chars = s.chars();
+        matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    }
+
     let tables = load_tables().unwrap();
 
     for config in TABLES {
@@ -102,7 +107,7 @@ fn env_variable_names_are_c_identifiers() {
         if let Some(ref env) = tables[key].environment {
             for entry in env {
                 assert!(
-                    var_re.is_match(&entry.variable),
+                    is_valid_var_name(&entry.variable),
                     "{}: '{}' is not a valid C identifier",
                     config.yaml_file,
                     entry.variable
