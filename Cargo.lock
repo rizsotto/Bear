@@ -102,7 +102,6 @@ dependencies = [
  "anyhow",
  "bear-codegen",
  "clap",
- "clap_complete",
  "crossbeam-channel",
  "directories",
  "env_logger",
@@ -130,6 +129,14 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "tempfile",
+]
+
+[[package]]
+name = "bear-completions"
+version = "4.1.2"
+dependencies = [
+ "bear",
+ "clap_complete",
 ]
 
 [[package]]

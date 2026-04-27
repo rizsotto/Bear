@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "bear-completions"
+description = "Shell completion script generator for Bear."
+version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "generate-completions"
+path = "src/bin/generate_completions.rs"
+
+[dependencies]
+bear = { path = "../bear" }
+clap_complete.workspace = true

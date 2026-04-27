@@ -6,7 +6,7 @@ This is the main crate. It contains the CLI driver, semantic analysis, and outpu
 
 | Directory | Responsibility |
 |---|---|
-| `src/bin/` | Entry points: `driver.rs` (main), `wrapper.rs`, `generate_completions.rs` |
+| `src/bin/` | Entry points: `driver.rs` (main), `wrapper.rs` |
 | `src/modes/` | Modes of operation |
 | `src/intercept/` | Command interception orchestration |
 | `src/output/` | Output generation (JSON compilation database, statistics) |

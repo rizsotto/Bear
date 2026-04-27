@@ -3,6 +3,7 @@
 [workspace]
 members = [
   "bear-codegen",
+  "bear-completions",
   "platform-checks",
   "bear",
   "intercept-preload",

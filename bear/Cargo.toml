@@ -23,10 +23,6 @@ path = "src/bin/driver.rs"
 name = "bear-wrapper"
 path = "src/bin/wrapper.rs"
 
-[[bin]]
-name = "generate-completions"
-path = "src/bin/generate_completions.rs"
-
 [dependencies]
 thiserror.workspace = true
 anyhow.workspace = true
@@ -34,7 +30,6 @@ serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true
 clap.workspace = true
-clap_complete.workspace = true
 directories.workspace = true
 log.workspace = true
 env_logger.workspace = true
