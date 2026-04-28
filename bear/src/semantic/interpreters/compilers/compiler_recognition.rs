@@ -10,6 +10,7 @@ use crate::config::{Compiler, CompilerType};
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::LazyLock;
 
 // Generated recognition pattern data from flags/*.yaml.
@@ -201,7 +202,12 @@ impl CompilerRecognizer {
             return Some(hint_type);
         }
 
-        // 2. Fall back to regex-based recognition
+        // 2. Check by -v output
+        if let Some(verbose_type) = self.recognize_by_verbose_hint(executable_path) {
+            return Some(verbose_type);
+        }
+
+        // 3. Fall back to regex-based recognition
         self.recognize_by_regex(executable_path)
     }
 
@@ -240,6 +246,31 @@ impl CompilerRecognizer {
 
         None
     }
+
+    /// Internal verbose hint based recognition
+    ///
+    /// This function ignores all errors in executing binary. Since the binary
+    /// can either not exists or not a binary.
+    fn recognize_by_verbose_hint(&self, executable_path: &Path) -> Option<CompilerType> {
+        let output = Command::new(executable_path).arg("-v").output();
+        if output.is_err() {
+            return None;
+        }
+
+        let output = output.unwrap();
+        if !output.status.success() {
+            return None;
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stderr);
+        if stdout.contains("clang version") {
+            Some(CompilerType::Clang)
+        } else if stdout.contains("gcc version") {
+            Some(CompilerType::Gcc)
+        } else {
+            None
+        }
+    }
 }
 
 impl Default for CompilerRecognizer {
@@ -264,7 +295,6 @@ mod tests {
         // Basic GCC names
         assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("g++")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("cc")), Some(CompilerType::Gcc));
         assert_eq!(recognizer.recognize(path("c++")), Some(CompilerType::Gcc));
 
         // Cross-compilation variants
