@@ -25,40 +25,25 @@ pub enum ValidationError {
     Multiple { errors: Vec<ValidationError> },
 }
 
-/// Combinator for collecting and handling validation errors
-#[derive(Default)]
-struct ValidationCollector {
-    errors: Vec<ValidationError>,
+/// Collapse a list of errors into a single `Result`.
+///
+/// Returns `Ok` for an empty list, the lone error directly for a singleton,
+/// and wraps two-or-more in `ValidationError::Multiple`.
+fn collapse(mut errors: Vec<ValidationError>) -> Result<(), ValidationError> {
+    match errors.len() {
+        0 => Ok(()),
+        1 => Err(errors.pop().unwrap()),
+        _ => Err(ValidationError::Multiple { errors }),
+    }
 }
 
-impl ValidationCollector {
-    fn new() -> Self {
-        Self { errors: Vec::new() }
-    }
-
-    fn add(&mut self, error: ValidationError) {
-        self.errors.push(error);
-    }
-
-    fn add_result(&mut self, result: Result<(), ValidationError>) {
-        if let Err(error) = result {
-            match error {
-                ValidationError::Multiple { errors } => {
-                    self.errors.extend(errors);
-                }
-                single_error => self.errors.push(single_error),
-            }
-        }
-    }
-
-    fn finish(self) -> Result<(), ValidationError> {
-        if self.errors.is_empty() {
-            Ok(())
-        } else if self.errors.len() == 1 {
-            Err(self.errors.into_iter().next().unwrap())
-        } else {
-            Err(ValidationError::Multiple { errors: self.errors })
-        }
+/// Append a sub-validator's outcome to `target`, flattening `Multiple` so the
+/// final error list stays flat (avoids ugly nested `Multiple { [Multiple ...] }`).
+fn extend_with(target: &mut Vec<ValidationError>, result: Result<(), ValidationError>) {
+    match result {
+        Ok(()) => {}
+        Err(ValidationError::Multiple { errors }) => target.extend(errors),
+        Err(single) => target.push(single),
     }
 }
 
@@ -66,31 +51,28 @@ impl Validator<Main> for Main {
     type Error = ValidationError;
 
     fn validate(config: &Main) -> Result<(), Self::Error> {
-        let mut collector = ValidationCollector::new();
+        let mut errors = Vec::new();
 
         // Validate each compiler configuration
         for compiler in config.compilers.iter() {
-            collector.add_result(Compiler::validate(compiler));
+            if let Err(e) = Compiler::validate(compiler) {
+                errors.push(e);
+            }
         }
 
         // Check for duplicate compiler paths
         let mut seen_paths = std::collections::HashSet::new();
         for (idx, compiler) in config.compilers.iter().enumerate() {
             if !seen_paths.insert(&compiler.path) {
-                collector.add(ValidationError::DuplicateEntry { field: "compiler", idx });
+                errors.push(ValidationError::DuplicateEntry { field: "compiler", idx });
             }
         }
 
-        // Validate source filter configuration
-        collector.add_result(SourceFilter::validate(&config.sources));
+        extend_with(&mut errors, SourceFilter::validate(&config.sources));
+        extend_with(&mut errors, DuplicateFilter::validate(&config.duplicates));
+        extend_with(&mut errors, PathFormat::validate(&config.format.paths));
 
-        // Validate duplicate filter configuration
-        collector.add_result(DuplicateFilter::validate(&config.duplicates));
-
-        // Validate path format configuration
-        collector.add_result(PathFormat::validate(&config.format.paths));
-
-        collector.finish()
+        collapse(errors)
     }
 }
 
@@ -98,14 +80,11 @@ impl Validator<Compiler> for Compiler {
     type Error = ValidationError;
 
     fn validate(config: &Compiler) -> Result<(), Self::Error> {
-        let mut collector = ValidationCollector::new();
-
-        // Check if compiler path exists
-        if !config.path.exists() {
-            collector.add(ValidationError::PathNotFound { path: config.path.display().to_string() });
+        if config.path.exists() {
+            Ok(())
+        } else {
+            Err(ValidationError::PathNotFound { path: config.path.display().to_string() })
         }
-
-        collector.finish()
     }
 }
 
@@ -113,18 +92,16 @@ impl Validator<SourceFilter> for SourceFilter {
     type Error = ValidationError;
 
     fn validate(config: &SourceFilter) -> Result<(), Self::Error> {
-        // Validate that directory rule paths are not empty
-        let mut collector = ValidationCollector::new();
-
-        for (idx, rule) in config.directories.iter().enumerate() {
-            if rule.path.as_os_str().is_empty() {
-                collector.add(ValidationError::EmptyString {
-                    field: format!("sources.directories[{}].path", idx),
-                });
-            }
-        }
-
-        collector.finish()
+        let errors = config
+            .directories
+            .iter()
+            .enumerate()
+            .filter(|(_, rule)| rule.path.as_os_str().is_empty())
+            .map(|(idx, _)| ValidationError::EmptyString {
+                field: format!("sources.directories[{}].path", idx),
+            })
+            .collect();
+        collapse(errors)
     }
 }
 
@@ -132,17 +109,17 @@ impl Validator<DuplicateFilter> for DuplicateFilter {
     type Error = ValidationError;
 
     fn validate(config: &DuplicateFilter) -> Result<(), Self::Error> {
-        // Check for duplicate OutputFields in match_on
-        let mut collector = ValidationCollector::new();
+        // The closure mutates `seen_fields`, which is intentional: `collect` drives
+        // the iterator to completion in order, so each entry is visited exactly once.
         let mut seen_fields = std::collections::HashSet::new();
-
-        for (idx, field) in config.match_on.iter().enumerate() {
-            if !seen_fields.insert(field) {
-                collector.add(ValidationError::DuplicateEntry { field: "duplicates.match_on", idx });
-            }
-        }
-
-        collector.finish()
+        let errors = config
+            .match_on
+            .iter()
+            .enumerate()
+            .filter(|(_, field)| !seen_fields.insert(*field))
+            .map(|(idx, _)| ValidationError::DuplicateEntry { field: "duplicates.match_on", idx })
+            .collect();
+        collapse(errors)
     }
 }
 
