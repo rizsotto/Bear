@@ -57,8 +57,9 @@ fn main() {
     println!("cargo:rustc-env=PRELOAD_LIBRARY={}", PRELOAD_NAME);
     println!("cargo:rustc-env=PRELOAD_LIBRARY_PATH={}", preload_path);
 
-    // Perform system checks for headers and symbols
-    platform_checks::perform_system_checks();
+    // Replay platform-checks results as cfg directives for this crate
+    platform_checks::emit_cfg();
+    platform_checks::emit_check_cfg();
 
     // Perform additional checks for executables
     check_executable_exists("true");

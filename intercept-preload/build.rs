@@ -1,18 +1,44 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::collections::HashSet;
 use std::io::Write;
+
+// Symbols that the C shim (src/c/shim.c) actually exports for LD_PRELOAD
+// interception. The cc -D defines and the version script / exports list
+// are restricted to this family, even though `platform_checks::DETECTED_SYMBOLS`
+// also includes auxiliary probes (dlopen, RTLD_NEXT, EACCES, ...).
+const INTERCEPT_FAMILY: &[&str] = &[
+    "execve",
+    "execv",
+    "execvpe",
+    "execvp",
+    "execvP",
+    "exect",
+    "execl",
+    "execlp",
+    "execle",
+    "posix_spawn",
+    "posix_spawnp",
+    "popen",
+    "system",
+];
 
 fn main() {
     // Tell cargo to invalidate the built crate whenever source changes
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/c/shim.c");
 
+    // Replay platform-checks results as cfg directives for this crate
+    platform_checks::emit_cfg();
+    platform_checks::emit_check_cfg();
+
     if cfg!(target_family = "unix") {
         let out_dir = std::env::var("OUT_DIR").unwrap();
 
-        // Perform system capability checks and get detected symbols
-        let detected_symbols = platform_checks::perform_system_checks();
+        let intercept_symbols: Vec<&str> = platform_checks::DETECTED_SYMBOLS
+            .iter()
+            .copied()
+            .filter(|s| INTERCEPT_FAMILY.contains(s))
+            .collect();
 
         // Compile the C shim for all intercepted functions
         // This handles variadic arguments properly (execl family) and provides
@@ -21,12 +47,11 @@ fn main() {
         // We use cargo_metadata(false) to prevent cc from emitting its own
         // cargo:rustc-link-lib directive, which would link without --whole-archive
         let mut shim = cc::Build::new();
-        for symbol in &detected_symbols {
+        for symbol in &intercept_symbols {
             let flag = format!("has_symbol_{}", symbol);
             shim.define(flag.as_str(), None);
         }
-        shim
-            .file("src/c/shim.c")
+        shim.file("src/c/shim.c")
             .warnings(true)
             .extra_warnings(true)
             .pic(true) // Position independent code for shared library
@@ -41,7 +66,7 @@ fn main() {
         if cfg!(target_os = "macos") {
             // Generate macOS export file
             let exports_path = format!("{}/exports.txt", out_dir);
-            generate_macos_exports(&exports_path, &detected_symbols);
+            generate_macos_exports(&exports_path, &intercept_symbols);
 
             // macOS uses -force_load instead of --whole-archive
             println!("cargo:rustc-cdylib-link-arg=-Wl,-force_load,{}/libshim.a", out_dir);
@@ -53,7 +78,7 @@ fn main() {
         } else {
             // Generate Linux/ELF version script
             let exports_path = format!("{}/exports.map", out_dir);
-            generate_linux_exports(&exports_path, &detected_symbols);
+            generate_linux_exports(&exports_path, &intercept_symbols);
 
             // Linux and other ELF platforms use --whole-archive
             println!("cargo:rustc-cdylib-link-arg=-Wl,--whole-archive");
@@ -79,8 +104,8 @@ fn main() {
     }
 }
 
-/// Generate the Linux ELF version script based on detected symbols
-fn generate_linux_exports(path: &str, detected_symbols: &HashSet<String>) {
+/// Generate the Linux ELF version script based on intercept symbols
+fn generate_linux_exports(path: &str, intercept_symbols: &[&str]) {
     let mut file = std::fs::File::create(path).expect("Failed to create exports.map");
 
     writeln!(file, "/* Generated version script for libexec library */").unwrap();
@@ -88,7 +113,7 @@ fn generate_linux_exports(path: &str, detected_symbols: &HashSet<String>) {
     writeln!(file, "    global:").unwrap();
 
     // Export symbols that were detected on this platform
-    for symbol in detected_symbols {
+    for symbol in intercept_symbols {
         writeln!(file, "        {};", symbol).unwrap();
     }
 
@@ -101,12 +126,12 @@ fn generate_linux_exports(path: &str, detected_symbols: &HashSet<String>) {
     writeln!(file, "}};").unwrap();
 }
 
-/// Generate the macOS exported symbols list based on detected symbols
-fn generate_macos_exports(path: &str, detected_symbols: &HashSet<String>) {
+/// Generate the macOS exported symbols list based on intercept symbols
+fn generate_macos_exports(path: &str, intercept_symbols: &[&str]) {
     let mut file = std::fs::File::create(path).expect("Failed to create exports.txt");
 
     // macOS exported_symbols_list format: one symbol per line, prefixed with underscore
-    for symbol in detected_symbols {
+    for symbol in intercept_symbols {
         writeln!(file, "_{}", symbol).unwrap();
     }
 
