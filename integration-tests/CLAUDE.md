@@ -61,11 +61,20 @@ See `requirements/CLAUDE.md` for the coverage-check script that verifies every
 
 ## Debugging
 
+When a test panics, the fixture automatically dumps the last captured bear
+stdout/stderr to the test binary's stderr. `run_bear` inherits `RUST_LOG`
+when set; if unset it defaults to `info` (so warn/info/error log lines reach
+the panic dump without the per-event debug spam from the preload library).
+
 ```bash
-BEAR_TEST_VERBOSE=1 cargo test                       # verbose on failure
-BEAR_TEST_PRESERVE_FAILURES=1 cargo test             # keep temp dirs
-BEAR_TEST_VERBOSE=1 BEAR_TEST_PRESERVE_FAILURES=1 cargo test  # both
+cargo test                                          # info-level dump on failure
+RUST_LOG=debug cargo test                           # full per-event trace (recommended for local triage)
+BEAR_TEST_PRESERVE_FAILURES=1 cargo test            # also keep temp dirs at /tmp/bear-test-<name>-<pid>
+RUST_LOG=debug BEAR_TEST_PRESERVE_FAILURES=1 cargo test  # both
 ```
+
+CI sets `RUST_LOG=debug` so failures on platforms that can't be reproduced
+locally carry full diagnostic context without a re-run.
 
 ## Regression protection role
 

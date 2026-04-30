@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::BearOutput;
 use anyhow::Result;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -10,8 +9,6 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct CompilationDatabase {
     pub(super) entries: Vec<Value>,
-    pub(super) verbose: bool,
-    pub(super) bear_output: Option<BearOutput>,
 }
 
 impl CompilationDatabase {
@@ -20,26 +17,6 @@ impl CompilationDatabase {
     pub fn assert_count(&self, expected: usize) -> Result<()> {
         let actual = self.entries.len();
         if actual != expected {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Compilation Database Debug Info ===");
-                eprintln!("Expected {} entries, but found {}", expected, actual);
-                eprintln!("Actual entries:");
-                for (i, entry) in self.entries.iter().enumerate() {
-                    eprintln!(
-                        "  Entry {}: {}",
-                        i,
-                        serde_json::to_string_pretty(entry).unwrap_or_else(|_| format!("{:?}", entry))
-                    );
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!("Expected {} compilation entries, but found {}", expected, actual);
         }
         Ok(())
@@ -50,26 +27,6 @@ impl CompilationDatabase {
     pub fn assert_contains(&self, matcher: &CompilationEntryMatcher) -> Result<()> {
         let found = self.entries.iter().any(|entry| matcher.matches(entry));
         if !found {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Compilation Database Debug Info ===");
-                eprintln!("Failed to find entry matching: {:?}", matcher);
-                eprintln!("Actual entries:");
-                for (i, entry) in self.entries.iter().enumerate() {
-                    eprintln!(
-                        "  Entry {}: {}",
-                        i,
-                        serde_json::to_string_pretty(entry).unwrap_or_else(|_| format!("{:?}", entry))
-                    );
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!(
                 "Expected to find compilation entry matching: {:?}\nActual entries: {:#?}",
                 matcher,

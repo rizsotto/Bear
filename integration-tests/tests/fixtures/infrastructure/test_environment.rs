@@ -22,7 +22,6 @@ pub struct TestEnvironment {
     test_dir: tempfile::TempDir,
     test_name: String,
     preserve_on_failure: bool,
-    verbose: bool,
     last_bear_output: std::cell::RefCell<Option<BearOutput>>,
 }
 
@@ -38,38 +37,11 @@ impl TestEnvironment {
             .map(|v| v == "1" || v.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let verbose = std::env::var("BEAR_TEST_VERBOSE")
-            .map(|v| v == "1" || v.to_lowercase() == "true")
-            .unwrap_or(false);
-
         Ok(Self {
             install,
             test_dir,
             test_name: test_name.to_string(),
             preserve_on_failure,
-            verbose,
-            last_bear_output: std::cell::RefCell::new(None),
-        })
-    }
-
-    /// Create a new test environment with explicit verbose setting
-    #[allow(dead_code)]
-    pub fn new_with_verbose(test_name: &str) -> Result<Self> {
-        let install = InstallEnvironment::new()?;
-
-        let test_dir = tempfile::TempDir::new()
-            .with_context(|| format!("Failed to create temp dir for test: {}", test_name))?;
-
-        let preserve_on_failure = std::env::var("BEAR_TEST_PRESERVE_FAILURES")
-            .map(|v| v == "1" || v.to_lowercase() == "true")
-            .unwrap_or(false);
-
-        Ok(Self {
-            install,
-            test_dir,
-            test_name: test_name.to_string(),
-            preserve_on_failure,
-            verbose: true,
             last_bear_output: std::cell::RefCell::new(None),
         })
     }
@@ -198,15 +170,25 @@ impl TestEnvironment {
         std::process::Command::new(self.install.path())
     }
 
-    /// Run bear with the given arguments
+    /// Run bear with the given arguments.
+    ///
+    /// `RUST_LOG` is inherited when set in the test process; otherwise it
+    /// defaults to `info`. The default keeps warn/info/error log lines in
+    /// captured stderr (so tests that assert on them work) without pulling
+    /// in the noisy per-event `debug` traces from the preload library. CI
+    /// sets `RUST_LOG=debug` explicitly to get the full diagnostic stream.
+    /// `RUST_BACKTRACE=1` is always forced so panics in bear surface
+    /// readable backtraces.
     pub fn run_bear(&self, args: &[&str]) -> Result<BearOutput> {
         let mut cmd = Command::new(self.install.path());
-        cmd.current_dir(self.test_dir()).env("RUST_LOG", "debug").env("RUST_BACKTRACE", "1").args(args);
+        cmd.current_dir(self.test_dir()).env("RUST_BACKTRACE", "1").args(args);
+        if std::env::var_os("RUST_LOG").is_none() {
+            cmd.env("RUST_LOG", "info");
+        }
 
         let output = cmd.output()?;
 
-        let bear_output =
-            BearOutput { output, temp_dir: self.test_dir().to_path_buf(), verbose: self.verbose };
+        let bear_output = BearOutput { output, temp_dir: self.test_dir().to_path_buf() };
 
         // Store the output for potential later display
         *self.last_bear_output.borrow_mut() = Some(bear_output.clone());
@@ -305,11 +287,7 @@ impl TestEnvironment {
         let entries: Vec<Value> =
             serde_json::from_str(&content).with_context(|| "Failed to parse compilation database JSON")?;
 
-        Ok(CompilationDatabase {
-            entries,
-            verbose: self.verbose,
-            bear_output: self.last_bear_output.borrow().clone(),
-        })
+        Ok(CompilationDatabase { entries })
     }
 
     /// Load intercept events file
@@ -325,45 +303,28 @@ impl TestEnvironment {
             .collect::<Result<Vec<_>, _>>()
             .with_context(|| "Failed to parse events JSON lines")?;
 
-        Ok(InterceptEvents {
-            events,
-            verbose: self.verbose,
-            bear_output: self.last_bear_output.borrow().clone(),
-        })
+        Ok(InterceptEvents { events })
     }
 
-    /// Show the last bear output for debugging
-    pub fn show_last_bear_output(&self) {
-        if let Some(ref output) = *self.last_bear_output.borrow() {
-            output.show_verbose_output();
-        } else {
-            eprintln!("No bear output available to show");
-        }
-    }
-
-    /// Get verbose mode setting
-    #[allow(dead_code)]
-    pub fn is_verbose(&self) -> bool {
-        self.verbose
-    }
-
-    /// Preserve test directory for debugging if test fails
+    /// Dump the last captured bear output unconditionally; cargo's per-test
+    /// capture discards it for passing tests and surfaces it for failing
+    /// ones (both `Err` returns and panics). Optionally preserve the temp
+    /// dir, but only on actual panic — `BEAR_TEST_PRESERVE_FAILURES` has
+    /// always been panic-gated.
     fn preserve_on_panic(&self) {
+        if let Some(ref output) = *self.last_bear_output.borrow() {
+            eprintln!("\n=== Bear output (test: {}) ===", self.test_name);
+            output.show_output();
+            eprintln!("=== end ===\n");
+        }
+
         if self.preserve_on_failure && std::thread::panicking() {
             let preserve_dir = format!("/tmp/bear-test-{}-{}", self.test_name, std::process::id());
-
             if let Err(e) = fs::rename(self.test_dir(), &preserve_dir) {
                 eprintln!("Failed to preserve test directory: {}", e);
             } else {
                 eprintln!("Test failed. Directory preserved at: {}", preserve_dir);
             }
-        }
-
-        // Show verbose output if enabled and test is failing
-        if self.verbose && std::thread::panicking() {
-            eprintln!("\n=== Bear Verbose Output (Test: {}) ===", self.test_name);
-            self.show_last_bear_output();
-            eprintln!("=== End Bear Output ===\n");
         }
     }
 }

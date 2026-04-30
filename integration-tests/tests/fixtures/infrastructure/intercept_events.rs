@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::BearOutput;
 use anyhow::Result;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -10,8 +9,6 @@ use std::path::PathBuf;
 #[derive(Debug)]
 pub struct InterceptEvents {
     pub(super) events: Vec<Value>,
-    pub(super) verbose: bool,
-    pub(super) bear_output: Option<BearOutput>,
 }
 
 impl InterceptEvents {
@@ -20,26 +17,6 @@ impl InterceptEvents {
     pub fn assert_count(&self, expected: usize) -> Result<()> {
         let actual = self.events.len();
         if actual != expected {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Events File Debug Info ===");
-                eprintln!("Expected {} events, but found {}", expected, actual);
-                eprintln!("Actual events:");
-                for (i, event) in self.events.iter().enumerate() {
-                    eprintln!(
-                        "  Event {}: {}",
-                        i,
-                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
-                    );
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!("Expected {} intercept events, but found {}", expected, actual);
         }
         Ok(())
@@ -50,26 +27,6 @@ impl InterceptEvents {
     pub fn assert_contains(&self, matcher: &EventMatcher) -> Result<()> {
         let found = self.events.iter().any(|event| matcher.matches(event));
         if !found {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Events File Debug Info ===");
-                eprintln!("Failed to find event matching: {:?}", matcher);
-                eprintln!("Actual events:");
-                for (i, event) in self.events.iter().enumerate() {
-                    eprintln!(
-                        "  Event {}: {}",
-                        i,
-                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
-                    );
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!(
                 "Expected to find intercept event matching: {:?}\nActual events: {:#?}",
                 matcher,
@@ -90,28 +47,6 @@ impl InterceptEvents {
     pub fn assert_count_matching(&self, matcher: &EventMatcher, expected: usize) -> Result<()> {
         let actual = self.count_matching(matcher);
         if actual != expected {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Events File Debug Info ===");
-                eprintln!("Expected {} events matching {:?}, but found {}", expected, matcher, actual);
-                eprintln!("Matching events:");
-                for (i, event) in self.events.iter().enumerate() {
-                    if matcher.matches(event) {
-                        eprintln!(
-                            "  Event {}: {}",
-                            i,
-                            serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
-                        );
-                    }
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!(
                 "Expected {} intercept events matching {:?}, but found {}",
                 expected,
@@ -127,26 +62,6 @@ impl InterceptEvents {
     pub fn assert_min_count(&self, min_expected: usize) -> Result<()> {
         let actual = self.events.len();
         if actual < min_expected {
-            if self.verbose {
-                // Show Bear command output first
-                if let Some(ref bear_output) = self.bear_output {
-                    eprintln!("\n=== Bear Command Output ===");
-                    bear_output.show_verbose_output();
-                    eprintln!("=== End Bear Output ===\n");
-                }
-
-                eprintln!("=== Events File Debug Info ===");
-                eprintln!("Expected at least {} events, but found {}", min_expected, actual);
-                eprintln!("Actual events:");
-                for (i, event) in self.events.iter().enumerate() {
-                    eprintln!(
-                        "  Event {}: {}",
-                        i,
-                        serde_json::to_string_pretty(event).unwrap_or_else(|_| format!("{:?}", event))
-                    );
-                }
-                eprintln!("=== End Debug Info ===\n");
-            }
             anyhow::bail!("Expected at least {} intercept events, but found {}", min_expected, actual);
         }
         Ok(())

@@ -3,41 +3,25 @@
 //! Test infrastructure for Bear integration tests
 //!
 //! This module provides utilities for setting up test environments,
-//! running bear commands, and validating outputs. It's designed to
-//! replicate the functionality of the Python/lit test suite.
+//! running bear commands, and validating outputs.
 //!
-//! # Verbose Output Support
+//! # Failure diagnostics
 //!
-//! The infrastructure supports verbose output display for debugging failed tests:
+//! When a test panics, `TestEnvironment::Drop` automatically dumps the last
+//! captured `BearOutput` (stdout, stderr, exit code) to the test binary's
+//! stderr. How rich that dump is depends on `RUST_LOG`:
 //!
-//! ## Automatic Verbose Mode
-//! Set `BEAR_TEST_VERBOSE=1` environment variable to automatically show bear output
-//! when any test fails (panics).
+//! - Local default (no `RUST_LOG`) → `run_bear` sets `RUST_LOG=info`, so
+//!   warn/info/error log lines are captured (tests that assert on them
+//!   work) but per-event `debug` traces from the preload library are
+//!   filtered out, keeping ccache-cached compilation stderr clean.
+//! - `RUST_LOG=debug cargo test` → propagated; bear logs verbosely and
+//!   failure dumps include the full per-event interception trace.
+//! - CI sets `RUST_LOG=debug` so failures on platforms that can't be
+//!   reproduced locally carry full diagnostic context without a re-run.
 //!
-//! ## Manual Verbose Control
-//! ```ignore
-//! let env = TestEnvironment::new_with_verbose("test_name", true)?;
-//! let output = env.run_bear(&["--output", "db.json", "--", "make"])?;
-//!
-//! // Show output only if verbose mode is enabled
-//! output.show_verbose_if_enabled();
-//!
-//! // Force show output regardless of verbose setting
-//! output.force_show_verbose();
-//!
-//! // Show last bear output from environment
-//! env.show_last_bear_output();
-//! ```
-//!
-//! ## Macro Support
-//! ```ignore
-//! bear_test!(my_test, verbose: true, |env| {
-//!     let output = env.run_bear(&["semantic"])?;
-//!     let db = env.load_compilation_database("compile_commands.json")?;
-//!     db.assert_count(1)?; // Will show verbose output if this fails
-//!     Ok(())
-//! });
-//! ```
+//! `BEAR_TEST_PRESERVE_FAILURES=1` additionally preserves the temp directory
+//! at `/tmp/bear-test-<test_name>-<pid>` on panic.
 
 mod bear_output;
 mod compilation_database;
@@ -64,13 +48,6 @@ macro_rules! bear_test {
         #[test]
         fn $name() -> anyhow::Result<()> {
             let env = TestEnvironment::new(stringify!($name))?;
-            $body(&env)
-        }
-    };
-    ($name:ident, verbose: $verbose:expr, $body:expr) => {
-        #[test]
-        fn $name() -> anyhow::Result<()> {
-            let env = TestEnvironment::new_with_verbose(stringify!($name), $verbose)?;
             $body(&env)
         }
     };

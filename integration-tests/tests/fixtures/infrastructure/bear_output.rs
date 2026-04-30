@@ -10,7 +10,6 @@ use std::process::Output;
 pub struct BearOutput {
     pub(super) output: Output,
     pub(super) temp_dir: PathBuf,
-    pub(super) verbose: bool,
 }
 
 impl Clone for BearOutput {
@@ -22,14 +21,14 @@ impl Clone for BearOutput {
                 stderr: self.output.stderr.clone(),
             },
             temp_dir: self.temp_dir.clone(),
-            verbose: self.verbose,
         }
     }
 }
 
 impl BearOutput {
-    /// Show verbose output for debugging
-    pub fn show_verbose_output(&self) {
+    /// Dump bear's stdout, stderr, and exit code to the test binary's stderr.
+    /// Used by `TestEnvironment::preserve_on_panic` for failure diagnostics.
+    pub fn show_output(&self) {
         let stdout = String::from_utf8_lossy(&self.output.stdout);
         let stderr = String::from_utf8_lossy(&self.output.stderr);
 
@@ -93,21 +92,5 @@ impl BearOutput {
     #[allow(dead_code)]
     pub fn exit_code(&self) -> Option<i32> {
         self.output.status.code()
-    }
-
-    /// Show verbose output if verbose mode is enabled
-    #[allow(dead_code)]
-    pub fn show_verbose_if_enabled(&self) {
-        if self.verbose {
-            self.show_verbose_output();
-        }
-    }
-
-    /// Force show verbose output regardless of verbose mode setting
-    #[allow(dead_code)]
-    pub fn force_show_verbose(&self) {
-        eprintln!("\n=== Bear Command Output ===");
-        self.show_verbose_output();
-        eprintln!("=== End Bear Output ===\n");
     }
 }

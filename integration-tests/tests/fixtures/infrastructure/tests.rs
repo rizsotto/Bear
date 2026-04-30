@@ -192,7 +192,7 @@ fn assert_min_count_test() -> Result<()> {
         json!({"execution": {"executable": "/usr/bin/gcc", "arguments": ["gcc", "-c", "test2.c"]}}),
     ];
 
-    let intercept_events = InterceptEvents { events, verbose: false, bear_output: None };
+    let intercept_events = InterceptEvents { events };
 
     // Should pass when actual >= min_expected
     assert!(intercept_events.assert_min_count(1).is_ok());
