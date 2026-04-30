@@ -90,3 +90,20 @@ Integration tests are the primary regression protection mechanism for Bear.
 - `tests/cases/` - test implementations grouped by feature area
 - `tests/fixtures/` - test infrastructure (TestEnvironment, assertions, constants)
 - `tests/integration.rs` - test entry point
+
+## Build script duties
+
+`build.rs` does:
+
+- Forwards `INTERCEPT_LIBDIR` and emits paths to the driver, wrapper,
+  and preload artifacts as `cargo:rustc-env=` vars (consumed via
+  `env!()` from the test fixtures).
+- Replays `platform-checks` results via `emit_cfg()` /
+  `emit_check_cfg()`.
+- Probes a fixed list of host executables (see `build.rs`) via
+  `which`, emitting `cargo:rustc-cfg=has_executable_<name>` for
+  single tools and `has_executable_<group>` for grouped lookups
+  (`shell`, `make`, `compiler_c`, `compiler_cxx`, `compiler_fortran`,
+  `compiler_cuda`). Tests gate on these via `#[cfg(has_executable_*)]`.
+- Searches well-known paths for a `ccache` masquerade directory,
+  emitting `cargo:rustc-cfg=host_has_ccache_masquerade` when found.

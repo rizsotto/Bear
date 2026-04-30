@@ -95,9 +95,6 @@ fn main() {
             // https://users.rust-lang.org/t/how-to-use-linker-version-scripts-in-rust-1-54
             println!("cargo:rustc-cdylib-link-arg=-fuse-ld=lld");
         }
-
-        // Force building cdylib even in debug mode
-        println!("cargo:rustc-cfg=build_cdylib");
     } else {
         // We don't build on other platforms
         println!("cargo:warning=libexec is not supported on this platform");

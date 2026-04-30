@@ -29,6 +29,28 @@ On unsupported platforms (e.g., Windows), the build warns and skips library gene
 `exec` family, `posix_spawn`, `popen`, `system`. Only functions detected as
 available on the host at build time (via `platform-checks`).
 
+## Build script duties
+
+`build.rs` is platform-gated to `cfg(target_family = "unix")` and on
+supported platforms:
+
+1. Replays `platform-checks` results via `platform_checks::emit_cfg()`
+   and `emit_check_cfg()`.
+2. cc-compiles `src/c/shim.c` into `libshim.a` with `-Dhas_symbol_X`
+   for each detected intercept-family symbol.
+3. Writes the symbol export list (`exports.map` on Linux,
+   `exports.txt` on macOS) into `OUT_DIR`.
+4. Emits cdylib link args:
+   - Linux: `-Wl,--whole-archive`, `-Wl,--version-script=...`,
+     `-Wl,-rpath,$ORIGIN`, `-fuse-ld=lld` (required; see Host
+     requirements in the top-level `CLAUDE.md`).
+   - macOS: `-Wl,-force_load,...`,
+     `-Wl,-exported_symbols_list,...`, `-Wl,-rpath,@loader_path`.
+
+`INTERCEPT_FAMILY` in `build.rs` lists the symbols `src/c/shim.c`
+exports. Source of truth is `src/c/shim.c` itself; keep them in sync
+when adding or removing an intercepted function.
+
 ## Before modifying
 
 - Changes here affect all intercepted builds on supported Unix platforms

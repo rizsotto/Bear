@@ -41,8 +41,11 @@ These files contain rules, context, and constraints specific to that area.
 |---|---|
 | Modify CLI arguments or output format | `bear/CLAUDE.md` |
 | Edit or add compiler interpreter YAML | `bear/interpreters/CLAUDE.md` |
-| Write or modify integration tests | `integration-tests/CLAUDE.md` |
+| Edit the YAML-to-Rust code generator | `bear-codegen/CLAUDE.md` |
+| Add or change a host capability probe | `platform-checks/CLAUDE.md` |
 | Touch the preload interception library | `intercept-preload/CLAUDE.md` |
+| Touch the shell-completions binary | `bear-completions/CLAUDE.md` |
+| Write or modify integration tests | `integration-tests/CLAUDE.md` |
 | Edit or regenerate the man page | `man/CLAUDE.md` |
 | Add, modify, or review a requirement | `requirements/CLAUDE.md` |
 
@@ -54,6 +57,33 @@ Do not skip these reads. They contain constraints that prevent regressions.
 2. **Semantic analysis** - filter non-compiler commands using interpreter YAML definitions
 3. **Configuration** - apply user config for output formatting
 4. **Output** - write `compile_commands.json`
+
+## Build pipeline
+
+The workspace builds in three layers before linking the user-facing binaries:
+
+1. `bear-codegen` runs from `bear/build.rs` to emit interpreter tables.
+   See `bear-codegen/CLAUDE.md`.
+2. `platform-checks/build.rs` probes the host once for headers and
+   symbols. Consumers replay the results via
+   `platform_checks::emit_cfg()` / `emit_check_cfg()`. See
+   `platform-checks/CLAUDE.md`.
+3. `intercept-preload/build.rs` cc-compiles `src/c/shim.c` and emits
+   cdylib link directives. See `intercept-preload/CLAUDE.md`.
+
+`INTERCEPT_LIBDIR` is the one cross-cutting build-time env var
+(relative path to the install location of `libexec.so` /
+`libexec.dylib`; defaults to `lib`). Validated and forwarded by both
+`bear/build.rs` and `integration-tests/build.rs`.
+
+## Host requirements
+
+- `cc` toolchain (gcc or clang).
+- `lld` linker (Linux only). The ELF version script uses multiple
+  version tags, which GNU ld does not support; the link step on
+  Linux fails without lld. macOS uses the system linker.
+- `ccache` (optional). When present and on PATH, the integration tests
+  exercise a ccache-masquerade-aware test path.
 
 ## Decision protocol
 
