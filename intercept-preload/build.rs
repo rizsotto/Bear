@@ -16,6 +16,7 @@ const INTERCEPT_FAMILY: &[&str] = &[
     "execl",
     "execlp",
     "execle",
+    "pclose",
     "posix_spawn",
     "posix_spawnp",
     "popen",

@@ -44,6 +44,7 @@ const SYMBOL_PROBES: &[(&str, &str)] = &[
     ("execlp", "unistd.h"),
     ("execle", "unistd.h"),
     ("posix_spawn", "spawn.h"),
+    ("pclose", "stdio.h"),
     ("posix_spawnp", "spawn.h"),
     ("popen", "stdio.h"),
     ("system", "stdlib.h"),
