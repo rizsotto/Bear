@@ -37,7 +37,7 @@ impl InstallEnvironment {
             .parent()
             .with_context(|| "cannot determine artifact directory from DRIVER_EXECUTABLE_PATH")?;
 
-        let output = std::process::Command::new("bash")
+        let output = std::process::Command::new("sh")
             .arg(INSTALL_SCRIPT_PATH)
             .env("PREFIX", destdir)
             .env("INTERCEPT_LIBDIR", INTERCEPT_LIBDIR)
