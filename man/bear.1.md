@@ -9,9 +9,9 @@ Bear - a tool to generate compilation database for Clang tooling.
 
 # SYNOPSIS
 
-**bear** [*OPTIONS*] [--] [*BUILD_COMMAND*...]
+**bear** [*OPTIONS*] [\-\-] [*BUILD_COMMAND*...]
 
-**bear intercept** [*OPTIONS*] [--] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] [\-\-] *BUILD_COMMAND*...
 
 **bear semantic** [*OPTIONS*]
 
@@ -30,19 +30,19 @@ Bear can operate in three modes:
 
 ## OPTIONS
 
-**-c, --config** *FILE*
+**-c, \-\-config** *FILE*
 : Specify a configuration file path. The configuration file controls output formatting, compiler recognition, source filtering, and duplicate handling.
 
-**-o, --output** *FILE*
+**-o, \-\-output** *FILE*
 : Specify the output file path (default: `compile_commands.json`). The output is a JSON compilation database.
 
-**-a, --append**
+**-a, \-\-append**
 : Append results to an existing output file instead of overwriting it. This allows incremental updates to the compilation database.
 
-**-h, --help**
+**-h, \-\-help**
 : Print help information.
 
-**-V, --version**
+**-V, \-\-version**
 : Print version information.
 
 
@@ -55,7 +55,7 @@ compiler calls and generate a compilation database as output.
 
 Intercepts command execution events during the build process and saves them to an events file for later processing.
 
-**bear intercept** [*OPTIONS*] [--] *BUILD_COMMAND*...
+**bear intercept** [*OPTIONS*] [\-\-] *BUILD_COMMAND*...
 
 ## bear semantic
 
