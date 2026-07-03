@@ -266,6 +266,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_nvidia_hpc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
@@ -426,6 +427,18 @@ pub(super) fn vala(from_environment: bool) -> impl Interpreter {
     )
 }
 
+pub(super) fn mpi(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &MPI_FLAGS,
+        &MPI_IGNORE_EXECUTABLES,
+        &MPI_IGNORE_FLAGS,
+        MPI_SLASH_PREFIX,
+        &MPI_ENV_RULES,
+        from_environment,
+        true,
+    )
+}
+
 #[cfg(test)]
 mod flag_table_invariants {
     use super::*;
@@ -540,6 +553,11 @@ mod flag_table_invariants {
     #[test]
     fn vala() {
         assert_invariants(&VALA_FLAGS);
+    }
+
+    #[test]
+    fn mpi() {
+        assert_invariants(&MPI_FLAGS);
     }
 
     #[test]

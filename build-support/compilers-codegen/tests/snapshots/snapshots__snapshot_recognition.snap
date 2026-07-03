@@ -1,5 +1,5 @@
 ---
-source: bear-codegen/tests/snapshots.rs
+source: build-support/compilers-codegen/tests/snapshots.rs
 expression: generate_recognition_patterns(&raw_tables)
 ---
 // Generated from compilers/*.yaml -- DO NOT EDIT
@@ -13,13 +13,16 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
     ("flang", &["flang", "flang-new"], true, true),
     ("cuda", &["nvcc"], true, true),
     ("intel_fortran", &["ifort", "ifx"], false, true),
+    ("intel_fortran", &["mpiifort", "mpiifx"], false, false),
     ("cray_fortran", &["crayftn", "ftn"], false, true),
     ("msvc", &["cl"], false, false),
     ("msvc", &["c1", "c1xx", "c2"], false, false),
     ("intel_cc", &["icx", "icpx"], false, true),
     ("intel_cc", &["icc", "icpc"], false, true),
+    ("intel_cc", &["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"], false, false),
     ("nvidia_hpc", &["nvc", "nvc++", "nvfortran"], false, true),
     ("nvidia_hpc", &["pgcc", "pgc++", "pgfortran"], false, true),
     ("armclang", &["armclang", "armclang++"], false, true),
     ("vala", &["valac"], true, true),
+    ("mpi", &["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"], false, true),
 ];

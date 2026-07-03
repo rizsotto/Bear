@@ -83,6 +83,11 @@ fn snapshot_flags_vala() {
 }
 
 #[test]
+fn snapshot_flags_mpi() {
+    insta::assert_snapshot!(generate_flag_file("mpi"));
+}
+
+#[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));

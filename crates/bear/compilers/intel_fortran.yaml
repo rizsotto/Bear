@@ -5,6 +5,11 @@ recognize:
   - executables: ["ifort", "ifx"]
     cross_compilation: false
     versioned: true
+  # Intel MPI wrappers: mpiifort/mpiifx are ifort/ifx with MPI paths baked
+  # in (see docs/rationale/mpi-wrappers-as-compilers.md).
+  - executables: ["mpiifort", "mpiifx"]
+    cross_compilation: false
+    versioned: false
 slash_prefix: false
 flags:
   - match: {pattern: "-preprocess-only"}

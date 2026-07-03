@@ -185,7 +185,7 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[CR]intel\-fortran\f[R], \f[CR]cray\-fortran\f[R], \f[CR]cuda\f[R],
 \f[CR]msvc\f[R], \f[CR]clang\-cl\f[R], \f[CR]intel_cc\f[R],
 \f[CR]nvidia\-hpc\f[R], \f[CR]armclang\f[R], \f[CR]ibm_xl\f[R],
-\f[CR]vala\f[R].
+\f[CR]vala\f[R], \f[CR]mpi\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .PP
@@ -201,6 +201,22 @@ compilers\f[B]:\f[R]
   \f[B]\-\f[R] path\f[B]:\f[R] /usr/bin/c++
     as\f[B]:\f[R] clang
 .EE
+.PP
+MPI compiler wrappers (Open MPI/MPICH\(cqs \f[CR]mpicc\f[R],
+\f[CR]mpicxx\f[R], \f[CR]mpic++\f[R], \f[CR]mpiCC\f[R],
+\f[CR]mpifort\f[R], \f[CR]mpif77\f[R], \f[CR]mpif90\f[R]) are recognized
+automatically, without any configuration.
+The wrapper is recorded as the compiler exactly as invoked \(en Bear
+does not expand it to the underlying compiler command it wraps.
+Clang tooling that needs the wrapper\(cqs baked\-in include paths can
+point at the wrapper directly (e.g.\ clangd\(cqs
+\f[CR]\-\-query\-driver\f[R]).
+Intel MPI\(cqs wrappers (\f[CR]mpiicc\f[R], \f[CR]mpiicpc\f[R],
+\f[CR]mpiicx\f[R], \f[CR]mpiicpx\f[R], \f[CR]mpiifort\f[R],
+\f[CR]mpiifx\f[R]) are recognized as the Intel compilers they front,
+using Intel\(cqs flag semantics.
+The launchers \f[CR]mpirun\f[R] and \f[CR]mpiexec\f[R] are not
+recognized: they execute programs, they do not compile.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2

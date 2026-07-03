@@ -1,6 +1,6 @@
 ---
 title: Recognize MPI compiler wrappers
-status: in-progress
+status: implemented
 ---
 
 ## Intent

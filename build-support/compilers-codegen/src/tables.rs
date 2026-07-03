@@ -135,4 +135,17 @@ pub const TABLES: &[TableConfig] = &[
         env_rules_name: "VALA_ENV_RULES",
         output_file: "flags_vala.rs",
     },
+    // MPI wrapper names (mpicc, mpicxx, ...) do not overlap any other
+    // compiler's recognition pattern, so position here does not affect
+    // priority. Intel MPI wrappers are extra basenames on intel_cc/
+    // intel_fortran above, not a separate table.
+    TableConfig {
+        yaml_file: "mpi.yaml",
+        static_name: "MPI_FLAGS",
+        ignore_executables_name: "MPI_IGNORE_EXECUTABLES",
+        ignore_flags_name: "MPI_IGNORE_FLAGS",
+        slash_prefix_name: "MPI_SLASH_PREFIX",
+        env_rules_name: "MPI_ENV_RULES",
+        output_file: "flags_mpi.rs",
+    },
 ];

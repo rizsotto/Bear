@@ -1,6 +1,6 @@
 use crate::fixtures::infrastructure::compilation_entry;
 use crate::fixtures::*;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde_json::json;
 
 #[test]
@@ -827,6 +827,161 @@ fn vala_multiple_sources_produce_single_entry() -> Result<()> {
             "b.vala".to_string(),
             "c.vala".to_string(),
         ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-mpi-wrappers
+//
+// An `mpicc -c hello.c` execution yields one entry, with the wrapper itself
+// (not the underlying compiler) as the recorded compiler.
+#[test]
+fn mpi_wrapper_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("mpi_wrapper_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "mpicc",
+        "arguments": ["mpicc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("mpicc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["mpicc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-mpi-wrappers
+//
+// Wrapper-info invocations (`-showme`, `-show`, `-compile_info`) print the
+// underlying compiler command and exit; none of them compile anything, so
+// none of them should yield a database entry.
+#[test]
+fn mpi_wrapper_info_flags_yield_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("mpi_wrapper_info_flags")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    for flag in ["-showme", "-show", "-compile_info"] {
+        let event = json!({
+            "executable": "mpicc",
+            "arguments": ["mpicc", flag],
+            "working_dir": temp_dir,
+            "environment": {}
+        });
+
+        env.create_source_files(&[("events.json", &event.to_string()), ("mpicc", "")])?;
+
+        env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+        let db = env.load_compilation_database("compile_commands.json")?;
+        db.assert_count(0).with_context(|| format!("flag {flag} must yield no entry"))?;
+    }
+
+    Ok(())
+}
+
+// Requirements: recognition-mpi-wrappers
+//
+// MPICH's compiler-override flag `-cc=gcc` must survive as a single token
+// (not be split, not be expanded) and must not swallow the source file that
+// follows it.
+#[test]
+fn mpi_wrapper_compiler_override_flag_is_retained() -> Result<()> {
+    let env = TestEnvironment::new("mpi_wrapper_compiler_override")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "mpicc",
+        "arguments": ["mpicc", "-cc=gcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("mpicc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "mpicc".to_string(),
+            "-cc=gcc".to_string(),
+            "-c".to_string(),
+            "hello.c".to_string()
+        ]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-mpi-wrappers
+//
+// In preload mode the wrapper's child compiler exec is intercepted too, so a
+// single compilation can produce both an `mpicc` and a `gcc` event for the
+// same file. The default duplicate filter (directory+file) must collapse
+// them to one entry, and since the wrapper's event comes first in the event
+// stream, the surviving entry must record the wrapper invocation.
+#[test]
+fn mpi_wrapper_and_child_compiler_events_collapse_to_wrapper_entry() -> Result<()> {
+    let env = TestEnvironment::new("mpi_wrapper_duplicate_collapse")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let wrapper_event = json!({
+        "executable": "mpicc",
+        "arguments": ["mpicc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let child_event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let events_content = format!("{}\n{}", wrapper_event, child_event);
+
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("mpicc", ""),
+        ("gcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["mpicc".to_string(), "-c".to_string(), "hello.c".to_string()]
     ))?;
 
     Ok(())

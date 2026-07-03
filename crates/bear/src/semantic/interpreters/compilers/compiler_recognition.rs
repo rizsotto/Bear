@@ -304,6 +304,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "armclang" => CompilerType::Armclang,
         "ibm_xl" => CompilerType::IbmXl,
         "vala" => CompilerType::Vala,
+        "mpi" => CompilerType::Mpi,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -788,6 +789,36 @@ mod tests {
         assert_eq!(recognizer.recognize(path("armclang")), Some(CompilerType::Armclang));
         assert_eq!(recognizer.recognize(path("armclang++")), Some(CompilerType::Armclang));
         assert_eq!(recognizer.recognize(path("armclang-14")), Some(CompilerType::Armclang));
+    }
+
+    // Requirements: recognition-mpi-wrappers
+    #[test]
+    fn test_mpi_wrapper_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        for name in ["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Mpi), "name: {}", name);
+        }
+
+        // Versioned variant
+        assert_eq!(recognizer.recognize(path("mpicc-14")), Some(CompilerType::Mpi));
+
+        // MPI launchers execute programs, they do not compile -- must not be recognized.
+        assert_eq!(recognizer.recognize(path("mpirun")), None);
+        assert_eq!(recognizer.recognize(path("mpiexec")), None);
+    }
+
+    // Requirements: recognition-mpi-wrappers
+    #[test]
+    fn test_intel_mpi_wrapper_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        for name in ["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::IntelCc), "name: {}", name);
+        }
+        for name in ["mpiifort", "mpiifx"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::IntelFortran), "name: {}", name);
+        }
     }
 
     #[test]

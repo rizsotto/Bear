@@ -160,7 +160,7 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`.
 - **ignore**: Whether to ignore this compiler.
 
 The generic compiler names `cc` and `c++` default to GCC semantics. On platforms where these map to a different compiler (macOS, FreeBSD, OpenBSD), use the `as` field to override:
@@ -172,6 +172,8 @@ compilers:
   - path: /usr/bin/c++
     as: clang
 ```
+
+MPI compiler wrappers (Open MPI/MPICH's `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90`) are recognized automatically, without any configuration. The wrapper is recorded as the compiler exactly as invoked -- Bear does not expand it to the underlying compiler command it wraps. Clang tooling that needs the wrapper's baked-in include paths can point at the wrapper directly (e.g. clangd's `--query-driver`). Intel MPI's wrappers (`mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx`, `mpiifort`, `mpiifx`) are recognized as the Intel compilers they front, using Intel's flag semantics. The launchers `mpirun` and `mpiexec` are not recognized: they execute programs, they do not compile.
 
 ### sources
 

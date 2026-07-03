@@ -9,6 +9,14 @@ recognize:
   - executables: ["icc", "icpc"]
     cross_compilation: false
     versioned: true
+  # Intel MPI wrappers: mpiicc/mpiicpc/mpiicx/mpiicpx are icc/icx with MPI
+  # paths baked in, front-ending a gcc-compatible driver but accepting
+  # Intel's flag surface (see docs/rationale/mpi-wrappers-as-compilers.md).
+  # Not versioned/cross-compilation: those suffixes are not used for the
+  # MPI wrapper names in practice.
+  - executables: ["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"]
+    cross_compilation: false
+    versioned: false
 slash_prefix: false
 flags:
   # Microarchitecture targeting

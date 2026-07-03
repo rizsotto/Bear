@@ -1,0 +1,37 @@
+# MPI compiler wrappers (Open MPI, MPICH): mpicc, mpicxx, mpic++, mpiCC,
+# mpifort, mpif77, mpif90. These wrap a gcc-compatible driver and pass
+# arguments through to it, so flag parsing extends the GCC table. The
+# wrapper itself is recorded as the compiler (see
+# docs/rationale/mpi-wrappers-as-compilers.md); Intel MPI wrappers
+# (mpiicc, mpiifort, ...) are handled separately as extra basenames on
+# the Intel compiler families, not here.
+#
+# Open MPI wrapper docs: https://docs.open-mpi.org/en/main/building-apps/customizing-wrappers.html
+# MPICH wrapper docs: mpicc(1) -- -show/-compile_info/-link_info
+extends: gcc
+type: mpi
+recognize:
+  - executables: ["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  # Wrapper-info invocations print the underlying compiler command and exit;
+  # these never compile anything, so no database entry is produced for them.
+  - match: {pattern: "-showme*"}
+    result: info_and_exit
+  - match: {pattern: "-show"}
+    result: info_and_exit
+  - match: {pattern: "-compile_info"}
+    result: info_and_exit
+  - match: {pattern: "-link_info"}
+    result: info_and_exit
+  # MPICH's compiler-override options. The optional '=' form must be
+  # supported for both the glued (`-cc=gcc`) and separate (`-cc gcc`)
+  # spellings, or the separate-token value would be misread as a source file.
+  - match: {pattern: "-cc{=}*"}
+    result: driver_option
+  - match: {pattern: "-cxx{=}*"}
+    result: driver_option
+  - match: {pattern: "-fc{=}*"}
+    result: driver_option

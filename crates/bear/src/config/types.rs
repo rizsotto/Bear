@@ -112,6 +112,8 @@ pub enum CompilerType {
     IbmXl,
     #[serde(alias = "vala", alias = "valac")]
     Vala,
+    #[serde(alias = "mpi", alias = "mpicc")]
+    Mpi,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
     Wrapper,
 }
@@ -132,6 +134,7 @@ impl std::fmt::Display for CompilerType {
             CompilerType::Armclang => "ARM Compiler",
             CompilerType::IbmXl => "IBM Open XL",
             CompilerType::Vala => "Vala",
+            CompilerType::Mpi => "MPI wrapper",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

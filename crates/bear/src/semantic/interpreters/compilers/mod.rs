@@ -70,6 +70,7 @@ impl CompilerInterpreter {
         self.register(CompilerType::Armclang, flag_based::armclang(from_environment));
         self.register(CompilerType::IbmXl, flag_based::ibm_xl(from_environment));
         self.register(CompilerType::Vala, flag_based::vala(from_environment));
+        self.register(CompilerType::Mpi, flag_based::mpi(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it
@@ -1845,6 +1846,88 @@ mod tests {
             if let RecognizeResult::Recognized(parsed) = result {
                 assert_eq!(parsed.arguments.len(), 3);
                 assert_eq!(parsed.arguments[1].kind(), none());
+            }
+        }
+    }
+
+    mod mpi {
+        use super::*;
+
+        // Requirements: recognition-mpi-wrappers
+        #[test]
+        fn basic_compilation() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("mpicc", vec!["mpicc", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 3);
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
+            }
+        }
+
+        /// Watch-out from the requirement: the glued form `-cc=gcc` must stay
+        /// a single token, and must not swallow the source file that follows.
+        // Requirements: recognition-mpi-wrappers
+        #[test]
+        fn compiler_override_glued_form_keeps_single_token_and_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("mpicc", vec!["mpicc", "-cc=gcc", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 4);
+                assert_eq!(parsed.arguments[1].kind(), driver());
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-cc=gcc".to_string()],
+                    "-cc=gcc must be retained as a single token"
+                );
+                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[3].kind(), Source { binary: false });
+                assert_eq!(
+                    parsed.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["hello.c".to_string()]
+                );
+            }
+        }
+
+        /// The separate-token spelling (`-cc gcc`) must consume the value too,
+        /// or "gcc" would be misread as a phantom source file.
+        // Requirements: recognition-mpi-wrappers
+        #[test]
+        fn compiler_override_separate_form_consumes_value() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution =
+                create_execution("mpicc", vec!["mpicc", "-cc", "gcc", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                let source_count =
+                    parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
+                assert_eq!(source_count, 1, "only hello.c must be a source, got {:?}", parsed.arguments);
+                assert_eq!(parsed.arguments[1].kind(), driver());
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-cc".to_string(), "gcc".to_string()]
+                );
+            }
+        }
+
+        /// Wrapper-info invocations classify as info-and-exit, which the
+        /// output converter uses to skip emitting a database entry.
+        // Requirements: recognition-mpi-wrappers
+        #[test]
+        fn wrapper_info_flags_are_info_and_exit() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            for args in [vec!["mpicc", "-showme"], vec!["mpicc", "-show"], vec!["mpicc", "-compile_info"]] {
+                let execution = create_execution("mpicc", args.clone(), "/project");
+                let result = sut.recognize(execution);
+                assert!(matches!(result, RecognizeResult::Recognized(_)), "args: {:?}", args);
+                if let RecognizeResult::Recognized(parsed) = result {
+                    assert_eq!(parsed.arguments[1].kind(), info(), "args: {:?}", args);
+                }
             }
         }
     }

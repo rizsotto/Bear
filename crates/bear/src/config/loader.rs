@@ -468,6 +468,10 @@ mod test {
         // Test Vala
         assert_compiler_type_deserializes("\"vala\"", CompilerType::Vala);
         assert_compiler_type_deserializes("\"valac\"", CompilerType::Vala);
+
+        // Test MPI wrapper
+        assert_compiler_type_deserializes("\"mpi\"", CompilerType::Mpi);
+        assert_compiler_type_deserializes("\"mpicc\"", CompilerType::Mpi);
     }
 
     #[test]
