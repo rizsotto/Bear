@@ -1,6 +1,6 @@
 ---
 title: Recognize AMD ROCm compiler names
-status: in-progress
+status: implemented
 ---
 
 ## Intent
@@ -51,11 +51,12 @@ Given the executable name `amdgpu-arch`:
   "a compiler driver utility that will call clang or nvcc, depending on
   target, and pass the appropriate include and library options". Being a
   driver does not disqualify it: gcc and clang are themselves drivers
-  over `cc1`/`-cc1` (which Bear already recognizes and ignores), and
-  `nvcc` -- the same kind of driver over a host compiler -- is already
-  recognized in `cuda.yaml`. Bear records the user-facing driver
-  invocation, the same way it does for `nvcc`; `hipcc` accepts
-  clang-style options, so the Clang flag table is the right fit.
+  over an internal compilation stage that Bear already recognizes and
+  ignores, and the CUDA compiler driver `nvcc` -- the same kind of driver
+  over a host compiler -- is already recognized as a compiler. Bear
+  records the user-facing driver invocation, the same way it does for
+  `nvcc`; `hipcc` accepts clang-style options, so it dispatches with
+  Clang flag semantics.
 - In preload interception mode the child compiler process that `hipcc`
   (or `amdclang`/`amdflang`) execs into is intercepted too, so a single
   compilation can produce more than one event for the same source file.

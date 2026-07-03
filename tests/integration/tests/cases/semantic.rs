@@ -1023,3 +1023,39 @@ fn cray_cc_execution_yields_single_entry() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: recognition-amd-compilers
+//
+// A `hipcc -c hello.c` execution yields one entry, using the ROCm HIP
+// compiler driver name directly (parsed with Clang flag semantics).
+#[test]
+fn hipcc_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("hipcc_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "hipcc",
+        "arguments": ["hipcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("hipcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["hipcc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}

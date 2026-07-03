@@ -177,6 +177,8 @@ MPI compiler wrappers (Open MPI/MPICH's `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `m
 
 The Cray Compiling Environment (CCE) C/C++ compiler names `craycc`, `crayCC`, and `craycxx` are recognized automatically, using Clang flag semantics (CCE C/C++ is Clang-based). The HPE Cray PrgEnv wrapper `CC` is classified by the same version probe as `cc`/`c++`: it resolves to CCE Clang under PrgEnv-cray, GCC under PrgEnv-gnu, and so on, matching whatever compiler module is currently loaded. A programming environment whose compiler prints a version banner the probe does not recognize (for example `nvc++` under PrgEnv-nvidia) is not classified; use the `as` field on that path to override.
 
+AMD's ROCm compiler names `amdclang`, `amdclang++`, and `hipcc` are recognized automatically, using Clang flag semantics; `amdflang` is recognized automatically, using Flang flag semantics. `hipcc` is a compiler driver (it calls clang or nvcc depending on target), the same way `nvcc` is; Bear records the driver invocation as executed. AOCC's plain `clang`/`clang++`/`flang` names were already covered by the existing Clang/Flang recognition.
+
 ### sources
 
 Filtering functionality based on the source file location.

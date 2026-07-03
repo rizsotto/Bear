@@ -6,6 +6,9 @@ recognize:
   - executables: ["flang", "flang-new"]
     cross_compilation: true
     versioned: true
+  - executables: ["amdflang"]
+    cross_compilation: false
+    versioned: false
 slash_prefix: false
 flags:
   - match: {pattern: "-J{ }*"}

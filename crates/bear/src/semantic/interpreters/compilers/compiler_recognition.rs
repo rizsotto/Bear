@@ -812,6 +812,20 @@ mod tests {
         assert_eq!(recognizer.recognize(path("craycc-17")), Some(CompilerType::CrayCc));
     }
 
+    // Requirements: recognition-amd-compilers
+    #[test]
+    fn test_amd_compiler_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        for name in ["amdclang", "amdclang++", "hipcc"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
+        }
+        assert_eq!(recognizer.recognize(path("amdflang")), Some(CompilerType::Flang));
+
+        // A GPU-arch reporting tool, not a compiler driver -- must not be recognized.
+        assert_eq!(recognizer.recognize(path("amdgpu-arch")), None);
+    }
+
     // Requirements: recognition-mpi-wrappers
     #[test]
     fn test_mpi_wrapper_recognition() {

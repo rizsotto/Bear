@@ -6,6 +6,9 @@ recognize:
   - executables: ["clang", "clang++"]
     cross_compilation: true
     versioned: true
+  - executables: ["amdclang", "amdclang++", "hipcc"]
+    cross_compilation: false
+    versioned: false
 ignore_when:
   flags: ["-cc1"]
 slash_prefix: false
