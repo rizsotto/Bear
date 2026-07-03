@@ -96,7 +96,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "bear"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "clap",
  "compilers-codegen",
@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "bear-completions"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "bear",
  "clap_complete",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "bear-driver"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "anyhow",
  "bear",
@@ -137,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "bear-test-tools"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "anyhow",
  "clap",
@@ -149,7 +149,7 @@ dependencies = [
 
 [[package]]
 name = "bear-wrapper"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "anyhow",
  "env_logger",
@@ -262,7 +262,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "compilers-codegen"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "anyhow",
  "insta",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "integration-tests"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "intercept"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "compilers-codegen",
  "libc",
@@ -560,7 +560,7 @@ dependencies = [
 
 [[package]]
 name = "intercept-preload"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "cc",
  "ctor",
@@ -576,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "intercept-supervisor"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "intercept",
  "libc",
@@ -696,7 +696,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "platform-checks"
-version = "4.1.5"
+version = "4.1.6"
 dependencies = [
  "cc",
  "tempfile",
