@@ -6,6 +6,8 @@ use crate::fixtures::infrastructure::TestEnvironment;
 use crate::fixtures::infrastructure::filename_of;
 use anyhow::Result;
 #[cfg(has_executable_sleep)]
+use std::io::Read;
+#[cfg(has_executable_sleep)]
 use std::process::Stdio;
 #[cfg(has_executable_sleep)]
 use std::time::Instant;
@@ -538,12 +540,30 @@ fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
         sleep = SLEEP_PATH,
     );
 
+    // Capture bear's stderr (RUST_LOG=debug on CI) so a teardown-timing
+    // failure carries the supervisor's own trace - which signal it forwarded
+    // and whether it escalated to SIGKILL - instead of a bare assertion.
     let mut cmd = env.command_bear();
     cmd.current_dir(env.test_dir())
+        .env("RUST_BACKTRACE", "1")
         .args(["--output", "compile_commands.json", "--", SHELL_PATH, "-c", &script])
         .stdout(Stdio::null())
-        .stderr(Stdio::null());
+        .stderr(Stdio::piped());
+    if std::env::var_os("RUST_LOG").is_none() {
+        cmd.env("RUST_LOG", "info");
+    }
     let mut child = cmd.spawn().expect("failed to spawn bear");
+
+    // Drain stderr on a thread: with debug logging a full pipe would otherwise
+    // block the very build we are trying to tear down. The write ends close
+    // when bear and its build tree exit, so the read returns EOF.
+    let stderr = child.stderr.take().expect("bear stderr was piped");
+    let drain = std::thread::spawn(move || {
+        let mut captured = String::new();
+        let mut stderr = stderr;
+        let _ = stderr.read_to_string(&mut captured);
+        captured
+    });
 
     wait_for_file(&ready);
 
@@ -553,12 +573,17 @@ fn signal_lets_a_trapping_build_run_its_trap() -> Result<()> {
     assert!(kill_status.success(), "kill -TERM reported failure");
 
     let status = child.wait().expect("failed to wait for bear");
+    let bear_stderr = drain.join().unwrap_or_default();
 
     // The trap ran (real signal forwarded with grace, not an immediate
     // SIGKILL) and Bear reflected the build's own exit code.
     let caught = std::fs::read_to_string(&marker).unwrap_or_default();
-    assert_eq!(caught.trim(), "caught", "build's TERM trap did not run");
-    assert_eq!(status.code(), Some(42), "bear did not propagate the build's trap exit code");
+    assert_eq!(caught.trim(), "caught", "build's TERM trap did not run; bear stderr:\n{bear_stderr}");
+    assert_eq!(
+        status.code(),
+        Some(42),
+        "bear did not propagate the build's trap exit code; bear stderr:\n{bear_stderr}"
+    );
     Ok(())
 }
 
