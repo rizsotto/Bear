@@ -1,6 +1,6 @@
 ---
 title: Recognize Cray CCE C/C++ compilers
-status: in-progress
+status: implemented
 ---
 
 ## Intent

@@ -472,6 +472,11 @@ mod test {
         // Test MPI wrapper
         assert_compiler_type_deserializes("\"mpi\"", CompilerType::Mpi);
         assert_compiler_type_deserializes("\"mpicc\"", CompilerType::Mpi);
+
+        // Test Cray C/C++ (CCE)
+        assert_compiler_type_deserializes("\"cray_cc\"", CompilerType::CrayCc);
+        assert_compiler_type_deserializes("\"cray-cc\"", CompilerType::CrayCc);
+        assert_compiler_type_deserializes("\"craycc\"", CompilerType::CrayCc);
     }
 
     #[test]

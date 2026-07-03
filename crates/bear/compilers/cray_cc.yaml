@@ -1,0 +1,20 @@
+# Cray Compiling Environment (CCE) C/C++ compiler: craycc, crayCC, craycxx.
+# CCE C/C++ is Clang-based, so flag parsing extends the Clang table.
+# https://cpe.ext.hpe.com/docs/cce/man7/cce_docs.7.html
+#
+# The HPE Cray PrgEnv wrapper "CC" is NOT listed here: on Cray systems "CC"
+# drives whichever compiler module the loaded programming environment
+# selects (CCE, GCC, or another vendor's compiler), so the basename alone
+# cannot say which compiler it is. It is classified by the ambiguous-name
+# version probe instead (see
+# docs/requirements/recognition-ambiguous-name-probe.md).
+extends: clang
+type: cray_cc
+recognize:
+  - executables: ["craycc", "crayCC", "craycxx"]
+    cross_compilation: false
+    versioned: true
+slash_prefix: false
+flags:
+  - match: {pattern: "-fcray-*"}
+    result: configures_compiling

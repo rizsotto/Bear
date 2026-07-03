@@ -267,6 +267,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_armclang.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
@@ -439,6 +440,18 @@ pub(super) fn mpi(from_environment: bool) -> impl Interpreter {
     )
 }
 
+pub(super) fn cray_cc(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &CRAY_CC_FLAGS,
+        &CRAY_CC_IGNORE_EXECUTABLES,
+        &CRAY_CC_IGNORE_FLAGS,
+        CRAY_CC_SLASH_PREFIX,
+        &CRAY_CC_ENV_RULES,
+        from_environment,
+        true,
+    )
+}
+
 #[cfg(test)]
 mod flag_table_invariants {
     use super::*;
@@ -558,6 +571,11 @@ mod flag_table_invariants {
     #[test]
     fn mpi() {
         assert_invariants(&MPI_FLAGS);
+    }
+
+    #[test]
+    fn cray_cc() {
+        assert_invariants(&CRAY_CC_FLAGS);
     }
 
     #[test]

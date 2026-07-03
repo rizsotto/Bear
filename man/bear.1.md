@@ -160,10 +160,10 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`.
 - **ignore**: Whether to ignore this compiler.
 
-The generic compiler names `cc` and `c++` default to GCC semantics. On platforms where these map to a different compiler (macOS, FreeBSD, OpenBSD), use the `as` field to override:
+The generic compiler names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` default to GCC/Clang semantics chosen by probing the executable's `--version` output (since the same basename can be a different compiler depending on the platform or, for `CC`, the loaded Cray programming environment). On platforms where the probe cannot classify the executable, use the `as` field to override:
 
 ```yaml
 compilers:
@@ -174,6 +174,8 @@ compilers:
 ```
 
 MPI compiler wrappers (Open MPI/MPICH's `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `mpifort`, `mpif77`, `mpif90`) are recognized automatically, without any configuration. The wrapper is recorded as the compiler exactly as invoked -- Bear does not expand it to the underlying compiler command it wraps. Clang tooling that needs the wrapper's baked-in include paths can point at the wrapper directly (e.g. clangd's `--query-driver`). Intel MPI's wrappers (`mpiicc`, `mpiicpc`, `mpiicx`, `mpiicpx`, `mpiifort`, `mpiifx`) are recognized as the Intel compilers they front, using Intel's flag semantics. The launchers `mpirun` and `mpiexec` are not recognized: they execute programs, they do not compile.
+
+The Cray Compiling Environment (CCE) C/C++ compiler names `craycc`, `crayCC`, and `craycxx` are recognized automatically, using Clang flag semantics (CCE C/C++ is Clang-based). The HPE Cray PrgEnv wrapper `CC` is classified by the same version probe as `cc`/`c++`: it resolves to CCE Clang under PrgEnv-cray, GCC under PrgEnv-gnu, and so on, matching whatever compiler module is currently loaded. A programming environment whose compiler prints a version banner the probe does not recognize (for example `nvc++` under PrgEnv-nvidia) is not classified; use the `as` field on that path to override.
 
 ### sources
 

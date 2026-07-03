@@ -25,4 +25,5 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
     ("armclang", &["armclang", "armclang++"], false, true),
     ("vala", &["valac"], true, true),
     ("mpi", &["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"], false, true),
+    ("cray_cc", &["craycc", "crayCC", "craycxx"], false, true),
 ];

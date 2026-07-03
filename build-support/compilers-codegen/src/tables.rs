@@ -148,4 +148,17 @@ pub const TABLES: &[TableConfig] = &[
         env_rules_name: "MPI_ENV_RULES",
         output_file: "flags_mpi.rs",
     },
+    // Cray CCE C/C++ names (craycc, crayCC, craycxx) do not overlap any
+    // other compiler's recognition pattern, so position here does not
+    // affect priority. The ambiguous PrgEnv wrapper "CC" is handled by the
+    // version probe, not by this table (see cray_cc.yaml).
+    TableConfig {
+        yaml_file: "cray_cc.yaml",
+        static_name: "CRAY_CC_FLAGS",
+        ignore_executables_name: "CRAY_CC_IGNORE_EXECUTABLES",
+        ignore_flags_name: "CRAY_CC_IGNORE_FLAGS",
+        slash_prefix_name: "CRAY_CC_SLASH_PREFIX",
+        env_rules_name: "CRAY_CC_ENV_RULES",
+        output_file: "flags_cray_cc.rs",
+    },
 ];

@@ -986,3 +986,40 @@ fn mpi_wrapper_and_child_compiler_events_collapse_to_wrapper_entry() -> Result<(
 
     Ok(())
 }
+
+// Requirements: recognition-cray-compilers
+//
+// A `craycc -c hello.c` execution yields one entry, using the CCE C/C++
+// compiler name directly (the same shape as the existing Cray Fortran
+// support for `crayftn`/`ftn`).
+#[test]
+fn cray_cc_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("cray_cc_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "craycc",
+        "arguments": ["craycc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("craycc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["craycc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}

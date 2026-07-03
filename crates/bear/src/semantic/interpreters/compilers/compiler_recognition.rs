@@ -16,30 +16,33 @@ use std::sync::LazyLock;
 
 /// Basenames whose underlying toolchain cannot be inferred from the name
 /// alone -- `cc` and `c++` resolve to GCC on most Linuxes but Clang on
-/// FreeBSD/OpenBSD/NetBSD/DragonFly and macOS.
+/// FreeBSD/OpenBSD/NetBSD/DragonFly and macOS. `CC` is the HPE Cray PrgEnv
+/// wrapper: it drives whichever compiler module the loaded programming
+/// environment selects (CCE, GCC, or another vendor's compiler), so the
+/// basename alone is ambiguous the same way.
 ///
 /// The probe is the sole classifier for these names: there is no regex
-/// fallback (gcc.yaml deliberately omits them). When the probe declines
-/// (timeout, unrecognizable output, spawn failure), `recognize` returns
-/// `None` rather than guessing -- a missing entry is visible and
-/// debuggable, whereas a wrongly-classified entry corrupts the
-/// compilation database silently via mismatched flag-arity tables.
-const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++"];
+/// fallback (gcc.yaml and cray_cc.yaml deliberately omit them). When the
+/// probe declines (timeout, unrecognizable output, spawn failure),
+/// `recognize` returns `None` rather than guessing -- a missing entry is
+/// visible and debuggable, whereas a wrongly-classified entry corrupts
+/// the compilation database silently via mismatched flag-arity tables.
+const AMBIGUOUS_NAMES: &[&str] = &["cc", "c++", "CC"];
 
 /// Recognizes the compiler type for an executable path, using a layered
 /// strategy:
 ///
 /// 1. **Hint lookup** — user-supplied [`Compiler`] entries (canonicalized)
 ///    are checked first; a hit short-circuits both probe and regex.
-/// 2. **Probe** — for ambiguous basenames (`cc`, `c++`) the binary is
+/// 2. **Probe** — for ambiguous basenames (`cc`, `c++`, `CC`) the binary is
 ///    invoked with `--version` and classified by signature. Memoization
 ///    of probe results lives in the probe itself (see
 ///    [`super::probe::CachingProbe`]); the recognizer only owns the
 ///    dispatch policy.
 /// 3. **Regex fallback** — filename is matched against patterns generated
-///    from `interpreters/*.yaml`. Note that `cc`/`c++` are intentionally
-///    omitted from the regex; if the probe declines, recognition returns
-///    `None` rather than guessing.
+///    from `interpreters/*.yaml`. Note that the ambiguous names above are
+///    intentionally omitted from the regex; if the probe declines,
+///    recognition returns `None` rather than guessing.
 pub struct CompilerRecognizer {
     patterns: Vec<(CompilerType, Regex)>,
     hints: HashMap<PathBuf, CompilerType>,
@@ -305,6 +308,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "ibm_xl" => CompilerType::IbmXl,
         "vala" => CompilerType::Vala,
         "mpi" => CompilerType::Mpi,
+        "cray_cc" => CompilerType::CrayCc,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -791,6 +795,23 @@ mod tests {
         assert_eq!(recognizer.recognize(path("armclang-14")), Some(CompilerType::Armclang));
     }
 
+    // Requirements: recognition-cray-compilers
+    #[test]
+    fn test_cray_cc_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        // Case sensitivity note: on Unix the recognition regex is
+        // case-sensitive, so "crayCC" only matches because it is listed as
+        // its own literal alternative in cray_cc.yaml, not because "craycc"
+        // case-folds to it. Both spellings must resolve independently.
+        for name in ["craycc", "crayCC", "craycxx"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::CrayCc), "name: {}", name);
+        }
+
+        // Versioned variant
+        assert_eq!(recognizer.recognize(path("craycc-17")), Some(CompilerType::CrayCc));
+    }
+
     // Requirements: recognition-mpi-wrappers
     #[test]
     fn test_mpi_wrapper_recognition() {
@@ -934,6 +955,57 @@ mod tests {
 
         assert_eq!(recognizer.recognize(path("cc")), None);
         assert_eq!(recognizer.recognize(path("c++")), None);
+    }
+
+    // Requirements: recognition-cray-compilers
+    #[test]
+    fn probe_classifies_cray_prgenv_cc_as_clang_via_cray_banner() {
+        // Simulates the HPE Cray PrgEnv wrapper "CC" resolving to the CCE
+        // Clang frontend under PrgEnv-cray. The Cray banner ("Cray clang
+        // version ...") contains the substring "clang version", which
+        // classify_version_output already recognizes -- no change to the
+        // classifier itself is needed for this case.
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Clang));
+        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Clang));
+    }
+
+    // Requirements: recognition-cray-compilers
+    #[test]
+    fn probe_classifies_cray_prgenv_cc_as_gcc_via_fsf_banner() {
+        // Simulates "CC" resolving to g++ under PrgEnv-gnu.
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Gcc));
+        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::Gcc));
+    }
+
+    // Requirements: recognition-cray-compilers
+    #[test]
+    fn config_hint_beats_probe_and_suppresses_it_for_cray_prgenv_cc() {
+        let compilers =
+            vec![Compiler { path: PathBuf::from("CC"), as_: Some(CompilerType::CrayCc), ignore: false }];
+        let probe = Box::new(FakeProbe::new().answer("CC", CompilerType::Clang));
+        let probe_ptr: *const FakeProbe = &*probe;
+        let recognizer = CompilerRecognizer::with_probe(&compilers, probe);
+
+        assert_eq!(recognizer.recognize(path("CC")), Some(CompilerType::CrayCc));
+        let calls = unsafe { (*probe_ptr).calls() };
+        assert_eq!(calls, 0, "hint must short-circuit the probe");
+    }
+
+    // Requirements: recognition-cray-compilers
+    #[test]
+    fn probe_inconclusive_for_cray_prgenv_cc_yields_not_recognized() {
+        // A programming environment whose compiler prints a banner the
+        // probe does not know (e.g. nvc++ under PrgEnv-nvidia) stays
+        // unrecognized -- documented limitation in
+        // recognition-cray-compilers.md.
+        let probe = Box::new(FakeProbe::new());
+        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+
+        assert_eq!(recognizer.recognize(path("CC")), None);
     }
 
     // Requirements: recognition-ambiguous-name-probe

@@ -114,6 +114,8 @@ pub enum CompilerType {
     Vala,
     #[serde(alias = "mpi", alias = "mpicc")]
     Mpi,
+    #[serde(alias = "cray_cc", alias = "cray-cc", alias = "craycc")]
+    CrayCc,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
     Wrapper,
 }
@@ -135,6 +137,7 @@ impl std::fmt::Display for CompilerType {
             CompilerType::IbmXl => "IBM Open XL",
             CompilerType::Vala => "Vala",
             CompilerType::Mpi => "MPI wrapper",
+            CompilerType::CrayCc => "Cray C/C++",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

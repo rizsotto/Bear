@@ -71,6 +71,7 @@ impl CompilerInterpreter {
         self.register(CompilerType::IbmXl, flag_based::ibm_xl(from_environment));
         self.register(CompilerType::Vala, flag_based::vala(from_environment));
         self.register(CompilerType::Mpi, flag_based::mpi(from_environment));
+        self.register(CompilerType::CrayCc, flag_based::cray_cc(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it

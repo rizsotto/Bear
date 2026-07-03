@@ -185,14 +185,17 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[CR]intel\-fortran\f[R], \f[CR]cray\-fortran\f[R], \f[CR]cuda\f[R],
 \f[CR]msvc\f[R], \f[CR]clang\-cl\f[R], \f[CR]intel_cc\f[R],
 \f[CR]nvidia\-hpc\f[R], \f[CR]armclang\f[R], \f[CR]ibm_xl\f[R],
-\f[CR]vala\f[R], \f[CR]mpi\f[R].
+\f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .PP
-The generic compiler names \f[CR]cc\f[R] and \f[CR]c++\f[R] default to
-GCC semantics.
-On platforms where these map to a different compiler (macOS, FreeBSD,
-OpenBSD), use the \f[CR]as\f[R] field to override:
+The generic compiler names \f[CR]cc\f[R], \f[CR]c++\f[R], and the HPE
+Cray PrgEnv wrapper \f[CR]CC\f[R] default to GCC/Clang semantics chosen
+by probing the executable\(cqs \f[CR]\-\-version\f[R] output (since the
+same basename can be a different compiler depending on the platform or,
+for \f[CR]CC\f[R], the loaded Cray programming environment).
+On platforms where the probe cannot classify the executable, use the
+\f[CR]as\f[R] field to override:
 .IP
 .EX
 compilers\f[B]:\f[R]
@@ -217,6 +220,19 @@ Intel MPI\(cqs wrappers (\f[CR]mpiicc\f[R], \f[CR]mpiicpc\f[R],
 using Intel\(cqs flag semantics.
 The launchers \f[CR]mpirun\f[R] and \f[CR]mpiexec\f[R] are not
 recognized: they execute programs, they do not compile.
+.PP
+The Cray Compiling Environment (CCE) C/C++ compiler names
+\f[CR]craycc\f[R], \f[CR]crayCC\f[R], and \f[CR]craycxx\f[R] are
+recognized automatically, using Clang flag semantics (CCE C/C++ is
+Clang\-based).
+The HPE Cray PrgEnv wrapper \f[CR]CC\f[R] is classified by the same
+version probe as \f[CR]cc\f[R]/\f[CR]c++\f[R]: it resolves to CCE Clang
+under PrgEnv\-cray, GCC under PrgEnv\-gnu, and so on, matching whatever
+compiler module is currently loaded.
+A programming environment whose compiler prints a version banner the
+probe does not recognize (for example \f[CR]nvc++\f[R] under
+PrgEnv\-nvidia) is not classified; use the \f[CR]as\f[R] field on that
+path to override.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2
