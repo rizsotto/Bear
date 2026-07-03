@@ -5,14 +5,16 @@ status: implemented
 
 ## Intent
 
-When a build invokes a compiler under an ambiguous name (notably `cc` and
-`c++`), Bear must dispatch to the correct interpreter (GCC vs Clang)
-regardless of which toolchain the system actually installs under that name.
-On Linux `cc` is typically GCC; on FreeBSD, OpenBSD, NetBSD, DragonFly, and
-macOS `cc` is Clang. Misidentifying the compiler causes flag-arity mistakes
-(e.g., Clang's `-Xclang <arg>` consumes the next argv slot, GCC's flag table
-does not), which corrupts source/output detection in the compilation
-database.
+When a build invokes a compiler under an ambiguous name (notably `cc`,
+`c++`, and the HPE Cray PrgEnv wrapper `CC`), Bear must dispatch to the
+correct interpreter (GCC vs Clang) regardless of which toolchain the
+system actually installs under that name. On Linux `cc` is typically
+GCC; on FreeBSD, OpenBSD, NetBSD, DragonFly, and macOS `cc` is Clang.
+On HPE Cray systems, `CC` drives whichever compiler module the loaded
+programming environment selects. Misidentifying the compiler causes
+flag-arity mistakes (e.g., Clang's `-Xclang <arg>` consumes the next
+argv slot, GCC's flag table does not), which corrupts source/output
+detection in the compilation database.
 
 The user expects `bear -- cc -c hello.c` to produce a correct entry on
 every host, without per-platform configuration, and without losing the
@@ -21,8 +23,8 @@ ability to override Bear's guess when needed.
 ## Acceptance criteria
 
 - For executables whose basename matches a known-ambiguous name (`cc`,
-  `c++`), Bear runs the executable once with `--version` to classify it as
-  GCC or Clang before dispatching to an interpreter.
+  `c++`, `CC`), Bear runs the executable once with `--version` to
+  classify it as GCC or Clang before dispatching to an interpreter.
 - The probe runs at most once per distinct canonical executable path for
   the lifetime of the process. Subsequent invocations of the same path
   reuse the cached result.
@@ -130,6 +132,9 @@ that resolves (after canonicalization) to the ccache wrapper:
   process-wide off switch; the override is per-path and explicit.
 - `gcc.yaml` carries a comment explaining why `cc`/`c++` are absent from
   its recognize list.
+- `CC` joined the ambiguous set for the HPE Cray PrgEnv wrapper (see
+  `recognition-cray-compilers.md`): the same reasoning as `cc`/`c++`
+  applies verbatim, no change to the classifier itself was needed.
 
 ## Rationale
 
