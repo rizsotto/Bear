@@ -1059,3 +1059,81 @@ fn hipcc_execution_yields_single_entry() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: recognition-embedded-toolchains
+//
+// A `qcc -c hello.c` execution yields one entry, using the QNX driver name
+// directly (parsed with GCC flag semantics -- QNX 8 is GCC-backed).
+#[test]
+fn qnx_qcc_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("qnx_qcc_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "qcc",
+        "arguments": ["qcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("qcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["qcc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-embedded-toolchains
+//
+// QNX's attached-value variant selector (`-Vgcc_ntoaarch64le`) must be
+// treated as a driver option, never as an input file, and must be retained
+// verbatim in the recorded arguments.
+#[test]
+fn qnx_qcc_variant_selector_is_retained_as_driver_option() -> Result<()> {
+    let env = TestEnvironment::new("qnx_qcc_variant_selector")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "qcc",
+        "arguments": ["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("qcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec![
+            "qcc".to_string(),
+            "-Vgcc_ntoaarch64le".to_string(),
+            "-c".to_string(),
+            "hello.c".to_string()
+        ]
+    ))?;
+
+    Ok(())
+}

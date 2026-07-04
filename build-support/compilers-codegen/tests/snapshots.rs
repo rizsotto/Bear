@@ -93,6 +93,11 @@ fn snapshot_flags_cray_cc() {
 }
 
 #[test]
+fn snapshot_flags_qnx() {
+    insta::assert_snapshot!(generate_flag_file("qnx"));
+}
+
+#[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));

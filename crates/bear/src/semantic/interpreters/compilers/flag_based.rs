@@ -268,6 +268,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_ibm_xl.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_qnx.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
@@ -452,6 +453,18 @@ pub(super) fn cray_cc(from_environment: bool) -> impl Interpreter {
     )
 }
 
+pub(super) fn qnx(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &QNX_FLAGS,
+        &QNX_IGNORE_EXECUTABLES,
+        &QNX_IGNORE_FLAGS,
+        QNX_SLASH_PREFIX,
+        &QNX_ENV_RULES,
+        from_environment,
+        true,
+    )
+}
+
 #[cfg(test)]
 mod flag_table_invariants {
     use super::*;
@@ -576,6 +589,11 @@ mod flag_table_invariants {
     #[test]
     fn cray_cc() {
         assert_invariants(&CRAY_CC_FLAGS);
+    }
+
+    #[test]
+    fn qnx() {
+        assert_invariants(&QNX_FLAGS);
     }
 
     #[test]

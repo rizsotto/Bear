@@ -72,6 +72,7 @@ impl CompilerInterpreter {
         self.register(CompilerType::Vala, flag_based::vala(from_environment));
         self.register(CompilerType::Mpi, flag_based::mpi(from_environment));
         self.register(CompilerType::CrayCc, flag_based::cray_cc(from_environment));
+        self.register(CompilerType::Qnx, flag_based::qnx(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it
@@ -1930,6 +1931,70 @@ mod tests {
                 if let RecognizeResult::Recognized(parsed) = result {
                     assert_eq!(parsed.arguments[1].kind(), info(), "args: {:?}", args);
                 }
+            }
+        }
+    }
+
+    mod qnx {
+        use super::*;
+
+        // Requirements: recognition-embedded-toolchains
+        #[test]
+        fn basic_compilation() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("qcc", vec!["qcc", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 3);
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
+            }
+        }
+
+        /// QNX's variant selector is attached-value only (`-Vgcc_ntoaarch64le`);
+        /// a bare `-V` (no attached value) lists variants. Both spellings are
+        /// modeled as a prefix pattern with 0 extra args, so the token is never
+        /// split and never swallows a following source file.
+        // Requirements: recognition-embedded-toolchains
+        #[test]
+        fn variant_selector_is_retained_and_does_not_swallow_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution =
+                create_execution("qcc", vec!["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 4);
+                assert_eq!(parsed.arguments[1].kind(), driver());
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-Vgcc_ntoaarch64le".to_string()],
+                    "-Vgcc_ntoaarch64le must be retained as a single token"
+                );
+                assert_eq!(parsed.arguments[2].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[3].kind(), Source { binary: false });
+                assert_eq!(
+                    parsed.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["hello.c".to_string()]
+                );
+            }
+        }
+
+        /// A bare `-V` (no attached value) must also be treated as a driver
+        /// option, never as a source file.
+        // Requirements: recognition-embedded-toolchains
+        #[test]
+        fn bare_variant_listing_flag_is_a_driver_option() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("qcc", vec!["qcc", "-V", "-c", "hello.c"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments[1].kind(), driver());
+                let source_count =
+                    parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
+                assert_eq!(source_count, 1, "only hello.c must be a source, got {:?}", parsed.arguments);
             }
         }
     }

@@ -116,6 +116,8 @@ pub enum CompilerType {
     Mpi,
     #[serde(alias = "cray_cc", alias = "cray-cc", alias = "craycc")]
     CrayCc,
+    #[serde(alias = "qnx", alias = "qcc")]
+    Qnx,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
     Wrapper,
 }
@@ -138,6 +140,7 @@ impl std::fmt::Display for CompilerType {
             CompilerType::Vala => "Vala",
             CompilerType::Mpi => "MPI wrapper",
             CompilerType::CrayCc => "Cray C/C++",
+            CompilerType::Qnx => "QNX qcc",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

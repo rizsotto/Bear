@@ -160,7 +160,7 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`.
 - **ignore**: Whether to ignore this compiler.
 
 The generic compiler names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` default to GCC/Clang semantics chosen by probing the executable's `--version` output (since the same basename can be a different compiler depending on the platform or, for `CC`, the loaded Cray programming environment). On platforms where the probe cannot classify the executable, use the `as` field to override:
@@ -178,6 +178,8 @@ MPI compiler wrappers (Open MPI/MPICH's `mpicc`, `mpicxx`, `mpic++`, `mpiCC`, `m
 The Cray Compiling Environment (CCE) C/C++ compiler names `craycc`, `crayCC`, and `craycxx` are recognized automatically, using Clang flag semantics (CCE C/C++ is Clang-based). The HPE Cray PrgEnv wrapper `CC` is classified by the same version probe as `cc`/`c++`: it resolves to CCE Clang under PrgEnv-cray, GCC under PrgEnv-gnu, and so on, matching whatever compiler module is currently loaded. A programming environment whose compiler prints a version banner the probe does not recognize (for example `nvc++` under PrgEnv-nvidia) is not classified; use the `as` field on that path to override.
 
 AMD's ROCm compiler names `amdclang`, `amdclang++`, and `hipcc` are recognized automatically, using Clang flag semantics; `amdflang` is recognized automatically, using Flang flag semantics. `hipcc` is a compiler driver (it calls clang or nvcc depending on target), the same way `nvcc` is; Bear records the driver invocation as executed. AOCC's plain `clang`/`clang++`/`flang` names were already covered by the existing Clang/Flang recognition.
+
+QNX's compiler driver names `qcc` and `q++` are recognized automatically, using GCC flag semantics (QNX's toolchain is GCC-backed). QNX's variant selector, `-V` (e.g. `-Vgcc_ntoaarch64le`, or bare `-V` to list available variants), is always treated as a driver option and is never mistaken for a source file.
 
 ### sources
 

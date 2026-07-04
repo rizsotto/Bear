@@ -1,0 +1,23 @@
+# QNX Neutrino RTOS compiler drivers: qcc, q++. QNX 8 ships a GCC 12.2-based
+# toolchain (see
+# https://www.qnx.com/developers/docs/8.0/com.qnx.doc.qnxsdp.migration/topic/toolchain.html),
+# so flag parsing extends the GCC table.
+#
+# The "-V" variant selector picks the target/compiler variant, e.g.
+# `-Vgcc_ntoaarch64le`. It is modeled as attached-value only (prefix match,
+# 0 extra args): both the attached form (`-Vgcc_ntoaarch64le`) and the bare
+# form (`-V`, which lists available variants) are a single token that must
+# never be split and must never swallow a following source file. QNX does
+# not accept a separate-token spelling (`-V gcc_ntoaarch64le` would be
+# read as `-V` plus an unrelated positional argument), so no `{ }` form is
+# needed here, unlike MPI's `-cc{=}*`.
+extends: gcc
+type: qnx
+recognize:
+  - executables: ["qcc", "q++"]
+    cross_compilation: false
+    versioned: false
+slash_prefix: false
+flags:
+  - match: {pattern: "-V*"}
+    result: driver_option

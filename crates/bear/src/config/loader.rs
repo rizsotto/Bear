@@ -477,6 +477,10 @@ mod test {
         assert_compiler_type_deserializes("\"cray_cc\"", CompilerType::CrayCc);
         assert_compiler_type_deserializes("\"cray-cc\"", CompilerType::CrayCc);
         assert_compiler_type_deserializes("\"craycc\"", CompilerType::CrayCc);
+
+        // Test QNX
+        assert_compiler_type_deserializes("\"qnx\"", CompilerType::Qnx);
+        assert_compiler_type_deserializes("\"qcc\"", CompilerType::Qnx);
     }
 
     #[test]

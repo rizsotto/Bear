@@ -161,4 +161,15 @@ pub const TABLES: &[TableConfig] = &[
         env_rules_name: "CRAY_CC_ENV_RULES",
         output_file: "flags_cray_cc.rs",
     },
+    // QNX driver names (qcc, q++) do not overlap any other compiler's
+    // recognition pattern, so position here does not affect priority.
+    TableConfig {
+        yaml_file: "qnx.yaml",
+        static_name: "QNX_FLAGS",
+        ignore_executables_name: "QNX_IGNORE_EXECUTABLES",
+        ignore_flags_name: "QNX_IGNORE_FLAGS",
+        slash_prefix_name: "QNX_SLASH_PREFIX",
+        env_rules_name: "QNX_ENV_RULES",
+        output_file: "flags_qnx.rs",
+    },
 ];

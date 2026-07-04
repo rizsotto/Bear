@@ -309,6 +309,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "vala" => CompilerType::Vala,
         "mpi" => CompilerType::Mpi,
         "cray_cc" => CompilerType::CrayCc,
+        "qnx" => CompilerType::Qnx,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -855,6 +856,19 @@ mod tests {
         for name in ["mpiifort", "mpiifx"] {
             assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::IntelFortran), "name: {}", name);
         }
+    }
+
+    // Requirements: recognition-embedded-toolchains
+    #[test]
+    fn test_qnx_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        assert_eq!(recognizer.recognize(path("qcc")), Some(CompilerType::Qnx));
+        assert_eq!(recognizer.recognize(path("q++")), Some(CompilerType::Qnx));
+
+        // A name that merely shares the "q" prefix is not a QNX driver.
+        assert_eq!(recognizer.recognize(path("qnxcc")), None);
+        assert_eq!(recognizer.recognize(path("qcc-fake")), None);
     }
 
     #[test]

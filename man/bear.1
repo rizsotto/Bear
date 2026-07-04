@@ -185,7 +185,7 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[CR]intel\-fortran\f[R], \f[CR]cray\-fortran\f[R], \f[CR]cuda\f[R],
 \f[CR]msvc\f[R], \f[CR]clang\-cl\f[R], \f[CR]intel_cc\f[R],
 \f[CR]nvidia\-hpc\f[R], \f[CR]armclang\f[R], \f[CR]ibm_xl\f[R],
-\f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R].
+\f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R], \f[CR]qnx\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .PP
@@ -243,6 +243,14 @@ on target), the same way \f[CR]nvcc\f[R] is; Bear records the driver
 invocation as executed.
 AOCC\(cqs plain \f[CR]clang\f[R]/\f[CR]clang++\f[R]/\f[CR]flang\f[R]
 names were already covered by the existing Clang/Flang recognition.
+.PP
+QNX\(cqs compiler driver names \f[CR]qcc\f[R] and \f[CR]q++\f[R] are
+recognized automatically, using GCC flag semantics (QNX\(cqs toolchain
+is GCC\-backed).
+QNX\(cqs variant selector, \f[CR]\-V\f[R]
+(e.g.\ \f[CR]\-Vgcc_ntoaarch64le\f[R], or bare \f[CR]\-V\f[R] to list
+available variants), is always treated as a driver option and is never
+mistaken for a source file.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2
