@@ -264,6 +264,16 @@ Microchip\(cqs XC8 driver names \f[CR]xc8\-cc\f[R] and \f[CR]xc8\f[R]
 are recognized automatically, using GCC flag semantics; the
 \f[CR]xc16\-gcc\f[R] and \f[CR]xc32\-gcc\f[R] names were already covered
 by the existing cross\-compiler prefix recognition.
+.PP
+Compiler launchers (\f[CR]ccache\f[R], \f[CR]distcc\f[R],
+\f[CR]sccache\f[R], \f[CR]icecc\f[R]) that carry the real compiler in
+their arguments are recorded as the real compiler\(cqs compilation:
+\f[CR]ccache gcc \-c main.c\f[R] produces an entry for
+\f[CR]gcc \-c main.c\f[R], with the launcher token dropped.
+A launcher invocation that does not name a recognized compiler, or a
+launcher wrapping another launcher, produces no entry.
+icecream\(cqs \f[CR]icerun\f[R] is not a compiler launcher (it runs
+arbitrary commands on the cluster) and is not recognized.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2

@@ -118,7 +118,7 @@ pub enum CompilerType {
     CrayCc,
     #[serde(alias = "qnx", alias = "qcc")]
     Qnx,
-    #[serde(alias = "ccache", alias = "distcc", alias = "sccache")]
+    #[serde(alias = "ccache", alias = "distcc", alias = "sccache", alias = "icecc")]
     Wrapper,
 }
 

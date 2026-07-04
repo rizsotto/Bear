@@ -1,12 +1,12 @@
 ---
 title: Recognize compiler-launcher invocations
-status: in-progress
+status: implemented
 ---
 
 ## Intent
 
 When a build compiles through a compiler-launcher command (ccache,
-distcc, sccache, and eventually icecc) that carries the real compiler in
+distcc, sccache, icecc) that carries the real compiler in
 its own arguments, Bear records the compilation as the real compiler's
 invocation, parsed with that compiler's flag semantics -- not the
 launcher's. A launcher reached through its masquerade symlink farm is
@@ -40,9 +40,10 @@ misclassify an ambiguous compiler name.
   compiler's name with the invocation's own arguments; the launcher
   re-executes the real compiler, and default duplicate detection
   collapses the pair in preload mode.
-- icecc, once recognized, follows the identical contract: the real
-  compiler in its arguments is recorded as the compilation, and icecc's
-  own flags are skipped the same way distcc's are.
+- icecc follows the identical contract: the real compiler in its
+  arguments is recorded as the compilation. In its launcher usage icecc
+  takes the compiler as its first argument with no launcher-specific
+  flags before it, so nothing needs skipping (unlike distcc).
 
 ## Non-functional constraints
 
@@ -90,9 +91,9 @@ launcher binary (a masquerade symlink farm first on PATH):
 > and the launcher's version banner does not classify the name as any
 > compiler.
 
-Given icecc support is implemented (a later phase):
+Given `icecc gcc -c main.c`:
 
-> When Bear recognizes `icecc gcc -c main.c`,
+> When Bear recognizes it,
 > then the recorded compiler is `gcc`, following the same contract as
 > ccache/distcc/sccache above.
 
@@ -101,12 +102,13 @@ Given icecc support is implemented (a later phase):
 - This requirement documents a contract that predates it: ccache,
   distcc, and sccache launcher-unwrap behavior has existed in Bear for
   several releases (`crates/bear/src/semantic/interpreters/compilers/wrapper.rs`).
-  It is written down now because the icecc addition needs an existing
-  contract to extend.
-- icecc support itself is not yet implemented; this requirement stays
-  `in-progress` until it lands. The Testing section already includes
-  icecc's scenario so the contract does not need a second revision when
-  the code arrives.
+  It was written down when the icecc addition needed an existing
+  contract to extend; icecc support landed with this requirement's
+  implementation.
+- icecream's `icerun` is deliberately not a launcher: it runs arbitrary
+  commands on the icecream cluster, not compiler invocations, so
+  recognizing it would record non-compilations. Same reasoning as the
+  `mpirun`/`mpiexec` exclusion in `recognition-mpi-wrappers`.
 - Distinct from `interception-wrapper-recursion`, which covers a
   different mechanism: PATH-masquerade loop prevention in Bear's own
   wrapper-mode interception (the `bear-wrapper` binary standing in for

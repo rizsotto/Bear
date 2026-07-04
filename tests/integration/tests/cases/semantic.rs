@@ -1292,3 +1292,41 @@ fn emscripten_driver_and_clang_child_events_collapse_to_driver_entry() -> Result
 
     Ok(())
 }
+
+// Requirements: recognition-compiler-launchers
+//
+// An `icecc gcc -c hello.c` execution is recorded as the real compiler's
+// compilation: the icecc token is dropped and gcc's argv survives, the same
+// contract as ccache/distcc/sccache.
+#[test]
+fn icecc_launcher_execution_records_real_compiler() -> Result<()> {
+    let env = TestEnvironment::new("icecc_launcher_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "icecc",
+        "arguments": ["icecc", "gcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("icecc", ""),
+        ("gcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["gcc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}

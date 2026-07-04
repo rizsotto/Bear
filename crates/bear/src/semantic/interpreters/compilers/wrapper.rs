@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Compiler wrapper handling for ccache, distcc, and sccache.
+//! Compiler wrapper handling for ccache, distcc, sccache, and icecc.
 //!
 //! Wrappers sit between the build system and the real compiler:
 //! `ccache gcc -c main.c`. The job here is small: detect the wrapper by
@@ -22,7 +22,10 @@ use std::path::{Path, PathBuf};
 /// Wrapper executable basenames. Single source of truth; consumed by
 /// [`CompilerRecognizer`] to build the regex that classifies wrappers and
 /// to skip them during the `--version` probe.
-pub(super) const WRAPPER_NAMES: &[&str] = &["ccache", "distcc", "sccache"];
+///
+/// icecream's `icerun` is deliberately absent: it launches arbitrary
+/// commands on the cluster, not compiler invocations.
+pub(super) const WRAPPER_NAMES: &[&str] = &["ccache", "distcc", "sccache", "icecc"];
 
 /// Try to strip a wrapper from `execution`, returning the inner compiler
 /// invocation along with its recognized [`CompilerType`].
@@ -81,10 +84,10 @@ fn detect_wrapper_name(executable: &Path) -> Option<&'static str> {
 /// the returned path is actually a compiler.
 fn extract_real_compiler(wrapper_name: &str, args: &[String]) -> Option<(PathBuf, Vec<String>)> {
     match wrapper_name {
-        // ccache and sccache: argv[1] is the real compiler, argv[2..] are
-        // its flags. They have no wrapper-specific flags of their own that
-        // we need to skip.
-        "ccache" | "sccache" => {
+        // ccache, sccache, and icecc: argv[1] is the real compiler,
+        // argv[2..] are its flags. In prefix usage they have no
+        // wrapper-specific flags of their own that we need to skip.
+        "ccache" | "sccache" | "icecc" => {
             let inner = args.get(1)?;
             Some((PathBuf::from(inner), args[1..].to_vec()))
         }
@@ -126,6 +129,7 @@ mod tests {
         Execution::from_strings(args[0], args, "/project", HashMap::new())
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_detect_wrapper_name() {
         let sut = |path_str| detect_wrapper_name(Path::new(path_str));
@@ -133,8 +137,12 @@ mod tests {
         assert_eq!(sut("/usr/bin/ccache"), Some("ccache"));
         assert_eq!(sut("/opt/distcc"), Some("distcc"));
         assert_eq!(sut("sccache"), Some("sccache"));
+        assert_eq!(sut("/usr/lib/icecc/bin/icecc"), Some("icecc"));
         assert_eq!(sut("/usr/bin/gcc"), None);
         assert_eq!(sut("make"), None);
+        // icerun launches arbitrary commands on the icecream cluster, not
+        // compiler invocations -- it is deliberately not a launcher here.
+        assert_eq!(sut("icerun"), None);
     }
 
     #[test]
@@ -166,6 +174,8 @@ mod tests {
             (vec!["sccache", "clang", "-c", "main.c"], "clang"),
             (vec!["distcc", "-j", "4", "gcc", "-c", "main.c"], "gcc"),
             (vec!["distcc", "clang", "-c", "main.c"], "clang"),
+            (vec!["icecc", "gcc", "-c", "main.c"], "gcc"),
+            (vec!["/usr/bin/icecc", "clang", "-c", "main.c"], "clang"),
         ];
 
         for (args, expected_inner) in cases {
@@ -186,6 +196,9 @@ mod tests {
             vec!["ccache"],                                  // wrapper without inner argv
             vec!["ccache", "make", "all"],                   // inner is not a compiler
             vec!["ccache", "distcc", "gcc", "-c", "main.c"], // wrapper-of-wrapper
+            vec!["icecc"],                                   // launcher without inner argv
+            vec!["icecc", "make", "all"],                    // inner is not a compiler
+            vec!["icecc", "ccache", "gcc", "-c", "main.c"],  // launcher-of-launcher
         ];
 
         for args in cases {

@@ -700,6 +700,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("distcc")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("sccache")), Some(CompilerType::Wrapper));
+        assert_eq!(recognizer.recognize(path("icecc")), Some(CompilerType::Wrapper));
 
         // Test with full paths
         assert_eq!(recognizer.recognize(path("/usr/bin/ccache")), Some(CompilerType::Wrapper));
@@ -709,6 +710,8 @@ mod tests {
         assert_eq!(recognizer.recognize(path("ccache-fake")), None);
         assert_eq!(recognizer.recognize(path("fake-distcc")), None);
         assert_eq!(recognizer.recognize(path("not-sccache")), None);
+        // icerun launches arbitrary commands, not compiler invocations.
+        assert_eq!(recognizer.recognize(path("icerun")), None);
     }
 
     #[test]
@@ -1134,9 +1137,9 @@ mod tests {
     // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
     #[test]
     fn wrapper_basenames_are_never_probed_even_under_ambiguous_paths() {
-        // ccache, distcc, sccache must reach the regex (which returns
-        // CompilerType::Wrapper). Probing them would return the underlying
-        // compiler's version and bypass wrapper unwrapping.
+        // ccache, distcc, sccache, icecc must reach the regex (which
+        // returns CompilerType::Wrapper). Probing them would return the
+        // underlying compiler's version and bypass wrapper unwrapping.
         let probe = Box::new(FakeProbe::new());
         let probe_ptr: *const FakeProbe = &*probe;
         let recognizer = CompilerRecognizer::with_probe(&[], probe);
@@ -1147,6 +1150,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("distcc")), Some(CompilerType::Wrapper));
         assert_eq!(recognizer.recognize(path("sccache")), Some(CompilerType::Wrapper));
+        assert_eq!(recognizer.recognize(path("icecc")), Some(CompilerType::Wrapper));
 
         let calls = unsafe { (*probe_ptr).calls() };
         assert_eq!(calls, 0);
@@ -1206,5 +1210,39 @@ mod tests {
             1,
             "canonicalization in the recognizer must collapse symlinks before the cache lookup"
         );
+    }
+
+    // The masquerade contract: an ambiguous basename (`cc`) that
+    // canonicalizes to a launcher binary must never be probed -- the
+    // launcher's own version banner would misclassify the name. Such an
+    // execution yields no classification of its own; the re-executed
+    // real compiler provides the entry as a separate event.
+    //
+    // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
+    #[test]
+    #[cfg(unix)]
+    fn ambiguous_name_canonicalizing_to_launcher_is_never_probed() {
+        use std::os::unix::fs::symlink;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let launcher = dir.path().join("ccache");
+        std::fs::write(&launcher, b"").expect("write ccache");
+
+        let farm = dir.path().join("masquerade");
+        std::fs::create_dir(&farm).expect("mkdir masquerade");
+        let link = farm.join("cc");
+        symlink(&launcher, &link).expect("symlink masquerade/cc -> ccache");
+
+        let probe = Box::new(FakeProbe::new());
+        let probe_ptr: *const FakeProbe = &*probe;
+        let recognizer = CompilerRecognizer::with_probe(&[], probe);
+
+        // The original basename is `cc`, which matches no regex pattern;
+        // with the probe declined by the wrapper guard, recognition
+        // returns None rather than trusting ccache's version banner.
+        assert_eq!(recognizer.recognize(&link), None);
+
+        let calls = unsafe { (*probe_ptr).calls() };
+        assert_eq!(calls, 0, "launcher-canonical ambiguous names must not reach the probe");
     }
 }

@@ -481,6 +481,12 @@ mod test {
         // Test QNX
         assert_compiler_type_deserializes("\"qnx\"", CompilerType::Qnx);
         assert_compiler_type_deserializes("\"qcc\"", CompilerType::Qnx);
+
+        // Test compiler launchers (wrappers)
+        assert_compiler_type_deserializes("\"ccache\"", CompilerType::Wrapper);
+        assert_compiler_type_deserializes("\"distcc\"", CompilerType::Wrapper);
+        assert_compiler_type_deserializes("\"sccache\"", CompilerType::Wrapper);
+        assert_compiler_type_deserializes("\"icecc\"", CompilerType::Wrapper);
     }
 
     #[test]
