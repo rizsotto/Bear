@@ -5,6 +5,14 @@ recognize:
   - executables: ["gcc", "g++", "gfortran", "egfortran", "f95"]
     cross_compilation: true
     versioned: true
+  # Microchip XC8 drivers: xc8-cc (the gcc-styled driver of XC8 v2.30+)
+  # and the legacy xc8 driver name. XC8's options are gcc-styled, so the
+  # GCC table fits; xc16-gcc/xc32-gcc already match the cross-prefix rule
+  # above. The XC8 archiver (xc8-ar) is deliberately absent -- it is not a
+  # compiler driver.
+  - executables: ["xc8-cc", "xc8"]
+    cross_compilation: false
+    versioned: false
   # The bare names `cc` and `c++` are intentionally not listed here. They
   # are ambiguous (GCC on Linux, Clang on FreeBSD/OpenBSD/NetBSD/DragonFly
   # and macOS) and dispatch is owned by the `--version` probe in

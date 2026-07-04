@@ -1137,3 +1137,158 @@ fn qnx_qcc_variant_selector_is_retained_as_driver_option() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: recognition-embedded-toolchains
+//
+// A `tiarmclang -c hello.c` execution yields one entry (TI's clang-based
+// driver, parsed with Clang flag semantics).
+#[test]
+fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("ti_tiarmclang_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "tiarmclang",
+        "arguments": ["tiarmclang", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("tiarmclang", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["tiarmclang".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-embedded-toolchains
+//
+// An `xc8-cc -c hello.c` execution yields one entry (Microchip's gcc-styled
+// XC8 driver, parsed with GCC flag semantics).
+#[test]
+fn microchip_xc8_cc_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("microchip_xc8_cc_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "xc8-cc",
+        "arguments": ["xc8-cc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("xc8-cc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["xc8-cc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-embedded-toolchains
+//
+// An `emcc -c hello.c` execution yields one entry, using the Emscripten
+// driver name directly (parsed with Clang flag semantics).
+#[test]
+fn emscripten_emcc_execution_yields_single_entry() -> Result<()> {
+    let env = TestEnvironment::new("emscripten_emcc_execution")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "emcc",
+        "arguments": ["emcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("emcc", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["emcc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-embedded-toolchains
+//
+// In preload mode emcc's underlying clang child process is intercepted too,
+// so a single compilation can produce both an `emcc` and a `clang` event for
+// the same file. The default duplicate filter (directory+file) must collapse
+// them to one entry, and since the driver's event comes first in the event
+// stream, the surviving entry must record the emcc invocation.
+#[test]
+fn emscripten_driver_and_clang_child_events_collapse_to_driver_entry() -> Result<()> {
+    let env = TestEnvironment::new("emscripten_duplicate_collapse")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let driver_event = json!({
+        "executable": "emcc",
+        "arguments": ["emcc", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let child_event = json!({
+        "executable": "clang",
+        "arguments": ["clang", "-c", "hello.c"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+    let events_content = format!("{}\n{}", driver_event, child_event);
+
+    env.create_source_files(&[
+        ("events.json", &events_content),
+        ("emcc", ""),
+        ("clang", ""),
+        ("hello.c", "int main() { return 0; }"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    db.assert_contains(&compilation_entry!(
+        file: "hello.c".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: vec!["emcc".to_string(), "-c".to_string(), "hello.c".to_string()]
+    ))?;
+
+    Ok(())
+}

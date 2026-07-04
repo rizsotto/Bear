@@ -181,6 +181,8 @@ AMD's ROCm compiler names `amdclang`, `amdclang++`, and `hipcc` are recognized a
 
 QNX's compiler driver names `qcc` and `q++` are recognized automatically, using GCC flag semantics (QNX's toolchain is GCC-backed). QNX's variant selector, `-V` (e.g. `-Vgcc_ntoaarch64le`, or bare `-V` to list available variants), is always treated as a driver option and is never mistaken for a source file.
 
+Emscripten's driver names `emcc` and `em++` (including the `emcc.py`/`em++.py` spellings) and Texas Instruments' `tiarmclang` are recognized automatically, using Clang flag semantics. In preload mode the underlying `clang` child process that `emcc`/`em++` spawn may be intercepted too; the default duplicate detection collapses the pair to a single entry recording the driver invocation. Microchip's XC8 driver names `xc8-cc` and `xc8` are recognized automatically, using GCC flag semantics; the `xc16-gcc` and `xc32-gcc` names were already covered by the existing cross-compiler prefix recognition.
+
 ### sources
 
 Filtering functionality based on the source file location.

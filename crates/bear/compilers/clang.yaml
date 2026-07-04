@@ -9,6 +9,14 @@ recognize:
   - executables: ["amdclang", "amdclang++", "hipcc"]
     cross_compilation: false
     versioned: false
+  # Emscripten drivers (emcc, em++, plus the .py-suffixed spellings some
+  # installs expose) and TI's tiarmclang. tiarmclang is a single token with
+  # no hyphen, so the <prefix>-clang cross rule does not catch it; it must
+  # be listed explicitly. Emscripten's binutils companions (emar, emranlib)
+  # are deliberately absent -- they are not compiler drivers.
+  - executables: ["emcc", "em++", "emcc.py", "em++.py", "tiarmclang"]
+    cross_compilation: false
+    versioned: false
 ignore_when:
   flags: ["-cc1"]
 slash_prefix: false

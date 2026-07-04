@@ -251,6 +251,19 @@ QNX\(cqs variant selector, \f[CR]\-V\f[R]
 (e.g.\ \f[CR]\-Vgcc_ntoaarch64le\f[R], or bare \f[CR]\-V\f[R] to list
 available variants), is always treated as a driver option and is never
 mistaken for a source file.
+.PP
+Emscripten\(cqs driver names \f[CR]emcc\f[R] and \f[CR]em++\f[R]
+(including the \f[CR]emcc.py\f[R]/\f[CR]em++.py\f[R] spellings) and
+Texas Instruments\(cq \f[CR]tiarmclang\f[R] are recognized
+automatically, using Clang flag semantics.
+In preload mode the underlying \f[CR]clang\f[R] child process that
+\f[CR]emcc\f[R]/\f[CR]em++\f[R] spawn may be intercepted too; the
+default duplicate detection collapses the pair to a single entry
+recording the driver invocation.
+Microchip\(cqs XC8 driver names \f[CR]xc8\-cc\f[R] and \f[CR]xc8\f[R]
+are recognized automatically, using GCC flag semantics; the
+\f[CR]xc16\-gcc\f[R] and \f[CR]xc32\-gcc\f[R] names were already covered
+by the existing cross\-compiler prefix recognition.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2

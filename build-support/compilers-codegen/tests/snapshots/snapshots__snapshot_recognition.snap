@@ -5,12 +5,14 @@ expression: generate_recognition_patterns(&raw_tables)
 // Generated from compilers/*.yaml -- DO NOT EDIT
 pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
     ("gcc", &["gcc", "g++", "gfortran", "egfortran", "f95"], true, true),
+    ("gcc", &["xc8-cc", "xc8"], false, false),
     ("gcc", &["cc1", "cc1plus", "cc1obj", "cc1objplus", "f951", "collect2", "lto1"], false, false),
     ("ibm_xl", &["ibm-clang", "ibm-clang++"], false, true),
     ("ibm_xl", &["xlclang", "xlclang++"], false, true),
     ("clang_cl", &["clang-cl"], false, true),
     ("clang", &["clang", "clang++"], true, true),
     ("clang", &["amdclang", "amdclang++", "hipcc"], false, false),
+    ("clang", &["emcc", "em++", "emcc.py", "em++.py", "tiarmclang"], false, false),
     ("flang", &["flang", "flang-new"], true, true),
     ("flang", &["amdflang"], false, false),
     ("cuda", &["nvcc"], true, true),

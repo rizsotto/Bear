@@ -1,6 +1,6 @@
 ---
 title: Recognize embedded and specialty toolchain compiler names
-status: in-progress
+status: implemented
 ---
 
 ## Intent

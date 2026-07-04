@@ -338,13 +338,15 @@ fn create_compiler_regex(executables: &[&str], cross_compilation: bool, versione
 
 /// Escape regex metacharacters that may appear in compiler executable names.
 ///
-/// The only metacharacter that actually appears in the YAML-defined executable
-/// names is `+` (e.g. `c++`, `g++`, `clang++`). `regex-lite` does not expose a
-/// public `escape` helper, so we provide a minimal local one.
+/// The metacharacters that actually appear in the YAML-defined executable
+/// names are `+` (e.g. `c++`, `g++`, `clang++`) and `.` (e.g. `emcc.py`).
+/// An unescaped `.` would be a one-character wildcard, so a name like
+/// `emccxpy` would falsely match the `emcc.py` pattern. `regex-lite` does
+/// not expose a public `escape` helper, so we provide a minimal local one.
 fn escape_executable(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
-        if c == '+' {
+        if c == '+' || c == '.' {
             out.push('\\');
         }
         out.push(c);
@@ -869,6 +871,58 @@ mod tests {
         // A name that merely shares the "q" prefix is not a QNX driver.
         assert_eq!(recognizer.recognize(path("qnxcc")), None);
         assert_eq!(recognizer.recognize(path("qcc-fake")), None);
+    }
+
+    // Requirements: recognition-embedded-toolchains
+    #[test]
+    fn test_emscripten_and_ti_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        // Emscripten drivers, including the .py-suffixed spellings some
+        // installs expose. tiarmclang is a single token (no hyphen), so the
+        // <prefix>-clang cross rule does not catch it; it must be listed.
+        for name in ["emcc", "em++", "emcc.py", "em++.py", "tiarmclang"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
+        }
+
+        // Emscripten's binutils companions are not compiler drivers.
+        assert_eq!(recognizer.recognize(path("emar")), None);
+        assert_eq!(recognizer.recognize(path("emranlib")), None);
+
+        // The dot in "emcc.py" must match literally, not as a regex
+        // wildcard: a name with any other character in that position is
+        // not an Emscripten driver.
+        assert_eq!(recognizer.recognize(path("emccxpy")), None);
+    }
+
+    // Requirements: recognition-embedded-toolchains
+    #[test]
+    fn test_microchip_xc8_recognition() {
+        let recognizer = CompilerRecognizer::new();
+
+        for name in ["xc8-cc", "xc8"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Gcc), "name: {}", name);
+        }
+
+        // The XC8 archiver is not a compiler driver.
+        assert_eq!(recognizer.recognize(path("xc8-ar")), None);
+    }
+
+    // Coverage lock: these names were already matched by the existing
+    // cross-compilation prefix rules (no YAML change); the test pins that
+    // behavior so a recognition-pattern refactor cannot silently lose them.
+    //
+    // Requirements: recognition-embedded-toolchains
+    #[test]
+    fn test_cross_prefixed_embedded_names_already_recognized() {
+        let recognizer = CompilerRecognizer::new();
+
+        for name in ["hexagon-clang", "hexagon-unknown-linux-musl-clang"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
+        }
+        for name in ["xc32-gcc", "riscv64-unknown-elf-gcc"] {
+            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Gcc), "name: {}", name);
+        }
     }
 
     #[test]
