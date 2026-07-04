@@ -107,6 +107,23 @@ pub fn create_c_file(env: &TestEnvironment, path: &str, content: &str) -> Result
     Ok(())
 }
 
+/// Returns a PATH value that resolves no executables: an empty directory
+/// inside the test environment.
+///
+/// Synthetic events carry a bare driver name (`swiftc`, `craycc`, ...).
+/// With no PATH in the event environment, Bear's executable resolution
+/// falls back to the host's confstr(_CS_PATH) - and when the driver name
+/// REALLY exists there (swiftc on a macOS runner), the recorded compiler
+/// token is rewritten to the host's absolute path and the literal-argv
+/// assertion breaks on that platform only. Pointing PATH at an empty
+/// directory makes resolution fail deterministically everywhere, so the
+/// bare name always survives verbatim.
+fn path_shield(env: &TestEnvironment) -> Result<String> {
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+    Ok(shield.to_str().unwrap().to_string())
+}
+
 /// Shared core for the per-compiler-family "recognition-style" semantic
 /// tests: create `dummy_executables` as empty files alongside a
 /// `source_file` (with `source_content`), write one event whose
@@ -128,7 +145,7 @@ fn assert_semantic_event_yields_entry_for_source(
         "executable": argv[0],
         "arguments": argv,
         "working_dir": temp_dir,
-        "environment": {}
+        "environment": { "PATH": path_shield(&env)? }
     });
     let events_content = event.to_string();
 
@@ -237,17 +254,18 @@ pub fn assert_duplicate_events_collapse_to_first(
     let env = TestEnvironment::new(env_name)?;
     let temp_dir = env.test_dir().to_str().unwrap().to_string();
 
+    let shield = path_shield(&env)?;
     let first_event = json!({
         "executable": first_argv[0],
         "arguments": first_argv,
         "working_dir": temp_dir,
-        "environment": {}
+        "environment": { "PATH": shield }
     });
     let second_event = json!({
         "executable": second_argv[0],
         "arguments": second_argv,
         "working_dir": temp_dir,
-        "environment": {}
+        "environment": { "PATH": shield }
     });
     let events_content = format!("{}\n{}", first_event, second_event);
 

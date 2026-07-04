@@ -1108,11 +1108,17 @@ fn swiftc_whole_module_invocation_yields_one_entry_per_source_with_full_argument
 
     let temp_dir = env.test_dir().to_str().unwrap();
 
+    // PATH shield: without it, a host that really ships swiftc (macOS
+    // runners) resolves the bare name to its absolute path and the
+    // literal-argv assertions below fail on that platform only.
+    let shield = env.test_dir().join("path-shield");
+    std::fs::create_dir_all(&shield)?;
+
     let event = json!({
         "executable": "swiftc",
         "arguments": ["swiftc", "-module-name", "App", "-emit-object", "a.swift", "b.swift"],
         "working_dir": temp_dir,
-        "environment": {}
+        "environment": { "PATH": shield.to_str().unwrap() }
     });
 
     env.create_source_files(&[
