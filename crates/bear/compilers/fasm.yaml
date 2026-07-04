@@ -1,0 +1,29 @@
+# flat assembler (fasm) flag definitions
+# https://flatassembler.net/docs.php?article=manual (fasm command-line
+# options)
+#
+# fasm's CLI is `fasm [options] source [output]`: the output positional is
+# not recorded as an `output` field by this family -- it is simply not a
+# recognized source extension, so it is classified as a plain argument and
+# ignored.
+#
+# fasm has its own CLI dialect, so this family has no `extends:`.
+type: fasm
+recognize:
+  - executables: ["fasm"]
+    cross_compilation: false
+    versioned: false
+slash_prefix: false
+flags:
+  # Memory limit (in KB, always a separate token, e.g. "-m 65536").
+  - match: {pattern: "-m", count: 1}
+    result: none
+  # Maximum number of passes.
+  - match: {pattern: "-p", count: 1}
+    result: none
+  # Symbol file for debugging.
+  - match: {pattern: "-s", count: 1}
+    result: none
+  # Define a symbol (name=value), glued or separate.
+  - match: {pattern: "-d{ }*"}
+    result: configures_preprocessing

@@ -160,7 +160,7 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`, `nasm`, `fasm`.
 - **ignore**: Whether to ignore this compiler.
 
 The generic compiler names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` default to GCC/Clang semantics chosen by probing the executable's `--version` output (since the same basename can be a different compiler depending on the platform or, for `CC`, the loaded Cray programming environment). On platforms where the probe cannot classify the executable, use the `as` field to override:
@@ -184,6 +184,8 @@ QNX's compiler driver names `qcc` and `q++` are recognized automatically, using 
 Emscripten's driver names `emcc` and `em++` (including the `emcc.py`/`em++.py` spellings) and Texas Instruments' `tiarmclang` are recognized automatically, using Clang flag semantics. In preload mode the underlying `clang` child process that `emcc`/`em++` spawn may be intercepted too; the default duplicate detection collapses the pair to a single entry recording the driver invocation. Microchip's XC8 driver names `xc8-cc` and `xc8` are recognized automatically, using GCC flag semantics; the `xc16-gcc` and `xc32-gcc` names were already covered by the existing cross-compiler prefix recognition.
 
 Compiler launchers (`ccache`, `distcc`, `sccache`, `icecc`) that carry the real compiler in their arguments are recorded as the real compiler's compilation: `ccache gcc -c main.c` produces an entry for `gcc -c main.c`, with the launcher token dropped. A launcher invocation that does not name a recognized compiler, or a launcher wrapping another launcher, produces no entry. icecream's `icerun` is not a compiler launcher (it runs arbitrary commands on the cluster) and is not recognized.
+
+The standalone assemblers `nasm`, `yasm`, and `fasm` are recognized automatically, so assembly language servers (for example asm-lsp) can read per-file assembler flags from `compile_commands.json`. Assembly compiled through a C/C++ compiler driver (for example `gcc -c foo.s`) was already recorded via that driver's own entry before this support existed; both paths now produce entries. The GNU assembler `as` is deliberately not recognized: gcc and clang spawn it internally on a temporary `.s` file for every ordinary C compile, and recognizing it would pollute the database with one throwaway entry per compilation, using a temporary filename that duplicate detection cannot collapse. MASM (`ml`, `ml64`) is out of scope (Windows-only, no recorded demand).
 
 ### sources
 

@@ -310,6 +310,8 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "mpi" => CompilerType::Mpi,
         "cray_cc" => CompilerType::CrayCc,
         "qnx" => CompilerType::Qnx,
+        "nasm" => CompilerType::Nasm,
+        "fasm" => CompilerType::Fasm,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -863,6 +865,23 @@ mod tests {
             // A name that merely shares the "q" prefix is not a QNX driver.
             ("qnxcc", None),
             ("qcc-fake", None),
+        ]);
+    }
+
+    // Requirements: recognition-assemblers
+    #[test]
+    fn test_assembler_recognition() {
+        assert_recognition(&[
+            ("nasm", Some(CompilerType::Nasm)),
+            ("yasm", Some(CompilerType::Nasm)),
+            ("fasm", Some(CompilerType::Fasm)),
+            // The GNU assembler is deliberately not recognized: gcc/clang
+            // spawn it internally on temporary .s files during ordinary
+            // compiles (see recognition-assemblers Notes).
+            ("as", None),
+            ("gas", None),
+            // A name that merely shares the "nasm" prefix is not NASM.
+            ("nasm-doc", None),
         ]);
     }
 

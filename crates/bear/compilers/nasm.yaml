@@ -1,0 +1,105 @@
+# NASM / YASM assembler flag definitions
+# https://www.nasm.us/doc/nasmdoc2.html (NASM command-line options)
+# https://yasm.tortall.net/YasmManual.html (YASM largely mirrors NASM's
+# short options for compatibility; see the long-option note below)
+#
+# NASM/YASM have their own CLI dialect (not derived from gcc/clang), so this
+# family has no `extends:`.
+type: nasm
+recognize:
+  - executables: ["nasm", "yasm"]
+    cross_compilation: false
+    versioned: false
+slash_prefix: false
+flags:
+  # --- Output format / output file ---
+  - match: {pattern: "-f{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-o{ }*"}
+    result: output
+
+  # --- Preprocessor ---
+  # NASM documents the lowercase forms as the canonical spellings; the
+  # uppercase ones are the C-compiler-compatible aliases. Both consume a
+  # glued or separate value, so a define like `-d NAME=release.asm` can
+  # never leak its value into source detection.
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-i{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-d{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-U{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-u{ }*"}
+    result: configures_preprocessing
+  # -P/-p: pre-include a file before assembling (case-sensitive, both forms
+  # exist across NASM/YASM).
+  - match: {pattern: "-P{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-p{ }*"}
+    result: configures_preprocessing
+  # Dependency-generation options, mirroring gcc's -M family so their
+  # separate-token value is consumed rather than read as a source file.
+  - match: {pattern: "-MF{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-MD{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-MT{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-MQ{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-M"}
+    result: configures_preprocessing
+  - match: {pattern: "-MG"}
+    result: configures_preprocessing
+  - match: {pattern: "-MP"}
+    result: configures_preprocessing
+  - match: {pattern: "-MW"}
+    result: configures_preprocessing
+  - match: {pattern: "-E"}
+    result: stops_at_preprocessing
+  - match: {pattern: "-e"}
+    result: stops_at_preprocessing
+
+  # --- Compilation-affecting, no consumed value ---
+  - match: {pattern: "-l{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-F{ }*"}
+    result: configures_compiling
+  - match: {pattern: "-a"}
+    result: configures_compiling
+  - match: {pattern: "-t"}
+    result: configures_compiling
+  - match: {pattern: "-g*"}
+    result: configures_compiling
+  - match: {pattern: "-O*"}
+    result: configures_compiling
+  - match: {pattern: "-w*"}
+    result: configures_compiling
+  - match: {pattern: "-W*"}
+    result: configures_compiling
+  - match: {pattern: "-X*"}
+    result: configures_compiling
+
+  # --- No semantic effect, but must consume a glued/separate value ---
+  - match: {pattern: "-Z{ }*"}
+    result: none
+  - match: {pattern: "-s"}
+    result: none
+
+  # --- Info and exit ---
+  - match: {pattern: "-v"}
+    result: info_and_exit
+  - match: {pattern: "-h"}
+    result: info_and_exit
+
+  # YASM's long options (--prefix=, --postfix=, --version, ...) carry their
+  # value after "=" when they take one -- never as a separate token -- so a
+  # 0-arg catch-all is safe here: it can never swallow a following source
+  # file. This also covers `yasm --version` (no entry either way, since
+  # there is no source argument to classify).
+  - match: {pattern: "--*"}
+    result: none

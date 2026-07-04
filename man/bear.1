@@ -185,7 +185,8 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[CR]intel\-fortran\f[R], \f[CR]cray\-fortran\f[R], \f[CR]cuda\f[R],
 \f[CR]msvc\f[R], \f[CR]clang\-cl\f[R], \f[CR]intel_cc\f[R],
 \f[CR]nvidia\-hpc\f[R], \f[CR]armclang\f[R], \f[CR]ibm_xl\f[R],
-\f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R], \f[CR]qnx\f[R].
+\f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R], \f[CR]qnx\f[R],
+\f[CR]nasm\f[R], \f[CR]fasm\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .PP
@@ -274,6 +275,21 @@ A launcher invocation that does not name a recognized compiler, or a
 launcher wrapping another launcher, produces no entry.
 icecream\(cqs \f[CR]icerun\f[R] is not a compiler launcher (it runs
 arbitrary commands on the cluster) and is not recognized.
+.PP
+The standalone assemblers \f[CR]nasm\f[R], \f[CR]yasm\f[R], and
+\f[CR]fasm\f[R] are recognized automatically, so assembly language
+servers (for example asm\-lsp) can read per\-file assembler flags from
+\f[CR]compile_commands.json\f[R].
+Assembly compiled through a C/C++ compiler driver (for example
+\f[CR]gcc \-c foo.s\f[R]) was already recorded via that driver\(cqs own
+entry before this support existed; both paths now produce entries.
+The GNU assembler \f[CR]as\f[R] is deliberately not recognized: gcc and
+clang spawn it internally on a temporary \f[CR].s\f[R] file for every
+ordinary C compile, and recognizing it would pollute the database with
+one throwaway entry per compilation, using a temporary filename that
+duplicate detection cannot collapse.
+MASM (\f[CR]ml\f[R], \f[CR]ml64\f[R]) is out of scope (Windows\-only, no
+recorded demand).
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2

@@ -995,3 +995,86 @@ fn icecc_launcher_execution_records_real_compiler() -> Result<()> {
         &["gcc", "-c", "hello.c"],
     )
 }
+
+// Requirements: recognition-assemblers
+//
+// A `nasm -f elf64 -o hello.o hello.asm` execution yields one entry for
+// `hello.asm`, using the NASM driver name directly, with the invocation's
+// arguments recorded verbatim.
+#[test]
+fn nasm_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "nasm_execution",
+        &["nasm", "-f", "elf64", "-o", "hello.o", "hello.asm"],
+        "hello.asm",
+        "section .text\nglobal _start\n_start:\n    ret\n",
+    )
+}
+
+// Requirements: recognition-assemblers
+//
+// A `fasm hello.asm` execution yields one entry for `hello.asm`, using the
+// flat assembler driver name directly.
+#[test]
+fn fasm_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "fasm_execution",
+        &["fasm", "hello.asm"],
+        "hello.asm",
+        "org 0x100\nret\n",
+    )
+}
+
+// Requirements: recognition-assemblers
+//
+// Direct assembly through a driver (`gcc -c foo.s`) is already recorded
+// today via the driver's own entry -- this is the actual fix for the
+// compile-then-assemble class of bug reported in issue #146, and it needs
+// no new recognition code (the standalone-assembler recognizer added by
+// this requirement is not involved). Locking this in guards against a
+// future regression that would make it invisible again.
+//
+// This does not use `assert_driver_yields_single_entry_for_source`: unlike
+// the synthetic embedded-toolchain names used elsewhere in this file,
+// `gcc` is a real, `PATH`-resolvable executable on any host that can build
+// Bear (its own host requirements list a `cc` toolchain), so
+// `ExecutableResolver` rewrites the recorded compiler token to gcc's
+// absolute path. The assertion below only pins the parts this test cares
+// about: one entry, for `foo.s`, invoked with `-c foo.s`, as `gcc`
+// (whichever path it resolved to).
+#[test]
+fn driver_compiled_assembly_yields_driver_entry() -> Result<()> {
+    let env = TestEnvironment::new("driver_compiled_assembly")?;
+    let temp_dir = env.test_dir().to_str().unwrap().to_string();
+
+    let event = json!({
+        "executable": "gcc",
+        "arguments": ["gcc", "-c", "foo.s"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("foo.s", ".text\n.globl main\nmain:\n    ret\n"),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(1)?;
+    let entry = &db.entries()[0];
+    assert_eq!(entry["file"], "foo.s");
+    assert_eq!(entry["directory"], temp_dir);
+    let arguments: Vec<String> = entry["arguments"]
+        .as_array()
+        .context("arguments must be an array")?
+        .iter()
+        .map(|v| v.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(&arguments[1..], &["-c".to_string(), "foo.s".to_string()]);
+    let compiler_basename = std::path::Path::new(&arguments[0]).file_name().and_then(|n| n.to_str());
+    assert_eq!(compiler_basename, Some("gcc"), "recorded compiler must be gcc, got {:?}", arguments[0]);
+
+    Ok(())
+}

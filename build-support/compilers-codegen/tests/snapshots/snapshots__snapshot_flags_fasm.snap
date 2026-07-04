@@ -1,0 +1,16 @@
+---
+source: build-support/compilers-codegen/tests/snapshots.rs
+expression: "generate_flag_file(\"fasm\")"
+---
+// Generated from compilers/fasm.yaml -- DO NOT EDIT
+static FASM_FLAGS: [FlagRule; 4] = [
+    FlagRule::new(FlagPattern::Exactly("-m", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-p", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-s", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+];
+static FASM_IGNORE_EXECUTABLES: [&str; 0] = [];
+static FASM_IGNORE_FLAGS: [&str; 0] = [];
+static FASM_SLASH_PREFIX: bool = false;
+static FASM_ENV_RULES: [EnvRule; 0] = [
+];

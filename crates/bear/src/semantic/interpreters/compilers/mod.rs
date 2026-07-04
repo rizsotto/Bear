@@ -73,6 +73,8 @@ impl CompilerInterpreter {
         self.register(CompilerType::Mpi, flag_based::mpi(from_environment));
         self.register(CompilerType::CrayCc, flag_based::cray_cc(from_environment));
         self.register(CompilerType::Qnx, flag_based::qnx(from_environment));
+        self.register(CompilerType::Nasm, flag_based::nasm(from_environment));
+        self.register(CompilerType::Fasm, flag_based::fasm(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it
@@ -2050,6 +2052,144 @@ mod tests {
                 let source_count =
                     parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
                 assert_eq!(source_count, 1, "only hello.c must be a source, got {:?}", parsed.arguments);
+            }
+        }
+    }
+
+    mod nasm {
+        use super::*;
+
+        /// The separate-token form of `-f` (output format) must consume its
+        /// value so it is never mis-classified as a second source file, and
+        /// the `-o` output pair must not swallow the assembly source that
+        /// precedes it.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn separate_format_value_is_consumed_not_classified_as_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "nasm",
+                vec!["nasm", "-f", "elf64", "hello.asm", "-o", "hello.o"],
+                "/project",
+            );
+            let result = sut.recognize(execution);
+            assert_command(
+                result,
+                vec![
+                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (configures(CompilerPass::Compiling), vec!["-f", "elf64"]),
+                    (Source { binary: false }, vec!["hello.asm"]),
+                    (ArgumentKind::Output, vec!["-o", "hello.o"]),
+                ],
+            );
+        }
+
+        /// NASM's canonical lowercase `-d` define must consume its value even
+        /// when that value ends in a source extension (`-d NAME=release.asm`
+        /// parameterizes a %include); leaking it into source detection would
+        /// fabricate a second compilation entry.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn lowercase_define_value_with_source_extension_is_not_a_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "nasm",
+                vec!["nasm", "-d", "CONFIG=release.asm", "-f", "elf64", "hello.asm"],
+                "/project",
+            );
+            let result = sut.recognize(execution);
+            assert_command(
+                result,
+                vec![
+                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-d", "CONFIG=release.asm"]),
+                    (configures(CompilerPass::Compiling), vec!["-f", "elf64"]),
+                    (Source { binary: false }, vec!["hello.asm"]),
+                ],
+            );
+        }
+
+        /// The glued form (`-felf64`) must be recognized the same way as the
+        /// separate-token form.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn glued_format_value_is_consumed_not_classified_as_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("nasm", vec!["nasm", "-felf64", "hello.asm"], "/project");
+            let result = sut.recognize(execution);
+            assert_command(
+                result,
+                vec![
+                    (ArgumentKind::Compiler, vec!["nasm"]),
+                    (configures(CompilerPass::Compiling), vec!["-felf64"]),
+                    (Source { binary: false }, vec!["hello.asm"]),
+                ],
+            );
+        }
+
+        /// `nasm -v` prints version info and exits; there is no source
+        /// argument, so no compilation entry can be synthesized from it.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn version_flag_has_no_source_argument() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("nasm", vec!["nasm", "-v"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments[1].kind(), info());
+                assert!(
+                    !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
+                    "got {:?}",
+                    parsed.arguments
+                );
+            }
+        }
+
+        /// YASM's long `--version` option is covered by the `--*` catch-all
+        /// (no separate-token value ever follows a YASM long option), and
+        /// still has no source argument to build an entry from.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn yasm_long_version_option_has_no_source_argument() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("yasm", vec!["yasm", "--version"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert!(
+                    !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
+                    "got {:?}",
+                    parsed.arguments
+                );
+            }
+        }
+    }
+
+    mod fasm {
+        use super::*;
+
+        /// `-m`'s memory-limit value is always a separate token; it must be
+        /// consumed so it is never mistaken for a source file, and the
+        /// trailing output positional (`hello.o`, not a recognized source
+        /// extension) must not turn into a second compilation entry.
+        // Requirements: recognition-assemblers
+        #[test]
+        fn memory_limit_value_is_consumed_and_output_positional_is_not_a_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution =
+                create_execution("fasm", vec!["fasm", "-m", "65536", "hello.asm", "hello.o"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 4);
+                assert_eq!(parsed.arguments[1].kind(), none());
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-m".to_string(), "65536".to_string()]
+                );
+                assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
+                assert_eq!(parsed.arguments[3].kind(), Source { binary: true }, "got {:?}", parsed.arguments);
             }
         }
     }

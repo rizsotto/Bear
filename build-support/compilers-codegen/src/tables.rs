@@ -172,4 +172,26 @@ pub const TABLES: &[TableConfig] = &[
         env_rules_name: "QNX_ENV_RULES",
         output_file: "flags_qnx.rs",
     },
+    // NASM/YASM names do not overlap any other compiler's recognition
+    // pattern, so position here does not affect priority.
+    TableConfig {
+        yaml_file: "nasm.yaml",
+        static_name: "NASM_FLAGS",
+        ignore_executables_name: "NASM_IGNORE_EXECUTABLES",
+        ignore_flags_name: "NASM_IGNORE_FLAGS",
+        slash_prefix_name: "NASM_SLASH_PREFIX",
+        env_rules_name: "NASM_ENV_RULES",
+        output_file: "flags_nasm.rs",
+    },
+    // fasm does not overlap any other compiler's recognition pattern, so
+    // position here does not affect priority.
+    TableConfig {
+        yaml_file: "fasm.yaml",
+        static_name: "FASM_FLAGS",
+        ignore_executables_name: "FASM_IGNORE_EXECUTABLES",
+        ignore_flags_name: "FASM_IGNORE_FLAGS",
+        slash_prefix_name: "FASM_SLASH_PREFIX",
+        env_rules_name: "FASM_ENV_RULES",
+        output_file: "flags_fasm.rs",
+    },
 ];

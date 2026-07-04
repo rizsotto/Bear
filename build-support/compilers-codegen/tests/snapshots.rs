@@ -98,6 +98,16 @@ fn snapshot_flags_qnx() {
 }
 
 #[test]
+fn snapshot_flags_nasm() {
+    insta::assert_snapshot!(generate_flag_file("nasm"));
+}
+
+#[test]
+fn snapshot_flags_fasm() {
+    insta::assert_snapshot!(generate_flag_file("fasm"));
+}
+
+#[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));

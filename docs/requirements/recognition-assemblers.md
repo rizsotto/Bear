@@ -1,6 +1,6 @@
 ---
 title: Recognize standalone assembler invocations
-status: in-progress
+status: implemented
 ---
 
 ## Intent

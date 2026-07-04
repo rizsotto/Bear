@@ -108,15 +108,18 @@ pub fn create_c_file(env: &TestEnvironment, path: &str, content: &str) -> Result
 }
 
 /// Shared core for the per-compiler-family "recognition-style" semantic
-/// tests: create `dummy_executables` as empty files alongside a `hello.c`
-/// source, write one event whose `executable`/`arguments` are `argv`, run
-/// `bear semantic`, and assert the resulting database holds exactly one
-/// entry for `hello.c` whose recorded arguments equal `expected_args`.
-fn assert_semantic_event_yields_entry(
+/// tests: create `dummy_executables` as empty files alongside a
+/// `source_file` (with `source_content`), write one event whose
+/// `executable`/`arguments` are `argv`, run `bear semantic`, and assert the
+/// resulting database holds exactly one entry for `source_file` whose
+/// recorded arguments equal `expected_args`.
+fn assert_semantic_event_yields_entry_for_source(
     env_name: &str,
     dummy_executables: &[&str],
     argv: &[&str],
     expected_args: &[&str],
+    source_file: &str,
+    source_content: &str,
 ) -> Result<()> {
     let env = TestEnvironment::new(env_name)?;
     let temp_dir = env.test_dir().to_str().unwrap().to_string();
@@ -130,7 +133,7 @@ fn assert_semantic_event_yields_entry(
     let events_content = event.to_string();
 
     let mut files: Vec<(&str, &str)> =
-        vec![("events.json", events_content.as_str()), ("hello.c", HELLO_C_SOURCE)];
+        vec![("events.json", events_content.as_str()), (source_file, source_content)];
     for name in dummy_executables {
         files.push((name, ""));
     }
@@ -141,12 +144,34 @@ fn assert_semantic_event_yields_entry(
     let db = env.load_compilation_database("compile_commands.json")?;
     db.assert_count(1)?;
     db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
+        file: source_file.to_string(),
         directory: temp_dir.clone(),
         arguments: expected_args.iter().map(|s| s.to_string()).collect::<Vec<_>>()
     ))?;
 
     Ok(())
+}
+
+/// Shared core for the per-compiler-family "recognition-style" semantic
+/// tests whose source is `hello.c`: create `dummy_executables` as empty
+/// files alongside a `hello.c` source, write one event whose
+/// `executable`/`arguments` are `argv`, run `bear semantic`, and assert the
+/// resulting database holds exactly one entry for `hello.c` whose recorded
+/// arguments equal `expected_args`.
+fn assert_semantic_event_yields_entry(
+    env_name: &str,
+    dummy_executables: &[&str],
+    argv: &[&str],
+    expected_args: &[&str],
+) -> Result<()> {
+    assert_semantic_event_yields_entry_for_source(
+        env_name,
+        dummy_executables,
+        argv,
+        expected_args,
+        "hello.c",
+        HELLO_C_SOURCE,
+    )
 }
 
 /// Common shape used by the per-compiler-family recognition tests (mpi
@@ -158,6 +183,28 @@ fn assert_semantic_event_yields_entry(
 #[allow(dead_code)]
 pub fn assert_driver_yields_single_entry(env_name: &str, argv: &[&str]) -> Result<()> {
     assert_semantic_event_yields_entry(env_name, &[argv[0]], argv, argv)
+}
+
+/// Same shape as [`assert_driver_yields_single_entry`], but for a family
+/// whose source isn't a `hello.c` translation unit (e.g. an assembler's
+/// `hello.asm`): the entry is asserted against `source_file`/
+/// `source_content` instead of the fixed `hello.c` default. Creates a dummy
+/// executable named `argv[0]` on disk.
+#[allow(dead_code)]
+pub fn assert_driver_yields_single_entry_for_source(
+    env_name: &str,
+    argv: &[&str],
+    source_file: &str,
+    source_content: &str,
+) -> Result<()> {
+    assert_semantic_event_yields_entry_for_source(
+        env_name,
+        &[argv[0]],
+        argv,
+        argv,
+        source_file,
+        source_content,
+    )
 }
 
 /// Launcher shape (e.g. icecc): the event's argv is the launcher token

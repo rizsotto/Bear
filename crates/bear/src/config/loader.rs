@@ -482,6 +482,13 @@ mod test {
         assert_compiler_type_deserializes("\"qnx\"", CompilerType::Qnx);
         assert_compiler_type_deserializes("\"qcc\"", CompilerType::Qnx);
 
+        // Test NASM/YASM
+        assert_compiler_type_deserializes("\"nasm\"", CompilerType::Nasm);
+        assert_compiler_type_deserializes("\"yasm\"", CompilerType::Nasm);
+
+        // Test fasm
+        assert_compiler_type_deserializes("\"fasm\"", CompilerType::Fasm);
+
         // Test compiler launchers (wrappers)
         assert_compiler_type_deserializes("\"ccache\"", CompilerType::Wrapper);
         assert_compiler_type_deserializes("\"distcc\"", CompilerType::Wrapper);

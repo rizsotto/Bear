@@ -118,6 +118,10 @@ pub enum CompilerType {
     CrayCc,
     #[serde(alias = "qnx", alias = "qcc")]
     Qnx,
+    #[serde(alias = "nasm", alias = "yasm")]
+    Nasm,
+    #[serde(alias = "fasm")]
+    Fasm,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache", alias = "icecc")]
     Wrapper,
 }
@@ -141,6 +145,8 @@ impl std::fmt::Display for CompilerType {
             CompilerType::Mpi => "MPI wrapper",
             CompilerType::CrayCc => "Cray C/C++",
             CompilerType::Qnx => "QNX qcc",
+            CompilerType::Nasm => "NASM",
+            CompilerType::Fasm => "flat assembler",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

@@ -1,6 +1,5 @@
 ---
 source: bear-codegen/tests/snapshots.rs
-assertion_line: 32
 expression: "generate_flag_file(\"clang_cl\")"
 ---
 // Generated from compilers/clang_cl.yaml -- DO NOT EDIT

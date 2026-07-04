@@ -31,4 +31,6 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
     ("mpi", &["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"], false, true),
     ("cray_cc", &["craycc", "crayCC", "craycxx"], false, true),
     ("qnx", &["qcc", "q++"], false, false),
+    ("nasm", &["nasm", "yasm"], false, false),
+    ("fasm", &["fasm"], false, false),
 ];

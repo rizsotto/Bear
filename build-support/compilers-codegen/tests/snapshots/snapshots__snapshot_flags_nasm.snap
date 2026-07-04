@@ -1,0 +1,46 @@
+---
+source: build-support/compilers-codegen/tests/snapshots.rs
+expression: "generate_flag_file(\"nasm\")"
+---
+// Generated from compilers/nasm.yaml -- DO NOT EDIT
+static NASM_FLAGS: [FlagRule; 34] = [
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-MF"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-MD"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-MT"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-MQ"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-MG", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-MP", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-MW", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-f"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-I"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-i"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-D"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-d"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-U"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-u"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-P"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-p"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-M", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-E", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::Exactly("-e", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-l"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-F"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-a", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-t", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("-g", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("-O", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("-w", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("-W", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Prefix("-X", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-Z"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-s", 0), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Exactly("-h", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Prefix("--", 0), ArgumentKind::Other(PassEffect::None)),
+];
+static NASM_IGNORE_EXECUTABLES: [&str; 0] = [];
+static NASM_IGNORE_FLAGS: [&str; 0] = [];
+static NASM_SLASH_PREFIX: bool = false;
+static NASM_ENV_RULES: [EnvRule; 0] = [
+];

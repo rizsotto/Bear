@@ -269,6 +269,8 @@ include!(concat!(env!("OUT_DIR"), "/flags_vala.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_mpi.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_qnx.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_nasm.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_fasm.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
@@ -465,6 +467,30 @@ pub(super) fn qnx(from_environment: bool) -> impl Interpreter {
     )
 }
 
+pub(super) fn nasm(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &NASM_FLAGS,
+        &NASM_IGNORE_EXECUTABLES,
+        &NASM_IGNORE_FLAGS,
+        NASM_SLASH_PREFIX,
+        &NASM_ENV_RULES,
+        from_environment,
+        true,
+    )
+}
+
+pub(super) fn fasm(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &FASM_FLAGS,
+        &FASM_IGNORE_EXECUTABLES,
+        &FASM_IGNORE_FLAGS,
+        FASM_SLASH_PREFIX,
+        &FASM_ENV_RULES,
+        from_environment,
+        true,
+    )
+}
+
 #[cfg(test)]
 mod flag_table_invariants {
     use super::*;
@@ -594,6 +620,16 @@ mod flag_table_invariants {
     #[test]
     fn qnx() {
         assert_invariants(&QNX_FLAGS);
+    }
+
+    #[test]
+    fn nasm() {
+        assert_invariants(&NASM_FLAGS);
+    }
+
+    #[test]
+    fn fasm() {
+        assert_invariants(&FASM_FLAGS);
     }
 
     #[test]

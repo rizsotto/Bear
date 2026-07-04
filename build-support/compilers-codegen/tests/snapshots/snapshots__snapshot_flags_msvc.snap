@@ -1,6 +1,5 @@
 ---
 source: bear-codegen/tests/snapshots.rs
-assertion_line: 62
 expression: "generate_flag_file(\"msvc\")"
 ---
 // Generated from compilers/msvc.yaml -- DO NOT EDIT
