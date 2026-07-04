@@ -321,6 +321,61 @@ mod tests {
                 }
             }
         }
+
+        /// Data-driven completeness check over every row of the codegen-generated
+        /// `RECOGNITION_PATTERNS` table (see `compiler_recognition.rs`): for the
+        /// first executable name in each row, dispatch through the full
+        /// `CompilerInterpreter` (recognizer + wrapper-unwrap + registered
+        /// interpreter), not just the recognizer.
+        ///
+        /// Why this matters: adding a compiler family is a multi-step recipe
+        /// (YAML `recognize:` entry, `CompilerType` variant, a `flag_based.rs`
+        /// constructor, and a `register_all` entry -- see
+        /// `crates/bear/compilers/CLAUDE.md`). Forgetting the last step still
+        /// makes every recognition unit test pass (the regex matches and
+        /// `recognize()` returns `Some(type)`), but `CompilerInterpreter` has no
+        /// interpreter registered for that type, so every real execution of the
+        /// family silently falls through to `NotRecognized` -- the same failure
+        /// mode as not recognizing the compiler at all, just discovered later
+        /// and more confusingly. This test catches that gap for every family
+        /// automatically, current and future, without needing a new test per
+        /// family.
+        ///
+        /// `NotRecognized` is the only failure signal: `Ignored` also proves
+        /// registration ran (the internal-executable rows -- cc1, c1, etc. --
+        /// legitimately resolve there via `ignore_when`), so the assertion is
+        /// "not NotRecognized", not "Recognized".
+        #[test]
+        fn every_recognition_pattern_row_is_dispatched_by_a_registered_interpreter() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+
+            for &(type_str, executables, _cross_compilation, _versioned) in
+                compiler_recognition::RECOGNITION_PATTERNS
+            {
+                // The hand-written Wrapper pattern is pushed onto DEFAULT_PATTERNS
+                // separately in compiler_recognition.rs and is not part of the
+                // generated RECOGNITION_PATTERNS table, so no wrapper row ever
+                // reaches this loop -- nothing to special-case here.
+                let name = executables[0];
+                // Every family dispatches on a plain "-c hello.c" invocation
+                // regardless of the source extension: source-vs-flag
+                // classification in FlagBasedInterpreter never inspects the
+                // file extension (verified empirically against vala, cuda,
+                // and the fortran families -- all still recognize a `.c`
+                // source; extension only affects the binary-vs-source flag on
+                // an already-classified Source argument, not the RecognizeResult
+                // variant).
+                let execution = create_execution(name, vec![name, "-c", "hello.c"], "/project");
+                let result = sut.recognize(execution);
+                assert!(
+                    !matches!(result, RecognizeResult::NotRecognized(_)),
+                    "family '{}' (executable '{}') matched the recognizer but was not dispatched \
+                     by any registered interpreter -- check register_all() in mod.rs for a missing entry",
+                    type_str,
+                    name
+                );
+            }
+        }
     }
 
     mod gcc {

@@ -838,34 +838,7 @@ fn vala_multiple_sources_produce_single_entry() -> Result<()> {
 // (not the underlying compiler) as the recorded compiler.
 #[test]
 fn mpi_wrapper_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("mpi_wrapper_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "mpicc",
-        "arguments": ["mpicc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("mpicc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["mpicc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("mpi_wrapper_execution", &["mpicc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-mpi-wrappers
@@ -905,39 +878,7 @@ fn mpi_wrapper_info_flags_yield_no_entry() -> Result<()> {
 // follows it.
 #[test]
 fn mpi_wrapper_compiler_override_flag_is_retained() -> Result<()> {
-    let env = TestEnvironment::new("mpi_wrapper_compiler_override")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "mpicc",
-        "arguments": ["mpicc", "-cc=gcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("mpicc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec![
-            "mpicc".to_string(),
-            "-cc=gcc".to_string(),
-            "-c".to_string(),
-            "hello.c".to_string()
-        ]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("mpi_wrapper_compiler_override", &["mpicc", "-cc=gcc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-mpi-wrappers
@@ -949,42 +890,11 @@ fn mpi_wrapper_compiler_override_flag_is_retained() -> Result<()> {
 // stream, the surviving entry must record the wrapper invocation.
 #[test]
 fn mpi_wrapper_and_child_compiler_events_collapse_to_wrapper_entry() -> Result<()> {
-    let env = TestEnvironment::new("mpi_wrapper_duplicate_collapse")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let wrapper_event = json!({
-        "executable": "mpicc",
-        "arguments": ["mpicc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    let child_event = json!({
-        "executable": "gcc",
-        "arguments": ["gcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    let events_content = format!("{}\n{}", wrapper_event, child_event);
-
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("mpicc", ""),
-        ("gcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["mpicc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_duplicate_events_collapse_to_first(
+        "mpi_wrapper_duplicate_collapse",
+        &["mpicc", "-c", "hello.c"],
+        &["gcc", "-c", "hello.c"],
+    )
 }
 
 // Requirements: recognition-cray-compilers
@@ -994,34 +904,7 @@ fn mpi_wrapper_and_child_compiler_events_collapse_to_wrapper_entry() -> Result<(
 // support for `crayftn`/`ftn`).
 #[test]
 fn cray_cc_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("cray_cc_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "craycc",
-        "arguments": ["craycc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("craycc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["craycc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("cray_cc_execution", &["craycc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-amd-compilers
@@ -1030,34 +913,7 @@ fn cray_cc_execution_yields_single_entry() -> Result<()> {
 // compiler driver name directly (parsed with Clang flag semantics).
 #[test]
 fn hipcc_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("hipcc_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "hipcc",
-        "arguments": ["hipcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("hipcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["hipcc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("hipcc_execution", &["hipcc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1066,34 +922,7 @@ fn hipcc_execution_yields_single_entry() -> Result<()> {
 // directly (parsed with GCC flag semantics -- QNX 8 is GCC-backed).
 #[test]
 fn qnx_qcc_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("qnx_qcc_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "qcc",
-        "arguments": ["qcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("qcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["qcc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("qnx_qcc_execution", &["qcc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1103,39 +932,10 @@ fn qnx_qcc_execution_yields_single_entry() -> Result<()> {
 // verbatim in the recorded arguments.
 #[test]
 fn qnx_qcc_variant_selector_is_retained_as_driver_option() -> Result<()> {
-    let env = TestEnvironment::new("qnx_qcc_variant_selector")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "qcc",
-        "arguments": ["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("qcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec![
-            "qcc".to_string(),
-            "-Vgcc_ntoaarch64le".to_string(),
-            "-c".to_string(),
-            "hello.c".to_string()
-        ]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry(
+        "qnx_qcc_variant_selector",
+        &["qcc", "-Vgcc_ntoaarch64le", "-c", "hello.c"],
+    )
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1144,34 +944,7 @@ fn qnx_qcc_variant_selector_is_retained_as_driver_option() -> Result<()> {
 // driver, parsed with Clang flag semantics).
 #[test]
 fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("ti_tiarmclang_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "tiarmclang",
-        "arguments": ["tiarmclang", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("tiarmclang", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["tiarmclang".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("ti_tiarmclang_execution", &["tiarmclang", "-c", "hello.c"])
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1180,34 +953,7 @@ fn ti_tiarmclang_execution_yields_single_entry() -> Result<()> {
 // XC8 driver, parsed with GCC flag semantics).
 #[test]
 fn microchip_xc8_cc_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("microchip_xc8_cc_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "xc8-cc",
-        "arguments": ["xc8-cc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("xc8-cc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["xc8-cc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("microchip_xc8_cc_execution", &["xc8-cc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1216,34 +962,7 @@ fn microchip_xc8_cc_execution_yields_single_entry() -> Result<()> {
 // driver name directly (parsed with Clang flag semantics).
 #[test]
 fn emscripten_emcc_execution_yields_single_entry() -> Result<()> {
-    let env = TestEnvironment::new("emscripten_emcc_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "emcc",
-        "arguments": ["emcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("emcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["emcc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_driver_yields_single_entry("emscripten_emcc_execution", &["emcc", "-c", "hello.c"])
 }
 
 // Requirements: recognition-embedded-toolchains
@@ -1255,42 +974,11 @@ fn emscripten_emcc_execution_yields_single_entry() -> Result<()> {
 // stream, the surviving entry must record the emcc invocation.
 #[test]
 fn emscripten_driver_and_clang_child_events_collapse_to_driver_entry() -> Result<()> {
-    let env = TestEnvironment::new("emscripten_duplicate_collapse")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let driver_event = json!({
-        "executable": "emcc",
-        "arguments": ["emcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    let child_event = json!({
-        "executable": "clang",
-        "arguments": ["clang", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-    let events_content = format!("{}\n{}", driver_event, child_event);
-
-    env.create_source_files(&[
-        ("events.json", &events_content),
-        ("emcc", ""),
-        ("clang", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["emcc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_duplicate_events_collapse_to_first(
+        "emscripten_duplicate_collapse",
+        &["emcc", "-c", "hello.c"],
+        &["clang", "-c", "hello.c"],
+    )
 }
 
 // Requirements: recognition-compiler-launchers
@@ -1300,33 +988,10 @@ fn emscripten_driver_and_clang_child_events_collapse_to_driver_entry() -> Result
 // contract as ccache/distcc/sccache.
 #[test]
 fn icecc_launcher_execution_records_real_compiler() -> Result<()> {
-    let env = TestEnvironment::new("icecc_launcher_execution")?;
-
-    let temp_dir = env.test_dir().to_str().unwrap();
-
-    let event = json!({
-        "executable": "icecc",
-        "arguments": ["icecc", "gcc", "-c", "hello.c"],
-        "working_dir": temp_dir,
-        "environment": {}
-    });
-
-    env.create_source_files(&[
-        ("events.json", &event.to_string()),
-        ("icecc", ""),
-        ("gcc", ""),
-        ("hello.c", "int main() { return 0; }"),
-    ])?;
-
-    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
-
-    let db = env.load_compilation_database("compile_commands.json")?;
-    db.assert_count(1)?;
-    db.assert_contains(&compilation_entry!(
-        file: "hello.c".to_string(),
-        directory: temp_dir.to_string(),
-        arguments: vec!["gcc".to_string(), "-c".to_string(), "hello.c".to_string()]
-    ))?;
-
-    Ok(())
+    assert_launcher_execution_yields_entry(
+        "icecc_launcher_execution",
+        &["icecc", "gcc"],
+        &["icecc", "gcc", "-c", "hello.c"],
+        &["gcc", "-c", "hello.c"],
+    )
 }

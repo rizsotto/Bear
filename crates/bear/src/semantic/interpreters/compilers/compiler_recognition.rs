@@ -364,9 +364,22 @@ mod tests {
         Path::new(s)
     }
 
+    /// Asserts each `(name, expected)` case against `recognizer`, naming the
+    /// case in the failure message so a table failure says which row broke.
+    fn assert_cases(recognizer: &CompilerRecognizer, cases: &[(&str, Option<CompilerType>)]) {
+        for (name, expected) in cases {
+            assert_eq!(recognizer.recognize(path(name)), *expected, "name: {}", name);
+        }
+    }
+
+    /// Constructs a default recognizer and asserts each `(name, expected)` case.
+    fn assert_recognition(cases: &[(&str, Option<CompilerType>)]) {
+        assert_cases(&CompilerRecognizer::new(), cases);
+    }
+
     /// Recognizer with the probe disabled. Use this for tests that exercise
-    /// the regex/hint layer in isolation. Tests that need to verify the
-    /// probe should construct a recognizer with a `FakeProbe`.
+    /// the regex/hint layer in isolation, without depending on whatever
+    /// `cc`/`c++` resolve to on the host running the test.
     fn no_probe_recognizer() -> CompilerRecognizer {
         CompilerRecognizer::with_probe(&[], Box::new(NoProbe))
     }
@@ -377,51 +390,48 @@ mod tests {
         // intentionally absent from the gcc.yaml regex: they are
         // ambiguous (Linux=GCC, BSDs/macOS=Clang) and dispatch is owned
         // by the probe. Tests for those names live in the probe_* group.
-        let recognizer = no_probe_recognizer();
-
-        // Basic GCC names
-        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++")), Some(CompilerType::Gcc));
-
-        // Cross-compilation variants
-        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-gcc")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("aarch64-linux-gnu-g++")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("x86_64-w64-mingw32-gcc")), Some(CompilerType::Gcc));
-
-        // Versioned variants
-        assert_eq!(recognizer.recognize(path("gcc-9")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++-11")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("gcc-11.2")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("gcc9")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("g++11")), Some(CompilerType::Gcc));
-
-        // With full paths
-        assert_eq!(recognizer.recognize(path("/usr/bin/gcc")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("/opt/gcc/bin/g++")), Some(CompilerType::Gcc));
+        assert_cases(
+            &no_probe_recognizer(),
+            &[
+                // Basic GCC names
+                ("gcc", Some(CompilerType::Gcc)),
+                ("g++", Some(CompilerType::Gcc)),
+                // Cross-compilation variants
+                ("arm-linux-gnueabi-gcc", Some(CompilerType::Gcc)),
+                ("aarch64-linux-gnu-g++", Some(CompilerType::Gcc)),
+                ("x86_64-w64-mingw32-gcc", Some(CompilerType::Gcc)),
+                // Versioned variants
+                ("gcc-9", Some(CompilerType::Gcc)),
+                ("g++-11", Some(CompilerType::Gcc)),
+                ("gcc-11.2", Some(CompilerType::Gcc)),
+                ("gcc9", Some(CompilerType::Gcc)),
+                ("g++11", Some(CompilerType::Gcc)),
+                // With full paths
+                ("/usr/bin/gcc", Some(CompilerType::Gcc)),
+                ("/opt/gcc/bin/g++", Some(CompilerType::Gcc)),
+            ],
+        );
     }
 
     #[test]
     fn test_clang_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Basic Clang names
-        assert_eq!(recognizer.recognize(path("clang")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang++")), Some(CompilerType::Clang));
-
-        // Cross-compilation variants
-        assert_eq!(recognizer.recognize(path("aarch64-linux-gnu-clang")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-clang++")), Some(CompilerType::Clang));
-
-        // Versioned variants
-        assert_eq!(recognizer.recognize(path("clang-15")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang++-16")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang15")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang++16")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("clang-15.0")), Some(CompilerType::Clang));
-
-        // With full paths
-        assert_eq!(recognizer.recognize(path("/usr/bin/clang")), Some(CompilerType::Clang));
-        assert_eq!(recognizer.recognize(path("/opt/llvm/bin/clang++")), Some(CompilerType::Clang));
+        assert_recognition(&[
+            // Basic Clang names
+            ("clang", Some(CompilerType::Clang)),
+            ("clang++", Some(CompilerType::Clang)),
+            // Cross-compilation variants
+            ("aarch64-linux-gnu-clang", Some(CompilerType::Clang)),
+            ("arm-linux-gnueabi-clang++", Some(CompilerType::Clang)),
+            // Versioned variants
+            ("clang-15", Some(CompilerType::Clang)),
+            ("clang++-16", Some(CompilerType::Clang)),
+            ("clang15", Some(CompilerType::Clang)),
+            ("clang++16", Some(CompilerType::Clang)),
+            ("clang-15.0", Some(CompilerType::Clang)),
+            // With full paths
+            ("/usr/bin/clang", Some(CompilerType::Clang)),
+            ("/opt/llvm/bin/clang++", Some(CompilerType::Clang)),
+        ]);
     }
 
     #[test]
@@ -480,43 +490,40 @@ mod tests {
 
     #[test]
     fn test_fortran_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Basic Fortran names
-        assert_eq!(recognizer.recognize(path("gfortran")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("f95")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("flang")), Some(CompilerType::Flang));
-        assert_eq!(recognizer.recognize(path("flang-new")), Some(CompilerType::Flang));
-
-        // Cross-compilation variants
-        assert_eq!(recognizer.recognize(path("arm-linux-gnueabi-gfortran")), Some(CompilerType::Gcc));
-
-        // Versioned variants
-        assert_eq!(recognizer.recognize(path("gfortran-11")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("gfortran11")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("f95-4.8")), Some(CompilerType::Gcc));
+        assert_recognition(&[
+            // Basic Fortran names
+            ("gfortran", Some(CompilerType::Gcc)),
+            ("f95", Some(CompilerType::Gcc)),
+            ("flang", Some(CompilerType::Flang)),
+            ("flang-new", Some(CompilerType::Flang)),
+            // Cross-compilation variants
+            ("arm-linux-gnueabi-gfortran", Some(CompilerType::Gcc)),
+            // Versioned variants
+            ("gfortran-11", Some(CompilerType::Gcc)),
+            ("gfortran11", Some(CompilerType::Gcc)),
+            ("f95-4.8", Some(CompilerType::Gcc)),
+        ]);
     }
 
     #[test]
     fn test_intel_fortran_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Intel Fortran names
-        assert_eq!(recognizer.recognize(path("ifort")), Some(CompilerType::IntelFortran));
-        assert_eq!(recognizer.recognize(path("ifx")), Some(CompilerType::IntelFortran));
-
-        // Versioned variants
-        assert_eq!(recognizer.recognize(path("ifort-2021")), Some(CompilerType::IntelFortran));
-        assert_eq!(recognizer.recognize(path("ifx-2023")), Some(CompilerType::IntelFortran));
+        assert_recognition(&[
+            // Intel Fortran names
+            ("ifort", Some(CompilerType::IntelFortran)),
+            ("ifx", Some(CompilerType::IntelFortran)),
+            // Versioned variants
+            ("ifort-2021", Some(CompilerType::IntelFortran)),
+            ("ifx-2023", Some(CompilerType::IntelFortran)),
+        ]);
     }
 
     #[test]
     fn test_cray_fortran_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Cray Fortran names
-        assert_eq!(recognizer.recognize(path("crayftn")), Some(CompilerType::CrayFortran));
-        assert_eq!(recognizer.recognize(path("ftn")), Some(CompilerType::CrayFortran));
+        assert_recognition(&[
+            // Cray Fortran names
+            ("crayftn", Some(CompilerType::CrayFortran)),
+            ("ftn", Some(CompilerType::CrayFortran)),
+        ]);
     }
 
     #[test]
@@ -605,30 +612,22 @@ mod tests {
 
     #[test]
     fn test_gcc_internal_executables_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Test that GCC internal executables are recognized as GCC type
-        assert_eq!(recognizer.recognize(path("cc1")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("cc1plus")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("cc1obj")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("cc1objplus")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("collect2")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("f951")), Some(CompilerType::Gcc));
-        assert_eq!(recognizer.recognize(path("lto1")), Some(CompilerType::Gcc));
-
-        // Test with full paths
-        assert_eq!(
-            recognizer.recognize(path("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1")),
-            Some(CompilerType::Gcc)
-        );
-        assert_eq!(
-            recognizer.recognize(path("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus")),
-            Some(CompilerType::Gcc)
-        );
-
-        // Test that non-GCC internal executables are not matched by this pattern
-        assert_eq!(recognizer.recognize(path("cc1foo")), None);
-        assert_eq!(recognizer.recognize(path("foo-cc1")), None);
+        assert_recognition(&[
+            // GCC internal executables are recognized as GCC type
+            ("cc1", Some(CompilerType::Gcc)),
+            ("cc1plus", Some(CompilerType::Gcc)),
+            ("cc1obj", Some(CompilerType::Gcc)),
+            ("cc1objplus", Some(CompilerType::Gcc)),
+            ("collect2", Some(CompilerType::Gcc)),
+            ("f951", Some(CompilerType::Gcc)),
+            ("lto1", Some(CompilerType::Gcc)),
+            // With full paths
+            ("/usr/libexec/gcc/x86_64-linux-gnu/11/cc1", Some(CompilerType::Gcc)),
+            ("/usr/lib/gcc/x86_64-linux-gnu/11/cc1plus", Some(CompilerType::Gcc)),
+            // Non-GCC internal executables are not matched by this pattern
+            ("cc1foo", None),
+            ("foo-cc1", None),
+        ]);
     }
 
     #[test]
@@ -673,45 +672,38 @@ mod tests {
 
     #[test]
     fn test_cuda_recognition() {
-        let recognizer = CompilerRecognizer::default();
-
-        // Test basic CUDA compiler recognition
-        assert_eq!(recognizer.recognize(path("nvcc")), Some(CompilerType::Cuda));
-
-        // Test versioned CUDA compiler
-        assert_eq!(recognizer.recognize(path("nvcc-12.0")), Some(CompilerType::Cuda));
-
-        // Test cross-compilation CUDA compiler
-        assert_eq!(recognizer.recognize(path("aarch64-linux-gnu-nvcc")), Some(CompilerType::Cuda));
-
-        // Test non-CUDA executables don't match
-        // Note: fake-nvcc matches because it looks like a cross-compilation target
-        assert_eq!(recognizer.recognize(path("nvcc-fake")), None); // Invalid suffix
-        assert_eq!(recognizer.recognize(path("not-nvcc-at-all")), None);
-        assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
+        assert_recognition(&[
+            ("nvcc", Some(CompilerType::Cuda)),
+            // Versioned variant
+            ("nvcc-12.0", Some(CompilerType::Cuda)),
+            // Cross-compilation variant
+            ("aarch64-linux-gnu-nvcc", Some(CompilerType::Cuda)),
+            // Non-CUDA executables don't match: "nvcc-fake" has an invalid
+            // version suffix, "not-nvcc-at-all" merely contains the substring.
+            ("nvcc-fake", None),
+            ("not-nvcc-at-all", None),
+            ("gcc", Some(CompilerType::Gcc)),
+        ]);
     }
 
     // Requirements: recognition-compiler-launchers
     #[test]
     fn test_wrapper_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Test wrapper recognition
-        assert_eq!(recognizer.recognize(path("ccache")), Some(CompilerType::Wrapper));
-        assert_eq!(recognizer.recognize(path("distcc")), Some(CompilerType::Wrapper));
-        assert_eq!(recognizer.recognize(path("sccache")), Some(CompilerType::Wrapper));
-        assert_eq!(recognizer.recognize(path("icecc")), Some(CompilerType::Wrapper));
-
-        // Test with full paths
-        assert_eq!(recognizer.recognize(path("/usr/bin/ccache")), Some(CompilerType::Wrapper));
-        assert_eq!(recognizer.recognize(path("/opt/distcc/bin/distcc")), Some(CompilerType::Wrapper));
-
-        // Test non-wrapper executables don't match
-        assert_eq!(recognizer.recognize(path("ccache-fake")), None);
-        assert_eq!(recognizer.recognize(path("fake-distcc")), None);
-        assert_eq!(recognizer.recognize(path("not-sccache")), None);
-        // icerun launches arbitrary commands, not compiler invocations.
-        assert_eq!(recognizer.recognize(path("icerun")), None);
+        assert_recognition(&[
+            ("ccache", Some(CompilerType::Wrapper)),
+            ("distcc", Some(CompilerType::Wrapper)),
+            ("sccache", Some(CompilerType::Wrapper)),
+            ("icecc", Some(CompilerType::Wrapper)),
+            // Full paths
+            ("/usr/bin/ccache", Some(CompilerType::Wrapper)),
+            ("/opt/distcc/bin/distcc", Some(CompilerType::Wrapper)),
+            // Non-wrapper executables don't match
+            ("ccache-fake", None),
+            ("fake-distcc", None),
+            ("not-sccache", None),
+            // icerun launches arbitrary commands, not compiler invocations.
+            ("icerun", None),
+        ]);
     }
 
     #[test]
@@ -750,165 +742,162 @@ mod tests {
 
     #[test]
     fn test_msvc_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("cl")), Some(CompilerType::Msvc));
-        assert_eq!(recognizer.recognize(path("cl.exe")), Some(CompilerType::Msvc));
-
-        // Internal executables should be recognized as MSVC (then ignored by interpreter)
-        assert_eq!(recognizer.recognize(path("c1")), Some(CompilerType::Msvc));
-        assert_eq!(recognizer.recognize(path("c1xx")), Some(CompilerType::Msvc));
-        assert_eq!(recognizer.recognize(path("c2")), Some(CompilerType::Msvc));
+        assert_recognition(&[
+            ("cl", Some(CompilerType::Msvc)),
+            ("cl.exe", Some(CompilerType::Msvc)),
+            // Internal executables should be recognized as MSVC (then ignored by interpreter)
+            ("c1", Some(CompilerType::Msvc)),
+            ("c1xx", Some(CompilerType::Msvc)),
+            ("c2", Some(CompilerType::Msvc)),
+        ]);
     }
 
     #[test]
     fn test_clang_cl_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("clang-cl")), Some(CompilerType::ClangCl));
-        assert_eq!(recognizer.recognize(path("clang-cl.exe")), Some(CompilerType::ClangCl));
-        assert_eq!(recognizer.recognize(path("clang-cl-17")), Some(CompilerType::ClangCl));
+        assert_recognition(&[
+            ("clang-cl", Some(CompilerType::ClangCl)),
+            ("clang-cl.exe", Some(CompilerType::ClangCl)),
+            ("clang-cl-17", Some(CompilerType::ClangCl)),
+        ]);
     }
 
     #[test]
     fn test_intel_cc_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("icx")), Some(CompilerType::IntelCc));
-        assert_eq!(recognizer.recognize(path("icpx")), Some(CompilerType::IntelCc));
-        assert_eq!(recognizer.recognize(path("icc")), Some(CompilerType::IntelCc));
-        assert_eq!(recognizer.recognize(path("icpc")), Some(CompilerType::IntelCc));
-        assert_eq!(recognizer.recognize(path("icx-2024")), Some(CompilerType::IntelCc));
+        assert_recognition(&[
+            ("icx", Some(CompilerType::IntelCc)),
+            ("icpx", Some(CompilerType::IntelCc)),
+            ("icc", Some(CompilerType::IntelCc)),
+            ("icpc", Some(CompilerType::IntelCc)),
+            ("icx-2024", Some(CompilerType::IntelCc)),
+        ]);
     }
 
     #[test]
     fn test_nvidia_hpc_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("nvc")), Some(CompilerType::NvidiaHpc));
-        assert_eq!(recognizer.recognize(path("nvc++")), Some(CompilerType::NvidiaHpc));
-        assert_eq!(recognizer.recognize(path("nvfortran")), Some(CompilerType::NvidiaHpc));
-        assert_eq!(recognizer.recognize(path("pgcc")), Some(CompilerType::NvidiaHpc));
-        assert_eq!(recognizer.recognize(path("pgc++")), Some(CompilerType::NvidiaHpc));
-        assert_eq!(recognizer.recognize(path("pgfortran")), Some(CompilerType::NvidiaHpc));
+        assert_recognition(&[
+            ("nvc", Some(CompilerType::NvidiaHpc)),
+            ("nvc++", Some(CompilerType::NvidiaHpc)),
+            ("nvfortran", Some(CompilerType::NvidiaHpc)),
+            ("pgcc", Some(CompilerType::NvidiaHpc)),
+            ("pgc++", Some(CompilerType::NvidiaHpc)),
+            ("pgfortran", Some(CompilerType::NvidiaHpc)),
+        ]);
     }
 
     #[test]
     fn test_armclang_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("armclang")), Some(CompilerType::Armclang));
-        assert_eq!(recognizer.recognize(path("armclang++")), Some(CompilerType::Armclang));
-        assert_eq!(recognizer.recognize(path("armclang-14")), Some(CompilerType::Armclang));
+        assert_recognition(&[
+            ("armclang", Some(CompilerType::Armclang)),
+            ("armclang++", Some(CompilerType::Armclang)),
+            ("armclang-14", Some(CompilerType::Armclang)),
+        ]);
     }
 
     // Requirements: recognition-cray-compilers
     #[test]
     fn test_cray_cc_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
         // Case sensitivity note: on Unix the recognition regex is
         // case-sensitive, so "crayCC" only matches because it is listed as
         // its own literal alternative in cray_cc.yaml, not because "craycc"
         // case-folds to it. Both spellings must resolve independently.
-        for name in ["craycc", "crayCC", "craycxx"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::CrayCc), "name: {}", name);
-        }
-
-        // Versioned variant
-        assert_eq!(recognizer.recognize(path("craycc-17")), Some(CompilerType::CrayCc));
+        assert_recognition(&[
+            ("craycc", Some(CompilerType::CrayCc)),
+            ("crayCC", Some(CompilerType::CrayCc)),
+            ("craycxx", Some(CompilerType::CrayCc)),
+            // Versioned variant
+            ("craycc-17", Some(CompilerType::CrayCc)),
+        ]);
     }
 
     // Requirements: recognition-amd-compilers
     #[test]
     fn test_amd_compiler_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        for name in ["amdclang", "amdclang++", "hipcc"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
-        }
-        assert_eq!(recognizer.recognize(path("amdflang")), Some(CompilerType::Flang));
-
-        // A GPU-arch reporting tool, not a compiler driver -- must not be recognized.
-        assert_eq!(recognizer.recognize(path("amdgpu-arch")), None);
+        assert_recognition(&[
+            ("amdclang", Some(CompilerType::Clang)),
+            ("amdclang++", Some(CompilerType::Clang)),
+            ("hipcc", Some(CompilerType::Clang)),
+            ("amdflang", Some(CompilerType::Flang)),
+            // A GPU-arch reporting tool, not a compiler driver -- must not be recognized.
+            ("amdgpu-arch", None),
+        ]);
     }
 
     // Requirements: recognition-mpi-wrappers
     #[test]
     fn test_mpi_wrapper_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        for name in ["mpicc", "mpicxx", "mpic++", "mpiCC", "mpifort", "mpif77", "mpif90"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Mpi), "name: {}", name);
-        }
-
-        // Versioned variant
-        assert_eq!(recognizer.recognize(path("mpicc-14")), Some(CompilerType::Mpi));
-
-        // MPI launchers execute programs, they do not compile -- must not be recognized.
-        assert_eq!(recognizer.recognize(path("mpirun")), None);
-        assert_eq!(recognizer.recognize(path("mpiexec")), None);
+        assert_recognition(&[
+            ("mpicc", Some(CompilerType::Mpi)),
+            ("mpicxx", Some(CompilerType::Mpi)),
+            ("mpic++", Some(CompilerType::Mpi)),
+            ("mpiCC", Some(CompilerType::Mpi)),
+            ("mpifort", Some(CompilerType::Mpi)),
+            ("mpif77", Some(CompilerType::Mpi)),
+            ("mpif90", Some(CompilerType::Mpi)),
+            // Versioned variant
+            ("mpicc-14", Some(CompilerType::Mpi)),
+            // MPI launchers execute programs, they do not compile -- must not be recognized.
+            ("mpirun", None),
+            ("mpiexec", None),
+        ]);
     }
 
     // Requirements: recognition-mpi-wrappers
     #[test]
     fn test_intel_mpi_wrapper_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        for name in ["mpiicc", "mpiicpc", "mpiicx", "mpiicpx"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::IntelCc), "name: {}", name);
-        }
-        for name in ["mpiifort", "mpiifx"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::IntelFortran), "name: {}", name);
-        }
+        assert_recognition(&[
+            ("mpiicc", Some(CompilerType::IntelCc)),
+            ("mpiicpc", Some(CompilerType::IntelCc)),
+            ("mpiicx", Some(CompilerType::IntelCc)),
+            ("mpiicpx", Some(CompilerType::IntelCc)),
+            ("mpiifort", Some(CompilerType::IntelFortran)),
+            ("mpiifx", Some(CompilerType::IntelFortran)),
+        ]);
     }
 
     // Requirements: recognition-embedded-toolchains
     #[test]
     fn test_qnx_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("qcc")), Some(CompilerType::Qnx));
-        assert_eq!(recognizer.recognize(path("q++")), Some(CompilerType::Qnx));
-
-        // A name that merely shares the "q" prefix is not a QNX driver.
-        assert_eq!(recognizer.recognize(path("qnxcc")), None);
-        assert_eq!(recognizer.recognize(path("qcc-fake")), None);
+        assert_recognition(&[
+            ("qcc", Some(CompilerType::Qnx)),
+            ("q++", Some(CompilerType::Qnx)),
+            // A name that merely shares the "q" prefix is not a QNX driver.
+            ("qnxcc", None),
+            ("qcc-fake", None),
+        ]);
     }
 
     // Requirements: recognition-embedded-toolchains
     #[test]
     fn test_emscripten_and_ti_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        // Emscripten drivers, including the .py-suffixed spellings some
-        // installs expose. tiarmclang is a single token (no hyphen), so the
-        // <prefix>-clang cross rule does not catch it; it must be listed.
-        for name in ["emcc", "em++", "emcc.py", "em++.py", "tiarmclang"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Clang), "name: {}", name);
-        }
-
-        // Emscripten's binutils companions are not compiler drivers.
-        assert_eq!(recognizer.recognize(path("emar")), None);
-        assert_eq!(recognizer.recognize(path("emranlib")), None);
-
-        // The dot in "emcc.py" must match literally, not as a regex
-        // wildcard: a name with any other character in that position is
-        // not an Emscripten driver.
-        assert_eq!(recognizer.recognize(path("emccxpy")), None);
+        assert_recognition(&[
+            // Emscripten drivers, including the .py-suffixed spellings some
+            // installs expose. tiarmclang is a single token (no hyphen), so
+            // the <prefix>-clang cross rule does not catch it; it must be
+            // listed.
+            ("emcc", Some(CompilerType::Clang)),
+            ("em++", Some(CompilerType::Clang)),
+            ("emcc.py", Some(CompilerType::Clang)),
+            ("em++.py", Some(CompilerType::Clang)),
+            ("tiarmclang", Some(CompilerType::Clang)),
+            // Emscripten's binutils companions are not compiler drivers.
+            ("emar", None),
+            ("emranlib", None),
+            // The dot in "emcc.py" must match literally, not as a regex
+            // wildcard: a name with any other character in that position is
+            // not an Emscripten driver.
+            ("emccxpy", None),
+        ]);
     }
 
     // Requirements: recognition-embedded-toolchains
     #[test]
     fn test_microchip_xc8_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        for name in ["xc8-cc", "xc8"] {
-            assert_eq!(recognizer.recognize(path(name)), Some(CompilerType::Gcc), "name: {}", name);
-        }
-
-        // The XC8 archiver is not a compiler driver.
-        assert_eq!(recognizer.recognize(path("xc8-ar")), None);
+        assert_recognition(&[
+            ("xc8-cc", Some(CompilerType::Gcc)),
+            ("xc8", Some(CompilerType::Gcc)),
+            // The XC8 archiver is not a compiler driver.
+            ("xc8-ar", None),
+        ]);
     }
 
     // Coverage lock: these names were already matched by the existing
@@ -930,12 +919,12 @@ mod tests {
 
     #[test]
     fn test_ibm_xl_recognition() {
-        let recognizer = CompilerRecognizer::new();
-
-        assert_eq!(recognizer.recognize(path("ibm-clang")), Some(CompilerType::IbmXl));
-        assert_eq!(recognizer.recognize(path("ibm-clang++")), Some(CompilerType::IbmXl));
-        assert_eq!(recognizer.recognize(path("xlclang")), Some(CompilerType::IbmXl));
-        assert_eq!(recognizer.recognize(path("xlclang++")), Some(CompilerType::IbmXl));
+        assert_recognition(&[
+            ("ibm-clang", Some(CompilerType::IbmXl)),
+            ("ibm-clang++", Some(CompilerType::IbmXl)),
+            ("xlclang", Some(CompilerType::IbmXl)),
+            ("xlclang++", Some(CompilerType::IbmXl)),
+        ]);
     }
 
     #[test]
