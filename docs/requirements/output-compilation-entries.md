@@ -70,6 +70,31 @@ this is the intended behaviour for a single-translation-unit compiler
 and avoids emitting several entries that all claim to produce the same
 combined output.
 
+### One entry per source, with the whole invocation's arguments (whole-module compilers)
+
+Some compilers analyze every source of an invocation together as a
+single "whole module" but still need one entry per source file,
+because per-file consuming tooling looks up a compile command by file
+path. Swift's `swiftc` in whole-module mode is the motivating example:
+a single invocation lists several `.swift` sources, and each file's
+semantics depend on the whole module, so no entry can be reduced to
+"this file only" the way a separable-sources entry is. For such a
+compiler:
+
+- An invocation that names N source files produces exactly N entries
+- Each entry's `file` field is a distinct source from the invocation
+- Every entry's argument list is the complete invocation -- every
+  source is retained in every entry, not stripped to that entry's own
+  file
+- Link-only flag stripping (below) still applies
+- If the invocation compiles no source at all, it produces no entry,
+  exactly as for the other two shapes
+
+This is a third, distinct shape: unlike the separable case, no source
+is stripped from any entry's arguments; unlike the single-invocation
+case, N entries are produced (one per source, not one for the whole
+invocation).
+
 ### Zero entries for invocations that do not compile a source
 
 An invocation produces no entries when any of the following holds:
@@ -190,6 +215,16 @@ src2.vala`):
 > with `file` set to the first source (`src1.vala`),
 > and all of the sources appearing in that entry's `arguments`.
 
+Given a build that runs a whole-module compiler over two or more
+sources in one invocation (for example
+`swiftc -module-name App a.swift b.swift`):
+
+> When the user runs Bear wrapping that build,
+> then `compile_commands.json` contains two entries, one for `a.swift`
+> and one for `b.swift`,
+> and both entries' `arguments` contain both `a.swift` and `b.swift`
+> (the whole invocation, not stripped to one source each).
+
 Given a build that runs `cc -o a.out src1.c src2.c src3.c`:
 
 > When the user runs Bear wrapping that build,
@@ -247,3 +282,7 @@ Given a build that runs `cc -o a.out src1.c src2.c` with the
 
 - [Recording Vala (valac) builds](../rationale/vala-transpiler-database.md) -
   transpiler/internal-cc handling and Vala source extensions.
+- [Swift whole-module entries](../rationale/swift-whole-module-entries.md) -
+  why whole-module Swift compiles need one entry per source with the
+  full invocation's arguments, rather than the stripped-per-source or
+  combined shapes above.
