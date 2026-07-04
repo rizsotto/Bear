@@ -288,6 +288,7 @@ mod tests {
             );
         }
 
+        // Requirements: recognition-compiler-launchers
         #[test]
         fn wrapper_recognition_and_delegation() {
             let sut = CompilerInterpreter::new_with_config(&[]);

@@ -152,6 +152,7 @@ mod tests {
         assert_eq!(0, distcc_option_count("--output"));
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_unwrap_extracts_real_compiler_for_valid_wrapper_calls() {
         let recognizer = CompilerRecognizer::new();
@@ -175,6 +176,7 @@ mod tests {
         }
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_unwrap_rejects_non_wrapper_or_invalid_calls() {
         let recognizer = CompilerRecognizer::new();
@@ -192,6 +194,7 @@ mod tests {
         }
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_unwrap_preserves_working_dir_and_environment() {
         let recognizer = CompilerRecognizer::new();
@@ -211,6 +214,7 @@ mod tests {
         assert_eq!(ty, CompilerType::Gcc);
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_unwrap_strips_distcc_flags_from_filtered_args() {
         let recognizer = CompilerRecognizer::new();

@@ -688,6 +688,7 @@ mod tests {
         assert_eq!(recognizer.recognize(path("gcc")), Some(CompilerType::Gcc));
     }
 
+    // Requirements: recognition-compiler-launchers
     #[test]
     fn test_wrapper_recognition() {
         let recognizer = CompilerRecognizer::new();
@@ -1062,7 +1063,7 @@ mod tests {
     // and is exercised in its own test module. The recognizer simply asks the
     // probe; whether the answer is fresh or memoized is opaque here.
 
-    // Requirements: recognition-ambiguous-name-probe
+    // Requirements: recognition-ambiguous-name-probe, recognition-compiler-launchers
     #[test]
     fn wrapper_basenames_are_never_probed_even_under_ambiguous_paths() {
         // ccache, distcc, sccache must reach the regex (which returns
