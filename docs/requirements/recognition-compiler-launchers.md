@@ -9,9 +9,9 @@ When a build compiles through a compiler-launcher command (ccache,
 distcc, sccache, and eventually icecc) that carries the real compiler in
 its own arguments, Bear records the compilation as the real compiler's
 invocation, parsed with that compiler's flag semantics -- not the
-launcher's. Executables that exist only to masquerade as a compiler (a
-launcher's own symlink farm, e.g. `/usr/lib64/ccache/gcc`) are never
-treated as if they were the real compiler.
+launcher's. A launcher reached through its masquerade symlink farm is
+never version-probed, so the launcher's own version banner can never
+misclassify an ambiguous compiler name.
 
 ## Acceptance criteria
 
@@ -29,11 +29,17 @@ treated as if they were the real compiler.
 - A launcher wrapping another launcher (`ccache distcc gcc -c main.c`)
   is not unwrapped; it yields no entry. Bear does not chase a chain of
   launchers.
-- An executable that resolves (after canonicalization) to a launcher
-  binary while being reached under a compiler's own name -- a launcher
-  masquerade symlink farm -- is never probed as if it were a compiler;
-  it is classified as the launcher and handled by the same unwrap path
-  as an explicit launcher invocation.
+- An ambiguous compiler basename (one whose classification relies on
+  the version probe) that resolves after canonicalization to a launcher
+  binary is never probed: the launcher's version banner must not stand
+  in for a compiler's. Such an execution yields no entry of its own; in
+  preload mode the real compiler that the launcher re-executes is
+  intercepted as a separate event and provides the entry.
+- A masquerade entry under a specific compiler's name (the launcher's
+  symlink farm shadowing `gcc` on PATH) is recorded under that
+  compiler's name with the invocation's own arguments; the launcher
+  re-executes the real compiler, and default duplicate detection
+  collapses the pair in preload mode.
 - icecc, once recognized, follows the identical contract: the real
   compiler in its arguments is recorded as the compilation, and icecc's
   own flags are skipped the same way distcc's are.
@@ -76,14 +82,13 @@ launcher):
 > When Bear recognizes it,
 > then no database entry is produced.
 
-Given an executable reached through a launcher's masquerade symlink farm
-under a compiler's own name (e.g. `/usr/lib64/ccache/gcc` resolving to
-the `ccache` binary):
+Given an ambiguous compiler name (`cc`) that canonicalizes to a
+launcher binary (a masquerade symlink farm first on PATH):
 
 > When Bear recognizes it,
-> then it is classified as the launcher, not probed as a compiler, and
-> unwrapped the same way an explicit `ccache gcc ...` invocation would
-> be.
+> then the version probe is not run,
+> and the launcher's version banner does not classify the name as any
+> compiler.
 
 Given icecc support is implemented (a later phase):
 
