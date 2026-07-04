@@ -1,0 +1,148 @@
+# Swift compiler (swiftc) flag definitions
+# https://github.com/swiftlang/swift/blob/main/include/swift/Option/Options.td
+# is the authoritative option table this file is verified against.
+#
+# swiftc has its own CLI dialect (not derived from gcc/clang), so this family
+# has no `extends:`. Arity matters more here than for most families: most
+# value-taking long options are Separate-only in Options.td (`-target x`,
+# never `-targetx`), unlike gcc/clang's glued-or-separate convention, so they
+# are modeled with `count: 1` (exact match, separate token only) rather than
+# the `{ }*` glued-or-separate syntax. `-D`/`-I`/`-F`/`-L`/`-l`/`-o`/`-j` ARE
+# JoinedOrSeparate in Options.td and use `{ }*` accordingly.
+#
+# `swift` (the package-manager subcommand driver: `swift build`, `swift run`,
+# ...) is deliberately not recognized -- see recognition-swift-compiler
+# Notes. Only `swiftc` is listed under `recognize:`.
+#
+# swiftc spawns per-file `swift-frontend` jobs the way gcc spawns `cc1`
+# (legacy toolchains self-invoke as `swiftc -frontend`); both are filtered
+# via `ignore_when`, the same mechanism gcc.yaml/clang.yaml use for their
+# own internal frontend executions.
+type: swift
+recognize:
+  - executables: ["swiftc"]
+    cross_compilation: false
+    versioned: false
+ignore_when:
+  executables: ["swift-frontend"]
+  flags: ["-frontend"]
+slash_prefix: false
+flags:
+  # --- Output ---
+  - match: {pattern: "-o{ }*"}
+    result: output
+
+  # --- Stops at compiling (object-file-only output) ---
+  - match: {pattern: "-emit-object"}
+    result: stops_at_compiling
+  - match: {pattern: "-c"}
+    result: stops_at_compiling
+
+  # --- Compilation-configuring, separate-token value only (Options.td: Separate) ---
+  - match: {pattern: "-module-name", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-sdk", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-target", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-swift-version", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-emit-module-path", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-index-store-path", count: 1}
+    result: configures_compiling
+  # Bridging header for mixed Swift/Objective-C targets; the value is a
+  # `.h` path, which IS a recognized source extension (headers are TUs for
+  # other families), so an unmatched `-import-objc-header` would leak its
+  # value in as a phantom compilable source.
+  - match: {pattern: "-import-objc-header", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-emit-objc-header-path", count: 1}
+    result: configures_compiling
+  # Swift 5.9+ C++-interop generalization of the ObjC header emission;
+  # same .h-valued separate-token shape, same phantom-source risk.
+  - match: {pattern: "-emit-clang-header-path", count: 1}
+    result: configures_compiling
+
+  # --- Linking-configuring, separate-token value only ---
+  - match: {pattern: "-framework", count: 1}
+    result: configures_linking
+
+  # --- Forwarded to a downstream tool; ambiguous, so classified to keep
+  #     rather than strip (dropping a compile-relevant forwarded flag is
+  #     worse than keeping a harmless one -- same reasoning as valac's -X). ---
+  - match: {pattern: "-Xcc", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-Xfrontend", count: 1}
+    result: configures_compiling
+  - match: {pattern: "-Xlinker", count: 1}
+    result: configures_linking
+
+  # --- Driver/build-machinery, separate-token value only; no compilation
+  #     semantic of their own, but must consume their value. ---
+  - match: {pattern: "-output-file-map", count: 1}
+    result: none
+  - match: {pattern: "-module-cache-path", count: 1}
+    result: none
+  - match: {pattern: "-working-directory", count: 1}
+    result: none
+  - match: {pattern: "-num-threads", count: 1}
+    result: none
+
+  # --- JoinedOrSeparate value-taking flags ---
+  - match: {pattern: "-j{ }*"}
+    result: none
+  - match: {pattern: "-D{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-I{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-F{ }*"}
+    result: configures_preprocessing
+  - match: {pattern: "-L{ }*"}
+    result: configures_linking
+  - match: {pattern: "-l{ }*"}
+    result: configures_linking
+
+  # --- Zero-arg compilation-configuring flags ---
+  - match: {pattern: "-emit-library"}
+    result: configures_compiling
+  - match: {pattern: "-emit-executable"}
+    result: configures_compiling
+  - match: {pattern: "-emit-module"}
+    result: configures_compiling
+  - match: {pattern: "-whole-module-optimization"}
+    result: configures_compiling
+  - match: {pattern: "-wmo"}
+    result: configures_compiling
+  - match: {pattern: "-parse-as-library"}
+    result: configures_compiling
+  - match: {pattern: "-enable-testing"}
+    result: configures_compiling
+  - match: {pattern: "-static"}
+    result: configures_compiling
+  - match: {pattern: "-Onone"}
+    result: configures_compiling
+  - match: {pattern: "-Osize"}
+    result: configures_compiling
+  - match: {pattern: "-O"}
+    result: configures_compiling
+  - match: {pattern: "-g"}
+    result: configures_compiling
+
+  # --- Verbose: does not suppress entry generation, unlike --version/--help.
+  #     `swiftc -v -c hello.swift` still compiles; only bare `-v` with no
+  #     compile action produces no source argument to build an entry from. ---
+  - match: {pattern: "-v"}
+    result: none
+
+  # --- Info and exit --- (Options.td: Flag<["-", "--"], "version"|"help">,
+  # i.e. both single- and double-dash spellings are valid and must each be
+  # listed since this schema matches literal strings, not prefix sets.)
+  - match: {pattern: "--version"}
+    result: info_and_exit
+  - match: {pattern: "-version"}
+    result: info_and_exit
+  - match: {pattern: "--help"}
+    result: info_and_exit
+  - match: {pattern: "-help"}
+    result: info_and_exit

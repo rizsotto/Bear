@@ -37,7 +37,7 @@
 use super::Entry;
 use super::path_format::{ResolveFn, resolver_for};
 use crate::config;
-use crate::semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect};
+use crate::semantic::{Argument, ArgumentKind, Command, CompilerPass, PassEffect, SourceMode};
 use log::warn;
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
@@ -88,38 +88,67 @@ impl CommandConverter {
         // Create output file if needed
         let output_file = self.create_output_file(&formatted_directory, &cmd.arguments);
 
-        if cmd.separable_sources {
-            // Create one entry per source argument (only non-binary source files)
-            cmd.arguments
-                .iter()
-                .enumerate()
-                .filter(|(_, arg)| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
-                .filter_map(|(source_idx, source_arg)| {
-                    self.build_entry(cmd, source_arg, Some(source_idx), &formatted_directory, &output_file)
-                })
-                .collect()
-        } else {
-            // Single-translation-unit compiler (e.g. valac): the whole invocation
-            // collapses to one entry whose `file` is the first compilable source.
-            // All sources are kept in the arguments (no sibling stripping).
-            let first_source =
-                cmd.arguments.iter().find(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }));
-            let Some(source_arg) = first_source else {
-                // No compilable source; should_skip_entry_generation already
-                // covers this, but keep the guard local to the branch.
-                return vec![];
-            };
+        match cmd.source_mode {
+            SourceMode::PerSourceStripped => {
+                // Create one entry per source argument (only non-binary source files),
+                // each entry keeping only its own source (siblings stripped).
+                cmd.arguments
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, arg)| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
+                    .filter_map(|(source_idx, source_arg)| {
+                        self.build_entry(
+                            cmd,
+                            source_arg,
+                            Some(source_idx),
+                            &formatted_directory,
+                            &output_file,
+                        )
+                    })
+                    .collect()
+            }
+            SourceMode::PerSourceFull => {
+                // Whole-module compiler (e.g. swiftc): one entry per compilable
+                // source, but every entry keeps the complete invocation (no
+                // sibling stripping), because each file's semantics depend on
+                // every other source in the same invocation.
+                cmd.arguments
+                    .iter()
+                    .filter(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }))
+                    .filter_map(|source_arg| {
+                        self.build_entry(cmd, source_arg, None, &formatted_directory, &output_file)
+                    })
+                    .collect()
+            }
+            SourceMode::Combined => {
+                // Single-translation-unit compiler (e.g. valac): the whole invocation
+                // collapses to one entry whose `file` is the first compilable source.
+                // All sources are kept in the arguments (no sibling stripping).
+                let first_source = cmd
+                    .arguments
+                    .iter()
+                    .find(|arg| matches!(arg.kind(), ArgumentKind::Source { binary: false }));
+                let Some(source_arg) = first_source else {
+                    // No compilable source; should_skip_entry_generation already
+                    // covers this, but keep the guard local to the branch.
+                    return vec![];
+                };
 
-            self.build_entry(cmd, source_arg, None, &formatted_directory, &output_file).into_iter().collect()
+                self.build_entry(cmd, source_arg, None, &formatted_directory, &output_file)
+                    .into_iter()
+                    .collect()
+            }
         }
     }
 
     /// Builds a single compilation database entry for `source_arg`.
     ///
     /// `selected` controls which sources are kept in the arguments:
-    /// `Some(idx)` keeps only the source at that index (separable compilers,
-    /// one entry per source), `None` keeps every source (single-translation-unit
-    /// compilers, one combined entry).
+    /// `Some(idx)` keeps only the source at that index
+    /// (`SourceMode::PerSourceStripped`, one entry per source with siblings
+    /// stripped). `None` keeps every source -- used both for
+    /// `SourceMode::Combined` (one entry total) and `SourceMode::PerSourceFull`
+    /// (one entry per source, but each keeps the full invocation).
     fn build_entry(
         &self,
         cmd: &Command,
@@ -208,9 +237,9 @@ impl CommandConverter {
     /// all non-source arguments, and the selected source file(s).
     /// It ensures that source files are placed in the correct position relative to output arguments.
     ///
-    /// `selected` is `Some(idx)` for separable compilers (keep only the source at
-    /// `idx`, strip the siblings) or `None` for single-translation-unit compilers
-    /// (keep every source).
+    /// `selected` is `Some(idx)` for `SourceMode::PerSourceStripped` (keep only
+    /// the source at `idx`, strip the siblings) or `None` for
+    /// `SourceMode::Combined`/`SourceMode::PerSourceFull` (keep every source).
     fn build_command_args(
         &self,
         cmd: &Command,
@@ -1163,11 +1192,19 @@ mod tests {
         assert!(!entry.file.is_absolute(), "file should be relative: {:?}", entry.file);
     }
 
-    /// Builds a `Command` with `separable_sources` toggled off, mirroring what
-    /// the valac interpreter produces. `from_strings` always sets the flag to
-    /// `true`, so combined-path tests flip it here.
+    /// Builds a `Command` with `source_mode` set to `Combined`, mirroring what
+    /// the valac interpreter produces. `from_strings` always sets
+    /// `PerSourceStripped`, so combined-path tests flip it here.
     fn combined(mut cmd: Command) -> Command {
-        cmd.separable_sources = false;
+        cmd.source_mode = crate::semantic::SourceMode::Combined;
+        cmd
+    }
+
+    /// Builds a `Command` with `source_mode` set to `PerSourceFull`, mirroring
+    /// what the swiftc interpreter produces. `from_strings` always sets
+    /// `PerSourceStripped`, so whole-module tests flip it here.
+    fn per_source_full(mut cmd: Command) -> Command {
+        cmd.source_mode = crate::semantic::SourceMode::PerSourceFull;
         cmd
     }
 
@@ -1365,6 +1402,114 @@ mod tests {
 
         let result = sut.convert(&command);
 
+        assert_eq!(result.len(), 0);
+    }
+
+    // Requirements: output-compilation-entries, recognition-swift-compiler
+    #[test]
+    fn test_per_source_full_produces_one_entry_per_source_with_full_arguments() {
+        let sut = {
+            let format = Format {
+                paths: PathFormat::default(),
+                entries: EntryFormat { use_array_format: true, include_output_field: false },
+                arguments: ArgumentsFormat::default(),
+            };
+            CommandConverter::new(format)
+        };
+
+        // swiftc-style whole-module invocation: two sources compiled together,
+        // each file's semantics depend on the whole module.
+        let command = per_source_full(Command::from_strings(
+            "/home/user",
+            "swiftc",
+            vec![
+                (ArgumentKind::Compiler, vec!["swiftc"]),
+                (ArgumentKind::Other(PassEffect::None), vec!["-module-name", "App"]),
+                (ArgumentKind::Source { binary: false }, vec!["a.swift"]),
+                (ArgumentKind::Source { binary: false }, vec!["b.swift"]),
+            ],
+        ));
+
+        let result = sut.convert(&command);
+
+        // Two entries, one per source, each keeping the whole invocation.
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].file, PathBuf::from("a.swift"));
+        assert_eq!(result[1].file, PathBuf::from("b.swift"));
+
+        for entry in &result {
+            let args_str = entry.arguments.join(" ");
+            assert!(
+                args_str.contains("a.swift"),
+                "entry for {:?} must keep a.swift: {}",
+                entry.file,
+                args_str
+            );
+            assert!(
+                args_str.contains("b.swift"),
+                "entry for {:?} must keep b.swift: {}",
+                entry.file,
+                args_str
+            );
+            assert!(
+                args_str.contains("-module-name"),
+                "entry for {:?} must keep non-source flags: {}",
+                entry.file,
+                args_str
+            );
+        }
+    }
+
+    // Requirements: output-compilation-entries, recognition-swift-compiler
+    #[test]
+    fn test_per_source_full_strips_link_only_flags() {
+        let sut = {
+            let format = Format {
+                paths: PathFormat::default(),
+                entries: EntryFormat { use_array_format: true, include_output_field: false },
+                arguments: ArgumentsFormat::default(),
+            };
+            CommandConverter::new(format)
+        };
+
+        let command = per_source_full(Command::from_strings(
+            "/home/user",
+            "swiftc",
+            vec![
+                (ArgumentKind::Compiler, vec!["swiftc"]),
+                (ArgumentKind::Source { binary: false }, vec!["a.swift"]),
+                (ArgumentKind::Source { binary: false }, vec!["b.swift"]),
+                (ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking)), vec!["-lm"]),
+            ],
+        ));
+
+        let result = sut.convert(&command);
+
+        assert_eq!(result.len(), 2);
+        for entry in &result {
+            let args_str = entry.arguments.join(" ");
+            assert!(!args_str.contains("-lm"), "link-only flag must be stripped: {}", args_str);
+        }
+    }
+
+    // Requirements: output-compilation-entries, recognition-swift-compiler
+    #[test]
+    fn test_per_source_full_with_no_compilable_source_produces_no_entries() {
+        let sut = {
+            let format = Format::default();
+            CommandConverter::new(format)
+        };
+
+        let command = per_source_full(Command::from_strings(
+            "/home/user",
+            "swiftc",
+            vec![
+                (ArgumentKind::Compiler, vec!["swiftc"]),
+                (ArgumentKind::Other(PassEffect::InfoAndExit), vec!["--version"]),
+            ],
+        ));
+
+        let result = sut.convert(&command);
         assert_eq!(result.len(), 0);
     }
 

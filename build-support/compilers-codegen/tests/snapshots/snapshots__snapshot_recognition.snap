@@ -33,4 +33,6 @@ pub static RECOGNITION_PATTERNS: &[(&str, &[&str], bool, bool)] = &[
     ("qnx", &["qcc", "q++"], false, false),
     ("nasm", &["nasm", "yasm"], false, false),
     ("fasm", &["fasm"], false, false),
+    ("swift", &["swiftc"], false, false),
+    ("swift", &["swift-frontend"], false, false),
 ];

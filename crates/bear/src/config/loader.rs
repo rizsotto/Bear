@@ -489,6 +489,10 @@ mod test {
         // Test fasm
         assert_compiler_type_deserializes("\"fasm\"", CompilerType::Fasm);
 
+        // Test Swift
+        assert_compiler_type_deserializes("\"swift\"", CompilerType::Swift);
+        assert_compiler_type_deserializes("\"swiftc\"", CompilerType::Swift);
+
         // Test compiler launchers (wrappers)
         assert_compiler_type_deserializes("\"ccache\"", CompilerType::Wrapper);
         assert_compiler_type_deserializes("\"distcc\"", CompilerType::Wrapper);

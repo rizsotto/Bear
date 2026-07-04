@@ -1,6 +1,6 @@
 ---
 title: Recognize Swift compiler (swiftc) invocations
-status: in-progress
+status: implemented
 ---
 
 ## Intent

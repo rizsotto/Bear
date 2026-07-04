@@ -194,4 +194,17 @@ pub const TABLES: &[TableConfig] = &[
         env_rules_name: "FASM_ENV_RULES",
         output_file: "flags_fasm.rs",
     },
+    // swiftc does not overlap any other compiler's recognition pattern, so
+    // position here does not affect priority. The internal swift-frontend
+    // executable is filtered via ignore_when, the same mechanism gcc's cc1
+    // uses, so it needs no separate table entry.
+    TableConfig {
+        yaml_file: "swift.yaml",
+        static_name: "SWIFT_FLAGS",
+        ignore_executables_name: "SWIFT_IGNORE_EXECUTABLES",
+        ignore_flags_name: "SWIFT_IGNORE_FLAGS",
+        slash_prefix_name: "SWIFT_SLASH_PREFIX",
+        env_rules_name: "SWIFT_ENV_RULES",
+        output_file: "flags_swift.rs",
+    },
 ];

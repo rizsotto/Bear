@@ -61,14 +61,35 @@ pub struct Command {
     pub working_dir: PathBuf,
     pub executable: PathBuf,
     pub arguments: Vec<Argument>,
-    /// Whether the invocation's sources are separable translation units.
-    ///
-    /// `true` (the default) for compilers like GCC/Clang where each source
-    /// compiles on its own; the converter fans the invocation into one entry
-    /// per source. `false` for single-translation-unit compilers (e.g. valac),
-    /// where all sources compile together and the converter emits exactly one
-    /// combined entry per invocation.
-    pub separable_sources: bool,
+    /// How this invocation's sources map to compilation database entries.
+    /// See [`SourceMode`].
+    pub source_mode: SourceMode,
+}
+
+/// How the sources named in one invocation map to compilation database
+/// entries. Set per compiler family in the interpreter factory
+/// (`interpreters/compilers/flag_based.rs`), not in the compiler-flag YAML,
+/// because it is consumed at the converter (post-parse), not at parse time.
+/// See the `output-compilation-entries` requirement for the full contract.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SourceMode {
+    /// Each source is a separable translation unit: the converter emits one
+    /// entry per source, and each entry's arguments keep only that source
+    /// (sibling sources in the same invocation are stripped). The default
+    /// for GCC, Clang, and most other families.
+    PerSourceStripped,
+    /// Every source in the invocation is analyzed together as a single
+    /// "whole module", but per-file consuming tooling still looks up a
+    /// compile command by file path: the converter emits one entry per
+    /// source, and every entry's arguments are the complete invocation (no
+    /// sibling stripping). Used by Swift's whole-module compilation
+    /// (`swiftc`).
+    PerSourceFull,
+    /// All sources in the invocation form a single translation unit and
+    /// produce one combined output: the converter emits exactly one entry
+    /// per invocation, with `file` set to the first source and every source
+    /// retained. Used by `valac`.
+    Combined,
 }
 
 /// A compiler command-line argument with semantic classification.
@@ -164,8 +185,8 @@ impl Command {
         working_dir: PathBuf,
         executable: PathBuf,
         arguments: Vec<Argument>,
-        separable_sources: bool,
+        source_mode: SourceMode,
     ) -> Self {
-        Self { working_dir, executable, arguments, separable_sources }
+        Self { working_dir, executable, arguments, source_mode }
     }
 }

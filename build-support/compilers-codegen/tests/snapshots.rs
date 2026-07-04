@@ -108,6 +108,11 @@ fn snapshot_flags_fasm() {
 }
 
 #[test]
+fn snapshot_flags_swift() {
+    insta::assert_snapshot!(generate_flag_file("swift"));
+}
+
+#[test]
 fn snapshot_recognition() {
     let raw_tables = load_tables().unwrap();
     insta::assert_snapshot!(generate_recognition_patterns(&raw_tables));

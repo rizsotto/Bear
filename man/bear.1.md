@@ -160,7 +160,7 @@ Controls the command interception method:
 Contains hints about what compiler needs to be recognized and what that compiler is.
 
 - **path**: Path to the compiler executable
-- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`, `nasm`, `fasm`.
+- **as**: Compiler type hint for semantic analysis. Valid values are: `gcc`, `clang`, `flang`, `intel-fortran`, `cray-fortran`, `cuda`, `msvc`, `clang-cl`, `intel_cc`, `nvidia-hpc`, `armclang`, `ibm_xl`, `vala`, `mpi`, `cray-cc`, `qnx`, `nasm`, `fasm`, `swift`.
 - **ignore**: Whether to ignore this compiler.
 
 The generic compiler names `cc`, `c++`, and the HPE Cray PrgEnv wrapper `CC` default to GCC/Clang semantics chosen by probing the executable's `--version` output (since the same basename can be a different compiler depending on the platform or, for `CC`, the loaded Cray programming environment). On platforms where the probe cannot classify the executable, use the `as` field to override:
@@ -186,6 +186,8 @@ Emscripten's driver names `emcc` and `em++` (including the `emcc.py`/`em++.py` s
 Compiler launchers (`ccache`, `distcc`, `sccache`, `icecc`) that carry the real compiler in their arguments are recorded as the real compiler's compilation: `ccache gcc -c main.c` produces an entry for `gcc -c main.c`, with the launcher token dropped. A launcher invocation that does not name a recognized compiler, or a launcher wrapping another launcher, produces no entry. icecream's `icerun` is not a compiler launcher (it runs arbitrary commands on the cluster) and is not recognized.
 
 The standalone assemblers `nasm`, `yasm`, and `fasm` are recognized automatically, so assembly language servers (for example asm-lsp) can read per-file assembler flags from `compile_commands.json`. Assembly compiled through a C/C++ compiler driver (for example `gcc -c foo.s`) was already recorded via that driver's own entry before this support existed; both paths now produce entries. The GNU assembler `as` is deliberately not recognized: gcc and clang spawn it internally on a temporary `.s` file for every ordinary C compile, and recognizing it would pollute the database with one throwaway entry per compilation, using a temporary filename that duplicate detection cannot collapse. MASM (`ml`, `ml64`) is out of scope (Windows-only, no recorded demand).
+
+The Swift compiler `swiftc` is recognized automatically; see "Swift Projects" below for its whole-module entry shape. The `swift` subcommand driver (`swift build`, `swift run`, `swift package`) is not recognized -- it is a subcommand dispatcher, not a compiler invocation.
 
 ### sources
 
@@ -368,6 +370,34 @@ knowing:
     Diagnostics:
       Suppress: '*'
     ```
+
+## Swift Projects
+
+Bear records `swiftc` invocations. Unlike `valac`, a whole-module
+`swiftc` invocation that names several `.swift` sources produces one
+entry PER source, not one combined entry -- and every one of those
+entries carries the COMPLETE invocation's arguments (every source in
+the module, not just its own). This matches the shape CMake's own Swift
+support emits and that SourceKit-LSP already consumes: per-file tooling
+looks up a compile command by file path, and whole-module compilation
+means each file's semantics genuinely depend on every other source in
+the invocation, so no entry can be reduced to "this file only". A
+larger whole-module invocation therefore produces a database with more
+duplicated argument data than a comparable GCC/Clang build; this is
+expected, not a bug.
+
+The internal per-file `swift-frontend` jobs that `swiftc` spawns (and a
+legacy toolchain's `swiftc -frontend` self-invocation) are filtered out
+automatically and produce no entries -- only the user-facing `swiftc`
+driver invocation is recorded.
+
+`-index-store-path` is never injected by Bear; if the build already
+passes it, it is recorded like any other flag, which benefits
+SourceKit-LSP's cross-file indexing, but Bear itself does not add it.
+
+On macOS, Xcode's `swiftc` is Apple-signed, so System Integrity
+Protection blocks `DYLD_INSERT_LIBRARIES`; Bear's wrapper interception
+mode applies there, the same as for any other Apple-signed compiler.
 
 ## Getting Help
 

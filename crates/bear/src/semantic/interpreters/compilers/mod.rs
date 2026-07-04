@@ -75,6 +75,7 @@ impl CompilerInterpreter {
         self.register(CompilerType::Qnx, flag_based::qnx(from_environment));
         self.register(CompilerType::Nasm, flag_based::nasm(from_environment));
         self.register(CompilerType::Fasm, flag_based::fasm(from_environment));
+        self.register(CompilerType::Swift, flag_based::swift(from_environment));
     }
 
     /// Registers an interpreter for a specific compiler type, wrapping it
@@ -2190,6 +2191,194 @@ mod tests {
                 );
                 assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
                 assert_eq!(parsed.arguments[3].kind(), Source { binary: true }, "got {:?}", parsed.arguments);
+            }
+        }
+    }
+
+    mod swift {
+        use super::*;
+
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn basic_compilation() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution("swiftc", vec!["swiftc", "-c", "hello.swift"], "/project");
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                assert_eq!(parsed.arguments.len(), 3);
+                assert_eq!(parsed.arguments[1].kind(), stops_at(CompilerPass::Compiling));
+                assert_eq!(parsed.arguments[2].kind(), Source { binary: false });
+            }
+        }
+
+        /// The motivating whole-module shape: several `.swift` sources in one
+        /// invocation. Recognition/parsing must classify both as compilable
+        /// sources and consume `-module-name`'s separate-token value without
+        /// treating it (or "App") as a source; the converter (tested
+        /// separately) is what fans this into one entry per source, each
+        /// keeping every token.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn whole_module_invocation_keeps_all_sources_and_flags() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "swiftc",
+                vec!["swiftc", "-module-name", "App", "-emit-object", "a.swift", "b.swift"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["swiftc"]),
+                    (configures(CompilerPass::Compiling), vec!["-module-name", "App"]),
+                    (stops_at(CompilerPass::Compiling), vec!["-emit-object"]),
+                    (Source { binary: false }, vec!["a.swift"]),
+                    (Source { binary: false }, vec!["b.swift"]),
+                ],
+            );
+        }
+
+        /// swiftc spawns per-file `swift-frontend` jobs the way gcc spawns
+        /// `cc1`; the internal executable name is filtered via `ignore_when`.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn swift_frontend_executable_is_ignored() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "swift-frontend",
+                vec!["swift-frontend", "-frontend", "-c", "a.swift"],
+                "/project",
+            );
+            assert_ignored(sut.recognize(execution), "internal executable");
+        }
+
+        /// A legacy toolchain re-invoking itself as `swiftc -frontend` must
+        /// also be filtered, via the `ignore_when.flags` list.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn frontend_flag_execution_is_ignored() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution =
+                create_execution("swiftc", vec!["swiftc", "-frontend", "-c", "a.swift"], "/project");
+            assert_ignored(sut.recognize(execution), "internal invocation");
+        }
+
+        /// `swiftc --version`/`-version` print info and exit; there is no
+        /// source argument, so no compilation entry can be synthesized.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn version_flags_are_info_and_exit() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            for args in [vec!["swiftc", "--version"], vec!["swiftc", "-version"]] {
+                let execution = create_execution("swiftc", args.clone(), "/project");
+                let result = sut.recognize(execution);
+                assert!(matches!(result, RecognizeResult::Recognized(_)), "args: {:?}", args);
+                if let RecognizeResult::Recognized(parsed) = result {
+                    assert_eq!(parsed.arguments[1].kind(), info(), "args: {:?}", args);
+                    assert!(
+                        !parsed.arguments.iter().any(|a| matches!(a.kind(), Source { .. })),
+                        "got {:?}",
+                        parsed.arguments
+                    );
+                }
+            }
+        }
+
+        /// `-Xcc`/`-Xlinker`/`-Xfrontend` each forward exactly one separate
+        /// token to a downstream tool; that token often starts with '-'
+        /// (`-Xlinker -rpath`), so `count: 1` must consume it unconditionally
+        /// or it would leak in as a phantom source.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn forwarded_flags_consume_dash_prefixed_value_not_a_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "swiftc",
+                vec![
+                    "swiftc",
+                    "-Xlinker",
+                    "-rpath",
+                    "-Xcc",
+                    "-DFOO",
+                    "-Xfrontend",
+                    "-enable-cross-import-overlays",
+                    "a.swift",
+                ],
+                "/project",
+            );
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                let source_count =
+                    parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
+                assert_eq!(source_count, 1, "only a.swift must be a source, got {:?}", parsed.arguments);
+                assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Linking));
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-Xlinker".to_string(), "-rpath".to_string()]
+                );
+                assert_eq!(parsed.arguments[2].kind(), configures(CompilerPass::Compiling));
+                assert_eq!(
+                    parsed.arguments[2].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-Xcc".to_string(), "-DFOO".to_string()]
+                );
+                assert_eq!(parsed.arguments[3].kind(), configures(CompilerPass::Compiling));
+                assert_eq!(
+                    parsed.arguments[3].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-Xfrontend".to_string(), "-enable-cross-import-overlays".to_string()]
+                );
+            }
+        }
+
+        /// `-D`/`-I` are JoinedOrSeparate in swiftc (unlike the Separate-only
+        /// `-target`/`-module-name`); both the glued and separate spellings
+        /// must be recognized so their value never leaks in as a source.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn define_and_import_path_accept_glued_or_separate_value() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "swiftc",
+                vec!["swiftc", "-DDEBUG", "-I", "/usr/local/include", "a.swift"],
+                "/project",
+            );
+            assert_command(
+                sut.recognize(execution),
+                vec![
+                    (Compiler, vec!["swiftc"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-DDEBUG"]),
+                    (configures(CompilerPass::Preprocessing), vec!["-I", "/usr/local/include"]),
+                    (Source { binary: false }, vec!["a.swift"]),
+                ],
+            );
+        }
+
+        /// `-import-objc-header`'s value is a `.h` path -- and `.h` IS a
+        /// recognized source extension for other families (headers are
+        /// translation units elsewhere), so an unmatched (0-arg) rule here
+        /// would leak the bridging header in as a phantom compilable
+        /// source, corrupting entry count. `count: 1` must consume it.
+        // Requirements: recognition-swift-compiler
+        #[test]
+        fn bridging_header_value_is_consumed_not_a_phantom_source() {
+            let sut = CompilerInterpreter::new_with_config(&[]);
+            let execution = create_execution(
+                "swiftc",
+                vec!["swiftc", "-import-objc-header", "Bridging.h", "-module-name", "App", "a.swift"],
+                "/project",
+            );
+            let result = sut.recognize(execution);
+            assert!(matches!(result, RecognizeResult::Recognized(_)));
+            if let RecognizeResult::Recognized(parsed) = result {
+                let source_count =
+                    parsed.arguments.iter().filter(|a| matches!(a.kind(), Source { .. })).count();
+                assert_eq!(source_count, 1, "only a.swift must be a source, got {:?}", parsed.arguments);
+                assert_eq!(parsed.arguments[1].kind(), configures(CompilerPass::Compiling));
+                assert_eq!(
+                    parsed.arguments[1].as_arguments(&|p| Cow::Borrowed(p)),
+                    vec!["-import-objc-header".to_string(), "Bridging.h".to_string()]
+                );
             }
         }
     }

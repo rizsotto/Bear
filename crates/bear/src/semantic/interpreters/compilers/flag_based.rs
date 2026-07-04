@@ -12,6 +12,7 @@ use super::super::matchers::{
 };
 use crate::semantic::{
     Argument, ArgumentKind, Command, CompilerPass, Execution, Interpreter, PassEffect, RecognizeResult,
+    SourceMode,
 };
 
 /// A generic compiler interpreter parameterized by a flag table and ignore filters.
@@ -29,12 +30,11 @@ struct FlagBasedInterpreter {
     /// When true, environment variables in `env_rules` are folded into the
     /// recognized arguments (`format.arguments.from_environment`).
     from_environment: bool,
-    /// When true (the default), each source is a separable translation unit and
-    /// the converter emits one entry per source. When false, all sources form a
-    /// single translation unit and the converter emits one entry per invocation
-    /// (e.g. valac). Set in the factory, not in the compiler-flag YAML, because
-    /// it is consumed at the converter (post-parse), not at parse time.
-    separable_sources: bool,
+    /// How this family's invocations map to compilation database entries.
+    /// See [`SourceMode`]. Set in the factory, not in the compiler-flag YAML,
+    /// because it is consumed at the converter (post-parse), not at parse
+    /// time.
+    source_mode: SourceMode,
 }
 
 impl FlagBasedInterpreter {
@@ -47,7 +47,7 @@ impl FlagBasedInterpreter {
         slash_prefix: bool,
         env_rules: &'static [EnvRule],
         from_environment: bool,
-        separable_sources: bool,
+        source_mode: SourceMode,
     ) -> Self {
         Self {
             analyzer: FlagAnalyzer::new(flags),
@@ -56,7 +56,7 @@ impl FlagBasedInterpreter {
             slash_prefix,
             env_rules,
             from_environment,
-            separable_sources,
+            source_mode,
         }
     }
 
@@ -99,7 +99,7 @@ impl Interpreter for FlagBasedInterpreter {
         all_args.extend(annotated_args);
         all_args.extend(append_args);
 
-        RecognizeResult::Recognized(Command::new(working_dir, executable, all_args, self.separable_sources))
+        RecognizeResult::Recognized(Command::new(working_dir, executable, all_args, self.source_mode))
     }
 }
 
@@ -271,6 +271,7 @@ include!(concat!(env!("OUT_DIR"), "/flags_cray_cc.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_qnx.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_nasm.rs"));
 include!(concat!(env!("OUT_DIR"), "/flags_fasm.rs"));
+include!(concat!(env!("OUT_DIR"), "/flags_swift.rs"));
 
 /// Factory functions returning opaque interpreters so callers never see concrete types.
 pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
@@ -281,7 +282,7 @@ pub(super) fn gcc(from_environment: bool) -> impl Interpreter {
         GCC_SLASH_PREFIX,
         &GCC_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -293,7 +294,7 @@ pub(super) fn clang(from_environment: bool) -> impl Interpreter {
         CLANG_SLASH_PREFIX,
         &CLANG_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -305,7 +306,7 @@ pub(super) fn flang(from_environment: bool) -> impl Interpreter {
         FLANG_SLASH_PREFIX,
         &FLANG_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -317,7 +318,7 @@ pub(super) fn cuda(from_environment: bool) -> impl Interpreter {
         CUDA_SLASH_PREFIX,
         &CUDA_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -329,7 +330,7 @@ pub(super) fn intel_fortran(from_environment: bool) -> impl Interpreter {
         INTEL_FORTRAN_SLASH_PREFIX,
         &INTEL_FORTRAN_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -341,7 +342,7 @@ pub(super) fn cray_fortran(from_environment: bool) -> impl Interpreter {
         CRAY_FORTRAN_SLASH_PREFIX,
         &CRAY_FORTRAN_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -353,7 +354,7 @@ pub(super) fn msvc(from_environment: bool) -> impl Interpreter {
         MSVC_SLASH_PREFIX,
         &MSVC_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -365,7 +366,7 @@ pub(super) fn clang_cl(from_environment: bool) -> impl Interpreter {
         CLANG_CL_SLASH_PREFIX,
         &CLANG_CL_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -377,7 +378,7 @@ pub(super) fn intel_cc(from_environment: bool) -> impl Interpreter {
         INTEL_CC_SLASH_PREFIX,
         &INTEL_CC_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -389,7 +390,7 @@ pub(super) fn nvidia_hpc(from_environment: bool) -> impl Interpreter {
         NVIDIA_HPC_SLASH_PREFIX,
         &NVIDIA_HPC_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -401,7 +402,7 @@ pub(super) fn armclang(from_environment: bool) -> impl Interpreter {
         ARMCLANG_SLASH_PREFIX,
         &ARMCLANG_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -413,7 +414,7 @@ pub(super) fn ibm_xl(from_environment: bool) -> impl Interpreter {
         IBM_XL_SLASH_PREFIX,
         &IBM_XL_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -427,7 +428,7 @@ pub(super) fn vala(from_environment: bool) -> impl Interpreter {
         from_environment,
         // valac compiles all sources of a target as one translation unit, so a
         // single invocation yields one combined entry, not one per source.
-        false,
+        SourceMode::Combined,
     )
 }
 
@@ -439,7 +440,7 @@ pub(super) fn mpi(from_environment: bool) -> impl Interpreter {
         MPI_SLASH_PREFIX,
         &MPI_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -451,7 +452,7 @@ pub(super) fn cray_cc(from_environment: bool) -> impl Interpreter {
         CRAY_CC_SLASH_PREFIX,
         &CRAY_CC_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -463,7 +464,7 @@ pub(super) fn qnx(from_environment: bool) -> impl Interpreter {
         QNX_SLASH_PREFIX,
         &QNX_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -475,7 +476,7 @@ pub(super) fn nasm(from_environment: bool) -> impl Interpreter {
         NASM_SLASH_PREFIX,
         &NASM_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
     )
 }
 
@@ -487,7 +488,22 @@ pub(super) fn fasm(from_environment: bool) -> impl Interpreter {
         FASM_SLASH_PREFIX,
         &FASM_ENV_RULES,
         from_environment,
-        true,
+        SourceMode::PerSourceStripped,
+    )
+}
+
+pub(super) fn swift(from_environment: bool) -> impl Interpreter {
+    FlagBasedInterpreter::new(
+        &SWIFT_FLAGS,
+        &SWIFT_IGNORE_EXECUTABLES,
+        &SWIFT_IGNORE_FLAGS,
+        SWIFT_SLASH_PREFIX,
+        &SWIFT_ENV_RULES,
+        from_environment,
+        // swiftc's whole-module compilation analyzes every named source
+        // together, but SourceKit-LSP looks up a compile command per file:
+        // one entry per source, each keeping the full invocation.
+        SourceMode::PerSourceFull,
     )
 }
 
@@ -630,6 +646,11 @@ mod flag_table_invariants {
     #[test]
     fn fasm() {
         assert_invariants(&FASM_FLAGS);
+    }
+
+    #[test]
+    fn swift() {
+        assert_invariants(&SWIFT_FLAGS);
     }
 
     #[test]

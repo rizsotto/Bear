@@ -186,7 +186,7 @@ Valid values are: \f[CR]gcc\f[R], \f[CR]clang\f[R], \f[CR]flang\f[R],
 \f[CR]msvc\f[R], \f[CR]clang\-cl\f[R], \f[CR]intel_cc\f[R],
 \f[CR]nvidia\-hpc\f[R], \f[CR]armclang\f[R], \f[CR]ibm_xl\f[R],
 \f[CR]vala\f[R], \f[CR]mpi\f[R], \f[CR]cray\-cc\f[R], \f[CR]qnx\f[R],
-\f[CR]nasm\f[R], \f[CR]fasm\f[R].
+\f[CR]nasm\f[R], \f[CR]fasm\f[R], \f[CR]swift\f[R].
 .IP \(bu 2
 \f[B]ignore\f[R]: Whether to ignore this compiler.
 .PP
@@ -290,6 +290,12 @@ one throwaway entry per compilation, using a temporary filename that
 duplicate detection cannot collapse.
 MASM (\f[CR]ml\f[R], \f[CR]ml64\f[R]) is out of scope (Windows\-only, no
 recorded demand).
+.PP
+The Swift compiler \f[CR]swiftc\f[R] is recognized automatically; see
+\(lqSwift Projects\(rq below for its whole\-module entry shape.
+The \f[CR]swift\f[R] subcommand driver (\f[CR]swift build\f[R],
+\f[CR]swift run\f[R], \f[CR]swift package\f[R]) is not recognized \(en
+it is a subcommand dispatcher, not a compiler invocation.
 .SS sources
 Filtering functionality based on the source file location.
 .IP \(bu 2
@@ -529,6 +535,37 @@ Diagnostics\f[B]:\f[R]
   Suppress\f[B]:\f[R] \(aq*\(aq
 .EE
 .RE
+.SS Swift Projects
+Bear records \f[CR]swiftc\f[R] invocations.
+Unlike \f[CR]valac\f[R], a whole\-module \f[CR]swiftc\f[R] invocation
+that names several \f[CR].swift\f[R] sources produces one entry PER
+source, not one combined entry \(en and every one of those entries
+carries the COMPLETE invocation\(cqs arguments (every source in the
+module, not just its own).
+This matches the shape CMake\(cqs own Swift support emits and that
+SourceKit\-LSP already consumes: per\-file tooling looks up a compile
+command by file path, and whole\-module compilation means each file\(cqs
+semantics genuinely depend on every other source in the invocation, so
+no entry can be reduced to \(lqthis file only\(rq.
+A larger whole\-module invocation therefore produces a database with
+more duplicated argument data than a comparable GCC/Clang build; this is
+expected, not a bug.
+.PP
+The internal per\-file \f[CR]swift\-frontend\f[R] jobs that
+\f[CR]swiftc\f[R] spawns (and a legacy toolchain\(cqs
+\f[CR]swiftc \-frontend\f[R] self\-invocation) are filtered out
+automatically and produce no entries \(en only the user\-facing
+\f[CR]swiftc\f[R] driver invocation is recorded.
+.PP
+\f[CR]\-index\-store\-path\f[R] is never injected by Bear; if the build
+already passes it, it is recorded like any other flag, which benefits
+SourceKit\-LSP\(cqs cross\-file indexing, but Bear itself does not add
+it.
+.PP
+On macOS, Xcode\(cqs \f[CR]swiftc\f[R] is Apple\-signed, so System
+Integrity Protection blocks \f[CR]DYLD_INSERT_LIBRARIES\f[R]; Bear\(cqs
+wrapper interception mode applies there, the same as for any other
+Apple\-signed compiler.
 .SS Getting Help
 There could be many reasons for any of these failures.
 When seeking help:

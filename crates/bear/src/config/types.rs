@@ -122,6 +122,8 @@ pub enum CompilerType {
     Nasm,
     #[serde(alias = "fasm")]
     Fasm,
+    #[serde(alias = "swift", alias = "swiftc")]
+    Swift,
     #[serde(alias = "ccache", alias = "distcc", alias = "sccache", alias = "icecc")]
     Wrapper,
 }
@@ -147,6 +149,7 @@ impl std::fmt::Display for CompilerType {
             CompilerType::Qnx => "QNX qcc",
             CompilerType::Nasm => "NASM",
             CompilerType::Fasm => "flat assembler",
+            CompilerType::Swift => "Swift",
             CompilerType::Wrapper => "Wrapper",
         };
         write!(f, "{}", name)

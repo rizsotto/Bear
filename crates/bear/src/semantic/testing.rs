@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use super::{Argument, ArgumentKind, Command, PassEffect};
+use super::{Argument, ArgumentKind, Command, PassEffect, SourceMode};
 use std::path::PathBuf;
 
 impl Command {
@@ -13,7 +13,7 @@ impl Command {
         Self {
             working_dir: PathBuf::from(working_dir),
             executable: PathBuf::from(executable),
-            separable_sources: true,
+            source_mode: SourceMode::PerSourceStripped,
             arguments: arguments
                 .into_iter()
                 .map(|(kind, args)| match kind {

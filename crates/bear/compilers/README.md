@@ -214,14 +214,21 @@ parse time, so they live in the interpreter factory functions in
 `crates/bear/src/semantic/interpreters/compilers/flag_based.rs`, not in
 the YAML schema:
 
-- `separable_sources` -- whether each source in an invocation is a
-  separable translation unit. Default `true` (GCC/Clang/etc.: one entry
-  per source). `valac` sets it to `false` because it compiles all of a
-  target's sources together as a single translation unit, so Bear emits
-  one combined entry per invocation. If a second single-translation-unit
-  compiler ever appears (Swift whole-module, rustc-crate), set the same
-  flag in its factory; promote it to the YAML/codegen path only if the
-  list grows.
+- `source_mode` (a `SourceMode` enum: `PerSourceStripped` / `PerSourceFull`
+  / `Combined`) -- how an invocation's sources map to compilation database
+  entries. `PerSourceStripped` (the default) is for GCC/Clang/etc.: each
+  source is a separable translation unit, and the converter emits one
+  entry per source, stripping sibling sources from each entry's arguments.
+  `Combined` is for a single-translation-unit compiler like `valac`, which
+  compiles all of a target's sources together and produces one output, so
+  the converter emits exactly one combined entry per invocation (`file` is
+  the first source, every source retained). `PerSourceFull` is for a
+  whole-module compiler like `swiftc`: every source is analyzed together,
+  but per-file consuming tooling (SourceKit-LSP) looks up a compile command
+  by file path, so the converter emits one entry per source while every
+  entry keeps the complete invocation (no sibling stripping). Promote this
+  to the YAML/codegen path only if a compiler needs a mode that varies by
+  configuration rather than being fixed per family.
 
 ## Adding a new compiler
 

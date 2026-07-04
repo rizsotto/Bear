@@ -31,10 +31,13 @@ A few per-interpreter properties are consumed at the converter (post-parse),
 not at parse time, so they are hard-coded in the factory functions in
 `flag_based.rs` rather than in these YAML files:
 
-- `separable_sources` (default `true`): set to `false` for a
-  single-translation-unit compiler like `valac`, which compiles all of a
-  target's sources together and yields one combined entry per invocation
-  instead of one per source. See `README.md` for details.
+- `source_mode` (`SourceMode`, default `PerSourceStripped`): controls how an
+  invocation's sources map to database entries. `PerSourceStripped` for most
+  families (one entry per source, siblings stripped); `Combined` for a
+  single-translation-unit compiler like `valac` (one combined entry per
+  invocation, all sources retained); `PerSourceFull` for a whole-module
+  compiler like `swiftc` (one entry per source, but every entry keeps every
+  source). See `README.md` for details.
 
 ## Common mistakes
 

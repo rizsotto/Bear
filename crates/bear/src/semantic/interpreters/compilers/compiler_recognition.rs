@@ -312,6 +312,7 @@ fn parse_compiler_type(type_str: &str) -> CompilerType {
         "qnx" => CompilerType::Qnx,
         "nasm" => CompilerType::Nasm,
         "fasm" => CompilerType::Fasm,
+        "swift" => CompilerType::Swift,
         other => panic!("Unknown compiler type in YAML: '{}'", other),
     }
 }
@@ -905,6 +906,24 @@ mod tests {
             // wildcard: a name with any other character in that position is
             // not an Emscripten driver.
             ("emccxpy", None),
+        ]);
+    }
+
+    // Requirements: recognition-swift-compiler
+    #[test]
+    fn test_swift_recognition() {
+        assert_recognition(&[
+            ("swiftc", Some(CompilerType::Swift)),
+            // swift-frontend is routed to the Swift type via ignore_when
+            // (the same mechanism gcc's cc1 uses) so the interpreter can
+            // filter it; the recognizer itself still classifies the
+            // basename as Swift.
+            ("swift-frontend", Some(CompilerType::Swift)),
+            // `swift` is the package-manager subcommand driver (`swift
+            // build`, `swift run`, ...), a different command-line model
+            // (subcommand dispatcher, not a compiler invocation) -- it is
+            // deliberately not recognized.
+            ("swift", None),
         ]);
     }
 

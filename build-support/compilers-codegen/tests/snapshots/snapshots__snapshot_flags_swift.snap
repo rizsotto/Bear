@@ -1,0 +1,55 @@
+---
+source: build-support/compilers-codegen/tests/snapshots.rs
+expression: "generate_flag_file(\"swift\")"
+---
+// Generated from compilers/swift.yaml -- DO NOT EDIT
+static SWIFT_FLAGS: [FlagRule; 43] = [
+    FlagRule::new(FlagPattern::Exactly("-whole-module-optimization", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-emit-clang-header-path", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-emit-objc-header-path", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-import-objc-header", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-module-cache-path", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-working-directory", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-emit-module-path", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-index-store-path", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-parse-as-library", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-output-file-map", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-emit-executable", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-enable-testing", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-swift-version", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-emit-library", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-emit-object", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-module-name", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-num-threads", 1), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::Exactly("-emit-module", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-framework", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("-Xfrontend", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("--version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Exactly("-Xlinker", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("-version", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Exactly("-target", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-static", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-Onone", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-Osize", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("--help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Exactly("-help", 0), ArgumentKind::Other(PassEffect::InfoAndExit)),
+    FlagRule::new(FlagPattern::Exactly("-sdk", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-Xcc", 1), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-wmo", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-o"), ArgumentKind::Output),
+    FlagRule::new(FlagPattern::Exactly("-c", 0), ArgumentKind::Other(PassEffect::StopsAt(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-j"), ArgumentKind::Other(PassEffect::None)),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-D"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-I"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-F"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Preprocessing))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-L"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::ExactlyWithGluedOrSep("-l"), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Linking))),
+    FlagRule::new(FlagPattern::Exactly("-O", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-g", 0), ArgumentKind::Other(PassEffect::Configures(CompilerPass::Compiling))),
+    FlagRule::new(FlagPattern::Exactly("-v", 0), ArgumentKind::Other(PassEffect::None)),
+];
+static SWIFT_IGNORE_EXECUTABLES: [&str; 1] = ["swift-frontend", ];
+static SWIFT_IGNORE_FLAGS: [&str; 1] = ["-frontend", ];
+static SWIFT_SLASH_PREFIX: bool = false;
+static SWIFT_ENV_RULES: [EnvRule; 0] = [
+];

@@ -1078,3 +1078,160 @@ fn driver_compiled_assembly_yields_driver_entry() -> Result<()> {
 
     Ok(())
 }
+
+// Requirements: recognition-swift-compiler
+//
+// A `swiftc -c hello.swift` execution yields one entry, using the Swift
+// driver name directly, with the invocation's arguments recorded verbatim.
+#[test]
+fn swiftc_single_file_execution_yields_single_entry() -> Result<()> {
+    assert_driver_yields_single_entry_for_source(
+        "swiftc_single_file",
+        &["swiftc", "-c", "hello.swift"],
+        "hello.swift",
+        "print(\"hello\")\n",
+    )
+}
+
+// Requirements: recognition-swift-compiler
+//
+// Swift's whole-module compilation names several sources in one invocation,
+// but SourceKit-LSP looks up a compile command per file. Bear must therefore
+// emit one entry PER source (unlike valac's single combined entry), and every
+// one of those entries must carry the COMPLETE invocation -- all sources, not
+// just its own -- because each file's semantics depend on the whole module.
+// `bear semantic` runs the interpreter without executing swiftc, so no Swift
+// toolchain is required.
+#[test]
+fn swiftc_whole_module_invocation_yields_one_entry_per_source_with_full_arguments() -> Result<()> {
+    let env = TestEnvironment::new("swiftc_whole_module")?;
+
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "swiftc",
+        "arguments": ["swiftc", "-module-name", "App", "-emit-object", "a.swift", "b.swift"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("a.swift", "func a() {}\n"),
+        ("b.swift", "func main() {}\n"),
+        ("swiftc", ""),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    // Two sources, whole-module: exactly two entries (one per source), each
+    // retaining every source and flag from the original invocation.
+    db.assert_count(2)?;
+    let full_arguments = vec![
+        "swiftc".to_string(),
+        "-module-name".to_string(),
+        "App".to_string(),
+        "-emit-object".to_string(),
+        "a.swift".to_string(),
+        "b.swift".to_string(),
+    ];
+    db.assert_contains(&compilation_entry!(
+        file: "a.swift".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: full_arguments.clone()
+    ))?;
+    db.assert_contains(&compilation_entry!(
+        file: "b.swift".to_string(),
+        directory: temp_dir.to_string(),
+        arguments: full_arguments
+    ))?;
+
+    Ok(())
+}
+
+// Requirements: recognition-swift-compiler
+//
+// swiftc spawns per-file `swift-frontend` jobs the way gcc spawns `cc1`;
+// the internal frontend executable must yield no database entry.
+#[test]
+fn swift_frontend_executable_execution_yields_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("swift_frontend_executable")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "swift-frontend",
+        "arguments": ["swift-frontend", "-frontend", "-c", "hello.swift"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("hello.swift", "print(\"hello\")\n"),
+        ("swift-frontend", ""),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
+
+// Requirements: recognition-swift-compiler
+//
+// A legacy toolchain that re-invokes itself as `swiftc -frontend` must also
+// yield no entry, via the `ignore_when.flags` filter (mirrors clang's -cc1).
+#[test]
+fn swiftc_frontend_flag_execution_yields_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("swiftc_frontend_flag")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "swiftc",
+        "arguments": ["swiftc", "-frontend", "-c", "hello.swift"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[
+        ("events.json", &event.to_string()),
+        ("hello.swift", "print(\"hello\")\n"),
+        ("swiftc", ""),
+    ])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
+
+// Requirements: recognition-swift-compiler
+//
+// `swiftc --version` prints version information and exits; it yields no
+// database entry.
+#[test]
+fn swiftc_version_flag_yields_no_entry() -> Result<()> {
+    let env = TestEnvironment::new("swiftc_version_flag")?;
+    let temp_dir = env.test_dir().to_str().unwrap();
+
+    let event = json!({
+        "executable": "swiftc",
+        "arguments": ["swiftc", "--version"],
+        "working_dir": temp_dir,
+        "environment": {}
+    });
+
+    env.create_source_files(&[("events.json", &event.to_string()), ("swiftc", "")])?;
+
+    env.run_bear_success(&["semantic", "--input", "events.json", "--output", "compile_commands.json"])?;
+
+    let db = env.load_compilation_database("compile_commands.json")?;
+    db.assert_count(0)?;
+
+    Ok(())
+}
