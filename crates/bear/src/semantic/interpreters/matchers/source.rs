@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+use std::path::Path;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum FileKind {
     CFamilyHeader,
@@ -52,6 +54,21 @@ pub fn looks_like_a_source_file(argument: &str) -> bool {
     argument.rsplit_once('.').is_some_and(|(_, extension)| file_kind(extension).is_some())
 }
 
+/// True when the path's extension is a C-family header (.h, .hpp, ...).
+pub fn is_header_file(path: &Path) -> bool {
+    matches!(kind_of(path), Some(FileKind::CFamilyHeader))
+}
+
+/// True when the path is a C, C++, or Objective-C translation unit - the file
+/// types eligible to donate compile flags to a synthesized header entry.
+pub fn is_c_family_source(path: &Path) -> bool {
+    matches!(kind_of(path), Some(FileKind::CFamilySource | FileKind::ObjCSource))
+}
+
+fn kind_of(path: &Path) -> Option<FileKind> {
+    path.extension().and_then(|ext| ext.to_str()).and_then(file_kind)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -102,6 +119,24 @@ mod test {
             let sut = file_kind(extension);
 
             assert_eq!(sut, expected, "extension: {extension}");
+        }
+    }
+
+    #[test]
+    fn test_is_header_file_and_is_c_family_source() {
+        let cases = [
+            ("util.h", true, false),
+            ("main.c", false, true),
+            ("a.mm", false, true),
+            ("a.swift", false, false),
+            ("a.o", false, false),
+        ];
+
+        for (path, expected_header, expected_source) in cases {
+            let sut = std::path::Path::new(path);
+
+            assert_eq!(is_header_file(sut), expected_header, "path: {path}");
+            assert_eq!(is_c_family_source(sut), expected_source, "path: {path}");
         }
     }
 }

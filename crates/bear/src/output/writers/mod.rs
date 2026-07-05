@@ -15,6 +15,7 @@ mod atomic;
 mod converter;
 mod file;
 mod filtering;
+mod synthesis;
 mod validating;
 
 use super::statistics::OutputStatistics;
@@ -27,6 +28,7 @@ use atomic::AtomicClangOutputWriter;
 use converter::ConverterClangOutputWriter;
 use file::ClangOutputWriter;
 use filtering::{DuplicateEntryFilter, FilteredOutputWriter, SourceEntryFilter};
+use synthesis::HeaderEntrySynthesizer;
 use validating::ValidatingOutputWriter;
 
 /// A trait representing a writer for iterator type `T`.
@@ -46,7 +48,9 @@ type ClangWriterStack = ConverterClangOutputWriter<
     AppendClangOutputWriter<
         AtomicClangOutputWriter<
             FilteredOutputWriter<
-                FilteredOutputWriter<ValidatingOutputWriter<ClangOutputWriter>, DuplicateEntryFilter>,
+                HeaderEntrySynthesizer<
+                    FilteredOutputWriter<ValidatingOutputWriter<ClangOutputWriter>, DuplicateEntryFilter>,
+                >,
                 SourceEntryFilter,
             >,
         >,
@@ -75,10 +79,12 @@ impl SemanticCommandWriter {
 /// 2. Append entries from an existing database (if configured)
 /// 3. Atomic file write (via temp file + rename)
 /// 4. Source file path filtering
-/// 5. Duplicate entry filtering
-/// 6. Entry validation (drop invalid entries with a warning; earlier filters
+/// 5. Header entry synthesis (if configured; clones a donor translation
+///    unit's arguments onto sibling header files)
+/// 6. Duplicate entry filtering
+/// 7. Entry validation (drop invalid entries with a warning; earlier filters
 ///    never see an entry that will be dropped here)
-/// 7. Final file serialization
+/// 8. Final file serialization
 pub(crate) fn create_pipeline(
     args: &args::BuildSemantic,
     config: &config::Main,
@@ -95,8 +101,9 @@ pub(crate) fn create_pipeline(
         FilteredOutputWriter::new(validating_writer, duplicate_filter, Arc::clone(&stats), |s| {
             &s.duplicates_detected
         });
+    let synthesizer = HeaderEntrySynthesizer::new(unique_writer, config.headers.clone(), Arc::clone(&stats));
     let source_filter_writer = FilteredOutputWriter::new(
-        unique_writer,
+        synthesizer,
         SourceEntryFilter::from(config.sources.clone()),
         Arc::clone(&stats),
         |s| &s.entries_filtered_by_source,
